@@ -44,8 +44,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
     // The active-conditions read cache (populated by LocationMappingService) must be invalidated
     // whenever a facility's configuration/conditions change, otherwise the acquire path keeps
     // evaluating stale conditions for up to the cache TTL.
-    private void InvalidateConditionsCache(string facilityId) =>
-        _cacheService.Remove(OrgLocationCacheKeys.Conditions(facilityId));
+    private Task InvalidateConditionsCache(string facilityId) =>
+        _cacheService.RemoveAsync(OrgLocationCacheKeys.Conditions(facilityId));
 
     public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model, CancellationToken cancellationToken = default)
     {
@@ -81,7 +81,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         await _database.LocationConfigurationRepository.AddAsync(entity);
         await _database.SaveChangesAsync();
 
-        InvalidateConditionsCache(entity.FacilityId);
+        await InvalidateConditionsCache(entity.FacilityId);
 
         // Re-classify the facility's already-cached Locations against the new conditions so the next
         // report run doesn't reuse a stale IsOrgLocation/MappedToOrg. CancellationToken.None: the config
@@ -119,7 +119,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
             await _database.SaveChangesAsync();
 
-            InvalidateConditionsCache(entity.FacilityId);
+            await InvalidateConditionsCache(entity.FacilityId);
             facilityId = entity.FacilityId;
 
             result = ProjectToModel(entity);
@@ -166,7 +166,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             updatedEntities.Clear();
             updatedEntities.AddRange(entities.Select(ProjectToModel));
 
-            InvalidateConditionsCache(facilityId);
+            await InvalidateConditionsCache(facilityId);
         }, cancellationToken);
 
         // Re-evaluate once after the full facility update commits. CancellationToken.None: the update is
@@ -196,7 +196,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             _database.LocationConfigurationRepository.Remove(entity);
             await _database.SaveChangesAsync();
 
-            InvalidateConditionsCache(entity.FacilityId);
+            await InvalidateConditionsCache(entity.FacilityId);
             facilityId = entity.FacilityId;
         });
 
@@ -242,7 +242,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
             await _database.SaveChangesAsync();
 
-            InvalidateConditionsCache(facilityId);
+            await InvalidateConditionsCache(facilityId);
             deleted = true;
         }, cancellationToken);
 

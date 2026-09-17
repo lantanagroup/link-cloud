@@ -46,13 +46,23 @@
     {
         var passCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == true);
         var failCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false && e.LastResult?.Skipped != true);
+        var skipCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Skipped == true);
         var totalCount = service.Endpoints.Count(e => !e.Definition.IsInformational);
+
+        // A step that was skipped was never going to run, so counting it against the service reads as
+        // work still outstanding. A service whose steps all skipped - DMRP on a stack with the module
+        // switched off - would otherwise sit at 0/N in the same grey as a run still in progress.
+        var runnableCount = totalCount - skipCount;
+        var allSkipped = totalCount > 0 && runnableCount == 0;
+        var serviceBadgeText = allSkipped ? "SKIPPED" : $"{passCount}/{runnableCount}";
         var staleOnly = !service.IsIncludedInLatestRun;
         var serviceBadgeClass = failCount > 0
             ? (staleOnly ? "border border-danger text-danger bg-transparent" : "au-badge-danger")
-            : (passCount == totalCount && totalCount > 0
-                ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
-                : (staleOnly ? "border border-secondary text-muted bg-transparent" : "bg-secondary"));
+            : allSkipped
+                ? (staleOnly ? "border border-secondary text-muted bg-transparent" : "au-badge-skip")
+                : (passCount == runnableCount && runnableCount > 0
+                    ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
+                    : (staleOnly ? "border border-secondary text-muted bg-transparent" : "bg-secondary"));
 
         <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName" data-service-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
             <h2 class="accordion-header au-health-header">
@@ -60,7 +70,7 @@
                     <button class="accordion-button collapsed au-health-toggle flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-@service.ServiceName" aria-expanded="false">
                         <i class="bi bi-hdd-stack me-2"></i>
                         <strong>@service.ServiceName</strong>
-                        <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@passCount/@totalCount</span>
+                        <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@serviceBadgeText</span>
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-dark btn-run-service me-2" data-service="@service.ServiceName">
                         <i class="bi bi-play-fill"></i>
@@ -620,7 +630,7 @@
             const svc = badge.dataset.service;
             const card = document.getElementById(`svc-${svc}`);
             if (!card) return;
-            let sp = 0, sf = 0, st = 0;
+            let sp = 0, sf = 0, sk = 0, st = 0;
             const included = card.dataset.serviceIncluded !== 'false';
             card.querySelectorAll(runnableRowSelector).forEach(row => {
                 st++;
@@ -629,6 +639,9 @@
 
                 const isPass = b.classList.contains('au-badge-success') || b.classList.contains('border-success');
                 const isFail = b.classList.contains('au-badge-danger') || b.classList.contains('border-danger');
+                // Read the label rather than the class: a skipped row is styled one way live and
+                // another once the run is stale, but it says SKIP in both.
+                const isSkip = b.textContent.trim() === 'SKIP';
 
                 if (isPass) {
                     sp++;
@@ -636,14 +649,24 @@
                 else if (isFail) {
                     sf++;
                 }
+                else if (isSkip) {
+                    sk++;
+                }
             });
 
-            badge.textContent = `${sp}/${st}`;
+            // Steps that never ran stay in the denominator - those are genuinely outstanding - but
+            // skipped ones drop out, so a fully skipped service reads as skipped rather than stalled.
+            const runnable = st - sk;
+            const allSkipped = st > 0 && runnable === 0;
+
+            badge.textContent = allSkipped ? 'SKIPPED' : `${sp}/${runnable}`;
             const cls = sf > 0
                 ? (!included ? 'border border-danger text-danger bg-transparent' : 'au-badge-danger')
-                : (sp === st && st > 0
-                    ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
-                    : (!included ? 'border border-secondary text-muted bg-transparent' : 'bg-secondary'));
+                : allSkipped
+                    ? (!included ? 'border border-secondary text-muted bg-transparent' : 'au-badge-skip')
+                    : (sp === runnable && runnable > 0
+                        ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
+                        : (!included ? 'border border-secondary text-muted bg-transparent' : 'bg-secondary'));
             badge.className = `badge svc-summary ms-2 ${cls}`;
         });
     }

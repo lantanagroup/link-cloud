@@ -58,7 +58,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
 
                 try
                 {
-                    cacheAccount = _cache.Get<string>(userKey);
+                    cacheAccount = await _cache.GetAsync<string>(userKey);
                 }
                 catch (Exception ex)
                 {
@@ -97,11 +97,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
                     {
                         if (_dataProtectionOptions.Value.Enabled)
                         {
-                            _cache.Set<string>(userKey, protector.Protect(JsonConvert.SerializeObject(account)), TimeSpan.FromMinutes(5));
+                            await _cache.SetAsync(userKey, protector.Protect(JsonConvert.SerializeObject(account)), TimeSpan.FromMinutes(5));
                         }
                         else
                         {
-                            _cache.Set<string>(userKey, JsonConvert.SerializeObject(account), TimeSpan.FromMinutes(5));
+                            await _cache.SetAsync(userKey, JsonConvert.SerializeObject(account), TimeSpan.FromMinutes(5));
                         }
                     }
                     catch (Exception ex)

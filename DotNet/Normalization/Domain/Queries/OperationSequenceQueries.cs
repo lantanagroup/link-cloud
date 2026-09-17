@@ -2,9 +2,11 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.Reflection;
+using TenantVendorVersionModel = LantanaGroup.Link.Shared.Application.Models.Tenant.VendorVersionModel;
 
 namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
@@ -20,13 +22,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
         private readonly IMemoryCache _cache;
+        private readonly IVendorVersionResolver _vendorVersionResolver;
         private readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(300); //5 mins
 
-        public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext, IMemoryCache cache) 
+        public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext, IMemoryCache cache, IVendorVersionResolver vendorVersionResolver)
         {
             _database = database;
             _dbContext = dbContext;
             _cache = cache;
+            _vendorVersionResolver = vendorVersionResolver;
         }
 
         public async Task<OperationSequenceModel> Get(string FacilityId, Guid id)
@@ -54,26 +58,26 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         {
             if (!useCache) 
             {
-                return Query(model);
+                return await QueryAsync(model, cancellationToken);
             }
 
-            //Daniel - 4/2026: Temporarily adding queried configs into memory cache to reduce the amount of queries made to the database.
             var cacheKey = BuildCacheKey(model);
-            var cacheResult = _cache.GetOrCreate(cacheKey, entry =>
+            if (_cache.TryGetValue(cacheKey, out List<OperationSequenceModel>? cacheResult) && cacheResult != null)
             {
-                entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
+                return cacheResult;
+            }
 
-                return Query(model);
-            });
+            var result = await QueryAsync(model, cancellationToken);
+            _cache.Set(cacheKey, result, _cacheTtl);
 
-            return cacheResult;
+            return result;
         }
 
         public void ClearCache(OperationSequenceSearchModel model) {
             _cache.Remove(BuildCacheKey(model));
         }
 
-        private List<OperationSequenceModel> Query(OperationSequenceSearchModel model) 
+        private async Task<List<OperationSequenceModel>> QueryAsync(OperationSequenceSearchModel model, CancellationToken cancellationToken)
         {
             IQueryable<OperationSequenceModel> query =
                     from o in _dbContext.OperationSequences
@@ -129,16 +133,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                                     ResourceTypeId = vp.OperationResourceType.ResourceType.Id
                                 }
                             },
-                            VendorVersion = new VendorVersionModel()
+                            VendorVersion = new TenantVendorVersionModel()
                             {
-                                Id = vp.VendorVersion.Id,
-                                VendorId = vp.VendorVersion.VendorId,
-                                Version = vp.VendorVersion.Version,
-                                Vendor = new VendorModel()
-                                {
-                                    Id = vp.VendorVersion.Vendor.Id,
-                                    Name = vp.VendorVersion.Vendor.Name
-                                }
+                                Id = vp.VendorVersionId
                             },
                             CreateDate = vp.CreateDate,
                             ModifyDate = vp.ModifyDate
@@ -155,7 +152,18 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.OperationResourceType.Resource.ResourceTypeId == model.ResourceTypeId);
             }
 
-            return query.ToList();
+            var records = await query.ToListAsync(cancellationToken);
+            var presets = records.SelectMany(record => record.VendorPresets).ToList();
+            if (presets.Count > 0)
+            {
+                var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(presets.Select(preset => preset.VendorVersionId), cancellationToken);
+                foreach (var preset in presets)
+                {
+                    preset.VendorVersion = resolvedVendorVersions[preset.VendorVersionId];
+                }
+            }
+
+            return records;
         }
     }
 }

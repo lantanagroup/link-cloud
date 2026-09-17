@@ -1,6 +1,8 @@
 ﻿using IntegrationTests.AutomationUI;
 using IntegrationTests.Census;
 using IntegrationTests.DataAcquisition;
+using IntegrationTests.DMRP;
+using IntegrationTests.MockDmrpApi;
 using IntegrationTests.Normalization;
 using IntegrationTests.Report;
 using IntegrationTests.Tenant;
@@ -30,9 +32,11 @@ public class IntegrationTestCollection :
     ICollectionFixture<TenantIntegrationTestFixture>,
     ICollectionFixture<CensusIntegrationTestFixture>,
     ICollectionFixture<DataAcquisitionIntegrationTestFixture>,
+    ICollectionFixture<DmrpIntegrationTestFixture>,
     ICollectionFixture<NormalizationIntegrationTestFixture>,
     ICollectionFixture<ReportIntegrationTestFixture>,
-    ICollectionFixture<AutomationUIIntegrationTestFixture>
+    ICollectionFixture<AutomationUIIntegrationTestFixture>,
+    ICollectionFixture<MockDmrpApiIntegrationTestFixture>
 {
     public const string Name = "IntegrationTests";
 }

@@ -97,7 +97,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
 
-
     string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");
 
     builder.Services.AddDbContext<ReportDbContext>((sp, options) =>

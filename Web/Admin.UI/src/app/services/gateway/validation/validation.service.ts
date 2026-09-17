@@ -55,6 +55,27 @@ export class ValidationService {
     )
   }
 
+  getValidationCategoriesBulkExport(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.appConfigService.config?.baseApiUrl}/validation/category/$bulk-export`).pipe(
+      tap(_ => console.log(`Fetched bulk export categories.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
+  }
+
+  initializeValidationCategories(): Observable<void> {
+    return this.http.post<void>(`${this.appConfigService.config?.baseApiUrl}/validation/category/$initialize`, {}).pipe(
+      tap(_ => console.log(`Initialized validation categories.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
+  }
+
+  bulkImportValidationCategories(categories: any[]): Observable<void> {
+    return this.http.post<void>(`${this.appConfigService.config?.baseApiUrl}/validation/category/$bulk-import`, categories).pipe(
+      tap(_ => console.log(`Bulk imported validation categories.`)),
+      catchError((error) => this.errorHandler.handleError(error))
+    );
+  }
+
   getTxDependencies(packageName: string): Observable<ITerminologyDependency[]> {
 
     const sanitizedPackage = encodeURIComponent(packageName);

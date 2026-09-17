@@ -383,9 +383,9 @@ public class FhirBundleGeneratorTests
             [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
             input);
 
+        Assert.Contains("Condition/TestPatient-Condition-001", excluded);
         Assert.Contains("Condition/TestPatient-Condition-002", excluded);
         Assert.Contains("Condition/TestPatient-Condition-004", excluded);
-        Assert.DoesNotContain("Condition/TestPatient-Condition-001", excluded);
         Assert.DoesNotContain("Condition/TestPatient-Condition-003", excluded);
     }
 
@@ -399,7 +399,7 @@ public class FhirBundleGeneratorTests
             [],
             []);
 
-        Assert.Empty(CqlFilterSimulator.ComputeFilteredKeys([], input));
+        Assert.Empty(CqlFilterSimulator.ComputeFilteredKeys(Array.Empty<ProfiledMeasureType>(), input));
     }
 
     [Fact]
@@ -409,10 +409,10 @@ public class FhirBundleGeneratorTests
         // contained resources across the per-measure .mr files. So a resource is only truly
         // absent from ABS when EVERY applicable measure excludes it.
         //
-        // ACH requires active + recordedDate < encounterEnd for problem-list items.
-        // Hypoglycemic only requires recordedDate <= encounterEnd.
-        // A resolved (non-active) problem-list Condition recorded during the encounter is
-        // excluded by ACH but INCLUDED by Hypoglycemic -> must NOT appear in the excluded set.
+        // ACH Monthly SDE Condition keeps only encounter-diagnosis linked to IP.
+        // Hypoglycemic SDE Condition keeps conditions whose onset overlaps IP.
+        // A resolved problem-list Condition recorded during the encounter is excluded by
+        // ACH but included by Hypoglycemic -> must NOT appear in the excluded set.
 
         var encounterId = "P-Enc-001";
         var encStart = new DateTime(2024, 5, 10, 0, 0, 0, DateTimeKind.Utc);

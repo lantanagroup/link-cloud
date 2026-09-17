@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                 var userKey = $"user:{user.Email}";
                 try
                 {
-                    _cache.Remove(userKey);
+                    await _cache.RemoveAsync(userKey, cancellationToken);
                 }
                 catch (Exception ex)
                 {

@@ -99,6 +99,11 @@ parameters:
     type: boolean
     default: true
 
+  - name: runAdHocDailyAchReportSuite
+    displayName: "Run Ad Hoc Daily ACH Report Generation Suite"
+    type: boolean
+    default: true
+
   - name: runRegenerateReportSuite
     displayName: "Run Ad Hoc Report Re-generation Suite"
     type: boolean
@@ -134,8 +139,9 @@ variables:
 
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
-  SCENARIO_ID_AdHocReport:       "00000000-0000-0000-0000-000000000001"
-  SCENARIO_ID_ScheduledReport:   "00000000-0000-0000-0000-000000000004"
+  SCENARIO_ID_AdHocReport:            "00000000-0000-0000-0000-000000000001"
+  SCENARIO_ID_AdHocDailyAchReport:    "00000000-0000-0000-0000-000000000009"
+  SCENARIO_ID_ScheduledReport:        "00000000-0000-0000-0000-000000000004"
   SCENARIO_ID_RegenerateReport:  "00000000-0000-0000-0000-000000000005"
 
   # Slack webhook is fetched at runtime from Azure App Configuration so the
@@ -289,6 +295,7 @@ stages:
                 Write-Host "Requested suites:"
                 Write-Host "  API Stability          : ${{ parameters.runApiStabilitySuite }}"
                 Write-Host "  Ad Hoc Report          : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Ad Hoc Daily ACH Report: ${{ parameters.runAdHocDailyAchReportSuite }}"
                 Write-Host "  Regenerate Report      : ${{ parameters.runRegenerateReportSuite }}"
                 Write-Host "  Scheduled Report       : ${{ parameters.runScheduledReportSuite }}"
 
@@ -501,6 +508,16 @@ stages:
                     Name     = "Ad Hoc Report Generation Suite"
                     Type     = "Scenario"
                     ScenarioId = "$(SCENARIO_ID_AdHocReport)"
+                    StartPath  = "/api/runs/start"
+                    StatusPathTemplate = "/api/runs/{0}/status"
+                    DetailsPathTemplate = "/Runs/Details/{0}"
+                  }
+                }
+                if ("${{ parameters.runAdHocDailyAchReportSuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "Ad Hoc Daily ACH Report Generation Suite"
+                    Type     = "Scenario"
+                    ScenarioId = "$(SCENARIO_ID_AdHocDailyAchReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
                     DetailsPathTemplate = "/Runs/Details/{0}"
@@ -856,8 +873,9 @@ stages:
                 Write-Host ""
                 Write-Host "Suite flags:"
                 Write-Host "  API Stability     : ${{ parameters.runApiStabilitySuite }}"
-                Write-Host "  Ad Hoc Report     : ${{ parameters.runAdHocReportSuite }}"
-                Write-Host "  Regenerate Report : ${{ parameters.runRegenerateReportSuite }}"
+                Write-Host "  Ad Hoc Report          : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Ad Hoc Daily ACH Report: ${{ parameters.runAdHocDailyAchReportSuite }}"
+                Write-Host "  Regenerate Report      : ${{ parameters.runRegenerateReportSuite }}"
                 Write-Host "  Scheduled Report  : ${{ parameters.runScheduledReportSuite }}"
                 Write-Host ""
 

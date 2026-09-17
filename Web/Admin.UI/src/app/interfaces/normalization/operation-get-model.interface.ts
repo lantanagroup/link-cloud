@@ -7,7 +7,7 @@ import {
   CopyLocationAliasToTypeIterativelyOperation
 } from "src/app/interfaces/normalization/copy-location-alias-to-type-iteratively-operation-interface";
 import { CopyPropertyOperation } from "src/app/interfaces/normalization/copy-property-interface";
-import {IVendorVersion} from "./vendor-interface";
+import {IVendorVersion} from "../tenant/vendor-interface";
 
  export interface IOperationModel {
    id: string;

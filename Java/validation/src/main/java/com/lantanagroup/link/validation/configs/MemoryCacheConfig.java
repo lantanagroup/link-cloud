@@ -27,7 +27,11 @@ public class MemoryCacheConfig {
     @ConditionalOnProperty(name = "cache.type", havingValue = "memory")
     public CacheManager caffeineCacheManager() {
         logger.info("Cache type set to 'memory'");
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager("validateCodeCache");
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+                "validateCodeCache",
+                "lookupCodeCache",
+                "isCodeSystemSupportedCache",
+                "isValueSetSupportedCache");
         cacheManager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(this.cacheConfig.getValidateCode().getTtl()))
                 .maximumSize(1000));

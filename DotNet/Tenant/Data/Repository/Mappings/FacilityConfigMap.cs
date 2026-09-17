@@ -13,12 +13,10 @@ namespace LantanaGroup.Link.Tenant.Data.Repository.Mappings
 
             builder.HasKey(b => b.Id).IsClustered(false);
 
-            // Map an empty/NULL Vendor column to null instead of the default enum value (Epic).
-            builder.Property(f => f.Vendor)
-                .HasMaxLength(50)
-                .HasConversion(
-                    v => v.HasValue ? v.Value.ToString() : null,
-                    v => string.IsNullOrEmpty(v) ? (Vendor?)null : Enum.Parse<Vendor>(v));
+            builder.HasOne(f => f.VendorVersion)
+                .WithMany()
+                .HasForeignKey(f => f.VendorVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.OwnsOne(facilityConfig => facilityConfig.ScheduledReports, navBuilder =>
             {

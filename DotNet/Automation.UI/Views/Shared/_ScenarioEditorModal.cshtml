@@ -43,6 +43,7 @@
                 </div>
             </div>
             <div id="formErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div id="formWarnings" class="alert alert-warning m-3 mb-0 py-2 small" style="display:none;white-space:pre-line;"></div>
             <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="modalBody">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="ScenarioId" value="" />
@@ -65,6 +66,23 @@
                                 <option value="ScheduledReport">Scheduled Report</option>
                                 <option value="RegenerateReport">Regenerate Report</option>
                             </select>
+                        </div>
+                        <div class="col-md-8" id="liveSimulationFields" style="display:none;">
+                            <label class="form-label d-block">Live Scheduled Simulation</label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="IsLiveSimulation" />
+                                <label class="form-check-label" for="IsLiveSimulation">Hold a short reporting window. Inpatient patterns admit/discharge automatically; interactive inject is optional.</label>
+                            </div>
+                            <div class="row g-2" id="liveSimulationOptions" style="display:none;">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="ReportingWindowMinutes">Reporting Window</label>
+                                    <select class="form-select" id="ReportingWindowMinutes">
+                                        <option value="5">5 minutes</option>
+                                        <option value="10" selected>10 minutes</option>
+                                        <option value="15">15 minutes</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-8">
                             <label class="form-label">Measures</label>
@@ -134,6 +152,9 @@
                         <div class="col-md-3">
                             <label class="form-label" for="ReportPeriodEnd">Report Period End</label>
                             <input class="form-control" type="date" id="ReportPeriodEnd" />
+                        </div>
+                        <div class="col-12">
+                            <div id="reportPeriodPolicyHint" class="small text-muted"></div>
                         </div>
                         <div class="col-12 d-flex gap-3">
                             <div class="form-check">
@@ -209,6 +230,10 @@
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
+                                        <button type="button" class="btn btn-sm btn-au-action" id="btnSuggestFromImported">
+                                            <i class="bi bi-magic me-1"></i>Suggest from patient data
+                                        </button>
+                                        <span id="importedUploadStatus" class="small text-muted" style="display:none;" role="status" aria-live="polite"></span>
                                     </div>
                                 </div>
                             </div>
@@ -222,6 +247,44 @@
 </div>
 <div id="scenarioModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
+<div id="replaceFhirModal" role="dialog" aria-modal="true" aria-labelledby="replaceFhirModalTitle" style="display:none;position:fixed;inset:0;z-index:1065;overflow-y:auto;">
+    <div id="replaceFhirBackdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;position:relative;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:700px;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0" id="replaceFhirModalTitle"><i class="bi bi-exclamation-triangle me-2"></i>Patient Already Exists on FHIR Server</h6>
+                <button type="button" class="btn btn-sm btn-outline-light" id="btnReplaceFhirClose">Close</button>
+            </div>
+            <div class="p-3">
+                <p class="mb-2">This patient already exists on the FHIR server.</p>
+                <p class="mb-2">Choose one action:</p>
+                <ol class="mb-3">
+                    <li><strong>Purge + Replace</strong>: expunge matching server resources, then replay this uploaded bundle.</li>
+                    <li><strong>Use FHIR Server Data</strong>: discard this upload and import by Patient ID using server data.</li>
+                </ol>
+                <div class="alert alert-warning py-2 small mb-3">This is a destructive server operation. Only proceed if you intentionally want uploaded content to become authoritative on the FHIR server.</div>
+                <div id="replaceFhirLargeHint" class="alert alert-info py-2 small mb-3" style="display:none;">
+                    This bundle is considered large. For now, use <strong>Purge + Replace</strong> because pulling full patient data from the server can be incomplete for large patients.
+                </div>
+                <div class="small text-muted mb-1">Patient</div>
+                <div class="fw-semibold mb-2" id="replaceFhirPatientLabel"></div>
+                <div id="replaceFhirHoldHint" class="small text-muted mb-2">Press and hold the button to confirm destructive replace.</div>
+                <div class="progress mb-2" style="height:8px;">
+                    <div id="replaceFhirHoldFill" class="progress-bar bg-danger" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="width:0%"></div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReplaceFhirCancel">Cancel</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="btnReplaceFhirConfirm">
+                        <i class="bi bi-arrow-repeat me-1"></i>Purge + Replace
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
     (function () {
         var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
@@ -249,6 +312,20 @@
         var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
         var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
         var uploadImportedBundleUrl = '@Url.Action("UploadImportedBundle", "Scenarios")';
+        var replacePatientOnFhirServerUrl = '@Url.Action("ReplacePatientOnFhirServer", "Scenarios")';
+        var discardUploadedBundleUrl = '@Url.Action("DiscardUploadedBundle", "Scenarios")';
+        var replaceFhirModal = document.getElementById('replaceFhirModal');
+        var replaceFhirBackdrop = document.getElementById('replaceFhirBackdrop');
+        var replaceFhirPatientLabel = document.getElementById('replaceFhirPatientLabel');
+        var replaceFhirLargeHint = document.getElementById('replaceFhirLargeHint');
+        var replaceFhirHoldHint = document.getElementById('replaceFhirHoldHint');
+        var replaceFhirHoldFill = document.getElementById('replaceFhirHoldFill');
+        var btnReplaceFhirConfirm = document.getElementById('btnReplaceFhirConfirm');
+        var btnUseServerData = document.getElementById('btnUseServerData');
+        var btnReplaceFhirCancel = document.getElementById('btnReplaceFhirCancel');
+        var btnReplaceFhirClose = document.getElementById('btnReplaceFhirClose');
+        var activePatientReplacementPollController = null;
+        var patientReplacementPollTimeoutMs = 2 * 60 * 1000;
 
         function notifyChanged(action, id, name) {
             document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
@@ -276,12 +353,189 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
         }
+        function cancelPatientReplacementPolling() {
+            if (activePatientReplacementPollController) {
+                activePatientReplacementPollController.abort();
+                activePatientReplacementPollController = null;
+            }
+        }
+        function isScenarioEditorModalOpen() {
+            return !!modal && modal.style.display !== 'none';
+        }
         function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
-        function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+        function closeModal() {
+            cancelPatientReplacementPolling();
+            modal.style.display = 'none';
+            backdrop.style.display = 'none';
+        }
         function ensureScenarioId() {
             if (!idInput.value) idInput.value = crypto.randomUUID();
             return idInput.value;
         }
+
+        async function promptReplaceFhirPatient(patientId, canUseServerData, requiresReplaceForLargePatient) {
+            return new Promise(function (resolve) {
+                if (!replaceFhirModal || !btnReplaceFhirConfirm || !replaceFhirPatientLabel || !btnUseServerData) {
+                    resolve('cancel');
+                    return;
+                }
+
+                var holdDurationMs = 1500;
+                var holdStart = 0;
+                var holdTimer = null;
+                var holdAnimationFrame = 0;
+                var holdCompleted = false;
+                var postConfirmVisualDelayMs = 1000;
+                var keyboardHoldActive = false;
+
+                replaceFhirPatientLabel.textContent = String(patientId || '').trim();
+                btnReplaceFhirConfirm.disabled = false;
+                btnReplaceFhirConfirm.classList.remove('btn-success');
+                btnReplaceFhirConfirm.classList.add('btn-danger');
+                if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
+                if (replaceFhirHoldFill) {
+                    replaceFhirHoldFill.style.width = '0%';
+                    replaceFhirHoldFill.setAttribute('aria-valuenow', '0');
+                }
+                btnUseServerData.disabled = !canUseServerData;
+                if (replaceFhirLargeHint) replaceFhirLargeHint.style.display = requiresReplaceForLargePatient ? '' : 'none';
+                replaceFhirModal.style.display = '';
+                btnReplaceFhirConfirm.focus();
+
+                function stopHold(resetVisual) {
+                    if (holdTimer) {
+                        clearInterval(holdTimer);
+                        holdTimer = null;
+                    }
+                    if (holdAnimationFrame) {
+                        cancelAnimationFrame(holdAnimationFrame);
+                        holdAnimationFrame = 0;
+                    }
+                    if (resetVisual && !holdCompleted) {
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = '0%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', '0');
+                        }
+                        if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
+                    }
+                }
+
+                function completeHold() {
+                    if (holdCompleted) return;
+                    holdCompleted = true;
+                    stopHold(false);
+                    if (replaceFhirHoldFill) {
+                        replaceFhirHoldFill.style.width = '100%';
+                        replaceFhirHoldFill.setAttribute('aria-valuenow', '100');
+                    }
+                    btnReplaceFhirConfirm.classList.remove('btn-danger');
+                    btnReplaceFhirConfirm.classList.add('btn-success');
+                    if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Confirmed. Starting purge + replace...';
+
+                    // Give the user a visible completion moment (full bar + green button)
+                    // before closing the modal and starting server-side work.
+                    setTimeout(function () { cleanup('replace'); }, postConfirmVisualDelayMs);
+                }
+
+                function startHold(ev) {
+                    if (ev) ev.preventDefault();
+                    if (btnReplaceFhirConfirm.disabled || holdCompleted) return;
+                    holdStart = Date.now();
+                    if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Keep holding...';
+                    stopHold(false);
+
+                    // Keep a short interval for legacy environments where RAF timing can be throttled,
+                    // but use RAF for smoother visual updates and reliable "fill to 100%" rendering.
+                    holdTimer = setInterval(function () {
+                        if (holdCompleted) return;
+                        var elapsed = Date.now() - holdStart;
+                        var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = pct + '%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', String(pct));
+                        }
+                        if (pct >= 100) completeHold();
+                    }, 30);
+
+                    (function animateHold() {
+                        if (holdCompleted) return;
+                        var elapsed = Date.now() - holdStart;
+                        var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = pct + '%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', String(pct));
+                        }
+                        if (pct >= 100) {
+                            completeHold();
+                            return;
+                        }
+                        holdAnimationFrame = requestAnimationFrame(animateHold);
+                    })();
+                }
+
+                function cancelHold(ev) {
+                    if (ev) ev.preventDefault();
+                    if (holdCompleted) return;
+                    stopHold(true);
+                }
+
+                function cleanup(result) {
+                    stopHold(false);
+                    replaceFhirModal.style.display = 'none';
+                    btnReplaceFhirConfirm.removeEventListener('pointerdown', startHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointerup', cancelHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointerleave', cancelHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointercancel', cancelHold);
+                    btnUseServerData.removeEventListener('click', onUseServerData);
+                    btnReplaceFhirCancel.removeEventListener('click', onCancel);
+                    btnReplaceFhirClose.removeEventListener('click', onCancel);
+                    document.removeEventListener('keydown', onDocumentKeyDown, true);
+                    document.removeEventListener('keyup', onDocumentKeyUp, true);
+                    if (replaceFhirBackdrop) replaceFhirBackdrop.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+
+                function onUseServerData() { cleanup('use-server'); }
+                function onCancel() { cleanup('cancel'); }
+                function onDocumentKeyDown(ev) {
+                    if (replaceFhirModal.style.display === 'none') return;
+
+                    if (ev.key === 'Escape') {
+                        ev.preventDefault();
+                        onCancel();
+                        return;
+                    }
+
+                    if (holdCompleted) return;
+                    if (document.activeElement !== btnReplaceFhirConfirm) return;
+                    if (ev.repeat) return;
+                    if (ev.key !== ' ' && ev.key !== 'Enter') return;
+
+                    keyboardHoldActive = true;
+                    startHold(ev);
+                }
+
+                function onDocumentKeyUp(ev) {
+                    if (!keyboardHoldActive) return;
+                    if (ev.key !== ' ' && ev.key !== 'Enter') return;
+
+                    keyboardHoldActive = false;
+                    cancelHold(ev);
+                }
+
+                btnReplaceFhirConfirm.addEventListener('pointerdown', startHold);
+                btnReplaceFhirConfirm.addEventListener('pointerup', cancelHold);
+                btnReplaceFhirConfirm.addEventListener('pointerleave', cancelHold);
+                btnReplaceFhirConfirm.addEventListener('pointercancel', cancelHold);
+                btnUseServerData.addEventListener('click', onUseServerData);
+                btnReplaceFhirCancel.addEventListener('click', onCancel);
+                btnReplaceFhirClose.addEventListener('click', onCancel);
+                document.addEventListener('keydown', onDocumentKeyDown, true);
+                document.addEventListener('keyup', onDocumentKeyUp, true);
+                if (replaceFhirBackdrop) replaceFhirBackdrop.addEventListener('click', onCancel);
+            });
+        }
+
         document.getElementById('btnModalClose').addEventListener('click', closeModal);
         backdrop.addEventListener('click', closeModal);
 
@@ -295,7 +549,21 @@
 
         // ---- Error display ----
         var formErrors = document.getElementById('formErrors');
+        var formWarnings = document.getElementById('formWarnings');
         function showError(msg) { formErrors.textContent = msg; formErrors.style.display = ''; }
+        function showWarning(msg) {
+            if (!msg) return;
+            var text = String(msg);
+            var lines = formWarnings.textContent ? formWarnings.textContent.split('\n') : [];
+            if (lines.indexOf(text) >= 0) return;
+            formWarnings.textContent = formWarnings.textContent ? (formWarnings.textContent + '\n' + text) : text;
+            formWarnings.style.whiteSpace = 'pre-line';
+            formWarnings.style.display = '';
+        }
+        function clearWarnings() {
+            formWarnings.style.display = 'none';
+            formWarnings.textContent = '';
+        }
         function clearErrors() { formErrors.style.display = 'none'; formErrors.textContent = ''; clearFieldErrors(); }
         function markFieldError(id, msg) {
             var el = document.getElementById(id);
@@ -337,6 +605,13 @@
             if (nd) ns.value = nd.value;
         }
 
+        function selectDefaultQueryPlanTemplate() {
+            var qp = document.getElementById('QueryPlanTemplate');
+            if (!qp) return;
+            var d = qp.querySelector('[data-is-default="true"]');
+            if (d) qp.value = d.value;
+        }
+
         function selectDefaultOrganizationResourceMap() {
             var orm = document.getElementById('OrganizationResourceMap');
             if (!orm) return;
@@ -359,6 +634,88 @@
             var ct = res.headers.get('content-type') || '';
             return ct.indexOf('json') >= 0 ? res.json() : null;
         }
+
+        async function waitForPatientReplacement(statusUrl, patientId) {
+            var startedAt = Date.now();
+            var controller = new AbortController();
+            activePatientReplacementPollController = controller;
+
+            function delayWithSignal(ms, signal) {
+                return new Promise(function (resolve, reject) {
+                    if (signal.aborted) {
+                        reject(new DOMException('Polling canceled.', 'AbortError'));
+                        return;
+                    }
+
+                    var timeoutId = window.setTimeout(function () {
+                        signal.removeEventListener('abort', onAbort);
+                        resolve();
+                    }, ms);
+
+                    function onAbort() {
+                        window.clearTimeout(timeoutId);
+                        signal.removeEventListener('abort', onAbort);
+                        reject(new DOMException('Polling canceled.', 'AbortError'));
+                    }
+
+                    signal.addEventListener('abort', onAbort);
+                });
+            }
+
+            try {
+                while (Date.now() - startedAt < patientReplacementPollTimeoutMs) {
+                    if (!isScenarioEditorModalOpen()) {
+                        throw new DOMException('Scenario editor modal closed.', 'AbortError');
+                    }
+
+                    var response = await fetch(statusUrl, {
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal
+                    });
+                    if (!response.ok) {
+                        throw new Error(await response.text() || 'Could not retrieve replacement status.');
+                    }
+
+                    var status = await response.json();
+                    setImportedUploadStatus(
+                        status.message || 'Replacing FHIR-server data for Patient/' + patientId + '...',
+                        !status.isComplete);
+
+                    if (status.isComplete) {
+                        if (!status.succeeded) {
+                            throw new Error(status.message || 'FHIR-server replacement failed.');
+                        }
+
+                        return status;
+                    }
+
+                    var elapsed = Date.now() - startedAt;
+                    var remaining = patientReplacementPollTimeoutMs - elapsed;
+                    if (remaining <= 0) {
+                        break;
+                    }
+
+                    if (!isScenarioEditorModalOpen()) {
+                        throw new DOMException('Scenario editor modal closed.', 'AbortError');
+                    }
+
+                    await delayWithSignal(Math.min(2000, remaining), controller.signal);
+                }
+            } catch (err) {
+                if (err && err.name === 'AbortError') {
+                    throw new Error('FHIR-server replacement status polling was canceled.');
+                }
+
+                throw err;
+            } finally {
+                if (activePatientReplacementPollController === controller) {
+                    activePatientReplacementPollController = null;
+                }
+            }
+
+            throw new Error('Timed out waiting for FHIR-server replacement status for Patient/' + patientId + '.');
+        }
+
         async function postForm(url, formData) {
             var res = await fetch(url, {
                 method: 'POST',
@@ -643,18 +1000,137 @@
         document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
             cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
         });
-        document.getElementById('ReportMethod').addEventListener('change', syncPatternColumns);
+        document.getElementById('ReportMethod').addEventListener('change', function () {
+            syncPatternColumns();
+            syncReportPeriodPolicyUi();
+            syncLiveSimulationUi();
+        });
+        document.getElementById('IsLiveSimulation').addEventListener('change', function () {
+            syncLiveSimulationUi();
+            syncReportPeriodPolicyUi();
+        });
+        var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
+        if (reportingWindowEl) {
+            reportingWindowEl.addEventListener('change', function () {
+                if (isScheduledLikeMethod()) syncReportPeriodPolicyUi();
+            });
+        }
+
+        function syncLiveSimulationUi() {
+            var fields = document.getElementById('liveSimulationFields');
+            var options = document.getElementById('liveSimulationOptions');
+            var liveToggle = document.getElementById('IsLiveSimulation');
+            if (!fields || !options || !liveToggle) return;
+            var scheduled = (document.getElementById('ReportMethod').value || '') === 'ScheduledReport';
+            fields.style.display = scheduled ? '' : 'none';
+            if (!scheduled) liveToggle.checked = false;
+            options.style.display = liveToggle.checked ? '' : 'none';
+        }
 
         // ---- Imported Patients ----
         var importedRows = document.getElementById('importedRows');
         var importedSummary = document.getElementById('importedSummary');
+        var importedUploadStatus = document.getElementById('importedUploadStatus');
 
-        // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
-        // when the period inputs are currently empty (never overwrite a user-set value).
+        function setImportedUploadStatus(message, isBusy) {
+            if (!importedUploadStatus) return;
+            if (!message) {
+                importedUploadStatus.style.display = 'none';
+                importedUploadStatus.textContent = '';
+                importedUploadStatus.className = 'small text-muted';
+                return;
+            }
+
+            importedUploadStatus.style.display = '';
+            importedUploadStatus.textContent = (isBusy ? '⏳ ' : '') + message;
+            importedUploadStatus.className = isBusy ? 'small text-primary' : 'small text-muted';
+        }
+
+        function hasImportedRows() {
+            return importedRows && importedRows.children && importedRows.children.length > 0;
+        }
+
+        function isScheduledLikeMethod() {
+            var method = (document.getElementById('ReportMethod').value || '').trim();
+            return method === 'ScheduledReport' || method === 'RegenerateReport';
+        }
+
+        function scheduledWindowExtraMinutes() {
+            var liveToggle = document.getElementById('IsLiveSimulation');
+            if (liveToggle && liveToggle.checked) {
+                var raw = parseInt((document.getElementById('ReportingWindowMinutes') || {}).value || '10', 10);
+                return isNaN(raw) || raw <= 0 ? 10 : raw;
+            }
+            // Matches RunExecutor non-live scheduled close: aligned now + 2 minutes.
+            return 2;
+        }
+
+        function formatUtcDateInput(d) {
+            function pad(n) { return n < 10 ? '0' + n : '' + n; }
+            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+        }
+
+        function computeScheduledEndUtc() {
+            return new Date(Date.now() + scheduledWindowExtraMinutes() * 60000);
+        }
+
+        function applyScheduledEndLock() {
+            var endEl = document.getElementById('ReportPeriodEnd');
+            if (!endEl) return;
+            endEl.value = formatUtcDateInput(computeScheduledEndUtc());
+        }
+
+        function ensureScheduledStartDefault() {
+            var startEl = document.getElementById('ReportPeriodStart');
+            if (!startEl || (startEl.value || '').trim()) return;
+            var start = new Date(Date.now());
+            start.setUTCDate(start.getUTCDate() - 5);
+            startEl.value = formatUtcDateInput(start);
+        }
+
+        function syncReportPeriodPolicyUi() {
+            var startEl = document.getElementById('ReportPeriodStart');
+            var endEl = document.getElementById('ReportPeriodEnd');
+            var hintEl = document.getElementById('reportPeriodPolicyHint');
+            if (!startEl || !endEl || !hintEl) return;
+
+            var scheduledLike = isScheduledLikeMethod();
+
+            if (!scheduledLike) {
+                startEl.disabled = false;
+                endEl.disabled = false;
+                startEl.required = false;
+                endEl.required = false;
+                hintEl.textContent = 'Optional. When empty, default period behavior is used for this run type.';
+                return;
+            }
+
+            ensureScheduledStartDefault();
+            applyScheduledEndLock();
+            startEl.disabled = false;
+            endEl.disabled = true;
+            startEl.required = false;
+            endEl.required = false;
+            var extra = scheduledWindowExtraMinutes();
+            var live = !!(document.getElementById('IsLiveSimulation') || {}).checked;
+            hintEl.textContent = live
+                ? ('End is locked to today plus the live inject window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.')
+                : ('End is locked to today plus the scheduled close window (' + extra + ' minutes). Start is editable. Importing a patient whose data is entirely outside this window will ask to push Start back; End never moves.');
+        }
+
+        // Adhoc: fill empty start/end from encounter dates (month snap, never overwrite).
+        // Scheduled: if the encounter range is entirely outside the locked window, ask to
+        // push Start back to the earliest encounter day. End stays locked.
         function suggestPeriodFromEncounter(encStartIso, encEndIso) {
             var startEl = document.getElementById('ReportPeriodStart');
             var endEl = document.getElementById('ReportPeriodEnd');
             if (!startEl || !endEl) return;
+
+            if (isScheduledLikeMethod()) {
+                offerToExtendScheduledStart(encStartIso, encEndIso);
+                return;
+            }
+
             var hasStart = !!(startEl.value || '').trim();
             var hasEnd = !!(endEl.value || '').trim();
             if (hasStart && hasEnd) return;
@@ -665,15 +1141,45 @@
             if (!s) s = e;
             if (!e) e = s;
 
-            // Snap to the calendar-month containing the encounter window.
             var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
             var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
 
-            function pad(n) { return n < 10 ? '0' + n : '' + n; }
-            function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+            if (!hasStart) startEl.value = formatUtcDateInput(monthStart);
+            if (!hasEnd) endEl.value = formatUtcDateInput(monthEnd);
+        }
 
-            if (!hasStart) startEl.value = iso(monthStart);
-            if (!hasEnd) endEl.value = iso(monthEnd);
+        function offerToExtendScheduledStart(encStartIso, encEndIso) {
+            ensureScheduledStartDefault();
+            applyScheduledEndLock();
+            var startEl = document.getElementById('ReportPeriodStart');
+            if (!startEl) return;
+
+            var status = compareEncounterToPeriod(encStartIso, encEndIso);
+            if (status === 'overlap' || status === 'unknown') return;
+
+            if (status === 'outside-after') {
+                showWarning('Imported patient data starts after the locked report end (' +
+                    (document.getElementById('ReportPeriodEnd').value || 'today') +
+                    '). End is not moved. This patient will stay outside the reporting window.');
+                return;
+            }
+
+            var encS = encStartIso ? new Date(encStartIso) : null;
+            if (!encS || isNaN(encS.getTime())) return;
+            var proposed = formatUtcDateInput(encS);
+            var current = (startEl.value || '').trim();
+            if (current && proposed >= current) return;
+
+            var endVal = (document.getElementById('ReportPeriodEnd').value || '').trim();
+            var msg = 'This patient\'s data is entirely before the current report period'
+                + (current ? ' (starts ' + current + ')' : '')
+                + '. Push Report Start back to ' + proposed
+                + ' so the patient is inside the window? End stays '
+                + (endVal || 'locked') + '.';
+            if (!window.confirm(msg)) return;
+
+            startEl.value = proposed;
+            rerenderImportedEncounterCells();
         }
 
         function importedRowEligEditor(elig) {
@@ -711,6 +1217,7 @@
             // Imported rows feed the total Patient Count alongside cohort sums, so any change
             // to the imported list must re-sync the read-only Patient Count field.
             syncCount();
+            syncReportPeriodPolicyUi();
         }
         function reindexImported() {
             Array.prototype.forEach.call(importedRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; });
@@ -799,12 +1306,14 @@
 
             var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
             var status = compareEncounterToPeriod(s, e);
-            var badge = status === 'inside'
-                ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
-                : status === 'outside'
-                    ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
-                    : '';
-            cell.innerHTML = '<div>' + label + '</div>' + badge;
+            var badge = status === 'overlap'
+                ? '<span class="badge rounded-pill au-badge-success mt-1 px-2 py-1" title="Encounter overlaps the report period">&#10003; overlaps period</span>'
+                : status === 'outside-before'
+                    ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter ends before report period start">&#9888; before period</span>'
+                    : status === 'outside-after'
+                        ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter starts after report period end">&#9888; after period</span>'
+                        : '';
+            cell.innerHTML = '<div>' + label + '</div>' + (badge ? '<div>' + badge + '</div>' : '');
         }
 
         function compareEncounterToPeriod(encStartIso, encEndIso) {
@@ -812,13 +1321,18 @@
             var pe = (document.getElementById('ReportPeriodEnd').value || '').trim();
             if (!ps && !pe) return 'unknown';
             var encS = encStartIso ? new Date(encStartIso) : null;
-            var encE = encEndIso ? new Date(encEndIso) : encS;
+            var encE = encEndIso ? new Date(encEndIso) : null;
             if (!encS) return 'unknown';
             var pStart = ps ? new Date(ps + 'T00:00:00Z') : null;
             var pEnd = pe ? new Date(pe + 'T23:59:59Z') : null;
-            if (pStart && encS < pStart) return 'outside';
-            if (pEnd && (encE || encS) > pEnd) return 'outside';
-            return 'inside';
+
+            // Overlap semantics:
+            // - Outside-before: encounter has a known end that is before period start.
+            // - Outside-after: encounter starts after period end.
+            // - Otherwise overlap/possibly-overlap (including in-progress with no end).
+            if (pStart && encE && encE < pStart) return 'outside-before';
+            if (pEnd && encS > pEnd) return 'outside-after';
+            return 'overlap';
         }
 
         function rerenderImportedEncounterCells() {
@@ -880,12 +1394,102 @@
 
         document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
             var files = Array.prototype.slice.call(ev.target.files || []);
+            var allImportedCleanly = files.length > 0;
+            var lastSpecialOutcomeMessage = '';
+
+            async function tryDiscardUploadedBundle(uploadedBundleId, fileName, contextLabel) {
+                try {
+                    await postJson(discardUploadedBundleUrl, {
+                        uploadedBundleId: uploadedBundleId
+                    });
+                    return true;
+                } catch (discardErr) {
+                    var discardMessage = 'Failed to discard uploaded bundle for "' + fileName + '" after ' + contextLabel + ': ' + (discardErr.message || 'Unknown error');
+                    showError(discardMessage);
+                    setImportedUploadStatus(discardMessage, false);
+                    lastSpecialOutcomeMessage = discardMessage;
+                    allImportedCleanly = false;
+                    return false;
+                }
+            }
+
+            if (files.length > 0) {
+                setImportedUploadStatus('Uploading and classifying ' + files.length + ' file(s)...', true);
+            }
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 try {
+                    setImportedUploadStatus('Processing "' + file.name + '" (' + (i + 1) + '/' + files.length + ')...', true);
                     var fd = new FormData();
                     fd.append('file', file);
                     var uploaded = await postForm(uploadImportedBundleUrl, fd);
+
+                    if (uploaded && uploaded.patientExistsOnServer && uploaded.bundleId && uploaded.patientId) {
+                        var decision = await promptReplaceFhirPatient(
+                            uploaded.patientId,
+                            !!uploaded.canUseServerData,
+                            !!uploaded.requiresReplaceForLargePatient);
+
+                        if (decision === 'cancel') {
+                            var discardedAfterCancel = await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'canceling replacement choice');
+                            if (!discardedAfterCancel) {
+                                continue;
+                            }
+                            lastSpecialOutcomeMessage = 'Skipped import for "' + file.name + '" because no action was selected.';
+                            setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                            allImportedCleanly = false;
+                            continue;
+                        }
+
+                        if (decision === 'use-server') {
+                            var discardedForServerUse = await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'choosing "Use FHIR Server Data"');
+                            if (!discardedForServerUse) {
+                                continue;
+                            }
+
+                            addImportedRow({ source: 'ExistingId', patientId: uploaded.patientId, autoDetect: true, measureEligibilities: {} });
+                            var serverRow = importedRows.lastElementChild;
+                            if (serverRow) await classifyImportedRow(serverRow);
+                            lastSpecialOutcomeMessage = 'Imported Patient/' + uploaded.patientId + ' from FHIR server data.';
+                            setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                            allImportedCleanly = false;
+                            continue;
+                        }
+
+                        if (decision === 'replace') {
+                            allImportedCleanly = false;
+                            setImportedUploadStatus('Replacing FHIR-server data for Patient/' + uploaded.patientId + '...', true);
+                            try {
+                                var replaceRes = await postJson(replacePatientOnFhirServerUrl, {
+                                    uploadedBundleId: uploaded.bundleId,
+                                    patientId: uploaded.patientId
+                                });
+                                if (!replaceRes || !replaceRes.statusUrl) {
+                                    throw new Error('FHIR-server replacement did not return a status endpoint.');
+                                }
+
+                                var replacementStatus = await waitForPatientReplacement(replaceRes.statusUrl, uploaded.patientId);
+                                lastSpecialOutcomeMessage = replacementStatus.message || 'Successfully replaced FHIR-server data for Patient/' + uploaded.patientId + '.';
+                                if (replacementStatus.deletedFailed > 0) {
+                                    showWarning('FHIR purge completed with ' + replacementStatus.deletedFailed + ' failed delete request(s).');
+                                }
+                                if (lastSpecialOutcomeMessage) {
+                                    setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                                }
+                            } catch (replaceErr) {
+                                var replaceMessage = 'Failed to replace FHIR-server patient data for "' + uploaded.patientId + '": ' + (replaceErr.message || 'Unknown error');
+                                showError(replaceMessage);
+                                setImportedUploadStatus(replaceMessage, false);
+                                lastSpecialOutcomeMessage = replaceMessage;
+                                await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'replace failure');
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (uploaded && uploaded.warningMessage && !uploaded.patientExistsOnServer) {
+                        showWarning(uploaded.warningMessage);
+                    }
 
                     addImportedRow({
                         source: 'Bundle',
@@ -903,7 +1507,19 @@
                     var row = importedRows.lastElementChild;
                     if (row) await classifyImportedRow(row);
                 } catch (err) {
-                    showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
+                    var readMessage = 'Failed to read "' + file.name + '": ' + (err.message || 'Unknown error');
+                    showError(readMessage);
+                    setImportedUploadStatus(readMessage, false);
+                    lastSpecialOutcomeMessage = readMessage;
+                    allImportedCleanly = false;
+                }
+            }
+
+            if (files.length > 0) {
+                if (!allImportedCleanly && lastSpecialOutcomeMessage) {
+                    setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                } else {
+                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s). Use Suggest from patient data to build location matching and cleanup from this upload.', false);
                 }
             }
             ev.target.value = '';
@@ -947,7 +1563,19 @@
         // Report Period inputs change (so the user gets immediate feedback when adjusting it).
         ['ReportPeriodStart', 'ReportPeriodEnd'].forEach(function (id) {
             var el = document.getElementById(id);
-            if (el) el.addEventListener('change', rerenderImportedEncounterCells);
+            if (!el) return;
+            el.addEventListener('change', function () {
+                if (isScheduledLikeMethod()) {
+                    applyScheduledEndLock();
+                    var startEl = document.getElementById('ReportPeriodStart');
+                    var endEl = document.getElementById('ReportPeriodEnd');
+                    if (startEl && endEl && startEl.value && endEl.value && startEl.value > endEl.value) {
+                        showWarning('Report Start cannot be after the locked End. Start was set to End.');
+                        startEl.value = endEl.value;
+                    }
+                }
+                rerenderImportedEncounterCells();
+            });
         });
 
         // ---- Collect form into JSON payload ----
@@ -956,6 +1584,9 @@
             var imported = getImportedPatients();
             var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
             var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
+            if (isScheduledLikeMethod()) applyScheduledEndLock();
+            var startVal = (document.getElementById('ReportPeriodStart').value || '').trim();
+            var endVal = (document.getElementById('ReportPeriodEnd').value || '').trim();
             return {
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
@@ -975,10 +1606,12 @@
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
                 normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
                 organizationResourceMapTemplateId: document.getElementById('OrganizationResourceMap').value || null,
-                reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
-                reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
+                reportPeriodStart: startVal ? (startVal + 'T00:00:00Z') : null,
+                reportPeriodEnd: endVal ? (endVal + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
-                importedPatientBundles: importedBundles
+                importedPatientBundles: importedBundles,
+                isLiveSimulation: !!document.getElementById('IsLiveSimulation').checked,
+                reportingWindowMinutes: parseInt(document.getElementById('ReportingWindowMinutes').value || '10', 10)
             };
         }
 
@@ -989,6 +1622,8 @@
             document.getElementById('ScenarioName').value = data.name || '';
             document.getElementById('ScenarioDescription').value = data.description || '';
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
+            document.getElementById('IsLiveSimulation').checked = !!data.isLiveSimulation;
+            document.getElementById('ReportingWindowMinutes').value = String(data.reportingWindowMinutes || 10);
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
@@ -1071,11 +1706,17 @@
             updateImportedSummary();
             syncCount();
             syncNhsnOrganizationFromUploadedPatients();
+            syncReportPeriodPolicyUi();
+            syncLiveSimulationUi();
         }
 
         // ---- Open modal ----
         async function openEditor(id, mode) {
             clearErrors();
+            clearWarnings();
+            cfgGenFingerprint = null;
+            cfgGenLastOrmId = null;
+            cfgGenLastSuiteId = null;
             if (id) {
                 try {
                     var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));
@@ -1099,12 +1740,15 @@
                 document.getElementById('ScenarioName').value = '';
                 document.getElementById('ScenarioDescription').value = '';
                 document.getElementById('ReportMethod').value = 'Adhoc';
+                document.getElementById('IsLiveSimulation').checked = false;
+                document.getElementById('ReportingWindowMinutes').value = '10';
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
+                selectDefaultQueryPlanTemplate();
                 selectDefaultNormalizationSuite();
                 selectDefaultOrganizationResourceMap();
                 document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
@@ -1115,6 +1759,8 @@
                 updateImportedSummary();
                 syncCount();
                 syncNhsnOrganizationFromUploadedPatients();
+                syncReportPeriodPolicyUi();
+                syncLiveSimulationUi();
                 openModal();
             }
         }
@@ -1133,6 +1779,10 @@
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
             if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
+            if (hasImported) {
+                if (!model.reportPeriodStart) { markFieldError('ReportPeriodStart', 'Report Period Start is required when imported patients are used.'); valid = false; }
+                if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
+            }
             // Imported-by-ID rows must have a non-empty patient id.
             var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
             if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
@@ -1164,6 +1814,112 @@
                 catch (err) { showError('Clone failed: ' + (err.message || 'Unknown error')); }
             });
         });
+
+        var cfgGenAnalyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
+        var cfgGenApplyOrmUrl = '@Url.Action("ApplyOrm", "ConfigurationGeneration")';
+        var cfgGenApplyNormUrl = '@Url.Action("ApplyNormalization", "ConfigurationGeneration")';
+        var cfgGenFingerprint = null;
+        var cfgGenLastOrmId = null;
+        var cfgGenLastSuiteId = null;
+
+        function upsertSelectOption(selectId, id, name) {
+            var sel = document.getElementById(selectId);
+            if (!sel || !id) return;
+            var existing = Array.prototype.find.call(sel.options, function (o) { return o.value === String(id); });
+            if (!existing) {
+                var opt = document.createElement('option');
+                opt.value = String(id);
+                opt.textContent = name || String(id);
+                sel.appendChild(opt);
+            }
+            sel.value = String(id);
+        }
+
+        function collectImportedAnalyzeRequest() {
+            var rows = importedRows ? importedRows.children : [];
+            var sources = [];
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (row.dataset.source === 'Bundle' && (row.dataset.uploadedBundleId || row.dataset.bundleJson)) {
+                    sources.push({
+                        source: 'Bundle',
+                        uploadedBundleId: row.dataset.uploadedBundleId || null,
+                        bundleJson: row.dataset.uploadedBundleId ? null : (row.dataset.bundleJson || null)
+                    });
+                    continue;
+                }
+                if (row.dataset.source === 'ExistingId') {
+                    var pid = (row.querySelector('.imp-pid') || {}).value;
+                    if (pid) sources.push({ source: 'ExistingId', patientId: pid });
+                }
+            }
+            if (!sources.length) return null;
+            return {
+                sources: sources,
+                priorFingerprint: cfgGenFingerprint,
+                refineOrmId: cfgGenLastOrmId,
+                refineSuiteId: cfgGenLastSuiteId
+            };
+        }
+
+        var btnSuggest = document.getElementById('btnSuggestFromImported');
+        if (btnSuggest) {
+            btnSuggest.addEventListener('click', async function () {
+                if (!window.BundleConfigGeneration) {
+                    showError('Configuration generator script failed to load.');
+                    return;
+                }
+                var req = collectImportedAnalyzeRequest();
+                if (!req) {
+                    showError('Add or upload at least one imported patient first.');
+                    return;
+                }
+                try {
+                    btnSuggest.disabled = true;
+                    var proposal = await window.BundleConfigGeneration.analyzeAndShow(
+                        { analyze: cfgGenAnalyzeUrl, applyOrm: cfgGenApplyOrmUrl, applyNorm: cfgGenApplyNormUrl },
+                        req,
+                        {
+                            selectOrmLabel: 'Save new ORM and select it',
+                            selectSuiteLabel: 'Save new suite and select it',
+                            namePrefix: (document.getElementById('ScenarioName') || {}).value || '',
+                            onSelectOrm: function (id, name) {
+                                upsertSelectOption('OrganizationResourceMap', id, name);
+                            },
+                            onSelectSuite: function (id, name) {
+                                upsertSelectOption('NormalizationSuite', id, name);
+                            },
+                            onSavedOrm: function (id) { cfgGenLastOrmId = id; },
+                            onSavedSuite: function (id) { cfgGenLastSuiteId = id; },
+                            onExtendOrm: async function (id) {
+                                var refined = await window.BundleConfigGeneration.postJson(cfgGenAnalyzeUrl, Object.assign({}, req, { refineOrmId: id }));
+                                cfgGenFingerprint = refined.fingerprint || refined.Fingerprint || cfgGenFingerprint;
+                                var saved = await window.BundleConfigGeneration.postJson(cfgGenApplyOrmUrl, {
+                                    proposal: refined.orm || refined.Orm,
+                                    updateExistingId: id
+                                });
+                                cfgGenLastOrmId = saved.id || saved.Id;
+                                upsertSelectOption('OrganizationResourceMap', saved.id || saved.Id, saved.name || saved.Name);
+                            },
+                            onExtendSuite: async function (id) {
+                                var refined = await window.BundleConfigGeneration.postJson(cfgGenAnalyzeUrl, Object.assign({}, req, { refineSuiteId: id }));
+                                cfgGenFingerprint = refined.fingerprint || refined.Fingerprint || cfgGenFingerprint;
+                                var saved = await window.BundleConfigGeneration.postJson(cfgGenApplyNormUrl, {
+                                    proposal: refined.normalization || refined.Normalization,
+                                    updateExistingSuiteId: id
+                                });
+                                cfgGenLastSuiteId = saved.id || saved.Id;
+                                upsertSelectOption('NormalizationSuite', saved.id || saved.Id, saved.name || saved.Name);
+                            }
+                        });
+                    cfgGenFingerprint = proposal.fingerprint || proposal.Fingerprint || cfgGenFingerprint;
+                } catch (err) {
+                    showError(err.message || 'Suggestion failed.');
+                } finally {
+                    btnSuggest.disabled = false;
+                }
+            });
+        }
 
         document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
             btn.addEventListener('click', async function () {

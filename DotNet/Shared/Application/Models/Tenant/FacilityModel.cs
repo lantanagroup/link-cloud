@@ -25,7 +25,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         public bool? IsDeleted { get; set; }
 
         [JsonPropertyName("vendor")]
-        public Vendor? Vendor { get; set; }
+        public VendorModel? Vendor { get; set; }
+
+        [JsonPropertyName("vendorVersionId")]
+        public Guid? VendorVersionId { get; set; }
 
         [JsonPropertyName("scheduledReports")]
         public TenantScheduledReportConfig ScheduledReports { get; set; } = new TenantScheduledReportConfig();

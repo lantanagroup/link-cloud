@@ -1,0 +1,303 @@
+using FluentAssertions;
+using LantanaGroup.Link.MockDmrpApi.Application.Models;
+using LantanaGroup.Link.MockDmrpApi.Application.Services;
+using LantanaGroup.Link.MockDmrpApi.Domain.Context;
+using LantanaGroup.Link.MockDmrpApi.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+using Task = System.Threading.Tasks.Task;
+
+namespace IntegrationTests.MockDmrpApi;
+
+/// <summary>
+/// Covers behaviour that only appears against a real database: the save interceptor, LINQ
+/// that has to translate to SQL, and the unique index.
+/// </summary>
+[Collection(IntegrationTestCollection.Name)]
+[Trait("Category", "IntegrationTests")]
+public class ReportingPlanPersistenceTests
+{
+    private readonly MockDmrpApiIntegrationTestFixture _fixture;
+
+    public ReportingPlanPersistenceTests(MockDmrpApiIntegrationTestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    /// <summary>A monthly (MSC) entry.</summary>
+    private static ReportingPlanEntryEntity Entry(
+        string facilityId = "F1", string measure = "HOB", int? month = 5, int year = 2026) =>
+        new()
+        {
+            FacilityId = facilityId,
+            Component = ReportingComponents.Msc,
+            Measure = measure,
+            ReportingMonth = month,
+            ReportingYear = year,
+            IsReporting = "Y"
+        };
+
+    /// <summary>An annual (PS) entry, which carries no month.</summary>
+    private static ReportingPlanEntryEntity AnnualEntry(
+        string facilityId = "F1", string measure = "HAI", int year = 2026) =>
+        new()
+        {
+            FacilityId = facilityId,
+            Component = ReportingComponents.Ps,
+            Measure = measure,
+            ReportingMonth = null,
+            ReportingYear = year,
+            IsReporting = "Y"
+        };
+
+    private async Task<T> WithServiceAsync<T>(Func<IReportingPlanService, Task<T>> action)
+    {
+        using var scope = _fixture.CreateScope();
+        return await action(scope.ServiceProvider.GetRequiredService<IReportingPlanService>());
+    }
+
+    [Fact]
+    public async Task CreateStampsCreateDateAndUpdateStampsModifyDate()
+    {
+        // Both come from the shared save interceptor rather than from the service, so this
+        // is the only place that wiring is actually proven.
+        await _fixture.ResetAsync();
+
+        var created = await WithServiceAsync(s => s.CreateAsync(Entry(), CancellationToken.None));
+
+        created.CreateDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        created.ModifyDate.Should().BeNull("nothing has modified it yet");
+
+        created.IsReporting = "N";
+        var updated = await WithServiceAsync(s => s.UpdateAsync(created, CancellationToken.None));
+
+        updated!.ModifyDate.Should().NotBeNull();
+        updated.ModifyDate!.Value.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task TheUniqueIndexRejectsADuplicateNaturalKey()
+    {
+        await _fixture.ResetAsync();
+        await WithServiceAsync(s => s.CreateAsync(Entry(), CancellationToken.None));
+
+        // The service pre-checks, but the index is the actual guarantee. Writing straight
+        // through the context bypasses the pre-check so the constraint itself is tested.
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+
+        var duplicate = Entry();
+        duplicate.Id = Guid.NewGuid().ToString();
+        context.ReportingPlanEntries.Add(duplicate);
+
+        var act = async () => await context.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
+    public void TheUniqueIndexIsNotFiltered()
+    {
+        // EF's default for a unique index over a nullable column is a filtered index --
+        // "WHERE [ReportingMonth] IS NOT NULL" -- which drops every annual row out of the
+        // index and silently permits duplicate patient-safety entries. The mapping
+        // suppresses that filter with HasFilter(null); this is what holds it there.
+        //
+        // Asserted against the model rather than by attempting a duplicate insert, because
+        // whether the database then rejects it is provider-specific: SQL Server treats NULL
+        // as a single value in a unique index and refuses the second row, while SQLite --
+        // what this fixture runs on -- follows the standard, where NULLs are distinct.
+        // The filter is the part that is ours to get wrong, so the filter is what is pinned.
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+
+        var index = context.Model
+            .FindEntityType(typeof(ReportingPlanEntryEntity))!
+            .GetIndexes()
+            .Single(i => i.IsUnique);
+
+        index.GetFilter().Should().BeNull("a filtered index would exclude every annual entry");
+        index.Properties.Select(p => p.Name).Should().Contain(
+            [nameof(ReportingPlanEntryEntity.Component), nameof(ReportingPlanEntryEntity.ReportingMonth)]);
+    }
+
+    [Fact]
+    public async Task TheServiceRejectsADuplicateAnnualEntryDespiteTheNullMonth()
+    {
+        // The pre-check compares ReportingMonth to a null parameter. In SQL that comparison
+        // is never true on its own, so this only works because EF compensates -- rewriting
+        // it to "(ReportingMonth = @p) OR (ReportingMonth IS NULL AND @p IS NULL)". The
+        // in-memory fake gets there for free, since null == null in LINQ-to-objects, so a
+        // real provider is the only place that compensation is actually proven.
+        await _fixture.ResetAsync();
+        await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+
+        var act = async () => await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+
+        await act.Should().ThrowAsync<DuplicateReportingPlanEntryException>();
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+        (await context.ReportingPlanEntries.CountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task TheUniqueIndexAllowsTheSameMeasureInAnotherPeriodOrFacility()
+    {
+        await _fixture.ResetAsync();
+
+        await WithServiceAsync(s => s.CreateAsync(Entry(), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(month: 6), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(year: 2027), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(facilityId: "F2"), CancellationToken.None));
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+
+        (await context.ReportingPlanEntries.CountAsync()).Should().Be(4);
+    }
+
+    [Fact]
+    public async Task TheUniqueIndexTreatsTheComponentAsPartOfTheKey()
+    {
+        // The same measure name under both components is two legitimate rows, not a
+        // duplicate -- the plans are independent.
+        await _fixture.ResetAsync();
+
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "SHARED"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(AnnualEntry(measure: "SHARED"), CancellationToken.None));
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+
+        (await context.ReportingPlanEntries.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ANullReportingMonthRoundTripsThroughTheDatabase()
+    {
+        // The column has to actually be nullable. If a migration ever made it NOT NULL,
+        // every annual write would fail at the database rather than at a validator.
+        await _fixture.ResetAsync();
+
+        var created = await WithServiceAsync(s => s.CreateAsync(AnnualEntry(), CancellationToken.None));
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+        var stored = await context.ReportingPlanEntries.SingleAsync(e => e.Id == created.Id);
+
+        stored.ReportingMonth.Should().BeNull();
+        stored.Component.Should().Be(ReportingComponents.Ps);
+    }
+
+    [Fact]
+    public async Task SearchTranslatesEveryFilterToSql()
+    {
+        // The predicate is built as an expression tree and must translate; a construct the
+        // provider cannot handle throws here but not against the in-memory fake.
+        await _fixture.ResetAsync();
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HOB"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HTCDI"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(facilityId: "F2"), CancellationToken.None));
+
+        var criteria = new ReportingPlanSearchCriteria
+        {
+            FacilityId = "F1",
+            Measure = "hob",
+            ReportingMonth = 5,
+            ReportingYear = 2026,
+            IsReporting = "Y"
+        };
+
+        var (records, metadata) = await WithServiceAsync(s => s.SearchAsync(criteria, CancellationToken.None));
+
+        records.Should().ContainSingle();
+        records[0].Measure.Should().Be("HOB", "the measure filter is case-insensitive");
+        metadata.TotalCount.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(ReportingPlanSortBy.FacilityId)]
+    [InlineData(ReportingPlanSortBy.Component)]
+    [InlineData(ReportingPlanSortBy.Measure)]
+    [InlineData(ReportingPlanSortBy.ReportingMonth)]
+    [InlineData(ReportingPlanSortBy.ReportingYear)]
+    [InlineData(ReportingPlanSortBy.CreateDate)]
+    [InlineData(ReportingPlanSortBy.ModifyDate)]
+    public async Task EverySortFieldOrdersAgainstTheDatabase(ReportingPlanSortBy sortBy)
+    {
+        // The shared repository builds the ordering by property name. A name that does not
+        // translate fails here rather than as a 500 in front of a user.
+        await _fixture.ResetAsync();
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HOB"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HTCDI"), CancellationToken.None));
+
+        var criteria = new ReportingPlanSearchCriteria { SortBy = sortBy, SortOrder = SortOrder.Ascending };
+
+        var (records, _) = await WithServiceAsync(s => s.SearchAsync(criteria, CancellationToken.None));
+
+        records.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task PagingReturnsDistinctPagesAndAnAccurateTotal()
+    {
+        await _fixture.ResetAsync();
+        foreach (var measure in new[] { "M1", "M2", "M3", "M4", "M5" })
+        {
+            await WithServiceAsync(s => s.CreateAsync(Entry(measure: measure), CancellationToken.None));
+        }
+
+        var first = await WithServiceAsync(s => s.SearchAsync(
+            new ReportingPlanSearchCriteria { PageSize = 2, PageNumber = 1, SortBy = ReportingPlanSortBy.Measure, SortOrder = SortOrder.Ascending },
+            CancellationToken.None));
+
+        var second = await WithServiceAsync(s => s.SearchAsync(
+            new ReportingPlanSearchCriteria { PageSize = 2, PageNumber = 2, SortBy = ReportingPlanSortBy.Measure, SortOrder = SortOrder.Ascending },
+            CancellationToken.None));
+
+        first.Records.Should().HaveCount(2);
+        second.Records.Should().HaveCount(2);
+        first.Metadata.TotalCount.Should().Be(5);
+        first.Metadata.TotalPages.Should().Be(3);
+        second.Records.Select(r => r.Measure).Should().NotIntersectWith(first.Records.Select(r => r.Measure));
+    }
+
+    [Fact]
+    public async Task DeleteByFacilityRemovesOnlyThatFacility()
+    {
+        await _fixture.ResetAsync();
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HOB"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(measure: "HTCDI"), CancellationToken.None));
+        await WithServiceAsync(s => s.CreateAsync(Entry(facilityId: "F2"), CancellationToken.None));
+
+        var removed = await WithServiceAsync(s => s.DeleteByFacilityAsync("F1", CancellationToken.None));
+
+        removed.Should().Be(2);
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+        var remaining = await context.ReportingPlanEntries.SingleAsync();
+        remaining.FacilityId.Should().Be("F2");
+    }
+
+    [Fact]
+    public async Task UpdateDoesNotCreateWhenTheEntryIsAbsent()
+    {
+        await _fixture.ResetAsync();
+
+        var absent = Entry();
+        absent.Id = Guid.NewGuid().ToString();
+
+        var result = await WithServiceAsync(s => s.UpdateAsync(absent, CancellationToken.None));
+
+        result.Should().BeNull();
+
+        using var scope = _fixture.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportingPlanDbContext>();
+        (await context.ReportingPlanEntries.CountAsync()).Should().Be(0, "update must never upsert");
+    }
+}

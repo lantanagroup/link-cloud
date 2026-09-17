@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,14 +497,14 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h3 id="summary" class="content-heading">Summary <a id="summary" href="#summary" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Summary"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+        <h3 id="summary" class="content-heading">Summary <a href="#summary" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Summary"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>This document explains how the platform uses a “tail message” to indicate that a patient is done being queried for a given phase, and how that signal flows across services:</p>
 <ul>
 <li>Data Acquisition → Normalization → Measure Evaluation</li>
 <li>For both Initial and Supplemental query/normalization phases</li>
 </ul>
 <p>The tail message allows Measure Evaluation to know precisely when to proceed with evaluation for the patient in each phase, avoiding premature or duplicate evaluations.</p>
-<h3 id="what-is-a-tail-message" class="content-heading">What is a tail message? <a id="what-is-a-tail-message" href="#what-is-a-tail-message" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What is a tail message?"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="what-is-a-tail-message" class="content-heading">What is a tail message? <a href="#what-is-a-tail-message" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What is a tail message?"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>A tail message is an event that marks the end of a patient’s resource stream for a specific reporting context (facility/reportTrackingId) and phase (<code>Initial</code> or <code>Supplemental</code>). It is modeled via the <code>acquisitionComplete</code> boolean carried on acquisition/normalization events:</p>
 <ul>
 <li><code>ResourceAcquired.acquisitionComplete: boolean</code></li>
@@ -515,7 +517,7 @@
 <li>Events → <a href="event-resourcenormalized.html">Resource Normalized</a> → contains <code>acquisitionComplete</code>, <code>patientId</code>, <code>queryType</code>, <code>scheduledReports</code>, <code>reportableEvent</code></li>
 </ul>
 <p>Note: On <code>ResourceNormalized</code>, <code>acquisitionComplete</code> exists but is not a required property; when present and <code>true</code>, it functions as the tail signal.</p>
-<h3 id="correlation-and-scope-of-a-tail" class="content-heading">Correlation and scope of a tail <a id="correlation-and-scope-of-a-tail" href="#correlation-and-scope-of-a-tail" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Correlation and scope of a tail"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="correlation-and-scope-of-a-tail" class="content-heading">Correlation and scope of a tail <a href="#correlation-and-scope-of-a-tail" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Correlation and scope of a tail"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>A tail applies to the intersection of the following:</p>
 <ul>
 <li>Patient: <code>patientId</code></li>
@@ -523,27 +525,27 @@
 <li>Phase: <code>queryType</code> = <code>Initial</code> or <code>Supplemental</code></li>
 </ul>
 <p>Measure Evaluation correlates resources using this tuple so that multiple patients and/or reports can be processed concurrently without interference.</p>
-<h3 id="end-to-end-flow-initial-phase" class="content-heading">End-to-end flow (Initial phase) <a id="end-to-end-flow-initial-phase" href="#end-to-end-flow-initial-phase" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: End-to-end flow (Initial phase)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="end-to-end-flow-initial-phase" class="content-heading">End-to-end flow (Initial phase) <a href="#end-to-end-flow-initial-phase" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: End-to-end flow (Initial phase)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li>Data Acquisition produces one <code>ResourceAcquired</code> per resource as it queries the EHR for the initial phase.</li>
 <li>After the last initial-phase resource for the patient/report is produced, Data Acquisition emits a tail <code>ResourceAcquired</code> with <code>acquisitionComplete = true</code> (resource payload may be absent).</li>
 <li>Normalization consumes <code>ResourceAcquired</code>, transforms resources, and forwards them as <code>ResourceNormalized</code> events. For the tail, Normalization propagates the end-of-stream by publishing a <code>ResourceNormalized</code> with <code>acquisitionComplete = true</code>.</li>
 <li>Measure Evaluation consumes <code>ResourceNormalized</code> and buffers per patient/report/phase until it receives the tail (<code>acquisitionComplete = true</code>). It then performs the Initial evaluation for that patient/report window. If reportable, it may emit <a href="event-measurereportgenerated.html">Measure Report Generated</a> (for informational/tracking purposes) or request supplemental data.</li>
 </ol>
-<h3 id="end-to-end-flow-supplemental-phase" class="content-heading">End-to-end flow (Supplemental phase) <a id="end-to-end-flow-supplemental-phase" href="#end-to-end-flow-supplemental-phase" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: End-to-end flow (Supplemental phase)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="end-to-end-flow-supplemental-phase" class="content-heading">End-to-end flow (Supplemental phase) <a href="#end-to-end-flow-supplemental-phase" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: End-to-end flow (Supplemental phase)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li>Data Acquisition executes the Supplemental plan only for patients deemed relevant (e.g., reportable) by Initial evaluation and produces <code>ResourceAcquired</code> events per resource.</li>
 <li>After the last supplemental resource is produced, Data Acquisition emits a tail <code>ResourceAcquired</code> with <code>acquisitionComplete = true</code>.</li>
 <li>Normalization normalizes the supplemental resources and emits <code>ResourceNormalized</code> events; for the tail, it publishes a <code>ResourceNormalized</code> with <code>acquisitionComplete = true</code>.</li>
 <li>Measure Evaluation buffers supplemental resources until it receives the supplemental tail, then performs the final evaluation for the patient/report. Upon completion it emits <a href="event-measurereportgenerated.html">Measure Report Generated</a> and per-resource <a href="event-resourceevaluated.html">ResourceEvaluated</a> as applicable.</li>
 </ol>
-<h3 id="why-a-tail-message" class="content-heading">Why a tail message? <a id="why-a-tail-message" href="#why-a-tail-message" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Why a tail message?"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="why-a-tail-message" class="content-heading">Why a tail message? <a href="#why-a-tail-message" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Why a tail message?"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Ordering and completeness: Resource arrivals can be out-of-order and across partitions. The tail provides a definitive completion signal for the current phase.</li>
 <li>Determinism: Evaluations only run once the phase’s resource stream is known to be complete for the patient/report tuple.</li>
 <li>Efficiency: Prevents unnecessary re-evaluations while resources are still in-flight.</li>
 </ul>
-<h3 id="message-and-field-references" class="content-heading">Message and field references <a id="message-and-field-references" href="#message-and-field-references" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Message and field references"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="message-and-field-references" class="content-heading">Message and field references <a href="#message-and-field-references" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Message and field references"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><p>Data Acquisition Service</p>
 <ul>
@@ -574,7 +576,7 @@
 </ul>
 </li>
 </ul>
-<h3 id="tail-message-structure-examples" class="content-heading">Tail message structure examples <a id="tail-message-structure-examples" href="#tail-message-structure-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail message structure examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="tail-message-structure-examples" class="content-heading">Tail message structure examples <a href="#tail-message-structure-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail message structure examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Initial tail (acquisition complete) carried on <a href="event-resourceacquired.html">Resource Acquired</a>:</p>
 <pre><code class="language-json">{
   &quot;acquisitionComplete&quot;: true,
@@ -610,7 +612,7 @@
 }
 </code></pre>
 <p>Supplemental tails use <code>queryType: &quot;Supplemental&quot;</code> with the same correlation semantics.</p>
-<h3 id="aggregation-logic-in-measure-evaluation-conceptual" class="content-heading">Aggregation logic in Measure Evaluation (conceptual) <a id="aggregation-logic-in-measure-evaluation-conceptual" href="#aggregation-logic-in-measure-evaluation-conceptual" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Aggregation logic in Measure Evaluation (conceptual)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="aggregation-logic-in-measure-evaluation-conceptual" class="content-heading">Aggregation logic in Measure Evaluation (conceptual) <a href="#aggregation-logic-in-measure-evaluation-conceptual" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Aggregation logic in Measure Evaluation (conceptual)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Group incoming <a href="event-resourcenormalized.html">Resource Normalized</a> by <code>(patientId, reportTrackingId, queryType)</code></li>
 <li>Buffer resources until a message with <code>acquisitionComplete = true</code> is observed</li>
@@ -623,7 +625,7 @@
 </ul>
 </li>
 </ul>
-<h3 id="operational-considerations-and-edge-cases" class="content-heading">Operational considerations and edge cases <a id="operational-considerations-and-edge-cases" href="#operational-considerations-and-edge-cases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Operational considerations and edge cases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="operational-considerations-and-edge-cases" class="content-heading">Operational considerations and edge cases <a href="#operational-considerations-and-edge-cases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Operational considerations and edge cases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Idempotency: Tails may be retried; consumers should treat <code>(patientId, reportTrackingId, queryType, acquisitionComplete=true)</code> as idempotent.</li>
 <li>Ordering: While per-partition ordering is preserved, resources and the tail can be on different partitions. Consumers must not rely on strict ordering across the entire topic—buffer/correlate instead.</li>
@@ -631,7 +633,7 @@
 <li>Duplicates: Deduplicate on a stable key (e.g., resourceId + patientId + reportTrackingId + queryType) before evaluation.</li>
 <li>Replays: On replay or reprocessing, tails should deterministically retrigger evaluation only if prior outputs are absent or invalidated.</li>
 </ul>
-<h3 id="where-this-is-implemented" class="content-heading">Where this is implemented <a id="where-this-is-implemented" href="#where-this-is-implemented" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where this is implemented"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="where-this-is-implemented" class="content-heading">Where this is implemented <a href="#where-this-is-implemented" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where this is implemented"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>These behaviors are derived from Link Cloud’s real-world implementation and the event schemas in this catalog:</p>
 <ul>
 <li><a href="event-resourceacquired.html">Resource Acquired</a> and <a href="event-resourcenormalized.html">Resource Normalized</a> include <code>acquisitionComplete</code> for tail signaling</li>
@@ -652,7 +654,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ntail_messages_4E1D6482["Design: Tail Messages"]</pre>
+ntail_messages_195FE81B["Design: Tail Messages"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

@@ -2,7 +2,6 @@
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using System.Text;
@@ -44,6 +43,24 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // The PendingValidation status must be persisted before the message is produced.
+            // Otherwise a fast ValidationComplete round-trip can set PassedValidation/FailedValidation
+            // first, and the write below would regress the entry to PendingValidation after a
+            // SubmitPayload was already produced, permanently blocking report completion.
+            using var scope = _serviceScopeFactory.CreateScope();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var entry = await reportEntryManager.GetEntry(scheduleId, patientId, cancellationToken);
+
+            if (entry == null)
+            {
+                throw new Exception($"No report entry record was found (ReportId = {scheduleId}, FacilityId = {facilityId}).");
+            }
+
+            entry.ReportingStatus = ReportingStatus.PendingValidation;
+            entry.SubmissionStatus = SubmissionStatus.PendingValidation;
+
+            await reportEntryManager.UpdateAsync(entry, cancellationToken);
+
             _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
@@ -68,19 +85,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 });
 
             _readyForValidationProducer.Flush();
-
-            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-            var entry = await reportEntryManager.GetEntry(scheduleId, patientId, CancellationToken.None);
-
-            if (entry == null)
-            {
-                throw new Exception($"No report entry record was found (ReportId = {scheduleId}, FacilityId = {facilityId}).");
-            }
-
-            entry.ReportingStatus = ReportingStatus.PendingValidation;
-            entry.SubmissionStatus = SubmissionStatus.PendingValidation;
-
-            await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
         }
     }
 }

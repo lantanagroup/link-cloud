@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,24 +497,24 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-validationcomplete.html">Validation Complete [event]</a>, <a href="command-validatevaluesetcode.html">Validate ValueSet Code [command]</a>, <a href="command-validatecodesystemcode.html">Validate CodeSystem Code [command]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-readyforvalidation.html">Ready for Validation [event]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Validation service is a Java based application that is responsible for validating FHIR resources against the FHIR specification and any additional constraints defined by the Link Cloud tenant. The service utilizes the <a href="https://hapifhir.io/">HAPI FHIR library</a> to perform the validation.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidationService_20F4F748["Service: Validation Service"]
-  nValidationService_20F4F748 -->|produces| nValidationComplete_7F3C0D47["Event: ValidationComplete"]
-  nReadyForValidation_293CC34C["Event: ReadyForValidation"] -->|consumed by| nValidationService_20F4F748
-  nValidationService_20F4F748 -->|sends| nValidateValueSetCode_2E2BA8B0["Command: ValidateValueSetCode"]
-  nValidationService_20F4F748 -->|sends| nValidateCodeSystemCode_15D077E8["Command: ValidateCodeSystemCode"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nReadyForValidation_293CC34C
-    nValidateCodeSystemCode_15D077E8
-    nValidateValueSetCode_2E2BA8B0
-    nValidationComplete_7F3C0D47
-    nValidationService_20F4F748
+nValidationService_5D88FD53["Service: Validation Service"]
+  nValidationService_5D88FD53 -->|produces| nValidationComplete_6ED20CD9["Event: ValidationComplete"]
+  nReadyForValidation_27561738["Event: ReadyForValidation"] -->|consumed by| nValidationService_5D88FD53
+  nValidationService_5D88FD53 -->|sends| nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"]
+  nValidationService_5D88FD53 -->|sends| nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nReadyForValidation_27561738
+    nValidateCodeSystemCode_2E03448C
+    nValidateValueSetCode_C70055C
+    nValidationComplete_6ED20CD9
+    nValidationService_5D88FD53
   end
 </pre></div>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=java#azure-app-config">Azure App Config</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#telemetry">Telemetry</a></li>
@@ -521,7 +523,7 @@ nValidationService_20F4F748["Service: Validation Service"]
 <li><a href="Entities/Details?type=design&amp;id=java#kafka">Kafka</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#service-authentication">Service Authentication</a></li>
 </ul>
-<h2 id="environment-variables" class="content-heading">Environment Variables <a id="environment-variables" href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="environment-variables" class="content-heading">Environment Variables <a href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -540,7 +542,7 @@ nValidationService_20F4F748["Service: Validation Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="custom-configurations" class="content-heading">Custom Configurations <a id="custom-configurations" href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="custom-configurations" class="content-heading">Custom Configurations <a href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -613,15 +615,15 @@ nValidationService_20F4F748["Service: Validation Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="new-installation-notes" class="content-heading">New Installation Notes <a id="new-installation-notes" href="#new-installation-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: New Installation Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="new-installation-notes" class="content-heading">New Installation Notes <a href="#new-installation-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: New Installation Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>After a new installation of the validation service, the following should be run/executed:</p>
 <ul>
 <li><code>/api/aritfact/$initialize</code> endpoint should be run to initialize the database with artifacts that are embedded in the validation service.</li>
 <li><code>/api/category/$initialize</code> endpoint should be run to initialize the database with default categories stored in <code>/src/main/resources/categories.json</code> (within the code-base)</li>
 </ul>
 <p>PENDING: This functionality is going to be altered so that they are automatically initialized on service startup when no artifacts or categories already exist in the service's database.</p>
-<h3 id="upload-storage" class="content-heading">Upload &amp; Storage <a id="upload-amp-storage" href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="upload-amp-storage" class="content-heading">Upload &amp; Storage <a href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Artifacts are uploaded either individual or as an NPM package (preferred).</p>
 <ul>
 <li>Individually: <code>PUT /api/validation/artifact/:type/:name</code></li>
@@ -634,26 +636,26 @@ nValidationService_20F4F748["Service: Validation Service"]
 <blockquote>
 <p>Note: The Admin UI currently only supports uploading a FHIR <code>Bundle</code> of resources. Doing so implies that the Admin UI can only upload individual resources from that Bundle to the validation service. We may consider using NPM packages in the Admin UI and aligning the MeasureEval service and the Validation service to use just NPM packages.</p>
 </blockquote>
-<h3 id="process-flow" class="content-heading">Process Flow <a id="process-flow" href="#process-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Process Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<h4 id="measure-evaluation-completion" class="content-heading">Measure Evaluation Completion <a id="measure-evaluation-completion" href="#measure-evaluation-completion" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Completion"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h3 id="process-flow" class="content-heading">Process Flow <a href="#process-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Process Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h4 id="measure-evaluation-completion" class="content-heading">Measure Evaluation Completion <a href="#measure-evaluation-completion" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Completion"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li>The Measure Evaluation Service evaluates a patient.</li>
 <li>Once evaluation is complete, it produces a Kafka <code>ResourceEvaluated</code> message for each resource returned by measure evaluation (including the MeasureReport).</li>
 </ul>
-<h4 id="report-service-persists-measurereport" class="content-heading">Report Service Persists MeasureReport <a id="report-service-persists-measurereport" href="#report-service-persists-measurereport" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Persists MeasureReport"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="report-service-persists-measurereport" class="content-heading">Report Service Persists MeasureReport <a href="#report-service-persists-measurereport" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Persists MeasureReport"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The report service consumes <code>ResourceEvaluated</code> and persists the resources.</p>
 <ul>
 <li>When the <code>MeasureReport</code> is processed by the Report service, it uses that to determine when it has received and persisted <em>all</em> resources.</li>
 <li>After all resources are persisted, the status of the patient for the submission changes to <code>ReadyToValidate</code>.</li>
 <li>After the status of the patient's submission changes, it produces a <code>ReadyForValidation</code> event.</li>
 </ul>
-<h4 id="validation-service-consumption" class="content-heading">Validation Service Consumption <a id="validation-service-consumption" href="#validation-service-consumption" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service Consumption"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="validation-service-consumption" class="content-heading">Validation Service Consumption <a href="#validation-service-consumption" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service Consumption"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li>The Validation Service consumes the Kafka <code>ReadyForValidation</code> event.</li>
 <li>It retrieves the <strong>MeasureReport</strong> for the specified patient from the Report Service.</li>
 <li>It extracts all contained FHIR resources and constructs a <strong>Bundle</strong> for validation.</li>
 </ul>
-<h4 id="validation-execution" class="content-heading">Validation Execution <a id="validation-execution" href="#validation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="validation-execution" class="content-heading">Validation Execution <a href="#validation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li>Each resource in the bundle is validated individually.</li>
 <li>The validation process includes:</li>
@@ -670,7 +672,7 @@ nValidationService_20F4F748["Service: Validation Service"]
 <li>Categorized results are persisted in the database.</li>
 <li>The validation service produces a <code>ValidationComplete</code> Kafka event and includes an indication of whether the patient's submission is valid.</li>
 </ul>
-<h3 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Validation Service supports two types of artifacts that define validation rules:</p>
 <ol>
 <li><strong>Package (<code>package.tgz</code> format)</strong></li>
@@ -685,9 +687,9 @@ nValidationService_20F4F748["Service: Validation Service"]
 <li>Individual <strong>StructureDefinitions</strong>, <strong>ValueSets</strong>, and <strong>CodeSystems</strong> can be provided.</li>
 </ul>
 <p>In addition to artifacts, categories must be initialized/specified in order to have categorized results. Otherwise, all validation results end up being &quot;uncategorized&quot;.</p>
-<h3 id="validation-categories" class="content-heading">Validation Categories <a id="validation-categories" href="#validation-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="validation-categories" class="content-heading">Validation Categories <a href="#validation-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Validation categories are used to group similar validation issues together, providing a way to manage and prioritize them. Each category defines a set of rules (matchers) that determine which validation issues belong to it.</p>
-<h4 id="category-properties" class="content-heading">Category Properties <a id="category-properties" href="#category-properties" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Category Properties"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="category-properties" class="content-heading">Category Properties <a href="#category-properties" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Category Properties"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each category consists of the following properties:</p>
 <ul>
 <li><strong>ID</strong>: A unique identifier for the category (e.g., <code>Incorrect_display_value_for_code</code>).</li>
@@ -701,7 +703,7 @@ nValidationService_20F4F748["Service: Validation Service"]
 <li><strong>Guidance</strong>: Instructions or information on how to resolve the issues in this category.</li>
 <li><strong>Matcher</strong>: A rule or set of rules used to match validation issues.</li>
 </ul>
-<h4 id="rule-matching-fields" class="content-heading">Rule Matching Fields <a id="rule-matching-fields" href="#rule-matching-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rule Matching Fields"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="rule-matching-fields" class="content-heading">Rule Matching Fields <a href="#rule-matching-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rule Matching Fields"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Rules can be keyed on the following fields of a validation result (OperationOutcome.issue):</p>
 <ul>
 <li><strong>MESSAGE</strong>: Matches against the human-readable description of the issue.</li>
@@ -709,14 +711,14 @@ nValidationService_20F4F748["Service: Validation Service"]
 <li><strong>CODE</strong>: Matches against the FHIR issue type code (e.g., <code>code-invalid</code>, <code>value</code>).</li>
 <li><strong>EXPRESSION</strong>: Matches against the FHIRPath expression pointing to the element in the resource that caused the issue.</li>
 </ul>
-<h4 id="matcher-types" class="content-heading">Matcher Types <a id="matcher-types" href="#matcher-types" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Matcher Types"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="matcher-types" class="content-heading">Matcher Types <a href="#matcher-types" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Matcher Types"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Validation matchers are used to define the rules for a category. All matchers support an <code>inverted</code> property, which allows for logical negation of the match result.</p>
 <ul>
 <li><strong>RegexMatcher</strong>: The primary matcher used for field-level matching. It evaluates a regular expression against a specific field of a validation issue.</li>
 <li><strong>InvertibleMatcher</strong>: This is the base abstract implementation for other matchers. While not used directly, it provides the <code>inverted</code> property to its subclasses (<code>RegexMatcher</code> and <code>CompositeMatcher</code>), allowing any rule to be negated.</li>
 <li><strong>CompositeMatcher</strong>: A powerful matcher that allows grouping multiple other matchers (including other composite matchers) to create complex matching logic. It uses a <code>requiresAllChildren</code> flag to determine if it should act as a logical AND (true) or logical OR (false).</li>
 </ul>
-<h4 id="detailed-matcher-examples" class="content-heading">Detailed Matcher Examples <a id="detailed-matcher-examples" href="#detailed-matcher-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Detailed Matcher Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="detailed-matcher-examples" class="content-heading">Detailed Matcher Examples <a href="#detailed-matcher-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Detailed Matcher Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Below are more detailed examples showing the differences and use cases for each matcher implementation.</p>
 <p><strong>1. RegexMatcher</strong></p>
 <p>The <code>RegexMatcher</code> is the most straightforward way to match a validation issue. It targets a specific field of the <code>OperationOutcome.issue</code>.</p>
@@ -787,7 +789,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
   ]
 }
 </code></pre>
-<h4 id="example-categories" class="content-heading">Example Categories <a id="example-categories" href="#example-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-categories" class="content-heading">Example Categories <a href="#example-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p><strong>Example 1: Incorrect Display Value (Acceptable)</strong></p>
 <p>This category matches issues where a code's display name is incorrect. It is marked as <code>acceptable: true</code>.</p>
 <pre><code class="language-json">{
@@ -818,7 +820,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
 </code></pre>
 <p>The system reserves a category with an ID of &quot;uncategorized&quot; for any validation issues within a report that are not mapped or associated with a defined category. This ensures that all validation issues are always captured, even when they don't match any of the configured category rules.</p>
 <p>Categories can be configured individually or in bulk via the API.</p>
-<h3 id="example-profile-validation" class="content-heading">Example: Profile Validation <a id="example-profile-validation" href="#example-profile-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example: Profile Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="example-profile-validation" class="content-heading">Example: Profile Validation <a href="#example-profile-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example: Profile Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When the validation service encounters an Observation resource like the following:</p>
 <pre><code class="language-jsonc">{
   &quot;resourceType&quot;: &quot;Observation&quot;,
@@ -836,7 +838,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
 </ul>
 <p>Similarly, for properties bound to a ValueSet or CodeSystem, the service expects these artifacts to be provided. If they
 are missing, it will issue warnings.</p>
-<h3 id="sequence-diagram" class="content-heading">Sequence Diagram <a id="sequence-diagram" href="#sequence-diagram" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Sequence Diagram"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="sequence-diagram" class="content-heading">Sequence Diagram <a href="#sequence-diagram" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Sequence Diagram"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following diagram illustrates the relationship between the Measure Evaluation Service, Kafka, and the Validation Service:</p>
 <pre class="mermaid">sequenceDiagram
     participant MES as Measure Evaluation Service
@@ -875,7 +877,7 @@ are missing, it will issue warnings.</p>
     VS->>Storage: Store OperationOutcome
     VS->>RS: Produces ValidationComplete event
 </pre>
-<h3 id="terminology-service-integration-and-caching" class="content-heading">Terminology Service Integration and Caching <a id="terminology-service-integration-and-caching" href="#terminology-service-integration-and-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology Service Integration and Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="terminology-service-integration-and-caching" class="content-heading">Terminology Service Integration and Caching <a href="#terminology-service-integration-and-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology Service Integration and Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Validation Service validates coded elements using either a remote terminology capability or local in-memory supports, depending on how the service is configured.</p>
 <p>Terminology resolution options (in order of precedence):</p>
 <ul>
@@ -896,13 +898,13 @@ are missing, it will issue warnings.</p>
 <li>If using the Link Terminology Service, the service automatically targets its FHIR endpoint.</li>
 <li>If no terminology endpoint is configured, the validator will not make network calls for terminology; only built-in/common supports are used.</li>
 </ul>
-<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a id="known-deficiencies" href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Global scope</strong>: All stored artifacts are always loaded; there is no filtering or scoping based on tenant or package.</li>
 <li><strong>No tenant-specific configuration</strong>: There is no ability to configure validation behavior per tenant or per package version.</li>
 <li>Use of the HAPI FHIR validation libraries only supports <code>CodeSystem</code>, <code>ValueSet</code>, and <code>StructureDefinition</code> resources.</li>
 </ul>
-<h2 id="future-considerations" class="content-heading">Future Considerations <a id="future-considerations" href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="future-considerations" class="content-heading">Future Considerations <a href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Operation to bulk <em>retrieve</em> categories and their rules that can be updated in an text editor and then provided back to the <em>bulk save</em> operation.</li>
 <li>Operation to validate <em>and</em> categorize a resource (or Bundle) and return a composite response of the validation results and associated categories.</li>
@@ -1468,17 +1470,17 @@ are missing, it will issue warnings.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidationService_20F4F748["Service: Validation Service"]
-  nValidationService_20F4F748 -->|produces| nValidationComplete_7F3C0D47["Event: ValidationComplete"]
-  nReadyForValidation_293CC34C["Event: ReadyForValidation"] -->|consumed by| nValidationService_20F4F748
-  nValidationService_20F4F748 -->|sends| nValidateValueSetCode_2E2BA8B0["Command: ValidateValueSetCode"]
-  nValidationService_20F4F748 -->|sends| nValidateCodeSystemCode_15D077E8["Command: ValidateCodeSystemCode"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nReadyForValidation_293CC34C
-    nValidateCodeSystemCode_15D077E8
-    nValidateValueSetCode_2E2BA8B0
-    nValidationComplete_7F3C0D47
-    nValidationService_20F4F748
+nValidationService_5D88FD53["Service: Validation Service"]
+  nValidationService_5D88FD53 -->|produces| nValidationComplete_6ED20CD9["Event: ValidationComplete"]
+  nReadyForValidation_27561738["Event: ReadyForValidation"] -->|consumed by| nValidationService_5D88FD53
+  nValidationService_5D88FD53 -->|sends| nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"]
+  nValidationService_5D88FD53 -->|sends| nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nReadyForValidation_27561738
+    nValidateCodeSystemCode_2E03448C
+    nValidateValueSetCode_C70055C
+    nValidationComplete_6ED20CD9
+    nValidationService_5D88FD53
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

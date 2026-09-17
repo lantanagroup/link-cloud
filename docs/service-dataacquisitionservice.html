@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,29 +497,29 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-patientcensusscheduled.html">Patient Census Scheduled [event]</a>, <a href="command-dataacquisitionrequested.html">Data Acquisition Requested [command]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Data Acquisition service is responsible for connecting and querying a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure. For Epic installations, Link Cloud is utilizing the Epic FHIR STU3 Patient List resource to inform which patients are currently admitted in the facility. While this is the current solution to acquiring the patient census, there are other means of patient acquisition being investigated (ADT V2, Bulk FHIR) to provide universal support across multiple EHR vendors.</p>
 <p>In addition to FHIR endpoints, the service supports <strong>SFTP-based acquisition</strong> for tenants that drop extract files (e.g., Cerner CCL pipe-delimited extracts) onto a remote SFTP server rather than exposing a queryable FHIR API. See <a href="#sftp-data-acquisition">SFTP Data Acquisition</a> below.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
-  nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_3BF82DDB
-  nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_3BF82DDB
-  nDataAcquisitionService_3BF82DDB -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nDataAcquisitionService_3BF82DDB -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
-    nDataAcquisitionService_3BF82DDB
+nDataAcquisitionService_2716332D["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_2716332D
+  nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_2716332D
+  nDataAcquisitionService_2716332D -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nDataAcquisitionService_2716332D -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
+    nDataAcquisitionService_2716332D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nPatientCensusScheduled_2383C0C6
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nPatientCensusScheduled_3CE52530
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
   end
 </pre></div>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -531,9 +533,9 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#data-acquisition-service-configuration">Data Acquisition Service Configuration</a></li>
 <li><a href="#sftp-acquisition-settings">SFTP Acquisition Settings</a></li>
 </ul>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p><strong>Data Acquisition</strong> is a crucial step in the report generation pipeline, responsible for obtaining clinical data from external systems, such as FHIR R4 endpoints within electronic health record (EHR) systems. By systematically acquiring and managing data, it ensures that downstream processes like evaluation and reporting are equipped with the necessary information.</p>
-<h3 id="key-roles-of-data-acquisition" class="content-heading">Key Roles of Data Acquisition <a id="key-roles-of-data-acquisition" href="#key-roles-of-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Roles of Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="key-roles-of-data-acquisition" class="content-heading">Key Roles of Data Acquisition <a href="#key-roles-of-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Roles of Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>Census Acquisition</strong>:</li>
 </ol>
@@ -554,7 +556,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <ul>
 <li>Retrieves additional data elements that may not be needed for initial evaluations but are desirable for complete submission and reporting.</li>
 </ul>
-<h3 id="where-data-acquisition-fits-in-the-pipeline" class="content-heading">Where Data Acquisition Fits in the Pipeline <a id="where-data-acquisition-fits-in-the-pipeline" href="#where-data-acquisition-fits-in-the-pipeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where Data Acquisition Fits in the Pipeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="where-data-acquisition-fits-in-the-pipeline" class="content-heading">Where Data Acquisition Fits in the Pipeline <a href="#where-data-acquisition-fits-in-the-pipeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Where Data Acquisition Fits in the Pipeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data acquisition plays a role in three distinct stages of the report generation pipeline:</p>
 <ol>
 <li><strong>Patient Identification</strong>:</li>
@@ -576,7 +578,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li>Acquiring additional, non-essential data to enrich the submission.</li>
 <li>Completes the dataset for comprehensive evaluation and reporting.</li>
 </ul>
-<h3 id="progressive-querying" class="content-heading">Progressive Querying <a id="progressive-querying" href="#progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="progressive-querying" class="content-heading">Progressive Querying <a href="#progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>To optimize data acquisition, the system employs a technique called <strong>Progressive Querying</strong>.</p>
 <p>During progressive querying, data is acquired in stages to meet the evaluation pipeline's needs. It flows between services via Kafka topics/events, starting from <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a> to normalization, through initial evaluation to determine patient relevance, and back to acquire supplemental data, which is then normalized and re-evaluated.</p>
 <p>This method minimizes the data retrieved from the EHR by acquiring only what is necessary at each stage of the pipeline:</p>
@@ -585,13 +587,13 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li><strong>Supplemental Querying</strong>: Retrieves additional data elements after initial evaluations confirm patient relevance.</li>
 <li><strong>Final Evaluation</strong>: Combines initial and supplemental data for comprehensive measure evaluation and reporting.</li>
 </ol>
-<h4 id="benefits-of-progressive-querying" class="content-heading">Benefits of Progressive Querying <a id="benefits-of-progressive-querying" href="#benefits-of-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits of Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="benefits-of-progressive-querying" class="content-heading">Benefits of Progressive Querying <a href="#benefits-of-progressive-querying" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits of Progressive Querying"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
 <li><strong>Efficiency</strong>: Reduces the volume of data retrieved from the EHR, optimizing system performance.</li>
 <li><strong>Precision</strong>: Focuses on acquiring only data that is needed for specific stages in the pipeline.</li>
 <li><strong>Scalability</strong>: Supports large-scale operations by limiting unnecessary data transfers.</li>
 </ul>
-<h3 id="bulk-fhir-in-data-acquisition" class="content-heading">Bulk FHIR in Data Acquisition <a id="bulk-fhir-in-data-acquisition" href="#bulk-fhir-in-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Bulk FHIR in Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="bulk-fhir-in-data-acquisition" class="content-heading">Bulk FHIR in Data Acquisition <a href="#bulk-fhir-in-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Bulk FHIR in Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Bulk FHIR</strong> is a mechanism under exploration for acquiring data efficiently. However, several limitations impact its general use in data acquisition workflows:</p>
 <ol>
 <li><strong>Challenges with Bulk FHIR</strong>:</li>
@@ -610,7 +612,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li>It can acquire &quot;Patient&quot; resources for a group of patients associated with a query, filter, or registry in the EHR.</li>
 <li>This use case is limited to identifying patients of interest and does not address broader data acquisition.</li>
 </ul>
-<h3 id="configuration-for-data-acquisition" class="content-heading">Configuration for Data Acquisition <a id="configuration-for-data-acquisition" href="#configuration-for-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration for Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration-for-data-acquisition" class="content-heading">Configuration for Data Acquisition <a href="#configuration-for-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration for Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Data acquisition is configurable per tenant, ensuring flexibility to accommodate diverse EHR systems and data requirements. Key configurable parameters include:</p>
 <ul>
 <li><p><strong>Base FHIR URL</strong>:</p>
@@ -673,8 +675,17 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li>Configurable settings to respect EHR query limitations (e.g., maximum queries per minute).</li>
 </ul>
 </li>
+<li><p><strong>Location Organization</strong>:</p>
+<ul>
+<li>Optional, per-facility feature for tenants whose FHIR endpoint spans multiple facilities (e.g., a health system where one FHIR server returns encounter data for every facility it operates). It scopes acquired/reported data to a single NHSN reporting Org ID by letting a tenant declare which <code>Location</code> resources belong to its reporting organization.</li>
+<li>Configurations can be managed via the Data Acquisition Rest API.</li>
+<li>The feature only activates when a facility has an <strong>active</strong> config with at least one condition. When none exist, org-location logic is a no-op and every patient is evaluated.</li>
+<li>Saving a config change invalidates the facility's conditions cache (1 hour TTL) and re-evaluates already-acquired <code>Location</code> resources against the updated conditions.</li>
+<li>Requires the facility's Query Plan to acquire <code>Encounter</code> resources and resolve <code>Location</code> references (<code>Reference</code> query type). Without those, there are no locations for the conditions to evaluate.</li>
 </ul>
-<h3 id="configuring-query-plans" class="content-heading">Configuring Query Plans <a id="configuring-query-plans" href="#configuring-query-plans" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Query Plans"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+</li>
+</ul>
+<h3 id="configuring-query-plans" class="content-heading">Configuring Query Plans <a href="#configuring-query-plans" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Query Plans"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Types of query plans:</strong></p>
 <ul>
 <li>Daily</li>
@@ -825,12 +836,12 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
   }
 }
 </code></pre>
-<h4 id="configuring-census-and-data-sources" class="content-heading">Configuring Census and Data Sources <a id="configuring-census-and-data-sources" href="#configuring-census-and-data-sources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Census and Data Sources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="configuring-census-and-data-sources" class="content-heading">Configuring Census and Data Sources <a href="#configuring-census-and-data-sources" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuring Census and Data Sources"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Data sources (where the FHIR server is located and how to authenticate) are configured via &quot;Query Configs&quot;. There is currently no association between a query <em>plan</em> and data source. Whenever data acquisition attempts to execute a query plan against a data source, it uses the FHIR server and authentication method specified by the &quot;Query Config&quot;, for the specified facility/tenant.</p>
 <p>TODO: Add details about how to authenticate against Epic, Cerner, Basic, and/or OAuth data sources.</p>
-<h3 id="query-plans-and-acquisition-logs" class="content-heading">Query Plans and Acquisition Logs <a id="query-plans-and-acquisition-logs" href="#query-plans-and-acquisition-logs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plans and Acquisition Logs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="query-plans-and-acquisition-logs" class="content-heading">Query Plans and Acquisition Logs <a href="#query-plans-and-acquisition-logs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plans and Acquisition Logs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Data Acquisition Service uses <strong>Query Plans</strong> to define the strategy for retrieving data. These plans are translated into <strong>Data Acquisition Logs</strong>, which represent discrete units of work to be executed by the worker service.</p>
-<h4 id="acquisition-log-lifecycle" class="content-heading">Acquisition Log Lifecycle <a id="acquisition-log-lifecycle" href="#acquisition-log-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Log Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="acquisition-log-lifecycle" class="content-heading">Acquisition Log Lifecycle <a href="#acquisition-log-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Log Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each acquisition task follows a strictly managed state machine:</p>
 <ol>
 <li><strong>Scheduled</strong>: The log entry is created but not yet ready for execution. This usually happens when a <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> event is received.</li>
@@ -840,21 +851,21 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li><strong>Completed</strong>: All resources for the log have been successfully acquired and normalized.</li>
 <li><strong>Failed</strong>: An error occurred during acquisition that exceeded the maximum retry attempts.</li>
 </ol>
-<h4 id="log-creation-process" class="content-heading">Log Creation Process <a id="log-creation-process" href="#log-creation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Creation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="log-creation-process" class="content-heading">Log Creation Process <a href="#log-creation-process" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Creation Process"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>When a <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> event is received, the service:</p>
 <ol>
 <li>Retrieves the appropriate <strong>Query Plan</strong> for the facility and report type.</li>
 <li>Identifies the target patients (either from the event itself or by creating a <strong>Census</strong> log).</li>
 <li>Generates a set of <code>DataAcquisitionLog</code> entries for each required resource type and patient, assigned to the <strong>Initial</strong> phase.</li>
 </ol>
-<h4 id="execution-and-dependency-management" class="content-heading">Execution and Dependency Management <a id="execution-and-dependency-management" href="#execution-and-dependency-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Execution and Dependency Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="execution-and-dependency-management" class="content-heading">Execution and Dependency Management <a href="#execution-and-dependency-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Execution and Dependency Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>The system determines when a log should be executed based on its <code>Status</code> and <code>QueryPhase</code>:</p>
 <ul>
 <li><strong>Phase-Based Execution</strong>: Logs are typically executed in phases. <strong>Initial</strong> phase logs are created first. Once initial data is acquired and evaluated by downstream services, they may trigger <strong>Supplemental</strong> acquisition by sending new <a href="command-dataacquisitionrequested.html">Data Acquisition Requested</a> events with a supplemental phase flag.</li>
 <li><strong>Wait Logic</strong>: Supplemental logs are not created until the initial evaluation confirms the patient's relevance to the report. This prevents unnecessary data retrieval for patients who do not meet the report's criteria.</li>
 <li><strong>Retry Mechanism</strong>: If a log fails due to transient issues (e.g., network timeout), it is incremented and returned to a <code>Pending</code> or <code>Scheduled</code> state for retry, up to a maximum of 5 attempts.</li>
 </ul>
-<h4 id="query-plan-structure" class="content-heading">Query Plan Structure <a id="query-plan-structure" href="#query-plan-structure" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan Structure"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="query-plan-structure" class="content-heading">Query Plan Structure <a href="#query-plan-structure" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Plan Structure"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>A Query Plan relates to logs by defining the &quot;blueprint&quot; for their creation:</p>
 <ul>
 <li><strong>ResourceType</strong>: The FHIR resource to be queried (e.g., Patient, Encounter, Observation).</li>
@@ -867,13 +878,24 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 <li><strong>QueryPhase</strong>: Categorizes the query into <code>Initial</code> or <code>Supplemental</code>.</li>
 </ul>
 <p>For more details on how these logs are processed, see the <a href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a>.</p>
-<h3 id="tail-messages" class="content-heading">Tail Messages <a id="tail-messages" href="#tail-messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>Data Acquisition emits a tail <a href="event-resourceacquired.html">Resource Acquired</a> event for each <code>(patientId, reportTrackingId, queryType)</code> tuple when all resources for the phase are produced. This tail sets <code>acquisitionComplete = true</code> and signals downstream services to proceed. See:</p>
+<h3 id="organization-location-mapping-and-encounter-mapping" class="content-heading">Organization Location Mapping and Encounter Mapping <a href="#organization-location-mapping-and-encounter-mapping" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Organization Location Mapping and Encounter Mapping"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When <a href="#configuration-for-data-acquisition">Location Organization</a> is configured for a facility, Data Acquisition tracks two additional things during acquisition: whether each acquired <code>Location</code> belongs to the tenant's reporting organization, and whether each patient's <code>Encounter</code> occurred at one of those locations. Together these determine whether a patient be evaluated.</p>
+<h4 id="organization-location-mapping" class="content-heading">Organization Location Mapping <a href="#organization-location-mapping" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Organization Location Mapping"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <ul>
-<li>Events → <a href="event-resourceacquired.html">Resource Acquired</a></li>
-<li>Docs → <a href="docs/development/patterns/tail_messages">Tail Messages: Patient Completion Signals</a></li>
+<li>Each <code>Location</code> resource acquired for a facility is persisted as an <code>OrganizationLocationMapping</code> record.</li>
+<li><code>IsOrgLocation</code> is set automatically by evaluating the facility's active <code>OrganizationLocationCondition</code> FHIRPath rules against the acquired <code>Location</code>.</li>
+<li><strong>Child locations inherit <code>IsOrgLocation</code> from their <code>partOf</code> parent.</strong> A child already flagged as an org location is never demoted just because its parent isn't.</li>
+<li>If an <code>Encounter</code> references a <code>Location</code> that hasn't been acquired yet, a placeholder <code>OrganizationLocationMapping</code> row is created so the reference can be resolved once the <code>Location</code> is acquired.</li>
+<li>Admins can manually override a location's org membership via <code>PUT api/data/location-mappings/{id}</code> (<code>IsLinkAdmin</code> setting). Setting <code>IsOrgLocation</code> cascades automatically: every <code>EncounterMapping.MappedToOrg</code> that references the updated location is recomputed, and the change propagates down the <code>partOf</code> hierarchy to child locations.</li>
 </ul>
-<h2 id="fhir-list-acquisition" class="content-heading">FHIR List Acquisition <a id="fhir-list-acquisition" href="#fhir-list-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIR List Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h4 id="encounter-mappings" class="content-heading">Encounter Mappings <a href="#encounter-mappings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Encounter Mappings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<ul>
+<li>Each acquired <code>Encounter</code> is persisted as an <code>EncounterMapping</code> record and linked via the <code>EncounterLocation</code> join table to the <code>OrganizationLocationMapping</code>(s) it references.</li>
+<li><code>MappedToOrg</code> is <code>true</code> if <strong>any</strong> location referenced by the encounter is an org location, and is recomputed automatically whenever the underlying location mapping changes.</li>
+<li><code>MappedToOrg</code> drives patient reportability: a patient is reportable only if at least one of their encounters is mapped to the org. For a non-reportable patient, dependent (supplemental) acquisition is preempted and the non-org encounter is stripped from the resource cache before evaluation, so the patient evaluates as non-reportable and is excluded from the report.</li>
+<li>Admins can manually override the flag via <code>PUT api/data/encounter-mappings/{id}</code> or <code>PUT api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code> (<code>IsLinkAdmin</code> setting).</li>
+</ul>
+<h2 id="fhir-list-acquisition" class="content-heading">FHIR List Acquisition <a href="#fhir-list-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: FHIR List Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Epic EHR deployments will have FHIR Lists available for Link to track recently admitted and discharged patients within a facility. Currently, there are six separate FHIR List Id's that track the time difference since the patient was admitted:</p>
 <table>
 <thead>
@@ -909,7 +931,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h3 id="list-acquisition-processing-sequence" class="content-heading">List Acquisition Processing Sequence <a id="list-acquisition-processing-sequence" href="#list-acquisition-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: List Acquisition Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="list-acquisition-processing-sequence" class="content-heading">List Acquisition Processing Sequence <a href="#list-acquisition-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: List Acquisition Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following demonstrates the workflow when the Data Acquisition service consumes a <code>PatientCensusScheduled</code> event for an Epic EHR facility:</p>
 <pre class="mermaid">sequenceDiagram
     participant CS as Census Service
@@ -934,10 +956,10 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
     CS->>SQL: Insert into Materialized View Store
     CS->>K: Produce PatientEvent (if patient is discharged)
 </pre>
-<h2 id="sftp-data-acquisition" class="content-heading">SFTP Data Acquisition <a id="sftp-data-acquisition" href="#sftp-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="sftp-data-acquisition" class="content-heading">SFTP Data Acquisition <a href="#sftp-data-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Data Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Some EHR deployments (notably Cerner via CCL extracts) cannot expose a queryable FHIR endpoint for census or resource acquisition. For these tenants, Data Acquisition supports pulling extract files from a per-facility SFTP server, parsing them into Link's domain model, and emitting Kafka events that drive the rest of the report generation pipeline.</p>
 <p>SFTP acquisition is implemented as an independent acquisition channel from FHIR querying. It does not consume <code>DataAcquisitionRequested</code> or produce <code>ReadyToAcquire</code> — instead, a background worker polls the <code>SftpAcquisitionLog</code> table on a fixed interval, opens an SFTP session per facility, and dispatches files to a processor selected by the log's <code>AcquisitionType</code> and <code>SubType</code>.</p>
-<h3 id="when-to-use-sftp-acquisition" class="content-heading">When to Use SFTP Acquisition <a id="when-to-use-sftp-acquisition" href="#when-to-use-sftp-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Use SFTP Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="when-to-use-sftp-acquisition" class="content-heading">When to Use SFTP Acquisition <a href="#when-to-use-sftp-acquisition" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Use SFTP Acquisition"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -960,7 +982,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h3 id="architecture" class="content-heading">Architecture <a id="architecture" href="#architecture" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="architecture" class="content-heading">Architecture <a href="#architecture" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre class="mermaid">flowchart LR
     subgraph Tenant["Tenant Environment"]
         EHR[(EHR /&lt;br/>Extract Job)]
@@ -997,7 +1019,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
     Proc -->|update status &amp; benchmarks| Log
     Kafka --> Census
 </pre>
-<h3 id="acquisition-lifecycle" class="content-heading">Acquisition Lifecycle <a id="acquisition-lifecycle" href="#acquisition-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="acquisition-lifecycle" class="content-heading">Acquisition Lifecycle <a href="#acquisition-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Acquisition Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Each <code>SftpAcquisitionLog</code> follows its own state machine, distinct from the FHIR <code>DataAcquisitionLog</code> lifecycle described above.</p>
 <pre class="mermaid">stateDiagram-v2
     [*] --> Pending : Census schedule creates log
@@ -1013,7 +1035,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
     MaxRetriesReached --> [*]
 </pre>
 <p>Retries use exponential backoff between <code>BaseRetryDelaySeconds</code> and <code>MaxRetryDelaySeconds</code> (e.g., 60s, 120s, 240s, 480s, ... capped at 3600s). The log's <code>RetryAttempts</code> field is incremented on each transition through <code>Failed</code>; once it exceeds <code>MaxRetryAttempts</code>, the log is parked in <code>MaxRetriesReached</code> and excluded from future polls.</p>
-<h3 id="per-file-processing-sequence" class="content-heading">Per-File Processing Sequence <a id="per-file-processing-sequence" href="#per-file-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-File Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="per-file-processing-sequence" class="content-heading">Per-File Processing Sequence <a href="#per-file-processing-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-File Processing Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre class="mermaid">sequenceDiagram
     participant W as SftpAcquisitionService
     participant H as SftpAcquisitionHandler
@@ -1054,9 +1076,9 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
         end
     end
 </pre>
-<h3 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>SFTP acquisition is configured at three layers: <strong>service-wide settings</strong>, <strong>per-facility connection / acquisition definitions</strong>, and <strong>secret-managed credentials</strong>.</p>
-<h4 id="sftp-acquisition-settings" class="content-heading">SFTP Acquisition Settings <a id="sftp-acquisition-settings" href="#sftp-acquisition-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Acquisition Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="sftp-acquisition-settings" class="content-heading">SFTP Acquisition Settings <a href="#sftp-acquisition-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SFTP Acquisition Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Worker-level tuning, sourced from the <code>SftpAcquisition</code> configuration section in <code>appsettings.json</code> / Azure App Configuration. These apply to the <code>SftpAcquisitionService</code> background host.</p>
 <table>
 <thead>
@@ -1140,7 +1162,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 }
 </code></pre>
 <p>A separate <code>SftpValidation</code> section (bound to <code>SftpValidationSettings</code>) holds validation rules applied to incoming <code>SftpConfiguration</code> payloads via the configuration API.</p>
-<h4 id="per-facility-sftp-configuration" class="content-heading">Per-Facility SFTP Configuration <a id="per-facility-sftp-configuration" href="#per-facility-sftp-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-Facility SFTP Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="per-facility-sftp-configuration" class="content-heading">Per-Facility SFTP Configuration <a href="#per-facility-sftp-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Per-Facility SFTP Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each facility that uses SFTP acquisition has exactly one <code>SftpConfiguration</code> row, managed via the <code>/api/data/sftp-configurations</code> endpoints on the Data Acquisition service. This describes <strong>how to connect</strong> to the tenant's SFTP server and <strong>what files to look for</strong>.</p>
 <table>
 <thead>
@@ -1266,22 +1288,22 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </tr>
 </tbody>
 </table>
-<h4 id="credentials" class="content-heading">Credentials <a id="credentials" href="#credentials" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Credentials"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="credentials" class="content-heading">Credentials <a href="#credentials" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Credentials"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>SFTP credentials are <strong>never stored on the <code>SftpConfiguration</code> row</strong>. They are persisted via the <code>ISecretManager</code> interface in whichever backend the deployment is configured to use, under the key:</p>
 <pre><code>sftp-credentials-{organizationId}
 </code></pre>
 <p>The payload is an <code>SftpCredentialsModel</code> (<code>Username</code>, <code>Password</code>). The configuration API exposes endpoints to set, retrieve status (without revealing the password), and delete credentials independently of the connection metadata.</p>
-<h4 id="connection-test" class="content-heading">Connection Test <a id="connection-test" href="#connection-test" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Connection Test"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="connection-test" class="content-heading">Connection Test <a href="#connection-test" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Connection Test"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>A dedicated test endpoint (<code>/api/data/sftp-configurations/{facilityId}/test</code>) opens a live SFTP session using the saved configuration and credentials, lists the configured <code>RemoteDirectory</code>, and reports success or the underlying error. Use this when onboarding a tenant or after rotating credentials.</p>
-<h3 id="kafka-events" class="content-heading">Kafka Events <a id="kafka-events" href="#kafka-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="kafka-events" class="content-heading">Kafka Events <a href="#kafka-events" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Events"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>SFTP acquisition emits events on a separate topic from FHIR acquisition. The current processor produces:</p>
 <ul>
 <li><strong><code>CernerPatientsAcquired</code></strong> — published by <code>CernerCCLExtractProcessor</code> once per successfully parsed census file. Consumed by the Census service's <code>CernerPatientsAcquiredListener</code>, which translates encounters into <code>PatientEvent</code> admit/discharge messages that feed the standard census workflow.</li>
 </ul>
 <p>SFTP processing intentionally does <strong>not</strong> emit <code>PatientListsAcquired</code> or <code>ReadyToAcquire</code>; those events remain specific to the FHIR-driven acquisition path.</p>
-<h3 id="observability" class="content-heading">Observability <a id="observability" href="#observability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="observability" class="content-heading">Observability <a href="#observability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When <code>EnableBenchmarking</code> is set on an <code>SftpConfiguration</code>, the worker writes an <code>SftpAcquisitionBenchmark</code> entry per processed file containing per-stage durations (connection, listing, download, parse, publish) and item counts. These are stored on the <code>SftpAcquisitionLog</code> and are queryable via <code>/api/data/sftp-logs</code>. The <code>Notes</code> field on the log captures human-readable error messages when a run fails.</p>
-<h2 id="logging" class="content-heading">Logging <a id="logging" href="#logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="logging" class="content-heading">Logging <a href="#logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Logging configuration defines the logging levels for different parts of the application.</p>
 <table>
 <thead>
@@ -1349,7 +1371,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">Priority</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">PatientId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>No</td><td>450</td></tr><tr><td><span style="padding-left:0px">FhirVersion</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryType</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">Status</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">ExecutionDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">RetryAttempts</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CompletionDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CompletionTimeMilliseconds</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">IsCensus</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportableEvent</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TailSent</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportTrackingId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TraceId</span></td><td>string</td><td>No</td><td>64</td></tr><tr><td><span style="padding-left:0px">Id</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IsDeleted</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SiblingCount</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ReferenceResourceType</span></td><td>string</td><td>No</td><td>128</td></tr>
+          <tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">Priority</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">PatientId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>No</td><td>450</td></tr><tr><td><span style="padding-left:0px">FhirVersion</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryType</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">Status</span></td><td>string</td><td>No</td><td>50</td></tr><tr><td><span style="padding-left:0px">ExecutionDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">RetryAttempts</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CompletionDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CompletionTimeMilliseconds</span></td><td>integer (int64)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">IsCensus</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportableEvent</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TailSent</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportTrackingId</span></td><td>string (uuid)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">TraceId</span></td><td>string</td><td>No</td><td>64</td></tr><tr><td><span style="padding-left:0px">Id</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IsDeleted</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SiblingCount</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ReferenceResourceType</span></td><td>string</td><td>No</td><td>128</td></tr>
         </tbody>
       </table>
     </div>
@@ -1366,7 +1388,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Note</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Note</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1383,7 +1405,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReferenceResourceId</span></td><td>string</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReferenceResourceId</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1400,7 +1422,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>512</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>512</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1408,7 +1430,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-5" aria-expanded="false"><strong>dbo.fhirListConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-5" aria-expanded="false"><strong>dbo.EncounterLocation</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-5" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1417,7 +1439,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirBaseServerUrl</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Authentication</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EHRPatientLists</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">EncounterLocationId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EncounterMappingId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifiedDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">OrganizationLocationMappingId</span></td><td>integer</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1425,7 +1447,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-6" aria-expanded="false"><strong>dbo.FhirQuery</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-6" aria-expanded="false"><strong>dbo.EncounterMapping</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-6" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1434,7 +1456,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Paged</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryParameters</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">QueryType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">MeasureId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">isReference</span></td><td>boolean</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusListId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusPatientStatus</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusTimeFrame</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">EncounterMappingId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EncounterId</span></td><td>string</td><td>Yes</td><td>500</td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">MappedToOrg</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifiedDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">PatientId</span></td><td>string</td><td>Yes</td><td>500</td></tr>
         </tbody>
       </table>
     </div>
@@ -1442,7 +1464,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-7" aria-expanded="false"><strong>dbo.fhirQueryConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-7" aria-expanded="false"><strong>dbo.fhirListConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-7" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1451,7 +1473,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirServerBaseUrl</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Authentication</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxAcquisitionPullTime</span></td><td>string (time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxConcurrentRequests</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MinAcquisitionPullTime</span></td><td>string (time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxRetries</span></td><td>integer</td><td>No</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirBaseServerUrl</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Authentication</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">EHRPatientLists</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1459,7 +1481,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-8" aria-expanded="false"><strong>dbo.FhirQueryResourceType</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-8" aria-expanded="false"><strong>dbo.FhirQuery</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-8" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1468,7 +1490,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirQueryId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>255</td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Paged</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryParameters</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">QueryType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">MeasureId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">isReference</span></td><td>boolean</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusListId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusPatientStatus</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CensusTimeFrame</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1476,7 +1498,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-9" aria-expanded="false"><strong>dbo.PendingReferenceIds</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-9" aria-expanded="false"><strong>dbo.fhirQueryConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-9" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1485,7 +1507,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>Yes</td><td>64</td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirServerBaseUrl</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Authentication</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxAcquisitionPullTime</span></td><td>string (time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxConcurrentRequests</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MinAcquisitionPullTime</span></td><td>string (time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">MaxRetries</span></td><td>integer</td><td>No</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1493,7 +1515,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-10" aria-expanded="false"><strong>dbo.queryPlan</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-10" aria-expanded="false"><strong>dbo.FhirQueryResourceType</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-10" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1502,7 +1524,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">PlanName</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EHRDescription</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">LookBack</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">InitialQueries</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SupplementalQueries</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Type</span></td><td>integer</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirQueryId</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>255</td></tr>
         </tbody>
       </table>
     </div>
@@ -1510,7 +1532,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-11" aria-expanded="false"><strong>dbo.ReferenceResources</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-11" aria-expanded="false"><strong>dbo.OrganizationLocationCondition</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-11" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1519,7 +1541,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">ReferenceResource</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">ConditionId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ConfigId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreatedOn</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">FhirPath</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifiedOn</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Priority</span></td><td>integer</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1527,7 +1549,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-12" aria-expanded="false"><strong>dbo.ResourceReferenceType</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-12" aria-expanded="false"><strong>dbo.OrganizationLocationConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-12" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1536,7 +1558,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirQueryId</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">ConfigId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreatedOn</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Description</span></td><td>string</td><td>No</td><td>500</td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">IsActive</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifiedOn</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1544,7 +1566,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-13" aria-expanded="false"><strong>dbo.ScheduledReports</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-13" aria-expanded="false"><strong>dbo.OrganizationLocationMapping</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-13" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1553,7 +1575,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">ReportTrackingId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Frequency</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">StartDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EndDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportTypes</span></td><td>string</td><td>No</td><td>2000</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">LocationMappingId</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>255</td></tr><tr><td><span style="padding-left:0px">IsActive</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">IsOrgLocation</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">LocationAlias</span></td><td>string</td><td>No</td><td>500</td></tr><tr><td><span style="padding-left:0px">LocationId</span></td><td>string</td><td>Yes</td><td>500</td></tr><tr><td><span style="padding-left:0px">LocationName</span></td><td>string</td><td>No</td><td>500</td></tr><tr><td><span style="padding-left:0px">ModifiedDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">PartOfId</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">PartOfValue</span></td><td>string</td><td>No</td><td>500</td></tr>
         </tbody>
       </table>
     </div>
@@ -1561,7 +1583,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-14" aria-expanded="false"><strong>dbo.SftpAcquisitionLog</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-14" aria-expanded="false"><strong>dbo.PendingReferenceIds</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-14" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1570,7 +1592,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ExternalId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>250</td></tr><tr><td><span style="padding-left:0px">AcquisitionType</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">ProcessDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">FileNames</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Notes</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">OriginatingSpanId</span></td><td>string</td><td>No</td><td>16</td></tr><tr><td><span style="padding-left:0px">OriginatingTraceId</span></td><td>string</td><td>No</td><td>32</td></tr><tr><td><span style="padding-left:0px">RetryAttempts</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Benchmarks</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Status</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">SubType</span></td><td>string</td><td>Yes</td><td>50</td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">DataAcquisitionLogId</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">CorrelationId</span></td><td>string</td><td>Yes</td><td>64</td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1578,7 +1600,7 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
 </div>
 <div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-15" aria-expanded="false"><strong>dbo.SftpConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-15" aria-expanded="false"><strong>dbo.queryPlan</strong> <span class="text-muted">(array, Required: No)</span></a>
   </div>
   <div id="db-schema-card-dataacquisitionservice-15" class="card-body export-collapsible">
     <div class="table-responsive">
@@ -1587,7 +1609,92 @@ nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
           <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
         </thead>
         <tbody>
-          <tr><td><span style="padding-left:0px">Id</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">OrganizationId</span></td><td>string</td><td>Yes</td><td>250</td></tr><tr><td><span style="padding-left:0px">Host</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">Port</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">RemoteDirectory</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Timeout</span></td><td>string (time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">RemoveAfterProcessing</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">AuthenticationProtocol</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">AcquisitionConfigurations</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EnableBenchmarking</span></td><td>boolean</td><td>Yes</td><td></td></tr>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">PlanName</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EHRDescription</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">LookBack</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">InitialQueries</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">SupplementalQueries</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Type</span></td><td>integer</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-16" aria-expanded="false"><strong>dbo.ReferenceResources</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-dataacquisitionservice-16" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">ResourceId</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td>128</td></tr><tr><td><span style="padding-left:0px">ReferenceResource</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-17" aria-expanded="false"><strong>dbo.ResourceReferenceType</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-dataacquisitionservice-17" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">QueryPhase</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ResourceType</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FhirQueryId</span></td><td>string (uuid)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ModifyDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-18" aria-expanded="false"><strong>dbo.ScheduledReports</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-dataacquisitionservice-18" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">ReportTrackingId</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Frequency</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">StartDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EndDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ReportTypes</span></td><td>string</td><td>No</td><td>2000</td></tr><tr><td><span style="padding-left:0px">CreateDate</span></td><td>string (date-time)</td><td>Yes</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-19" aria-expanded="false"><strong>dbo.SftpAcquisitionLog</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-dataacquisitionservice-19" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>integer (int64)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">ExternalId</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">FacilityId</span></td><td>string</td><td>Yes</td><td>250</td></tr><tr><td><span style="padding-left:0px">AcquisitionType</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">ProcessDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">FileNames</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">Notes</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">OriginatingSpanId</span></td><td>string</td><td>No</td><td>16</td></tr><tr><td><span style="padding-left:0px">OriginatingTraceId</span></td><td>string</td><td>No</td><td>32</td></tr><tr><td><span style="padding-left:0px">RetryAttempts</span></td><td>integer</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Benchmarks</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">ScheduledDate</span></td><td>string (date-time)</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Status</span></td><td>string</td><td>Yes</td><td>50</td></tr><tr><td><span style="padding-left:0px">SubType</span></td><td>string</td><td>Yes</td><td>50</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="db-schema-card-dataacquisitionservice-20" aria-expanded="false"><strong>dbo.SftpConfiguration</strong> <span class="text-muted">(array, Required: No)</span></a>
+  </div>
+  <div id="db-schema-card-dataacquisitionservice-20" class="card-body export-collapsible">
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Required?</th><th>Length</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span style="padding-left:0px">Id</span></td><td>string (uuid)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">OrganizationId</span></td><td>string</td><td>Yes</td><td>250</td></tr><tr><td><span style="padding-left:0px">Host</span></td><td>string</td><td>Yes</td><td>256</td></tr><tr><td><span style="padding-left:0px">Port</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">RemoteDirectory</span></td><td>string</td><td>No</td><td></td></tr><tr><td><span style="padding-left:0px">Timeout</span></td><td>string (time)</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">RemoveAfterProcessing</span></td><td>boolean</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">AuthenticationProtocol</span></td><td>integer</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">AcquisitionConfigurations</span></td><td>string</td><td>Yes</td><td></td></tr><tr><td><span style="padding-left:0px">EnableBenchmarking</span></td><td>boolean</td><td>Yes</td><td></td></tr>
         </tbody>
       </table>
     </div>
@@ -1716,6 +1823,154 @@ Supported Authentication Types: Basic, Epic</p>
   </div>
 </div>
 <div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data/encounter-mappings/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/encounter-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">PUT /api/data/encounter-mappings/{id}
+Updates the MappedToOrg flag for the specified EncounterMapping.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}
+Returns 200 OK with empty list [] when none exist.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>encounterId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" aria-expanded="false"><strong>PUT</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-encounter-mappings-facilities-facilityid-encounters-encounterid" class="card-body export-collapsible">
+    <p class="text-muted">PUT /api/data/encounter-mappings/facilities/{facilityId}/encounters/{encounterId}
+Updates the MappedToOrg flag for the specified encounter within a facility.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>encounterId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-patients-patientid" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/patients/{patientId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-patients-patientid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/patients/{patientId}
+Returns 200 OK with empty list [] when none exist.</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr><tr><td>patientId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/encounter-mappings/facilities/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-encounter-mappings-facilities-facilityid-search" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/data/encounter-mappings/facilities/{facilityId}/search</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>PatientId</td><td></td><td>No</td><td></td></tr><tr><td>EncounterId</td><td></td><td>No</td><td></td></tr><tr><td>MappedToOrg</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-encounter-mappings" aria-expanded="false"><strong>POST</strong> <code>/api/data/encounter-mappings</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-encounter-mappings" class="card-body export-collapsible">
+    <p class="text-muted">POST /api/data/encounter-mappings</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueries" aria-expanded="false"><strong>GET</strong> <code>/api/data/{facilityId}/FhirQueries</code></a></div>
   <div id="openapi-card-dataacquisitionservice-get-api-data-facilityid-fhirqueries" class="card-body export-collapsible">
     <p class="text-muted">Get query results for a correlation Id</p>
@@ -1754,7 +2009,7 @@ Supported Authentication Types: Basic, Epic</p>
     <thead>
       <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
     </thead>
-    <tbody><tr><td>FacilityId</td><td></td><td>No</td><td></td></tr><tr><td>PatientId</td><td></td><td>No</td><td></td></tr><tr><td>ReportId</td><td></td><td>No</td><td></td></tr><tr><td>ResourceId</td><td></td><td>No</td><td></td></tr><tr><td>QueryPhase</td><td></td><td>No</td><td></td></tr><tr><td>QueryType</td><td></td><td>No</td><td></td></tr><tr><td>Statuses</td><td></td><td>No</td><td></td></tr><tr><td>Priority</td><td></td><td>No</td><td></td></tr><tr><td>ResourceType</td><td></td><td>No</td><td></td></tr><tr><td>CreatedBefore</td><td></td><td>No</td><td></td></tr><tr><td>PageNumber</td><td></td><td>No</td><td></td></tr><tr><td>PageSize</td><td></td><td>No</td><td></td></tr><tr><td>SortBy</td><td></td><td>No</td><td></td></tr><tr><td>SortOrder</td><td></td><td>No</td><td></td></tr><tr><td>IncludeDeleted</td><td></td><td>No</td><td></td></tr></tbody>
+    <tbody><tr><td>FacilityId</td><td></td><td>No</td><td></td></tr><tr><td>PatientId</td><td></td><td>No</td><td></td></tr><tr><td>ReportId</td><td></td><td>No</td><td></td></tr><tr><td>ResourceId</td><td></td><td>No</td><td></td></tr><tr><td>QueryPhase</td><td></td><td>No</td><td></td></tr><tr><td>QueryType</td><td></td><td>No</td><td></td></tr><tr><td>Statuses</td><td></td><td>No</td><td></td></tr><tr><td>Priority</td><td></td><td>No</td><td></td></tr><tr><td>ResourceType</td><td></td><td>No</td><td></td></tr><tr><td>CreatedBefore</td><td></td><td>No</td><td></td></tr><tr><td>SearchTerm</td><td></td><td>No</td><td></td></tr><tr><td>PageNumber</td><td></td><td>No</td><td></td></tr><tr><td>PageSize</td><td></td><td>No</td><td></td></tr><tr><td>SortBy</td><td></td><td>No</td><td></td></tr><tr><td>SortOrder</td><td></td><td>No</td><td></td></tr><tr><td>IncludeDeleted</td><td></td><td>No</td><td></td></tr></tbody>
   </table>
 </div>
   </div>
@@ -2142,6 +2397,277 @@ Intended for automation reconciliation.</p>
       <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
     </thead>
     <tbody><tr><td>facilityId</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-id" class="card-body export-collapsible">
+    <p class="text-muted">GET /location-org-configs/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-config-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-location-config-id" class="card-body export-collapsible">
+    <p class="text-muted">PUT /location-org-configs/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-config-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-config/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-config-id" class="card-body export-collapsible">
+    <p class="text-muted">DELETE /location-org-configs/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">GET /location-org-configs/facility/{facilityId}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-post-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>POST</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-post-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">POST /location-org-configs/facility/{facilityId}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">PUT /location-org-configs/facility/{facilityId} (updates ALL configs for the facility)</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-config-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-config/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-config-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">DELETE /location-org-configs/facility/{facilityId}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-config/facility/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-config-facility-facilityid-search" class="card-body export-collapsible">
+    <p class="text-muted">GET /location-org-configs/facility/{facilityId}/search</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>ConfigId</td><td></td><td>No</td><td></td></tr><tr><td>IsActive</td><td></td><td>No</td><td></td></tr><tr><td>DescriptionContains</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr></tbody>
+  </table>
+</div>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-id" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/location-mappings/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-put-api-data-location-mappings-id" aria-expanded="false"><strong>PUT</strong> <code>/api/data/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-put-api-data-location-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">PUT /api/location-mappings/{id}</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-id" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-mappings/{id}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-id" class="card-body export-collapsible">
+    <p class="text-muted">DELETE /api/location-mappings/{id}
+Deletes the mapping with the specified Id</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>id</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/location-mappings/facility/{facilityId}
+Returns 200 OK with empty list [] when none exist</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-facility-facilityid" aria-expanded="false"><strong>DELETE</strong> <code>/api/data/location-mappings/facility/{facilityId}</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-delete-api-data-location-mappings-facility-facilityid" class="card-body export-collapsible">
+    <p class="text-muted">DELETE /api/location-mappings/facility/{facilityId}
+Deletes ALL mappings for the facility</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid-search" aria-expanded="false"><strong>GET</strong> <code>/api/data/location-mappings/facility/{facilityId}/search</code></a></div>
+  <div id="openapi-card-dataacquisitionservice-get-api-data-location-mappings-facility-facilityid-search" class="card-body export-collapsible">
+    <p class="text-muted">GET /api/location-mappings/facility/{facilityId}/search</p>
+    <h6>Route Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td></td><td>Yes</td><td></td></tr></tbody>
+  </table>
+</div>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>LocationMappingId</td><td></td><td>No</td><td></td></tr><tr><td>LocationId</td><td></td><td>No</td><td></td></tr><tr><td>LocationName</td><td></td><td>No</td><td></td></tr><tr><td>LocationAlias</td><td></td><td>No</td><td></td></tr><tr><td>PartOfValue</td><td></td><td>No</td><td></td></tr><tr><td>IsOrgLocation</td><td></td><td>No</td><td></td></tr><tr><td>IsActive</td><td></td><td>No</td><td></td></tr><tr><td>pageNumber</td><td></td><td>No</td><td></td></tr><tr><td>pageSize</td><td></td><td>No</td><td></td></tr><tr><td>sortBy</td><td></td><td>No</td><td></td></tr><tr><td>sortOrder</td><td></td><td>No</td><td></td></tr></tbody>
   </table>
 </div>
   </div>
@@ -2618,21 +3144,21 @@ Only logs in ConfigurationRequired or MaxRetriesReached status can be reset.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nDataAcquisitionService_3BF82DDB["Service: Data Acquisition Service"]
-  nPatientCensusScheduled_2383C0C6["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_3BF82DDB
-  nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_3BF82DDB
-  nDataAcquisitionService_3BF82DDB -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nDataAcquisitionService_3BF82DDB -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
-    nDataAcquisitionService_3BF82DDB
+nDataAcquisitionService_2716332D["Service: Data Acquisition Service"]
+  nPatientCensusScheduled_3CE52530["Event: PatientCensusScheduled"] -->|consumed by| nDataAcquisitionService_2716332D
+  nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"] -->|handled by| nDataAcquisitionService_2716332D
+  nDataAcquisitionService_2716332D -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nDataAcquisitionService_2716332D -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
+    nDataAcquisitionService_2716332D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nPatientCensusScheduled_2383C0C6
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nPatientCensusScheduled_3CE52530
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

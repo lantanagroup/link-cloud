@@ -56,6 +56,17 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
             _dbContext.Set<T>().Remove(entity);
         }
 
+        public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate)
+        {
+            return ExecuteDeleteAsync(predicate, CancellationToken.None);
+        }
+
+        public async Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _dbContext.Set<T>().Where(predicate).ExecuteDeleteAsync(cancellationToken);
+        }
+
         // Query Methods
         public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate)
         {

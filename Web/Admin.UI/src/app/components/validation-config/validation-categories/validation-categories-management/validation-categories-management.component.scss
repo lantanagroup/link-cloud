@@ -1,0 +1,51 @@
+.validation-categories-management {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.validation-categories-management__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.validation-categories-management__kicker {
+  color: #6f6f6f;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.validation-categories-management__title {
+  margin: 0;
+}
+
+.validation-categories-management__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.validation-categories-management__filter-row {
+  max-width: 640px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.validation-categories-management__table-container {
+  overflow-x: auto;
+}
+
+.vd-mat-table table {
+  width: 100%;
+}
+
+.mat-form-field {
+  width: 100%;
+}

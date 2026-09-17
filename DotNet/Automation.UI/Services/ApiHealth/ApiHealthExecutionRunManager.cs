@@ -435,7 +435,8 @@ public sealed class ApiHealthExecutionRunManager(
         run.Completed = true;
         run.Failed = failed;
         run.Error = error;
-        run.FinishedAt = DateTimeOffset.UtcNow;
+        var finishedAt = DateTimeOffset.UtcNow;
+        run.FinishedAt = finishedAt;
 
         lock (_sync)
         {
@@ -445,7 +446,7 @@ public sealed class ApiHealthExecutionRunManager(
 
         try
         {
-            await store.CompleteExecutionRunAsync(run.RunId, failed, error, run.FinishedAt.Value);
+            await store.CompleteExecutionRunAsync(run.RunId, failed, error, finishedAt);
         }
         catch (Exception ex)
         {

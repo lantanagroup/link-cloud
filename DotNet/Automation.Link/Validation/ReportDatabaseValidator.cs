@@ -66,7 +66,8 @@ public class ReportDatabaseValidator
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
-            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, errors);
+            var reportableMeasureTypeMap = await BuildHasReportableMeasureRowsByTypeAsync(scheduleId);
+            await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, expectedSubmitted, reportableMeasureTypeMap, errors);
         }
         catch (Exception ex)
         {
@@ -187,7 +188,7 @@ public class ReportDatabaseValidator
         var expectedTotal = expectedPatientCount * expectedMeasureIds.Count;
 
         if (reports.Count != expectedTotal)
-            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedTotal} ({expectedPatientCount} patients × {expectedMeasureIds.Count} measures), actual {reports.Count}");
+            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedTotal} ({expectedPatientCount} patients x {expectedMeasureIds.Count} measures), actual {reports.Count}");
 
         var expectedSet = expectedMeasureIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var report in reports)
@@ -205,6 +206,8 @@ public class ReportDatabaseValidator
         string facilityId,
         IReadOnlyList<string> expectedMeasureIds,
         Dictionary<string, int>? expectedQualifyingCountPerMeasure,
+        IReadOnlyList<string> expectedSubmittedPatientIds,
+        IReadOnlyDictionary<string, bool> hasReportableRowsByReportType,
         List<string> errors)
     {
         var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
@@ -223,7 +226,26 @@ public class ReportDatabaseValidator
 
             // Use cohort data to determine if this measure has any qualifying patients.
             var measureHasQualifyingPatients = true;
-            if (expectedQualifyingCountPerMeasure != null && !string.IsNullOrWhiteSpace(pop.ReportType))
+
+            if (!string.IsNullOrWhiteSpace(pop.ReportType)
+                && hasReportableRowsByReportType.TryGetValue(pop.ReportType, out var hasReportableRows))
+            {
+                measureHasQualifyingPatients = hasReportableRows;
+            }
+
+            // expectedSubmittedPatientIds is the authoritative expectation produced by
+            // run-planning prediction logic (profile expectations plus imported-patient
+            // period-aware checks). When none are expected to be submitted,
+            // ReportPopulation rows may be present but not contain valid
+            // group/measure-report population rows.
+            if (expectedSubmittedPatientIds.Count == 0)
+                measureHasQualifyingPatients = false;
+
+            if (expectedSubmittedPatientIds.Count > 0
+                && expectedQualifyingCountPerMeasure != null
+                && !string.IsNullOrWhiteSpace(pop.ReportType)
+                && !hasReportableRowsByReportType.ContainsKey(pop.ReportType)
+                && !string.IsNullOrWhiteSpace(pop.ReportType))
             {
                 expectedQualifyingCountPerMeasure.TryGetValue(pop.ReportType, out var count);
                 measureHasQualifyingPatients = count > 0;
@@ -233,7 +255,7 @@ public class ReportDatabaseValidator
             {
                 if (!measureHasQualifyingPatients)
                 {
-                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has no GroupPopulations (expected — 0 qualifying patients per cohort config).");
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has no GroupPopulations (expected 0 qualifying patients per cohort config).");
                     continue;
                 }
 
@@ -251,12 +273,25 @@ public class ReportDatabaseValidator
             {
                 if (!measureHasQualifyingPatients)
                 {
-                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has GroupPopulations but none are valid (expected — 0 qualifying patients per cohort config).");
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has GroupPopulations but none are valid (expected 0 qualifying patients per cohort config).");
                     continue;
                 }
 
                 AddError(errors, $"ReportPopulation '{pop.ReportType}' has no valid GroupPopulation with population code and measure report rows.");
             }
         }
+    }
+
+    private async Task<IReadOnlyDictionary<string, bool>> BuildHasReportableMeasureRowsByTypeAsync(Guid scheduleId)
+    {
+        var rows = await _reader.GetEntryMeasureReportsAsync(scheduleId);
+
+        return rows
+            .Where(r => !string.IsNullOrWhiteSpace(r.ReportType))
+            .GroupBy(r => r.ReportType!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Any(r => string.Equals(r.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase)),
+                StringComparer.OrdinalIgnoreCase);
     }
 }

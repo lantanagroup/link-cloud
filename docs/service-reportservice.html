@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,48 +497,48 @@
 <div class="row">
     <div class="col-md-8">
         <div class="mb-3"><strong>Produces:</strong> <a href="event-auditableeventoccurred.html">Auditable Event Occurred [event]</a>, <a href="event-readyforvalidation.html">Ready for Validation [event]</a>, <a href="event-submitpayload.html">Submit Payload [event]</a>, <a href="command-dataacquisitionrequested.html">Data Acquisition Requested [command]</a>, <a href="command-evaluationrequested.html">Evaluation Requested [command]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-validationcomplete.html">Validation Complete [event]</a>, <a href="event-measurereportgenerated.html">Measure Report Generated [event]</a>, <a href="event-patientevent.html">Patient Event [event]</a>, <a href="event-reportscheduled.html">Report Scheduled [event]</a>, <a href="event-payloadsubmitted.html">Payload Submitted [event]</a>, <a href="command-generatereportrequested.html">Generate Report Requested [command]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nReportService_1ECFD801["Service: Report Service"]
-  nReportService_1ECFD801 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nReportService_1ECFD801 -->|produces| nReadyForValidation_293CC34C["Event: ReadyForValidation"]
-  nReportService_1ECFD801 -->|produces| nSubmitPayload_2F556666["Event: SubmitPayload"]
-  nValidationComplete_7F3C0D47["Event: ValidationComplete"] -->|consumed by| nReportService_1ECFD801
-  nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"] -->|consumed by| nReportService_1ECFD801
-  nPatientEvent_34D33665["Event: PatientEvent"] -->|consumed by| nReportService_1ECFD801
-  nReportScheduled_BC6D32E["Event: ReportScheduled"] -->|consumed by| nReportService_1ECFD801
-  nPayloadSubmitted_2E346CAB["Event: PayloadSubmitted"] -->|consumed by| nReportService_1ECFD801
-  nReportService_1ECFD801 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
-  nReportService_1ECFD801 -->|sends| nEvaluationRequested_7F27B0ED["Command: EvaluationRequested"]
-  nGenerateReportRequested_7BC99734["Command: GenerateReportRequested"] -->|handled by| nReportService_1ECFD801
-  nReportService_1ECFD801 -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nReportService_1ECFD801 -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
-    nEvaluationRequested_7F27B0ED
-    nMeasureReportGenerated_38AFFB54
-    nReadyForValidation_293CC34C
-    nValidationComplete_7F3C0D47
+nReportService_417D4454["Service: Report Service"]
+  nReportService_417D4454 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nReportService_417D4454 -->|produces| nReadyForValidation_27561738["Event: ReadyForValidation"]
+  nReportService_417D4454 -->|produces| nSubmitPayload_7A027AAE["Event: SubmitPayload"]
+  nValidationComplete_6ED20CD9["Event: ValidationComplete"] -->|consumed by| nReportService_417D4454
+  nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"] -->|consumed by| nReportService_417D4454
+  nPatientEvent_630CFEC8["Event: PatientEvent"] -->|consumed by| nReportService_417D4454
+  nReportScheduled_4BA62BDB["Event: ReportScheduled"] -->|consumed by| nReportService_417D4454
+  nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"] -->|consumed by| nReportService_417D4454
+  nReportService_417D4454 -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
+  nReportService_417D4454 -->|sends| nEvaluationRequested_4E6DD5AE["Command: EvaluationRequested"]
+  nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"] -->|handled by| nReportService_417D4454
+  nReportService_417D4454 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nReportService_417D4454 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
+    nEvaluationRequested_4E6DD5AE
+    nMeasureReportGenerated_6D344E8F
+    nReadyForValidation_27561738
+    nValidationComplete_6ED20CD9
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nGenerateReportRequested_7BC99734
-    nPatientEvent_34D33665
-    nPayloadSubmitted_2E346CAB
-    nReportScheduled_BC6D32E
-    nReportService_1ECFD801
-    nSubmitPayload_2F556666
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nGenerateReportRequested_150FD8B0
+    nPatientEvent_630CFEC8
+    nPayloadSubmitted_40AD77DB
+    nReportScheduled_4BA62BDB
+    nReportService_417D4454
+    nSubmitPayload_7A027AAE
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
   end
 </pre></div>
-<h2 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The following environment variables and settings are used for the Report Service:</p>
 <table>
 <thead>
@@ -799,7 +801,7 @@ nReportService_1ECFD801["Service: Report Service"]
 <blockquote>
 <p>For a full list of environment variables and their usage, see the <a href="../../../../../link-cloud/docker-compose.yml">docker-compose.yml</a> file and the <code>appsettings.json</code> file.</p>
 </blockquote>
-<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#swagger">Swagger</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
@@ -811,7 +813,7 @@ nReportService_1ECFD801["Service: Report Service"]
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
 </ul>
-<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Retry Scheduling in the Report Service:</p>
 <p>Within the Report service, retries are scheduled using Quartz.NET's in-memory scheduler. The retry jobs are managed by a dedicated RetryScheduleService that uses the &quot;InMemoryScheduler&quot; (registered via keyed dependency injection) to schedule and execute retry operations. This approach ensures that retry jobs are lightweight, fast, and do not persist across service restarts making them ideal for transient, short-lived retry logic where durability is not required.</p>
 <p>Impact of InMemory vs. SQL Persistence:</p>
@@ -1628,41 +1630,41 @@ When set to `false`, restores all previously deleted report schedules.</td></tr>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nReportService_1ECFD801["Service: Report Service"]
-  nReportService_1ECFD801 -->|produces| nAuditableEventOccurred_2E7ED8D7["Event: AuditableEventOccurred"]
-  nReportService_1ECFD801 -->|produces| nReadyForValidation_293CC34C["Event: ReadyForValidation"]
-  nReportService_1ECFD801 -->|produces| nSubmitPayload_2F556666["Event: SubmitPayload"]
-  nValidationComplete_7F3C0D47["Event: ValidationComplete"] -->|consumed by| nReportService_1ECFD801
-  nMeasureReportGenerated_38AFFB54["Event: MeasureReportGenerated"] -->|consumed by| nReportService_1ECFD801
-  nPatientEvent_34D33665["Event: PatientEvent"] -->|consumed by| nReportService_1ECFD801
-  nReportScheduled_BC6D32E["Event: ReportScheduled"] -->|consumed by| nReportService_1ECFD801
-  nPayloadSubmitted_2E346CAB["Event: PayloadSubmitted"] -->|consumed by| nReportService_1ECFD801
-  nReportService_1ECFD801 -->|sends| nDataAcquisitionRequested_4BBEB8F8["Command: DataAcquisitionRequested"]
-  nReportService_1ECFD801 -->|sends| nEvaluationRequested_7F27B0ED["Command: EvaluationRequested"]
-  nGenerateReportRequested_7BC99734["Command: GenerateReportRequested"] -->|handled by| nReportService_1ECFD801
-  nReportService_1ECFD801 -->|provides| nGetFacilityConfig_32C58A79["Query: GetFacilityConfig"]
-  nReportService_1ECFD801 -->|provides| nGetServiceInfo_13F02E06["Query: GetServiceInfo"]
-  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
-    nAuditableEventOccurred_2E7ED8D7
-    nEvaluationRequested_7F27B0ED
-    nMeasureReportGenerated_38AFFB54
-    nReadyForValidation_293CC34C
-    nValidationComplete_7F3C0D47
+nReportService_417D4454["Service: Report Service"]
+  nReportService_417D4454 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
+  nReportService_417D4454 -->|produces| nReadyForValidation_27561738["Event: ReadyForValidation"]
+  nReportService_417D4454 -->|produces| nSubmitPayload_7A027AAE["Event: SubmitPayload"]
+  nValidationComplete_6ED20CD9["Event: ValidationComplete"] -->|consumed by| nReportService_417D4454
+  nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"] -->|consumed by| nReportService_417D4454
+  nPatientEvent_630CFEC8["Event: PatientEvent"] -->|consumed by| nReportService_417D4454
+  nReportScheduled_4BA62BDB["Event: ReportScheduled"] -->|consumed by| nReportService_417D4454
+  nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"] -->|consumed by| nReportService_417D4454
+  nReportService_417D4454 -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
+  nReportService_417D4454 -->|sends| nEvaluationRequested_4E6DD5AE["Command: EvaluationRequested"]
+  nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"] -->|handled by| nReportService_417D4454
+  nReportService_417D4454 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
+  nReportService_417D4454 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
+  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
+    nAuditableEventOccurred_415BEB2
+    nEvaluationRequested_4E6DD5AE
+    nMeasureReportGenerated_6D344E8F
+    nReadyForValidation_27561738
+    nValidationComplete_6ED20CD9
   end
-  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_4BBEB8F8
+  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_132A644D
   end
-  subgraph nReport_4D4FBBDA_domain["Domain: Report"]
-    nGenerateReportRequested_7BC99734
-    nPatientEvent_34D33665
-    nPayloadSubmitted_2E346CAB
-    nReportScheduled_BC6D32E
-    nReportService_1ECFD801
-    nSubmitPayload_2F556666
+  subgraph nReport_6794871_domain["Domain: Report"]
+    nGenerateReportRequested_150FD8B0
+    nPatientEvent_630CFEC8
+    nPayloadSubmitted_40AD77DB
+    nReportScheduled_4BA62BDB
+    nReportService_417D4454
+    nSubmitPayload_7A027AAE
   end
-  subgraph nTenant_379CD514_domain["Domain: Tenant"]
-    nGetFacilityConfig_32C58A79
-    nGetServiceInfo_13F02E06
+  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
+    nGetFacilityConfig_3B638653
+    nGetServiceInfo_1DD835E0
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

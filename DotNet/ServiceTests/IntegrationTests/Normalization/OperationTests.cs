@@ -30,16 +30,9 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
             var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-
-            var vendorVersion = (await vendorQueries.SearchVendors(new VendorSearchModel()
-            {
-                VendorId = vendor.Id
-            })).First().Versions.Single();
+            var vendorVersionId = Guid.NewGuid();
 
             var facilityId = Guid.NewGuid().ToString();
             var operation = new CopyPropertyOperation("Copy Location Identifier to Type", "identifier.value", "type[0].coding.code");
@@ -52,7 +45,7 @@ namespace IntegrationTests.Normalization
                 Description = "Integration Test Copy Property Operation",
                 IsDisabled = false,
                 ResourceTypes = ["Location"],
-                VendorIds = [vendor.Id]
+                VendorVersionIds = [vendorVersionId]
             });
 
             Assert.True(taskResult.IsSuccess, taskResult.ErrorMessage);
@@ -86,8 +79,8 @@ namespace IntegrationTests.Normalization
             Assert.Contains("Copy Location Identifier to Type", sequences[0].OperationResourceType.Operation.OperationJson);
             Assert.NotEmpty(sequences[0].VendorPresets);
             Assert.Equal(result.VendorPresets[0].Id, sequences[0].VendorPresets[0].Id);
-            Assert.Equal(vendor.Name, sequences[0].VendorPresets[0].VendorVersion.Vendor.Name);
-            Assert.Equal("default", sequences[0].VendorPresets[0].VendorVersion.Version);
+            Assert.Equal(vendorVersionId, sequences[0].VendorPresets[0].VendorVersion.Id);
+            Assert.Equal("test", sequences[0].VendorPresets[0].VendorVersion.Version);
             Assert.Equal("Location", sequences[0].VendorPresets[0].OperationResourceType.Resource.ResourceName);
 
             var deleteResult = await operationManager.DeleteOperationSequence(new DeleteOperationSequencesModel()
@@ -112,11 +105,11 @@ namespace IntegrationTests.Normalization
             };
         }
 
-        private CreateOperationModel GetValidCreateModelWithVendors(List<Guid> vendorIds, List<string> resourceTypes)
+        private CreateOperationModel GetValidCreateModelWithVendorVersions(List<Guid> vendorVersionIds, List<string> resourceTypes)
         {
             return new CreateOperationModel
             {
-                VendorIds = vendorIds,
+            VendorVersionIds = vendorVersionIds,
                 OperationType = "CopyProperty",
                 OperationJson = "{\"Name\": \"Test Copy\", \"Description\": \"Test Copy Description\", \"SourceFhirPath\": \"id\", \"TargetFhirPath\": \"meta.versionId\"}",
                 ResourceTypes = resourceTypes,
@@ -151,13 +144,10 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
             var operationQueries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
 
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            Assert.NotNull(vendor);
-            var vendorIds = new List<Guid> { vendor.Id };
-            var model = GetValidCreateModelWithVendors(vendorIds, new List<string> { "Patient" });
+            var vendorVersionId = Guid.NewGuid();
+            var model = GetValidCreateModelWithVendorVersions([vendorVersionId], new List<string> { "Patient" });
 
             var result = await operationManager.CreateOperation(model);
 
@@ -165,7 +155,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(result.ObjectResult);
 
             var created = (OperationModel)result.ObjectResult;
-            var searched = await operationQueries.Search(new OperationSearchModel { VendorId = vendorIds.First() });
+            var searched = await operationQueries.Search(new OperationSearchModel { VendorVersionId = vendorVersionId });
             Assert.Contains(searched.Records, o => o.Id == created.Id);
         }
 
@@ -176,7 +166,7 @@ namespace IntegrationTests.Normalization
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
 
             var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), new List<string> { "Patient" });
-            model.VendorIds = new List<Guid> { Guid.NewGuid() };
+            model.VendorVersionIds = new List<Guid> { Guid.NewGuid() };
 
             var result = await operationManager.CreateOperation(model);
             Assert.False(result.IsSuccess);
@@ -193,7 +183,7 @@ namespace IntegrationTests.Normalization
 
             var result = await operationManager.CreateOperation(model);
             Assert.False(result.IsSuccess);
-            Assert.Contains("one or more Vendor IDs", result.ErrorMessage);
+            Assert.Contains("one or more Vendor Version IDs", result.ErrorMessage);
         }
 
         [Fact]
@@ -259,7 +249,7 @@ namespace IntegrationTests.Normalization
             var updateModel = new UpdateOperationModel
             {
                 Id = opId,
-                VendorIds = new List<Guid> { Guid.NewGuid() },
+                VendorVersionIds = new List<Guid> { Guid.NewGuid() },
                 OperationJson = "{\"Name\": \"Test Copy\", \"Description\": \"Test Copy Description\", \"SourceFhirPath\": \"id\", \"TargetFhirPath\": \"meta.versionId\"}",
                 ResourceTypes = new List<string> { "Patient" }
             };
@@ -306,22 +296,16 @@ namespace IntegrationTests.Normalization
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
-            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
             var operationQueries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
 
-            // Create vendor
-            var vendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            var vendorIds = new List<Guid> { vendor.Id };
+            var vendorVersionId = Guid.NewGuid();
 
-            // Create operation with vendors
-            var createModel = GetValidCreateModelWithVendors(vendorIds, new List<string> { "Patient" });
+            var createModel = GetValidCreateModelWithVendorVersions([vendorVersionId], new List<string> { "Patient" });
             var createResult = await operationManager.CreateOperation(createModel);
             var opId = ((OperationModel)createResult.ObjectResult).Id;
 
-            // Add another vendor
-            var newVendor = await vendorManager.CreateVendor(Guid.NewGuid().ToString());
-            var newVendorIds = new List<Guid> { vendor.Id, newVendor.Id };
-            await operationManager.UpdateVendorPresetsForOperation(opId, newVendorIds);
+            var newVendorVersionId = Guid.NewGuid();
+            await operationManager.UpdateVendorPresetsForOperation(opId, [vendorVersionId, newVendorVersionId]);
 
             var updated = await operationQueries.Get(opId, null);
             Assert.Equal(2, updated.VendorPresets.Count);

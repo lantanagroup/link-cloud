@@ -1,0 +1,214 @@
+================================================================================
+KAFKA RETRY - ARCHITECTURE & DESIGN DECISIONS
+================================================================================
+
+Companion doc: Java/docs/retry-cleanup-and-cache-ownership.md covers what the
+retry machinery is FOR - the resource-cache ownership contract, terminal-only
+cleanup and the onDeadLetter hook, fail-fast blob clients, and testing recipes.
+
+--------------------------------------------------------------------------------
+1. THE DRIVING CONSTRAINT
+--------------------------------------------------------------------------------
+MeasureEval evaluates CQL, which can run long. Processing on the Kafka POLL
+thread would risk exceeding max.poll.interval.ms -> consumer eviction ->
+rebalance (and duplicate processing). So records are processed on a background
+single-thread executor (AbstractAsyncConsumer): the container thread submits the
+work and immediately returns to polling.
+
+Consequence that shapes everything: the business exception is thrown on the
+EXECUTOR thread, not the container thread. Spring Kafka's native @RetryableTopic
+/ DefaultErrorHandler retry orchestration only fires when the exception
+propagates on the CONTAINER thread - so the framework never sees async failures,
+and retries must be routed by hand.
+
+
+--------------------------------------------------------------------------------
+2. THE CORE PATTERN - OWN THE POLICY, RENT THE PLUMBING
+--------------------------------------------------------------------------------
+
+  main topic --> @KafkaListener.consume --> doConsume (background executor)
+                                              | success --> ack
+                                              | failure --> RetryTopicRecoverer
+                                              |    | attempts++
+                                              |    | due = now + backoff(attempt)
+                                              |    | DLPR --> resolver:
+                                              |          | -Retry (transient, attempts left)
+                                              |          | -Error (disabled | poison | exhausted)
+                                              | ack (always - publish-then-ack -> at-least-once)
+
+  -Retry topic --> Spring backoff-aware listener (waits until due-ts)
+                     --> same consume --> (loop)
+
+  - WE own the retry policy - classify (transient vs poison), count attempts,
+    compute the per-attempt backoff, choose the destination topic.
+  - SPRING owns the retry plumbing - the backoff-aware -Retry consumer that
+    physically delays redelivery (KafkaBackoffAwareMessageListenerAdapter),
+    provisioned by RetryTopicConfiguration. We drive it by hand-stamping the
+    headers it reads, where the backoff timestamp is an ABSOLUTE due-time
+    (now + backoffMs).
+
+On failure the record is PUBLISHED THEN ACKED (at-least-once: a crash mid-flight
+leaves the offset uncommitted -> redelivery, no silent loss).
+
+
+--------------------------------------------------------------------------------
+3. TWO FAILURE PATHS, ONE DEAD-LETTER
+--------------------------------------------------------------------------------
+
+  Async path:
+    business exception in process() (executor thread)
+    -> RetryTopicRecoverer + resolver -> -Retry or -Error
+
+  Container-thread path:
+    deserialization / binding (before the listener runs)
+    -> Spring's DefaultErrorHandler (FixedBackOff(0,0), no re-seek) -> -Error
+
+Complementary, not redundant: deserialization poison can never succeed, so it is
+intercepted at intake and dead-lettered immediately without burning a retry
+cycle - and it never reaches -Retry. The async recoverer never sees
+deserialization failures (they happen before the executor hand-off), so a
+separate container-thread handler is required.
+
+
+--------------------------------------------------------------------------------
+4. COMPONENTS (current, post-refactor)
+--------------------------------------------------------------------------------
+
+  AbstractAsyncConsumer<K,T>            (shared/kafka)
+      Submits process(record) to a single-thread executor; on success acks; on
+      failure calls the recoverer then acks (always, in finally).
+
+  ResourcesNormalizedConsumer /        (measureeval/services)
+  EvaluationRequestedConsumer
+      @KafkaListener(containerFactory="manualAckListenerContainerFactory")
+      -> doConsume(record, ack).
+
+  manualAckListenerContainerFactory    (measureeval KafkaConfig)
+      AckMode.MANUAL_IMMEDIATE + asyncAcks; wired to defaultErrorHandler.
+
+  RetryTopicRecoverer                  (shared/kafka)
+      Stamps retry headers + absolute due-time now + backoffMsForAttempt(attempt);
+      delegates to a DeadLetterPublishingRecoverer.
+
+  RetryTopicRecovererFactory           (shared/kafka)
+      Builds the recoverer + destination resolver + poison classifier; the
+      POISON SET is parameterized (no FHIR/HAPI types in shared).
+
+  KafkaRetryConfig                     (shared/config)
+      Retry policy: consumer-retry-duration, disable-retry-consumer. Helpers
+      effectiveMaxAttempts (size + 1) and backoffMsForAttempt (index clamped at
+      both ends). These two properties are the whole surface - there is no flat
+      maxAttempts/retry-backoff-ms fallback (see 8.7).
+
+  RetryTopicConfiguration beans        (measureeval KafkaConfig)
+      Provision Spring's backoff-aware -Retry listener;
+      @ConditionalOnProperty(disable-retry-consumer=false).
+
+  DefaultErrorHandler (defaultErrorHandler bean)   (measureeval KafkaConfig)
+      Container-thread failures (deserialization) -> -Error.
+
+
+--------------------------------------------------------------------------------
+5. CONFIGURATION MODEL (mirrors .NET ConsumerSettings)
+--------------------------------------------------------------------------------
+
+  spring:
+    kafka:
+      retry:
+        consumer-retry-duration: [PT20S, PT60S, PT120S]   # N entries => N retries, then -Error
+        disable-retry-consumer: false                      # true => straight to -Error; listener not provisioned
+
+  - consumer-retry-duration is the single source of truth for retry depth and
+    timing: ISO-8601 entry K-1 is the delay before retry K, and the attempt count
+    is derived (effectiveMaxAttempts = size + 1). Matches .NET's
+    ConsumerRetryDuration[retryCount-1] + count > Count() termination.
+  - An empty list disables retries (the first failure is dead-lettered); the
+    default is two 3-second delays (3 attempts).
+  - Disable routes everything to -Error AND (via @ConditionalOnProperty) skips
+    provisioning the -Retry listener.
+
+Changing retry depth/timing or turning retries off is a CONFIG change, not a
+code change.
+
+
+--------------------------------------------------------------------------------
+6. SHARED vs SERVICE LAYERING
+--------------------------------------------------------------------------------
+  shared      - reusable mechanism, free of service-specific types:
+                AbstractAsyncConsumer, RetryTopicRecoverer,
+                RetryTopicRecovererFactory, KafkaRetryConfig. Container-thread
+                dead-lettering uses Spring's stock DefaultErrorHandler.
+
+  measureeval - service-specific wiring: the @KafkaListener consumers, concrete
+                -Retry/-Error topic names + typed templates, the POISON-EXCEPTION
+                SET (FhirParseException, ValidationException,
+                MessageHandlingException, DataFormatException,
+                DeserializationException), and the RetryTopicConfiguration beans
+                for these topics.
+
+The boundary is deliberate: the MECHANISM (async hand-off, header contract,
+backoff policy) is generic; the CONTENT (which topics, which exceptions are
+poison) is service-specific and passed in as parameters.
+
+
+--------------------------------------------------------------------------------
+7. THE HEADER CONTRACT & ITS GUARD (spring-kafka 3.1.4)
+--------------------------------------------------------------------------------
+The recoverer hand-writes headers Spring's backoff listener reads, so the
+encodings must match exactly:
+
+  retry_topic-attempts            attempts so far          ByteBuffer.putInt (4 bytes)
+  retry_topic-backoff-timestamp   absolute due-time =      BigInteger.valueOf(ts).toByteArray()
+                                  now + backoffMs
+  retry_topic-original-timestamp  first-attempt time       stamped once, then preserved
+
+These are spring-kafka INTERNALS - an upgrade can silently break the delay.
+Guarded by:
+  - Pinned version - spring-kafka.version = 3.1.4 in the parent pom (with a
+    comment), so a Boot bump can't move it accidentally.
+  - RetryTopicRecovererTest - asserts our header bytes decode exactly as Spring's
+    reader.
+  - RetryTopicBackoffDelayTest - embedded-Kafka test asserting a -Retry record is
+    actually delayed (runs in CI).
+
+
+--------------------------------------------------------------------------------
+8. DESIGN DECISIONS (the steps that produced this)
+--------------------------------------------------------------------------------
+  1.  Keep the async executor (pre-spike architectural constraint). -> Rules out
+      the native synchronous retry-topic model, since the framework can't see
+      async exceptions.
+  2.  Topic-based retry, reusing Spring's backoff listener, for the first ship -
+      no new infrastructure; Kafka gives durability, distribution, and crash
+      recovery for free. (Mongo store is the preferred longer-term destination;
+      Quartz a gated fallback.)
+  3.  Own the policy, rent the plumbing - custom RetryTopicRecoverer + destination
+      resolver for routing/classification; Spring's backoff-aware -Retry listener
+      only for the delay.
+  4.  Two failure paths - async business failures via the recoverer;
+      container-thread deserialization via a separate handler (the async path
+      structurally cannot see them).
+  5.  Use Spring's stock DefaultErrorHandler for the container path (over a
+      hand-rolled CommonErrorHandler) - correct seek/no-retry semantics, no-loss
+      via uncommitted offset, less code. .notRetryOn(DeserializationException)
+      kept as a cheap policy-agreement guard.
+  6.  Configuration mirrors .NET ConsumerSettings - consumer-retry-duration
+      (ISO-8601 array) and disable-retry-consumer, for cross-service consistency.
+  7.  Derive attempt count from the array - N delays => N retries, then -Error.
+      An earlier draft also honoured flat maxAttempts/retry-backoff-ms as a
+      fallback; that was dropped so the array is the single source of truth and
+      depth/timing cannot be set two ways that disagree. NOTE: those two keys
+      are still present in all four App Configuration stores
+      (/spring/kafka/retry/maxAttempts = 5, retry-backoff-ms = 3000, label
+      MeasureEval) where they are now inert - nothing binds them. Editing them
+      to tune retries has no effect. They should be removed from the stores, and
+      consumer-retry-duration / disable-retry-consumer provisioned in their place
+      if an environment needs to differ from the application.yml schedule.
+  8.  Pin spring-kafka + add the delay test - close the silent-break risk from the
+      header coupling.
+  9.  Layer reusable mechanism into shared; parameterize the poison set - so
+      Validation (and future services) reuse AbstractAsyncConsumer /
+      RetryTopicRecoverer / RetryTopicRecovererFactory / KafkaRetryConfig without
+      dragging FHIR types into shared.
+
+

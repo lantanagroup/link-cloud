@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions
                             builderContext.AddRequestTransform(async transformContext =>
                             {
                                 var tokenService = services.BuildServiceProvider().GetRequiredService<ICreateLinkBearerToken>();
-                                var token = await tokenService.ExecuteAsync(transformContext.HttpContext.User, 2);
+                                var token = await tokenService.ExecuteAsync(transformContext.HttpContext.User, 2, transformContext.HttpContext.RequestAborted);
                                 transformContext.ProxyRequest.Headers.Remove("Authorization");
                                 transformContext.ProxyRequest.Headers.Add("Authorization", $"Bearer {token}");
                             });

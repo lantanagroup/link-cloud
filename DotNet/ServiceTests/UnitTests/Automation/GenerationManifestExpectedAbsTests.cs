@@ -168,6 +168,29 @@ public class GenerationManifestExpectedAbsTests
     }
 
     [Fact]
+    public void Empty_simulated_acquired_set_does_not_fallback_to_generated_keys()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Egen", "Condition/Cgen" },
+            },
+            SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase)
+            },
+        };
+
+        var keys = manifest.GetExpectedAbsKeysForPatient("p-q");
+
+        keys.Should().BeEquivalentTo(["Patient/p-q"]);
+    }
+
+    [Fact]
     public void Expected_abs_counts_do_not_include_organization_when_include_setting_is_false()
     {
         var manifest = new GenerationManifest

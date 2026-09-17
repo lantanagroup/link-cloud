@@ -161,8 +161,8 @@ public class SearchFhirCommandTests
         var provider = new Mock<IDistributedSemaphoreProvider>();
 
         semaphore
-            .Setup(s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
-            .Returns(handle.Object);
+            .Setup(s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle>(handle.Object));
         provider
             .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
             .Returns(semaphore.Object);
@@ -226,7 +226,7 @@ public class SearchFhirCommandTests
         Assert.Single(results);
         Assert.Equal("b1", results[0].Id);
         semaphore.Verify(
-            s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
+            s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
             Times.Once());
         handle.Verify(h => h.Dispose(), Times.Once());
         metrics.Verify(
@@ -287,7 +287,7 @@ public class SearchFhirCommandTests
         // Semaphore acquired twice (initial + paging), released twice even
         // though the second acquire threw during ContinueAsync.
         semaphore.Verify(
-            s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
+            s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
         handle.Verify(h => h.Dispose(), Times.Exactly(2));
     }
@@ -308,13 +308,13 @@ public class SearchFhirCommandTests
         var semaphore = new Mock<IDistributedSemaphore>();
 
         semaphore
-            .Setup(s => s.Acquire(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.AcquireAsync(It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
             .Returns(() =>
             {
                 trace.Add("acquired");
                 var h = new Mock<IDistributedSynchronizationHandle>();
                 h.Setup(x => x.Dispose()).Callback(() => trace.Add("released"));
-                return h.Object;
+                return new ValueTask<IDistributedSynchronizationHandle>(h.Object);
             });
         provider
             .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))

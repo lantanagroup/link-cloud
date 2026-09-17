@@ -58,23 +58,23 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         public async Task<HttpResponseMessage> RestoreFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Patch, $"api/facility/restore/{Uri.EscapeDataString(facilityId)}");
-            await SetAuthHeaderAsync(user, request);
+            await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> SoftDeleteFacilityAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Delete, $"api/facility/softDelete/{Uri.EscapeDataString(facilityId)}");
-            await SetAuthHeaderAsync(user, request);
+            await SetAuthHeaderAsync(user, request, cancellationToken);
             return await _client.SendAsync(request, cancellationToken);
         }
 
-        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request)
+        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (_authenticationSchemaConfig.Value.EnableAnonymousAccess) return;
             using var scope = _scopeFactory.CreateScope();
             var createLinkBearerToken = scope.ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-            var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+            var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 

@@ -40,7 +40,7 @@ public class NormalizationSuiteApplicationValidatorTests
     }
 
     [Fact]
-    public async Task NonOptionalOperation_AllNoAction_FailsValidation()
+    public async Task NonOptionalOperation_AllNoAction_PassesValidation()
     {
         var output = new CapturingOutput();
         var sut = new NormalizationSuiteApplicationValidator(output);
@@ -52,8 +52,10 @@ public class NormalizationSuiteApplicationValidatorTests
             "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CopyProperty:OpNoAction:NoAction]"
         };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            sut.ValidateAllAsync(abs, suite, logs));
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("NoAction=1", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -165,19 +167,160 @@ public class NormalizationSuiteApplicationValidatorTests
         output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
     }
 
-    private static NormalizationOperationDefinition BuildCopyPropertyOperation(string name) => new()
+    [Fact]
+    public async Task ExtendedSuite_GeneratedLocationOp_MatchesRuntimeSequenceNotSuiteSequence()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var copyLocation = BuildCopyPropertyOperation("Copy Location Identifiers to Type", "CopyLocation");
+        var copyProperty = BuildCopyPropertyOperation("Copy Location Identifier Value to Type Code");
+        var copyAlias = BuildCopyPropertyOperation("Copy Location aliases to type iteratively", "CopyLocationAliasToTypeIteratively");
+        var transform = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Set Encounter status when class matches upload",
+            OperationType = "ConditionalTransform",
+            ResourceTypes = ["Encounter"],
+            ConditionTargetFhirPath = "status",
+            ConditionTargetValue = "in-progress"
+        };
+
+        var suite = new NormalizationSuiteResolution(
+            "System Default extended",
+            [copyLocation, copyProperty, copyAlias, transform],
+            [
+                new NormalizationSuiteSequenceResolution(
+                    "Default Location Normalization",
+                    [
+                        new NormalizationSuiteSequenceOperationResolution(1, copyLocation),
+                        new NormalizationSuiteSequenceOperationResolution(2, copyProperty)
+                    ]),
+                new NormalizationSuiteSequenceResolution(
+                    "Generated patient sequence",
+                    [
+                        new NormalizationSuiteSequenceOperationResolution(1, copyAlias),
+                        new NormalizationSuiteSequenceOperationResolution(2, transform)
+                    ])
+            ],
+            []);
+
+        var abs = new Dictionary<string, object>
+        {
+            ["location.ndjson"] = "{\"resourceType\":\"Location\",\"id\":\"loc-1\"}\n",
+            ["encounter.ndjson"] = "{\"resourceType\":\"Encounter\",\"id\":\"enc-1\"}\n"
+        };
+        var logs = new List<string>
+        {
+            "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CopyLocation:Copy Location Identifiers to Type:Success | 2:CopyProperty:Copy Location Identifier Value to Type Code:Success | 3:CopyLocationAliasToTypeIteratively:Copy Location aliases to type iteratively:Success]",
+            "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Encounter, ResourceId=enc-1, Steps=[1:ConditionalTransform:Set Encounter status when class matches upload:Success]"
+        };
+
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l =>
+            l.Contains("runtime Location#3", StringComparison.Ordinal)
+            && l.Contains("Copy Location aliases to type iteratively", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l =>
+            l.Contains("runtime Encounter#1", StringComparison.Ordinal)
+            && l.Contains("Set Encounter status when class matches upload", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NonOptionalOperation_EvidenceAtWrongRuntimeSequence_FailsAndLogsNearby()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suite = BuildSuiteWithSingleOperation("Copy Location aliases to type iteratively", sequence: 1, operationType: "CopyLocationAliasToTypeIteratively");
+        var abs = BuildAbs("loc-1");
+        var logs = new List<string>
+        {
+            "[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CopyLocation:Copy Location Identifiers to Type:Success | 3:CopyLocationAliasToTypeIteratively:Copy Location aliases to type iteratively:Success]"
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ValidateAllAsync(abs, suite, logs));
+
+        output.Lines.Should().Contain(l =>
+            l.Contains("runtime sequence=1", StringComparison.Ordinal)
+            && l.Contains("Same name/type observed at sequence=3 (Success=1)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NonOptionalOperation_EmDashName_MatchesSanitizeForLogEvidence()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var suiteName = "Live Patient Test cleanup — Copy Location aliases to type iteratively";
+        var loggedName = "Live Patient Test cleanup   Copy Location aliases to type iteratively";
+        var suite = BuildSuiteWithSingleOperation(suiteName, sequence: 1, operationType: "CopyLocationAliasToTypeIteratively");
+        var abs = BuildAbs("loc-1");
+        var logs = new List<string>
+        {
+            $"[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CopyLocationAliasToTypeIteratively:{loggedName}:Success]"
+        };
+
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("Evidence found", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NonOptionalOperation_CodeMapNameWithColons_MatchesEvidence()
+    {
+        var output = new CapturingOutput();
+        var sut = new NormalizationSuiteApplicationValidator(output);
+
+        var name = "Code map Location.type (http://terminology.hl7.org/CodeSystem/v3-RoleCode)";
+        var op = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            OperationType = "CodeMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type.coding"
+        };
+        var suite = new NormalizationSuiteResolution(
+            "Test Suite",
+            [op],
+            [
+                new NormalizationSuiteSequenceResolution(
+                    "Generated",
+                    [new NormalizationSuiteSequenceOperationResolution(3, op)])
+            ],
+            []);
+        var abs = BuildAbs("loc-1");
+        var logs = new List<string>
+        {
+            $"[NormalizationExecutionSummary] FacilityId=f1, CorrelationId=c1, PatientId=p1, ResourceType=Location, ResourceId=loc-1, Steps=[1:CodeMap:{name}:Success]"
+        };
+
+        await sut.ValidateAllAsync(abs, suite, logs);
+
+        output.Lines.Should().Contain(l => l.Contains("NORMALIZATION SUITE APPLICATION VALIDATION: Passed", StringComparison.Ordinal));
+        output.Lines.Should().Contain(l => l.Contains("runtime Location#1", StringComparison.Ordinal));
+    }
+
+    private static NormalizationOperationDefinition BuildCopyPropertyOperation(string name, string operationType = "CopyProperty") => new()
     {
         Id = Guid.NewGuid(),
         Name = name,
-        OperationType = "CopyProperty",
+        OperationType = operationType,
         ResourceTypes = ["Location"],
         SourceFhirPath = "identifier.value",
         TargetFhirPath = "type[0].coding.code"
     };
 
-    private static NormalizationSuiteResolution BuildSuiteWithSingleOperation(string operationName, int sequence)
+    private static NormalizationSuiteResolution BuildSuiteWithSingleOperation(
+        string operationName,
+        int sequence,
+        string operationType = "CopyProperty")
     {
-        var op = BuildCopyPropertyOperation(operationName);
+        var op = BuildCopyPropertyOperation(operationName, operationType);
         return new NormalizationSuiteResolution(
             "Test Suite",
             [op],

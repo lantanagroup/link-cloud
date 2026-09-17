@@ -87,7 +87,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -203,7 +203,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -225,7 +225,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
 
                 //create a bearer token for the system account
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -241,7 +241,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -253,7 +253,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -265,7 +265,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -277,7 +277,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
@@ -290,7 +290,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2, cancellationToken);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 

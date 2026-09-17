@@ -77,7 +77,7 @@ public class ReadFhirCommand : IReadFhirCommand
         _logger.LogDebug(
             "Semaphore: Read acquire attempt facility={FacilityId} resource={ResourceType}/{ResourceId} maxConcurrent={MaxConcurrent}",
             maskedFacilityId, request.resourceType, maskedResourceId, maxConcurrent);
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
@@ -93,7 +93,7 @@ public class ReadFhirCommand : IReadFhirCommand
                 PreferredFormat = ResourceFormat.Json
             });
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)

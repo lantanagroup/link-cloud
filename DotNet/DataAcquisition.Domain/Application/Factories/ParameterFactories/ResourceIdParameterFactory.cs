@@ -16,8 +16,16 @@ public class ResourceIdParameterFactory : IResourceIdParameterFactory
     }
     public async Task<ParameterFactoryResult?> Build(ResourceIdsParameter parameter, GetPatientDataRequest request, IDataAcquisitionLogQueries dataAcquisitionLogQueries)
     {
+        var reportTrackingId = request.ConsumeResult?.Message?.Value?.ScheduledReports
+            ?.Select(report => report.ReportTrackingId)
+            .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+
         List<string> resourceIds = await
-            dataAcquisitionLogQueries.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, parameter.Resource);
+            dataAcquisitionLogQueries.GetResourceIdsForReportPatient(
+                request.CorrelationId,
+                request.FacilityId,
+                reportTrackingId,
+                parameter.Resource);
 
         if (resourceIds == null || !resourceIds.Any())
         {

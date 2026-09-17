@@ -76,7 +76,7 @@ namespace UnitTests.DataAcquisition.Factories
             var resourceIds = new List<string> { "id1", "id2", "id3" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, "Patient", It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), "Patient", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(resourceIds);
 
             // Act
@@ -111,7 +111,7 @@ namespace UnitTests.DataAcquisition.Factories
             var request = new GetPatientDataRequest { CorrelationId = "corr1", FacilityId = "fac1" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<string> { "id1", "id2", "id3" });
 
             // Act
@@ -190,7 +190,7 @@ namespace UnitTests.DataAcquisition.Factories
             var request = new GetPatientDataRequest { CorrelationId = "corr1", FacilityId = "fac1" };
 
             _dataAcquisitionLogQueriesMock
-                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, "Patient", It.IsAny<CancellationToken>()))
+                .Setup(q => q.GetResourceIdsForReportPatient(request.CorrelationId, request.FacilityId, It.IsAny<string?>(), "Patient", It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<string> { "id1", "id2", "id3" });
 
             // Act

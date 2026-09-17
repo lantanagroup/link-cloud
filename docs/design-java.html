@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -551,9 +553,9 @@
 </tbody>
 </table>
 <p>Note: Official guidance is to <em>remove</em> dashes (-) entirely from the environment variable. For example: <code>label-filter</code> becomes <code>LABELFILTER</code>. However, both <code>LABEL-FILTER</code> and <code>LABELFILTER</code> work interchangeably.</p>
-<h1 id="overriding-default-configs" class="content-heading">Overriding Default Configs <a id="overriding-default-configs" href="#overriding-default-configs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overriding Default Configs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="overriding-default-configs" class="content-heading">Overriding Default Configs <a href="#overriding-default-configs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overriding Default Configs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Any of the properties for serivce configuration can be provided either via environment variables, through a custom <code>application.yml</code> file, or via properties set in java using <code>-D&lt;propertyName&gt;=&lt;value&gt;</code> passed as an argument to the JVM during startup.</p>
-<h1 id="azure-app-config-and-key-vault" class="content-heading">Azure App Config and Key Vault <a id="azure-app-config-and-key-vault" href="#azure-app-config-and-key-vault" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config and Key Vault"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="azure-app-config-and-key-vault" class="content-heading">Azure App Config and Key Vault <a href="#azure-app-config-and-key-vault" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config and Key Vault"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Default <code>key-filter</code> and <code>label-filter</code> properties are specified for each service, so that at deployment time only the connection to the Azure App Config or Key Vault services needs to be configured/specified in environment variables.</p>
 <table>
 <thead>
@@ -591,12 +593,12 @@
 </tr>
 </tbody>
 </table>
-<h2 id="authentication" class="content-heading">Authentication <a id="authentication" href="#authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="authentication" class="content-heading">Authentication <a href="#authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Java Azure libraries have difficult using different authentication mechanisms between App Config (AAC) and Key Vault (AKV). If you specify AZURE_CLIENT_ID, it will attempt to use managed identity for <em>both</em> AAC and AKV.</p>
 <p>If using managed identity authentication for one, it is suggested to use managed identity for both; <em>not</em> a connectionString with a token/secret embedded in it for AAC and MI for AKV.</p>
 <p>Specifying all three <code>AZURE_CLIENT_ID</code>, <code>AZURE_CLIENT_SECRET</code> and <code>AZURE_TENANT_ID</code> is only necessary when using a service principal for authentication. Only <code>AZURE_CLIENT_ID</code> is necessary to authenticate using managed identity.</p>
 <p>If using a service principal for authentication, the <code>AZURE_TENANT_ID</code> is <em>not</em> the same as the subscription ID.</p>
-<h1 id="blob-storage" class="content-heading">Blob Storage <a id="blob-storage" href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="blob-storage" class="content-heading">Blob Storage <a href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -624,7 +626,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="telemetry" class="content-heading">Telemetry <a id="telemetry" href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="telemetry" class="content-heading">Telemetry <a href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -656,7 +658,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="swagger" class="content-heading">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="swagger" class="content-heading">Swagger <a href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -683,8 +685,8 @@
 </tr>
 </tbody>
 </table>
-<h1 id="databases" class="content-heading">Databases <a id="databases" href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="mongo-db" class="content-heading">Mongo DB <a id="mongo-db" href="#mongo-db" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo DB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="databases" class="content-heading">Databases <a href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="mongo-db" class="content-heading">Mongo DB <a href="#mongo-db" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo DB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -727,7 +729,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="sql-server" class="content-heading">SQL Server <a id="sql-server" href="#sql-server" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="sql-server" class="content-heading">SQL Server <a href="#sql-server" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -776,7 +778,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="auto-updatemigrate-dbs" class="content-heading">Auto Update/Migrate DBs <a id="auto-update-migrate-dbs" href="#auto-update-migrate-dbs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Auto Update/Migrate DBs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="auto-update-migrate-dbs" class="content-heading">Auto Update/Migrate DBs <a href="#auto-update-migrate-dbs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Auto Update/Migrate DBs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -795,7 +797,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="kafka" class="content-heading">Kafka <a id="kafka" href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="kafka" class="content-heading">Kafka <a href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -838,7 +840,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-authentication" class="content-heading">Service Authentication <a id="service-authentication" href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-authentication" class="content-heading">Service Authentication <a href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -881,7 +883,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="hapi-fhir-server-configuration" class="content-heading">HAPI FHIR Server Configuration <a id="hapi-fhir-server-configuration" href="#hapi-fhir-server-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HAPI FHIR Server Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="hapi-fhir-server-configuration" class="content-heading">HAPI FHIR Server Configuration <a href="#hapi-fhir-server-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: HAPI FHIR Server Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The HAPI module supports rate-limiting configuration to control the number of requests allowed within a specified time period. When rate-limiting is enabled, clients that exceed the configured limits will receive HTTP 429 (Too Many Requests) responses.</p>
 <table>
 <thead>
@@ -913,7 +915,7 @@
 <li><code>HAPI_FHIR_RATELIMITING_DURATION=PT5M</code> - Set time window to 5 minutes</li>
 </ul>
 <p><strong>Note:</strong> Rate-limiting is applied per client IP address. When <code>count</code> is set to -1 (default), no rate-limiting is applied.</p>
-<h1 id="service-information" class="content-heading">Service Information <a id="service-information" href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-information" class="content-heading">Service Information <a href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The service-information configuration allows exposing build, version and deployment information through the <code>/api/XXX/info</code> (i.e. <code>/api/validation/info</code>) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.</p>
 <table>
 <thead>
@@ -970,7 +972,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-njava_C251860["Design: Configuring Java Services"]</pre>
+njava_4B345774["Design: Configuring Java Services"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

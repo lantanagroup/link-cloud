@@ -21,6 +21,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+        order_updates: true
 
   data:
     redis:
@@ -29,9 +35,6 @@ spring:
 
 authentication:
   anonymous: true
-
-secret-management:
-  managerUri: https://link-vault.vault.azure.net/
 
 springdoc:
   api-docs:

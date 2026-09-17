@@ -10,6 +10,20 @@
     <h2 class="fw-bold mb-1"><i class="bi bi-funnel me-2"></i>Normalizations</h2>
     <p class="text-muted mb-3">Manage normalization operations, sequences, and suites. Suites are selectable on scenarios to control which normalizations run during a test.</p>
 
+    <div class="au-card">
+        <div class="card-header">Suggest from a patient bundle</div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Upload one or more FHIR bundles. We'll propose one operation of each type the data can support, reuse existing operations when they already match, and recommend a suite if one already covers the work. Upload additional patients to refine the same suite.</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                @Html.AntiForgeryToken()
+                <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
+                <button type="button" class="btn btn-sm btn-au-action" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNormGenerateReset">Start over</button>
+                <span id="normGenSessionHint" class="small text-muted"></span>
+            </div>
+        </div>
+    </div>
+
     <ul class="nav nav-tabs mb-3" id="normTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
@@ -295,6 +309,18 @@
                             <input class="form-control" id="OpCodeMapFhirPath" />
                         </div>
                         <div class="col-12 op-field op-field-CodeMap">
+                            <label class="form-label">Code System Maps</label>
+                            <div id="opCodeSystemMapRows"></div>
+                            <div class="d-flex gap-2 mt-2 align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
+                                <span class="text-muted" title="Use the textarea and controls independently: Load from JSON copies textarea JSON into controls, and Sync JSON from Controls copies controls into the textarea.">
+                                    <i class="bi bi-info-circle"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label">Code System Maps <small class="text-muted">(JSON)</small></label>
                             <textarea class="form-control font-monospace" id="OpCodeSystemMaps" rows="6" style="font-size:.8rem;"></textarea>
                         </div>
@@ -306,11 +332,11 @@
                         </div>
 
                         @* --- CopyLocationAliasToTypeIteratively fields --- *@
-                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively">
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively" id="OpCopyIterativeMaxIterationsWrap">
                             <label class="form-label" for="OpMaxIterations">Max Iterations</label>
                             <input class="form-control" type="number" min="1" id="OpMaxIterations" value="15" />
                         </div>
-                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively d-flex align-items-end">
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively align-items-end" id="OpCopyIterativeSplitOnCommaWrap">
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="OpSplitOnComma" />
                                 <label class="form-check-label" for="OpSplitOnComma">Split Alias Entries on Comma</label>
@@ -411,6 +437,7 @@
 <div id="suiteModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @section Scripts {
+<script src="~/js/bundle-config-generation.js" asp-append-version="true"></script>
 <script>
     // -- Data from server --
     const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
@@ -498,9 +525,120 @@
         const t = document.getElementById('OpType').value;
         document.querySelectorAll('.op-field').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.op-field-' + t).forEach(el => el.style.display = '');
+
+        const copyIterativeVisible = t === 'CopyLocationAliasToTypeIteratively';
+        document.getElementById('OpCopyIterativeMaxIterationsWrap').style.display = copyIterativeVisible ? '' : 'none';
+        document.getElementById('OpCopyIterativeSplitOnCommaWrap').style.display = copyIterativeVisible ? 'flex' : 'none';
     }
 
     document.getElementById('OpType').addEventListener('change', toggleOpFields);
+
+    function addCodeMapEntryRow(entriesHost, key, value) {
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-1 code-map-entry-row';
+        row.innerHTML =
+            '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
+            + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
+            + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button></div>';
+
+        row.querySelector('.code-map-source-key').value = key || '';
+        row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
+        row.querySelector('.code-map-target-display').value = value?.display || value?.Display || '';
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        entriesHost.appendChild(row);
+    }
+
+    function addCodeSystemMapCard(item) {
+        const host = document.getElementById('opCodeSystemMapRows');
+        const card = document.createElement('div');
+        card.className = 'card mb-2 p-2 code-system-map-card';
+        card.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="fw-semibold">Code System Map</span>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>'
+            + '</div>'
+            + '<div class="row g-2 mb-2">'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Target System</label><input class="form-control form-control-sm csm-target-system" /></div>'
+            + '</div>'
+            + '<div class="small text-muted mb-1">Code Maps</div>'
+            + '<div class="csm-code-maps"></div>'
+            + '<button type="button" class="btn btn-sm btn-outline-success mt-2 csm-add-code-map"><i class="bi bi-plus-lg me-1"></i>Add Code Map</button>';
+
+        card.querySelector('button.btn-outline-danger').addEventListener('click', () => card.remove());
+        const entriesHost = card.querySelector('.csm-code-maps');
+        card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
+
+        card.querySelector('.csm-source-system').value = item?.sourceSystem || item?.SourceSystem || '';
+        card.querySelector('.csm-target-system').value = item?.targetSystem || item?.TargetSystem || '';
+
+        const maps = item?.codeMaps || item?.CodeMaps || {};
+        const entries = Object.entries(maps);
+        if (entries.length === 0) {
+            addCodeMapEntryRow(entriesHost, '', { code: '', display: '' });
+        } else {
+            entries.forEach(([key, value]) => addCodeMapEntryRow(entriesHost, key, value));
+        }
+
+        host.appendChild(card);
+    }
+
+    function clearCodeSystemMapCards() {
+        document.getElementById('opCodeSystemMapRows').innerHTML = '';
+    }
+
+    function clearCodeMapEditorState() {
+        clearCodeSystemMapCards();
+        document.getElementById('OpCodeSystemMaps').value = '';
+    }
+
+    function setCodeSystemMapCards(items) {
+        clearCodeSystemMapCards();
+        (items || []).forEach(item => addCodeSystemMapCard(item));
+    }
+
+    function buildCodeSystemMapsFromCardsOrError() {
+        const cards = Array.from(document.querySelectorAll('#opCodeSystemMapRows .code-system-map-card'));
+        if (cards.length === 0) return null;
+
+        return cards.map((card, index) => {
+            const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
+            const targetSystem = (card.querySelector('.csm-target-system').value || '').trim();
+            if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
+            if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
+
+            const codeMaps = {};
+            const rows = Array.from(card.querySelectorAll('.code-map-entry-row'));
+            if (rows.length === 0) throw new Error(`Code System Map #${index + 1} requires at least one Code Map entry.`);
+
+            rows.forEach((row, rowIndex) => {
+                const key = (row.querySelector('.code-map-source-key').value || '').trim();
+                const code = (row.querySelector('.code-map-target-code').value || '').trim();
+                const display = (row.querySelector('.code-map-target-display').value || '').trim();
+
+                if (!key && !code && !display) return;
+                if (!key) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Source Code.`);
+                if (!code) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Target Code.`);
+                if (Object.prototype.hasOwnProperty.call(codeMaps, key))
+                    throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} duplicates Source Code '${key}'. Source Codes must be unique within a map.`);
+
+                codeMaps[key] = {
+                    code: code,
+                    display: display || code
+                };
+            });
+
+            if (Object.keys(codeMaps).length === 0)
+                throw new Error(`Code System Map #${index + 1} requires at least one non-empty Code Map entry.`);
+
+            return {
+                sourceSystem,
+                targetSystem,
+                codeMaps
+            };
+        });
+    }
 
     function openOpEditor(data, mode) {
         document.getElementById('OpId').value = data?.id || '';
@@ -515,6 +653,7 @@
         document.getElementById('OpCondTargetValue').value = data?.conditionTargetValue || '';
         document.getElementById('OpCodeMapFhirPath').value = data?.codeMapFhirPath || '';
         document.getElementById('OpCodeSystemMaps').value = data?.codeSystemMaps ? JSON.stringify(data.codeSystemMaps, null, 2) : '';
+        setCodeSystemMapCards(data?.codeSystemMaps || []);
         document.getElementById('OpExtensionUrls').value = (data?.extensionUrls || []).join('\n');
         document.getElementById('OpMaxIterations').value = data?.maxIterations ?? 15;
         document.getElementById('OpSplitOnComma').checked = !!data?.splitOnComma;
@@ -613,6 +752,20 @@
         return parsed;
     }
 
+    document.getElementById('btnAddCodeSystemMap').addEventListener('click', () => {
+        addCodeSystemMapCard(null);
+    });
+
+    document.getElementById('btnCodeMapLoadFromJson').addEventListener('click', () => {
+        const parsed = parseCodeSystemMapsOrError();
+        setCodeSystemMapCards(parsed);
+    });
+
+    document.getElementById('btnCodeMapSyncJson').addEventListener('click', () => {
+        const built = buildCodeSystemMapsFromCardsOrError();
+        document.getElementById('OpCodeSystemMaps').value = JSON.stringify(built || [], null, 2);
+    });
+
     function collectOpData() {
         const conditions = [];
         document.querySelectorAll('#opConditionsContainer .row').forEach(row => {
@@ -623,7 +776,8 @@
             });
         });
 
-        const codeSystemMaps = parseCodeSystemMapsOrError();
+        const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
+        const codeSystemMaps = codeSystemMapsFromCards ?? parseCodeSystemMapsOrError();
 
         return {
             id: document.getElementById('OpId').value || crypto.randomUUID(),
@@ -700,7 +854,11 @@
 
         const container = document.getElementById('seqEntriesContainer');
         container.innerHTML = '';
-        (data?.entries || []).sort((a,b) => a.sequence - b.sequence).forEach(e => addSeqEntryRow(e));
+        (data?.entries || [])
+            .sort((a, b) => a.sequence - b.sequence)
+            .forEach(e => addSeqEntryRow(e));
+
+        updateSeqOperationOptions();
 
         document.getElementById('btnSeqSave').style.display = mode === 'edit' ? '' : 'none';
         document.getElementById('seqSystemOverlay').style.display = mode === 'view' ? '' : 'none';
@@ -711,14 +869,78 @@
     function addSeqEntryRow(entry) {
         const container = document.getElementById('seqEntriesContainer');
         const seq = container.children.length + 1;
-        const options = allOperations.map(o => `<option value="${o.id}" ${o.id === entry?.operationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`).join('');
+
+        const selectedOperationIds = new Set(
+            Array.from(container.querySelectorAll('.seq-op-select'))
+                .map(select => select.value).filter(Boolean)
+        );
+
+        const selectedOperationId = entry?.operationId
+            || allOperations.find(o => !selectedOperationIds.has(o.id))?.id
+            || '';
+
+        const formErrors = document.getElementById('seqFormErrors');
+
+        if (!selectedOperationId) {
+            formErrors.textContent = 'All available operations are already included in this sequence.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
-            <select class="form-select form-select-sm seq-op-select">${options}</select>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove(); renumberSeqEntries();"><i class="bi bi-x-lg"></i></button>`;
+            <select class="form-select form-select-sm seq-op-select"></select>
+            <button type="button" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-x-lg"></i>
+            </button>`;
+
+        const select = row.querySelector('.seq-op-select');
+
+        allOperations.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o.id;
+            option.textContent = `${o.name} (${o.operationType})`;
+            option.selected = o.id === selectedOperationId;
+            select.appendChild(option);
+        });
+
+        select.addEventListener('change', updateSeqOperationOptions);
+
+        row.querySelector('.btn-outline-danger').addEventListener('click', () => {
+            row.remove();
+            renumberSeqEntries();
+            updateSeqOperationOptions();
+        });
+
         container.appendChild(row);
+        updateSeqOperationOptions();
+    }
+
+    function updateSeqOperationOptions() {
+        const selects = Array.from(document.querySelectorAll('#seqEntriesContainer .seq-op-select'));
+
+        selects.forEach(select => {
+            const selectedByOtherRows = new Set(
+                selects
+                    .filter(other => other !== select)
+                    .map(other => other.value)
+                    .filter(Boolean)
+            );
+
+            Array.from(select.options).forEach(option => {
+                option.disabled =
+                    option.value !== select.value &&
+                    selectedByOtherRows.has(option.value);
+            });
+        });
+
+        document.getElementById('btnAddSeqEntry').disabled =
+            selects.length >= allOperations.length;
     }
 
     function renumberSeqEntries() {
@@ -744,12 +966,31 @@
     }
 
     document.getElementById('btnSeqSave').addEventListener('click', async () => {
+        const formErrors = document.getElementById('seqFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
         const data = collectSeqData();
-        const resp = await postJson('@Url.Action("SaveSequence", "Normalizations")', data);
-        if (resp.ok) { location.reload(); } else {
+
+        const operationIds = data.entries.map(e => e.operationId);
+        if (new Set(operationIds).size !== operationIds.length) {
+            formErrors.textContent =
+                'A sequence cannot contain the same operation more than once.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        const resp = await postJson(
+            '@Url.Action("SaveSequence", "Normalizations")',
+            data
+        );
+
+        if (resp.ok) {
+            location.reload();
+        } else {
             const err = await resp.text();
-            document.getElementById('seqFormErrors').textContent = err;
-            document.getElementById('seqFormErrors').style.display = '';
+            formErrors.textContent = err;
+            formErrors.style.display = '';
         }
     });
 
@@ -900,5 +1141,74 @@
         await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
         location.reload();
     }));
+
+    const analyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
+    const applyOrmUrl = '@Url.Action("ApplyOrm", "ConfigurationGeneration")';
+    const applyNormUrl = '@Url.Action("ApplyNormalization", "ConfigurationGeneration")';
+    const normGenKey = 'cfgGen.norm';
+    function loadNormGenState(){
+        try { return JSON.parse(sessionStorage.getItem(normGenKey) || '{}'); } catch { return {}; }
+    }
+    function saveNormGenState(state){ sessionStorage.setItem(normGenKey, JSON.stringify(state || {})); }
+    function refreshNormGenHint(){
+        const hint = document.getElementById('normGenSessionHint');
+        if (!hint) return;
+        const state = loadNormGenState();
+        hint.textContent = state.fingerprint
+            ? 'Session has prior patient data. The next analyze will refine the current proposal. Use Start over to reset.'
+            : '';
+    }
+    refreshNormGenHint();
+    document.getElementById('btnNormGenerateReset').addEventListener('click', () => {
+        sessionStorage.removeItem(normGenKey);
+        document.getElementById('normGenFile').value = '';
+        refreshNormGenHint();
+    });
+    document.getElementById('btnNormGenerate').addEventListener('click', async () => {
+        const files = document.getElementById('normGenFile').files;
+        if (!files.length) { alert('Choose one or more FHIR bundle JSON files first.'); return; }
+        const btn = document.getElementById('btnNormGenerate');
+        btn.disabled = true;
+        try {
+        const sources = await window.BundleConfigGeneration.readFilesAsSources(files);
+        const state = loadNormGenState();
+        const request = { sources, priorFingerprint: state.fingerprint || null, refineOrmId: state.lastOrmId || null, refineSuiteId: state.lastSuiteId || null };
+        function persist(idKey, id, proposal){
+            const next = loadNormGenState();
+            if (proposal) next.fingerprint = proposal.fingerprint || proposal.Fingerprint || next.fingerprint;
+            if (idKey && id) next[idKey] = id;
+            saveNormGenState(next);
+            refreshNormGenHint();
+        }
+        const proposal = await window.BundleConfigGeneration.analyzeAndShow(
+            { analyze: analyzeUrl, applyOrm: applyOrmUrl, applyNorm: applyNormUrl },
+            request,
+            {
+                selectOrmLabel: 'Save new ORM',
+                selectSuiteLabel: 'Save new suite',
+                onSelectOrm: () => location.reload(),
+                onSelectSuite: () => location.reload(),
+                onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
+                onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
+                onExtendOrm: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
+                    persist('lastOrmId', saved.id || saved.Id, refined);
+                    location.reload();
+                },
+                onExtendSuite: async (id) => {
+                    const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
+                    const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
+                    persist('lastSuiteId', saved.id || saved.Id, refined);
+                    location.reload();
+                }
+            });
+        persist(null, null, proposal);
+        } catch (err) {
+            alert(err.message || 'Suggestion failed.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
 </script>
 }

@@ -6,7 +6,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({{startOnLoad:true}});
+        mermaid.initialize({ startOnLoad: true });
 
         function getMermaidSourceFromContainer(container) {{
             const pre = container?.querySelector('pre.mermaid');
@@ -452,6 +452,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
@@ -466,7 +467,9 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
@@ -477,6 +480,7 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
@@ -484,8 +488,6 @@
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -495,11 +497,11 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h2 id="purpose" class="content-heading">Purpose <a id="purpose" href="#purpose" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Purpose"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="purpose" class="content-heading">Purpose <a href="#purpose" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Purpose"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>This design explains how Link authenticates to EHR vendor APIs when acquiring data from facility systems.</p>
 <p>The scope of this design is EHR authentication for data acquisition. It does not describe Link user login, Admin UI authentication, service-to-service authentication within Link, or authorization policies for Link users.</p>
 <p>For EHR vendors that expose FHIR APIs, Link authenticates as an application registered in the vendor's system. The application registration represents the Link integration for that vendor environment. Link uses that registration to request access tokens before making data acquisition requests.</p>
-<h2 id="scope" class="content-heading">Scope <a id="scope" href="#scope" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="scope" class="content-heading">Scope <a href="#scope" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>This design covers:</p>
 <ul>
 <li>How Link obtains OAuth2 access tokens from EHR vendors.</li>
@@ -516,7 +518,7 @@
 <li>Link internal service authentication.</li>
 <li>General user authorization or role-based access control.</li>
 </ul>
-<h2 id="oauth2-jwt-client-assertion-pattern" class="content-heading">OAuth2 JWT Client Assertion Pattern <a id="oauth2-jwt-client-assertion-pattern" href="#oauth2-jwt-client-assertion-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: OAuth2 JWT Client Assertion Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="oauth2-jwt-client-assertion-pattern" class="content-heading">OAuth2 JWT Client Assertion Pattern <a href="#oauth2-jwt-client-assertion-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: OAuth2 JWT Client Assertion Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>All supported EHR vendors so far use a form of OAuth2-based authentication. The exact vendor requirements vary, but the high-level workflow is consistent:</p>
 <ol>
 <li>Link generates a JWT client assertion using the configured client ID.</li>
@@ -526,11 +528,11 @@
 <li>Link sends the access token as an <code>Authorization: Bearer &lt;token&gt;</code> header on each EHR data acquisition request.</li>
 </ol>
 <p>The client ID represents the Link app registration in the vendor's system. The private key is held by Link and used only for signing JWT client assertions. The corresponding public key is made available to the EHR so the EHR can verify that the JWT was signed by Link.</p>
-<h2 id="public-key-distribution" class="content-heading">Public Key Distribution <a id="public-key-distribution" href="#public-key-distribution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Public Key Distribution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="current-manual-public-key-registration" class="content-heading">Current Manual Public Key Registration <a id="current-manual-public-key-registration" href="#current-manual-public-key-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Current Manual Public Key Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="public-key-distribution" class="content-heading">Public Key Distribution <a href="#public-key-distribution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Public Key Distribution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="current-manual-public-key-registration" class="content-heading">Current Manual Public Key Registration <a href="#current-manual-public-key-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Current Manual Public Key Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Historically, Link has provided the public key as part of each facility's request to access the Link app registration.</p>
 <p>In practice, this means the public key associated with each facility using the app is copied into the vendor's app registration or access request process. This approach works, but it creates a manual onboarding step for each facility and makes key rotation more operationally difficult.</p>
-<h3 id="jwks-based-public-key-discovery" class="content-heading">JWKS-Based Public Key Discovery <a id="jwks-based-public-key-discovery" href="#jwks-based-public-key-discovery" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Public Key Discovery"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="jwks-based-public-key-discovery" class="content-heading">JWKS-Based Public Key Discovery <a href="#jwks-based-public-key-discovery" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Public Key Discovery"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Vendors are moving toward validating JWT signatures through a JWKS document.</p>
 <p>With this approach, Link publishes public keys at a public JWKS endpoint. The EHR retrieves the JWKS document and uses the matching public key to validate JWT client assertions signed by Link.</p>
 <p>This reduces manual public key copy/paste during facility onboarding and creates a cleaner path for key rotation.</p>
@@ -544,7 +546,7 @@
 <li>If validation succeeds, the EHR returns an access token.</li>
 <li>Link uses the access token for FHIR API requests during data acquisition.</li>
 </ol>
-<h2 id="jwks-based-authentication-flow" class="content-heading">JWKS-Based Authentication Flow <a id="jwks-based-authentication-flow" href="#jwks-based-authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="jwks-based-authentication-flow" class="content-heading">JWKS-Based Authentication Flow <a href="#jwks-based-authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre class="mermaid">sequenceDiagram
     participant Lnk as "Link Data Acquisition"
     participant VC as "Vendor Configuration"
@@ -567,12 +569,12 @@
     Lnk->>API: Request FHIR data with "Authorization: Bearer token"
     API-->>Lnk: Return FHIR response
 </pre>
-<h2 id="key-storage" class="content-heading">Key Storage <a id="key-storage" href="#key-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="key-storage" class="content-heading">Key Storage <a href="#key-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>JWT signing keys are stored in Key Vault. Link does not store private signing key material directly in tenant, facility, vendor, or data acquisition configuration records.</p>
 <p>When Link needs to generate a signed JWT, it resolves the applicable key identifier from configuration and requests the key from Key Vault.</p>
 <p>The implementation may either retrieve private key material for in-process signing or use a Key Vault-backed signing capability, depending on the deployment and SDK support.</p>
 <p>The JWKS endpoint exposes only public key material needed by EHRs to validate signatures. Private keys must never be exposed through the JWKS endpoint, admin UI screens, configuration APIs, logs, or exported architecture documentation.</p>
-<h2 id="vendor-specific-key-strategy" class="content-heading">Vendor-Specific Key Strategy <a id="vendor-specific-key-strategy" href="#vendor-specific-key-strategy" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor-Specific Key Strategy"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="vendor-specific-key-strategy" class="content-heading">Vendor-Specific Key Strategy <a href="#vendor-specific-key-strategy" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor-Specific Key Strategy"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Link will maintain a separate key/certificate pair per EHR vendor.</p>
 <p>Examples:</p>
 <table>
@@ -599,7 +601,7 @@
 </table>
 <p>A single shared key would technically be sufficient for multiple vendors when the same algorithm is supported. However, vendor-specific keys reduce the blast radius if a private key is compromised. If one vendor-specific key is breached, only facilities using that vendor's key are impacted.</p>
 <p>Vendor-specific keys are also required when vendors have different signing algorithm requirements. Oracle requires a different algorithm than Epic and Cerner, so Oracle must have its own key regardless of the preferred blast-radius reduction strategy.</p>
-<h2 id="vendor-key-association" class="content-heading">Vendor Key Association <a id="vendor-key-association" href="#vendor-key-association" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor Key Association"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="vendor-key-association" class="content-heading">Vendor Key Association <a href="#vendor-key-association" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor Key Association"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Link has a concept of <code>Vendor</code> and supports vendor-level configuration through the vendor configuration screen.</p>
 <p>The current plan is to associate each vendor with a specific Key Vault key and <code>kid</code>.</p>
 <p>For example:</p>
@@ -626,7 +628,7 @@
 </tbody>
 </table>
 <p>At runtime, Link should resolve the signing key from the vendor associated with the facility's EHR configuration. This keeps key management centralized at the vendor level and avoids requiring every facility to independently configure key material when the vendor-level key is sufficient.</p>
-<h2 id="runtime-key-resolution" class="content-heading">Runtime Key Resolution <a id="runtime-key-resolution" href="#runtime-key-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Runtime Key Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="runtime-key-resolution" class="content-heading">Runtime Key Resolution <a href="#runtime-key-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Runtime Key Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>At runtime, Link resolves the signing key based on the facility's configured EHR vendor.</p>
 <p>The initial resolution model is:</p>
 <ol>
@@ -642,12 +644,12 @@
 <li>Use a facility-specific key/kid override, when configured.</li>
 <li>Otherwise, use the vendor-level key/kid.</li>
 </ol>
-<h2 id="future-facility-level-key-overrides" class="content-heading">Future Facility-Level Key Overrides <a id="future-facility-level-key-overrides" href="#future-facility-level-key-overrides" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Facility-Level Key Overrides"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="future-facility-level-key-overrides" class="content-heading">Future Facility-Level Key Overrides <a href="#future-facility-level-key-overrides" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Facility-Level Key Overrides"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The initial implementation should associate keys at the vendor level. However, the design should remain flexible enough to support tenant/facility-level key overrides in the future.</p>
 <p>A facility-level override may be needed if vendor-level keying is not sufficient for a specific facility. For example, a facility may have a policy requiring a unique key/certificate pair for that facility's app registration or authorization workflow.</p>
 <p>Tenant/facility-level overrides are not part of the initial implementation, but the configuration model should avoid assumptions that would make this difficult to add later.</p>
-<h2 id="operational-considerations" class="content-heading">Operational Considerations <a id="operational-considerations" href="#operational-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Operational Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="key-rotation" class="content-heading">Key Rotation <a id="key-rotation" href="#key-rotation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Rotation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="operational-considerations" class="content-heading">Operational Considerations <a href="#operational-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Operational Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="key-rotation" class="content-heading">Key Rotation <a href="#key-rotation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Rotation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Key rotation should be supported without disrupting active facilities.</p>
 <p>A typical rotation process is:</p>
 <ol>
@@ -659,26 +661,26 @@
 <li>Retire the old key after all affected vendor integrations have moved to the new key.</li>
 </ol>
 <p>If tenant/facility-level key overrides are introduced later, the same rotation model should apply to those overrides.</p>
-<h3 id="key-identification" class="content-heading">Key Identification <a id="key-identification" href="#key-identification" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Identification"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="key-identification" class="content-heading">Key Identification <a href="#key-identification" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Identification"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Each public key in the JWKS document must include a stable <code>kid</code>.</p>
 <p>The JWT signed by Link must include the same <code>kid</code> in its header so the EHR can select the correct public key.</p>
 <p>Vendor configuration should persist the Key Vault key reference and the <code>kid</code> that should be used for JWT signing. The <code>kid</code> used in signed JWTs must align with the corresponding public key published in the JWKS document.</p>
-<h3 id="private-key-protection" class="content-heading">Private Key Protection <a id="private-key-protection" href="#private-key-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Private Key Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="private-key-protection" class="content-heading">Private Key Protection <a href="#private-key-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Private Key Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Private keys must remain secret and must not be exposed through configuration APIs, logs, JWKS documents, admin UI screens, or exported architecture documentation.</p>
 <p>The JWKS endpoint exposes only public key material.</p>
-<h3 id="facility-onboarding" class="content-heading">Facility Onboarding <a id="facility-onboarding" href="#facility-onboarding" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility Onboarding"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="facility-onboarding" class="content-heading">Facility Onboarding <a href="#facility-onboarding" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility Onboarding"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When a vendor supports JWKS validation, facility onboarding should reference the Link-hosted JWKS endpoint instead of requiring public key material to be manually copied into each facility's app registration request.</p>
 <p>When a vendor or facility still requires manual public key registration, Link may continue supporting that workflow as a vendor-specific onboarding requirement.</p>
-<h3 id="token-caching" class="content-heading">Token Caching <a id="token-caching" href="#token-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="token-caching" class="content-heading">Token Caching <a href="#token-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Token responses may be cached according to the vendor-provided expiration period to avoid requesting a new token for every FHIR request.</p>
 <p>Token caching should be scoped in a way that avoids cross-facility or cross-vendor token reuse. At minimum, the cache key should account for the facility, vendor, token endpoint, client ID, requested scopes/audience, and any other vendor-specific token request parameters that influence the issued token.</p>
-<h2 id="data-acquisition-integration" class="content-heading">Data Acquisition Integration <a id="data-acquisition-integration" href="#data-acquisition-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="data-acquisition-integration" class="content-heading">Data Acquisition Integration <a href="#data-acquisition-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>EHR authentication is used by Link's data acquisition workflow whenever Link needs to query an EHR FHIR endpoint.</p>
 <p>Before issuing FHIR requests, Link obtains an access token from the vendor authorization server. Once the token is received, Link attaches it to each outbound EHR API request:</p>
 <pre><code class="language-http">Authorization: Bearer &lt;access-token&gt;
 </code></pre>
 <p>The access token is used only for EHR API requests associated with the relevant facility/vendor authentication context.</p>
-<h2 id="open-questions" class="content-heading">Open Questions <a id="open-questions" href="#open-questions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Open Questions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="open-questions" class="content-heading">Open Questions <a href="#open-questions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Open Questions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The following implementation details should be confirmed as the design is implemented:</p>
 <ol>
 <li>What public URL path will Link expose for the JWKS document?</li>
@@ -694,7 +696,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nehr_auth_FAA739A["Design: EHR Authentication"]</pre>
+nehr_auth_3DC647E4["Design: EHR Authentication"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

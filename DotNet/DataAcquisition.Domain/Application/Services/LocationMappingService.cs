@@ -107,9 +107,11 @@ public interface ILocationMappingService
     /// acquired-resource cache before the tail's ResourcesAcquired event is produced. The Encounter is
     /// fetched and cached by its own (ungated) primary log, so marking a dependent log NotReportable does
     /// not keep the non-org encounter out of MeasureEval; this strip does. A patient whose encounters are
-    /// all non-org ends up with no cached encounter — MeasureEval evaluates no qualifying encounter and
-    /// produces a non-reportable outcome — while a patient with a mix keeps only the org encounters.
-    /// No-op when org-location mapping is not active for the facility.
+    /// all non-org ends up with no cached encounter. The tail finalizer then omits that empty
+    /// Encounter key from ResourcesAcquired so Normalization is not pointed at an empty location.
+    /// MeasureEval evaluates no qualifying encounter and produces a non-reportable outcome.
+    /// A patient with a mix keeps only the org encounters. No-op when org-location mapping
+    /// is not active for the facility.
     /// </summary>
     /// <param name="facilityId">The facility the correlation belongs to.</param>
     /// <param name="correlationId">The acquisition correlation whose cached encounters to filter.</param>
@@ -173,7 +175,7 @@ public class LocationMappingService(
     public async Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location,
         string? locationAlias = null, CancellationToken cancellationToken = default)
     {
-        var conditions = await GetActiveConditionsForFacility(facilityId);
+        var conditions = await GetActiveConditionsForFacility(facilityId, cancellationToken);
         if (conditions.Count == 0)
         {
             throw new NotFoundException($"FacilityId {facilityId} does not have any location mappings configured");
@@ -310,7 +312,7 @@ public class LocationMappingService(
                 locationId: location.PartOf.Reference.SplitReference());
         }
 
-        var isOrgLocation = await IsOrgLocationAsync(facilityId, location) || partOf?.IsOrgLocation == true;
+        var isOrgLocation = await IsOrgLocationAsync(facilityId, location, cancellationToken) || partOf?.IsOrgLocation == true;
 
         if (locationMapping is null)
         {
@@ -339,7 +341,7 @@ public class LocationMappingService(
 
     public async Task<bool> IsConfigured(string facilityId, CancellationToken cancellationToken)
     {
-        var mappings = await GetActiveConditionsForFacility(facilityId);
+        var mappings = await GetActiveConditionsForFacility(facilityId, cancellationToken);
 
         return mappings.Count != 0;
     }
@@ -492,7 +494,7 @@ public class LocationMappingService(
         }
 
         var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
-        var cachedEncounters = _resourceCache.Get(cacheKey);
+        var cachedEncounters = await _resourceCache.GetAsync(cacheKey, cancellationToken);
         if (cachedEncounters.Count == 0)
         {
             return 0;
@@ -520,13 +522,13 @@ public class LocationMappingService(
             return 0;
         }
 
-        // UpdateCorrelationCache is an additive HashSet, so removing entries requires deleting the key
+        // UpdateCorrelationCacheAsync is an additive HashSet, so removing entries requires deleting the key
         // and rewriting it with only the org encounters. When none remain the key is left empty, so
         // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
-        _resourceCache.Delete([cacheKey]);
+        await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
         if (orgEncounters.Count > 0)
         {
-            _resourceCache.UpdateCorrelationCache(cacheKey, orgEncounters, ResourceType.Encounter);
+            await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
         }
 
         _logger.LogDebug(
@@ -773,7 +775,7 @@ public class LocationMappingService(
         foreach (var location in cachedLocations.Values)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            directOrgById[location.Id] = await IsOrgLocationAsync(facilityId, location);
+            directOrgById[location.Id] = await IsOrgLocationAsync(facilityId, location, cancellationToken);
             parentById[location.Id] = location.PartOf?.Reference?.SplitReference();
         }
 
@@ -838,14 +840,15 @@ public class LocationMappingService(
 
     private async Task<bool> IsOrgLocationAsync(
         string facilityId,
-        Location? location)
+        Location? location,
+        CancellationToken cancellationToken)
     {
         if (location is null)
         {
             return false;
         }
 
-        var conditions = await GetActiveConditionsForFacility(facilityId);
+        var conditions = await GetActiveConditionsForFacility(facilityId, cancellationToken);
 
         if (conditions.Count == 0)
         {
@@ -874,11 +877,11 @@ public class LocationMappingService(
         return false;
     }
 
-    private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId)
+    private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId, CancellationToken cancellationToken)
     {
         var cacheKey = OrgLocationCacheKeys.Conditions(facilityId);
 
-        var conditions = _cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey);
+        var conditions = await _cacheService.GetAsync<List<OrganizationLocationConditionModel>?>(cacheKey, cancellationToken);
 
         if (conditions is not null)
         {
@@ -894,7 +897,7 @@ public class LocationMappingService(
             .OrderBy(c => c.Priority)
             .ToList();
 
-        _cacheService.Set(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute);
+        await _cacheService.SetAsync(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute, cancellationToken);
 
         return conditions;
     }
