@@ -70,10 +70,20 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                     .StoreDurably()
                     .Build();
 
-                await scheduler.ScheduleJob(job, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
+                try
+                {
+                    await scheduler.ScheduleJob(job, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
 
-                _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).", timeZoneId, cron);
-                return;
+                    _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).", timeZoneId, cron);
+                    return;
+                }
+                catch (ObjectAlreadyExistsException ex)
+                {
+                    // Another cluster node's ReconcileAllAsync won the race between our CheckExists
+                    // and this ScheduleJob. Fall through to the verify/reschedule logic below instead
+                    // of crashing the loser out of the hosted service's StartAsync.
+                    _logger.LogDebug(ex, "DMRP nightly job for timezone {TimeZone} was scheduled by another node; verifying its trigger.", timeZoneId);
+                }
             }
 
             var existing = (await scheduler.GetTriggersOfJob(jobKey, cancellationToken)).OfType<ICronTrigger>().FirstOrDefault();

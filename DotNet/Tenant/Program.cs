@@ -84,7 +84,6 @@ namespace Tenant
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();
-            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
 
             builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
@@ -161,6 +160,11 @@ namespace Tenant
             builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
 
             builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
+
+            // Hosted services start in registration order, so the DMRP module's cleanup (flag off) or
+            // reconcile (flag on) hosted service - registered above, inside AddDmrpModule - must be
+            // registered before the classic scheduler starts the shared Quartz scheduler.
+            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
 
             //Add problem details
             builder.Services.AddTenantProblemDetails(builder.Environment);
