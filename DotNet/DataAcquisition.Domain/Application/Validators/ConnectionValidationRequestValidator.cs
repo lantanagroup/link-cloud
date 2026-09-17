@@ -45,4 +45,31 @@ public class ConnectionValidationRequestValidator
         errorMessage = string.Empty;
         return true;
     }
+
+    /// <summary>
+    /// Validates the fhirServerUrl supplied to the configuration-free connection validation endpoint.
+    /// </summary>
+    public static bool ValidateFhirServerUrl(string? fhirServerUrl, out string errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(fhirServerUrl))
+        {
+            errorMessage = "No FHIR server URL was provided. One is required to validate.";
+            return false;
+        }
+
+        if (!Uri.TryCreate(fhirServerUrl.Trim(), UriKind.Absolute, out var uri))
+        {
+            errorMessage = "The FHIR server URL provided is not a valid absolute URL.";
+            return false;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            errorMessage = "The FHIR server URL provided must use the http or https scheme.";
+            return false;
+        }
+
+        errorMessage = string.Empty;
+        return true;
+    }
 }

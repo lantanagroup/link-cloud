@@ -321,6 +321,7 @@ public static class GeneralStartupExtensions
         //Services
         services.AddTransient<ITenantApiService, TenantApiService>();
         services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
+        services.AddTransient<IValidateFhirServerConnectionService, ValidateFhirServerConnectionService>();
         services.AddTransient<IFhirApiService, FhirApiService>();
         services.AddTransient<ILocationMappingService, LocationMappingService>();
         services.AddTransient<IResourcesAcquiredTailFinalizer, ResourcesAcquiredTailFinalizer>();
