@@ -91,6 +91,7 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
+      mkdir -p "$(workingDir)/packages"
       cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/"
 # # Install NPM dependencies
 # - task: Npm@1
