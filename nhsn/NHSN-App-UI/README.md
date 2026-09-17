@@ -57,7 +57,7 @@ The standalone test harness server can source all of its runtime settings from e
 variables, Azure App Configuration, or hard-coded defaults. To enable Azure App Configuration, set:
 
 - `ExternalConfigurationSource=AzureAppConfiguration`
-- `DatabaseConnections__AzureAppConfiguration=<AAC connection string>`
+- `ConnectionStrings__AzureAppConfiguration=<AAC connection string>`
 
 The server loads only `/nhsn_app_ui/*` values in these two AAC scopes:
 
@@ -69,7 +69,7 @@ other label are not selected by the server.
 
 Configuration precedence is **environment variable first, then AAC, then the hard-coded default**.
 This means the server requires no runtime environment variables unless AAC is enabled; only
-`ExternalConfigurationSource` and `DatabaseConnections__AzureAppConfiguration` are needed to
+`ExternalConfigurationSource` and `ConnectionStrings__AzureAppConfiguration` are needed to
 bootstrap AAC.
 
 #### Supported settings
