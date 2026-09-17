@@ -79,19 +79,13 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             using var producer = _producerFactory.CreateProducer(new ProducerConfig());
             using var gate = new SemaphoreSlim(scheduling.ResolvedConcurrency);
 
-            // A single producer instance is shared across every facility running concurrently.
-            // Confluent's real producer tolerates concurrent Produce calls, but nothing about this
-            // job depends on messages actually leaving in parallel, so calls into it are serialized
-            // rather than leaving that assumption unstated.
-            using var produceGate = new SemaphoreSlim(1, 1);
-
             var outcomes = await Task.WhenAll(facilities.Select(async facility =>
             {
                 await gate.WaitAsync(cancellationToken);
                 try
                 {
                     return await RunFacilityAsync(facility, comingMidnight, periods, timeZone, scheduling, producer,
-                        produceGate, cancellationToken);
+                        cancellationToken);
                 }
                 finally
                 {
@@ -114,7 +108,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
         private async Task<DmrpFireOutcome> RunFacilityAsync(ScheduledFacility facility, DateTime comingMidnight,
             IReadOnlyList<ScheduledPeriod> periods, TimeZoneInfo timeZone, DmrpSchedulingSettings scheduling,
-            IProducer<string, object> producer, SemaphoreSlim produceGate, CancellationToken cancellationToken)
+            IProducer<string, object> producer, CancellationToken cancellationToken)
         {
             // Its own scope: the repositories behind these are EF-backed and not safe to share
             // across the facilities running concurrently.
@@ -169,8 +163,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                         continue;
                     }
 
-                    await ProduceAsync(producer, produceGate, facility.FacilityId, period, dqms, timeZone,
-                        cancellationToken);
+                    await ProduceAsync(producer, facility.FacilityId, period, dqms, timeZone, cancellationToken);
                     emitted++;
                 }
 
@@ -270,9 +263,8 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             return false;
         }
 
-        private async Task ProduceAsync(IProducer<string, object> producer, SemaphoreSlim produceGate,
-            string facilityId, ScheduledPeriod period, string[] dqms, TimeZoneInfo timeZone,
-            CancellationToken cancellationToken)
+        private async Task ProduceAsync(IProducer<string, object> producer, string facilityId, ScheduledPeriod period,
+            string[] dqms, TimeZoneInfo timeZone, CancellationToken cancellationToken)
         {
             var (startUtc, endUtc) = ReportingPeriodMath.ForFrequency(period.Frequency, period.LocalStart, timeZone);
             var trackingId = ReportTrackingIds.For(facilityId, period.Frequency, startUtc).ToString();
@@ -298,15 +290,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 }
             };
 
-            await produceGate.WaitAsync(cancellationToken);
-            try
-            {
-                await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message, cancellationToken);
-            }
-            finally
-            {
-                produceGate.Release();
-            }
+            await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message, cancellationToken);
 
             _logger.LogInformation(
                 "Produced {Topic} for facility {FacilityId}: {Frequency} {StartDate} - {EndDate}, {DqmCount} dQM(s), tracking {TrackingId}",
