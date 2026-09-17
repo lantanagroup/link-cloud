@@ -4,7 +4,7 @@ resources:
     source: Build_And_Push_All
     trigger: true
 
-  repository:
+  repositories:
     - repository: AzureDevOps
       type: git
       name: lantanagroup/nhsnlink
