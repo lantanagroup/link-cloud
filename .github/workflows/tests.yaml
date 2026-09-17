@@ -80,7 +80,9 @@ jobs:
           docker buildx bake --file docker-compose.yml \
             --set *.cache-from=type=gha,scope=e2e-docker \
             --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker   # <-- makes images visible to `docker compose`
+            --set *.output=type=docker \
+            --set automation-ui.secrets.feed_accesstoken=env://AZURE_ARTIFACTS_PAT \
+            --set mock-fhir-server.secrets.feed_accesstoken=env://AZURE_ARTIFACTS_PAT
 
       - name: Start services
         run: docker compose up --no-build -d

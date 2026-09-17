@@ -15,7 +15,9 @@ public static class MetricsScenarioFingerprint
         IEnumerable<string>? measures,
         string? thetisGitSha,
         Guid? queryPlanId,
-        Guid? normalizationSuiteId)
+        Guid? normalizationSuiteId,
+        IEnumerable<string>? measureTemplateIds = null,
+        string? measureContentHash = null)
     {
         var payload = string.Join('|',
             patientCount.ToString(),
@@ -27,9 +29,20 @@ public static class MetricsScenarioFingerprint
             string.Join(',', (measures ?? []).OrderBy(m => m, StringComparer.OrdinalIgnoreCase)),
             thetisGitSha ?? "",
             queryPlanId?.ToString("N") ?? "",
-            normalizationSuiteId?.ToString("N") ?? "");
+            normalizationSuiteId?.ToString("N") ?? "",
+            string.Join(',', (measureTemplateIds ?? []).OrderBy(id => id, StringComparer.OrdinalIgnoreCase)),
+            measureContentHash ?? "");
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexString(hash)[..12].ToLowerInvariant();
+    }
+
+    public static string HashMeasureBundles(IEnumerable<string>? bundleJsons)
+    {
+        var joined = string.Join('\n', bundleJsons ?? []);
+        if (string.IsNullOrEmpty(joined))
+            return "";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(joined));
+        return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 
     public static int NextVersion(string? previousFingerprint, int previousVersion, string currentFingerprint)

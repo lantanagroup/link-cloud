@@ -50,7 +50,7 @@ public sealed class TerminologyCodeLookup(
             }
             catch (Exception ex)
             {
-                logger.LogDebug(ex, "Terminology lookup failed for {System}|{Code}.", sys, code);
+                logger.LogDebug(ex, "Terminology lookup failed.");
             }
         }
 

@@ -34,7 +34,9 @@ public sealed record RunMetricsCaptureInput(
     Guid? NormalizationSuiteId = null,
     long? GenerationDurationMs = null,
     DateTime? ReportCreatedAt = null,
-    DateTime? SubmittedAt = null);
+    DateTime? SubmittedAt = null,
+    IReadOnlyList<string>? MeasureTemplateIds = null,
+    IReadOnlyList<string>? MeasureBundleJsons = null);
 
 public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 {
@@ -269,7 +271,9 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 input.Measures,
                 ThetisRevision.TryGetGitSha(),
                 input.QueryPlanTemplateId,
-                input.NormalizationSuiteId),
+                input.NormalizationSuiteId,
+                input.MeasureTemplateIds,
+                MetricsScenarioFingerprint.HashMeasureBundles(input.MeasureBundleJsons)),
             Validators = input.Validators.Select(v => new ValidatorOutcomeSnapshot
             {
                 Name = v.Name,

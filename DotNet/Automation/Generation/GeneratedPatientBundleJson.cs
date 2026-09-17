@@ -36,15 +36,36 @@ public static class GeneratedPatientBundleJson
             writer.WriteStartObject();
             writer.WriteString("resourceType", "Bundle");
             writer.WriteString("type", "collection");
-            writer.WriteNumber("total", entries.Count);
             writer.WritePropertyName("entry");
             writer.WriteStartArray();
             foreach (var entry in entries)
-                entry.WriteTo(writer);
+                WriteCollectionEntry(writer, entry);
             writer.WriteEndArray();
             writer.WriteEndObject();
         }
 
         return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    /// <summary>
+    /// FHIR collection Bundles may not carry <c>entry.request</c> (transaction-only)
+    /// or <c>Bundle.total</c>.
+    /// </summary>
+    private static void WriteCollectionEntry(Utf8JsonWriter writer, JsonElement entry)
+    {
+        writer.WriteStartObject();
+        if (entry.TryGetProperty("fullUrl", out var fullUrl))
+        {
+            writer.WritePropertyName("fullUrl");
+            fullUrl.WriteTo(writer);
+        }
+
+        if (entry.TryGetProperty("resource", out var resource))
+        {
+            writer.WritePropertyName("resource");
+            resource.WriteTo(writer);
+        }
+
+        writer.WriteEndObject();
     }
 }

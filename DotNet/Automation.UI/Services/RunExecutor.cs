@@ -1392,7 +1392,9 @@ internal sealed class RunExecutor
                     state.Options.NormalizationSuiteId,
                     generationDurationMs,
                     reportCreatedAt,
-                    submittedAt),
+                    submittedAt,
+                    state.Options.SelectedMeasureIds.Select(id => id.ToString("N")).ToList(),
+                    state.Options.MeasureBundleJsons),
                 cancellationToken);
         }
         catch (Exception ex)

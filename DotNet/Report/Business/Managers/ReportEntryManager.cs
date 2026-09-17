@@ -403,15 +403,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.ModifyDate = DateTime.UtcNow;
             entity.AggregateReportUri = model.AggregateReportUri;
             entity.AggregateReportBlobName = model.AggregateReportBlobName;
+            string? reportingFrom = null;
+            string? reportingTo = null;
             if (entity.ReportingStatus != model.ReportingStatus)
             {
-                _metrics.IncrementStatusTransition(entity.FacilityId, entity.ReportingStatus.ToString(), model.ReportingStatus.ToString());
+                reportingFrom = entity.ReportingStatus.ToString();
+                reportingTo = model.ReportingStatus.ToString();
             }
             entity.ReportingStatus = model.ReportingStatus;
             entity.SubmissionStatus = model.SubmissionStatus;
             entity.SubmitReportDateTime = model.SubmitReportDateTime;
 
             var existingMeasureReports = entity.MeasureReports.ToList();
+            var measureTransitions = new List<(string From, string To)>();
 
             foreach (var measureModel in model.MeasureReports)
             {
@@ -436,7 +440,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 {
                     if (existing.Status != measureModel.Status)
                     {
-                        _metrics.IncrementStatusTransition(entity.FacilityId, existing.Status.ToString(), measureModel.Status.ToString());
+                        measureTransitions.Add((existing.Status.ToString(), measureModel.Status.ToString()));
                     }
                     existing.Status = measureModel.Status;
                     existing.MeasureReportId = measureModel.MeasureReportId;
@@ -474,6 +478,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
 
             _dbContext.Update(entity);
             await PersistAsync(entity.FacilityId, cancellationToken);
+            if (reportingFrom != null && reportingTo != null)
+                _metrics.IncrementStatusTransition(entity.FacilityId, reportingFrom, reportingTo);
+            foreach (var (from, to) in measureTransitions)
+                _metrics.IncrementStatusTransition(entity.FacilityId, from, to);
             return model;
         }
 

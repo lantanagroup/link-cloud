@@ -36,6 +36,30 @@ public class MetricsScenarioFingerprintTests
     }
 
     [Fact]
+    public void Different_measure_template_ids_produce_a_new_fingerprint()
+    {
+        var a = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-a"], "hash-a");
+        var b = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-b"], "hash-a");
+        a.Should().NotBe(b);
+    }
+
+    [Fact]
+    public void Different_measure_bundle_hashes_produce_a_new_fingerprint()
+    {
+        var a = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-a"], "hash-a");
+        var b = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-a"], "hash-b");
+        a.Should().NotBe(b);
+    }
+
+    [Fact]
+    public void HashMeasureBundles_is_stable_for_the_same_json()
+    {
+        var hash = MetricsScenarioFingerprint.HashMeasureBundles(["{\"a\":1}"]);
+        hash.Should().Be(MetricsScenarioFingerprint.HashMeasureBundles(["{\"a\":1}"]));
+        hash.Should().NotBe(MetricsScenarioFingerprint.HashMeasureBundles(["{\"a\":2}"]));
+    }
+
+    [Fact]
     public void Describe_is_readable()
     {
         var text = MetricsScenarioFingerprint.Describe(150, 20260329, 25, 50, 8);
