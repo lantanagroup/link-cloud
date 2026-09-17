@@ -81,11 +81,11 @@ public class DmrpNightlyJobTests
             Options.Create(_settings), _metrics.Object, NullLogger<DmrpNightlyJob>.Instance);
     }
 
-    private static IJobExecutionContext ContextFiredAt(DateTimeOffset scheduledUtc)
+    private static IJobExecutionContext ContextFiredAt(DateTimeOffset scheduledUtc, string zone = Zone)
     {
         var detail = JobBuilder.Create<DmrpNightlyJob>()
-            .WithIdentity(Zone, "DmrpNightly")
-            .UsingJobData(DmrpNightlyJob.TimeZoneKey, Zone)
+            .WithIdentity(zone, "DmrpNightly")
+            .UsingJobData(DmrpNightlyJob.TimeZoneKey, zone)
             .Build();
 
         var context = new Mock<IJobExecutionContext>();
@@ -262,6 +262,20 @@ public class DmrpNightlyJobTests
         await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
 
         _produced.Select(m => ((ReportScheduledMessage)m.Value).ReportTrackingId).Distinct().Should().ContainSingle();
+    }
+
+    /// <summary>
+    /// A zone job whose timezone the platform cannot resolve has no period math it could get right.
+    /// It fires nothing and says so, rather than throwing into Quartz's misfire handling every night.
+    /// </summary>
+    [Fact]
+    public async Task A_zone_the_platform_does_not_know_fires_nothing_and_does_not_throw()
+    {
+        var act = () => CreateJob().Execute(ContextFiredAt(NightOfOctober14, "Mars/Olympus_Mons"));
+
+        await act.Should().NotThrowAsync();
+        _produced.Should().BeEmpty();
+        _metrics.VerifyNoOtherCalls();
     }
 
     [Fact]

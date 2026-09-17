@@ -23,8 +23,14 @@ namespace LantanaGroup.Link.DMRP.Scheduling
     /// <remarks>
     /// The JobDataMap carries only the timezone. Everything else is read at fire time, so there is
     /// no snapshot to keep in step with the facility table. All period math derives from the
-    /// scheduled fire time, so a fire recovered late still announces the periods it was scheduled
-    /// for. Facilities are independent: one failing is counted and logged, and the loop goes on.
+    /// scheduled fire time rather than the wall clock, read once at the top of the fire so every
+    /// facility in a zone is announced against the same night. That time is not enough on its own to
+    /// recover a missed night: the trigger's misfire policy is FireOnceNow, which Quartz implements
+    /// by moving the trigger's next fire time to the recovery instant, so a fire recovered after
+    /// midnight carries the recovery time as its scheduled time. The configured nightly cron's
+    /// nominal local time is passed alongside it, and a fire earlier in the local day than that is
+    /// read as the previous night's - see <see cref="ReportingPeriods.ComingMidnight"/>.
+    /// Facilities are independent: one failing is counted and logged, and the loop goes on.
     /// A failed fire is never refired immediately; the trigger's misfire policy governs recovery,
     /// and the deterministic ReportTrackingId makes a recovered fire safe.
     /// </remarks>
@@ -59,11 +65,24 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             var zoneId = context.JobDetail.JobDataMap.GetString(TimeZoneKey)
                 ?? throw new JobExecutionException($"{nameof(DmrpNightlyJob)} fired without a {TimeZoneKey} in its JobDataMap.");
 
-            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
-            var scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
-            var comingMidnight = ReportingPeriods.ComingMidnight(scheduledUtc, timeZone);
-            var periods = ReportingPeriods.StartingAt(comingMidnight);
+            TimeZoneInfo timeZone;
+            try
+            {
+                timeZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+            }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                // The same fall-back as the reconciler: a zone the platform does not know is a job
+                // that can never produce a correct period, so say so and fire nothing rather than
+                // throw into Quartz's misfire handling every night.
+                _logger.LogError(ex, "DMRP nightly fire for timezone {TimeZone} did nothing: the platform does not know it.", zoneId);
+                return;
+            }
+
             var scheduling = _settings.Value.Scheduling;
+            var scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
+            var comingMidnight = ReportingPeriods.ComingMidnight(scheduledUtc, timeZone, scheduling.ResolvedNightlyLocalTime);
+            var periods = ReportingPeriods.StartingAt(comingMidnight);
 
             IReadOnlyList<ScheduledFacility> facilities;
             using (var scope = _scopeFactory.CreateScope())

@@ -143,6 +143,36 @@ namespace LantanaGroup.Link.DMRP.Config
                 ? NightlyCron
                 : DefaultNightlyCron;
 
+        /// <summary>
+        /// The local time of day <see cref="ResolvedNightlyCron"/> fires at, or null when the cron
+        /// does not name exactly one.
+        /// </summary>
+        /// <remarks>
+        /// Quartz's FireOnceNow misfire handling moves a recovered fire's scheduled time to the
+        /// recovery instant, so the fire time alone cannot say which night was missed. Comparing it
+        /// against this nominal time can: a fire that lands earlier in the local day than the cron
+        /// would ever fire is a recovery of the night before. A cron whose seconds, minutes or hours
+        /// field is a wildcard, list, range or step fires at more than one time of day and so has no
+        /// nominal time; it returns null and the comparison is skipped.
+        /// </remarks>
+        public TimeSpan? ResolvedNightlyLocalTime
+        {
+            get
+            {
+                var fields = ResolvedNightlyCron.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                if (fields.Length < 3
+                    || !int.TryParse(fields[0], out var seconds) || seconds is < 0 or > 59
+                    || !int.TryParse(fields[1], out var minutes) || minutes is < 0 or > 59
+                    || !int.TryParse(fields[2], out var hours) || hours is < 0 or > 23)
+                {
+                    return null;
+                }
+
+                return new TimeSpan(hours, minutes, seconds);
+            }
+        }
+
         public int ResolvedConcurrency => Concurrency is >= 1 and <= 32 ? Concurrency : DefaultConcurrency;
 
         public int ResolvedCatchUpNights => CatchUpNights is >= 0 and <= 28 ? CatchUpNights : DefaultCatchUpNights;
