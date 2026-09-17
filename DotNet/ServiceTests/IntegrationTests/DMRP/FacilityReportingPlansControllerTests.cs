@@ -947,6 +947,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         // The flat read projects nothing, but its window still decides which stored rows come back.
         Assert.Equal([(2026, 11)], RowsOf(result));
+        VerifyTimeZoneLookups(Times.Once());
     }
 
     [Fact]
@@ -1006,6 +1007,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
             CancellationToken.None);
 
         Assert.Equal((FacilityId, 10, 2026), Assert.Single(_sync.Calls));
+        VerifyTimeZoneLookups(Times.Once());
     }
 
     [Fact]
@@ -1020,6 +1022,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
             monthsAhead: null, refresh: true, CancellationToken.None);
 
         Assert.Equal((FacilityId, 12, 2026), Assert.Single(_sync.Calls));
+        VerifyTimeZoneLookups(Times.Once());
     }
 
     /// <summary>

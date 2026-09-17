@@ -102,6 +102,23 @@ namespace UnitTests.DMRP
             VerifyWarnings(Times.Once());
         }
 
+        /// <summary>
+        /// The write path resolves the period before the host validates the facility, so this value can be
+        /// whatever a caller sent. It must fall back rather than throw, and the resolver must not hand the
+        /// value to the logger - which is why the lookup is checked rather than caught.
+        /// </summary>
+        [Theory]
+        [InlineData("Not/AZone\r\n2026-01-01 INFO Forged log line")]
+        [InlineData("../../etc/passwd")]
+        [InlineData("Etc/GMT+99")]
+        public void Resolve_falls_back_to_utc_for_a_timezone_a_caller_invented(string timeZone)
+        {
+            var period = CreateResolver("2026-10-31T13:00:00Z").Resolve(FacilityId, timeZone);
+
+            Assert.Equal(new ReportingPeriod(2026, 10), period);
+            VerifyWarnings(Times.Once());
+        }
+
         [Fact]
         public void Resolve_never_asks_the_host_for_a_timezone()
         {

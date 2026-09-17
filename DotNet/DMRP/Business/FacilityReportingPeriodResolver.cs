@@ -45,22 +45,24 @@ public class FacilityReportingPeriodResolver : IFacilityReportingPeriodResolver
             return ToPeriod(utcNow);
         }
 
-        try
-        {
-            var zone = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
-
-            return ToPeriod(TimeZoneInfo.ConvertTime(utcNow, zone));
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+        // Checked rather than caught. The write path resolves the period before the host validates the
+        // facility, so this timezone is still whatever the caller sent, and the exception thrown by
+        // FindSystemTimeZoneById would carry that value into the log unsanitized. Nothing is thrown
+        // here, so there is no exception to log and no unsanitized value to leak.
+        if (!TimeZoneInfo.TryFindSystemTimeZoneById(timeZone, out var zone))
         {
             // Fall back rather than fail. On the write path the host's own validation then rejects the
-            // timezone with a message naming it; on the read path the caller still gets an answer.
-            _logger.LogWarning(ex,
+            // timezone with a message naming it; on the read path the caller still gets an answer. The
+            // rejected value is left out of the log: the host's response names it on the way in, and a
+            // stored one can be read from the facility.
+            _logger.LogWarning(
                 "Facility {FacilityId} has an unusable timezone; the reporting period was read in UTC instead.",
                 facilityId?.SanitizeForLog());
 
             return ToPeriod(utcNow);
         }
+
+        return ToPeriod(TimeZoneInfo.ConvertTime(utcNow, zone));
     }
 
     public async Task<ReportingPeriod> ResolveAsync(string facilityId, CancellationToken cancellationToken)
