@@ -234,6 +234,43 @@ public class ReportsEndpoints : IApi
                     "point to are not included.";
                 return operation;
             });
+
+        group.MapGet("/{reportId}/acknowledgement", async (
+                string reportId,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+                Results.Ok(new ReportAccuracyAcknowledgementResponse
+                {
+                    Accepted = await service.GetReportAccuracyAcknowledgementAsync(reportId, cancellationToken)
+                }))
+            .WithName("GetReportAccuracyAcknowledgement")
+            .Produces<ReportAccuracyAcknowledgementResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Whether this report's accuracy has been acknowledged.";
+                operation.Description = "Accepted is null when nothing has been recorded yet for this report.";
+                return operation;
+            });
+
+        group.MapPut("/{reportId}/acknowledgement", async (
+                string reportId,
+                ReportAccuracyAcknowledgementRequest request,
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+            {
+                await service.RecordReportAccuracyAcknowledgementAsync(reportId, request.Accepted, request.StatementKey, cancellationToken);
+                return Results.NoContent();
+            })
+            .WithName("AcknowledgeReportAccuracy")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Records whether this report's accuracy is acknowledged.";
+                operation.Description = "Append-only -- records a new attestation row rather than editing a prior one.";
+                return operation;
+            });
     }
 
     private static Dictionary<string, string[]> Validate(ReportRequest request)

@@ -525,6 +525,16 @@ export class MockApiClient implements ApiClient {
     return immediate({...summary, regeneratedFrom: reportId});
   }
 
+  async getReportAcknowledgement(): Promise<boolean | null> {
+    await tick();
+    return null;
+  }
+
+  async acknowledgeReport(): Promise<void> {
+    await tick();
+    // Intentionally stores nothing -- mirrors acknowledgeCensus above.
+  }
+
   // ------------------------------------------------------------ reporting plan
 
   async getReportingPlan(): Promise<C.ReportingPlan> {

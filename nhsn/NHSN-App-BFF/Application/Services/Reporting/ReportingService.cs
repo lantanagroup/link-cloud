@@ -3,6 +3,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reporting;
 
@@ -11,6 +12,7 @@ public sealed class ReportingService : IReportingService
     private readonly IFacilityGateway _facilityGateway;
     private readonly IReportGateway _reportGateway;
     private readonly IDataAcquisitionGateway _dataAcquisitionGateway;
+    private readonly IAcknowledgementService _acknowledgementService;
     private readonly INhsnUserContext _userContext;
     private readonly ILogger<ReportingService> _logger;
 
@@ -18,12 +20,14 @@ public sealed class ReportingService : IReportingService
         IFacilityGateway facilityGateway,
         IReportGateway reportGateway,
         IDataAcquisitionGateway dataAcquisitionGateway,
+        IAcknowledgementService acknowledgementService,
         INhsnUserContext userContext,
         ILogger<ReportingService> logger)
     {
         _facilityGateway = facilityGateway;
         _reportGateway = reportGateway;
         _dataAcquisitionGateway = dataAcquisitionGateway;
+        _acknowledgementService = acknowledgementService;
         _userContext = userContext;
         _logger = logger;
     }
@@ -119,6 +123,19 @@ public sealed class ReportingService : IReportingService
 
     public Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default) =>
         _reportGateway.GetPatientMeasureReportExportAsync(reportId, patientId, reportType, cancellationToken);
+
+    public Task<bool?> GetReportAccuracyAcknowledgementAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        var facilityId = _userContext.RequireFacilityId();
+        return _acknowledgementService.GetLatestAsync(facilityId, AcknowledgementKind.ReportAccuracy, reportId, cancellationToken);
+    }
+
+    public Task RecordReportAccuracyAcknowledgementAsync(string reportId, bool accepted, string statementKey, CancellationToken cancellationToken = default)
+    {
+        var facilityId = _userContext.RequireFacilityId();
+        return _acknowledgementService.RecordAsync(
+            facilityId, AcknowledgementKind.ReportAccuracy, reportId, accepted, statementKey, _userContext.ExternalUserId, cancellationToken);
+    }
 
     private static DateTime ParseDate(string? value) =>
         DateTime.SpecifyKind(
