@@ -734,6 +734,7 @@ services:
       dockerfile: DotNet/Automation.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
       secrets:
         - feed_accesstoken
     networks:
@@ -1033,6 +1034,7 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
       secrets:
         - feed_accesstoken
     networks:
