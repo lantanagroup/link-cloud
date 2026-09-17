@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Caching.Memory;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition;
 

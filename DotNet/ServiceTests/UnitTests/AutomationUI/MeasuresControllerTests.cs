@@ -4,6 +4,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.AutomationUI;
 
