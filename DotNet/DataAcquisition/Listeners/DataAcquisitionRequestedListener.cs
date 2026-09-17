@@ -4,12 +4,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using System.Text.Json;
 
@@ -62,6 +63,17 @@ public class DataAcquisitionRequestedListener : BaseListener<DataAcquisitionRequ
         using var scope = _serviceScopeFactory.CreateScope();
         var patientDataService =
             scope.ServiceProvider.GetRequiredService<IPatientDataService>();
+
+        var cache = scope.ServiceProvider.GetService<ICacheService>();
+        foreach (var report in consumeResult.Message.Value.ScheduledReports ?? [])
+        {
+            await ReportMetricsModeCache.RememberIfPerformanceAsync(
+                cache,
+                facilityId,
+                report.ReportTrackingId,
+                consumeResult.Message.Headers,
+                cancellationToken);
+        }
 
         await patientDataService.CreateLogEntries(new GetPatientDataRequest
         {

@@ -370,7 +370,8 @@ internal sealed class RunExecutor
                 importedPatients: generationRequest.ImportedPatients,
                 generatedTemplateCache: generationRequest.GeneratedTemplateCache,
                 maxConcurrentPatients: _automationConfig.FhirGeneration.MaxConcurrentPatients,
-                measureBundleJsons: scenarioConfig.MeasureBundleJsons);
+                measureBundleJsons: scenarioConfig.MeasureBundleJsons,
+                cancellationToken: state.RunCancellation.Token);
 
             patientIds = pipelineResult.PatientIds;
             generationManifest = pipelineResult.Manifest;
@@ -1326,6 +1327,16 @@ internal sealed class RunExecutor
         }
     }
 
+    internal static IReadOnlyList<string> PatientShapeKeys(ResolvedRunOptions options) =>
+        options.PatientCohorts.Select(c => string.Join(':',
+            c.PatientConfigurationId?.ToString("N") ?? "",
+            c.ScheduledInpatientPattern?.ToString() ?? "",
+            c.Intent?.EncounterClass ?? "",
+            c.Intent?.DurationMinutes?.ToString() ?? "",
+            c.Intent?.IncludeHypoglycemicInsulin?.ToString() ?? "",
+            c.Intent?.PrimaryConditionSnomed ?? "",
+            c.PatientCount.ToString())).ToList();
+
     private async Task<AutomationRunMetricsDocument?> CaptureMetricsSnapshotAsync(
         MutableRunState state,
         IReadOnlyList<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot> validatorResults,
@@ -1394,7 +1405,8 @@ internal sealed class RunExecutor
                     reportCreatedAt,
                     submittedAt,
                     state.Options.SelectedMeasureIds.Select(id => id.ToString("N")).ToList(),
-                    state.Options.MeasureBundleJsons),
+                    state.Options.MeasureBundleJsons,
+                    PatientShapeKeys(state.Options)),
                 cancellationToken);
         }
         catch (Exception ex)

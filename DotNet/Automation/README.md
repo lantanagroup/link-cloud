@@ -5,6 +5,14 @@ generation, predictive pipeline modeling, and reusable automation primitives. It
 dependency on any Link-specific service; host projects compose it with environment-specific
 orchestration.
 
+Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Authenticate once per machine before `dotnet restore` of Automation / Automation.UI / MockFhirServer:
+
+```
+dotnet nuget update source Shared_BOTW_Feed --username az --password %AZURE_ARTIFACTS_PAT% --store-password-in-clear-text --configfile nuget.config
+```
+
+Other Link services still restore from nuget.org. Restoring the whole solution still needs that PAT because Directory.Packages.props pins Thetis.
+
 This README is the comprehensive reference for the project. It is aimed at three audiences:
 
 - **Product owners / project managers** -- sections 1 and 2 explain what the project produces

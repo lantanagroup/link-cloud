@@ -48,6 +48,20 @@ public static class ThetisRevision
         return assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
     }
 
+    /// <summary>
+    /// Fingerprint identity: NuGet informational version when the engine is loaded,
+    /// else sibling git SHA when a checkout exists.
+    /// </summary>
+    public static string? TryGetFingerprintRevision() =>
+        TryGetAssemblyInformationalVersion() ?? TryGetGitSha();
+
+    public static string ResolveSource()
+    {
+        if (FindThetisRoot() != null)
+            return "sibling-project-ref";
+        return TryGetAssemblyInformationalVersion() != null ? "nuget" : "unknown";
+    }
+
     private static string? FindThetisRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -1,5 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -25,15 +27,18 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
+    private readonly ICacheService? _cache;
 
     public DataAcquisitionLogService(ILogger<DataAcquisitionLogService> logger, IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IProducer<long, ReadyToAcquire> readyToAcquireProducer)
+        IProducer<long, ReadyToAcquire> readyToAcquireProducer,
+        ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _dataAcquisitionLogManager = dataAcquisitionLogManager ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ?? throw new ArgumentNullException(nameof(_dataAcquisitionLogQueries));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
+        _cache = cache;
     }
     public async Task StartRetrievalProcess(long logId, CancellationToken cancellationToken = default)
     {
@@ -62,6 +67,11 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
 
             await _dataAcquisitionLogManager.UpdateAsync(request, cancellationToken);
 
+            var headers = new Headers();
+            KafkaHeaderHelper.ApplyIfPerformance(
+                headers,
+                await ReportMetricsModeCache.TryGetAsync(_cache, log.FacilityId, log.ReportTrackingId, cancellationToken));
+
             await _readyToAcquireProducer.ProduceAsync(
                 nameof(KafkaTopic.ReadyToAcquire),
                 new Message<long, ReadyToAcquire>
@@ -70,8 +80,10 @@ public class DataAcquisitionLogService : IDataAcquisitionLogService
                     Value = new ReadyToAcquire
                     {
                         LogId = log.Id,
-                        FacilityId = log.FacilityId
-                    }
+                        FacilityId = log.FacilityId,
+                        ReportTrackingId = log.ReportTrackingId ?? string.Empty
+                    },
+                    Headers = headers
                 }, cancellationToken);
 
             transaction = null;

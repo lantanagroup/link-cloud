@@ -112,7 +112,8 @@ public static class FhirGenerationPipeline
         int? maxConcurrentPatients = null,
         IPatientEntryGenerator? patientEntryGenerator = null,
         ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null,
-        IReadOnlyList<string>? measureBundleJsons = null)
+        IReadOnlyList<string>? measureBundleJsons = null,
+        CancellationToken cancellationToken = default)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
@@ -224,7 +225,7 @@ public static class FhirGenerationPipeline
             var patientIndex = p; // capture for closure
             tasks[p] = System.Threading.Tasks.Task.Run(async () =>
             {
-                await semaphore.WaitAsync();
+                await semaphore.WaitAsync(cancellationToken);
                 try
                 {
                     var (patientId, profile, bundleCount, templateKey) = await GenerateAndUploadSinglePatientAsync(
@@ -247,7 +248,8 @@ public static class FhirGenerationPipeline
                         ids,
                         generatedTemplateCache,
                         patientEntryGenerator,
-                        measureBundleJsons);
+                        measureBundleJsons,
+                        cancellationToken);
 
                     patientIds[patientIndex] = patientId;
                     generatedTemplateKeys[patientIndex] = templateKey;
@@ -542,7 +544,8 @@ public static class FhirGenerationPipeline
         FhirBundleGenerator.SharedIds ids,
         IGeneratedPatientTemplateCache? generatedTemplateCache,
         IPatientEntryGenerator? patientEntryGenerator,
-        IReadOnlyList<string>? measureBundleJsons = null)
+        IReadOnlyList<string>? measureBundleJsons = null,
+        CancellationToken cancellationToken = default)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
@@ -588,7 +591,7 @@ public static class FhirGenerationPipeline
                 RequirementsPlan = generationRequirementsPlan,
                 Ids = ids,
                 Output = output
-            });
+            }, cancellationToken);
 
             bundles = ChunkEntries(entries, patientId, 0);
 

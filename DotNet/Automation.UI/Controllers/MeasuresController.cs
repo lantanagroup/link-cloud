@@ -9,6 +9,12 @@ namespace Automation.UI.Controllers;
 
 public class MeasuresController(IMeasureTemplateStore store) : Controller
 {
+    /// <summary>
+    /// Cosmos Mongo API practical document budget is 2 MB. Leave headroom for
+    /// template metadata around the inline FHIR bundle.
+    /// </summary>
+    internal const int MaxBundleJsonBytes = 1_500_000;
+
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -73,6 +79,8 @@ public class MeasuresController(IMeasureTemplateStore store) : Controller
             return BadRequest("Measure name is required.");
         if (!Enum.IsDefined(model.GenerationFamily))
             return BadRequest("A supported generation type is required.");
+        if (Encoding.UTF8.GetByteCount(model.BundleJson ?? "") > MaxBundleJsonBytes)
+            return BadRequest($"Measure bundle exceeds {MaxBundleJsonBytes / 1_000_000.0:0.#} MB. Store a smaller bundle or split the upload.");
 
         var existing = await store.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })

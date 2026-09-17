@@ -52,6 +52,22 @@ public class MetricsScenarioFingerprintTests
     }
 
     [Fact]
+    public void Different_thetis_versions_produce_a_new_fingerprint()
+    {
+        var a = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], null, null, null, ["id-a"], "hash-a", "1.0.0");
+        var b = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], null, null, null, ["id-a"], "hash-a", "1.0.1");
+        a.Should().NotBe(b);
+    }
+
+    [Fact]
+    public void Different_patient_shape_keys_produce_a_new_fingerprint()
+    {
+        var a = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-a"], "hash-a", "1.0.0", ["cfg-a"]);
+        var b = MetricsScenarioFingerprint.Compute(150, 1, 25, 50, 8, "k", ["ACH"], "abc", null, null, ["id-a"], "hash-a", "1.0.0", ["cfg-b"]);
+        a.Should().NotBe(b);
+    }
+
+    [Fact]
     public void HashMeasureBundles_is_stable_for_the_same_json()
     {
         var hash = MetricsScenarioFingerprint.HashMeasureBundles(["{\"a\":1}"]);

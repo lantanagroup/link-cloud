@@ -17,7 +17,9 @@ public static class MetricsScenarioFingerprint
         Guid? queryPlanId,
         Guid? normalizationSuiteId,
         IEnumerable<string>? measureTemplateIds = null,
-        string? measureContentHash = null)
+        string? measureContentHash = null,
+        string? thetisVersion = null,
+        IEnumerable<string>? patientShapeKeys = null)
     {
         var payload = string.Join('|',
             patientCount.ToString(),
@@ -31,7 +33,9 @@ public static class MetricsScenarioFingerprint
             queryPlanId?.ToString("N") ?? "",
             normalizationSuiteId?.ToString("N") ?? "",
             string.Join(',', (measureTemplateIds ?? []).OrderBy(id => id, StringComparer.OrdinalIgnoreCase)),
-            measureContentHash ?? "");
+            measureContentHash ?? "",
+            thetisVersion ?? "",
+            string.Join(',', (patientShapeKeys ?? []).OrderBy(k => k, StringComparer.OrdinalIgnoreCase)));
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexString(hash)[..12].ToLowerInvariant();
     }

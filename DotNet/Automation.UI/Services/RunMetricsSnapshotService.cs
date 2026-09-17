@@ -36,7 +36,8 @@ public sealed record RunMetricsCaptureInput(
     DateTime? ReportCreatedAt = null,
     DateTime? SubmittedAt = null,
     IReadOnlyList<string>? MeasureTemplateIds = null,
-    IReadOnlyList<string>? MeasureBundleJsons = null);
+    IReadOnlyList<string>? MeasureBundleJsons = null,
+    IReadOnlyList<string>? PatientShapeKeys = null);
 
 public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 {
@@ -151,7 +152,9 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 {
                     await DelayAsync(wait, cancellationToken);
                     var evaluationTime = _time.GetUtcNow();
-                    await QueryStagesAsync(stages, input.FacilityId, evaluationTime, cancellationToken);
+                    var lookbackSeconds = ResolveUtilizationLookbackSeconds(
+                        (evaluationTime - window.StartedAt).TotalSeconds);
+                    await QueryStagesAsync(stages, input.FacilityId, evaluationTime, lookbackSeconds, cancellationToken);
 
                     // Later pipeline steps often export after Data Acquisition. One extra
                     // OTEL interval is enough for short adhoc runs without stretching every capture.
@@ -162,7 +165,9 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                             input.RunId);
                         await DelayAsync(wait, cancellationToken);
                         evaluationTime = _time.GetUtcNow();
-                        await QueryStagesAsync(stages, input.FacilityId, evaluationTime, cancellationToken, missingOnly: true);
+                        lookbackSeconds = ResolveUtilizationLookbackSeconds(
+                            (evaluationTime - window.StartedAt).TotalSeconds);
+                        await QueryStagesAsync(stages, input.FacilityId, evaluationTime, lookbackSeconds, cancellationToken, missingOnly: true);
                     }
 
                     var anyStage = stages.Values.Any(s => !s.Unavailable);
@@ -179,8 +184,6 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                     // Query at now (after the wait) with a lookback that still covers the run.
                     // Evaluating at FinishedAt misses OTEL samples that have not been scraped yet;
                     // a lookback of only e2eSeconds at now covers the idle wait instead of the run.
-                    var lookbackSeconds = ResolveUtilizationLookbackSeconds(
-                        (evaluationTime - window.StartedAt).TotalSeconds);
                     foreach (var processQuery in ProcessUtilizationQueries)
                     {
                         utilization[processQuery.Key] = await QueryProcessUtilizationAsync(
@@ -238,7 +241,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             Thetis = new ThetisRevisionSnapshot
             {
                 Generator = "thetis",
-                Source = "sibling-project-ref",
+                Source = ThetisRevision.ResolveSource(),
                 GitSha = ThetisRevision.TryGetGitSha(),
                 AssemblyInformationalVersion = ThetisRevision.TryGetAssemblyInformationalVersion(),
                 Seed = input.Seed,
@@ -273,7 +276,9 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 input.QueryPlanTemplateId,
                 input.NormalizationSuiteId,
                 input.MeasureTemplateIds,
-                MetricsScenarioFingerprint.HashMeasureBundles(input.MeasureBundleJsons)),
+                MetricsScenarioFingerprint.HashMeasureBundles(input.MeasureBundleJsons),
+                ThetisRevision.TryGetAssemblyInformationalVersion(),
+                input.PatientShapeKeys),
             Validators = input.Validators.Select(v => new ValidatorOutcomeSnapshot
             {
                 Name = v.Name,
@@ -411,6 +416,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         Dictionary<string, StageLatencySnapshot> stages,
         string facilityId,
         DateTimeOffset evaluationTime,
+        int windowSeconds,
         CancellationToken cancellationToken,
         bool missingOnly = false)
     {
@@ -422,9 +428,18 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                 continue;
 
             stages[stageQuery.Stage] = await QueryStageAsync(
-                stageQuery, facilityId, evaluationTime, cancellationToken);
+                stageQuery, facilityId, windowSeconds, evaluationTime, cancellationToken);
         }
     }
+
+    internal static string StageCountQuery(string histogramBase, string facility, int windowSeconds) =>
+        $"sum(increase({histogramBase}_count{{facility_id=\"{facility}\"}}[{windowSeconds}s]))";
+
+    internal static string StageQuantileQuery(string histogramBase, string facility, int windowSeconds, string quantile) =>
+        $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{{facility_id=\"{facility}\"}}[{windowSeconds}s])))";
+
+    internal static string StageErrorQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
+        $"sum(increase({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
 
     internal static string DotNetPeakMemoryQuery(string exportedJob, int windowSeconds) =>
         $"max(max_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";
@@ -623,29 +638,29 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     private async Task<StageLatencySnapshot> QueryStageAsync(
         StageQuery stage,
         string facilityId,
+        int windowSeconds,
         DateTimeOffset evaluationTime,
         CancellationToken cancellationToken)
     {
         var facility = EscapePromLabel(facilityId);
-        var bucketSelector = $"{stage.HistogramBase}_bucket{{facility_id=\"{facility}\"}}";
-        var countSelector = $"sum({stage.HistogramBase}_count{{facility_id=\"{facility}\"}})";
+        var countSelector = StageCountQuery(stage.HistogramBase, facility, windowSeconds);
 
         var count = await _prometheus.QueryScalarAsync(countSelector, evaluationTime, cancellationToken);
         if (count is null or <= 0)
             return new StageLatencySnapshot { Unavailable = true };
 
         var p50 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.50, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
+            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.50"), evaluationTime, cancellationToken);
         var p95 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.95, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
+            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.95"), evaluationTime, cancellationToken);
         var p99 = await _prometheus.QueryScalarAsync(
-            $"histogram_quantile(0.99, sum by (le) ({bucketSelector}))", evaluationTime, cancellationToken);
+            StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.99"), evaluationTime, cancellationToken);
 
         double errorCount = 0;
         if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) && !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
         {
-            var errorSelector =
-                $"sum({stage.ErrorCounter}{{facility_id=\"{facility}\",outcome=\"{EscapePromLabel(stage.ErrorOutcome)}\"}})";
+            var errorSelector = StageErrorQuery(
+                stage.ErrorCounter, facility, EscapePromLabel(stage.ErrorOutcome), windowSeconds);
             errorCount = await _prometheus.QueryScalarAsync(errorSelector, evaluationTime, cancellationToken) ?? 0;
         }
 

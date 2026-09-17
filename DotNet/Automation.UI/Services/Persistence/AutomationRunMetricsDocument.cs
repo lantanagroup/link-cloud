@@ -50,7 +50,7 @@ public sealed class AutomationRunMetricsDocument
 public sealed class ThetisRevisionSnapshot
 {
     public string Generator { get; set; } = "thetis";
-    public string Source { get; set; } = "sibling-project-ref";
+    public string Source { get; set; } = "unknown";
     public string? GitSha { get; set; }
     public string? AssemblyInformationalVersion { get; set; }
     public int Seed { get; set; }

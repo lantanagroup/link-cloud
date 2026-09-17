@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation.ResourceFactories;
+using PatientProfile = LantanaGroup.Automation.Generation.PatientProfile;
 using Microsoft.Extensions.DependencyInjection;
 using Thetis.Generation.Abstractions;
 
@@ -96,66 +97,41 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
                 request.ClinicalPeriodStart, request.ClinicalPeriodEnd);
         }
 
-        AlignEncounterToSharedStay(entries, anchors, request.Ids, encStart, encEnd);
+        AlignEncounterToSharedStay(entries, anchors, request.Ids, encStart, encEnd, request.Profile);
 
         var stamped = ScenarioResourceGeneration.ApplyGenerationRequirements(entries, request.RequirementsPlan);
+        var stayLabel = request.Profile.RequiresInpatientEncounter() ? "ED/ICU/step-down" : "single-location";
         request.Output?.WriteLine(
-            $"[Thetis] automation fixture overlay: stay locations=ED/ICU/step-down, " +
+            $"[Thetis] automation fixture overlay: stay locations={stayLabel}, " +
             $"generation-requirement applications={stamped}");
 
         return entries;
     }
 
     /// <summary>
-    /// Overlay the Automation shared-stay graph (ED → ICU → step-down, attending,
-    /// serviceProvider) onto the Thetis Encounter. The engine mints one location
-    /// reference; org-location mapping and Location reference queries need the
-    /// full stay that factories already emit.
+    /// Overlay the Automation shared-stay graph onto the Thetis Encounter.
+    /// Inpatient stays get ED → ICU → step-down scaled to [encStart, encEnd].
+    /// AMB/EMER stays get a single ED location for the whole window so ICU/step-down
+    /// periods cannot invert on short outpatient durations.
     /// </summary>
     private static void AlignEncounterToSharedStay(
         List<Bundle.EntryComponent> entries,
         ScenarioResourceGeneration.PatientAnchorContext anchors,
         FhirBundleGenerator.SharedIds ids,
         DateTime encStart,
-        DateTime encEnd)
+        DateTime encEnd,
+        PatientProfile profile)
     {
         var encounter = entries.Select(e => e.Resource).OfType<Encounter>().FirstOrDefault();
         if (encounter is null)
             return;
 
-        encounter.Location =
-        [
-            new Encounter.LocationComponent
-            {
-                Location = new ResourceReference($"Location/{ids.EdLocation}") { Display = "Emergency Department" },
-                Status = Encounter.EncounterLocationStatus.Completed,
-                Period = new Period
-                {
-                    StartElement = new FhirDateTime(encStart),
-                    EndElement = new FhirDateTime(encStart.AddHours(4))
-                }
-            },
-            new Encounter.LocationComponent
-            {
-                Location = new ResourceReference($"Location/{ids.IcuLocation}") { Display = "Intensive Care Unit" },
-                Status = Encounter.EncounterLocationStatus.Completed,
-                Period = new Period
-                {
-                    StartElement = new FhirDateTime(encStart.AddHours(4)),
-                    EndElement = new FhirDateTime(encEnd.AddDays(-1))
-                }
-            },
-            new Encounter.LocationComponent
-            {
-                Location = new ResourceReference($"Location/{ids.StepDownLocation}") { Display = "Step-Down Unit" },
-                Status = Encounter.EncounterLocationStatus.Completed,
-                Period = new Period
-                {
-                    StartElement = new FhirDateTime(encEnd.AddDays(-1)),
-                    EndElement = new FhirDateTime(encEnd)
-                }
-            }
-        ];
+        if (encEnd <= encStart)
+            encEnd = encStart.AddMinutes(1);
+
+        encounter.Location = profile.RequiresInpatientEncounter()
+            ? BuildInpatientStayLocations(ids, encStart, encEnd)
+            : BuildSingleStayLocation(ids, encStart, encEnd);
 
         if (encounter.ServiceProvider is null || string.IsNullOrWhiteSpace(encounter.ServiceProvider.Reference))
         {
@@ -204,7 +180,7 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
                     Period = new Period
                     {
                         StartElement = encounter.Period?.StartElement,
-                        EndElement = new FhirDateTime(encStart.AddHours(2))
+                        EndElement = new FhirDateTime(Min(encStart.AddHours(2), encEnd))
                     },
                     Individual = new ResourceReference($"Practitioner/{anchors.AdmittingPractId}")
                     {
@@ -214,6 +190,72 @@ public sealed class ThetisPatientEntryGenerator : IPatientEntryGenerator
             ];
         }
     }
+
+    private static List<Encounter.LocationComponent> BuildSingleStayLocation(
+        FhirBundleGenerator.SharedIds ids,
+        DateTime encStart,
+        DateTime encEnd) =>
+    [
+        new Encounter.LocationComponent
+        {
+            Location = new ResourceReference($"Location/{ids.EdLocation}") { Display = "Emergency Department" },
+            Status = Encounter.EncounterLocationStatus.Completed,
+            Period = Period(encStart, encEnd)
+        }
+    ];
+
+    private static List<Encounter.LocationComponent> BuildInpatientStayLocations(
+        FhirBundleGenerator.SharedIds ids,
+        DateTime encStart,
+        DateTime encEnd)
+    {
+        var total = encEnd - encStart;
+        var third = TimeSpan.FromTicks(Math.Max(1, total.Ticks / 3));
+        var edLen = Min(TimeSpan.FromHours(4), third);
+        var stepLen = Min(TimeSpan.FromDays(1), third);
+        if (edLen + stepLen >= total)
+        {
+            edLen = third;
+            stepLen = third;
+        }
+
+        var edEnd = encStart + edLen;
+        var stepStart = encEnd - stepLen;
+        if (stepStart < edEnd)
+            stepStart = edEnd;
+
+        return
+        [
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.EdLocation}") { Display = "Emergency Department" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = Period(encStart, edEnd)
+            },
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.IcuLocation}") { Display = "Intensive Care Unit" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = Period(edEnd, stepStart)
+            },
+            new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/{ids.StepDownLocation}") { Display = "Step-Down Unit" },
+                Status = Encounter.EncounterLocationStatus.Completed,
+                Period = Period(stepStart, encEnd)
+            }
+        ];
+    }
+
+    private static Period Period(DateTime start, DateTime end) => new()
+    {
+        StartElement = new FhirDateTime(start),
+        EndElement = new FhirDateTime(end < start ? start : end)
+    };
+
+    private static DateTime Min(DateTime a, DateTime b) => a <= b ? a : b;
+
+    private static TimeSpan Min(TimeSpan a, TimeSpan b) => a <= b ? a : b;
 
     private static List<Bundle.EntryComponent> ExtractEntries(string bundleJson)
     {

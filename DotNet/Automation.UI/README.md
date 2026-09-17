@@ -4,6 +4,14 @@
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
 inspect pipeline state, and review validation outcomes -- all from a browser.
 
+Thetis packages restore from Azure Artifacts `Shared_BOTW_Feed`. Before `dotnet restore` or `docker compose build`:
+
+```
+dotnet nuget update source Shared_BOTW_Feed --username az --password %AZURE_ARTIFACTS_PAT% --store-password-in-clear-text --configfile nuget.config
+```
+
+Set `AZURE_ARTIFACTS_PAT` in the environment for compose (feed secret / `FEED_ACCESSTOKEN` ARG fallback). CI uses the `AZURE_ARTIFACTS_PAT` GitHub/Azure secret.
+
 It composes:
 
 - `Automation` (generation + prediction modeling)

@@ -146,6 +146,19 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public void Stage_queries_use_increase_over_the_window()
+    {
+        RunMetricsSnapshotService.StageCountQuery("link_data_acq_query_duration_milliseconds", "fac-1", 90)
+            .Should().Contain("increase(")
+            .And.Contain("facility_id=\"fac-1\"")
+            .And.Contain("[90s]");
+        RunMetricsSnapshotService.StageQuantileQuery("link_normalization_duration_milliseconds", "fac-1", 90, "0.95")
+            .Should().Contain("histogram_quantile(0.95")
+            .And.Contain("increase(")
+            .And.Contain("_bucket{facility_id=\"fac-1\"}");
+    }
+
+    [Fact]
     public void Http_api_queries_exclude_health_and_use_increase_over_the_window()
     {
         RunMetricsSnapshotService.HttpCountQuery("DataAcquisition", 90)

@@ -47,6 +47,7 @@ public class ThetisGenerationInvariantTests
             Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.EdLocation, StringComparison.Ordinal) == true);
             Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.IcuLocation, StringComparison.Ordinal) == true);
             Assert.Contains(generated.Encounter.Location, l => l.Location?.Reference?.Contains(ids.StepDownLocation, StringComparison.Ordinal) == true);
+            AssertLocationPeriodsAreForward(generated.Encounter);
             Assert.Contains(generated.Entries.Select(e => e.Resource).OfType<MedicationRequest>(),
                 mr => mr.Requester != null);
             Assert.True(
@@ -114,6 +115,47 @@ public class ThetisGenerationInvariantTests
         Assert.DoesNotContain(
             encounter.Type?.SelectMany(t => t.Coding) ?? [],
             c => string.Equals(c.Code, "32485007", StringComparison.Ordinal));
+        Assert.Single(encounter.Location);
+        Assert.DoesNotContain(encounter.Location, l => l.Location?.Reference?.Contains(ids.IcuLocation, StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(encounter.Location, l => l.Location?.Reference?.Contains(ids.StepDownLocation, StringComparison.Ordinal) == true);
+        AssertLocationPeriodsAreForward(encounter);
+    }
+
+    [Fact]
+    public async Task Short_inpatient_stay_keeps_forward_location_periods()
+    {
+        var (ids, _, practitionerIds, medicationIds) =
+            FactorySharedInfrastructureGenerator.Shared.Generate(null, RunTag);
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(
+                new Dictionary<ProfiledMeasureType, MeasureEligibility>
+                {
+                    [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying
+                },
+                Intent: new PatientGenerationIntent
+                {
+                    EncounterClass = "IMP",
+                    DurationMinutes = 90,
+                    IncludeHypoglycemicInsulin = false
+                }),
+            PatientIndex = 0,
+            BaseSeed = FrozenSeed,
+            TotalResourcesPerPatient = 15,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            ClinicalPeriodStart = PeriodStartUtc,
+            ClinicalPeriodEnd = PeriodStartUtc.AddHours(6),
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            Output = new NullOutputHelper()
+        };
+
+        var entries = await ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
+        var encounter = Assert.Single(entries.Select(e => e.Resource).OfType<Encounter>());
+        Assert.Equal(3, encounter.Location.Count);
+        AssertLocationPeriodsAreForward(encounter);
     }
 
     [Fact]
@@ -449,6 +491,17 @@ public class ThetisGenerationInvariantTests
         Assert.Contains(generated.Entries, e => e.Resource is CareTeam);
         Assert.Contains(generated.Entries, e => e.Resource is CarePlan);
         Assert.Contains(generated.Entries, e => e.Resource is Hl7.Fhir.Model.List);
+    }
+
+    private static void AssertLocationPeriodsAreForward(Encounter encounter)
+    {
+        foreach (var location in encounter.Location)
+        {
+            var start = location.Period?.StartElement?.ToDateTimeOffset(TimeSpan.Zero);
+            var end = location.Period?.EndElement?.ToDateTimeOffset(TimeSpan.Zero);
+            Assert.True(start.HasValue && end.HasValue, "stay location must have a period");
+            Assert.True(end.Value >= start.Value, $"location period inverted: {start} > {end}");
+        }
     }
 
     private static void AssertEncounterInsideReportWindow(Encounter encounter)
