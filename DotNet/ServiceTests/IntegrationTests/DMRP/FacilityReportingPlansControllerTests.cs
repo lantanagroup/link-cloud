@@ -79,8 +79,14 @@ public class FacilityReportingPlansControllerTests : IDisposable
         // these tests assert on depend on the day they run.
         _clock = new FakeTimeProvider(Now);
 
+        // The resolver reads the same fixed clock, so the tests still decide what "now" is. The facility's
+        // timezone comes from the fixture's shared stub, which answers UTC unless a test says otherwise.
+        var periodResolver = new FacilityReportingPeriodResolver(
+            sp.GetRequiredService<ILogger<FacilityReportingPeriodResolver>>(), _clock,
+            _fixture.FacilityTimeZoneSourceMock.Object);
+
         _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _sync,
-            _fixture.FacilityExistenceMock.Object, _clock)
+            _fixture.FacilityExistenceMock.Object, periodResolver)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -92,6 +98,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
+        _fixture.ResetFacilityTimeZoneSource();
     }
 
     public void Dispose()
@@ -99,6 +106,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
+        _fixture.ResetFacilityTimeZoneSource();
         _scope.Dispose();
     }
 
@@ -848,5 +856,227 @@ public class FacilityReportingPlansControllerTests : IDisposable
             sortBy: null, sortOrder: null, pageSize: 10, pageNumber: 1, cancellationToken: CancellationToken.None);
 
         Assert.Empty(Assert.IsType<PagedFacilityReportingPlanDto>(Assert.IsType<OkObjectResult>(remaining).Value).Records);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // LEGLINK-1139 - the current period is the facility's own month, not the UTC month.
+    //
+    // Facilities are in US states and territories, so both directions occur: ahead of UTC (the
+    // Marshall Islands, UTC+12) a facility's month turns over before UTC's; behind it (American
+    // Samoa, UTC-11) after. Every instant below was checked against TimeZoneInfo.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>13:00 UTC on 31 October 2026: already 1 November in Majuro, still October in UTC.</summary>
+    private static readonly DateTimeOffset MajuroInNovember = new(2026, 10, 31, 13, 0, 0, TimeSpan.Zero);
+
+    /// <summary>05:00 UTC on 1 November 2026: already November in UTC, still 31 October in Pago Pago.</summary>
+    private static readonly DateTimeOffset PagoPagoInOctober = new(2026, 11, 1, 5, 0, 0, TimeSpan.Zero);
+
+    private void GivenFacilityTimeZone(string? timeZone) =>
+        _fixture.FacilityTimeZoneSourceMock
+            .Setup(s => s.GetTimeZoneAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(timeZone);
+
+    private void VerifyTimeZoneLookups(Times times) =>
+        _fixture.FacilityTimeZoneSourceMock.Verify(
+            s => s.GetTimeZoneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), times);
+
+    private static List<(int Year, int Month)> PeriodsOf(IActionResult result) =>
+        Assert.IsType<PagedFacilityReportingPlanPeriodDto>(Assert.IsType<OkObjectResult>(result).Value)
+            .Records.Select(p => (p.ReportingYear, p.ReportingMonth)).ToList();
+
+    private static List<(int Year, int Month)> RowsOf(IActionResult result) =>
+        Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value)
+            .Select(p => (p.ReportingYear, p.ReportingMonth)).ToList();
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_FacilityAheadOfUtc_AnchorsOnItsLocalMonth()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        GivenFacilityTimeZone("Pacific/Majuro");
+        _clock.SetUtcNow(MajuroInNovember);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: 2, isReporting: null,
+            cancellationToken: CancellationToken.None);
+
+        // The facility is in November, so October - finished, as far as it is concerned - is not in its
+        // look-ahead. Anchored in UTC, the window would have been October and November.
+        Assert.Equal([(2026, 11), (2026, 12)], PeriodsOf(result));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_FacilityBehindUtc_AnchorsOnItsLocalMonth()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        GivenFacilityTimeZone("Pacific/Pago_Pago");
+        _clock.SetUtcNow(PagoPagoInOctober);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: 2, isReporting: null,
+            cancellationToken: CancellationToken.None);
+
+        // Still October locally, so October is where the window opens, not November.
+        Assert.Equal([(2026, 10), (2026, 11)], PeriodsOf(result));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_UtcFacility_AnchorsOnTheUtcMonthAtTheSameInstant()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        _clock.SetUtcNow(MajuroInNovember);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: 2, isReporting: null,
+            cancellationToken: CancellationToken.None);
+
+        // The control for the Majuro case: same instant, same rows, a UTC facility is still in October.
+        Assert.Equal([(2026, 10), (2026, 11)], PeriodsOf(result));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_MonthsAhead_IsCountedFromTheFacilitysLocalMonth()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        GivenFacilityTimeZone("Pacific/Majuro");
+        _clock.SetUtcNow(MajuroInNovember);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null,
+            monthsAhead: 1, refresh: false, CancellationToken.None);
+
+        // The flat read projects nothing, but its window still decides which stored rows come back.
+        Assert.Equal([(2026, 11)], RowsOf(result));
+        VerifyTimeZoneLookups(Times.Once());
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithRefresh_SyncsTheFacilitysLocalMonth()
+    {
+        GivenFacilityTimeZone("Pacific/Majuro");
+        _clock.SetUtcNow(MajuroInNovember);
+
+        await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        // Syncing October would refresh a month the facility has already finished.
+        Assert.Equal((FacilityId, 11, 2026), Assert.Single(_sync.Calls));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithRefreshButNoWindow_SyncsTheLocalMonthAndReadsEveryPeriod()
+    {
+        await CreatedPlanAsync(month: 10, year: 2026);
+        await CreatedPlanAsync(month: 11, year: 2026);
+        GivenFacilityTimeZone("Pacific/Majuro");
+        _clock.SetUtcNow(MajuroInNovember);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, monthsAhead: null, isReporting: null,
+            refresh: true, cancellationToken: CancellationToken.None);
+
+        // The refresh still needs the current period, so it is resolved - in the facility's timezone. With
+        // no window nothing is projected from it: the answer is every period on record, October included.
+        Assert.Equal((FacilityId, 11, 2026), Assert.Single(_sync.Calls));
+        Assert.Equal([(2026, 10), (2026, 11)], PeriodsOf(result));
+    }
+
+    [Fact]
+    public void Constructor_RefusesAMissingPeriodResolver()
+    {
+        var sp = _scope.ServiceProvider;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => new FacilityReportingPlansController(
+            sp.GetRequiredService<ILogger<FacilityReportingPlansController>>(),
+            sp.GetRequiredService<IFacilityReportingPlanManager>(),
+            sp.GetRequiredService<IFacilityReportingPlanQueries>(),
+            sp.GetRequiredService<IFacilityReportingPlanLookAhead>(),
+            _sync,
+            _fixture.FacilityExistenceMock.Object,
+            null!));
+
+        Assert.Equal("facilityReportingPeriodResolver", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithRefreshAndNoPeriod_SyncsTheFacilitysLocalMonth()
+    {
+        GivenFacilityTimeZone("Pacific/Pago_Pago");
+        _clock.SetUtcNow(PagoPagoInOctober);
+
+        await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, refresh: true,
+            CancellationToken.None);
+
+        Assert.Equal((FacilityId, 10, 2026), Assert.Single(_sync.Calls));
+        VerifyTimeZoneLookups(Times.Once());
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithRefreshAndOnlyAMonth_TakesTheYearFromTheLocalMonth()
+    {
+        GivenFacilityTimeZone("Pacific/Pago_Pago");
+
+        // 05:00 UTC on 1 January 2027 is still 31 December 2026 in Pago Pago, so "December" means 2026.
+        _clock.SetUtcNow(new DateTimeOffset(2027, 1, 1, 5, 0, 0, TimeSpan.Zero));
+
+        await _controller.GetFacilityReportingPlansForFacility(FacilityId, month: 12, year: null, isReporting: null,
+            monthsAhead: null, refresh: true, CancellationToken.None);
+
+        Assert.Equal((FacilityId, 12, 2026), Assert.Single(_sync.Calls));
+        VerifyTimeZoneLookups(Times.Once());
+    }
+
+    /// <summary>
+    /// The Admin UI's call. With no window and no refresh nothing needs the current period, so the
+    /// facility's timezone is not looked up at all.
+    /// </summary>
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithoutWindowOrRefresh_DoesNotLookUpTheTimeZone()
+    {
+        await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, false,
+            CancellationToken.None);
+
+        VerifyTimeZoneLookups(Times.Never());
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithoutWindowOrRefresh_DoesNotLookUpTheTimeZone()
+    {
+        await _controller.GetFacilityReportingPlanPeriods(FacilityId, null, null,
+            cancellationToken: CancellationToken.None);
+
+        VerifyTimeZoneLookups(Times.Never());
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithWindowAndRefresh_LooksUpTheTimeZoneOnce()
+    {
+        // The refresh, the window and the anchor all come from one resolution.
+        await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        VerifyTimeZoneLookups(Times.Once());
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_UnknownFacilityWithAWindow_IsStillOkAndEmpty()
+    {
+        GivenFacilityTimeZone(null);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 3, null,
+            cancellationToken: CancellationToken.None);
+
+        // No facility means no timezone; the window falls back to UTC and the answer is an empty page, not 404.
+        Assert.Empty(PeriodsOf(result));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_UnknownFacilityWithAWindow_IsStillOkAndEmpty()
+    {
+        GivenFacilityTimeZone(null);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null,
+            monthsAhead: 3, refresh: false, CancellationToken.None);
+
+        Assert.Empty(RowsOf(result));
     }
 }
