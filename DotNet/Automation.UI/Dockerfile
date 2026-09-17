@@ -54,7 +54,7 @@ WORKDIR "/src/DotNet/Automation.UI"
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     extra=""; \
     if [ "$BUILD_CONFIGURATION" = "Release" ]; then extra="/p:DebugType=None /p:DebugSymbols=false"; fi; \
-    dotnet publish "Automation.UI.csproj" -c "$BUILD_CONFIGURATION" -o /app/publish /p:UseAppHost=false $extra
+    dotnet publish "Automation.UI.csproj" -c "$BUILD_CONFIGURATION" -o /app/publish --no-restore /p:UseAppHost=false $extra
 
 FROM base AS final
 WORKDIR /app
