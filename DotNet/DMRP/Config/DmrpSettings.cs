@@ -19,6 +19,12 @@ namespace LantanaGroup.Link.DMRP.Config
         /// it turns a startup problem into a runtime call somewhere unexpected.
         /// </summary>
         public DmrpApiSettings Api { get; set; } = new();
+
+        /// <summary>
+        /// The nightly job that turns reporting plans into scheduled reports. Only read when
+        /// <see cref="Enabled"/> is true.
+        /// </summary>
+        public DmrpSchedulingSettings Scheduling { get; set; } = new();
     }
 
     /// <summary>
@@ -106,5 +112,39 @@ namespace LantanaGroup.Link.DMRP.Config
             && !string.IsNullOrWhiteSpace(TokenUrl)
             && !string.IsNullOrWhiteSpace(ClientId)
             && !string.IsNullOrWhiteSpace(ClientSecret);
+    }
+
+    /// <summary>
+    /// When and how hard the nightly scheduling job runs. Every value has a default and an accepted
+    /// range; a value outside the range falls back to the default rather than failing the boot,
+    /// matching <see cref="DmrpApiSettings.TimeoutSeconds"/>.
+    /// </summary>
+    public sealed class DmrpSchedulingSettings
+    {
+        public const string DefaultNightlyCron = "0 59 23 * * ?";
+        public const int DefaultConcurrency = 4;
+        public const int DefaultCatchUpNights = 3;
+
+        /// <summary>Quartz cron, evaluated in each facility timezone. Default 23:59 every night.</summary>
+        public string NightlyCron { get; set; } = DefaultNightlyCron;
+
+        /// <summary>How many facilities one fire works on at once. Range 1-32.</summary>
+        public int Concurrency { get; set; } = DefaultConcurrency;
+
+        /// <summary>
+        /// On how many nights at the start of a month a facility with no plan rows for that month is
+        /// refreshed from DMRP. Bounds fleet-wide probing of facilities that are enrolled in nothing.
+        /// Range 0-28; 0 disables catch-up.
+        /// </summary>
+        public int CatchUpNights { get; set; } = DefaultCatchUpNights;
+
+        public string ResolvedNightlyCron =>
+            !string.IsNullOrWhiteSpace(NightlyCron) && Quartz.CronExpression.IsValidExpression(NightlyCron)
+                ? NightlyCron
+                : DefaultNightlyCron;
+
+        public int ResolvedConcurrency => Concurrency is >= 1 and <= 32 ? Concurrency : DefaultConcurrency;
+
+        public int ResolvedCatchUpNights => CatchUpNights is >= 0 and <= 28 ? CatchUpNights : DefaultCatchUpNights;
     }
 }
