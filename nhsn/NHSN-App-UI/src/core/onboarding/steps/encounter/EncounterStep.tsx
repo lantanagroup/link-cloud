@@ -722,7 +722,8 @@ function referenceLabel(code: EncounterCode): string {
   return `${systemBadgeLabel(code.system)} ${code.code} — ${code.display}`;
 }
 
-function encodeTarget(system: string, code: string): string {
+/** Exported for the Report Details "Encounter Mapping" modal, which encodes a new mapping's target the same way. */
+export function encodeTarget(system: string, code: string): string {
   return system && code ? `${system}|${code}` : '';
 }
 

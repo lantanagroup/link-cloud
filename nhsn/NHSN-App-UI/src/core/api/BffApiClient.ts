@@ -12,6 +12,7 @@ import type {
   ConnectionResult,
   EncounterCode,
   EncounterCodeDetail,
+  EncounterMapping,
   FhirConfig,
   HslocCode,
   HslocMapping,
@@ -24,6 +25,7 @@ import type {
   PageRequest,
   PatientIdentifier,
   PatientPipeline,
+  PreQualIssue,
   QueryPlan,
   ReportDetail,
   ReportPatientEntry,
@@ -215,6 +217,15 @@ export class BffApiClient implements ApiClient {
     await this.http.put<void>('/hsloc-mappings', mappings);
   }
 
+  async getEncounterMappings(): Promise<EncounterMapping[]> {
+    const {data} = await this.http.get<EncounterMapping[]>('/encounter-mappings');
+    return data;
+  }
+
+  async saveEncounterMappings(mappings: EncounterMapping[]): Promise<void> {
+    await this.http.put<void>('/encounter-mappings', mappings);
+  }
+
   // ------------------------------------------------------------ mrn intake
 
   async getMrnIntake(): Promise<MrnIntake | null> {
@@ -260,6 +271,13 @@ export class BffApiClient implements ApiClient {
   async getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence> {
     const {data} = await this.http.get<PatientMappingEvidence>(
       `/reports/${encodeURIComponent(reportId)}/patients/${encodeURIComponent(patientId)}/mapping-evidence`
+    );
+    return data;
+  }
+
+  async getPatientPreQualResults(reportId: string, patientId: string): Promise<PreQualIssue[]> {
+    const {data} = await this.http.get<PreQualIssue[]>(
+      `/reports/${encodeURIComponent(reportId)}/patients/${encodeURIComponent(patientId)}/pre-qual-results`
     );
     return data;
   }

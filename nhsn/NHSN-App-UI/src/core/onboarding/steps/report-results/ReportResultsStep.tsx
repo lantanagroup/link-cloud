@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
 import type {
   CodeMapEvidence,
+  EncounterCode,
+  EncounterMapping,
   HslocCode,
   HslocMapping,
   LocationMethod,
@@ -36,7 +38,7 @@ import { useNotifications } from '../../../notifications/NotificationProvider';
 import type { StepProps } from '../../flow';
 import { useOnboarding } from '../../OnboardingProvider';
 import type { LocationOrgDraft } from '../../types';
-import { buildGroups } from '../encounter/EncounterStep';
+import { buildGroups, decodeTarget, encodeTarget } from '../encounter/EncounterStep';
 import { METHOD_LABEL_KEYS } from '../location-org/LocationOrgStep';
 import {
   parseQueryPlan,
@@ -152,54 +154,6 @@ function dqmLabel(
     .filter((mapping) => mapping.digitalQualityMeasure === dqmId)
     .map((mapping) => mapping.nhsnMeasure);
   return names.length > 0 ? names.join(' / ') : dqmId;
-}
-
-// Report generation has no completion signal wired up downstream in this environment -- every ad
-// hoc report stays Pending forever, so Complete is otherwise never seen. Stable per report id
-// (not re-rolled every render) rather than truly random, so a report doesn't flicker between
-// looking Pending and Complete on refresh. Delete this once Report reports real completion.
-// A report shown as Complete (see demoDisplayStatus below) can't honestly still have patients
-// sitting in PatientIdentified/PendingValidation -- those mean "hasn't reached a verdict yet",
-// which contradicts the report itself being done. Resolves those two to a terminal outcome,
-// stable per patient id so it doesn't flicker on refresh. Passed/Failed/NotReportable are already
-// terminal and pass through untouched.
-function demoDisplayReportingStatus(
-  status: ReportingStatus,
-  patientId: string,
-  reportIsComplete: boolean,
-): ReportingStatus {
-  if (
-    !reportIsComplete ||
-    status === 'PassedValidation' ||
-    status === 'FailedValidation' ||
-    status === 'NotReportable'
-  ) {
-    return status;
-  }
-  const terminalOutcomes: ReportingStatus[] = [
-    'PassedValidation',
-    'FailedValidation',
-    'NotReportable',
-  ];
-  let hash = 0;
-  for (let i = 0; i < patientId.length; i++) {
-    hash = (hash * 31 + patientId.charCodeAt(i)) >>> 0;
-  }
-  return terminalOutcomes[hash % terminalOutcomes.length];
-}
-
-function demoDisplayStatus(
-  status: ReportStatus,
-  reportId: string,
-): ReportStatus {
-  if (status !== 'Pending') {
-    return status;
-  }
-  let hash = 0;
-  for (let i = 0; i < reportId.length; i++) {
-    hash = (hash * 31 + reportId.charCodeAt(i)) >>> 0;
-  }
-  return hash % 2 === 0 ? 'Complete' : 'Pending';
 }
 
 // The external CDC measure spec page for a dQM id. No Link service carries this URL anywhere
@@ -589,7 +543,7 @@ function buildReportSummarySheet(detail: ReportDetail): XlsxSheet {
     ],
     ['Create Date', formatDateTime(detail.createDate)],
     ['Patient Count', String(detail.patientCount)],
-    ['Status', demoDisplayStatus(detail.status, detail.reportId)],
+    ['Status', detail.status],
   );
   return { name: 'Report Summary', headers: ['Field', 'Value'], rows };
 }
@@ -839,10 +793,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
   // Mappings are fetched fresh via getHslocMappings() -- the same call HslocStep itself makes --
   // rather than read off draft.hsloc.mappings: the draft only picks up HslocStep's edits when that
   // step's own Continue button patches it, so it can lag behind what saveHslocMappings actually
-  // persisted (e.g. right after this modal's own "+ Add Mapping" adds one). Location Org / Encounter
-  // have no equivalent -- unlike saveHslocMappings, neither has a save call that isn't gated to its
-  // own onboarding step (see saveDraft's doc comment), so those two modals stay read-only and link
-  // to the real step instead.
+  // persisted (e.g. right after this modal's own "+ Add Mapping" adds one). Organization
+  // Identification has no equivalent -- its 4 configuration methods make inline editing a much
+  // bigger UI lift, so that modal stays read-only and links to the real step instead.
   const [hslocCodes, setHslocCodes] = useState<HslocCode[]>([]);
   const [hslocMappings, setHslocMappings] = useState<HslocMapping[]>([]);
   const [hslocDataLoading, setHslocDataLoading] = useState(false);
@@ -850,6 +803,12 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     Record<string, string>
   >({});
   const [addingHslocCode, setAddingHslocCode] = useState<string | null>(null);
+
+  const [encounterCodes, setEncounterCodes] = useState<EncounterCode[]>([]);
+  const [encounterMappings, setEncounterMappings] = useState<EncounterMapping[]>([]);
+  const [encounterDataLoading, setEncounterDataLoading] = useState(false);
+  const [encounterSelections, setEncounterSelections] = useState<Record<string, string>>({});
+  const [addingEncounterKey, setAddingEncounterKey] = useState<string | null>(null);
 
   const [queryPlanOpen, setQueryPlanOpen] = useState(false);
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null);
@@ -1046,6 +1005,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     setMappingEvidenceError(null);
     setMappingEvidenceLoading(true);
     setHslocSelections({});
+    setEncounterSelections({});
     try {
       const evidence = await api.getPatientMappingEvidence(
         detail.reportId,
@@ -1084,14 +1044,23 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
         setHslocDataLoading(false);
       }
     }
+    if (column === 'encounter') {
+      setEncounterDataLoading(true);
+      try {
+        const [codes, mappings] = await Promise.all([
+          encounterCodes.length === 0 ? api.getEncounterCodes() : Promise.resolve(encounterCodes),
+          api.getEncounterMappings()
+        ]);
+        setEncounterCodes(codes);
+        setEncounterMappings(mappings);
+      } catch (cause) {
+        notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+      } finally {
+        setEncounterDataLoading(false);
+      }
+    }
   }
 
-  // The only one of the three mapping indicators with a save call that isn't gated to its own
-  // onboarding step (see saveHslocMappings vs. the note on ApiClient.saveDraft) -- so it is the only
-  // one this screen can persist a new mapping through. Appends to the live hslocMappings (fetched
-  // fresh when the modal opened, not draft.hsloc.mappings -- see the state comment above) rather
-  // than replacing, mirroring the onboarding POC's "add to configuration" behavior. Also mirrors the
-  // full result into the draft so the Location Identification step reflects it without a refetch.
   async function handleAddHslocMapping(unmappedCode: string) {
     const hslocCode = hslocSelections[unmappedCode];
     if (!hslocCode) {
@@ -1122,6 +1091,33 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       );
     } finally {
       setAddingHslocCode(null);
+    }
+  }
+
+  async function handleAddEncounterMapping(sourceSystem: string, unmappedCode: string) {
+    const key = `${sourceSystem}|${unmappedCode}`;
+    const target = encounterSelections[key];
+    if (!target) {
+      return;
+    }
+    const [targetSystem, targetCode] = decodeTarget(target);
+    const targetDisplay = encounterCodes.find(code => code.system === targetSystem && code.code === targetCode)?.display;
+    setAddingEncounterKey(key);
+    try {
+      const nextMappings = [...encounterMappings, {system: sourceSystem, code: unmappedCode, display: targetDisplay, encounterType: target}];
+      await api.saveEncounterMappings(nextMappings);
+      setEncounterMappings(nextMappings);
+      mirror('encounter', {mappings: nextMappings});
+      notifySuccess(t('onboarding:reportResults.detail.mappingEvidence.encounterMappingAdded'));
+      setEncounterSelections(prev => {
+        const next = {...prev};
+        delete next[key];
+        return next;
+      });
+    } catch (cause) {
+      notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
+    } finally {
+      setAddingEncounterKey(null);
     }
   }
 
@@ -1232,22 +1228,10 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       detail && currentDqm
         ? dqmLabel(currentDqm, detail.measureMapping)
         : undefined;
-    const reportIsComplete = detail
-      ? demoDisplayStatus(detail.status, detail.reportId) === 'Complete'
-      : false;
     // Population narrows to patients with a measure report for the active dQM -- real per-dQM
     // data. The status pie is still each patient's one overall ReportingStatus: Link has no
     // per-dQM validation outcome to split it by.
-    const dqmScopedPatients = patientsForDqm(patients, currentDqm).map(
-      (patient) => ({
-        ...patient,
-        reportingStatus: demoDisplayReportingStatus(
-          patient.reportingStatus,
-          patient.patientId,
-          reportIsComplete,
-        ),
-      }),
-    );
+    const dqmScopedPatients = patientsForDqm(patients, currentDqm);
     const statusBreakdown = buildReportStatusBreakdown(dqmScopedPatients);
     const patientRows = toPatientRows(dqmScopedPatients, currentDqm);
     const mappingEvidencePatientRow =
@@ -1268,7 +1252,14 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       : [];
     const encounterGroups = buildGroups(
       draft.encounter.codeSystems ?? [],
-      draft.encounter.mappings ?? [],
+      encounterMappings,
+    );
+    const encounterUnmappedEntries = encounterCodeMaps.flatMap((codeMap) =>
+      codeMap.unmappedCodes.map((code) => ({
+        sourceSystem: codeMap.sourceSystem,
+        code,
+        key: `${codeMap.sourceSystem}|${code}`,
+      })),
     );
 
     let sliceStart = 0;
@@ -1416,10 +1407,8 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                 <dt>{t('onboarding:reportResults.columns.status')}</dt>
                 <dd>
                   <span
-                    className={`nhsn-link__status-pill ${STATUS_PILL_CLASS[demoDisplayStatus(detail.status, detail.reportId)]}`}>
-                    {t(
-                      `onboarding:reportResults.status.${demoDisplayStatus(detail.status, detail.reportId)}`,
-                    )}
+                    className={`nhsn-link__status-pill ${STATUS_PILL_CLASS[detail.status]}`}>
+                    {t(`onboarding:reportResults.status.${detail.status}`)}
                   </span>
                 </dd>
               </div>
@@ -2201,7 +2190,11 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     'onboarding:reportResults.detail.patientDetail.downloadResourceBundle',
                   )}
                 </Button>
-                <Button variant="secondary" onClick={handleDownloadUnavailable}>
+                <Button
+                  variant="secondary"
+                  onClick={() => handleDownloadPatientReport(selectedPatientRow.patientId, currentDqm)}
+                  disabled={!currentDqm || downloadingPatientId === selectedPatientRow.patientId}
+                  loading={downloadingPatientId === selectedPatientRow.patientId}>
                   <DownloadIcon />
                   {t(
                     'onboarding:reportResults.detail.patientDetail.downloadReport',
@@ -2586,8 +2579,6 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             )}
         </Modal>
 
-        {/* Encounter Mapping -- read-only, same reasoning as Location Org above: Encounter Mapping
-            config only saves through the Encounter Mapping step's own saveDraft call. */}
         <Modal
           open={mappingEvidenceColumn === 'encounter'}
           title={t(
@@ -2666,7 +2657,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               'onboarding:reportResults.detail.mappingEvidence.configuredEncounterCodeSystems',
             )}
           </h3>
-          {encounterGroups.length === 0 ? (
+          {encounterDataLoading ? (
+            <NHSNLoadingIndicator />
+          ) : encounterGroups.length === 0 ? (
             <p className="nhsn-link__hint-text">
               {t(
                 'onboarding:reportResults.detail.mappingEvidence.noCodeSystemsConfigured',
@@ -2725,6 +2718,94 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                 </div>
               </div>
             ))
+          )}
+
+          {!encounterDataLoading && encounterUnmappedEntries.length > 0 && (
+            <>
+              <h3 className="nhsn-link__report-results-detail-section-title">
+                {t(
+                  'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
+                )}
+              </h3>
+              <div className="nhsn-link__report-results-table-scroll">
+                <table className="nhsn-link__report-results-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">
+                        {t(
+                          'onboarding:reportResults.detail.mappingEvidence.sourceSystem',
+                        )}
+                      </th>
+                      <th scope="col">
+                        {t(
+                          'onboarding:reportResults.detail.mappingEvidence.yourCode',
+                        )}
+                      </th>
+                      <th scope="col">
+                        {t(
+                          'onboarding:reportResults.detail.mappingEvidence.targetSystem',
+                        )}
+                      </th>
+                      <th aria-hidden="true" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {encounterUnmappedEntries.map((entry) => (
+                      <tr key={entry.key}>
+                        <td>{entry.sourceSystem}</td>
+                        <td>{entry.code}</td>
+                        <td>
+                          <Select
+                            id={`encounter-add-${entry.key}`}
+                            label={t(
+                              'onboarding:reportResults.detail.mappingEvidence.targetSystem',
+                            )}
+                            placeholder={t(
+                              'onboarding:reportResults.detail.mappingEvidence.selectTargetCode',
+                            )}
+                            options={encounterCodes.map((code) => ({
+                              value: encodeTarget(code.system, code.code),
+                              label: `${code.code} - ${code.display}`,
+                            }))}
+                            value={encounterSelections[entry.key] ?? ''}
+                            onChange={(value) =>
+                              setEncounterSelections((prev) => ({
+                                ...prev,
+                                [entry.key]: value,
+                              }))
+                            }
+                          />
+                        </td>
+                        <td>
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              handleAddEncounterMapping(
+                                entry.sourceSystem,
+                                entry.code,
+                              )
+                            }
+                            disabled={
+                              !encounterSelections[entry.key] ||
+                              addingEncounterKey === entry.key
+                            }
+                            loading={addingEncounterKey === entry.key}>
+                            {t(
+                              'onboarding:reportResults.detail.mappingEvidence.addMapping',
+                            )}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="nhsn-link__hint-text">
+                {t(
+                  'onboarding:reportResults.detail.mappingEvidence.encounterAddedHint',
+                )}
+              </p>
+            </>
           )}
 
           {mappingEvidencePatientRow &&
@@ -2875,10 +2956,8 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     </td>
                     <td className="nhsn-link__report-results-nowrap">
                       <span
-                        className={`nhsn-link__status-pill ${STATUS_PILL_CLASS[demoDisplayStatus(report.status, report.reportId)]}`}>
-                        {t(
-                          `onboarding:reportResults.status.${demoDisplayStatus(report.status, report.reportId)}`,
-                        )}
+                        className={`nhsn-link__status-pill ${STATUS_PILL_CLASS[report.status]}`}>
+                        {t(`onboarding:reportResults.status.${report.status}`)}
                       </span>
                     </td>
                   </tr>

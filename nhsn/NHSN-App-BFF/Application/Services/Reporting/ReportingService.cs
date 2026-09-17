@@ -13,6 +13,7 @@ public sealed class ReportingService : IReportingService
     private readonly IReportGateway _reportGateway;
     private readonly IDataAcquisitionGateway _dataAcquisitionGateway;
     private readonly IAcknowledgementService _acknowledgementService;
+    private readonly IValidationGateway _validationGateway;
     private readonly INhsnUserContext _userContext;
     private readonly ILogger<ReportingService> _logger;
 
@@ -21,6 +22,7 @@ public sealed class ReportingService : IReportingService
         IReportGateway reportGateway,
         IDataAcquisitionGateway dataAcquisitionGateway,
         IAcknowledgementService acknowledgementService,
+        IValidationGateway validationGateway,
         INhsnUserContext userContext,
         ILogger<ReportingService> logger)
     {
@@ -28,6 +30,7 @@ public sealed class ReportingService : IReportingService
         _reportGateway = reportGateway;
         _dataAcquisitionGateway = dataAcquisitionGateway;
         _acknowledgementService = acknowledgementService;
+        _validationGateway = validationGateway;
         _userContext = userContext;
         _logger = logger;
     }
@@ -135,6 +138,12 @@ public sealed class ReportingService : IReportingService
         var facilityId = _userContext.RequireFacilityId();
         return _acknowledgementService.RecordAsync(
             facilityId, AcknowledgementKind.ReportAccuracy, reportId, accepted, statementKey, _userContext.ExternalUserId, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<PreQualIssue>> GetPatientPreQualResultsAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
+    {
+        var facilityId = _userContext.RequireFacilityId();
+        return _validationGateway.GetPatientResultsAsync(facilityId, reportId, patientId, cancellationToken);
     }
 
     private static DateTime ParseDate(string? value) =>
