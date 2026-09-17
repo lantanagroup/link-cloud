@@ -206,7 +206,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if (!result.IsValid || operationType != nameof(OperationType.HSLOCMap))
                 return result;
 
-            var operation = (HSLOCMapOperation)OperationHelper.GetOperation(operationType, operationJson);
+            //additional validation for HSLOCMap operations: all target codes must match active HSLOC codes
+            var operation = OperationHelper.GetOperation(operationType, operationJson) as HSLOCMapOperation;
+            if(operation == null) return result;
+            
             var targetCodes = operation.CodeSystemMaps.SelectMany(map => map.CodeMaps.Values)
                 .Select(map => map.Code).Distinct(StringComparer.Ordinal).ToList();
             if (targetCodes.Count == 0)
