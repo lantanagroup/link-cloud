@@ -2,7 +2,7 @@ const { load, LabelFilter } = require('@azure/app-configuration-provider');
 const { DefaultAzureCredential } = require('@azure/identity');
 const { CONFIGURATION_KEYS } = require('./configuration-keys');
 
-const CONNECTION_STRING_ENVIRONMENT_VARIABLE = 'DatabaseConnections__AzureAppConfiguration';
+const CONNECTION_STRING_ENVIRONMENT_VARIABLE = 'ConnectionStrings__AzureAppConfiguration';
 const KEY_FILTER = '/nhsn_app_ui/*';
 const SERVICE_LABEL = 'NhsnAppUI';
 const LOG_PREFIX = '[NHSN-App-UI configuration] [AzureAppConfiguration]';
