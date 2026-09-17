@@ -2244,8 +2244,8 @@
         "type": "Project",
         "dependencies": {
           "Hl7.Fhir.R4": "[6.2.0, )",
-          "LantanaGroup.Thetis.Generation.Abstractions": "[1.0.0-alpha.1, )",
-          "LantanaGroup.Thetis.Generation.Engine": "[1.0.0-alpha.1, )",
+          "LantanaGroup.Thetis.Generation.Abstractions": "[1.0.0, )",
+          "LantanaGroup.Thetis.Generation.Engine": "[1.0.0, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.10, )",
           "RestSharp": "[112.1.0, )"
@@ -2346,22 +2346,6 @@
           "LinkSdk": "[1.0.0, )",
           "LinqKit.Core": "[1.2.11, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
-        }
-      },
-      "LantanaGroup.Thetis.Generation.Abstractions": {
-        "type": "Project"
-      },
-      "LantanaGroup.Thetis.Generation.Engine": {
-        "type": "Project",
-        "dependencies": {
-          "Bogus": "[35.6.5, )",
-          "Hl7.Fhir.R4": "[6.2.0, )",
-          "LanguageExt.Core": "[4.4.9, )",
-          "LantanaGroup.Thetis.Generation.Abstractions": "[1.0.0-alpha.1, )",
-          "Microsoft.Extensions.DependencyInjection": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )",
-          "RulesEngine": "[6.0.0, )",
-          "System.Linq.Dynamic.Core": "[1.7.2, )"
         }
       },
       "link.authorization": {
@@ -2704,6 +2688,28 @@
         "dependencies": {
           "AngleSharp": "[0.17.1]",
           "AngleSharp.Css": "[0.17.0]"
+        }
+      },
+      "LantanaGroup.Thetis.Generation.Abstractions": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "IY0ioROFGCt/W+yJkcq72m7IYBSsVarEfsTBOQoOFmLGivB0uXq0rthpg6oMo3f0Q+jLxe9ag/y1B5BNmlkPOQ=="
+      },
+      "LantanaGroup.Thetis.Generation.Engine": {
+        "type": "CentralTransitive",
+        "requested": "[1.0.0, )",
+        "resolved": "1.0.0",
+        "contentHash": "WEkJTGvgRxuT0UtYjZKQEOy/oCl84TBodAbpLpOzHaXb7g5ZanKNMF7FMeMswO5kZobsmKVFFKUDBVFVlnegyw==",
+        "dependencies": {
+          "Bogus": "35.6.5",
+          "Hl7.Fhir.R4": "6.2.0",
+          "LanguageExt.Core": "4.4.9",
+          "LantanaGroup.Thetis.Generation.Abstractions": "1.0.0",
+          "Microsoft.Extensions.DependencyInjection": "10.0.8",
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.8",
+          "RulesEngine": "6.0.0",
+          "System.Linq.Dynamic.Core": "1.7.2"
         }
       },
       "LinqKit": {

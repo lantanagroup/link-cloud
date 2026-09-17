@@ -729,10 +729,9 @@ services:
     build:
       context: .
       dockerfile: DotNet/Automation.UI/Dockerfile
-      additional_contexts:
-        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
     networks:
       - link-nw
     depends_on:
@@ -1019,10 +1018,9 @@ services:
     build:
       context: .
       dockerfile: DotNet/MockFhirServer/Dockerfile
-      additional_contexts:
-        thetis: ../thetis
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
     networks:
       - link-nw
     healthcheck:

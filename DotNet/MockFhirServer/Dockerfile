@@ -10,17 +10,22 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     NUGET_XMLDOC_MODE=skip
 WORKDIR /src
 COPY ["Directory.Packages.props", "./"]
+COPY ["nuget.config", "./"]
 COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/MockFhirServer.csproj", "DotNet/MockFhirServer/"]
-COPY --from=thetis ["Thetis.Generation.Abstractions/Thetis.Generation.Abstractions.csproj", "/thetis/Thetis.Generation.Abstractions/"]
-COPY --from=thetis ["Thetis.Generation.Engine/Thetis.Generation.Engine.csproj", "/thetis/Thetis.Generation.Engine/"]
+ARG FEED_ACCESSTOKEN
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
+    if [ -n "$FEED_ACCESSTOKEN" ]; then \
+      dotnet nuget update source Shared_BOTW_Feed \
+        --username docker \
+        --password "$FEED_ACCESSTOKEN" \
+        --store-password-in-clear-text \
+        --configfile nuget.config; \
+    fi; \
     dotnet restore "DotNet/MockFhirServer/MockFhirServer.csproj" /p:RestorePackagesWithLockFile=false
 
 COPY ["DotNet/Automation/", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/", "DotNet/MockFhirServer/"]
-COPY --from=thetis ["Thetis.Generation.Abstractions/", "/thetis/Thetis.Generation.Abstractions/"]
-COPY --from=thetis ["Thetis.Generation.Engine/", "/thetis/Thetis.Generation.Engine/"]
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

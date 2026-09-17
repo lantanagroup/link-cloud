@@ -65,26 +65,11 @@ jobs:
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
       LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
+      AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      # Thetis is a private sibling repo (project reference, no NuGet package yet).
-      # Dockerfiles COPY --from=thetis; compose additional_contexts maps that to ../thetis.
-      - name: Checkout thetis sibling
-        uses: actions/checkout@v5
-        with:
-          repository: lantanagroup/thetis
-          path: _thetis
-          ref: main
-          # GITHUB_TOKEN cannot read other private repos (GitHub reports "not found").
-          # THETIS_CHECKOUT_TOKEN must be a PAT or oauth token with repo read on lantanagroup/thetis.
-          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
-          persist-credentials: false
-
-      - name: Expose thetis as ../thetis
-        run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -170,6 +155,14 @@ jobs:
       # with "The process cannot access the file ... being used by another
       # process" (MSB4018). Building once and passing --no-build/--no-restore
       # to each parallel run avoids the contention.
+      - name: Authenticate Shared_BOTW_Feed
+        run: |
+          dotnet nuget update source Shared_BOTW_Feed \
+            --username az \
+            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
       - name: Restore & build BackendE2ETests
         run: |
           dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
@@ -300,25 +293,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # Thetis is a private sibling repo (project reference, no NuGet package yet).
-      - name: Checkout thetis sibling
-        uses: actions/checkout@v5
-        with:
-          repository: lantanagroup/thetis
-          path: _thetis
-          ref: main
-          # GITHUB_TOKEN cannot read other private repos (GitHub reports "not found").
-          # THETIS_CHECKOUT_TOKEN must be a PAT or oauth token with repo read on lantanagroup/thetis.
-          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
-          persist-credentials: false
-
-      - name: Expose thetis as ../thetis
-        run: ln -sfn "$GITHUB_WORKSPACE/_thetis" "$(dirname "$GITHUB_WORKSPACE")/thetis"
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Authenticate Shared_BOTW_Feed
+        run: |
+          dotnet nuget update source Shared_BOTW_Feed \
+            --username az \
+            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
+            --store-password-in-clear-text \
+            --configfile nuget.config
 
       - name: Cache NuGet packages
         uses: actions/cache@v4

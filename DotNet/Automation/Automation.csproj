@@ -6,15 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>LantanaGroup.Automation</RootNamespace>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <ThetisEngineProjectPath Condition="'$(ThetisEngineProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Engine\Thetis.Generation.Engine.csproj</ThetisEngineProjectPath>
-    <ThetisAbstractionsProjectPath Condition="'$(ThetisAbstractionsProjectPath)' == ''">..\..\..\thetis\Thetis.Generation.Abstractions\Thetis.Generation.Abstractions.csproj</ThetisAbstractionsProjectPath>
-    <!-- Sibling ../thetis project refs. NuGet packages are planned, not published yet. -->
-    <UseThetisProjectReference Condition="'$(UseThetisProjectReference)' == ''">true</UseThetisProjectReference>
   </PropertyGroup>
-
-  <Target Name="EnsureThetisSibling" BeforeTargets="ResolveProjectReferences;CollectPackageReferences" Condition="'$(UseThetisProjectReference)' == 'true'">
-    <Error Text="Thetis sibling project is required at $(ThetisEngineProjectPath). Clone ../thetis next to link-cloud." Condition="!Exists('$(ThetisEngineProjectPath)')" />
-  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ServiceTests" />
@@ -22,19 +14,11 @@
 
   <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4" />
+    <PackageReference Include="LantanaGroup.Thetis.Generation.Abstractions" />
+    <PackageReference Include="LantanaGroup.Thetis.Generation.Engine" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="RestSharp" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(UseThetisProjectReference)' == 'true'">
-    <ProjectReference Include="$(ThetisAbstractionsProjectPath)" />
-    <ProjectReference Include="$(ThetisEngineProjectPath)" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(UseThetisProjectReference)' != 'true'">
-    <PackageReference Include="LantanaGroup.Thetis.Generation.Abstractions" />
-    <PackageReference Include="LantanaGroup.Thetis.Generation.Engine" />
   </ItemGroup>
 
   <ItemGroup>
