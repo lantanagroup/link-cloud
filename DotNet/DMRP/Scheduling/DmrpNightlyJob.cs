@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Confluent.Kafka;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Config;
@@ -226,6 +227,12 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             var month = comingMidnight.Month;
             var year = comingMidnight.Year;
 
+            // One predicate for both readings of the same question - has this facility any rows for
+            // the month - so the "are we due a catch-up" test and the "did the catch-up land" test
+            // cannot drift apart.
+            Expression<Func<FacilityReportingPlan, bool>> hasRowsForTheMonth =
+                p => p.FacilityId == facilityId && p.ReportingMonth == month && p.ReportingYear == year;
+
             var monthEnd = comingMidnight.Day == 1;
             var catchUp = false;
 
@@ -235,9 +242,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             {
                 plans = services.GetRequiredService<IEntityRepository<FacilityReportingPlan>>();
 
-                catchUp = !await plans.AnyAsync(
-                    p => p.FacilityId == facilityId && p.ReportingMonth == month && p.ReportingYear == year,
-                    cancellationToken);
+                catchUp = !await plans.AnyAsync(hasRowsForTheMonth, cancellationToken);
             }
 
             if (!monthEnd && !catchUp)
@@ -246,18 +251,15 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             }
 
             var sync = services.GetRequiredService<IDmrpReportingPlanSync>();
+            var refreshed = false;
 
-            for (var attempt = 1; attempt <= 2; attempt++)
+            for (var attempt = 1; attempt <= 2 && !refreshed; attempt++)
             {
                 try
                 {
                     await sync.SyncAsync(facilityId, month, year, cancellationToken);
 
-                    // Backfilled only if the refresh actually produced rows: an empty answer from
-                    // DMRP leaves nothing to announce, late or otherwise.
-                    return catchUp && await plans!.AnyAsync(
-                        p => p.FacilityId == facilityId && p.ReportingMonth == month && p.ReportingYear == year,
-                        cancellationToken);
+                    refreshed = true;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -265,7 +267,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 }
                 catch (Exception ex) when (attempt == 1)
                 {
-                    _logger.LogDebug(ex, "DMRP refresh for facility {FacilityId} ({Month}/{Year}) failed once; retrying.",
+                    _logger.LogInformation(ex, "DMRP refresh for facility {FacilityId} ({Month}/{Year}) failed once; retrying.",
                         facilityId.SanitizeForLog(), month, year);
                 }
                 catch (Exception ex)
@@ -279,7 +281,11 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 }
             }
 
-            return false;
+            // Outside the retry, deliberately: a database error confirming the rows is neither a DMRP
+            // call worth repeating nor a plan-refresh failure worth counting, and it belongs to the
+            // facility's own error handling. Backfilled only if the refresh actually produced rows -
+            // an empty answer from DMRP leaves nothing to announce, late or otherwise.
+            return refreshed && catchUp && await plans!.AnyAsync(hasRowsForTheMonth, cancellationToken);
         }
 
         private async Task ProduceAsync(IProducer<string, object> producer, string facilityId, ScheduledPeriod period,
@@ -310,6 +316,8 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             };
 
             await producer.ProduceAsync(KafkaTopic.ReportScheduled.ToString(), message, cancellationToken);
+
+            _metrics.RecordReportScheduled(facilityId, period.Frequency, dqms, startUtc, endUtc);
 
             _logger.LogInformation(
                 "Produced {Topic} for facility {FacilityId}: {Frequency} {StartDate} - {EndDate}, {DqmCount} dQM(s), tracking {TrackingId}",

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text;
 using Confluent.Kafka;
 using FluentAssertions;
 using LantanaGroup.Link.DMRP.Business;
@@ -34,13 +35,21 @@ public class DmrpNightlyJobTests
     private readonly Mock<IDmrpSchedulingMetrics> _metrics = new();
     private readonly Mock<IProducer<string, object>> _producer = new();
     private readonly List<Message<string, object>> _produced = [];
+    private readonly List<string> _topics = [];
     private readonly DmrpSettings _settings = new() { Enabled = true };
 
     public DmrpNightlyJobTests()
     {
         _producer
             .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, object>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, Message<string, object>, CancellationToken>((_, m, _) => { lock (_produced) { _produced.Add(m); } })
+            .Callback<string, Message<string, object>, CancellationToken>((topic, m, _) =>
+            {
+                lock (_produced)
+                {
+                    _topics.Add(topic);
+                    _produced.Add(m);
+                }
+            })
             .ReturnsAsync((DeliveryResult<string, object>)null!);
 
         // Default world: one facility, rows exist for every month, mapped to one daily dQM.
@@ -124,6 +133,21 @@ public class DmrpNightlyJobTests
         monthly.StartDate.Should().Be(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc));
         monthly.EndDate.Should().Be(new DateTime(2026, 12, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(-1));
         _produced.Should().OnlyContain(m => m.Key == "100");
+
+        // Everything downstream keys off these two halves agreeing: the Report service dedupes on the
+        // ReportTrackingId in the value, and every other service correlates on the header. The classic
+        // job writes one value into both, and so must this one.
+        _produced.Should().AllSatisfy(m =>
+            Encoding.ASCII.GetString(m.Headers.GetLastBytes("X-Correlation-Id"))
+                .Should().Be(((ReportScheduledMessage)m.Value).ReportTrackingId));
+
+        _topics.Should().OnlyContain(t => t == KafkaTopic.ReportScheduled.ToString()).And.HaveCount(2);
+
+        // One per produced event, the counterpart of the classic job's per-event counter.
+        _metrics.Verify(m => m.RecordReportScheduled("100", It.IsAny<string>(), It.IsAny<string[]>(),
+            It.IsAny<DateTime>(), It.IsAny<DateTime>()), Times.Exactly(2));
+        _metrics.Verify(m => m.RecordReportScheduled("100", ReportingPeriodMath.Monthly,
+            new[] { "NHSNdQMHTCDI" }, monthly.StartDate, monthly.EndDate), Times.Once);
     }
 
     [Fact]
