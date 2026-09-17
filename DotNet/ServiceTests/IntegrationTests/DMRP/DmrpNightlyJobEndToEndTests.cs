@@ -197,7 +197,9 @@ public class DmrpNightlyJobEndToEndTests : IAsyncLifetime
         var producer = new Mock<IProducer<string, object>>();
         producer
             .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, object>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, Message<string, object>, CancellationToken>((_, m, _) => _produced.Add(m))
+            // The job produces for its facilities concurrently, so this callback can run on several
+            // threads at once. List<T> is not safe under that.
+            .Callback<string, Message<string, object>, CancellationToken>((_, m, _) => { lock (_produced) { _produced.Add(m); } })
             .ReturnsAsync((DeliveryResult<string, object>)null!);
         var producerFactory = new Mock<IKafkaProducerFactory<string, object>>();
         producerFactory.Setup(f => f.CreateProducer(It.IsAny<ProducerConfig>(), null, null, true)).Returns(producer.Object);

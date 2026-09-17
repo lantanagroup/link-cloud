@@ -50,6 +50,50 @@ public class ReportingPeriodMathTests
         end.Should().Be(new DateTime(2026, 10, 15, 4, 59, 59, DateTimeKind.Utc));
     }
 
+    // The zone every one of these periods is really computed in: the fixed offset above cannot show
+    // what a DST boundary does to the length of a period.
+    private static readonly TimeZoneInfo Chicago = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+
+    /// <summary>
+    /// The day the clocks go back is 25 hours long. The period has to cover all of it, or the last
+    /// hour of the day is never reported on.
+    /// </summary>
+    [Fact]
+    public void Daily_covers_the_whole_of_a_twenty_five_hour_day()
+    {
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Daily,
+            new DateTime(2026, 11, 1), Chicago);
+
+        // Nov 1 2026 begins at 00:00 CDT (UTC-5) and ends at 23:59:59 CST (UTC-6).
+        start.Should().Be(new DateTime(2026, 11, 1, 5, 0, 0, DateTimeKind.Utc));
+        end.Should().Be(new DateTime(2026, 11, 2, 5, 59, 59, DateTimeKind.Utc));
+        (end - start).Should().Be(TimeSpan.FromHours(25).Subtract(TimeSpan.FromSeconds(1)));
+    }
+
+    /// <summary>The day the clocks go forward is 23 hours long, and the period must not claim 24.</summary>
+    [Fact]
+    public void Daily_covers_the_whole_of_a_twenty_three_hour_day()
+    {
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Daily,
+            new DateTime(2027, 3, 14), Chicago);
+
+        // Mar 14 2027 begins at 00:00 CST (UTC-6) and ends at 23:59:59 CDT (UTC-5).
+        start.Should().Be(new DateTime(2027, 3, 14, 6, 0, 0, DateTimeKind.Utc));
+        end.Should().Be(new DateTime(2027, 3, 15, 4, 59, 59, DateTimeKind.Utc));
+        (end - start).Should().Be(TimeSpan.FromHours(23).Subtract(TimeSpan.FromSeconds(1)));
+    }
+
+    /// <summary>A month containing a DST change starts and ends on different offsets.</summary>
+    [Fact]
+    public void Monthly_spans_a_month_that_changes_offset_part_way_through()
+    {
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Monthly,
+            new DateTime(2026, 11, 15, 9, 0, 0), Chicago);
+
+        start.Should().Be(new DateTime(2026, 11, 1, 5, 0, 0, DateTimeKind.Utc));
+        end.Should().Be(new DateTime(2026, 12, 1, 5, 59, 59, DateTimeKind.Utc));
+    }
+
     [Fact]
     public void An_unknown_frequency_is_refused()
     {
