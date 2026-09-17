@@ -22,6 +22,8 @@ COPY ["DotNet/Automation.UI/Automation.UI.csproj", "DotNet/Automation.UI/"]
 ARG FEED_ACCESSTOKEN
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     if [ -n "$FEED_ACCESSTOKEN" ]; then \
+      rm -rf /root/.nuget/packages/lantanagroup.thetis.generation.abstractions \
+             /root/.nuget/packages/lantanagroup.thetis.generation.engine; \
       dotnet nuget update source Shared_BOTW_Feed \
         --username docker \
         --password "$FEED_ACCESSTOKEN" \
@@ -44,7 +46,7 @@ WORKDIR "/src/DotNet/Automation.UI"
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     extra=""; \
     if [ "$BUILD_CONFIGURATION" = "Release" ]; then extra="/p:DebugType=None /p:DebugSymbols=false"; fi; \
-    dotnet publish "Automation.UI.csproj" -c "$BUILD_CONFIGURATION" -o /app/publish /p:UseAppHost=false $extra
+    dotnet publish "Automation.UI.csproj" -c "$BUILD_CONFIGURATION" -o /app/publish --no-restore /p:UseAppHost=false $extra
 
 FROM base AS final
 WORKDIR /app

@@ -311,9 +311,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ runner.os }}-nuget-v2-
+
+      # Drop any Thetis 1.0.0 that a previous run packed locally (NU1403 vs lock file).
+      - name: Drop cached Thetis packages
+        run: |
+          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
+                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
       # spend their per-test pull budget on the cold pull. Retry up to 3 times
