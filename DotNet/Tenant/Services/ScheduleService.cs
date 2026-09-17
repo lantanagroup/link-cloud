@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Extensions;
+﻿using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -7,6 +8,7 @@ using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
@@ -24,21 +26,41 @@ namespace LantanaGroup.Link.Tenant.Services
         private readonly ILogger<ScheduleService> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly bool _dmrpEnabled;
 
         public ScheduleService(
             ILogger<ScheduleService> logger,
             ISchedulerFactory schedulerFactory,
             IServiceScopeFactory serviceScopeFactory,
-            IJobFactory jobFactory)
+            IJobFactory jobFactory,
+            IOptions<DmrpSettings> dmrpSettings)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
             _scopeFactory = serviceScopeFactory;
+            _dmrpEnabled = dmrpSettings.Value.Enabled;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             _scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+
+            if (_dmrpEnabled)
+            {
+                // Scheduling is the DMRP nightly job's while the flag is on. Classic per-facility
+                // jobs left from before the flag would announce stale, snapshotted measure lists.
+                var classic = await _scheduler.GetJobKeys(
+                    GroupMatcher<JobKey>.GroupEquals(nameof(KafkaTopic.ReportScheduled)), cancellationToken);
+
+                if (classic.Count > 0)
+                {
+                    await _scheduler.DeleteJobs(classic, cancellationToken);
+                    _logger.LogInformation("DMRP is enabled; removed {Count} classic report job(s).", classic.Count);
+                }
+
+                await _scheduler.Start(cancellationToken);
+                return;
+            }
 
             using (var scope = _scopeFactory.CreateScope())
             {
@@ -65,6 +87,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             // Create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
@@ -86,6 +113,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task DeleteJobsForFacility(string facilityId, List<string>? frequencies = null, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             frequencies ??= new List<string> { MONTHLY, WEEKLY, DAILY };
 
             foreach (string frequency in frequencies)
@@ -116,6 +148,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task UpdateJobsForFacility(Facility updatedFacility, Facility existingFacility, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             List<string> frequencies = new List<string>();
 
             if (!updatedFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x).SequenceEqual(existingFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x)))
