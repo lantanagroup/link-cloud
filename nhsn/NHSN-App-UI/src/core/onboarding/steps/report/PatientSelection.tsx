@@ -261,7 +261,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
               </p>
             ) : (
               <>
-                <div className="report-patient-scroll">
+                <div className="report-patient-scroll" tabIndex={0}>
                   <table>
                     <thead>
                       <tr>
@@ -313,7 +313,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     return (
       <div className="report-selected-patients">
         <div className="section-title">{t('onboarding:report.patients.census.selectedTitle')}</div>
-        <div className="report-patient-scroll">
+        <div className="report-patient-scroll" tabIndex={0}>
           <table>
             <thead>
               <tr>

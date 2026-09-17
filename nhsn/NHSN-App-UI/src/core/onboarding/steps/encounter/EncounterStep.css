@@ -503,9 +503,10 @@
   background: #eaf2fc;
 }
 
-.encounter-mapping .encounter-row:focus-visible {
-  outline: 2px solid var(--encounter-blue);
-  outline-offset: -2px;
+.encounter-mapping .encounter-table-scroll:focus,
+.encounter-mapping .encounter-table-scroll:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
 }
 
 @container (max-width: 780px) {

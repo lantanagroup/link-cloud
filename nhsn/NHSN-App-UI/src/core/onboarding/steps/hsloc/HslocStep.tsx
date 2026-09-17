@@ -397,7 +397,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
               </p>
             </div>
 
-            <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll">
+            <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll" tabIndex={0}>
               <table className="nhsn-link__table nhsn-link__hsloc-table">
                 <thead>
                   <tr>
@@ -422,15 +422,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                         <tr
                           key={row.code}
                           className={`nhsn-link__hsloc-row${row.code === selectedCode ? ' nhsn-link__hsloc-row--selected' : ''}`}
-                          tabIndex={0}
-                          aria-selected={row.code === selectedCode}
-                          onClick={() => setSelectedCode(row.code)}
-                          onKeyDown={event => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              setSelectedCode(row.code);
-                            }
-                          }}>
+                          onClick={() => setSelectedCode(row.code)}>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.category}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.type}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.code}</td>
