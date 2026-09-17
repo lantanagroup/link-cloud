@@ -72,6 +72,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Shared_BOTW_Feed restore needs a PAT that is not set on this repo.
+      # Pack Thetis 1.0.0 from the private sibling so docker bake and
+      # BackendE2ETests restore from local-thetis-nupkgs/ instead.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Checkout Thetis
+        uses: actions/checkout@v5
+        with:
+          repository: lantanagroup/thetis
+          ref: main
+          path: .thetis
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
+          persist-credentials: false
+
+      - name: Pack Thetis 1.0.0 into local-thetis-nupkgs
+        run: bash Scripts/pack-thetis-local-nupkgs.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -156,13 +176,17 @@ jobs:
       # with "The process cannot access the file ... being used by another
       # process" (MSB4018). Building once and passing --no-build/--no-restore
       # to each parallel run avoids the contention.
-      - name: Authenticate Shared_BOTW_Feed
+      - name: Point Shared_BOTW_Feed at local Thetis nupkgs
         run: |
           dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
+            --source "${GITHUB_WORKSPACE}/local-thetis-nupkgs" \
             --configfile nuget.config
+          # Locally packed 1.0.0 does not match the feed package contentHash
+          # in packages.lock.json (NU1403). Directory.Packages.props still
+          # pins exact versions.
+          find . -name packages.lock.json -not -path './.thetis/*' -delete
+          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
+                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
 
       - name: Restore & build BackendE2ETests
         run: |
@@ -299,14 +323,6 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Authenticate Shared_BOTW_Feed
-        run: |
-          dotnet nuget update source Shared_BOTW_Feed \
-            --username az \
-            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
-            --store-password-in-clear-text \
-            --configfile nuget.config
-
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
@@ -314,6 +330,27 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+
+      - name: Checkout Thetis
+        uses: actions/checkout@v5
+        with:
+          repository: lantanagroup/thetis
+          ref: main
+          path: .thetis
+          token: ${{ secrets.THETIS_CHECKOUT_TOKEN }}
+          persist-credentials: false
+
+      - name: Pack Thetis 1.0.0 into local-thetis-nupkgs
+        run: bash Scripts/pack-thetis-local-nupkgs.sh
+
+      - name: Point Shared_BOTW_Feed at local Thetis nupkgs
+        run: |
+          dotnet nuget update source Shared_BOTW_Feed \
+            --source "${GITHUB_WORKSPACE}/local-thetis-nupkgs" \
+            --configfile nuget.config
+          find . -name packages.lock.json -not -path './.thetis/*' -delete
+          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
+                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
       # spend their per-test pull budget on the cold pull. Retry up to 3 times

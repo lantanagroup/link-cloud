@@ -439,3 +439,8 @@ Scripts/AzureAppConfig/config-key-inventory.json
 # A local clone of the private link-cac repository, if one is put here. The tooling defaults
 # to a sibling ../link-cac instead; override with LINK_CAC_CONFIG_DIR or --config-dir.
 .link-cac/
+
+# CI / local pack of Thetis 1.0.0 so restore can skip Shared_BOTW_Feed.
+.thetis/
+local-thetis-nupkgs/*.nupkg
+local-thetis-nupkgs/*.snupkg

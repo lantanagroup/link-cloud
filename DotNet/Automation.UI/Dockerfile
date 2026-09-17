@@ -12,6 +12,7 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 WORKDIR /src
 COPY ["Directory.Packages.props", "./"]
 COPY ["nuget.config", "./"]
+COPY ["local-thetis-nupkgs/", "local-thetis-nupkgs/"]
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
 COPY ["DotNet/LinkSdk/LinkSdk.csproj", "DotNet/LinkSdk/"]
@@ -21,12 +22,21 @@ COPY ["DotNet/Normalization.Engine/Normalization.Engine.csproj", "DotNet/Normali
 COPY ["DotNet/Automation.UI/Automation.UI.csproj", "DotNet/Automation.UI/"]
 ARG FEED_ACCESSTOKEN
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
-    if [ -n "$FEED_ACCESSTOKEN" ]; then \
+    if ls local-thetis-nupkgs/*.nupkg >/dev/null 2>&1; then \
+      echo "Using local Thetis nupkgs"; \
+      rm -rf /root/.nuget/packages/lantanagroup.thetis.generation.abstractions \
+             /root/.nuget/packages/lantanagroup.thetis.generation.engine; \
+      dotnet nuget update source Shared_BOTW_Feed \
+        --source /src/local-thetis-nupkgs \
+        --configfile nuget.config; \
+    elif [ -n "$FEED_ACCESSTOKEN" ]; then \
       dotnet nuget update source Shared_BOTW_Feed \
         --username docker \
         --password "$FEED_ACCESSTOKEN" \
         --store-password-in-clear-text \
         --configfile nuget.config; \
+    else \
+      echo "No local Thetis nupkgs and FEED_ACCESSTOKEN is empty; restore of LantanaGroup.Thetis.* will fail."; \
     fi; \
     dotnet restore "DotNet/Automation.UI/Automation.UI.csproj" /p:RestorePackagesWithLockFile=false
 

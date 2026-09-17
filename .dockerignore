@@ -4,6 +4,7 @@
 
 # Local / agent output
 artifacts/
+.thetis/
 TestResults/
 .tmp*/
 .tmp-*/

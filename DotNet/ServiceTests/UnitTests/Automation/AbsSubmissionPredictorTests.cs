@@ -4,7 +4,9 @@ using System.Text.RegularExpressions;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Automation;
 
@@ -248,7 +250,7 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
-    public void Generated_patients_across_seeds_match_cql_invariants_per_measure()
+    public async Task Generated_patients_across_seeds_match_cql_invariants_per_measure()
     {
         var failures = new List<string>();
         var (ids, sharedEntries, practitionerIds, medicationIds) = FhirBundleGenerator.BuildSharedResources();
@@ -261,15 +263,13 @@ public class AbsSubmissionPredictorTests
             List<Bundle.EntryComponent> entries;
             try
             {
-                entries = FhirBundleGenerator.GeneratePatientEntries(
+                entries = await GenerateThetisPatientEntriesAsync(
                     patientId,
                     ids,
                     practitionerIds,
                     medicationIds,
                     totalResourcesPerPatient: 220,
-                    seed: seed,
-                    clinicalPeriodStart: PeriodStart,
-                    clinicalPeriodEnd: PeriodEnd);
+                    seed: seed);
             }
             catch (Exception ex)
             {
@@ -308,17 +308,15 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
-    public void Same_generated_patient_predicted_counts_differ_by_measure_family()
+    public async Task Same_generated_patient_predicted_counts_differ_by_measure_family()
     {
         var (ids, sharedEntries, practitionerIds, medicationIds) = FhirBundleGenerator.BuildSharedResources();
         var sharedSim = AbsSubmissionPredictor.IndexEntries(sharedEntries);
         var patientId = ids.PatientId(0);
-        var entries = FhirBundleGenerator.GeneratePatientEntries(
+        var entries = await GenerateThetisPatientEntriesAsync(
             patientId, ids, practitionerIds, medicationIds,
             totalResourcesPerPatient: 400,
-            seed: 42,
-            clinicalPeriodStart: PeriodStart,
-            clinicalPeriodEnd: PeriodEnd);
+            seed: 42);
 
         var monthly = PredictGenerated(
             patientId, entries, sharedSim, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
@@ -799,6 +797,33 @@ public class AbsSubmissionPredictorTests
             failures.Add($"seed={seed} {ShortName(measure)} predicted zero ABS keys for a qualifying generated patient");
         if (!keys.Contains($"Patient/{patientId}"))
             failures.Add($"seed={seed} {ShortName(measure)} missing Patient/{patientId} in predicted ABS keys");
+    }
+
+    private static Task<List<Bundle.EntryComponent>> GenerateThetisPatientEntriesAsync(
+        string patientId,
+        FhirBundleGenerator.SharedIds ids,
+        List<string> practitionerIds,
+        List<string> medicationIds,
+        int totalResourcesPerPatient,
+        int seed)
+    {
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(
+                GeneratedPatientMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying)),
+            PatientIndex = 0,
+            BaseSeed = seed,
+            TotalResourcesPerPatient = totalResourcesPerPatient,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = GeneratedPatientMeasures,
+            ClinicalPeriodStart = PeriodStart,
+            ClinicalPeriodEnd = PeriodEnd,
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            PatientId = patientId
+        };
+        return ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
     }
 
     private static GenerationManifest PredictGenerated(
