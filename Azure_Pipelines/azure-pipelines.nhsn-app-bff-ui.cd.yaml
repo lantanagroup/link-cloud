@@ -5,10 +5,10 @@ resources:
     trigger: true
 
   repositories:
-    - repository: nhsnlink
-      type: git
-      name: nhsnlink
-      ref: refs/heads/main
+  - repository: nhsnlink
+    type: git
+    name: nhsnlink
+    ref: refs/heads/main
 
 trigger:
   branches:
@@ -19,7 +19,7 @@ trigger:
     - nhsn/NHSN-App-UI/*
     exclude:
     - '*'
-    
+
 pr: none
 
 pool:
@@ -27,95 +27,138 @@ pool:
 
 variables:
 - group: link-cloud-variables
+
 - name: project
   value: 'nhsn/NHSN-App-UI/NHSN-App-UI.esproj'
-- name: registry-repo-Name
+
+- name: registry-repo-name
   value: 'link-nhsn-app-bff-ui'
+
 - name: dockerPath
   value: '**/nhsn/NHSN-App-UI/Dockerfile'
+
 - name: workingDir
-  value: 'nhsn/NHSN-App-UI'
-  
+  value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI'
+
+- name: reactCorePackage
+  value: '$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz'
+
 steps:
 
-  - checkout: self
-    path: github
+- checkout: self
+  path: link-cloud
+  fetchDepth: 0
+  fetchTags: true
 
-  - checkout: nhsnlink
-    path: nhsnlink
+- checkout: nhsnlink
+  path: nhsnlink
+  fetchDepth: 0
+  fetchTags: true
 
-  - task: NodeTool@0
-    inputs:
-      versionSpec: '20.x'
-    displayName: 'Install Node.js'
+# =========================================================
+# Install Node.js
+# =========================================================
+- task: NodeTool@0
+  displayName: 'Install Node.js'
+  inputs:
+    versionSpec: '20.x'
 
-  - task: Bash@3
-    inputs:
-      targetType: 'inline'
-      script: |
-        GIT_COMMIT=$(git rev-parse --short HEAD)
-        echo "GIT_COMMIT: ${GIT_COMMIT}"
-        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-  - task: Bash@3
-    displayName: 'Find tarball'
-    inputs:
-      targetType: 'inline'
-      script: |
-        echo "Build.SourcesDirectory:"
-        echo "$(Build.SourcesDirectory)"
+# =========================================================
+# Verify repository files
+# =========================================================
+- task: Bash@3
+  displayName: 'Verify Repository Files'
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "GitHub repo:"
+      ls -lah "$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI"
 
-        echo ""
-        echo "Contents of source directory:"
-        find "$(Build.SourcesDirectory)" -maxdepth 5 -type f -name "*.tgz" -print
+      echo
+      echo "React Core package:"
+      ls -lah "$(reactCorePackage)"
 
-        echo ""
-        echo "Looking specifically for nhsn-react-core:"
-        find "$(Build.SourcesDirectory)" -type f -name "nhsn-react-core-2.4.1.tgz" -print
+# =========================================================
+# Get Git commit
+# =========================================================
+- task: Bash@3
+  displayName: 'Get Git Commit'
+  inputs:
+    targetType: 'inline'
+    script: |
+      cd "$(Build.SourcesDirectory)"
 
-  - task: Npm@1  
-    displayName: 'npm install'  
-    inputs:
-      command: custom  
-      # workingDir: $(workingDir)
-      workingDir: '$(Build.SourcesDirectory)/nhsn/NHSN-App-UI'
-      customCommand: 'install /home/vsts/work/1/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz'
-      
-  - task: Npm@1  
-    displayName: Build  
-    inputs: 
-      command: custom  
-      verbose: false 
-      workingDir: $(workingDir)
-      customCommand: 'run build'
-  
-  - task: PowerShell@2
-    inputs:
-      targetType: 'inline'
-      script: |
-        if ("$(Build.SourceBranch)" -like "*release/*") {
+      GIT_COMMIT=$(git rev-parse --short HEAD)
+
+      echo "GIT_COMMIT: ${GIT_COMMIT}"
+
+      echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+
+# =========================================================
+# Install NPM dependencies
+# =========================================================
+- task: Npm@1
+  displayName: 'npm install'
+  inputs:
+    command: 'custom'
+    workingDir: '$(workingDir)'
+    customCommand: 'install $(reactCorePackage)'
+
+# =========================================================
+# Build NHSN App UI
+# =========================================================
+- task: Npm@1
+  displayName: 'Build NHSN App UI'
+  inputs:
+    command: 'custom'
+    workingDir: '$(workingDir)'
+    customCommand: 'run build'
+    verbose: false
+
+
+# =========================================================
+# Generate Docker image tag
+# =========================================================
+- task: PowerShell@2
+  displayName: 'Generate Docker Image Tag'
+  inputs:
+    targetType: 'inline'
+    script: |
+      if ("$(Build.SourceBranch)" -like "*release/*") {
         $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
-        }
-        else { 
+      }
+      else {
         $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
-        }
-        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
-        Write-Host "Set MyTag to: $myTag1"
+      }
 
-  - task: Docker@2
-    displayName: "Build & Push NHSN-App-UI Docker Image"
-    condition: always()
-    inputs:
-      containerRegistry: $(containerRegistry) # Variable Group
-      repository: $(registry-repo-name)
-      command: 'buildAndPush'
-      Dockerfile: $(dockerPath)
-      tags: |
-        latest
-        $(MyTag)
-      buildContext: '$(Build.Repository.LocalPath)'
+      Write-Host "Docker image tag: $myTag1"
 
-  - task: PublishPipelineArtifact@1
-    inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)'
-      artifact: 'manifest'
+      Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+
+
+# =========================================================
+# Build and Push Docker Image
+# =========================================================
+- task: Docker@2
+  displayName: 'Build & Push NHSN-App-UI Docker Image'
+  inputs:
+    containerRegistry: '$(containerRegistry)'
+    repository: '$(registry-repo-name)'
+    command: 'buildAndPush'
+    Dockerfile: '$(dockerPath)'
+    buildContext: '$(Build.SourcesDirectory)'
+    tags: |
+      latest
+      $(MyTag)
+
+
+# =========================================================
+# Publish Artifact
+# =========================================================
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish Manifest Artifact'
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)'
+    artifact: 'manifest'
