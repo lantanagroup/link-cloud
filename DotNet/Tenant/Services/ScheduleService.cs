@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
@@ -14,9 +15,9 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public class ScheduleService : IHostedService
     {
-        public const string MONTHLY = "Monthly";
-        public const string WEEKLY = "Weekly";
-        public const string DAILY = "Daily";
+        public const string MONTHLY = ReportingPeriodMath.Monthly;
+        public const string WEEKLY = ReportingPeriodMath.Weekly;
+        public const string DAILY = ReportingPeriodMath.Daily;
 
         private IScheduler? _scheduler;
 
