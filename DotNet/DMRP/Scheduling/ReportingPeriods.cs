@@ -13,14 +13,29 @@ namespace LantanaGroup.Link.DMRP.Scheduling
     public static class ReportingPeriods
     {
         /// <summary>
-        /// The local midnight following the scheduled fire. Derived from the scheduled time rather
-        /// than the clock so a fire recovered late still names the periods it was scheduled for.
+        /// The local midnight the fire announces: normally the one following it, and the one it has
+        /// already passed when the fire is a late recovery of the previous night's.
         /// </summary>
-        public static DateTime ComingMidnight(DateTimeOffset scheduledFireUtc, TimeZoneInfo timeZone)
+        /// <remarks>
+        /// The trigger's misfire policy is FireOnceNow, which Quartz implements by moving the
+        /// trigger's next fire time to the recovery instant - so on a recovered fire the scheduled
+        /// time is when the pod came back, not the 23:59 that was missed, and taking the day after it
+        /// would skip a night and announce the wrong periods. <paramref name="nominalLocalTime"/> is
+        /// the time of day the cron actually fires at: a fire landing earlier in the local day than
+        /// that can only be a recovery, and the midnight it was meant to announce is the one that has
+        /// just passed. Null when the cron fires at more than one time of day, which leaves nothing to
+        /// compare and the fire taken at face value.
+        /// </remarks>
+        public static DateTime ComingMidnight(DateTimeOffset scheduledFireUtc, TimeZoneInfo timeZone,
+            TimeSpan? nominalLocalTime)
         {
             ArgumentNullException.ThrowIfNull(timeZone);
 
-            return TimeZoneInfo.ConvertTime(scheduledFireUtc, timeZone).Date.AddDays(1);
+            var local = TimeZoneInfo.ConvertTime(scheduledFireUtc, timeZone);
+
+            return nominalLocalTime is { } nominal && local.TimeOfDay < nominal
+                ? local.Date
+                : local.Date.AddDays(1);
         }
 
         /// <summary>Daily always; Monthly when the midnight is the first of a month.</summary>

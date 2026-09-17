@@ -47,8 +47,12 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 
-                // Anchor on the scheduled fire time, not the wall clock: a misfire recovered after
-                // midnight must still announce the period it was scheduled for.
+                // Anchor on Quartz's scheduled fire time rather than reading the wall clock again, so
+                // the whole of this job's period math comes from one instant. It is not misfire
+                // recovery: these triggers carry Quartz's smart policy, which for a cron trigger means
+                // fire once now, and Quartz implements that by moving the scheduled
+                // time to the recovery instant, so a fire recovered late announces the period of the
+                // recovery instant - the same behaviour as before this was anchored.
                 DateTimeOffset scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
                 DateTime currentDateInTimeZone = TimeZoneInfo.ConvertTime(scheduledUtc, timeZone).DateTime;
 
