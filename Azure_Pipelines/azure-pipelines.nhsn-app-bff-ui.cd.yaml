@@ -91,8 +91,7 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/nhsn-react-core-2.4.1.tgz"
-
+      cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/"
 # # Install NPM dependencies
 # - task: Npm@1
 #   displayName: 'npm install'
