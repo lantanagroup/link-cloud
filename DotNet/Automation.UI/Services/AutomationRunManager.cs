@@ -150,22 +150,24 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // â”€â”€ Path 1: zombie run (exists in the store but no in-memory state) â”€â”€â”€â”€â”€â”€â”€â”€
-        // _runs is lost on every app restart, so any run that was Running when the
-        // previous process died is a zombie: still flagged Running in Mongo, but
-        // with no execution task to signal. Returning false here was the reason the
-        // UI's Cancel button appeared to do nothing after a docker restart.
+        // Path 1: zombie run (exists in the store but no in-memory state).
+        // _runs is lost on every app restart, so a run that was Running when the
+        // previous process died is still flagged Running in Mongo with no execution
+        // task to signal.
         if (!_runs.TryGetValue(runId, out var state))
             return await CancelZombieRunAsync(runId, cancellationToken);
+
+        if (state.Status == AutomationRunStatus.Cancelled)
+            return true;
 
         if (!state.Status.IsCancellable())
             return false;
 
-        // â”€â”€ Path 2: live in-process run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Path 2: live in-process run.
         // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
         // PersistRunSummaryAsync internally, so the row is marked Cancelled in Mongo
-        // before we return â€” the UI will see the updated status on its next refresh
-        // regardless of how long cleanup takes.
+        // before we return — the UI will see the updated status on its next refresh
+        // regardless of how long abort/cleanup takes.
         state.CancelRequested = true;
         state.Status = AutomationRunStatus.Cancelled;
         state.Error = "Cancelled by user.";
@@ -182,28 +184,30 @@ public class AutomationRunManager : IAutomationRunManager
             // best effort
         }
 
-        // Run the downstream cleanup workflow (FHIR purge, config teardown, report
-        // soft-delete) as a background task. Holding the HTTP request for 10s + N
-        // cross-service calls is what made Cancel feel hung to users; the run is
-        // already marked Cancelled at this point, so the UI doesn't need to wait.
-        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(state));
+        QueueCancellationCleanup(
+            runId,
+            state.FacilityId,
+            state.ReportId,
+            state.FhirDataLoader,
+            state.ExecutionTask,
+            message => WriteLog(state, message));
 
         return true;
     }
 
     /// <summary>
     /// Cancels a run whose in-memory state no longer exists in this process.
-    /// Writes a minimal Cancelled summary directly through the snapshot store so
-    /// the dashboard updates correctly and the orchestrator stops polling.
-    /// Cleanup of downstream service state isn't attempted here because the facility
-    /// and report IDs captured on the persisted summary are the only handles we have
-    /// and may be missing if the run died before they were assigned.
+    /// Marks Cancelled immediately, then queues the same abort/quiesce/FHIR
+    /// cleanup as a live cancel. Downstream failures must not fail the HTTP cancel.
     /// </summary>
     private async Task<bool> CancelZombieRunAsync(Guid runId, CancellationToken cancellationToken)
     {
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
         if (summary == null)
             return false;
+
+        if (summary.Status == AutomationRunStatus.Cancelled)
+            return true;
 
         if (!summary.Status.IsCancellable())
             return false;
@@ -219,38 +223,55 @@ public class AutomationRunManager : IAutomationRunManager
         await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
         await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
 
-        try
-        {
-            var leftoverCleanup = _hostServices.GetService<LeftoverRunCleanupService>();
-            if (leftoverCleanup != null)
-                await leftoverCleanup.QuiesceFacilityAsync(summary.FacilityId, summary.ReportId, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Zombie-run quiesce failed for {RunId} facility {FacilityId}.", runId, summary.FacilityId.SanitizeForLog());
-            throw;
-        }
+        QueueCancellationCleanup(
+            runId,
+            summary.FacilityId,
+            summary.ReportId,
+            fhirDataLoader: null,
+            executionTask: null,
+            writeLog: null);
 
         _logger.LogInformation(
-            "Cancelled zombie run {RunId}. Pipeline quiesced for facility {FacilityId}; resting data remains until teardown retention.",
+            "Cancelled zombie run {RunId}. Abort/quiesce queued for facility {FacilityId}.",
             runId, summary.FacilityId.SanitizeForLog());
 
         return true;
     }
 
-    private async Task CleanupCancelledRunInBackgroundAsync(MutableRunState state)
+    private void QueueCancellationCleanup(
+        Guid runId,
+        string? facilityId,
+        string? reportId,
+        FhirDataLoader? fhirDataLoader,
+        Task? executionTask,
+        Action<string>? writeLog)
+    {
+        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(
+            runId, facilityId, reportId, fhirDataLoader, executionTask, writeLog));
+    }
+
+    private async Task CleanupCancelledRunInBackgroundAsync(
+        Guid runId,
+        string? facilityId,
+        string? reportId,
+        FhirDataLoader? fhirDataLoader,
+        Task? executionTask,
+        Action<string>? writeLog)
     {
         try
         {
-            if (state.ExecutionTask != null)
+            if (executionTask != null)
             {
                 // Let the running pipeline observe the cancellation token and unwind
                 // cleanly before we start clawing back its outputs.
-                await Task.WhenAny(state.ExecutionTask, Task.Delay(TimeSpan.FromSeconds(10)));
+                await Task.WhenAny(executionTask, Task.Delay(TimeSpan.FromSeconds(10)));
             }
 
-            var output = new RunAutomationOutput(message => WriteLog(state, message));
-            output.WriteLine("Cancellation requested. Running cancellation cleanup workflow...");
+            IAutomationOutput output = writeLog != null
+                ? new RunAutomationOutput(writeLog)
+                : new RunAutomationOutput(message =>
+                    _logger.LogInformation("Cancel cleanup {RunId}: {Message}", runId, message));
+            output.WriteLine("Cancellation requested. Aborting pipeline work for this facility...");
 
             using var scope = _hostServices.CreateScope();
             var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
@@ -262,7 +283,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? (await settingsStore.GetEffectiveAsync(CancellationToken.None)).AbortTtl
                 : scope.ServiceProvider.GetService<IOptions<LeftoverRunCleanupOptions>>()?.Value.AbortTtl
                   ?? TimeSpan.FromDays(14);
-            var fhirDataLoader = state.FhirDataLoader
+            var loader = fhirDataLoader
                 ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
@@ -270,24 +291,21 @@ public class AutomationRunManager : IAutomationRunManager
                 censusClient,
                 reportClient,
                 abortRegistry,
-                fhirDataLoader,
+                loader,
                 output,
-                state.FacilityId,
-                state.ReportId,
+                facilityId,
+                reportId,
                 abortTtl,
                 CancellationToken.None);
 
-            await _orchestrator.CompleteRunAsync(state.RunId);
-            await PersistRunSummaryAsync(state);
+            await _orchestrator.CompleteRunAsync(runId);
             output.WriteLine("Cancellation cleanup complete.");
         }
         catch (Exception ex)
         {
-            // A failure in background cleanup must never crash the host. The run is
-            // already marked Cancelled in the store from BroadcastStatus above; this
-            // only affects downstream service state that an operator may need to
-            // inspect/clean up manually.
-            _logger.LogError(ex, "Background cancellation cleanup failed for run {RunId}.", state.RunId);
+            // A failure in background cleanup must never fail Cancel or crash the host.
+            // The run is already marked Cancelled; leftover work can be retried from Cleanup.
+            _logger.LogError(ex, "Background cancellation cleanup failed for run {RunId}.", runId);
         }
     }
 

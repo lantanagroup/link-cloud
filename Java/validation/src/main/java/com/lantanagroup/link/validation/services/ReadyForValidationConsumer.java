@@ -84,7 +84,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     @Override
     protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
-        _logger.debug("Processing {} message for facility {}, patient {}, report {}",
+        _logger.info("Processing {} message for facility {}, patient {}, report {}",
                 LogUtils.sanitize(record.topic()),
                 LogUtils.sanitize(record.key().getFacilityId()),
                 LogUtils.sanitize(record.value().getPatientId()),
@@ -198,7 +198,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
 
         try (Timer timer = Timer.start()) {
             results = validationService.validate(bundle);
-            _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
+            _logger.info("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
 
             attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
             validationMetrics.addToValidationCounter(attributes);
@@ -211,7 +211,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             result.setReportId(reportId);
         }
 
-        try (Timer timer = Timer.start()) {
+        try (Timer timer = Timer.start();
+             ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
+                     _logger, "categorizing " + results.size() + " results")) {
             categorizationService.categorize(results);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
@@ -220,7 +222,11 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                         && result.getCategories().stream().anyMatch(Category::isSubmit))
                 .toList();
         if (!submittedResults.isEmpty()) {
-            resultRepository.saveAll(submittedResults);
+            _logger.info("Persisting {} submitted validation results", submittedResults.size());
+            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
+                    _logger, "persisting " + submittedResults.size() + " results")) {
+                resultRepository.saveAll(submittedResults);
+            }
         }
         return results;
     }

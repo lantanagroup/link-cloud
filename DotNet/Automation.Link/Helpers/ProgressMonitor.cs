@@ -127,15 +127,16 @@ public class ProgressMonitor
             _lastNormalizationActivity = normalizationActivity;
         }
 
-        // Validation activity is meaningful only after acquisition has produced work for downstream services.
-        if (_lastAcqLogCount <= 0)
-            return;
-
         var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
-        if (!string.IsNullOrWhiteSpace(validationActivity) && !string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
+        if (!string.IsNullOrWhiteSpace(validationActivity))
         {
-            _output.WriteLine($"[DIAG][Validation] Active: {validationActivity}");
-            _lastValidationActivity = validationActivity;
+            _acquisitionActivity.MarkProgress(DateTime.UtcNow);
+            _progressTracker?.NoteActivity();
+            if (!string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
+            {
+                _output.WriteLine($"[DIAG][Validation] Active: {validationActivity}");
+                _lastValidationActivity = validationActivity;
+            }
         }
     }
 

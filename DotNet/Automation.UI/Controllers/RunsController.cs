@@ -256,8 +256,19 @@ public class RunsController(
         if (request?.Id == null || request.Id == Guid.Empty)
             return BadRequest(new { success = false, error = "Missing run ID" });
 
-        var cancelled = await runManager.CancelRunAsync(request.Id, cancellationToken);
-        return Ok(new { success = cancelled });
+        try
+        {
+            var cancelled = await runManager.CancelRunAsync(request.Id, cancellationToken);
+            if (cancelled)
+                return Ok(new { success = true });
+
+            return Ok(new { success = false, error = "This run is not running." });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cancel failed for run {RunId}.", request.Id);
+            return Ok(new { success = false, error = "Cancel could not be completed. Refresh the page and check the run status." });
+        }
     }
 
     [HttpPost]

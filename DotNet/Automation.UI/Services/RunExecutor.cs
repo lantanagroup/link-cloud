@@ -790,7 +790,7 @@ internal sealed class RunExecutor
                 pipelineReader: services.GetRequiredService<PipelineDataReader>()))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics, cancellationToken);
                 await diagnostics.StopAsync();
 
                 if (!submitted)
@@ -897,7 +897,7 @@ internal sealed class RunExecutor
                     expectsDataAcquisition: false);
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics, cancellationToken);
                 await regenDiagnostics.StopAsync();
 
                 if (!regenSubmitted)
