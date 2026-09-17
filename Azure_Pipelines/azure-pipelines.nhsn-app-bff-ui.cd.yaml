@@ -35,7 +35,7 @@ variables:
   value: 'link-nhsn-app-bff-ui'
 
 - name: dockerPath
-  value: '$(Build.SourcesDirectory)/link-cloud/nhsn/NHSN-App-UI/Dockerfile'
+  value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI/Dockerfile'
 
 - name: workingDir
   value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI'
