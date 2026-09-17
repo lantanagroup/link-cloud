@@ -58,6 +58,12 @@ namespace LantanaGroup.Link.Tenant.Services
                     _logger.LogInformation("DMRP is enabled; removed {Count} classic report job(s).", classic.Count);
                 }
 
+                // This service is the only place the shared Quartz scheduler is started, and StopAsync
+                // the only place it is shut down - with the flag on as well as off. It has to be:
+                // starting it any earlier, in the DMRP module's hosted service for instance, would let
+                // the classic jobs just deleted above fire against snapshotted measure lists in the
+                // window before the delete. Moving Start/Shutdown into DmrpNightlyScheduleHostedService
+                // means moving this cleanup there with it.
                 await _scheduler.Start(cancellationToken);
                 return;
             }
@@ -77,6 +83,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 }
             }
 
+            // As above: the one place the shared scheduler is started, whichever branch got here.
             await _scheduler.Start(cancellationToken);
         }
 

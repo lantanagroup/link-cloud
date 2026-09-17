@@ -9,13 +9,13 @@ using LantanaGroup.Link.Tenant.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
+using ServiceTests.TestHelpers;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Tenant;
@@ -32,12 +32,7 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
         _connection.Open();
 
         var services = new ServiceCollection();
-        // A shared, externally-owned factory: Quartz's static LogProvider caches whatever
-        // ILoggerFactory the first AddQuartz call in the process resolves, so a per-test factory
-        // that this container disposes leaves later tests constructing loggers against a disposed
-        // instance. NullLoggerFactory.Instance is never disposed by the container because it is
-        // supplied, not created.
-        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddQuartzTestLogging();
         services.RegisterQuartzDatabaseInTest();
         // StartAsync with DMRP off enumerates facilities through TenantDbContext; an empty one is enough.
         services.AddDbContext<TenantDbContext>(o => o.UseSqlite(_connection));

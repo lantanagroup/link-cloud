@@ -16,7 +16,10 @@ namespace LantanaGroup.Link.DMRP.Scheduling
         /// <summary>Idempotent. Creates the zone's job if missing; reschedules if the cron changed.</summary>
         Task EnsureZoneJobAsync(string timeZoneId, CancellationToken cancellationToken = default);
 
-        /// <summary>Ensure every zone facilities use; delete jobs for zones none use.</summary>
+        /// <summary>
+        /// Ensure every zone facilities use; delete jobs for zones none use. A directory that names
+        /// no zones at all leaves the existing jobs alone - see the implementation.
+        /// </summary>
         Task ReconcileAllAsync(CancellationToken cancellationToken = default);
 
         /// <summary>Delete every zone job. Run when DMRP is turned off.</summary>
@@ -118,6 +121,20 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
             var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
             var existing = await scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals(JobGroup), cancellationToken);
+
+            if (wanted.Count == 0 && existing.Count > 0)
+            {
+                // A directory read that came back empty for a transient reason would otherwise
+                // unschedule the whole fleet, and nothing would put it back until someone saved a
+                // facility. Zero zones next to jobs that exist is far more likely a failed read than
+                // every facility being deleted at once, and the orphan sweep is only ever a tidy-up:
+                // a zone job no facility uses produces nothing when it fires. Keep them and say so.
+                _logger.LogWarning(
+                    "The facility directory named no timezones while {Count} DMRP nightly job(s) exist; keeping them rather than unscheduling the fleet on what may be a failed read.",
+                    existing.Count);
+
+                return;
+            }
 
             foreach (var orphan in existing.Where(k => !wanted.Contains(k.Name, StringComparer.Ordinal)))
             {

@@ -3,12 +3,12 @@ using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
 using Quartz.Impl.Matchers;
+using ServiceTests.TestHelpers;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DMRP;
@@ -24,13 +24,7 @@ public class DmrpNightlyJobReconcilerTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var services = new ServiceCollection();
-        // A disposable ILoggerFactory from AddLogging() gets torn down by this test's DisposeAsync,
-        // but Quartz's logging bridge holds a process-wide static reference to whichever factory the
-        // first Quartz scheduler in the process was built with. A later test's scheduler creation
-        // then throws ObjectDisposedException reaching through that stale reference. NullLoggerFactory
-        // is a shared instance whose Dispose() is a no-op, so it satisfies Quartz's requirement for an
-        // ILoggerFactory without that cross-test hazard.
-        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddQuartzTestLogging();
         services.RegisterQuartzDatabaseInTest();
         services.AddScoped(_ => _directory.Object);
         _provider = services.BuildServiceProvider();
@@ -110,6 +104,24 @@ public class DmrpNightlyJobReconcilerTests : IAsyncLifetime
         await reconciler.ReconcileAllAsync();
 
         (await ZoneJobs()).Select(k => k.Name).Should().BeEquivalentTo(["America/Chicago", "America/New_York"]);
+    }
+
+    /// <summary>
+    /// A directory read that comes back empty for a transient reason must not unschedule the fleet.
+    /// Zero zones next to jobs that exist is far more likely a failed read than every facility in the
+    /// estate being deleted at once, and the sweep is only ever a tidy-up: a zone job with no
+    /// facilities produces nothing when it fires.
+    /// </summary>
+    [Fact]
+    public async Task Reconcile_all_keeps_the_zone_jobs_when_the_directory_returns_nothing()
+    {
+        var reconciler = CreateReconciler();
+        await reconciler.EnsureZoneJobAsync("America/Chicago");
+
+        Zones();
+        await reconciler.ReconcileAllAsync();
+
+        (await ZoneJobs()).Select(k => k.Name).Should().BeEquivalentTo(["America/Chicago"]);
     }
 
     [Fact]
