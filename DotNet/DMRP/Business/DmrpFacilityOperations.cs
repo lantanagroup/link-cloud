@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.DMRP.Business
         /// </summary>
         private readonly IEntityRepository<FacilityReportingPlan> _reportingPlanRepository;
 
-        private readonly TimeProvider _timeProvider;
+        private readonly IFacilityReportingPeriodResolver _facilityReportingPeriodResolver;
 
         public DmrpFacilityOperations(ILogger<DmrpFacilityOperations> logger,
             IFacilityOperations hostImplementation,
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.DMRP.Business
             IReportingPlanScheduleProjector scheduleProjector,
             IFacilityReportingPlanManager reportingPlanManager,
             IEntityRepository<FacilityReportingPlan> reportingPlanRepository,
-            TimeProvider timeProvider)
+            IFacilityReportingPeriodResolver facilityReportingPeriodResolver)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hostImplementation = hostImplementation ?? throw new ArgumentNullException(nameof(hostImplementation));
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.DMRP.Business
             _scheduleProjector = scheduleProjector ?? throw new ArgumentNullException(nameof(scheduleProjector));
             _reportingPlanManager = reportingPlanManager ?? throw new ArgumentNullException(nameof(reportingPlanManager));
             _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
-            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            _facilityReportingPeriodResolver = facilityReportingPeriodResolver ?? throw new ArgumentNullException(nameof(facilityReportingPeriodResolver));
         }
 
         public async Task CreateAsync(FacilityModel facility, CancellationToken cancellationToken = default)
@@ -164,15 +164,15 @@ namespace LantanaGroup.Link.DMRP.Business
                 return EmptySchedule();
             }
 
-            var (month, year) = CurrentPeriod(facility);
+            var reportingPeriod = _facilityReportingPeriodResolver.Resolve(facilityId, facility.TimeZone);
 
-            var entries = await _reportingPlans.GetForPeriodAsync(facilityId, month, year, cancellationToken);
+            var entries = await _reportingPlans.GetForPeriodAsync(facilityId, reportingPeriod.Month, reportingPeriod.Year, cancellationToken);
 
             if (entries.Count == 0)
             {
                 _logger.LogInformation(
                     "Facility {FacilityId} has no reporting plans for {Month}/{Year}; it is scheduled for no reports.",
-                    facilityId.SanitizeForLog(), month, year);
+                    facilityId.SanitizeForLog(), reportingPeriod.Month, reportingPeriod.Year);
 
                 return EmptySchedule();
             }
@@ -180,40 +180,7 @@ namespace LantanaGroup.Link.DMRP.Business
             // The same derivation the facility-facing look-ahead runs. Shared rather than repeated:
             // a facility told it will report something Link is not going to run is worse than a
             // facility told nothing.
-            return _scheduleProjector.Project(entries, facilityId, new ReportingPeriod(year, month));
-        }
-
-        /// <summary>
-        /// The reporting period the facility is currently in, read in its own timezone so a facility
-        /// near a month boundary is scheduled against the month it is actually in.
-        /// </summary>
-        private (int Month, int Year) CurrentPeriod(FacilityModel facility)
-        {
-            var utcNow = _timeProvider.GetUtcNow();
-
-            if (string.IsNullOrWhiteSpace(facility.TimeZone))
-            {
-                return (utcNow.Month, utcNow.Year);
-            }
-
-            try
-            {
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
-                var localNow = TimeZoneInfo.ConvertTime(utcNow, timeZone);
-
-                return (localNow.Month, localNow.Year);
-            }
-            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-            {
-                // The host validates the timezone and answers with a message naming it. Falling back
-                // to UTC here lets the request reach that validation rather than failing first with an
-                // error about reporting periods.
-                _logger.LogWarning(ex,
-                    "Facility {FacilityId} has an unusable timezone; the reporting period was read in UTC instead.",
-                    facility.FacilityId?.SanitizeForLog());
-
-                return (utcNow.Month, utcNow.Year);
-            }
+            return _scheduleProjector.Project(entries, facilityId, reportingPeriod);
         }
 
         /// <summary>
