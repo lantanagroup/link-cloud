@@ -40,7 +40,7 @@ public class DmrpNightlyJobTests
     {
         _producer
             .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<string, object>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, Message<string, object>, CancellationToken>((_, m, _) => _produced.Add(m))
+            .Callback<string, Message<string, object>, CancellationToken>((_, m, _) => { lock (_produced) { _produced.Add(m); } })
             .ReturnsAsync((DeliveryResult<string, object>)null!);
 
         // Default world: one facility, rows exist for every month, mapped to one daily dQM.
