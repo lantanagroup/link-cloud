@@ -98,7 +98,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
         _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
-                bundle != null ? bundle.getEntry().size() : 0, facilityId, reportId);
+                bundle != null ? bundle.getEntry().size() : 0,
+                LogUtils.sanitize(facilityId),
+                LogUtils.sanitize(reportId));
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
@@ -224,7 +226,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                 .toList();
         if (!submittedResults.isEmpty()) {
             _logger.info("Persisting {} submitted validation results facility={} report={}",
-                    submittedResults.size(), facilityId, reportId);
+                    submittedResults.size(),
+                    LogUtils.sanitize(facilityId),
+                    LogUtils.sanitize(reportId));
             try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
                     _logger, "persisting " + submittedResults.size() + " results", facilityId, reportId)) {
                 resultRepository.saveAll(submittedResults);

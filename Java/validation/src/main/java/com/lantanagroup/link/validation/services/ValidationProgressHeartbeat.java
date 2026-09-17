@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.concurrent.Executors;
@@ -50,10 +51,12 @@ public final class ValidationProgressHeartbeat implements AutoCloseable {
 
     static String format(String detail, String facilityId, String reportId, long elapsedSeconds) {
         StringBuilder line = new StringBuilder(LOG_TOKEN).append(": ").append(detail);
-        if (facilityId != null && !facilityId.isBlank())
-            line.append(" facility=").append(facilityId);
-        if (reportId != null && !reportId.isBlank())
-            line.append(" report=").append(reportId);
+        String safeFacility = LogUtils.sanitize(facilityId);
+        String safeReport = LogUtils.sanitize(reportId);
+        if (safeFacility != null && !safeFacility.isBlank())
+            line.append(" facility=").append(safeFacility);
+        if (safeReport != null && !safeReport.isBlank())
+            line.append(" report=").append(safeReport);
         line.append(" (elapsed ").append(elapsedSeconds).append("s)");
         return line.toString();
     }

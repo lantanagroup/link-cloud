@@ -5,6 +5,7 @@ import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
@@ -93,7 +94,9 @@ public class ValidationService {
             if (resource instanceof Bundle bundle) {
                 detail = "FHIR bundle " + bundle.getEntry().size() + " entries";
                 logger.info("Starting validation of Bundle with {} entries facility={} report={}",
-                        bundle.getEntry().size(), facilityId, reportId);
+                        bundle.getEntry().size(),
+                        LogUtils.sanitize(facilityId),
+                        LogUtils.sanitize(reportId));
             }
             ValidationResult validationResult;
             try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail, facilityId, reportId)) {

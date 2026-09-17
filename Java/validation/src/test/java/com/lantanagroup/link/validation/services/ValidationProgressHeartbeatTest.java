@@ -21,4 +21,16 @@ class ValidationProgressHeartbeatTest {
                 "validation still in progress: FHIR bundle 11781 entries facility=fac-1 report=rep-1 (elapsed 90s)",
                 scoped);
     }
+
+    @Test
+    void format_replaces_control_characters_in_ids() {
+        String line = ValidationProgressHeartbeat.format(
+                "FHIR bundle 1 entries",
+                "fac\n1",
+                "rep\r2",
+                1);
+        assertEquals(
+                "validation still in progress: FHIR bundle 1 entries facility=fac 1 report=rep 2 (elapsed 1s)",
+                line);
+    }
 }

@@ -1214,11 +1214,14 @@ internal sealed class RunExecutor
                 facilityId,
                 reportId);
 
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-                throw new OperationCanceledException("Run was cancelled.");
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
 
-            state.Status = AutomationRunStatus.Succeeded;
-            state.FinishedAt = DateTimeOffset.UtcNow;
+                state.Status = AutomationRunStatus.Succeeded;
+                state.FinishedAt = DateTimeOffset.UtcNow;
+            }
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
@@ -1229,16 +1232,25 @@ internal sealed class RunExecutor
         }
         catch (Exception ex)
         {
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+            bool cancelledAfterFault;
+            lock (state.Sync)
+            {
+                cancelledAfterFault = state.CancelRequested || state.Status == AutomationRunStatus.Cancelled;
+                if (!cancelledAfterFault)
+                {
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                }
+            }
+
+            if (cancelledAfterFault)
             {
                 _logger.LogInformation(ex, "Run {RunId} faulted after cancel request: {ExceptionType}", state.RunId, ex.GetType().Name);
                 return;
             }
 
             _logger.LogError(ex, "Run {RunId} failed", state.RunId);
-            state.Status = AutomationRunStatus.Failed;
-            state.Error = ex.Message;
-            state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");

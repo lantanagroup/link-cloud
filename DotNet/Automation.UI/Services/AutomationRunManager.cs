@@ -157,21 +157,27 @@ public class AutomationRunManager : IAutomationRunManager
         if (!_runs.TryGetValue(runId, out var state))
             return await CancelZombieRunAsync(runId, cancellationToken);
 
-        if (!state.Status.IsSuccessfulCancelTarget())
-            return false;
+        bool queueCleanup;
+        lock (state.Sync)
+        {
+            if (!state.Status.IsSuccessfulCancelTarget())
+                return false;
 
-        if (state.Status == AutomationRunStatus.Cancelled)
-            return true;
+            if (state.Status == AutomationRunStatus.Cancelled)
+                return true;
+
+            state.CancelRequested = true;
+            state.Status = AutomationRunStatus.Cancelled;
+            state.Error = "Cancelled by user.";
+            state.FinishedAt = DateTimeOffset.UtcNow;
+            queueCleanup = true;
+        }
 
         // Path 2: live in-process run.
         // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
         // PersistRunSummaryAsync internally, so the row is marked Cancelled in Mongo
-        // before we return — the UI will see the updated status on its next refresh
+        // before we return. The UI will see the updated status on its next refresh
         // regardless of how long abort/cleanup takes.
-        state.CancelRequested = true;
-        state.Status = AutomationRunStatus.Cancelled;
-        state.Error = "Cancelled by user.";
-        state.FinishedAt = DateTimeOffset.UtcNow;
         _liveInjector.CloseSession(runId);
         await BroadcastStatus(state);
 
@@ -184,13 +190,16 @@ public class AutomationRunManager : IAutomationRunManager
             // best effort
         }
 
-        QueueCancellationCleanup(
-            runId,
-            state.FacilityId,
-            state.ReportId,
-            state.FhirDataLoader,
-            state.ExecutionTask,
-            message => WriteLog(state, message));
+        if (queueCleanup)
+        {
+            QueueCancellationCleanup(
+                runId,
+                state.FacilityId,
+                state.ReportId,
+                state.FhirDataLoader,
+                state.ExecutionTask,
+                message => WriteLog(state, message));
+        }
 
         return true;
     }
