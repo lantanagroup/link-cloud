@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,6 +46,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
         var hslocError = GetHslocMapSaveError(model);
         if (hslocError != null)
             return BadRequest(hslocError);
+
+        if (string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            model.CodeMapFhirPath = HslocMappingDefaults.FhirPath;
 
         var existing = await store.GetOperationByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
@@ -117,12 +121,16 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
     internal static string? GetHslocMapSaveError(NormalizationOperationDefinition model)
     {
-        if (!string.Equals(model.OperationType, "HSLOCMap", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
             return null;
 
         if (model.ResourceTypes is not { Count: 1 }
             || !string.Equals(model.ResourceTypes[0], "Location", StringComparison.Ordinal))
             return "HSLOCMap operations must target only the Location resource type.";
+
+        if (!string.IsNullOrWhiteSpace(model.CodeMapFhirPath)
+            && !string.Equals(model.CodeMapFhirPath.Trim(), HslocMappingDefaults.FhirPath, StringComparison.Ordinal))
+            return $"HSLOCMap FhirPath must be {HslocMappingDefaults.FhirPath}.";
 
         if (model.CodeSystemMaps.Count == 0)
             return "HSLOCMap requires at least one Code System Map.";

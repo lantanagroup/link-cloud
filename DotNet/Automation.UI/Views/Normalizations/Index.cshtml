@@ -312,6 +312,7 @@
                         <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label" for="OpCodeMapFhirPath">FhirPath</label>
                             <input class="form-control" id="OpCodeMapFhirPath" />
+                            <div class="form-text op-field op-field-HSLOCMap">HSLOCMap always maps Location.type after copying identifier and alias onto type. This path cannot be changed.</div>
                         </div>
                         <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label">Code System Maps</label>
@@ -552,8 +553,12 @@
         document.getElementById('OpCopyIterativeMaxIterationsWrap').style.display = copyIterativeVisible ? '' : 'none';
         document.getElementById('OpCopyIterativeSplitOnCommaWrap').style.display = copyIterativeVisible ? 'flex' : 'none';
 
-        if (t === 'HSLOCMap')
+        const fhirPath = document.getElementById('OpCodeMapFhirPath');
+        fhirPath.readOnly = t === 'HSLOCMap';
+        if (t === 'HSLOCMap') {
+            fhirPath.value = hslocMapUiDefaults.fhirPath;
             applyHslocMapDefaultsIfEmpty();
+        }
     }
 
     function applyHslocMapDefaultsIfEmpty() {
@@ -862,8 +867,9 @@
             conditionTargetFhirPath: document.getElementById('OpCondTargetFhirPath').value || null,
             conditionTargetValue: document.getElementById('OpCondTargetValue').value || null,
             conditions: conditions,
-            codeMapFhirPath: (document.getElementById('OpCodeMapFhirPath').value || '').trim()
-                || (operationType === 'HSLOCMap' ? hslocMapUiDefaults.fhirPath : null),
+            codeMapFhirPath: operationType === 'HSLOCMap'
+                ? hslocMapUiDefaults.fhirPath
+                : (document.getElementById('OpCodeMapFhirPath').value || '').trim() || null,
             codeSystemMaps: codeSystemMaps,
             extensionUrls: document.getElementById('OpExtensionUrls').value.split('\n').map(s => s.trim()).filter(Boolean),
             maxIterations: parseInt(document.getElementById('OpMaxIterations').value || '15', 10),
