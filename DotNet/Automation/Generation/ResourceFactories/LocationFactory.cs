@@ -20,9 +20,9 @@ public static class LocationFactory
         {
             "ICU" => ("1025-6", "Trauma Critical Care"),
             "ER"  => ("1108-0", "Emergency Department"),
-            "HU"  => ("1093-4", "Step Down Unit"),
+            "HU"  => ("1099-1", "Adult Step Down Unit"),
             "HOSP"=> ("1060-3", "Medical Ward"),
-            "OF"  => ("1160-1", "Outpatient Clinic"),
+            "OF"  => ("1160-1", "Urgent Care Center"),
             _     => ("1060-3", "Medical Ward"),
         };
 

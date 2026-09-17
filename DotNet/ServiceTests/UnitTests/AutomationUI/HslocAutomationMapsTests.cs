@@ -17,7 +17,10 @@ public class HslocAutomationMapsTests
         maps.Should().ContainSingle(m =>
             m.SourceSystem == HslocMappingDefaults.RoleCodeSystem
             && m.TargetSystem == MappingTargetSystems.HslocUrl
-            && m.CodeMaps["ICU"].Code == "1025-6");
+            && m.CodeMaps["ICU"].Code == "1025-6"
+            && m.CodeMaps["HU"].Code == "1099-1"
+            && m.CodeMaps["HU"].Display == "Adult Step Down Unit"
+            && m.CodeMaps["OF"].Display == "Urgent Care Center");
         maps.Should().NotContain(m => m.SourceSystem == HslocMappingDefaults.IdentifierSystem);
     }
 
@@ -28,7 +31,10 @@ public class HslocAutomationMapsTests
 
         var identifier = maps.Single(m => m.SourceSystem == HslocMappingDefaults.IdentifierSystem);
         identifier.CodeMaps["abcd1234-Loc-ICU"].Code.Should().Be("1025-6");
-        identifier.CodeMaps["abcd1234-Loc-Hospital"].Code.Should().Be("1060-3");
+        identifier.CodeMaps["abcd1234-Loc-ED"].Code.Should().Be("1108-0");
+        identifier.CodeMaps["abcd1234-Loc-StepDown"].Code.Should().Be("1099-1");
+        identifier.CodeMaps["abcd1234-Loc-Outpatient"].Code.Should().Be("1160-1");
+        identifier.CodeMaps.Should().NotContainKey("abcd1234-Loc-Hospital");
     }
 
     [Fact]
@@ -79,6 +85,7 @@ public class HslocAutomationMapsTests
         var merged = HslocAutomationMaps.Merge(existing, ["Patient-abcd1234-001"]);
         var identifier = merged.Single(m => m.SourceSystem == HslocMappingDefaults.IdentifierSystem);
         identifier.CodeMaps["abcd1234-Loc-ICU"].Code.Should().Be("1108-0");
-        identifier.CodeMaps["abcd1234-Loc-Hospital"].Code.Should().Be("1060-3");
+        identifier.CodeMaps.Should().ContainKey("abcd1234-Loc-ED");
+        identifier.CodeMaps.Should().NotContainKey("abcd1234-Loc-Hospital");
     }
 }

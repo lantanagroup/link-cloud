@@ -74,12 +74,13 @@ public static class HslocAutomationMaps
         {
             SourceSystem = HslocMappingDefaults.IdentifierSystem,
             TargetSystem = MappingTargetSystems.HslocUrl,
+            // Hospital identifier is omitted. HSLOCMap copies ancestor identifiers onto child
+            // Location.type, so mapping Loc-Hospital would stamp Medical Ward onto ICU/ED/HU/OF.
             CodeMaps = new Dictionary<string, NormalizationCodeMapEntry>(StringComparer.Ordinal)
             {
                 [ids.IcuLocation] = Entry("ICU"),
                 [ids.EdLocation] = Entry("ER"),
                 [ids.StepDownLocation] = Entry("HU"),
-                [ids.HospitalLocation] = Entry("HOSP"),
                 [ids.OutpatientLocation] = Entry("OF")
             }
         };
