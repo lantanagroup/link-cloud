@@ -69,6 +69,14 @@ public class ConnectionValidationRequestValidator
             return false;
         }
 
+        // A base URL is all that is usable here: callers append /metadata to it, so a query string
+        // or fragment would end up buried mid-URL and silently address the wrong resource.
+        if (!string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            errorMessage = "The FHIR server URL provided must be a base URL without a query string or fragment.";
+            return false;
+        }
+
         errorMessage = string.Empty;
         return true;
     }

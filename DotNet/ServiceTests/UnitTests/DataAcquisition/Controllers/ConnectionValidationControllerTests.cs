@@ -76,6 +76,8 @@ public class ConnectionValidationControllerTests
     [InlineData("/relative/path")]
     [InlineData("file:///etc/passwd")]
     [InlineData("ftp://fhir.test/r4")]
+    [InlineData("http://fhir.test/r4?foo=bar")]
+    [InlineData("http://fhir.test/r4#fragment")]
     public async Task ValidateFhirServerConnection_InvalidUrl_ReturnsBadRequest(string fhirServerUrl)
     {
         var mocker = new AutoMocker();
