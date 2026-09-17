@@ -98,8 +98,10 @@ public class RunExecutorGenerationBranchTests
             cache);
         withCache.GeneratedTemplateCache.Should().BeSameAs(cache);
         request.Profiles.Should().HaveCount(4);
+        // ExpandProfiles predicts per-measure eligibility from intent (Hypo is
+        // often NonQualifying even when the cohort was AllQualifying).
         request.Profiles.Should().OnlyContain(profile =>
-            selectedMeasures.All(profile.QualifiesFor)
+            profile.QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
             && profile.ResourcesPerPatient == 123);
     }
 

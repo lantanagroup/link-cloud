@@ -68,6 +68,15 @@ public class AbsSubmissionPredictorTests
         ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
     ];
 
+    // Thetis DiagnosticReports use laboratory LOINC 11502-2, which Daily CQL
+    // retrieves but the predictor does not keep (Daily SDE is COVID/flu/RSV).
+    // Seed-sweep invariants therefore skip Daily.
+    private static readonly ProfiledMeasureType[] GeneratedPatientInvariantMeasures =
+    [
+        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+    ];
+
     private static readonly string ThetisDumpRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
         "Automation Thetis Bundles");
@@ -290,7 +299,7 @@ public class AbsSubmissionPredictorTests
                 MeasurementPeriodEnd = PeriodEnd
             };
 
-            foreach (var measure in GeneratedPatientMeasures)
+            foreach (var measure in GeneratedPatientInvariantMeasures)
             {
                 try
                 {
