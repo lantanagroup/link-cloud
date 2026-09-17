@@ -109,11 +109,32 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanPeriodModel>>> GetFacilityReportingPlanPeriodsAsync(
+        string facilityId,
+        int? monthsAhead = null,
+        bool? isReporting = null,
+        bool refresh = false,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityReportingPlanPeriodModel>>(
+            () => Request($"/dmrp/reporting-plans/facilities/{facilityId}/periods")
+                .SetQueryParam("monthsAhead", monthsAhead)
+                .SetQueryParam("isReporting", isReporting)
+                // Sent only when asked for, so a default call cannot be mistaken for one that
+                // deliberately declined a refresh.
+                .SetQueryParam("refresh", refresh ? "true" : null)
+                .SetQueryParam("pageSize", pageSize)
+                .SetQueryParam("pageNumber", pageNumber)
+                .GetAsync(cancellationToken: cancellationToken));
+
     public async Task<LinkApiResponse<List<FacilityReportingPlanModel>>> GetFacilityReportingPlansForFacilityAsync(
         string facilityId,
         int? month = null,
         int? year = null,
         bool? isReporting = null,
+        int? monthsAhead = null,
+        bool refresh = false,
         CancellationToken cancellationToken = default)
     {
         var response = await SendAsync<List<FacilityReportingPlanModel>>(
@@ -121,6 +142,8 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
                 .SetQueryParam("month", month)
                 .SetQueryParam("year", year)
                 .SetQueryParam("isReporting", isReporting)
+                .SetQueryParam("monthsAhead", monthsAhead)
+                .SetQueryParam("refresh", refresh ? "true" : null)
                 .GetAsync(cancellationToken: cancellationToken));
 
         if (response.IsSuccessStatusCode && response.Body is null)

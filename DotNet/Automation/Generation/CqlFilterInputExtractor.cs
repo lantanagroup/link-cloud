@@ -36,6 +36,7 @@ public static class CqlFilterInputExtractor
         var serviceRequests = new List<ServiceRequest>();
         var specimens = new List<Specimen>();
         var locations = new List<CqlFilterSimulator.LocationContext>();
+        var medications = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in entries)
         {
@@ -74,7 +75,17 @@ public static class CqlFilterInputExtractor
                 case Location location:
                     locations.Add(new CqlFilterSimulator.LocationContext(location.Id ?? string.Empty));
                     break;
+                case Medication medication:
+                    if (!string.IsNullOrWhiteSpace(medication.Id))
+                        medications[medication.Id] = ExtractCodeableConceptCodes(medication.Code);
+                    break;
             }
+        }
+
+        foreach (var (id, codes) in ExtractMedicationCodes(sharedResourceEntries))
+        {
+            if (!medications.ContainsKey(id))
+                medications[id] = codes;
         }
 
         foreach (var loc in ExtractLocations(sharedResourceEntries))
@@ -104,8 +115,8 @@ public static class CqlFilterInputExtractor
         var observationContexts = observations.Select(BuildObservationContext).ToList();
         var diagnosticReportContexts = diagnosticReports.Select(BuildDiagnosticReportContext).ToList();
         var procedureContexts = procedures.Select(BuildProcedureContext).ToList();
-        var medicationRequestContexts = medicationRequests.Select(BuildMedicationRequestContext).ToList();
-        var medicationAdministrationContexts = medicationAdministrations.Select(BuildMedicationAdministrationContext).ToList();
+        var medicationRequestContexts = medicationRequests.Select(mr => BuildMedicationRequestContext(mr, medications)).ToList();
+        var medicationAdministrationContexts = medicationAdministrations.Select(ma => BuildMedicationAdministrationContext(ma, medications)).ToList();
         var coverageContexts = coverages.Select(BuildCoverageContext).ToList();
         var serviceRequestContexts = serviceRequests.Select(BuildServiceRequestContext).ToList();
         var specimenContexts = specimens.Select(BuildSpecimenContext).ToList();
@@ -163,9 +174,16 @@ public static class CqlFilterInputExtractor
             .Select(reference => reference!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var diagnosisIds = (enc.Diagnosis ?? [])
+            .Select(diagnosis => diagnosis.Condition?.Reference)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Select(reference => reference!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         return new CqlFilterSimulator.EncounterContext(enc.Id ?? string.Empty, start, end, classCode, status)
         {
-            LocationReferences = locationRefs
+            LocationReferences = locationRefs,
+            DiagnosisConditionIds = diagnosisIds
         };
     }
 
@@ -295,12 +313,22 @@ public static class CqlFilterInputExtractor
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        var resultRefs = (report.Result ?? [])
+            .Select(r => r.Reference)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Select(reference => reference!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         return new CqlFilterSimulator.DiagnosticReportContext(
             report.Id,
             effectiveStart,
             effectiveEnd)
         {
-            CategoryCodes = categories
+            CategoryCodes = categories,
+            Codes = ExtractCodeableConceptCodes(report.Code),
+            ResultReferences = resultRefs,
+            Status = report.Status?.ToString() ?? string.Empty
         };
     }
 
@@ -336,7 +364,9 @@ public static class CqlFilterInputExtractor
         };
     }
 
-    private static CqlFilterSimulator.MedicationRequestContext BuildMedicationRequestContext(MedicationRequest mr)
+    private static CqlFilterSimulator.MedicationRequestContext BuildMedicationRequestContext(
+        MedicationRequest mr,
+        IReadOnlyDictionary<string, List<string>> medicationCodes)
     {
         var authoredOn = ParseFhirDateTime(mr.AuthoredOn) ?? DateTime.MinValue;
         return new CqlFilterSimulator.MedicationRequestContext(
@@ -344,12 +374,14 @@ public static class CqlFilterInputExtractor
             authoredOn,
             mr.Encounter?.Reference ?? string.Empty)
         {
-            MedicationCodes = ExtractCodeableConceptCodes(mr.Medication as CodeableConcept),
+            MedicationCodes = ResolveMedicationCodes(mr.Medication, medicationCodes),
             Intent = mr.Intent?.ToString() ?? string.Empty
         };
     }
 
-    private static CqlFilterSimulator.MedicationAdministrationContext BuildMedicationAdministrationContext(MedicationAdministration ma)
+    private static CqlFilterSimulator.MedicationAdministrationContext BuildMedicationAdministrationContext(
+        MedicationAdministration ma,
+        IReadOnlyDictionary<string, List<string>> medicationCodes)
     {
         DateTime effectiveStart;
         DateTime effectiveEnd;
@@ -375,7 +407,7 @@ public static class CqlFilterInputExtractor
             effectiveEnd,
             ma.Context?.Reference ?? string.Empty)
         {
-            MedicationCodes = ExtractCodeableConceptCodes(ma.Medication as CodeableConcept),
+            MedicationCodes = ResolveMedicationCodes(ma.Medication, medicationCodes),
             Status = ma.Status?.ToString() ?? string.Empty
         };
     }
@@ -442,5 +474,65 @@ public static class CqlFilterInputExtractor
             .Select(code => code!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static List<string> ResolveMedicationCodes(
+        DataType? medication,
+        IReadOnlyDictionary<string, List<string>> medicationCodes)
+    {
+        var fromConcept = ExtractCodeableConceptCodes(medication as CodeableConcept);
+        if (fromConcept.Count > 0)
+            return fromConcept;
+
+        var reference = (medication as ResourceReference)?.Reference;
+        if (string.IsNullOrWhiteSpace(reference))
+            return [];
+
+        var id = FhirReferenceId.FromReference(reference);
+        return medicationCodes.TryGetValue(id, out var codes) ? codes : [];
+    }
+
+    internal static Dictionary<string, List<string>> ExtractMedicationCodes(
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? entries)
+    {
+        var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        if (entries == null)
+            return result;
+
+        foreach (var (resourceType, resourceId, _, resource) in entries)
+        {
+            if (!string.Equals(resourceType, "Medication", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(resourceId))
+            {
+                continue;
+            }
+
+            result[resourceId] = ExtractCodesFromJson(resource);
+        }
+
+        return result;
+    }
+
+    private static List<string> ExtractCodesFromJson(JsonElement resource)
+    {
+        var codes = new List<string>();
+        if (!resource.TryGetProperty("code", out var code) || code.ValueKind != JsonValueKind.Object)
+            return codes;
+        if (!code.TryGetProperty("coding", out var coding) || coding.ValueKind != JsonValueKind.Array)
+            return codes;
+
+        foreach (var item in coding.EnumerateArray())
+        {
+            if (!item.TryGetProperty("code", out var codeProp) || codeProp.ValueKind != JsonValueKind.String)
+                continue;
+            var value = codeProp.GetString();
+            if (!string.IsNullOrWhiteSpace(value)
+                && !codes.Contains(value, StringComparer.OrdinalIgnoreCase))
+            {
+                codes.Add(value);
+            }
+        }
+
+        return codes;
     }
 }

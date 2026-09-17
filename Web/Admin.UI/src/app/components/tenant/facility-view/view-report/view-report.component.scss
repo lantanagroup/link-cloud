@@ -1,4 +1,5 @@
 @use 'sass:color';
+@use '../../../../../styles/schedule-status.scss';
 
 .reporting-status {
   display: inline-block;
@@ -10,6 +11,9 @@
 $processing-status: #0d7494;
 $not-reportable-status: #d97706;
 $submitted-status: #047832;
+// Terminal like Submitted, but nothing was published externally, so it reads as its own
+// colour rather than borrowing the success green.
+$completed-not-submitted-status: #5b21b6;
 
 .status-processing {
     @extend .reporting-status;
@@ -34,6 +38,17 @@ $submitted-status: #047832;
     background-color: color.adjust($submitted-status, $lightness: 65%);
     color: $submitted-status;
     box-shadow: 0 0 0 1px color.adjust($submitted-status, $lightness: -10%);
+    padding: 6px 6px;
+    border-radius: 0.375rem;
+}
+
+// Patient-level equivalent: evaluated and validated normally, deliberately not submitted.
+// The schedule-level badge lives in styles/schedule-status.scss.
+.status-not-submitted {
+    @extend .reporting-status;
+    background-color: color.adjust($completed-not-submitted-status, $lightness: 55%);
+    color: $completed-not-submitted-status;
+    box-shadow: 0 0 0 1px color.adjust($completed-not-submitted-status, $lightness: -10%);
     padding: 6px 6px;
     border-radius: 0.375rem;
 }

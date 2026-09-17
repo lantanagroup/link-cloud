@@ -162,6 +162,11 @@ public class RunsController(
         return RedirectToAction(nameof(Details), new { id = startedRunId });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult CleanLeftovers()
+        => RedirectToAction("Index", "Cleanup");
+
     [HttpGet]
     public async Task<IActionResult> Details(
         Guid id,

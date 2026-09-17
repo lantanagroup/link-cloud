@@ -205,7 +205,7 @@ public static class FhirGenerationPipeline
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries = null;
         if (acquisitionSimulation != null)
         {
-            sharedSimEntries = BuildResourceIndex(sharedEntries);
+            sharedSimEntries = AbsSubmissionPredictor.IndexEntries(sharedEntries);
         }
 
         // ------------------------------------------------------------------
@@ -355,7 +355,7 @@ public static class FhirGenerationPipeline
 
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries = null;
         if (acquisitionSimulation != null)
-            sharedSimEntries = BuildResourceIndex(sharedEntries);
+            sharedSimEntries = AbsSubmissionPredictor.IndexEntries(sharedEntries);
 
         var patientIndex = NextGeneratedPatientIndex(targetManifest.PatientIds, runTag);
         var sliceBuilder = new GenerationManifest.IncrementalBuilder();
@@ -826,7 +826,7 @@ public static class FhirGenerationPipeline
 
         if (acquisitionSimulation != null)
         {
-            var patientSimEntries = BuildResourceIndex(entries);
+            var patientSimEntries = AbsSubmissionPredictor.IndexEntries(entries);
             var acquiredKeys = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
                 patientId,
                 patientSimEntries,
@@ -1148,40 +1148,6 @@ public static class FhirGenerationPipeline
         }
 
         return bundles;
-    }
-
-    /// <summary>
-    /// Converts in-memory FHIR bundle entries into (ResourceType, ResourceId, Key, JsonElement)
-    /// tuples for use by <see cref="QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient"/>.
-    /// Each entry is serialized individually and parsed to produce a <see cref="JsonElement"/>
-    /// that the simulator can inspect for category, date, and reference properties.
-    /// </summary>
-    private static List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> BuildResourceIndex(
-        IReadOnlyList<Bundle.EntryComponent> entries)
-    {
-        var result = new List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>(entries.Count);
-        var serializerOptions = FhirSerializerOptions.ForFhirWithoutValidation();
-
-        foreach (var entry in entries)
-        {
-            var url = entry.Request?.Url;
-            if (string.IsNullOrWhiteSpace(url) || !url.Contains('/'))
-                continue;
-
-            var slashIdx = url.IndexOf('/');
-            var resourceType = url[..slashIdx];
-            var resourceId = url[(slashIdx + 1)..];
-
-            if (entry.Resource == null)
-                continue;
-
-            // Serialize the individual resource to JSON and parse to JsonElement
-            var json = JsonSerializer.Serialize(entry.Resource, entry.Resource.GetType(), serializerOptions);
-            using var doc = JsonDocument.Parse(json);
-            result.Add((resourceType, resourceId, url, doc.RootElement.Clone()));
-        }
-
-        return result;
     }
 
     private static bool ShouldEmitDetailedPatientLog(int patientIndex)

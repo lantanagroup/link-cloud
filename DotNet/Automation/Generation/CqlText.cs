@@ -26,8 +26,79 @@ internal static class CqlText
         if (string.IsNullOrEmpty(cql))
             return string.Empty;
 
-        var withoutBlock = Regex.Replace(cql, @"/\*.*?\*/", " ", RegexOptions.Singleline);
-        return Regex.Replace(withoutBlock, @"//.*?$", " ", RegexOptions.Multiline);
+        // Character scanner so `http://` / `https://` inside valueset URLs and
+        // quoted CQL strings are not treated as `//` line comments. A naive
+        // `//.*?$` regex truncated every canonical URL and broke CQL-name →
+        // ValueSet URL matching in CqlMeasureBundleModel.
+        var sb = new System.Text.StringBuilder(cql.Length);
+        for (var i = 0; i < cql.Length; i++)
+        {
+            var c = cql[i];
+            if (c == '\'')
+            {
+                sb.Append(c);
+                i++;
+                while (i < cql.Length)
+                {
+                    sb.Append(cql[i]);
+                    if (cql[i] == '\'')
+                    {
+                        if (i + 1 < cql.Length && cql[i + 1] == '\'')
+                        {
+                            sb.Append(cql[++i]);
+                            i++;
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    i++;
+                }
+
+                continue;
+            }
+
+            if (c == '"')
+            {
+                sb.Append(c);
+                i++;
+                while (i < cql.Length)
+                {
+                    sb.Append(cql[i]);
+                    if (cql[i] == '"')
+                        break;
+                    i++;
+                }
+
+                continue;
+            }
+
+            if (c == '/' && i + 1 < cql.Length && cql[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < cql.Length && !(cql[i] == '*' && cql[i + 1] == '/'))
+                    i++;
+                if (i + 1 < cql.Length)
+                    i++;
+                sb.Append(' ');
+                continue;
+            }
+
+            if (c == '/' && i + 1 < cql.Length && cql[i + 1] == '/'
+                && (i == 0 || cql[i - 1] != ':'))
+            {
+                while (i < cql.Length && cql[i] != '\n' && cql[i] != '\r')
+                    i++;
+                if (i < cql.Length)
+                    sb.Append(cql[i]);
+                continue;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 
     public static Dictionary<string, string> ParseDefineBodies(string cql)

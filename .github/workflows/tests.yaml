@@ -66,6 +66,7 @@ jobs:
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
       LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
       AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
+      LEFTOVER_CLEANUP_ENABLED: "false"
 
     steps:
       - name: Checkout code

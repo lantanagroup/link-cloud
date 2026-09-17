@@ -13,16 +13,22 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public interface IHSLOCQueries
     {
         Task<List<HSLOC>> GetAll(bool includeInactive = false, CancellationToken cancellationToken = default);
+        Task<IReadOnlyDictionary<string, Guid>> GetActiveLookup(CancellationToken cancellationToken = default);
     }
 
     public class HSLOCQueries : IHSLOCQueries
     {
         private readonly NormalizationDbContext _dbContext;
+        private readonly IHSLOCLookupCache _lookupCache;
 
-        public HSLOCQueries(NormalizationDbContext dbContext)
+        public HSLOCQueries(NormalizationDbContext dbContext, IHSLOCLookupCache lookupCache)
         {
             _dbContext = dbContext;
+            _lookupCache = lookupCache;
         }
+
+        public Task<IReadOnlyDictionary<string, Guid>> GetActiveLookup(CancellationToken cancellationToken = default) =>
+            _lookupCache.GetActiveLookup(_dbContext, cancellationToken);
 
         public async Task<List<HSLOC>> GetAll(bool includeInactive = false, CancellationToken cancellationToken = default)
         {

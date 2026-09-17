@@ -1,8 +1,9 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -11,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -141,8 +143,12 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
+        var services = new ServiceCollection();
+        var serviceProvider = services.BuildServiceProvider();
+        var scope = new Mock<IServiceScope>();
+        scope.SetupGet(item => item.ServiceProvider).Returns(serviceProvider);
         var scopeFactory = new Mock<IServiceScopeFactory>();
-        scopeFactory.Setup(item => item.CreateScope()).Returns(Mock.Of<IServiceScope>());
+        scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
         var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
         telemetrySettings.SetupGet(x => x.CurrentValue).Returns(new TelemetrySettings { PatientTags = false });
@@ -159,13 +165,16 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             Mock.Of<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
+            new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
+                new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>())),
             new ConditionalTransformOperationService(Mock.Of<ILogger<ConditionalTransformOperationService>>()),
             new CopyLocationOperationService(Mock.Of<ILogger<CopyLocationOperationService>>()),
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             purger.Object,
-            telemetrySettings.Object);
+            telemetrySettings.Object,
+            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(string patientId = PatientId)

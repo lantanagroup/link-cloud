@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
@@ -37,6 +38,28 @@ public class FacilityReportingPlansControllerTests : IDisposable
     private readonly FacilityReportingPlansController _controller;
     private readonly IEntityRepository<MeasureMapping> _mappingRepository;
     private readonly IEntityRepository<FacilityReportingPlan> _planRepository;
+    private readonly RecordingSync _sync = new();
+
+    /// <summary>
+    /// Stands in for the DMRP sync. The refresh contract is about whether the sync ran and what
+    /// happens when it cannot, so what it would have written is beside the point here.
+    /// </summary>
+    private sealed class RecordingSync : IDmrpReportingPlanSync
+    {
+        public List<(string FacilityId, int Month, int Year)> Calls { get; } = [];
+
+        public bool Fail { get; set; }
+
+        public Task<DmrpSyncResult> SyncAsync(string facilityId, int month, int year,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add((facilityId, month, year));
+
+            return Fail
+                ? throw new DmrpApiException("The DMRP API operation /msc answered 503.")
+                : Task.FromResult(DmrpSyncResult.Nothing);
+        }
+    }
 
     public FacilityReportingPlansControllerTests(DmrpIntegrationTestFixture fixture)
     {
@@ -56,7 +79,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         // these tests assert on depend on the day they run.
         _clock = new FakeTimeProvider(Now);
 
-        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _clock)
+        _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _sync,
+            _fixture.FacilityExistenceMock.Object, _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -174,26 +198,47 @@ public class FacilityReportingPlansControllerTests : IDisposable
     {
         var request = await ValidRequestAsync();
 
+        // The message names the component and measure the unique index is keyed on, not the mapping.
+        // The request leaves both implicit, so they come from the default and from the mapping.
+        var measure = (await _mappingRepository.GetAsync(request.MeasureMappingId!)).Measure;
+
         await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
         var secondResult = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(secondResult, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {request.FacilityId}, measure mapping " +
-            $"{request.MeasureMappingId} and period {request.ReportingMonth}/{request.ReportingYear}.",
+            $"A reporting plan already exists for facility {request.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {request.ReportingMonth}/{request.ReportingYear}.",
             problem.Detail);
     }
 
     [Fact]
-    public async Task CreateFacilityReportingPlan_NullMeasureMappingId_ReturnsBadRequest()
+    public async Task CreateFacilityReportingPlan_NoMappingAndNoMeasure_ReturnsBadRequest()
     {
         var request = await ValidRequestAsync();
         request.MeasureMappingId = null;
+        request.Measure = null;
 
         var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
 
         var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
-        Assert.Equal("MeasureMappingId is required.", problem.Detail);
+        Assert.Equal("Measure is required when no measure mapping is supplied to take it from.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task CreateFacilityReportingPlan_NoMappingButAMeasure_RecordsTheEnrollmentUnmapped()
+    {
+        // DMRP returns measures Link may have no mapping for. The enrollment is recorded anyway,
+        // so it is visible to the admin who will map it rather than dropped on the way in.
+        var request = await ValidRequestAsync();
+        request.MeasureMappingId = null;
+        request.Measure = "UNMAPPED-MEASURE";
+
+        var result = await _controller.CreateFacilityReportingPlan(request, CancellationToken.None);
+
+        var created = Assert.IsType<FacilityReportingPlanModel>(Assert.IsType<CreatedResult>(result).Value);
+        Assert.Null(created.MeasureMappingId);
+        Assert.Equal("UNMAPPED-MEASURE", created.Measure);
     }
 
     [Fact]
@@ -241,7 +286,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync();
         await CreatedPlanAsync(facilityId: OtherFacilityId);
 
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, false, CancellationToken.None);
 
         var plans = Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value);
         Assert.Single(plans);
@@ -254,8 +299,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync(month: 5, year: 2026, isReporting: true);
         await CreatedPlanAsync(month: 6, year: 2026, isReporting: false);
 
-        var may = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, null, CancellationToken.None);
-        var notReporting = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, false, null, CancellationToken.None);
+        var may = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, null, false, CancellationToken.None);
+        var notReporting = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, false, null, false, CancellationToken.None);
 
         Assert.Single(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(may).Value));
 
@@ -267,7 +312,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task GetFacilityReportingPlansForFacility_NoPlans_ReturnsEmptyList()
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility("no-such-facility", null, null, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility("no-such-facility", null, null, null, null, false, CancellationToken.None);
 
         Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value));
     }
@@ -275,7 +320,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task GetFacilityReportingPlansForFacility_MonthOutOfRange_ReturnsBadRequest()
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 0, null, null, null, CancellationToken.None);
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 0, null, null, null, false, CancellationToken.None);
 
         AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
     }
@@ -289,7 +334,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         await CreatedPlanAsync(month: 12, year: 2026);
         await CreatedPlanAsync(month: 1, year: 2027);
 
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, 3,
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, 3, false,
             CancellationToken.None);
 
         var plans = Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(result).Value);
@@ -304,7 +349,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [InlineData(25)]
     public async Task GetFacilityReportingPlansForFacility_MonthsAheadOutOfRange_ReturnsBadRequest(int monthsAhead)
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, monthsAhead,
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, monthsAhead, false,
             CancellationToken.None);
 
         AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
@@ -313,7 +358,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
     [Fact]
     public async Task GetFacilityReportingPlansForFacility_MonthsAheadWithAnExactPeriod_ReturnsBadRequest()
     {
-        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, 6,
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, 6, false,
             CancellationToken.None);
 
         var problem = AssertProblem(result, StatusCodes.Status400BadRequest, "Bad Request");
@@ -478,6 +523,127 @@ public class FacilityReportingPlansControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithRefresh_SyncsThePeriodBeingAskedAbout()
+    {
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, 5, 2026, null, null, true,
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal((FacilityId, 5, 2026), Assert.Single(_sync.Calls));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithRefreshAndNoPeriod_SyncsTheCurrentOne()
+    {
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, true,
+            CancellationToken.None);
+
+        // Without a month or year the request can only be about now, which is what the clock says.
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal((FacilityId, 10, 2026), Assert.Single(_sync.Calls));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithoutRefresh_DoesNotCallDmrp()
+    {
+        await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, false,
+            CancellationToken.None);
+
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithRefresh_SyncsTheCurrentPeriodOnce()
+    {
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        // One refresh for a six-month window, not one per month: every projected month is derived
+        // from the current period's enrollment.
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal((FacilityId, 10, 2026), Assert.Single(_sync.Calls));
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WithoutRefresh_DoesNotCallDmrp()
+    {
+        await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null,
+            cancellationToken: CancellationToken.None);
+
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_RefreshOnAnUnknownFacility_IsNotFound()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        // Reading an unknown facility answers an empty list, because absence of enrollment is a
+        // meaningful answer. Refreshing one is a write: it would create reporting plan rows keyed on
+        // an id Link has no facility for, which nothing but an explicit delete would ever remove.
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_RefreshOnAnUnknownFacility_IsNotFound()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status404NotFound, "Not Found");
+        Assert.Empty(_sync.Calls);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WithoutRefresh_AnUnknownFacilityStillReads()
+    {
+        _fixture.FacilityExistenceMock
+            .Setup(item => item.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, refresh: false,
+            cancellationToken: CancellationToken.None);
+
+        // The existence check guards the write, not the read. A plain read of an unknown facility
+        // keeps answering 200 with nothing in it.
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlanPeriods_WhenTheRefreshFails_ReturnsBadGateway()
+    {
+        _sync.Fail = true;
+
+        var result = await _controller.GetFacilityReportingPlanPeriods(FacilityId, 6, null, refresh: true,
+            cancellationToken: CancellationToken.None);
+
+        // Stale rows are not served in place of the current ones the caller asked for. A caller
+        // that would rather have stale data than none can ask again without refresh.
+        AssertProblem(result, StatusCodes.Status502BadGateway, "Bad Gateway");
+    }
+
+    [Fact]
+    public async Task GetFacilityReportingPlansForFacility_WhenTheRefreshFails_ReturnsBadGateway()
+    {
+        _sync.Fail = true;
+
+        var result = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, true,
+            CancellationToken.None);
+
+        AssertProblem(result, StatusCodes.Status502BadGateway, "Bad Gateway");
+    }
+
+    [Fact]
     public async Task SearchFacilityReportingPlans_FiltersAndPages()
     {
         await CreatedPlanAsync(month: 5);
@@ -557,6 +723,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var first = await CreatedPlanAsync(month: 5);
         var second = await CreatedPlanAsync(month: 6);
 
+        var measure = (await _mappingRepository.GetAsync(first.MeasureMappingId!)).Measure;
+
         var result = await _controller.UpdateFacilityReportingPlan(second.Id!, new FacilityReportingPlanUpdateRequest
         {
             Id = second.Id,
@@ -569,8 +737,8 @@ public class FacilityReportingPlansControllerTests : IDisposable
 
         var problem = AssertProblem(result, StatusCodes.Status409Conflict, "Conflict");
         Assert.Equal(
-            $"A reporting plan already exists for facility {first.FacilityId}, measure mapping " +
-            $"{first.MeasureMappingId} and period {first.ReportingMonth}/{first.ReportingYear}.",
+            $"A reporting plan already exists for facility {first.FacilityId}, component {ReportingComponents.Msc}, " +
+            $"measure {measure} and period {first.ReportingMonth}/{first.ReportingYear}.",
             problem.Detail);
     }
 
@@ -653,7 +821,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         var result = await _controller.DeleteFacilityReportingPlansForFacility(FacilityId, CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
 
-        var cleared = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, CancellationToken.None);
+        var cleared = await _controller.GetFacilityReportingPlansForFacility(FacilityId, null, null, null, null, false, CancellationToken.None);
         Assert.Empty(Assert.IsType<List<FacilityReportingPlanModel>>(Assert.IsType<OkObjectResult>(cleared).Value));
         Assert.IsType<OkObjectResult>(
             await _controller.GetFacilityReportingPlan(survivor.Id!, CancellationToken.None));

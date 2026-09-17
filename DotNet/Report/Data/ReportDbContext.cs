@@ -31,6 +31,8 @@ public partial class ReportDbContext : DbContext
 
     public virtual DbSet<ReportResource> ReportResource { get; set; }
 
+    public virtual DbSet<ReportEntryMappingOutcome> ReportEntryMappingOutcome { get; set; }
+
     public virtual DbSet<ReportSchedule> ReportSchedule { get; set; }
 
     public virtual DbSet<ScheduleReportType> ScheduleReportType { get; set; }

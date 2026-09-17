@@ -18,6 +18,11 @@ public class FacilityReportingPlanModel
     public string? MeasureMappingId { get; set; }
 
     /// <summary>
+    /// The NHSN component the enrollment belongs to - MSC or PS. Both are reported monthly.
+    /// </summary>
+    public string? Component { get; set; }
+
+    /// <summary>
     /// Month of the reporting period, 1-12.
     /// </summary>
     public int ReportingMonth { get; set; }
@@ -118,6 +123,16 @@ public class FacilityReportingPlanMeasureModel
     /// The NHSN measure the facility enrolled in, such as HOB.
     /// </summary>
     public string? Measure { get; set; }
+
+    /// <summary>
+    /// The NHSN component the enrollment came from - MSC or PS. Null on a projected measure, which
+    /// has no plan row behind it to have come from either.
+    /// </summary>
+    /// <remarks>
+    /// Per measure rather than per period: one month can carry enrollments from both components, so
+    /// a single value for the period would have to pick one and be wrong about the rest.
+    /// </remarks>
+    public string? Component { get; set; }
 
     /// <summary>
     /// The digital quality measure the mapping evaluates, or null when the mapping could not be

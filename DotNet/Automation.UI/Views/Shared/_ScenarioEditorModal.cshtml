@@ -166,6 +166,15 @@
                             <div id="nhsnOrganizationHint" class="form-text"></div>
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label d-block">DMRP</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="EnableDmrp" />
+                                <label class="form-check-label" for="EnableDmrp">
+                                    Enable DMRP enrollment
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label" for="ReportPeriodStart">Report Period Start</label>
                             <input class="form-control" type="date" id="ReportPeriodStart" />
                         </div>
@@ -1318,6 +1327,9 @@
         document.getElementById('IsMetricsRun').addEventListener('change', function () {
             syncMetricsRunUi();
         });
+        document.getElementById('EnableDmrp').addEventListener('change', function () {
+            syncDmrpUi();
+        });
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
             reportingWindowEl.addEventListener('change', function () {
@@ -1347,6 +1359,22 @@
             if (value == null || String(value).trim() === '') return null;
             var n = parseInt(value, 10);
             return isNaN(n) ? null : n;
+        }
+
+        function syncDmrpUi() {
+            var toggle = document.getElementById('EnableDmrp');
+            var input = document.getElementById('NhsnOrganizationId');
+            var hint = document.getElementById('nhsnOrganizationHint');
+
+            if (!toggle || !input || !hint) return;
+
+            if (toggle.checked) {
+                input.required = true;
+                hint.textContent = 'Required when DMRP enrollment is enabled.';
+            } else {
+                input.required = false;
+                hint.textContent = '';
+            }
         }
 
         // ---- Imported Patients ----
@@ -1940,6 +1968,7 @@
                 patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
                 patientCohorts: cohorts,
                 nhsnOrganizationId: (document.getElementById('NhsnOrganizationId').value || '').trim(),
+                enableDmrp: document.getElementById('EnableDmrp').checked,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
@@ -1977,6 +2006,7 @@
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
             document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
+            document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
             function isoToDateValue(s) {
                 if (!s) return '';
@@ -2062,6 +2092,7 @@
             updateImportedSummary();
             syncCount();
             syncNhsnOrganizationFromUploadedPatients();
+            syncDmrpUi();
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
             syncMetricsRunUi();
@@ -2110,6 +2141,7 @@
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
+                document.getElementById('EnableDmrp').checked = false;
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
                 fillDefaultAdhocPeriod();
@@ -2126,6 +2158,7 @@
                 updateImportedSummary();
                 syncCount();
                 syncNhsnOrganizationFromUploadedPatients();
+                syncDmrpUi();
                 syncReportPeriodPolicyUi();
                 syncLiveSimulationUi();
                 syncMetricsRunUi();
@@ -2147,8 +2180,10 @@
                 valid = false;
             }
 
-            if (!(model.nhsnOrganizationId || '').trim()) {
-                markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.');
+            if (model.enableDmrp && !(model.nhsnOrganizationId || '').trim()) {
+                markFieldError(
+                    'NhsnOrganizationId',
+                    'NHSN Organization ID is required when DMRP is enabled.');
                 valid = false;
             }
 

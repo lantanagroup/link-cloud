@@ -65,5 +65,8 @@ public enum KafkaTopic
     ValidationCompleteRetry,
     SubmitPayload,
     [StringValue("SubmitPayload-Retry")]
-    SubmitPayloadRetry
+    SubmitPayloadRetry,
+    MappingOutcomeEvaluated,
+    [StringValue("MappingOutcomeEvaluated-Retry")]
+    MappingOutcomeEvaluatedRetry,
 }

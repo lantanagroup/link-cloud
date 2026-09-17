@@ -183,7 +183,11 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         {
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Delete All Measure Mappings");
 
-            if (await _reportingPlanRepository.AnyAsync(_ => true, cancellationToken))
+            // Scoped to plans that actually reference a mapping, the same question the single-mapping
+            // delete above asks. A plan whose measure Link has no mapping for holds no foreign key, so
+            // it cannot be what stops a delete - and refusing on its account would leave a database of
+            // nothing but unmapped enrollments unable to clear its mappings at all.
+            if (await _reportingPlanRepository.AnyAsync(p => p.MeasureMappingId != null, cancellationToken))
             {
                 _logger.LogInformation(
                     "Measure mappings are referenced by facility reporting plans and none were deleted");

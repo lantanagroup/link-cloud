@@ -248,6 +248,32 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_adds_a_type_condition_for_every_uploaded_code_on_the_same_system()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 3,
+            LocationsWithoutIdentifier = 3,
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1039-7" },
+                new LocationTypeHint { System = hsloc, Code = "1052-0" },
+                new LocationTypeHint { System = hsloc, Code = "1060-3" }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, []);
+        proposal.Conditions.Should().HaveCount(3);
+        proposal.Conditions.Select(c => c.FhirPath).Should().BeEquivalentTo(
+        [
+            $"Location.type.coding.where(system = '{hsloc}' and code = '1039-7').exists()",
+            $"Location.type.coding.where(system = '{hsloc}' and code = '1052-0').exists()",
+            $"Location.type.coding.where(system = '{hsloc}' and code = '1060-3').exists()"
+        ]);
+    }
+
+    [Fact]
     public void Orm_builder_extends_existing_map_with_new_identifier_systems()
     {
         var existing = new OrganizationResourceMapTemplate

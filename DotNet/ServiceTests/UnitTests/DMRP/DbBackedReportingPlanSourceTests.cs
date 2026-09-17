@@ -70,6 +70,7 @@ namespace UnitTests.DMRP
             {
                 FacilityId = facilityId,
                 MeasureMappingId = mapping.Id,
+                Measure = mapping.Measure,
                 ReportingMonth = month,
                 ReportingYear = year,
                 IsReporting = isReporting

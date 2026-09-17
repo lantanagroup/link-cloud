@@ -41,6 +41,7 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<LeftoverRunCleanupOptions>(builder.Configuration.GetSection(LeftoverRunCleanupOptions.SectionName));
 builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
 var lokiUrl = builder.Configuration["Loki:Url"];
@@ -239,6 +240,7 @@ builder.Services.AddSingleton<IGeneratedTemplateCacheVersionLookup>(sp => sp.Get
 builder.Services.AddSingleton<GeneratedPatientBundleReplayService>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
+builder.Services.AddSingleton<ICleanupSettingsStore, MongoCleanupSettingsStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
 builder.Services.AddSingleton<IMeasureTemplateStore, MongoMeasureTemplateStore>();
@@ -375,6 +377,11 @@ builder.Services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotServ
 builder.Services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+builder.Services.AddSingleton<LeftoverRunCleanupService>();
+builder.Services.AddSingleton<ILeftoverRunCleanup>(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
 builder.Services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 builder.Services.AddSingleton<MetricsRunPresenter>();
@@ -456,6 +463,7 @@ app.MapControllerRoute(
     pattern: "{controller=Runs}/{action=Index}/{id?}");
 
 app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<CleanupHub>("/hubs/cleanup");
 app.MapHealthChecks("/health");
 
 app.Run();

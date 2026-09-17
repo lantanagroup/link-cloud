@@ -124,6 +124,44 @@ public class ApiHealthErrorFormattingTests
         result.ErrorMessage.Should().Be("Error: Expected HTTP 200 but got 500.");
     }
 
+    [Fact]
+    public async Task Untyped_step_preserves_full_request_and_response_bodies()
+    {
+        var requestBody = new string('r', 1000);
+        var responseBody = new string('s', 1000);
+
+        var result = await _suite.RunUntypedAsync(200, () => Task.FromResult(new LinkApiResponse
+        {
+            StatusCode = 200,
+            RequestBody = requestBody,
+            RawBody = responseBody
+        }));
+
+        result.RequestBody.Should().Be(requestBody);
+        result.ResponseBody.Should().Be(responseBody);
+        result.RequestBody.Should().HaveLength(1000);
+        result.ResponseBody.Should().HaveLength(1000);
+    }
+
+    [Fact]
+    public async Task Typed_step_preserves_full_request_and_response_bodies()
+    {
+        var requestBody = new string('r', 1000);
+        var responseBody = new string('s', 1000);
+
+        var result = await _suite.RunTypedAsync(200, () => Task.FromResult(new LinkApiResponse<DummyBody>
+        {
+            StatusCode = 200,
+            RequestBody = requestBody,
+            RawBody = responseBody
+        }));
+
+        result.RequestBody.Should().Be(requestBody);
+        result.ResponseBody.Should().Be(responseBody);
+        result.RequestBody.Should().HaveLength(1000);
+        result.ResponseBody.Should().HaveLength(1000);
+    }
+
     private sealed class TestSuite : ServiceTestSuiteBase
     {
         public override string ServiceName => "TestService";

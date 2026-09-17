@@ -25,8 +25,8 @@
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon" style="filter:invert(1);"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                <div class="navbar-collapse collapse">
+                    <ul class="navbar-nav me-auto">
                         <li class="nav-item">
                             <a class="nav-link @(NavActive("Runs") ? "active" : "")" asp-area="" asp-controller="Runs" asp-action="Index"><i class="bi bi-play-circle me-1"></i>Runs</a>
                         </li>
@@ -50,6 +50,14 @@
                                 <li><a class="dropdown-item" asp-area="" asp-controller="OrganizationResourceMaps" asp-action="Index"><i class="bi bi-diagram-2 me-1"></i>Org Resource Maps</a></li>
                                 <li><a class="dropdown-item" asp-area="" asp-controller="PatientConfigurations" asp-action="Index"><i class="bi bi-person-gear me-1"></i>Patient Configurations</a></li>
                             </ul>
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav au-nav-admin">
+                        <li class="nav-item d-none d-sm-flex align-items-center">
+                            <span class="navbar-text au-nav-admin-label">Admin</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Cleanup" asp-action="Index"><i class="bi bi-recycle me-1"></i>Cleanup</a>
                         </li>
                     </ul>
                 </div>

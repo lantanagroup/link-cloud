@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Jobs;
@@ -148,6 +149,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 var endDate = value.EndDate;
                 var frequency = value.Frequency;
                 var reportId = value.ReportTrackingId;
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, nameof(ReportScheduledListener), facilityId, reportId?.ToString(), cancellationToken))
+                    return;
 
                 var reportTypes = value.ReportTypes;
 

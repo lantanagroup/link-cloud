@@ -212,7 +212,16 @@ public class EncounterMappingManagerUnitTests
             .ThrowsAsync(new DbUpdateException("FK violation", new Exception()));
 
         // Re-check: only id 5 exists; 99 is the missing reference.
+        //
+        // Both overloads are stubbed on purpose: CreateAsync validates through the tokenless one while the
+        // location lookups now pass a token, and the test should not care which the internals choose.
         _mockOrgLocationRepo.Setup(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>()))
+            .ReturnsAsync(new List<OrganizationLocationMapping>
+            {
+                new() { LocationMappingId = 5, FacilityId = "Fac1", LocationId = "Loc5" }
+            });
+
+        _mockOrgLocationRepo.Setup(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OrganizationLocationMapping>
             {
                 new() { LocationMappingId = 5, FacilityId = "Fac1", LocationId = "Loc5" }
@@ -401,7 +410,7 @@ public class EncounterMappingManagerUnitTests
         // SearchAsync resolves each mapping's locations (for LocationId) via a follow-up query; this
         // mapping has none, so return an empty set.
         _mockLocationRepo
-            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>()))
+            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EncounterLocation>());
 
         // Act

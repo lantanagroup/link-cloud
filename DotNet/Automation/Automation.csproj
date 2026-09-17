@@ -26,4 +26,8 @@
     <EmbeddedResource Include="measures\*.json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ServiceTests" />
+  </ItemGroup>
+
 </Project>

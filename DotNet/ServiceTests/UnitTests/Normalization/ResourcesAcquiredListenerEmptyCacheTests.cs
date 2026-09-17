@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -14,7 +15,9 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -211,10 +214,41 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task ProcessMessageAsync_AbortedFacility_PurgesCacheAndDoesNotProduce()
+    {
+        var abort = new InMemoryPipelineAbortRegistry();
+        await abort.AbortAsync(FacilityId, reportId: null, TimeSpan.FromDays(14));
+
+        var purger = new Mock<IResourceCachePurger>();
+        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var resourceCache = new Mock<IResourceCache>();
+        var listener = BuildListener(resourceCache, producer, abort, purger.Object);
+
+        await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
+
+        purger.Verify(
+            item => item.PurgeAsync(It.IsAny<ResourcesAcquiredValue>(), "pipeline aborted", It.IsAny<CancellationToken>()),
+            Times.Once);
+        producer.Verify(
+            item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        resourceCache.Verify(
+            item => item.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
-        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer)
+        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
+        IPipelineAbortRegistry? abortRegistry = null,
+        IResourceCachePurger? purger = null,
+        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
     {
+        mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
         sequenceQueries
             .Setup(item => item.Search(
@@ -225,6 +259,8 @@ public class ResourcesAcquiredListenerEmptyCacheTests
 
         var services = new ServiceCollection();
         services.AddSingleton(sequenceQueries.Object);
+        if (abortRegistry != null)
+            services.AddSingleton(abortRegistry);
         var serviceProvider = services.BuildServiceProvider();
 
         var scope = new Mock<IServiceScope>();
@@ -255,13 +291,16 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             producer.Object,
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
+            new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
+                new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>())),
             new ConditionalTransformOperationService(Mock.Of<ILogger<ConditionalTransformOperationService>>()),
             new CopyLocationOperationService(Mock.Of<ILogger<CopyLocationOperationService>>()),
             new CopyLocationAliasToTypeIterativelyOperationService(Mock.Of<ILogger<CopyLocationAliasToTypeIterativelyOperationService>>()),
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
-            Mock.Of<IResourceCachePurger>(),
-            telemetrySettings.Object);
+            purger ?? Mock.Of<IResourceCachePurger>(),
+            telemetrySettings.Object,
+            mappingOutcomeProducer.Object);
     }
 
     private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)

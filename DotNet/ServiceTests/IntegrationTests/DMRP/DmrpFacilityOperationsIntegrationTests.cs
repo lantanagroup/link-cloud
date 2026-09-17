@@ -84,6 +84,7 @@ public class DmrpFacilityOperationsIntegrationTests : IDisposable
         {
             FacilityId = FacilityId,
             MeasureMappingId = mapping.Id,
+            Measure = mapping.Measure,
             ReportingMonth = month,
             ReportingYear = year,
             IsReporting = true

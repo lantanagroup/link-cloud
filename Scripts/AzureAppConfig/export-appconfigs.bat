@@ -1,11 +1,13 @@
 @echo off
-REM Export an Azure App Configuration store to the committed Config/app-config.<env>.json shape.
+REM Export an Azure App Configuration store to the app-config.<env>.json shape committed in the
+REM private link-cac repository. Write it there, not into this one - LEGLINK-912 moved those
+REM files out, and the paths below assume link-cac is cloned beside link-cloud.
 REM
 REM   export-appconfigs.bat <app-config-name> <output-file> [auth-mode]
 REM
-REM   export-appconfigs.bat nhsnlink-ac-dev  Config\app-config.dev.json
-REM   export-appconfigs.bat nhnslink-ac-qa   Config\app-config.qa.json   login
-REM   export-appconfigs.bat nhnslink-ac-qa2  Config\app-config.qa2.json  key
+REM   export-appconfigs.bat nhsnlink-ac-dev  ..\link-cac\Config\app-config.dev.json
+REM   export-appconfigs.bat nhnslink-ac-qa   ..\link-cac\Config\app-config.qa.json   login
+REM   export-appconfigs.bat nhnslink-ac-qa2  ..\link-cac\Config\app-config.qa2.json  key
 REM
 REM auth-mode "login" uses your Entra identity and needs the App Configuration Data Reader
 REM role on the store. "key" uses the store's access key, read via the control plane, and
@@ -16,7 +18,8 @@ REM
 REM   --profile appconfig/kvset
 REM       Produces the { "items": [ ... ] } shape with key/value/label/content_type/tags per
 REM       row. The default profile writes a nested configuration tree with no labels at all,
-REM       which is not what Config/app-config.*.json contains and cannot be round-tripped.
+REM       which is not what the committed app-config.*.json files contain and cannot be
+REM       round-tripped.
 REM
 REM   --label "*"
 REM       Exports every label. Omitting it exports ONLY rows with no label. The previous

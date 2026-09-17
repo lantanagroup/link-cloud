@@ -24,6 +24,7 @@
     <EmbeddedResource Include="Resources\indMeasureReport.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Automation\Diagnostics\*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
@@ -73,6 +74,22 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // lands, an implementation that refreshes those rows from the API replaces this one and
             // nothing downstream changes.
             builder.Services.AddScoped<IReportingPlanSource, DbBackedReportingPlanSource>();
+
+            // Registered whether or not DMRP:Api is filled in. An environment with no API to talk to
+            // simply never calls it, and the client says so plainly if something does; refusing to
+            // register would instead surface as a resolve failure somewhere unrelated.
+            builder.Services.AddHttpClient(DmrpApiClient.HttpClientName, client =>
+            {
+                // Bounded rather than left at HttpClient's 100-second default, which is far longer
+                // than an admin GET should hang on a third party. The setting resolves itself, so a
+                // value HttpClient would refuse cannot reach the setter and fail the first refresh.
+                client.Timeout = (builder.Configuration
+                    .GetSection(DmrpSettings.ConfigSectionName)
+                    .Get<DmrpSettings>()?.Api ?? new DmrpApiSettings()).ResolvedTimeout;
+            });
+            builder.Services.AddSingleton<IDmrpApiTokenProvider, DmrpApiTokenProvider>();
+            builder.Services.AddScoped<IDmrpApiClient, DmrpApiClient>();
+            builder.Services.AddScoped<IDmrpReportingPlanSync, DmrpReportingPlanSync>();
 
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.

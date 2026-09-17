@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -166,6 +167,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
                 var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
                 var reportPopulationManager = scope.ServiceProvider.GetRequiredService<IReportPopulationManager>();
+                var mappingOutcomeManager = scope.ServiceProvider.GetRequiredService<IReportEntryMappingOutcomeManager>();
 
                 var key = result.Message.Key;
                 var value = result.Message.Value;
@@ -181,6 +183,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     throw new DeadLetterException("FacilityId is null or empty.");
                 }
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
+                    return;
 
                 if (value is { Regenerate: true, ReportId: not null })
                 {
@@ -311,6 +317,21 @@ namespace LantanaGroup.Link.Report.Listeners
                 if (newEntries.Count > 0)
                 {
                     await reportEntryManager.AddRangeAsync(newEntries, cancellationToken);
+                }
+
+                if (value is { Regenerate: true, ReportId: not null })
+                {
+                    // Regeneration re-evaluates the resources the original run stored, so DataAcquisition
+                    // and Normalization are both bypassed and neither mapping outcome producer fires.
+                    // Carrying the original run's outcomes forward is what keeps the regenerated report
+                    // from showing every indicator as never evaluated. They are not approximations: both
+                    // mapping steps ran before those resources were written, so they describe exactly the
+                    // resource set this report re-evaluates.
+                    //
+                    // The patient set matches by construction, since newEntries is built from the source
+                    // schedule's own entries.
+                    await mappingOutcomeManager.CopyToScheduleAsync(
+                        value.ReportId.Value, reportSchedule.Id, cancellationToken);
                 }
 
                 if (value.Regenerate)

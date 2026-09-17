@@ -192,8 +192,7 @@ public static class IpWindowExtensions
     public static bool AnyEncounterMatches(this IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> windows, string? encounterReference)
     {
         if (windows == null || string.IsNullOrWhiteSpace(encounterReference)) return false;
-        var slash = encounterReference.IndexOf('/');
-        var refId = slash >= 0 ? encounterReference[(slash + 1)..] : encounterReference;
+        var refId = FhirReferenceId.FromReference(encounterReference);
         for (var i = 0; i < windows.Count; i++)
         {
             if (string.Equals(refId, windows[i].EncounterId, StringComparison.OrdinalIgnoreCase))

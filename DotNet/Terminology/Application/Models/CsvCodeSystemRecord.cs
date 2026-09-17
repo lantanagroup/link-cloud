@@ -1,4 +1,5 @@
 using CsvHelper.Configuration.Attributes;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 
 namespace LantanaGroup.Link.Terminology.Application.Models;
 
