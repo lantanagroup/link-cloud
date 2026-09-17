@@ -37,9 +37,12 @@ public class ReportTrackingIdsTests
     [Fact]
     public void The_id_is_stable_across_releases()
     {
-        // Pinned: a change here means every previously produced report id would no longer dedupe.
-        ReportTrackingIds.For("100", "Monthly", Start).ToString()
-            .Should().Be(ReportTrackingIds.For("100", "Monthly", Start).ToString())
-            .And.HaveLength(36);
+        // The literal is the whole point: it pins the namespace GUID and the "id|frequency|O-format
+        // start" name together. Changing either - a new namespace, a different separator, a different
+        // date format, a trimmed facility id - invalidates every id already in flight, so the Report
+        // service would no longer recognise a re-announced period as one it has already stored and
+        // would create a second report for it. If this test fails, the change is the bug.
+        ReportTrackingIds.For("100", "Monthly", Start)
+            .Should().Be(new Guid("08c9e01e-3640-5e31-a7f4-1bc106a412f4"));
     }
 }
