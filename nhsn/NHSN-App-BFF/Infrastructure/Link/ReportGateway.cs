@@ -13,10 +13,12 @@ internal sealed class ReportGateway : IReportGateway
     private const string ServiceName = "Report";
 
     private readonly IReportServiceClient _reportClient;
+    private readonly IReportingPlanGateway _reportingPlanGateway;
 
-    public ReportGateway(IReportServiceClient reportClient)
+    public ReportGateway(IReportServiceClient reportClient, IReportingPlanGateway reportingPlanGateway)
     {
         _reportClient = reportClient;
+        _reportingPlanGateway = reportingPlanGateway;
     }
 
     public async Task<ReportScheduleSummary?> GetLatestScheduleAsync(string facilityId, CancellationToken cancellationToken = default)
@@ -44,12 +46,16 @@ internal sealed class ReportGateway : IReportGateway
         var ordered = schedules.OrderByDescending(schedule => schedule.CreateDate ?? DateTime.MinValue).ToList();
         var pageItems = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
+        // One facility backs every row in this page, so the facility's measure mapping is fetched
+        // once here rather than once per row.
+        var availableMeasures = await _reportingPlanGateway.GetAvailableMeasuresAsync(facilityId, cancellationToken);
+
         var items = new List<ReportSummary>(pageItems.Count);
         foreach (var schedule in pageItems)
         {
             var summaryResponse = await _reportClient.GetReportSummaryAsync(schedule.Id.ToString(), cancellationToken);
             var summary = LinkResponseHandler.Optional(summaryResponse, ServiceName, nameof(ListReportsAsync));
-            items.Add(ToDetail(schedule, summary));
+            items.Add(ToDetail(schedule, summary, availableMeasures));
         }
 
         return new Paged<ReportSummary>
@@ -73,7 +79,9 @@ internal sealed class ReportGateway : IReportGateway
         var summaryResponse = await _reportClient.GetReportSummaryAsync(reportId, cancellationToken);
         var summary = LinkResponseHandler.Optional(summaryResponse, ServiceName, nameof(GetReportAsync));
 
-        return ToDetail(schedule, summary);
+        var availableMeasures = await _reportingPlanGateway.GetAvailableMeasuresAsync(schedule.FacilityId, cancellationToken);
+
+        return ToDetail(schedule, summary, availableMeasures);
     }
 
     public async Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default)
@@ -126,19 +134,35 @@ internal sealed class ReportGateway : IReportGateway
     // Schedule carries CreateDate and the report window; summary (when Report has generated one
     // yet) carries the patient count and completion status. Falls back to the schedule's own
     // report types/status when Report has not produced a summary for it yet.
-    private static ReportDetail ToDetail(ReportScheduleApiModel schedule, ReportSummaryApiModel? summary) => new()
+    private static ReportDetail ToDetail(ReportScheduleApiModel schedule, ReportSummaryApiModel? summary, IReadOnlyList<AvailableMeasure> availableMeasures)
     {
-        ReportId = schedule.Id.ToString(),
-        Measures = summary is {ReportTypes.Count: > 0} ? summary.ReportTypes : schedule.ReportTypes,
-        PatientCount = summary?.PatientCount ?? 0,
-        StartDate = schedule.ReportStartDate.ToString("O"),
-        EndDate = schedule.ReportEndDate.ToString("O"),
-        CreateDate = (schedule.CreateDate ?? schedule.ReportStartDate).ToString("O"),
-        Status = ToUiStatus(summary?.Status),
-        // rdMeasureMapping has no real endpoint yet -- DMRP's mapping proposal is still in
-        // development, matching the onboarding POC's own note on this field.
-        MeasureMapping = []
-    };
+        var measures = summary is {ReportTypes.Count: > 0} ? summary.ReportTypes : schedule.ReportTypes;
+        var measureSet = new HashSet<string>(measures, StringComparer.Ordinal);
+
+        return new ReportDetail
+        {
+            ReportId = schedule.Id.ToString(),
+            Measures = measures,
+            PatientCount = summary?.PatientCount ?? 0,
+            StartDate = schedule.ReportStartDate.ToString("O"),
+            EndDate = schedule.ReportEndDate.ToString("O"),
+            CreateDate = (schedule.CreateDate ?? schedule.ReportStartDate).ToString("O"),
+            Status = ToUiStatus(summary?.Status),
+            // Scoped to this report's own dQMs -- a facility's available measures can include ones
+            // this particular report did not use (a later report, a different reporting period).
+            // A dQM the report used that no longer appears here (the facility unenrolled or the
+            // measure definition was removed from MeasureEval since) is simply absent -- the UI
+            // falls back to the raw dQM id for that one rather than guessing a name for it.
+            MeasureMapping = availableMeasures
+                .Where(measure => measureSet.Contains(measure.DigitalQualityMeasure))
+                .Select(measure => new MeasureMapping
+                {
+                    NhsnMeasure = measure.Name,
+                    DigitalQualityMeasure = measure.DigitalQualityMeasure
+                })
+                .ToList()
+        };
+    }
 
     // Report's ReportStatus has no distinct "Failed" value -- Unknown (including "no summary yet")
     // is the closest fit and surfaces as the UI's Failed pill rather than silently reading Pending.

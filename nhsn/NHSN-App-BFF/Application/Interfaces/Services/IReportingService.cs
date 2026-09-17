@@ -43,4 +43,13 @@ public interface IReportingService
 
     /// <summary>Reads one patient's measure-report export data for the given report type, for the patient report download action.</summary>
     Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The most recently recorded report-accuracy acknowledgement for this report, or null when
+    /// none has been recorded yet.
+    /// </summary>
+    Task<bool?> GetReportAccuracyAcknowledgementAsync(string reportId, CancellationToken cancellationToken = default);
+
+    /// <summary>Records whether this report's accuracy is acknowledged. Append-only -- a new attestation row, never an edit of a prior one.</summary>
+    Task RecordReportAccuracyAcknowledgementAsync(string reportId, bool accepted, string statementKey, CancellationToken cancellationToken = default);
 }

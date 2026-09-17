@@ -308,6 +308,15 @@ export class BffApiClient implements ApiClient {
     return pollOperation(this.http, initial, {isDone: isReportSettled});
   }
 
+  async getReportAcknowledgement(reportId: string): Promise<boolean | null> {
+    const {data} = await this.http.get<{accepted: boolean | null}>(`/reports/${encodeURIComponent(reportId)}/acknowledgement`);
+    return data.accepted;
+  }
+
+  async acknowledgeReport(reportId: string, acknowledgement: Acknowledgement): Promise<void> {
+    await this.http.put<void>(`/reports/${encodeURIComponent(reportId)}/acknowledgement`, acknowledgement);
+  }
+
   // ------------------------------------------------------------ reporting plan
 
   async getReportingPlan(): Promise<ReportingPlan> {

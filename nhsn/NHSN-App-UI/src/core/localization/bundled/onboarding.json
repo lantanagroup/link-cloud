@@ -528,7 +528,8 @@
       "refreshed": "Report list refreshed.",
       "reportPending": "A report is already pending. Wait for it to complete before generating another.",
       "noReports": "No reports have been generated yet.",
-      "notAcknowledged": "Please acknowledge that the generated reports are accurate before continuing."
+      "notAcknowledged": "Please acknowledge that the generated reports are accurate before continuing.",
+      "ackError": "Unable to record the acknowledgement."
     },
     "detail": {
       "title": "Report Details",

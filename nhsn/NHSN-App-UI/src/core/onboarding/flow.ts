@@ -130,7 +130,7 @@ export const STEPS: Step[] = [
     id: 'report-results',
     labelKey: 'onboarding:steps.reportResults',
     Component: lazyStep(() => import('./steps/report-results/ReportResultsStep')),
-    isComplete: TEMP_ALWAYS_COMPLETE
+    isComplete: draft => Boolean(draft.reportResults.accuracyAcknowledged)
   },
   {
     id: 'mrn-intake',
