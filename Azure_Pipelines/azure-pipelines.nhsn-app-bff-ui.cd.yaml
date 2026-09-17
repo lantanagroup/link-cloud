@@ -127,7 +127,7 @@ steps:
     repository: '$(registry-repo-name)'
     command: 'buildAndPush'
     Dockerfile: '$(dockerPath)'
-    buildContext: '$(Build.SourcesDirectory)/nhsn/NHSN-App-UI'
+    buildContext: '$(workingDir)'
     tags: |
       latest
       $(MyTag)
