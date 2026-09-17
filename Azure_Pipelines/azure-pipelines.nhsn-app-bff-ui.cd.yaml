@@ -55,18 +55,13 @@ steps:
   fetchDepth: 0
   fetchTags: true
 
-# =========================================================
 # Install Node.js
-# =========================================================
 - task: NodeTool@0
   displayName: 'Install Node.js'
   inputs:
     versionSpec: '20.x'
 
-
-# =========================================================
 # Verify repository files
-# =========================================================
 - task: Bash@3
   displayName: 'Verify Repository Files'
   inputs:
@@ -79,26 +74,18 @@ steps:
       echo "React Core package:"
       ls -lah "$(reactCorePackage)"
 
-# =========================================================
 # Get Git commit
-# =========================================================
 - task: Bash@3
   displayName: 'Get Git Commit'
   inputs:
     targetType: 'inline'
     script: |
       cd "$(Build.SourcesDirectory)"
-
       GIT_COMMIT=$(git rev-parse --short HEAD)
-
       echo "GIT_COMMIT: ${GIT_COMMIT}"
-
       echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-
-# =========================================================
 # Install NPM dependencies
-# =========================================================
 - task: Npm@1
   displayName: 'npm install'
   inputs:
@@ -106,9 +93,7 @@ steps:
     workingDir: '$(workingDir)'
     customCommand: 'install $(reactCorePackage)'
 
-# =========================================================
 # Build NHSN App UI
-# =========================================================
 - task: Npm@1
   displayName: 'Build NHSN App UI'
   inputs:
@@ -117,10 +102,7 @@ steps:
     customCommand: 'run build'
     verbose: false
 
-
-# =========================================================
 # Generate Docker image tag
-# =========================================================
 - task: PowerShell@2
   displayName: 'Generate Docker Image Tag'
   inputs:
@@ -137,10 +119,7 @@ steps:
 
       Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
 
-
-# =========================================================
 # Build and Push Docker Image
-# =========================================================
 - task: Docker@2
   displayName: 'Build & Push NHSN-App-UI Docker Image'
   inputs:
@@ -153,10 +132,7 @@ steps:
       latest
       $(MyTag)
 
-
-# =========================================================
 # Publish Artifact
-# =========================================================
 - task: PublishPipelineArtifact@1
   displayName: 'Publish Manifest Artifact'
   inputs:
