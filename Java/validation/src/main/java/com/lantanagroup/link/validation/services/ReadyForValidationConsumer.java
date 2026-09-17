@@ -97,7 +97,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
-        _logger.info("Retrieved patient bundle with {} entries", bundle != null ? bundle.getEntry().size() : 0);
+        _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
+                bundle != null ? bundle.getEntry().size() : 0, facilityId, reportId);
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
@@ -197,8 +198,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         Attributes attributes;
 
         try (Timer timer = Timer.start()) {
-            results = validationService.validate(bundle);
-            _logger.info("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
+            results = validationService.validate(bundle, facilityId, reportId);
+            _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
 
             attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
             validationMetrics.addToValidationCounter(attributes);
@@ -213,7 +214,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
 
         try (Timer timer = Timer.start();
              ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
-                     _logger, "categorizing " + results.size() + " results")) {
+                     _logger, "categorizing " + results.size() + " results", facilityId, reportId)) {
             categorizationService.categorize(results);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
@@ -222,9 +223,10 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
                         && result.getCategories().stream().anyMatch(Category::isSubmit))
                 .toList();
         if (!submittedResults.isEmpty()) {
-            _logger.info("Persisting {} submitted validation results", submittedResults.size());
+            _logger.info("Persisting {} submitted validation results facility={} report={}",
+                    submittedResults.size(), facilityId, reportId);
             try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
-                    _logger, "persisting " + submittedResults.size() + " results")) {
+                    _logger, "persisting " + submittedResults.size() + " results", facilityId, reportId)) {
                 resultRepository.saveAll(submittedResults);
             }
         }

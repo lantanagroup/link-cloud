@@ -805,8 +805,8 @@
             }
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-x-circle"></i>';
-            var reason = (res.body && res.body.error)
-                ? res.body.error
+            var reason = (res.body && (res.body.error || res.body.detail))
+                ? (res.body.error || res.body.detail)
                 : 'This run is not running.';
             alert(reason);
         })

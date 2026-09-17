@@ -84,14 +84,19 @@ public class ValidationService {
     }
 
     public List<Result> validate(IBaseResource resource) {
+        return validate(resource, null, null);
+    }
+
+    public List<Result> validate(IBaseResource resource, String facilityId, String reportId) {
         try {
             String detail = "FHIR resource";
             if (resource instanceof Bundle bundle) {
                 detail = "FHIR bundle " + bundle.getEntry().size() + " entries";
-                logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
+                logger.info("Starting validation of Bundle with {} entries facility={} report={}",
+                        bundle.getEntry().size(), facilityId, reportId);
             }
             ValidationResult validationResult;
-            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail)) {
+            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail, facilityId, reportId)) {
                 validationResult = fhirValidator.validateWithResult(resource);
             }
             List<Result> results = validationResult.getMessages().stream()

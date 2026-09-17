@@ -17,12 +17,16 @@ public final class ValidationProgressHeartbeat implements AutoCloseable {
 
     private final Logger logger;
     private final String detail;
+    private final String facilityId;
+    private final String reportId;
     private final long startedNanos = System.nanoTime();
     private final ScheduledExecutorService scheduler;
 
-    private ValidationProgressHeartbeat(Logger logger, String detail, long intervalMs) {
+    private ValidationProgressHeartbeat(Logger logger, String detail, String facilityId, String reportId, long intervalMs) {
         this.logger = logger;
         this.detail = detail;
+        this.facilityId = facilityId;
+        this.reportId = reportId;
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "validation-progress-heartbeat");
             thread.setDaemon(true);
@@ -33,20 +37,34 @@ public final class ValidationProgressHeartbeat implements AutoCloseable {
     }
 
     public static ValidationProgressHeartbeat start(Logger logger, String detail) {
-        return start(logger, detail, DEFAULT_INTERVAL_MS);
+        return start(logger, detail, null, null, DEFAULT_INTERVAL_MS);
     }
 
-    static ValidationProgressHeartbeat start(Logger logger, String detail, long intervalMs) {
-        return new ValidationProgressHeartbeat(logger, detail, intervalMs);
+    public static ValidationProgressHeartbeat start(Logger logger, String detail, String facilityId, String reportId) {
+        return start(logger, detail, facilityId, reportId, DEFAULT_INTERVAL_MS);
+    }
+
+    static ValidationProgressHeartbeat start(Logger logger, String detail, String facilityId, String reportId, long intervalMs) {
+        return new ValidationProgressHeartbeat(logger, detail, facilityId, reportId, intervalMs);
+    }
+
+    static String format(String detail, String facilityId, String reportId, long elapsedSeconds) {
+        StringBuilder line = new StringBuilder(LOG_TOKEN).append(": ").append(detail);
+        if (facilityId != null && !facilityId.isBlank())
+            line.append(" facility=").append(facilityId);
+        if (reportId != null && !reportId.isBlank())
+            line.append(" report=").append(reportId);
+        line.append(" (elapsed ").append(elapsedSeconds).append("s)");
+        return line.toString();
     }
 
     static String format(String detail, long elapsedSeconds) {
-        return LOG_TOKEN + ": " + detail + " (elapsed " + elapsedSeconds + "s)";
+        return format(detail, null, null, elapsedSeconds);
     }
 
     private void tick() {
         long elapsedSeconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedNanos);
-        logger.info(format(detail, elapsedSeconds));
+        logger.info(format(detail, facilityId, reportId, elapsedSeconds));
     }
 
     @Override

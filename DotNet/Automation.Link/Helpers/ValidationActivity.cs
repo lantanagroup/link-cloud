@@ -8,6 +8,19 @@ public static class ValidationActivity
 {
     public const string LogToken = "validation still in progress";
 
+    public static bool MatchesRun(string logLine, string? facilityId, string? reportId)
+    {
+        if (string.IsNullOrWhiteSpace(logLine))
+            return false;
+        if (!string.IsNullOrWhiteSpace(facilityId)
+            && !logLine.Contains(facilityId, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!string.IsNullOrWhiteSpace(reportId)
+            && !logLine.Contains(reportId, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
+    }
+
     public static string? Summarize(IEnumerable<string> logLines, TimeSpan lookback)
     {
         var lines = logLines

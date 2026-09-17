@@ -630,16 +630,22 @@ public class LokiScraper
         return lines;
     }
 
-    public async Task<string?> GetValidationActivitySummaryAsync(TimeSpan lookback)
+    public async Task<string?> GetValidationActivitySummaryAsync(
+        TimeSpan lookback,
+        string? facilityId = null,
+        string? reportId = null)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        // Heartbeats are INFO. ReadyForValidation "Processing ... patient ... report"
-        // is also INFO after the keep-alive change. Token must match ValidationActivity.LogToken.
-        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |~ \"({ValidationActivity.LogToken}|Starting validation of Bundle|Retrieved patient bundle|Validation completed|Categorizing validation results|Persisting)\" !~ \"(?i)({HarmlessPatterns})\"";
+        // Heartbeats and ReadyForValidation Processing lines are INFO. Token must match ValidationActivity.LogToken.
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |~ \"({ValidationActivity.LogToken}|Starting validation of Bundle|Retrieved patient bundle|Processing .+patient|Persisting)\" !~ \"(?i)({HarmlessPatterns})\"";
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            query += $" |= \"{facilityId}\"";
+        if (!string.IsNullOrWhiteSpace(reportId))
+            query += $" |= \"{reportId}\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
@@ -664,6 +670,8 @@ public class LokiScraper
                 {
                     var logLine = value[1]?.ToString();
                     if (string.IsNullOrWhiteSpace(logLine)) continue;
+                    if (!ValidationActivity.MatchesRun(logLine, facilityId, reportId))
+                        continue;
                     logCount++;
                     logLines.Add(logLine);
 

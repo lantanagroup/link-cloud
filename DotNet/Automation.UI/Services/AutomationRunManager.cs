@@ -157,11 +157,11 @@ public class AutomationRunManager : IAutomationRunManager
         if (!_runs.TryGetValue(runId, out var state))
             return await CancelZombieRunAsync(runId, cancellationToken);
 
+        if (!state.Status.IsSuccessfulCancelTarget())
+            return false;
+
         if (state.Status == AutomationRunStatus.Cancelled)
             return true;
-
-        if (!state.Status.IsCancellable())
-            return false;
 
         // Path 2: live in-process run.
         // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
@@ -206,11 +206,11 @@ public class AutomationRunManager : IAutomationRunManager
         if (summary == null)
             return false;
 
+        if (!summary.Status.IsSuccessfulCancelTarget())
+            return false;
+
         if (summary.Status == AutomationRunStatus.Cancelled)
             return true;
-
-        if (!summary.Status.IsCancellable())
-            return false;
 
         summary.Status = AutomationRunStatus.Cancelled;
         summary.Error = "Cancelled by user (no active execution in this process).";
@@ -220,9 +220,6 @@ public class AutomationRunManager : IAutomationRunManager
         await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
         await _orchestrator.CompleteRunAsync(runId);
 
-        await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
-        await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
-
         QueueCancellationCleanup(
             runId,
             summary.FacilityId,
@@ -230,6 +227,9 @@ public class AutomationRunManager : IAutomationRunManager
             fhirDataLoader: null,
             executionTask: null,
             writeLog: null);
+
+        await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
+        await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
 
         _logger.LogInformation(
             "Cancelled zombie run {RunId}. Abort/quiesce queued for facility {FacilityId}.",
@@ -270,7 +270,7 @@ public class AutomationRunManager : IAutomationRunManager
             IAutomationOutput output = writeLog != null
                 ? new RunAutomationOutput(writeLog)
                 : new RunAutomationOutput(message =>
-                    _logger.LogInformation("Cancel cleanup {RunId}: {Message}", runId, message));
+                    _logger.LogInformation("Cancel cleanup {RunId}: {Message}", runId, message.SanitizeForLog()));
             output.WriteLine("Cancellation requested. Aborting pipeline work for this facility...");
 
             using var scope = _hostServices.CreateScope();

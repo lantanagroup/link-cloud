@@ -11,5 +11,14 @@ class ValidationProgressHeartbeatTest {
         String line = ValidationProgressHeartbeat.format("FHIR bundle 11781 entries", 90);
         assertEquals("validation still in progress: FHIR bundle 11781 entries (elapsed 90s)", line);
         assertTrue(line.contains(ValidationProgressHeartbeat.LOG_TOKEN));
+
+        String scoped = ValidationProgressHeartbeat.format(
+                "FHIR bundle 11781 entries",
+                "fac-1",
+                "rep-1",
+                90);
+        assertEquals(
+                "validation still in progress: FHIR bundle 11781 entries facility=fac-1 report=rep-1 (elapsed 90s)",
+                scoped);
     }
 }

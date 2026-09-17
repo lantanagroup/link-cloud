@@ -264,10 +264,16 @@ public class RunsController(
 
             return Ok(new { success = false, error = "This run is not running." });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Cancel failed for run {RunId}.", request.Id);
-            return Ok(new { success = false, error = "Cancel could not be completed. Refresh the page and check the run status." });
+            return Problem(
+                detail: "Cancel could not be completed. Refresh the page and check the run status.",
+                statusCode: StatusCodes.Status500InternalServerError);
         }
     }
 

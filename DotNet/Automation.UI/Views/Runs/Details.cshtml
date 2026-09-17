@@ -644,8 +644,8 @@
                     }
                     cancelBtn.disabled = false;
                     cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
-                    var reason = (res.body && res.body.error)
-                        ? res.body.error
+                    var reason = (res.body && (res.body.error || res.body.detail))
+                        ? (res.body.error || res.body.detail)
                         : 'This run is not running.';
                     alert(reason);
                 })

@@ -127,7 +127,10 @@ public class ProgressMonitor
             _lastNormalizationActivity = normalizationActivity;
         }
 
-        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(60));
+        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(
+            TimeSpan.FromSeconds(60),
+            facilityId,
+            reportId);
         if (!string.IsNullOrWhiteSpace(validationActivity))
         {
             _acquisitionActivity.MarkProgress(DateTime.UtcNow);
