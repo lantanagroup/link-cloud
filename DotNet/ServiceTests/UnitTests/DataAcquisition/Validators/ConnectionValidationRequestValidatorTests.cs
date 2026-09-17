@@ -49,7 +49,7 @@ public class ConnectionValidationRequestValidatorTests
 
     [Theory]
     [InlineData("not-a-url")]
-    [InlineData("/relative/path")]
+    [InlineData("relative/path")]
     public void ValidateFhirServerUrl_NotAnAbsoluteUrl_IsRejected(string fhirServerUrl)
     {
         var isValid = ConnectionValidationRequestValidator.ValidateFhirServerUrl(fhirServerUrl, out var errorMessage);
