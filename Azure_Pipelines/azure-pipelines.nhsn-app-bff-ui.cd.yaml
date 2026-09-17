@@ -4,6 +4,13 @@ resources:
     source: Build_And_Push_All
     trigger: true
 
+  repository:
+    - repository: AzureDevOps
+      type: git
+      name: lantanagroup/nhsnlink
+      ref: refs/heads/main
+
+
 trigger:
   branches:
     include:
@@ -27,10 +34,18 @@ variables:
   value: 'link-nhsn-app-bff-ui'
 - name: dockerPath
   value: '**/nhsn/NHSN-App-UI/Dockerfile'
-- name: projectDir
+- name: workingDir
   value: 'nhsn/NHSN-App-UI'
   
 steps:
+
+  - checkout: self
+  - checkout: AzureDevOps
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+    displayName: 'Install Node.js'
 
   - task: Bash@3
     inputs:
@@ -40,23 +55,21 @@ steps:
         echo "GIT_COMMIT: ${GIT_COMMIT}"
         echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-  - task: DotNetCoreCLI@2
-    displayName: Restore
+  - task: Npm@1  
+    displayName: 'npm install'  
     inputs:
-      command: restore
-      projects: '$(project)'
-  
-  - task: DotNetCoreCLI@2
-    displayName: Build
-    inputs:
-      command: build
-      projects: '$(project)'
-
-  - task: DotNetCoreCLI@2
-    inputs:
-      command: 'test'
-      projects: $(testProject)'
-    displayName: 'Run Tests'
+      command: custom  
+      # workingDir: $(workingDir)
+      workingDir: "$(Build.SourcesDirectory)/lantanagroup/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz"
+      customCommand: 'install'
+      
+  - task: Npm@1  
+    displayName: Build  
+    inputs: 
+      command: custom  
+      verbose: false 
+      workingDir: $(workingDir)
+      customCommand: 'run build'
   
   - task: PowerShell@2
     inputs:
