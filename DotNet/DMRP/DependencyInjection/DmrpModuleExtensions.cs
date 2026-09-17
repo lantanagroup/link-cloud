@@ -56,6 +56,11 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                     mvcBuilder.PartManager.ApplicationParts.Remove(part);
                 }
 
+                // The reconciler needs only Quartz and the settings, both of which the host has
+                // whether or not the module is on.
+                builder.Services.AddSingleton<IDmrpNightlyJobReconciler, DmrpNightlyJobReconciler>();
+                builder.Services.AddHostedService<DmrpNightlyScheduleCleanupService>();
+
                 return false;
             }
 
@@ -100,6 +105,9 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
             builder.Services.AddSingleton<IDmrpSchedulingMetrics, DmrpSchedulingMetrics>();
             builder.Services.AddTransient<DmrpNightlyJob>();
+
+            builder.Services.AddSingleton<IDmrpNightlyJobReconciler, DmrpNightlyJobReconciler>();
+            builder.Services.AddHostedService<DmrpNightlyScheduleHostedService>();
 
             builder.Services.TryAddSingleton(TimeProvider.System);
 
