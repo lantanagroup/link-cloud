@@ -10,7 +10,7 @@ trigger:
     - nhsn-app-component
   paths:
     include:
-    - nhsn/NHSN-App-BFF/*
+    - nhsn/NHSN-App-UI/*
     exclude:
     - '*'
     
@@ -22,17 +22,17 @@ pool:
 variables:
 - group: link-cloud-variables
 - name: project
-  value: 'nhsn/NHSN-App-BFF/NHSN-App-BFF.csproj'
+  value: 'nhsn/NHSN-App-UI/NHSN-App-UI.esproj'
 # - name: testProject
 #   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
 - name: serviceName
-  value: 'app-bff'
+  value: 'nhsn-app-bff-ui'
 - name: registry-repo-Name
-  value: 'link-app-bff'
+  value: 'link-nhsn-app-bff-ui'
 - name: dockerPath
-  value: '**/nhsn/NHSN-App-BFF/Dockerfile'
+  value: '**/nhsn/NHSN-App-UI/Dockerfile'
 - name: projectDir
-  value: 'nhsn/NHSN-App-BFF'
+  value: 'nhsn/NHSN-App-UI'
   
 steps:
 
@@ -84,7 +84,7 @@ steps:
         Write-Host "Set MyTag to: $myTag1"
 
   - task: Docker@2
-    displayName: "Build & Push NHSN-App-BFF Docker Image"
+    displayName: "Build & Push NHSN-App-UI Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
