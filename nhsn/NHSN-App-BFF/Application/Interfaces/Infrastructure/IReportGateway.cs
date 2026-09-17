@@ -30,6 +30,13 @@ public interface IReportGateway
     Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reads the distinct patient ids across every one of a facility's report schedules, newest
+    /// schedule first -- the "patients involved in the facility's generated reports" set the MRN
+    /// Identifier Intake rule builder's patient list is drawn from.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetFacilityPatientIdsAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Reads the real evidence behind one patient's Location Org / HSLOC / Encounter mapping
     /// indicators, or null when Report has no entry for that patient in this report.
     /// </summary>

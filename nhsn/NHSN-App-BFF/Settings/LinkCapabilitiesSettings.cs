@@ -20,4 +20,8 @@ public class LinkCapabilitiesSettings
 
     // Cerner — LinkSdk has no sFTP coverage at all.
     public bool SftpFileListing { get; set; }
+
+    // MRN Identifier Intake's rule builder — no LinkSdk client exposes a report patient's real
+    // Patient.identifier array yet. See IPatientIdentifierGateway's doc comment.
+    public bool PatientIdentifierLookup { get; set; }
 }

@@ -21,6 +21,7 @@ import type {
   LocationMethod,
   Measure,
   MrnIntake,
+  MrnIntakeOptions,
   Paged,
   PageRequest,
   PatientIdentifier,
@@ -240,6 +241,13 @@ export class BffApiClient implements ApiClient {
   async getPatientIdentifiers(): Promise<PatientIdentifier[]> {
     const {data} = await this.http.get<PatientIdentifier[]>('/mrn-intake/patient-identifiers');
     return data;
+  }
+
+  async getMrnIntakeOptions(): Promise<MrnIntakeOptions> {
+    return cachedReference('mrn-intake-options', async () => {
+      const {data} = await this.http.get<MrnIntakeOptions>('/mrn-intake/options');
+      return data;
+    });
   }
 
   // ------------------------------------------------------------ reporting

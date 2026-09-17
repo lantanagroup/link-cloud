@@ -1212,6 +1212,85 @@
   margin-bottom: 18px;
 }
 
+/* A page with several distinct question groups (first needed by MRN Identifier Intake) - the
+   same small-caps divider FhirStep/CensusStep/EncounterStep each redefine under their own
+   step-specific root class, given a shared name instead of a fourth copy. */
+.nhsn-link__section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+
+.nhsn-link__section-title:first-child {
+  margin-top: 0;
+}
+
+/* Kendo's FormRadioGroup (core/fields/inputs.tsx YesNoField/RadioGroupField), first used by MRN
+   Identifier Intake's Yes/No questions. Kendo injects its own minimal base rules for .k-radio at
+   runtime (not this app's hand-rolled convention, which targets .k-input/.k-numerictextbox etc.
+   directly - see those rules above), and that injection lands after this stylesheet, so a bare
+   `.k-radio` rule here loses the cascade tie. Scoped under `.nhsn-link__content`, present on
+   every step's root, to win on specificity instead of load order. */
+.nhsn-link__content .k-radio-list {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 24px;
+}
+
+.nhsn-link__content .k-radio-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nhsn-link__content .k-radio-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.nhsn-link__content .k-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  border: 2px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 50%;
+  background: var(--kendo-color-app-surface, #ffffff);
+  position: relative;
+  cursor: pointer;
+}
+
+.nhsn-link__content .k-radio:checked {
+  border-color: var(--kendo-color-primary, #0057b7);
+}
+
+.nhsn-link__content .k-radio:checked::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--kendo-color-primary, #0057b7);
+}
+
+.nhsn-link__content .k-radio:focus-visible {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 2px;
+}
+
+.nhsn-link__content .k-radio-label {
+  font-size: 14px;
+  color: var(--kendo-color-app-text, #1f2328);
+  cursor: pointer;
+  user-select: none;
+}
+
 .nhsn-link__field-label {
   display: flex;
   align-items: center;
@@ -1232,14 +1311,18 @@
   fill: #cfeee0;
 }
 
-/* core/fields/layout.tsx RequiredAsterisk - a plain "*" glyph set right after
-   the label text (not an icon), so it reads as part of the label instead of
-   a separate element floating beside it. */
+/* core/fields/layout.tsx RequiredAsterisk - the one required-field marker
+   every hand-rolled label in the app uses, positioned inline right beside
+   the label text it follows. `align-self` covers containers that lay the
+   label out as a flex row (where `vertical-align` has no effect); both are
+   kept so the icon lands at the top of the label in every context. */
 .nhsn-link__required-asterisk {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 3px;
-  color: red;
-  font-size: 1.1em;
-  line-height: 1;
+  vertical-align: top;
+  align-self: flex-start;
 }
 
 /* Kendo's own label, visually hidden (never `display: none`) where FieldLabel already shows it. */
@@ -1794,10 +1877,13 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 }
 
+/* Matches the POC's .modal-wide (index.html:645) -- was 94vh, tighter than the POC's 90vh, which
+   left too little of the centered flex gap above/below for this modal to read as clear of the
+   viewport edges. */
 .nhsn-link__modal--large {
   width: 860px;
   max-width: 95vw;
-  max-height: 94vh;
+  max-height: 90vh;
 }
 
 .nhsn-link__modal--small {
@@ -2337,6 +2423,18 @@
 
 .nhsn-link__report-results-legend-count {
   color: var(--kendo-color-app-text-subtle, #5a5f69);
+}
+
+/* ---------------------------------------------- MRN identifier intake */
+
+/* Suppresses the package's default page-header border/padding, like every other step does. */
+.nhsn-link__mrn-intake .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__subtitle {
+  max-width: none;
 }
 
 /* ---------------------------------------------- patient status timeline modal */

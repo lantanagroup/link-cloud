@@ -10,7 +10,7 @@ public sealed record DraftEnvelopeResponse
     public FacilityDraftResponse? Draft { get; init; }
 
     // The last commit attempt, or null before one has been made.
-    public object? CommitState { get; init; }
+    public CommitResultResponse? CommitState { get; init; }
 
     // Per-section origin and status. Always present, one entry per section.
     public IReadOnlyList<SectionSource> Sources { get; init; } = [];
@@ -43,6 +43,12 @@ public sealed record FacilityDraftResponse
     public ReportSection Report { get; init; } = new();
     public ReportResultsSection ReportResults { get; init; } = new();
     public ReportingPlanSection ReportingPlan { get; init; } = new();
+
+    // Read-only mirror of what GET /mrn-intake would return, null until the facility has saved
+    // one. The MRN Identifier Intake step writes through its own endpoint, never through
+    // PUT /onboarding — this exists only so a reload or export renders without a second round
+    // trip.
+    public MrnIntakeResponse? MrnIntake { get; init; }
 }
 
 // Tenant.

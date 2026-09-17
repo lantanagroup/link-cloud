@@ -4,6 +4,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
 {
     [DbContext(typeof(NhsnAppDbContext))]
-    partial class NhsnAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916093105_AddMrnIntakeAndCommit")]
+    partial class AddMrnIntakeAndCommit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -63,38 +66,6 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
                     b.HasIndex("FacilityId", "Kind", "AcceptedOn");
 
                     b.ToTable("Acknowledgements", (string)null);
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.MrnIntakeOptionSet", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("LabelKey")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("OptionGroup")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OptionGroup", "Value")
-                        .IsUnique();
-
-                    b.ToTable("MrnIntakeOptionSets", (string)null);
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities.MrnIntakeRecord", b =>

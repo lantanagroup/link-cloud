@@ -271,11 +271,38 @@ export interface MrnIdentifierRule {
   element: string;
   rule: string;
   value: string;
+  // Set only for a rule added from a specific patient's identifier card (the "+ Add rule" button
+  // inside the modal) -- scopes the rule to that one identifier instead of every identifier with
+  // this element. Absent for a rule added through the plain "Rule to identify..." list, which is
+  // intentionally general (applies wherever the element matches).
+  patientId?: string;
+  identifierIndex?: number;
+}
+
+export interface PatientIdentifierElement {
+  value: string;
+  type?: string;
+  system?: string;
+  use?: string;
+  assigner?: string;
+  periodStart?: string;
+  periodEnd?: string;
 }
 
 export interface PatientIdentifier {
   patientId: string;
-  elements: Array<{ system?: string; value: string; type?: string }>;
+  elements: PatientIdentifierElement[];
+}
+
+export interface MrnIntakeOption {
+  value: string;
+  labelKey: string;
+}
+
+export interface MrnIntakeOptions {
+  multipleMrnTypes: MrnIntakeOption[];
+  varianceTypes: MrnIntakeOption[];
+  changeTypes: MrnIntakeOption[];
 }
 
 export interface MrnIntake {

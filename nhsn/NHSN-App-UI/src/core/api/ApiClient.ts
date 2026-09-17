@@ -18,6 +18,7 @@ import type {
   LocationMethod,
   Measure,
   MrnIntake,
+  MrnIntakeOptions,
   Paged,
   PageRequest,
   PatientIdentifier,
@@ -110,6 +111,8 @@ export interface ApiClient {
   getMrnIntake(): Promise<MrnIntake | null>;
   saveMrnIntake(intake: MrnIntake): Promise<void>;
   getPatientIdentifiers(): Promise<PatientIdentifier[]>;
+  /** The step's checkbox option sets — same for every facility, so callers may cache it. */
+  getMrnIntakeOptions(): Promise<MrnIntakeOptions>;
 
   // reporting
   requestReport(request: ReportRequest): Promise<Operation<ReportSummary>>;

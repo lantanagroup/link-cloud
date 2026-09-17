@@ -480,7 +480,134 @@
     "title": "Report Results"
   },
   "mrnIntake": {
-    "title": "MRN Identifier Intake"
+    "title": "MRN Identifier Intake",
+    "intro1": "When multiple patient identifiers are present in FHIR, the facility reporting digital quality measures (dQMs) to NHSN should identify the one that is operationally used by end users in the source EHR. This allows NHSN to provide back to the facility the medical record number (MRN) end user can use to recognize and retrieve the patients based on their NHSN analysis reports. In FHIR implementations, Patient.identifier is a repeating element, and more than one identifier may be represented as MRN or may appear to be the MRN. Fields such as type, use, system, assigner, and period can help distinguish identifiers. If more than one identifier is coded as the MRN, NHSN needs to differentiate the usable MRN using FHIR fields such as identifier.system, identifier.use, identifier.assigner, and identifier.period.",
+    "intro2": "NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided on this page ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This page should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.",
+    "sections": {
+      "multipleMrn": "Multiple MRN Candidates",
+      "userFacingMrn": "User-Facing MRN in the EHR",
+      "correspondingIdentifier": "Corresponding FHIR Identifier",
+      "ruleToIdentify": "Rule to Identify the Usable MRN",
+      "variability": "Variability Across Facilities or Settings",
+      "changesOverTime": "MRN Changes Over Time"
+    },
+    "multipleMrn": {
+      "question": "In your facility's EHR, are there multiple MRN-like patient identifiers?",
+      "selectAllHint": "Select all that apply (these will not be used for displaying your data in NHSN reports):",
+      "types": {
+        "empi": "Enterprise identifier (EMPI)",
+        "legacy": "Legacy MRN",
+        "facility": "Facility-specific MRN",
+        "visit": "Visit identifier",
+        "other": "Other identifier"
+      },
+      "otherLabel": "Other identifier"
+    },
+    "userFacing": {
+      "question": "From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)",
+      "noOptionsHint": "Select at least one identifier in the question above to choose from here.",
+      "isCalledMrnQuestion": "Is this the identifier staff call the MRN?",
+      "otherTermLabel": "If no, what term is used?",
+      "canSearchQuestion": "Can staff search for patients using this identifier?"
+    },
+    "identifierTable": {
+      "hint": "Below are the patients queried from your facility's reports along with each patient's Patient.identifier entries. Click a patient id to review their identifiers and add rules for the elements that identify the usable MRN. Not every patient needs to be reviewed to identify all of the required identifier elements needed to identify the usable MRN.",
+      "columns": {
+        "patientId": "Patient Id",
+        "identifiers": "Identifiers",
+        "rulesAdded": "Rules Added"
+      },
+      "empty": "No patients found in your facility's generated reports yet.",
+      "notAvailable": "N/A",
+      "noIdentifiers": "No identifiers found for this patient.",
+      "identifierHeading": "Identifier {{number}}",
+      "fields": {
+        "value": "Value",
+        "type": "Type",
+        "system": "System",
+        "use": "Use",
+        "assigner": "Assigner",
+        "periodStart": "Period Start",
+        "periodEnd": "Period End"
+      },
+      "addRule": "+ Add rule",
+      "ruleAdded": "Rule added: {{operator}}",
+      "ruleAddedWithValue": "Rule added: {{operator}} \"{{value}}\""
+    },
+    "rules": {
+      "hint": "Build one or more rules NHSN should use to identify the usable MRN when multiple identifiers are present. Adding a rule for an element in the patient identifier table above automatically adds it here too. You can add, edit or remove any rule.",
+      "addButton": "+ Add Rule",
+      "emptyState": "None added yet.",
+      "elementLabel": "Element",
+      "operatorLabel": "Operator",
+      "valueLabel": "Value",
+      "elements": {
+        "value": "identifier.value",
+        "type": "identifier.type",
+        "system": "identifier.system",
+        "use": "identifier.use",
+        "assigner": "identifier.assigner",
+        "periodStart": "identifier.period.start",
+        "periodEnd": "identifier.period.end"
+      },
+      "operators": {
+        "mustBePresent": "Must be present",
+        "equals": "Equals",
+        "greaterThan": "Greater than",
+        "lessThan": "Less than",
+        "absent": "Must be absent (no end date)"
+      },
+      "placeholders": {
+        "value": "e.g. 100234",
+        "type": "e.g. MR",
+        "system": "e.g. http://hospital.org/fhir/identifier/mrn",
+        "use": "e.g. usual",
+        "assigner": "e.g. St. Mary's Medical Center",
+        "period": "YYYY-MM-DD"
+      }
+    },
+    "variance": {
+      "question": "Does MRN vary by facility/campus/setting within your health system (e.g., another hospital within your health system, but on the same EHR instance)?",
+      "selectAllHint": "If Yes, select all that apply:",
+      "types": {
+        "facility": "Varies by facility",
+        "campus": "Varies by campus",
+        "setting": "Varies by care setting",
+        "ehrInstance": "Varies by EHR instance",
+        "other": "Varies by other"
+      },
+      "otherLabel": "Varies by other"
+    },
+    "changes": {
+      "question": "Can the usable MRN change over time for the same patient?",
+      "selectAllHint": "If Yes, select all that apply:",
+      "types": {
+        "merge": "Changes by patient merge",
+        "transfer": "Changes on facility transfer",
+        "correction": "Changes by identifier correction",
+        "other": "Change by other"
+      },
+      "otherLabel": "Change by other"
+    },
+    "actions": {
+      "complete": "Complete Enrollment"
+    },
+    "messages": {
+      "incomplete": "Please complete all fields before continuing.",
+      "loadError": "Unable to load MRN identifier data.",
+      "saveError": "Unable to save MRN identifier data.",
+      "completeError": "Unable to complete enrollment."
+    },
+    "errors": {
+      "selectYesNo": "Please select Yes or No.",
+      "selectAtLeastOne": "Please select at least one option.",
+      "describeOtherIdentifier": "Please describe the other identifier.",
+      "fieldRequired": "This field is required.",
+      "addAtLeastOneRule": "Please add at least one rule.",
+      "ruleValueRequired": "Please provide a value for every rule that requires one.",
+      "describeOtherVariance": "Please describe the other variance.",
+      "describeOtherChange": "Please describe the other change."
+    }
   },
   "complete": {
     "title": "Enrollment Complete",

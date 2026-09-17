@@ -92,6 +92,36 @@ internal sealed class ReportGateway : IReportGateway
         return entries.Select(ToPatientEntry).ToList();
     }
 
+    // Same building blocks as ListReportsAsync (schedules) and GetReportPatientsAsync (entries per
+    // schedule), just unioned across every schedule instead of one -- mirrors the onboarding POC's
+    // getMrnIntakePatients(), which unions patientIds across facility.reports and, on a duplicate,
+    // keeps the entry from the most-recently-created report. Newest-schedule-first here achieves
+    // the same "most recent wins" dedupe: the first time a patient id is seen is from its newest
+    // report.
+    public async Task<IReadOnlyList<string>> GetFacilityPatientIdsAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var schedulesResponse = await _reportClient.GetSchedulesByFacilityAsync(facilityId, cancellationToken: cancellationToken);
+        var schedules = LinkResponseHandler.Optional(schedulesResponse, ServiceName, nameof(GetFacilityPatientIdsAsync)) ?? [];
+        var ordered = schedules.OrderByDescending(schedule => schedule.CreateDate ?? DateTime.MinValue);
+
+        var patientIds = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var schedule in ordered)
+        {
+            var entriesResponse = await _reportClient.GetEntriesByScheduleAsync(schedule.Id.ToString(), cancellationToken);
+            var entries = LinkResponseHandler.Optional(entriesResponse, ServiceName, nameof(GetFacilityPatientIdsAsync)) ?? [];
+            foreach (var entry in entries)
+            {
+                if (seen.Add(entry.PatientId))
+                {
+                    patientIds.Add(entry.PatientId);
+                }
+            }
+        }
+
+        return patientIds;
+    }
+
     public async Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
     {
         var response = await _reportClient.GetEntryByScheduleAndPatientAsync(reportId, patientId, cancellationToken);

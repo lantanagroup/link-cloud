@@ -45,6 +45,21 @@ internal sealed class CensusConfigurationGateway : ICensusConfigurationGateway
         var updateResponse = await _censusClient.UpdateCensusConfigAsync(facilityId, current, cancellationToken);
         LinkResponseHandler.Require(updateResponse, ServiceName, nameof(SaveAcquisitionFrequencyAsync));
     }
+
+    public async Task EnableAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var response = await _censusClient.GetCensusConfigAsync(facilityId, cancellationToken);
+        var current = LinkResponseHandler.Require(response, ServiceName, nameof(EnableAsync));
+
+        if (current.Enabled == true)
+        {
+            return;
+        }
+
+        current.Enabled = true;
+        var updateResponse = await _censusClient.UpdateCensusConfigAsync(facilityId, current, cancellationToken);
+        LinkResponseHandler.Require(updateResponse, ServiceName, nameof(EnableAsync));
+    }
 }
 
 // Census stores acquisition cadence as a Quartz cron trigger — CensusConfigController rejects

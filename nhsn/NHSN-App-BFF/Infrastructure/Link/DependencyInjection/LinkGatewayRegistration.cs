@@ -44,6 +44,7 @@ public static class LinkGatewayRegistration
         services.AddScoped<ISftpFileGateway, SftpFileGateway>();
         services.AddScoped<ISftpConfigurationGateway, SftpConfigurationGateway>();
         services.AddScoped<IPatientListGateway, PatientListGateway>();
+        services.AddScoped<IPatientIdentifierGateway, PatientIdentifierGateway>();
 
         return services;
     }
