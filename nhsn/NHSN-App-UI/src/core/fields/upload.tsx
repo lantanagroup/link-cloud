@@ -57,9 +57,12 @@ export function DownloadLinkButton({
         {buttonText}
       </button>
       {hint && <p className="nhsn-link__hint-text">{hint}</p>}
+      <p className="nhsn-link__visually-hidden" role="alert">
+        {error}
+      </p>
       {error && (
         <MessageContainer type="error" showIcon>
-          <span role="alert">{error}</span>
+          <span>{error}</span>
         </MessageContainer>
       )}
     </div>

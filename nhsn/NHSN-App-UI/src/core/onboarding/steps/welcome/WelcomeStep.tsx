@@ -1,6 +1,6 @@
 import React from 'react';
 import {Trans, useTranslation} from 'react-i18next';
-import {Button, PageHeader, StepActions} from '../../../fields';
+import {Button, NewTabAnnouncement, PageHeader, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 
@@ -24,10 +24,26 @@ export function WelcomeStep({onNext}: StepProps) {
           t={t}
           i18nKey="onboarding:welcome.intro"
           components={{
-            nhsnlink: <a href="https://www.cdc.gov/nhsn/fhirportal/about.html" target="_blank" rel="noreferrer" />,
-            fhir: <a href="https://www.hl7.org/fhir/R4/index.html" target="_blank" rel="noreferrer" />
+            nhsnlink: (
+              <a
+                href="https://www.cdc.gov/nhsn/fhirportal/about.html"
+                target="_blank"
+                rel="noreferrer"
+                aria-describedby="welcome-nhsnlink-link-hint"
+              />
+            ),
+            fhir: (
+              <a
+                href="https://www.hl7.org/fhir/R4/index.html"
+                target="_blank"
+                rel="noreferrer"
+                aria-describedby="welcome-fhir-link-hint"
+              />
+            )
           }}
         />
+        <NewTabAnnouncement id="welcome-nhsnlink-link-hint" />
+        <NewTabAnnouncement id="welcome-fhir-link-hint" />
       </p>
 
       <h2>{t('onboarding:welcome.audienceTitle')}</h2>

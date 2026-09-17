@@ -215,11 +215,9 @@ export function ChipMultiSelect<T extends string>({
         </ul>
       </div>
 
-      {base.error && (
-        <p id={`${id}-error`} className="k-form-error" role="alert">
-          {base.error}
-        </p>
-      )}
+      <p id={`${id}-error`} className="k-form-error" role="alert">
+        {base.error}
+      </p>
     </div>
   );
 }

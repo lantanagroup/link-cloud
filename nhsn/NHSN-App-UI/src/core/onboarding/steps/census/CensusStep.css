@@ -377,6 +377,15 @@
   font-weight: 600;
 }
 
+.census-poi .census-connection-status {
+  margin: 0.5rem 0 1.25rem 0;
+}
+
+.census-poi .census-connection-status:empty {
+  display: none;
+  margin: 0;
+}
+
 /*
  * The app-wide button chrome (NHSNLink.css) is scoped to
  * .nhsn-link__step-actions, since every other step's buttons only ever sit in

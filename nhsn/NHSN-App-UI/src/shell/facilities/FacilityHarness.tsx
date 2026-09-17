@@ -379,7 +379,7 @@ export function FacilityHarness() {
         </div>
       </aside>
 
-      <main className="shell__content">
+      <div className="shell__content">
         {client ? (
           <AppRoot client={client} baseUrl="/" />
         ) : (
@@ -388,7 +388,7 @@ export function FacilityHarness() {
             <p>{t("shell.selectOrCreateDescription")}</p>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

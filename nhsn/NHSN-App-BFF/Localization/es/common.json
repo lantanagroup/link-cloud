@@ -96,9 +96,13 @@
   },
   "status": {
     "saving": "Guardando…",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "stepComplete": "(completado)"
   },
   "errors": {
     "unexpected": "Algo salió mal. Inténtelo de nuevo."
+  },
+  "a11y": {
+    "opensInNewTab": "(se abre en una pestaña nueva)"
   }
 }

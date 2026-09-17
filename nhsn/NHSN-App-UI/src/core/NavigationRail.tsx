@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 type RouteName = "home" | "onboarding" | "configuration";
 
@@ -35,10 +36,11 @@ export function NavigationRail({
   facilityId,
   stepsSection,
 }: NavigationRailProps) {
+  const { t } = useTranslation("common");
   return (
     <aside className="nhsn-link__nav">
       <div className="nhsn-link__nav-header">
-        <h1 className="nhsn-link__nav-title">{title}</h1>
+        <p className="nhsn-link__nav-title">{title}</p>
         <div className="nhsn-link__nav-userinfo">
           <p>
             {userName}
@@ -62,7 +64,7 @@ export function NavigationRail({
         )}
       </div>
 
-      <div className="nhsn-link__nav-scroll">
+      <nav className="nhsn-link__nav-scroll" aria-label={t("navigation.title")}>
         {stepsSection ?? (
           <div className="nhsn-link__nav-sections">
             {sections.map((section, index) => (
@@ -90,7 +92,7 @@ export function NavigationRail({
             ))}
           </div>
         )}
-      </div>
+      </nav>
     </aside>
   );
 }

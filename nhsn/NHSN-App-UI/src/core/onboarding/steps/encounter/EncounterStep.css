@@ -152,40 +152,6 @@
   font-size: 12.5px;
 }
 
-/* -------------------------------------------------- tabs (POC .btn-group > .btn / .btn-secondary) */
-
-.encounter-mapping .btn-group {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 22px;
-}
-
-.encounter-mapping .tab-btn {
-  border: 1px solid var(--encounter-blue);
-  background: #ffffff;
-  color: var(--encounter-blue);
-  border-radius: 6px;
-  padding: 9px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.encounter-mapping .tab-btn:hover {
-  background: var(--encounter-gray-100);
-}
-
-.encounter-mapping .tab-btn--active {
-  background: var(--encounter-blue);
-  border-color: var(--encounter-blue);
-  color: #ffffff;
-}
-
-.encounter-mapping .tab-btn--active:hover {
-  background: var(--encounter-blue-dark);
-}
-
 /* -------------------------------------------------- mapping tab */
 
 .encounter-mapping .codesystem-block {

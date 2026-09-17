@@ -24,6 +24,7 @@ import {
   CheckboxField,
   MessageContainer,
   Modal,
+  NewTabAnnouncement,
   NHSNLoadingIndicator,
   PageHeader,
   Select,
@@ -963,11 +964,15 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           </div>
         </div>
 
+        <p className="nhsn-link__visually-hidden" role="alert">
+          {!detailLoading ? detailError : null}
+        </p>
+
         {detailLoading && <NHSNLoadingIndicator />}
 
         {!detailLoading && detailError && (
           <MessageContainer type="error" showIcon>
-            <span role="alert">{detailError}</span>
+            <span>{detailError}</span>
           </MessageContainer>
         )}
 
@@ -1012,8 +1017,8 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
               <table className="nhsn-link__report-results-table">
                 <thead>
                   <tr>
-                    <th>{t('onboarding:reportResults.detail.columns.nhsnMeasure')}</th>
-                    <th>{t('onboarding:reportResults.detail.columns.digitalQualityMeasure')}</th>
+                    <th scope="col">{t('onboarding:reportResults.detail.columns.nhsnMeasure')}</th>
+                    <th scope="col">{t('onboarding:reportResults.detail.columns.digitalQualityMeasure')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1034,6 +1039,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                               target="_blank"
                               rel="noopener noreferrer">
                               {dqmInfo.name}
+                              <NewTabAnnouncement />
                             </a>
                           ) : (
                             '—'
@@ -1098,13 +1104,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>{t('onboarding:reportResults.detail.columns.patientId')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.fhirResourceCount')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.reportStatus')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.preQualResults')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.locationOrg')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.hslocMapping')}</th>
-                        <th>{t('onboarding:reportResults.detail.columns.encounterMapping')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.patientId')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.fhirResourceCount')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.reportStatus')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.preQualResults')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.locationOrg')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.hslocMapping')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.encounterMapping')}</th>
                         <th aria-hidden="true" />
                       </tr>
                     </thead>
@@ -1237,10 +1243,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
               </Button>
             </>
           }>
+          <p className="nhsn-link__visually-hidden" role="alert">
+            {!queryPlanLoading ? queryPlanError : null}
+          </p>
           {queryPlanLoading && <NHSNLoadingIndicator />}
           {!queryPlanLoading && queryPlanError && (
             <MessageContainer type="error" showIcon>
-              <span role="alert">{queryPlanError}</span>
+              <span>{queryPlanError}</span>
             </MessageContainer>
           )}
           {!queryPlanLoading && !queryPlanError && parsedQueryPlan && (
@@ -1273,12 +1282,12 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.section')}</th>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.resourceType')}</th>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.queryType')}</th>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.operationType')}</th>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.paged')}</th>
-                      <th>{t('onboarding:reportResults.detail.queryPlan.parameters')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.section')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.resourceType')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.queryType')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.operationType')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.paged')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.queryPlan.parameters')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1327,10 +1336,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
               </Button>
             </>
           }>
+          <p className="nhsn-link__visually-hidden" role="alert">
+            {!acquisitionLogLoading ? acquisitionLogError : null}
+          </p>
           {acquisitionLogLoading && <NHSNLoadingIndicator />}
           {!acquisitionLogLoading && acquisitionLogError && (
             <MessageContainer type="error" showIcon>
-              <span role="alert">{acquisitionLogError}</span>
+              <span>{acquisitionLogError}</span>
             </MessageContainer>
           )}
           {!acquisitionLogLoading && !acquisitionLogError && (
@@ -1377,7 +1389,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                     onChange={value => setAcquisitionLogFilters(prev => ({...prev, status: value}))}
                   />
                 </div>
-                <p className="nhsn-link__report-results-result-count">
+                <p className="nhsn-link__report-results-result-count" aria-live="polite">
                   {t('onboarding:reportResults.detail.acquisitionLog.resultCount', {
                     shown: filteredAcquisitionLogs.length,
                     total: acquisitionLogs.length
@@ -1387,12 +1399,12 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
-                        <th>{t('onboarding:reportResults.detail.columns.patientId')}</th>
-                        <th>{t('onboarding:reportResults.detail.acquisitionLog.resource')}</th>
-                        <th>{t('onboarding:reportResults.detail.acquisitionLog.queryPhase')}</th>
-                        <th>{t('onboarding:reportResults.detail.acquisitionLog.queryType')}</th>
-                        <th>{t('onboarding:reportResults.detail.acquisitionLog.parameters')}</th>
-                        <th>{t('onboarding:reportResults.detail.acquisitionLog.status')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.columns.patientId')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.acquisitionLog.resource')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.acquisitionLog.queryPhase')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.acquisitionLog.queryType')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.acquisitionLog.parameters')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.acquisitionLog.status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1551,7 +1563,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 <thead>
                   <tr>
                     {locationOrgConfig.headers.map(header => (
-                      <th key={header}>{header}</th>
+                      <th key={header} scope="col">{header}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1581,10 +1593,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
           <h3 className="nhsn-link__report-results-detail-section-title">
             {t('onboarding:reportResults.detail.mappingEvidence.locationEvidenceHeading')}
           </h3>
+          <p className="nhsn-link__visually-hidden" role="alert">
+            {!mappingEvidenceLoading ? mappingEvidenceError : null}
+          </p>
           {mappingEvidenceLoading && <NHSNLoadingIndicator />}
           {!mappingEvidenceLoading && mappingEvidenceError && (
             <MessageContainer type="error" showIcon>
-              <span role="alert">{mappingEvidenceError}</span>
+              <span>{mappingEvidenceError}</span>
             </MessageContainer>
           )}
           {!mappingEvidenceLoading && !mappingEvidenceError && mappingEvidence && (
@@ -1593,9 +1608,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.locationId')}</th>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.locationAlias')}</th>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.isOrgLocation')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.locationId')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.locationAlias')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.isOrgLocation')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1622,7 +1637,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
 
           {mappingEvidencePatientRow && !mappingEvidencePatientRow.locationOrgFound && (
             <MessageContainer type="info" showIcon>
-              <p>{t('onboarding:reportResults.detail.mappingEvidence.notFoundLocationOrgHint')}</p>
+              <p role="status">{t('onboarding:reportResults.detail.mappingEvidence.notFoundLocationOrgHint')}</p>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -1663,9 +1678,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             <table className="nhsn-link__report-results-table">
               <thead>
                 <tr>
-                  <th>{t('onboarding:reportResults.detail.mappingEvidence.yourCode')}</th>
-                  <th>{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
-                  <th>{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
+                  <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.yourCode')}</th>
+                  <th scope="col">{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
+                  <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1692,10 +1707,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             </table>
           </div>
 
+          <p className="nhsn-link__visually-hidden" role="alert">
+            {!mappingEvidenceLoading ? mappingEvidenceError : null}
+          </p>
           {mappingEvidenceLoading && <NHSNLoadingIndicator />}
           {!mappingEvidenceLoading && mappingEvidenceError && (
             <MessageContainer type="error" showIcon>
-              <span role="alert">{mappingEvidenceError}</span>
+              <span>{mappingEvidenceError}</span>
             </MessageContainer>
           )}
 
@@ -1711,8 +1729,8 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
-                        <th>{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
-                        <th>{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
+                        <th scope="col">{vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.hslocCode')}</th>
                         <th aria-hidden="true" />
                       </tr>
                     </thead>
@@ -1769,10 +1787,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             </div>
           </dl>
 
+          <p className="nhsn-link__visually-hidden" role="alert">
+            {!mappingEvidenceLoading ? mappingEvidenceError : null}
+          </p>
           {mappingEvidenceLoading && <NHSNLoadingIndicator />}
           {!mappingEvidenceLoading && mappingEvidenceError && (
             <MessageContainer type="error" showIcon>
-              <span role="alert">{mappingEvidenceError}</span>
+              <span>{mappingEvidenceError}</span>
             </MessageContainer>
           )}
 
@@ -1785,8 +1806,8 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.sourceSystem')}</th>
-                      <th>{t('onboarding:reportResults.detail.mappingEvidence.unmappedCodes')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.sourceSystem')}</th>
+                      <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.unmappedCodes')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1817,9 +1838,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
-                        <th>{t('onboarding:reportResults.detail.mappingEvidence.localValue')}</th>
-                        <th>{t('onboarding:reportResults.detail.mappingEvidence.standardSystem')}</th>
-                        <th>{t('onboarding:reportResults.detail.mappingEvidence.standardCode')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.localValue')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.standardSystem')}</th>
+                        <th scope="col">{t('onboarding:reportResults.detail.mappingEvidence.standardCode')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1845,7 +1866,7 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
 
           {mappingEvidencePatientRow && !mappingEvidencePatientRow.encounterFound && (
             <MessageContainer type="info" showIcon>
-              <p>{t('onboarding:reportResults.detail.mappingEvidence.notFoundEncounterHint')}</p>
+              <p role="status">{t('onboarding:reportResults.detail.mappingEvidence.notFoundEncounterHint')}</p>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -1879,11 +1900,15 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
         </Button>
       </div>
 
+      <p className="nhsn-link__visually-hidden" role="alert">
+        {!loading ? loadError : null}
+      </p>
+
       {loading && <NHSNLoadingIndicator />}
 
       {!loading && loadError && reports.length === 0 && (
         <MessageContainer type="error" showIcon>
-          <span role="alert">{loadError}</span>
+          <span>{loadError}</span>
         </MessageContainer>
       )}
 
@@ -1901,13 +1926,13 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
             </colgroup>
             <thead>
               <tr>
-                <th>{t('onboarding:reportResults.columns.reportId')}</th>
-                <th>{t('onboarding:reportResults.columns.measures')}</th>
-                <th>{t('onboarding:reportResults.columns.patientCount')}</th>
-                <th>{t('onboarding:reportResults.columns.startDate')}</th>
-                <th>{t('onboarding:reportResults.columns.endDate')}</th>
-                <th>{t('onboarding:reportResults.columns.createDate')}</th>
-                <th>{t('onboarding:reportResults.columns.status')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.reportId')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.measures')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.patientCount')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.startDate')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.endDate')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.createDate')}</th>
+                <th scope="col">{t('onboarding:reportResults.columns.status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1960,11 +1985,9 @@ export function ReportResultsStep({onNext, onBack}: StepProps) {
         />
       </div>
 
-      {validationMessage && (
-        <p className="nhsn-link__form-error" role="alert">
-          {validationMessage}
-        </p>
-      )}
+      <p className="nhsn-link__form-error" role="alert">
+        {validationMessage}
+      </p>
 
       <StepActions saving={saving}>
         <Button variant="secondary" onClick={onBack} disabled={saving}>

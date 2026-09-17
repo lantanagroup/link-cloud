@@ -64,6 +64,11 @@ body {
   cursor: pointer;
 }
 
+.shell__toggle:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
 .shell--collapsed .shell__toggle {
   margin: 0 auto;
 }

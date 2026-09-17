@@ -123,6 +123,16 @@ export function RequiredAsterisk() {
   return <TbAsterisk aria-hidden="true" className="nhsn-link__required-asterisk" color="red" size={8} strokeWidth={3} />;
 }
 
+export function NewTabAnnouncement({id}: {id?: string}) {
+  const {t} = useTranslation('common');
+  return (
+    <span id={id} className="nhsn-link__visually-hidden">
+      {' '}
+      {t('a11y.opensInNewTab')}
+    </span>
+  );
+}
+
 export interface SidePanelLayoutProps {
   children: React.ReactNode;
 }

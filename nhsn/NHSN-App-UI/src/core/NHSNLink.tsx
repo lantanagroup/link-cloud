@@ -175,9 +175,9 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
               stepsSection={<OnboardingStepsNav />}
             />
 
-            <section className="nhsn-link__grid">
+            <main className="nhsn-link__grid">
               <StepHost />
-            </section>
+            </main>
           </div>
         </OnboardingProvider>
       ) : (
@@ -193,12 +193,12 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
             facilityId={userInfo.facilityId}
           />
 
-          <section className="nhsn-link__grid">
+          <main className="nhsn-link__grid">
             {route === 'home' && <Home userInfo={userInfo} />}
             {route === 'configuration' && userInfo.isOnboarded && (
               <ConfigurationScreen />
             )}
-          </section>
+          </main>
         </div>
       )}
     </div>
@@ -228,6 +228,7 @@ function resolveRoute(pathname: string, baseUrl: string): RouteName {
 const FIELD_HINT_OPEN_CLASS = 'k-form-field--hint-open';
 const INFO_ICON_OPEN_CLASS = 'info-icon--open';
 const OPEN_SELECTOR = `.${FIELD_HINT_OPEN_CLASS}, .${INFO_ICON_OPEN_CLASS}`;
+const HINT_LABEL_SELECTOR = '.k-form-field:has(.k-form-hint) .k-label';
 
 function closeAllHintsExcept(keep: Element | null) {
   document.querySelectorAll(OPEN_SELECTOR).forEach((el) => {
@@ -237,7 +238,66 @@ function closeAllHintsExcept(keep: Element | null) {
   });
 }
 
+function toggleFieldHint(field: Element) {
+  const isOpen = field.classList.contains(FIELD_HINT_OPEN_CLASS);
+  closeAllHintsExcept(isOpen ? null : field);
+  field.classList.toggle(FIELD_HINT_OPEN_CLASS, !isOpen);
+}
+
+/**
+ * The "?" badge is CSS-generated content (`.k-label::after`) and can never be
+ * focusable, so this injects a real `<button>` into each hinted label instead.
+ * Kept in sync via a MutationObserver since steps mount new fields on navigation.
+ */
+function useHintLabelFocusability() {
+  useEffect(() => {
+    function tagLabels(root: ParentNode) {
+      root.querySelectorAll<HTMLLabelElement>(HINT_LABEL_SELECTOR).forEach((label) => {
+        if (label.dataset.hintTrigger === 'true') {
+          return;
+        }
+        label.dataset.hintTrigger = 'true';
+
+        const hintText = label.htmlFor
+          ?     document.getElementById(`${label.htmlFor}_hint`)?.textContent ?? ''
+          : '';
+        const bubbleId = label.htmlFor ? `${label.htmlFor}_hint_bubble` : undefined;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'nhsn-link__hint-trigger';
+        button.setAttribute('aria-label', 'More information');
+        if (bubbleId) {
+          button.setAttribute('aria-describedby', bubbleId);
+        }
+        button.appendChild(document.createTextNode('?'));
+
+        const bubble = document.createElement('span');
+        bubble.className = 'nhsn-link__hint-trigger-bubble';
+        bubble.setAttribute('role', 'tooltip');
+        if (bubbleId) {
+          bubble.id = bubbleId;
+        }
+        bubble.textContent = hintText;
+        button.appendChild(bubble);
+
+        label.appendChild(button);
+      });
+    }
+
+    tagLabels(document);
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
+        tagLabels(document);
+      }
+    });
+    observer.observe(document.body, {childList: true, subtree: true});
+    return () => observer.disconnect();
+  }, []);
+}
+
 function useHintTooltips() {
+  useHintLabelFocusability();
   useEffect(() => {
     function handleClick(event: MouseEvent) {
       const target = event.target as Element | null;
@@ -258,17 +318,16 @@ function useHintTooltips() {
         return;
       }
 
-      if (trigger) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      event.preventDefault();
+      event.stopPropagation();
 
-      const openClass = fieldTrigger
-        ? FIELD_HINT_OPEN_CLASS
-        : INFO_ICON_OPEN_CLASS;
-      const isOpen = trigger.classList.contains(openClass);
-      closeAllHintsExcept(isOpen ? null : trigger);
-      trigger.classList.toggle(openClass, !isOpen);
+      if (fieldTrigger) {
+        toggleFieldHint(fieldTrigger);
+      } else {
+        const isOpen = trigger.classList.contains(INFO_ICON_OPEN_CLASS);
+        closeAllHintsExcept(isOpen ? null : trigger);
+        trigger.classList.toggle(INFO_ICON_OPEN_CLASS, !isOpen);
+      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
