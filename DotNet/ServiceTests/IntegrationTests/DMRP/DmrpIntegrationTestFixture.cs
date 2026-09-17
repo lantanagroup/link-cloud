@@ -2,6 +2,7 @@ using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -112,6 +113,8 @@ namespace IntegrationTests.DMRP
             // supplying them, so the fixture stands in for the host here as it does for the facility
             // lookup above. The module needs a named type, so the mock is reached through one.
             builder.Services.AddScoped(_ => new HostFacilityOperations(FacilityOperationsMock.Object));
+
+            builder.Services.RegisterQuartzDatabaseInTest();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
                 builder.Services.AddControllers());
