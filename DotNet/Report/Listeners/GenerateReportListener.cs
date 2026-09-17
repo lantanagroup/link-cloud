@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -179,6 +180,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     throw new DeadLetterException("FacilityId is null or empty.");
                 }
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, Name, facilityId, value.AdhocReportId.ToString(), cancellationToken))
+                    return;
 
                 if (value is { Regenerate: true, ReportId: not null })
                 {

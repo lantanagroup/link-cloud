@@ -66,4 +66,12 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
         string fhirServerUrl,
         CancellationToken cancellationToken = default);
+
+    /// Tests SFTP connection details without a saved configuration, optionally previewing the patients in
+    /// each Cerner extract. The request body is not captured in the response, because it carries the password.
+    /// </summary>
+    Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
+        SftpTestConnectionRequestApiModel request,
+        bool includeFileContent = false,
+        CancellationToken cancellationToken = default);
 }
