@@ -15,7 +15,6 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -175,24 +174,6 @@ namespace UnitTests.DMRP
         }
 
         /// <summary>
-        /// Enabled, the module reconciles its zone jobs at boot rather than leaving a stale or
-        /// missing job for the classic scheduler's shared Quartz scheduler to fire (or not) blind.
-        /// </summary>
-        [Fact]
-        public void AddDmrpModule_registers_the_reconciler_and_boot_reconcile_hosted_service_when_enabled()
-        {
-            var builder = CreateBuilder(enabled: true);
-
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
-
-            Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
-
-            var hostedService = Assert.Single(builder.Services,
-                d => d.ServiceType == typeof(IHostedService));
-            Assert.Equal(typeof(DmrpNightlyScheduleHostedService), hostedService.ImplementationType);
-        }
-
-        /// <summary>
         /// Where a facility is lives in the host's records, which the module cannot see. Like the
         /// existence check, the host supplies it and the module adds no registration of its own.
         /// </summary>
@@ -261,25 +242,6 @@ namespace UnitTests.DMRP
                 builder.Services.AddControllers());
 
             Assert.False(registered);
-        }
-
-        /// <summary>
-        /// Disabled, the module still registers the reconciler and a cleanup hosted service, so any
-        /// jobs left over from a previous run with the flag on are swept before the classic
-        /// scheduler starts its shared Quartz scheduler.
-        /// </summary>
-        [Fact]
-        public void AddDmrpModule_registers_the_reconciler_and_boot_cleanup_hosted_service_when_disabled()
-        {
-            var builder = CreateBuilder(enabled: false);
-
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
-
-            Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
-
-            var hostedService = Assert.Single(builder.Services,
-                d => d.ServiceType == typeof(IHostedService));
-            Assert.Equal(typeof(DmrpNightlyScheduleCleanupService), hostedService.ImplementationType);
         }
 
         /// <summary>

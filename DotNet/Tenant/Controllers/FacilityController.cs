@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -246,6 +247,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (ScheduledReportsNotAcceptedException ex)
             {
                 return BadRequestProblem(ex.Message);
+            }
+            catch (DmrpApiException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "DMRP could not be reached");
             }
             catch (ApplicationException ex)
             {

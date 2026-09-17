@@ -1,6 +1,9 @@
-﻿using LantanaGroup.Link.DMRP.Business;
+﻿using FluentAssertions;
+using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -32,6 +35,8 @@ namespace UnitTests.DMRP
         private readonly Mock<IFacilityReportingPlanManager> _planManager = new();
         private readonly Mock<IEntityRepository<FacilityReportingPlan>> _planRepository = new();
         private readonly Mock<IFacilityTimeZoneSource> _timeZoneSource = new();
+        private readonly Mock<IDmrpReportingPlanSync> _sync = new();
+        private readonly Mock<IDmrpNightlyJobReconciler> _reconciler = new();
 
         private DmrpFacilityOperations CreateOperations() =>
             // The real projector and period resolver rather than mocks: these tests assert on the
@@ -41,7 +46,8 @@ namespace UnitTests.DMRP
                 new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance),
                 _planManager.Object, _planRepository.Object,
                 new FacilityReportingPeriodResolver(NullLogger<FacilityReportingPeriodResolver>.Instance,
-                    new FixedTimeProvider(FixedNow), _timeZoneSource.Object));
+                    new FixedTimeProvider(FixedNow), _timeZoneSource.Object),
+                _sync.Object, _reconciler.Object);
 
         private void GivenPlan(params ReportingPlanEntry[] entries) =>
             _plans.Setup(p => p.GetForPeriodAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
@@ -423,12 +429,61 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
+        public async Task Create_refreshes_the_current_month_from_dmrp_before_deriving_the_schedule()
+        {
+            var facility = new FacilityModel { FacilityId = "100", TimeZone = "UTC", ScheduledReports = EmptySchedule() };
+            var order = new List<string>();
+            _sync.Setup(s => s.SyncAsync("100", FixedNow.Month, FixedNow.Year, It.IsAny<CancellationToken>()))
+                .Callback(() => order.Add("sync")).ReturnsAsync(DmrpSyncResult.Nothing);
+            _plans.Setup(p => p.GetForPeriodAsync("100", FixedNow.Month, FixedNow.Year, It.IsAny<CancellationToken>()))
+                .Callback(() => order.Add("read")).ReturnsAsync(Array.Empty<ReportingPlanEntry>());
+
+            await CreateOperations().CreateAsync(facility);
+
+            order.Should().Equal("sync", "read");
+        }
+
+        [Fact]
+        public async Task Create_fails_closed_when_dmrp_cannot_be_read()
+        {
+            var facility = new FacilityModel { FacilityId = "100", TimeZone = "UTC", ScheduledReports = EmptySchedule() };
+            _sync.Setup(s => s.SyncAsync("100", It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new DmrpApiException("down"));
+
+            var operations = CreateOperations();
+            var act = () => operations.CreateAsync(facility);
+
+            await act.Should().ThrowAsync<DmrpApiException>();
+            _inner.Verify(i => i.CreateAsync(It.IsAny<FacilityModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task Create_update_and_restore_ensure_the_zone_job_after_the_host_write()
+        {
+            var facility = new FacilityModel { FacilityId = "100", TimeZone = "America/Chicago", ScheduledReports = EmptySchedule() };
+            _sync.Setup(s => s.SyncAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(DmrpSyncResult.Nothing);
+            _plans.Setup(p => p.GetForPeriodAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Array.Empty<ReportingPlanEntry>());
+
+            var operations = CreateOperations();
+            await operations.CreateAsync(facility);
+            await operations.UpdateAsync(facility, facility);
+            await operations.RestoreAsync(facility);
+
+            _reconciler.Verify(r => r.EnsureZoneJobAsync("America/Chicago", It.IsAny<CancellationToken>()), Times.Exactly(3));
+        }
+
+        private static TenantScheduledReportConfig EmptySchedule() =>
+            new() { Daily = Array.Empty<string>(), Weekly = Array.Empty<string>(), Monthly = Array.Empty<string>() };
+
+        [Fact]
         public void Constructor_refuses_a_missing_period_resolver()
         {
             var exception = Assert.Throws<ArgumentNullException>(() =>
                 new DmrpFacilityOperations(NullLogger<DmrpFacilityOperations>.Instance, _inner.Object, _plans.Object,
                     new ReportingPlanScheduleProjector(NullLogger<ReportingPlanScheduleProjector>.Instance),
-                    _planManager.Object, _planRepository.Object, null!));
+                    _planManager.Object, _planRepository.Object, null!, _sync.Object, _reconciler.Object));
 
             Assert.Equal("facilityReportingPeriodResolver", exception.ParamName);
         }
