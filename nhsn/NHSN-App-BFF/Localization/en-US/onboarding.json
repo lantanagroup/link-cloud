@@ -90,7 +90,7 @@
       "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
       "invalidUrl": "Enter a valid, fully-qualified URL.",
       "invalidNumber": "Enter a whole number of zero or greater.",
-      "invalidNumberRange": "Enter a whole number within the allowed range.",
+      "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
       "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
@@ -98,7 +98,8 @@
       "invalidFhirId": "Enter a valid FHIR id.",
       "invalidFhirPath": "Enter a valid FHIRPath expression.",
       "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it or leave it blank to select one online.",
-      "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it or leave it blank to select one online."
+      "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it or leave it blank to select one online.",
+      "lineFormat": "{{sheet}} {{location}}: {{message}}"
     }
   },
   "fhirServerInfo": {

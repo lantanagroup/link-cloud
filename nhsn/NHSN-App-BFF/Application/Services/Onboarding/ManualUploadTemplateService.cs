@@ -138,7 +138,12 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             Encounter = await BuildEncounterAsync(rows, cancellationToken)
         };
 
-        var totalFields = rows.Values.Count(row => row.TryGetValue("A", out var key) && ScalarFieldKeys.Contains(key));
+        var hslocImported = fields.Hsloc?.Mappings is {Count: > 0};
+        var encounterImported = fields.Encounter?.Mappings is {Count: > 0};
+
+        var totalFields = rows.Values.Count(row => row.TryGetValue("A", out var key) && ScalarFieldKeys.Contains(key))
+            + 1 // HSLOC Location Mapping
+            + 1; // Encounter Mapping
 
         // Only a fully valid sheet gets saved - a cell error rejects the whole import (Accepted =
         // false), so nothing here is ever written half-validated. Accepted is captured before a
@@ -167,7 +172,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         {
             Accepted = accepted,
             CellErrors = errors,
-            FieldsImported = values.Count,
+            FieldsImported = values.Count + (hslocImported ? 1 : 0) + (encounterImported ? 1 : 0),
             TotalFields = totalFields,
             Fields = fields
         };
@@ -532,7 +537,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
                 value = NormalizeExcelTime(value);
             }
 
-            var messageKey = ValidateScalar(key, value);
+            var (messageKey, detail) = ValidateScalar(key, value);
             if (messageKey is not null)
             {
                 // Recorded as an error (which rejects the whole import - Accepted=false - so
@@ -546,7 +551,8 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
                     Cell = $"C{rowNumber}",
                     MessageKey = messageKey,
                     Section = SectionFor(key),
-                    Label = row.GetValueOrDefault("B")
+                    Label = row.GetValueOrDefault("B"),
+                    Detail = detail
                 });
             }
 
@@ -556,25 +562,25 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         return values;
     }
 
-    private static string? ValidateScalar(string key, string value)
+    private static (string? MessageKey, string? Detail) ValidateScalar(string key, string value)
     {
         if (FhirIdKeys.Contains(key))
         {
-            return ValidateFhirId(value);
+            return (ValidateFhirId(value), null);
         }
 
         return key switch
         {
-            "fhirBaseUrl" => ValidateAbsoluteUrl(value),
+            "fhirBaseUrl" => (ValidateAbsoluteUrl(value), null),
             "maxConcurrentRequests" => ValidateIntRange(value, FieldValidationRules.MaxConcurrentRequestsMin, FieldValidationRules.MaxConcurrentRequestsCap),
             "maxRetries" => ValidateIntRange(value, FieldValidationRules.MaxRetriesMin, FieldValidationRules.MaxRetriesCap),
-            "minPullTime" or "maxPullTime" => ValidatePullTime(value),
+            "minPullTime" or "maxPullTime" => (ValidatePullTime(value), null),
             "sftpPort" => ValidateIntRange(value, FieldValidationRules.SftpPortMin, FieldValidationRules.SftpPortMax),
             "censusFreqHours" or "censusFreqMinutes"
-                or "patientLagDays" or "patientLagHours" or "patientLagMinutes" => ValidateNonNegativeInteger(value),
-            "locOrgMethod" => ValidateLocationMethod(value),
-            "customFhirPath" => ValidateFhirPath(value),
-            _ => null
+                or "patientLagDays" or "patientLagHours" or "patientLagMinutes" => (ValidateNonNegativeInteger(value), null),
+            "locOrgMethod" => (ValidateLocationMethod(value), null),
+            "customFhirPath" => (ValidateFhirPath(value), null),
+            _ => (null, null)
         };
     }
 
@@ -594,8 +600,13 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
     private static string? ValidateNonNegativeInteger(string value) =>
         FieldValidationRules.IsNonNegativeInteger(value) ? null : "onboarding:manualUpload.errors.invalidNumber";
 
-    private static string? ValidateIntRange(string value, int min, int max) =>
-        FieldValidationRules.IsIntInRange(value, min, max) ? null : "onboarding:manualUpload.errors.invalidNumberRange";
+    // Detail carries the actual min/max so the facility sees the real allowed range instead of a
+    // generic "within the allowed range" - interpolated into the message via {{detail}}, same
+    // mechanism SaveFailed already uses for a downstream service's own explanation.
+    private static (string? MessageKey, string? Detail) ValidateIntRange(string value, int min, int max) =>
+        FieldValidationRules.IsIntInRange(value, min, max)
+            ? (null, null)
+            : ("onboarding:manualUpload.errors.invalidNumberRange", $"{min}-{max}");
 
     private static string? ValidatePullTime(string value) =>
         FieldValidationRules.IsPullTime(value) ? null : "onboarding:manualUpload.errors.invalidPullTime";
