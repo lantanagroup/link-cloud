@@ -39,7 +39,8 @@ export class MockApiClient implements ApiClient {
     private readonly capabilities: C.Capabilities = {
       patientListWithNames: false,
       fhirConnectionProbe: false,
-      sftpFileListing: false
+      sftpFileListing: false,
+      onboardingRevisit: false
     }
   ) {}
 

@@ -21,6 +21,7 @@ function userWith(capabilities: Partial<Capabilities>): UserInfoResponse {
       patientListWithNames: false,
       fhirConnectionProbe: false,
       sftpFileListing: false,
+      onboardingRevisit: false,
       ...capabilities
     }
   };

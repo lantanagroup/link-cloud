@@ -40,7 +40,8 @@ describe('CensusStep', () => {
         client={new MockApiClient(undefined, undefined, {
           patientListWithNames: true,
           fhirConnectionProbe: false,
-          sftpFileListing: false
+          sftpFileListing: false,
+          onboardingRevisit: false
         })}
         baseUrl="/"
       />
