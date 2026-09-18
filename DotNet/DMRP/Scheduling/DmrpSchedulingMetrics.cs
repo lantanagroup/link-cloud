@@ -43,14 +43,23 @@ namespace LantanaGroup.Link.DMRP.Scheduling
         private readonly Counter<long> _outcomes;
         private readonly Counter<long> _refreshFailures;
 
-        // The host's meter, so these export through the host's existing OpenTelemetry registration
-        // (TelemetryServiceExtension adds exactly one meter, named Link.{ServiceName}).
+        // The host's meter, so these export through the host's existing OpenTelemetry registration.
+        // TelemetryServiceExtension subscribes to exactly one meter, Link.{name}, where name is the
+        // constant the host passes to AddLinkTelemetry ("Tenant"). SetupServiceInformation stores that
+        // same constant in ServiceConfigName; ServiceName is the display name from configuration
+        // ("Link Tenant Service"), and a meter built from it is never exported.
         public DmrpSchedulingMetrics(IMeterFactory meterFactory, ServiceInformation serviceInformation)
         {
             ArgumentNullException.ThrowIfNull(meterFactory);
             ArgumentNullException.ThrowIfNull(serviceInformation);
+            if (string.IsNullOrWhiteSpace(serviceInformation.ServiceConfigName))
+            {
+                throw new ArgumentException(
+                    $"{nameof(ServiceInformation)}.{nameof(ServiceInformation.ServiceConfigName)} is required; " +
+                    "it names the meter the host exports.", nameof(serviceInformation));
+            }
 
-            var meter = meterFactory.Create($"Link.{serviceInformation.ServiceName}");
+            var meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
             _reportsScheduled = meter.CreateCounter<long>("link_dmrp.report_scheduled.count");
             _outcomes = meter.CreateCounter<long>("link_dmrp.nightly_fire.facility_outcome.count");
             _refreshFailures = meter.CreateCounter<long>("link_dmrp.plan_refresh.failure.count");
