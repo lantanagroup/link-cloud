@@ -23,8 +23,10 @@ public sealed record PackageZipDownloadResult(
 // Builds the manual-upload import package: the vendor's import sheet, its census and JWKS
 // instructions, and — for Epic only — the org-resolution guidance, zipped together.
 //
-// The files are copied byte for byte out of StaticAssets. Nothing is generated or rewritten, so
-// what a facility extracts is exactly what was reviewed and deployed.
+// Every file is copied byte for byte out of StaticAssets, except the import sheet itself: its
+// "Facility: ..." / "Vendor: ..." header lines are rewritten to name the actual downloading
+// facility (see ManualUploadTemplatePersonalizer) before it's added to the zip. Nothing else in
+// the sheet, and nothing in any other file, is touched.
 public interface IPackageZipDownloadService
 {
     Task<PackageZipDownloadResult> ExportAsync(CancellationToken cancellationToken = default);

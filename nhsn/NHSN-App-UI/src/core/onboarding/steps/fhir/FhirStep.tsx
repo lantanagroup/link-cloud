@@ -66,10 +66,17 @@ export function FhirStep({onNext, onBack}: StepProps) {
     }
   }, [testing, testResult]);
 
-  function handleBaseUrlChange(value: string) {
-    setBaseUrl(value);
+  // Any field on this page invalidates a prior Test Connection - not just the base URL. The
+  // reachability check itself only depends on the URL, but the whole point of testing is "this
+  // configuration is good to save," so touching anything means that promise needs re-confirming.
+  function resetConnectionTest() {
     setTestedBaseUrl(null);
     setTestResult(null);
+  }
+
+  function handleBaseUrlChange(value: string) {
+    setBaseUrl(value);
+    resetConnectionTest();
     patch('fhir', {fhirServerBaseUrl: value});
   }
 
@@ -297,6 +304,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 setMaxConcurrentRequests(value);
                 markTouched('maxConcurrentRequests');
                 refreshErrors({maxConcurrentRequests: value});
+                resetConnectionTest();
                 patch('fhir', {maxConcurrentRequests: value});
               }}
               onBlur={() => {
@@ -316,6 +324,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 setMaxRetries(value);
                 markTouched('maxRetries');
                 refreshErrors({maxRetries: value});
+                resetConnectionTest();
                 patch('fhir', {maxRetries: value});
               }}
               onBlur={() => {
@@ -336,6 +345,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               onChange={value => {
                 const normalized = digitsOnly(value);
                 setMinPullTime(normalized);
+                resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
               }}
               onBlur={() => handlePullTimeBlur(minPullTime, setMinPullTime, 'minAcquisitionPullTime')} />
@@ -350,6 +360,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               onChange={value => {
                 const normalized = digitsOnly(value);
                 setMaxPullTime(normalized);
+                resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
               }}
               onBlur={() => handlePullTimeBlur(maxPullTime, setMaxPullTime, 'maxAcquisitionPullTime')} />
@@ -379,6 +390,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagDays(value);
                   markTouched('lagDays');
                   refreshErrors({lagDays: value});
+                  resetConnectionTest();
                   patchLagDuration({lagDays: value});
                 }}
                 onBlur={() => {
@@ -398,6 +410,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagHours(value);
                   markTouched('lagHours');
                   refreshErrors({lagHours: value});
+                  resetConnectionTest();
                   patchLagDuration({lagHours: value});
                 }}
                 onBlur={() => {
@@ -417,6 +430,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
                   setLagMinutes(value);
                   markTouched('lagMinutes');
                   refreshErrors({lagMinutes: value});
+                  resetConnectionTest();
                   patchLagDuration({lagMinutes: value});
                 }}
                 onBlur={() => {
@@ -493,12 +507,20 @@ function buildIso8601Duration(days?: number, hours?: number, minutes?: number): 
   return `P${normalizedDays}DT${normalizedHours}H${normalizedMinutes}M`;
 }
 
-// Inverse of buildIso8601Duration: PxDTyHzM -> [days, hours, minutes].
+// Inverse of buildIso8601Duration, but tolerant of any minimal ISO-8601 duration shape, not just
+// the one buildIso8601Duration itself emits: a value round-tripped through Query Dispatch comes
+// back as .NET's XmlConvert.ToString(TimeSpan), which drops any component that's zero entirely -
+// 50 days with no hours/minutes serializes as "P50D", not "P50DT0H0M" - so every one of D/T/H/M/S
+// here is optional, and a missing piece just means zero, not "unparseable".
 function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
-  const match = duration?.match(/^P(\d+)DT(\d+)H(\d+)M$/);
+  if (!duration) {
+    return [undefined, undefined, undefined];
+  }
+
+  const match = duration.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?)?$/);
   if (!match) {
     return [undefined, undefined, undefined];
   }
 
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
+  return [Number(match[1] ?? 0), Number(match[2] ?? 0), Number(match[3] ?? 0)];
 }

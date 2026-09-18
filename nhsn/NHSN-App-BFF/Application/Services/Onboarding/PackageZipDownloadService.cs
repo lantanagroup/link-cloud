@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
@@ -33,17 +34,20 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
     };
 
     private readonly IOnboardingReadService _readService;
+    private readonly IFacilityGateway _facilityGateway;
     private readonly INhsnUserContext _userContext;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<PackageZipDownloadService> _logger;
 
     public PackageZipDownloadService(
         IOnboardingReadService readService,
+        IFacilityGateway facilityGateway,
         INhsnUserContext userContext,
         IWebHostEnvironment environment,
         ILogger<PackageZipDownloadService> logger)
     {
         _readService = readService;
+        _facilityGateway = facilityGateway;
         _userContext = userContext;
         _environment = environment;
         _logger = logger;
@@ -90,18 +94,35 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
             return new PackageZipDownloadResult(PackageZipDownloadStatus.AssetsUnavailable, MissingFiles: missing);
         }
 
+        // Only for the "Facility: ..." / "Vendor: ..." lines at the top of the import sheet - every
+        // other file, and every other cell of the sheet itself, is still copied byte for byte.
+        // Without this, every facility's sheet named whichever sample facility happened to be on
+        // disk when the asset was authored, not the facility that actually downloaded it.
+        var facility = await _facilityGateway.GetAsync(facilityId, cancellationToken);
+        var facilityLine = $"Facility: {facility?.FacilityName ?? facilityId} ({facilityId})";
+        var vendorLine = $"Vendor: {vendor.Value}";
+
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
             foreach (var (entryName, filePath) in resolved)
             {
                 var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
-
-                // Copied verbatim — no reading, no rewriting. Extracting the zip yields the same
-                // bytes as the file on disk.
                 await using var entryStream = entry.Open();
-                await using var source = File.OpenRead(filePath);
-                await source.CopyToAsync(entryStream, cancellationToken);
+
+                if (Path.GetExtension(filePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    var templateBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+                    var personalized = ManualUploadTemplatePersonalizer.Personalize(templateBytes, facilityLine, vendorLine);
+                    await entryStream.WriteAsync(personalized, cancellationToken);
+                }
+                else
+                {
+                    // Every other file is copied verbatim — extracting it from the zip yields the
+                    // same bytes as the file on disk.
+                    await using var source = File.OpenRead(filePath);
+                    await source.CopyToAsync(entryStream, cancellationToken);
+                }
             }
         }
 

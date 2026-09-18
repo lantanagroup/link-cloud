@@ -32,6 +32,12 @@ export function isValidHttpUrl(value: string): boolean {
 /** 24-hour HH:MM, hours 00-23, minutes 00-59 — what `normalizePullTime` in FhirStep produces on blur. */
 const PULL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+const MAX_CONCURRENT_REQUESTS_CAP = 8;
+
+// Mirrors the BFF's FieldValidationRules.LagDurationCapMinutes (30 days), shared with the
+// manual-upload import path - keep the two in sync, they've drifted apart before.
+const LAG_DAYS_CAP = 30;
+
 export function validateFhir(values: FhirFieldValues): FieldErrors {
   const errors: FieldErrors = {};
 
@@ -44,7 +50,11 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   if (values.maxConcurrentRequests == null) {
     errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.maxConcurrentRequests) || values.maxConcurrentRequests < 1 || values.maxConcurrentRequests > 8) {
+  } else if (
+    !Number.isInteger(values.maxConcurrentRequests) ||
+    values.maxConcurrentRequests < 1 ||
+    values.maxConcurrentRequests > MAX_CONCURRENT_REQUESTS_CAP
+  ) {
     errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.messages.invalidMaxConcurrentRequests';
   }
 
@@ -71,7 +81,7 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   if (values.lagDays == null) {
     errors.lagDays = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > 30) {
+  } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > LAG_DAYS_CAP) {
     errors.lagDays = 'onboarding:fhirServerInfo.messages.invalidLagDays';
   }
 

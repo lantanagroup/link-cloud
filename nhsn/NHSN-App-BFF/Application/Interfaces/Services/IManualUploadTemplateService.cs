@@ -6,7 +6,9 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 // mirroring the fields a facility would otherwise fill in step by step online.
 public interface IManualUploadTemplateService
 {
-    // Parses an uploaded workbook and validates every recognized cell. Never writes anything —
-    // the frontend patches its own draft on acceptance and the normal save path persists it.
+    // Parses an uploaded workbook and validates every recognized cell. A fully valid sheet is
+    // saved immediately, in this same call (see IOnboardingWriteService.SaveImportedFieldsAsync) —
+    // the frontend then patches its own draft from the returned ImportResult.Fields, which reflects
+    // what was actually saved, not merely what was parsed.
     Task<ImportResult> ImportAsync(Stream fileStream, CancellationToken cancellationToken = default);
 }

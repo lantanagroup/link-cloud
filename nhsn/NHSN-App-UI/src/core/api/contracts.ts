@@ -497,12 +497,64 @@ export interface CommitResult {
 // ---------------------------------------------------------------- import/export
 
 export interface ImportResult {
+  /** True whenever the sheet itself was well-formed - a section that then failed to actually save
+   *  (cross-service precondition, a downstream validator) does NOT flip this false, so the caller
+   *  still applies whatever DID save. Check `cellErrors` regardless of this flag. */
   accepted: boolean;
-  cellErrors: Array<{ sheet: string; cell: string; messageKey: string }>;
+  /** `section` is the StepId (see onboarding/types.ts) the failing field belongs to, when known -
+   *  used to flag the right step in the onboarding nav. Absent for sheet-level errors like invalidFormat.
+   *  `detail`, when present, is a downstream service's own English explanation for a save-time
+   *  failure (messageKey `onboarding:manualUpload.errors.saveFailed`) - interpolate it into that key. */
+  cellErrors: Array<{ sheet: string; cell: string; messageKey: string; section?: string; detail?: string; label?: string }>;
   /** How many recognized fields had a non-empty value in the uploaded sheet. */
   fieldsImported: number;
   /** How many fields the import sheet defines in total. */
   totalFields: number;
+  /** The sheet's values, shaped for `OnboardingProvider.patch()`. Absent sections had nothing to import. */
+  fields?: ImportedFields;
+}
+
+/**
+ * Values read out of an uploaded import sheet, one optional slice per step the sheet covers.
+ * Deliberately its own wire shape rather than reusing the `*Draft` types from onboarding/types.ts
+ * (importing them here would cycle back into this file) - each slice is structurally identical to
+ * its `*Draft` counterpart, so callers pass it straight into `patch(section, ...)`. See
+ * ManualUploadStep's `handleSelect`. The BFF already saves everything itself (including SFTP
+ * credentials, straight to Data Acquisition) before responding - `census.sftpUsername`/
+ * `sftpPassword` are never present on what comes back, only `hasCredentials`, so a secret is never
+ * round-tripped to the browser once it's been saved.
+ */
+export interface ImportedFields {
+  fhir?: {
+    fhirServerBaseUrl?: string;
+    maxConcurrentRequests?: number;
+    maxRetries?: number;
+    minAcquisitionPullTime?: string;
+    maxAcquisitionPullTime?: string;
+    lagDuration?: string;
+  };
+  census?: {
+    patientListIds?: Partial<Record<CensusListKey, string>>;
+    sftpHost?: string;
+    sftpPort?: number;
+    sftpRemoteDirectory?: string;
+    sftpRemoveAfterProcessing?: boolean;
+    acquisitionFrequency?: string;
+    hasCredentials?: boolean;
+  };
+  locationOrg?: {
+    method?: LocationMethod;
+    managingOrganizationIds?: string[];
+    locationTypes?: Array<{ code: string; alias: string }>;
+    locationIdentifiers?: Array<{ system: string; code: string }>;
+    customFhirPath?: string;
+  };
+  hsloc?: {
+    mappings?: HslocMapping[];
+  };
+  encounter?: {
+    mappings?: EncounterMapping[];
+  };
 }
 
 // ---------------------------------------------------------------- paging
