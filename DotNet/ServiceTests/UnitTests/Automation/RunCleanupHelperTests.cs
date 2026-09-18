@@ -20,13 +20,21 @@ public class RunCleanupHelperTests
     private static readonly TimeSpan TeardownRetention = TimeSpan.FromDays(14);
 
     [Fact]
-    public void Guid_facility_with_no_run_is_quiesced_and_torn_down()
+    public void Guid_facility_with_no_automation_run_is_not_selected()
     {
         var facilityId = Guid.NewGuid().ToString();
         var facilities = Facilities(facilityId);
 
-        SelectQuiesce(facilities, []).Should().Equal(facilityId);
-        SelectTeardown(facilities, []).Should().Equal(facilityId);
+        SelectQuiesce(facilities, []).Should().BeEmpty();
+        SelectTeardown(facilities, []).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Qa_guid_tenant_without_an_automation_run_is_not_selected()
+    {
+        var qaFacility = "bf47f291-f206-4716-bd89-41cc1fa649e7";
+        SelectQuiesce(Facilities(qaFacility), []).Should().BeEmpty();
+        SelectTeardown(Facilities(qaFacility), []).Should().BeEmpty();
     }
 
     [Fact]
@@ -54,9 +62,7 @@ public class RunCleanupHelperTests
             [Run(runId, facilityId, status, finishedAt: null)],
             now: DateTimeOffset.Parse("2026-08-28T20:00:00Z"));
 
-        leftovers.Should().HaveCount(1);
-        leftovers.Should().NotContain(runId.ToString());
-        leftovers.Should().NotContain(facilityId);
+        leftovers.Should().BeEmpty();
     }
 
     [Fact]
@@ -143,6 +149,21 @@ public class RunCleanupHelperTests
 
         RunCleanupHelper.SelectHistoryPurgeRuns([active], now, TeardownRetention)
             .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Custom_range_facilities_exclude_guid_tenants_without_an_automation_run()
+    {
+        var runId = Guid.NewGuid();
+        var extra = Guid.NewGuid().ToString();
+        var runs = new[]
+        {
+            Run(runId, runId.ToString(), AutomationRunStatus.Succeeded, finishedAt: DateTimeOffset.Parse("2026-08-10T12:00:00Z"))
+        };
+
+        RunCleanupHelper.SelectAutomationFacilitiesForRuns(
+            Facilities(runId.ToString(), extra, "echs"),
+            runs).Should().Equal(runId.ToString());
     }
 
     [Fact]

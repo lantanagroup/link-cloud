@@ -128,6 +128,40 @@ public class CleanupControllerTests
         => new CleanupCustomRangeForm().TeardownFacilities.Should().BeFalse();
 
     [Fact]
+    public async Task Report_WhenMissing_Returns404()
+    {
+        var reports = new Mock<ICleanupReportStore>();
+        reports.Setup(s => s.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CleanupReport?)null);
+        var sut = Create(MockCleanup(), MockStore(), reports);
+
+        var result = await sut.Report(Guid.NewGuid(), CancellationToken.None);
+
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Report_WhenPresent_ReturnsJson()
+    {
+        var report = new CleanupReport
+        {
+            Id = Guid.NewGuid(),
+            Label = "Custom range cleanup",
+            Status = "completed",
+            Message = "torn down 1",
+            TornDownFacilityIds = ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+        };
+        var reports = new Mock<ICleanupReportStore>();
+        reports.Setup(s => s.GetAsync(report.Id, It.IsAny<CancellationToken>())).ReturnsAsync(report);
+        var sut = Create(MockCleanup(), MockStore(), reports);
+
+        var result = await sut.Report(report.Id, CancellationToken.None);
+
+        var json = result.Should().BeOfType<JsonResult>().Subject;
+        json.Value.Should().BeSameAs(report);
+    }
+
+    [Fact]
     public void CleanupActivity_Percent_IsZeroWhenIdle()
         => CleanupActivity.Idle.Percent.Should().Be(0);
 
@@ -144,13 +178,17 @@ public class CleanupControllerTests
             At = DateTimeOffset.UtcNow
         }.Percent.Should().Be(25);
 
-    private static CleanupController Create(Mock<ILeftoverRunCleanup> cleanup, Mock<ICleanupSettingsStore> store)
+    private static CleanupController Create(
+        Mock<ILeftoverRunCleanup> cleanup,
+        Mock<ICleanupSettingsStore> store,
+        Mock<ICleanupReportStore>? reports = null)
     {
         var http = new DefaultHttpContext();
         http.Request.Headers.Accept = "application/json";
         var sut = new CleanupController(
             cleanup.Object,
             store.Object,
+            (reports ?? new Mock<ICleanupReportStore>()).Object,
             TimeProvider.System,
             Mock.Of<ILogger<CleanupController>>())
         {

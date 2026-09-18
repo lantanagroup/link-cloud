@@ -18,6 +18,7 @@ public sealed class LeftoverRunCleanupService(
     ISnapshotStore snapshotStore,
     TimeProvider time,
     ICleanupSettingsStore settingsStore,
+    ICleanupReportStore reportStore,
     IPipelineAbortRegistry abortRegistry,
     IHubContext<CleanupHub> cleanupHub,
     IOptions<LeftoverRunCleanupOptions> leftoverOptions,
@@ -304,6 +305,7 @@ public sealed class LeftoverRunCleanupService(
             throw new InvalidOperationException("A cleanup pass is already running.");
 
         IsRunning = true;
+        var startedAt = time.GetUtcNow();
         try
         {
             var settings = await settingsStore.GetEffectiveAsync(cancellationToken);
@@ -450,11 +452,14 @@ public sealed class LeftoverRunCleanupService(
                     mode, selectedFacilities.Count, quiesced.Count, tornDown.Count, historyRuns.Count, purged.Count, failedFacilities.Count, failedRuns.Count, result.ProcessedAllCandidates);
             }
 
+            var status = failedFacilities.Count > 0 || failedRuns.Count > 0 ? "failed" : "completed";
+            var finishedAt = time.GetUtcNow();
+            var message = FormatActivityResult(label, result);
             await PublishAsync(new CleanupActivity
             {
                 Mode = mode,
                 Label = label,
-                Status = failedFacilities.Count > 0 || failedRuns.Count > 0 ? "failed" : "completed",
+                Status = status,
                 Trigger = trigger,
                 Total = total,
                 Processed = processed,
@@ -462,32 +467,78 @@ public sealed class LeftoverRunCleanupService(
                 TornDown = tornDown.Count,
                 Purged = purged.Count,
                 Failed = failedFacilities.Count + failedRuns.Count,
-                Message = FormatActivityResult(label, result),
-                At = time.GetUtcNow()
+                Message = message,
+                At = finishedAt
+            }, cancellationToken);
+
+            await TrySaveReportAsync(new CleanupReport
+            {
+                Id = Guid.NewGuid(),
+                Mode = mode,
+                Label = label,
+                Trigger = trigger,
+                Status = status,
+                StartedAt = startedAt,
+                FinishedAt = finishedAt,
+                QuiesceCandidateCount = result.QuiesceCandidateCount,
+                QuiescedFacilityIds = result.QuiescedFacilityIds,
+                TeardownCandidateCount = result.TeardownCandidateCount,
+                TornDownFacilityIds = result.TornDownFacilityIds,
+                HistoryPurgeCandidateCount = result.HistoryPurgeCandidateCount,
+                PurgedRunIds = result.PurgedRunIds,
+                FailedFacilityIds = result.FailedFacilityIds,
+                FailedRunIds = result.FailedRunIds,
+                Message = message
             }, cancellationToken);
 
             return result;
         }
         catch (OperationCanceledException)
         {
+            var finishedAt = time.GetUtcNow();
+            var message = $"{label} cancelled.";
             await PublishAsync(CurrentActivity with
             {
                 Status = "failed",
-                Message = $"{label} cancelled.",
-                At = time.GetUtcNow()
+                Message = message,
+                At = finishedAt
+            }, CancellationToken.None);
+            await TrySaveReportAsync(new CleanupReport
+            {
+                Id = Guid.NewGuid(),
+                Mode = mode,
+                Label = label,
+                Trigger = trigger,
+                Status = "failed",
+                StartedAt = startedAt,
+                FinishedAt = finishedAt,
+                Message = message
             }, CancellationToken.None);
             throw;
         }
         catch (Exception ex)
         {
+            var finishedAt = time.GetUtcNow();
+            var message = $"{label} failed: {ex.Message}";
             await PublishAsync(new CleanupActivity
             {
                 Mode = mode,
                 Label = label,
                 Status = "failed",
                 Trigger = trigger,
-                Message = $"{label} failed: {ex.Message}",
-                At = time.GetUtcNow()
+                Message = message,
+                At = finishedAt
+            }, CancellationToken.None);
+            await TrySaveReportAsync(new CleanupReport
+            {
+                Id = Guid.NewGuid(),
+                Mode = mode,
+                Label = label,
+                Trigger = trigger,
+                Status = "failed",
+                StartedAt = startedAt,
+                FinishedAt = finishedAt,
+                Message = message
             }, CancellationToken.None);
             throw;
         }
@@ -551,6 +602,18 @@ public sealed class LeftoverRunCleanupService(
             Message = message,
             At = time.GetUtcNow()
         }, cancellationToken);
+
+    private async Task TrySaveReportAsync(CleanupReport report, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await reportStore.SaveAsync(report, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not persist leftover cleanup report for {Mode}.", report.Mode);
+        }
+    }
 
     private async Task PublishAsync(CleanupActivity activity, CancellationToken cancellationToken)
     {
