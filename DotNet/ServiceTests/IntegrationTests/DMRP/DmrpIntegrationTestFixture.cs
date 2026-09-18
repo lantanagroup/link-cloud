@@ -4,6 +4,7 @@ using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
@@ -129,7 +130,7 @@ namespace IntegrationTests.DMRP
             builder.Services.RegisterQuartzDatabaseInTest();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ReportSchedulingJobs.ClassicJobGroup);
             if (!registered)
             {
                 throw new InvalidOperationException("The DMRP module did not register; the fixture cannot resolve its services.");

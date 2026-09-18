@@ -15,6 +15,11 @@ using Quartz.Spi;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
+    /// <summary>
+    /// The classic per-facility report scheduling. Hosted only when DMRP is disabled: with the flag on
+    /// DmrpNightlyScheduleHostedService owns the shared Quartz scheduler, and this class stays
+    /// registered as a plain singleton whose per-facility methods return without touching it.
+    /// </summary>
     public class ScheduleService : IHostedService
     {
         public const string MONTHLY = ReportingPeriodMath.Monthly;
@@ -45,29 +50,6 @@ namespace LantanaGroup.Link.Tenant.Services
         {
             _scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
 
-            if (_dmrpEnabled)
-            {
-                // Scheduling is the DMRP nightly job's while the flag is on. Classic per-facility
-                // jobs left from before the flag would announce stale, snapshotted measure lists.
-                var classic = await _scheduler.GetJobKeys(
-                    GroupMatcher<JobKey>.GroupEquals(ReportSchedulingJobs.ClassicJobGroup), cancellationToken);
-
-                if (classic.Count > 0)
-                {
-                    await _scheduler.DeleteJobs(classic, cancellationToken);
-                    _logger.LogInformation("DMRP is enabled; removed {Count} classic report job(s).", classic.Count);
-                }
-
-                // This service is the only place the shared Quartz scheduler is started, and StopAsync
-                // the only place it is shut down - with the flag on as well as off. It has to be:
-                // starting it any earlier, in the DMRP module's hosted service for instance, would let
-                // the classic jobs just deleted above fire against snapshotted measure lists in the
-                // window before the delete. Moving Start/Shutdown into DmrpNightlyScheduleHostedService
-                // means moving this cleanup there with it.
-                await _scheduler.Start(cancellationToken);
-                return;
-            }
-
             using (var scope = _scopeFactory.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
@@ -83,7 +65,6 @@ namespace LantanaGroup.Link.Tenant.Services
                 }
             }
 
-            // As above: the one place the shared scheduler is started, whichever branch got here.
             await _scheduler.Start(cancellationToken);
         }
 

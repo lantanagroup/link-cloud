@@ -1,7 +1,7 @@
 using FluentAssertions;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
-using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -66,7 +66,7 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
     };
 
     private async Task<int> ClassicJobCount() =>
-        (await _scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals(nameof(KafkaTopic.ReportScheduled)))).Count;
+        (await _scheduler.GetJobKeys(GroupMatcher<JobKey>.GroupEquals(ReportSchedulingJobs.ClassicJobGroup))).Count;
 
     [Fact]
     public async Task With_dmrp_off_a_facility_gets_its_classic_jobs()
@@ -79,28 +79,19 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
         (await ClassicJobCount()).Should().Be(1);
     }
 
+    /// <summary>
+    /// With the flag on this service is not hosted - DmrpNightlyScheduleHostedService is - so StartAsync
+    /// is never called. TenantFacilityOperations still calls these three on every facility save, which
+    /// is why the gates inside them, rather than the missing registration, are what keeps Quartz clean.
+    /// </summary>
     [Fact]
     public async Task With_dmrp_on_add_update_and_delete_touch_nothing()
     {
         var service = Create(dmrpEnabled: true);
-        await service.StartAsync(CancellationToken.None);
 
         await service.AddJobsForFacility(MonthlyFacility());
         await service.UpdateJobsForFacility(MonthlyFacility(), MonthlyFacility());
         await service.DeleteJobsForFacility("100");
-
-        (await ClassicJobCount()).Should().Be(0);
-    }
-
-    [Fact]
-    public async Task With_dmrp_on_boot_removes_classic_jobs_left_from_before_the_flag()
-    {
-        // A classic per-facility job as ScheduleService created it before the flag was turned on.
-        await _scheduler.AddJob(JobBuilder.Create<LantanaGroup.Link.Tenant.Jobs.ReportScheduledJob>()
-            .WithIdentity("100-Monthly", nameof(KafkaTopic.ReportScheduled)).StoreDurably().Build(), replace: false);
-        (await ClassicJobCount()).Should().Be(1);
-
-        await Create(dmrpEnabled: true).StartAsync(CancellationToken.None);
 
         (await ClassicJobCount()).Should().Be(0);
     }

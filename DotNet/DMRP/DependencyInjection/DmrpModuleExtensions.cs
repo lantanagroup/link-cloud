@@ -32,14 +32,20 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
         /// than replacing them, so the host stays the single place facilities are validated, persisted
         /// and scheduled.
         /// </typeparam>
+        /// <param name="classicJobGroup">
+        /// The Quartz job group the host's own, pre-DMRP report jobs live in. When the module is
+        /// enabled it takes the scheduler over and deletes that group at boot, so jobs left from
+        /// before the flag cannot fire. The host names it because the module has no way to know it.
+        /// </param>
         /// <returns>True when the module was registered, otherwise false.</returns>
         public static bool AddDmrpModule<TDbContext, THostFacilityOperations>(this WebApplicationBuilder builder,
-            IMvcBuilder mvcBuilder)
+            IMvcBuilder mvcBuilder, string classicJobGroup)
             where TDbContext : DbContext
             where THostFacilityOperations : class, IFacilityOperations
         {
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(mvcBuilder);
+            ArgumentException.ThrowIfNullOrWhiteSpace(classicJobGroup);
 
             var section = builder.Configuration.GetSection(DmrpSettings.ConfigSectionName);
             builder.Services.Configure<DmrpSettings>(section);
@@ -107,6 +113,10 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             builder.Services.AddTransient<DmrpNightlyJob>();
 
             builder.Services.AddSingleton<IDmrpNightlyJobReconciler, DmrpNightlyJobReconciler>();
+
+            // Enabled, the module owns the shared Quartz scheduler's lifecycle - which means it has to
+            // know which group the host's classic jobs are in so it can sweep them before starting it.
+            builder.Services.AddSingleton(new DmrpSchedulingHostOptions(classicJobGroup));
             builder.Services.AddHostedService<DmrpNightlyScheduleHostedService>();
 
             builder.Services.TryAddSingleton(TimeProvider.System);

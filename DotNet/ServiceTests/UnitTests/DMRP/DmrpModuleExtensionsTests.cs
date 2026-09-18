@@ -28,6 +28,13 @@ namespace UnitTests.DMRP
     [Trait("Category", "UnitTests")]
     public class DmrpModuleExtensionsTests
     {
+        /// <summary>
+        /// Stands in for the host's classic job group. Deliberately not the real
+        /// <c>ReportSchedulingJobs.ClassicJobGroup</c>: the module is supposed to carry whatever the
+        /// host names, and a value only these tests use is what shows it does.
+        /// </summary>
+        private const string ClassicGroup = "HostClassicReportJobs";
+
         private static WebApplicationBuilder CreateBuilder(bool? enabled)
         {
             var builder = WebApplication.CreateBuilder();
@@ -79,7 +86,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.True(registered);
             Assert.Contains(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -96,7 +103,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             // The module must not stand up a context of its own; it repositories over the host's.
             var repository = Assert.Single(builder.Services,
@@ -112,7 +119,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             Assert.Contains(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
@@ -146,7 +153,7 @@ namespace UnitTests.DMRP
 
             builder.Services.AddSingleton(hostLookup);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
             Assert.Same(hostLookup, registration.ImplementationInstance);
@@ -157,7 +164,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
@@ -167,7 +174,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services,
                 d => d.ServiceType == typeof(IFacilityReportingPeriodResolver));
@@ -183,13 +190,46 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
 
             var hostedService = Assert.Single(builder.Services,
                 d => d.ServiceType == typeof(IHostedService));
             Assert.Equal(typeof(DmrpNightlyScheduleHostedService), hostedService.ImplementationType);
+        }
+
+        /// <summary>
+        /// The hosted service deletes the host's classic jobs before it starts the scheduler, so it
+        /// needs the group they are in. The host names it; the module only carries it through.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_carries_the_hosts_classic_job_group_to_the_hosted_service()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
+
+            var registration = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(DmrpSchedulingHostOptions));
+            var options = Assert.IsType<DmrpSchedulingHostOptions>(registration.ImplementationInstance);
+            Assert.Equal(ClassicGroup, options.ClassicJobGroup);
+        }
+
+        /// <summary>
+        /// A blank group would have the hosted service sweep Quartz's own default group at every boot.
+        /// Refuse it where the host can see it rather than at the first start.
+        /// </summary>
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void AddDmrpModule_throws_when_the_host_names_no_classic_job_group(string classicJobGroup)
+        {
+            var builder = CreateBuilder(enabled: true);
+            var mvcBuilder = builder.Services.AddControllers();
+
+            Assert.Throws<ArgumentException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, classicJobGroup));
         }
 
         /// <summary>
@@ -205,7 +245,7 @@ namespace UnitTests.DMRP
             var hostSource = Mock.Of<IFacilityTimeZoneSource>();
             builder.Services.AddSingleton(hostSource);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityTimeZoneSource));
             Assert.Same(hostSource, registration.ImplementationInstance);
@@ -225,7 +265,7 @@ namespace UnitTests.DMRP
             var mvcBuilder = builder.Services.AddControllers();
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
 
             Assert.Contains(nameof(IFacilityTimeZoneSource), exception.Message);
         }
@@ -243,7 +283,7 @@ namespace UnitTests.DMRP
             var mvcBuilder = builder.Services.AddControllers();
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
 
             Assert.Contains(nameof(IFacilityDirectory), exception.Message);
         }
@@ -258,7 +298,7 @@ namespace UnitTests.DMRP
             builder.Services.RemoveAll<IFacilityTimeZoneSource>();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.False(registered);
         }
@@ -273,7 +313,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: false);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
 
@@ -297,7 +337,7 @@ namespace UnitTests.DMRP
             var mvcBuilder = builder.Services.AddControllers();
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
 
             Assert.Contains(nameof(IFacilityOperations), exception.Message);
         }
@@ -314,7 +354,7 @@ namespace UnitTests.DMRP
             builder.Services.AddScoped(_ => new HostFacilityOperations());
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.True(registered);
         }
@@ -330,7 +370,7 @@ namespace UnitTests.DMRP
             builder.Services.RemoveAll<IFacilityOperations>();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.False(registered);
         }
@@ -340,7 +380,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             using var provider = BuildProviderWithModuleDependencies(builder);
             using var scope = provider.CreateScope();
@@ -358,7 +398,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: false);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityOperations));
 
@@ -393,7 +433,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.False(registered);
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -419,7 +459,7 @@ namespace UnitTests.DMRP
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             mvcBuilder.AddApplicationPart(dmrpAssembly);
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.False(registered);
             Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
