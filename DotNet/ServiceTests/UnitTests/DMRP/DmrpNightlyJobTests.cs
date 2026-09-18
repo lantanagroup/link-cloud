@@ -153,6 +153,41 @@ public class DmrpNightlyJobTests
     [Fact]
     public async Task A_mid_month_night_with_rows_does_not_call_dmrp()
     {
+        // Also covers the override-unset case: with ScheduledFireTimeOverride left at its default
+        // (null), a mid-month fire behaves exactly as here - Daily only, no sync call.
+        await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
+
+        _sync.Verify(s => s.SyncAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _produced.Should().ContainSingle().Which.Value.As<ReportScheduledMessage>().Frequency.Should().Be("Daily");
+    }
+
+    [Fact]
+    public async Task A_scheduled_fire_time_override_rehearses_month_end_on_a_mid_month_fire()
+    {
+        // 23:59 UTC on Oct 31 - the QA override anchors the periods there even though the trigger
+        // itself fired mid-month.
+        _settings.Scheduling.ScheduledFireTimeOverride = "2026-10-31T23:59:00Z";
+        _source
+            .Setup(s => s.GetForPeriodAsync("100", 11, 2026, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ReportingPlanEntry("HOB", Dqm, Frequency.Daily),
+                new ReportingPlanEntry("HTCDI", "NHSNdQMHTCDI", Frequency.Monthly)
+            ]);
+
+        await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
+
+        _sync.Verify(s => s.SyncAsync("100", 11, 2026, It.IsAny<CancellationToken>()), Times.Once);
+        _produced.Select(m => ((ReportScheduledMessage)m.Value).Frequency)
+            .Should().BeEquivalentTo([ReportingPeriodMath.Daily, ReportingPeriodMath.Monthly]);
+        _produced.Should().AllSatisfy(m =>
+            ((ReportScheduledMessage)m.Value).StartDate.Should().Be(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public async Task An_unparseable_scheduled_fire_time_override_is_ignored()
+    {
+        _settings.Scheduling.ScheduledFireTimeOverride = "not a date";
+
         await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
 
         _sync.Verify(s => s.SyncAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);

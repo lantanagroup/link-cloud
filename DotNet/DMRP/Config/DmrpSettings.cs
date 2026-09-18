@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace LantanaGroup.Link.DMRP.Config
 {
     /// <summary>
@@ -137,6 +139,27 @@ namespace LantanaGroup.Link.DMRP.Config
         /// Range 0-28; 0 disables catch-up.
         /// </summary>
         public int CatchUpNights { get; set; } = DefaultCatchUpNights;
+
+        /// <summary>
+        /// A QA aid: when set, every fire of the nightly job anchors its periods on this instant
+        /// instead of the trigger's scheduled time, so the month-end refresh and the Monthly
+        /// announcement can be rehearsed on any date. Must never be set in a production environment.
+        /// An unparseable value is ignored, treated the same as unset.
+        /// </summary>
+        public string? ScheduledFireTimeOverride { get; set; }
+
+        /// <summary>
+        /// <see cref="ScheduledFireTimeOverride"/> parsed as an ISO-8601 instant, or null when it is
+        /// unset, blank, or not parseable. An offset other than UTC is adjusted to UTC rather than
+        /// rejected, so "2026-09-30T23:59:00-04:00" resolves to the same instant as
+        /// "2026-10-01T03:59:00Z".
+        /// </summary>
+        public DateTimeOffset? ResolvedScheduledFireTimeOverride =>
+            !string.IsNullOrWhiteSpace(ScheduledFireTimeOverride)
+            && DateTimeOffset.TryParse(ScheduledFireTimeOverride, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+                ? parsed
+                : null;
 
         public string ResolvedNightlyCron =>
             !string.IsNullOrWhiteSpace(NightlyCron) && Quartz.CronExpression.IsValidExpression(NightlyCron)

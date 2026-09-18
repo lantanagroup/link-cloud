@@ -456,6 +456,10 @@ global:
     required: false
     defaultValue: "3"
     consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:ScheduledFireTimeOverride"
+    description: "QA aid. An ISO-8601 UTC instant (for example 2026-10-01T03:59:00Z, which is 23:59 Eastern on 30 September). When set, every fire of the DMRP nightly job anchors its reporting periods on this instant instead of the trigger's scheduled time, so the month-end refresh and the Monthly announcement can be rehearsed on any date. Leave unset in production; the job logs a warning on every fire while it is set."
+    required: false
+    consumers: ["Tenant"]
 
 services:
   Account:
