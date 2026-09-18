@@ -704,6 +704,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: link-automation-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
@@ -717,6 +718,8 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Redis__Password: ${REDIS_PASS}
+      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -734,6 +737,8 @@ services:
       mongo:
         condition: service_healthy
       admin-bff:
+        condition: service_healthy
+      redis_cache:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
@@ -860,6 +865,7 @@ services:
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      Redis__Password: ${REDIS_PASS}
     ports:
       - "8072:8072"
     build:
@@ -876,6 +882,8 @@ services:
         condition: service_completed_successfully
       azurite_init:
         condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
       otel-collector:
         condition: service_started
       loki:
@@ -935,6 +943,10 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      DMRP__Api__BaseUrl: http://mock-dmrp-api:8080
+      DMRP__Api__TokenUrl: http://mock-dmrp-api:8080/api/mock-dmrp/oauth2/token
+      DMRP__Api__ClientId: ${MOCK_DMRP_CLIENT_ID:-link-cloud-dev}
+      DMRP__Api__ClientSecret: ${MOCK_DMRP_CLIENT_SECRET:-link-cloud-dev-secret}
     ports:
       - "8074:8074"
     build:

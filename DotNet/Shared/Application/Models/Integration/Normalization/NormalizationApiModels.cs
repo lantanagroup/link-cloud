@@ -182,3 +182,14 @@ public class UpdateFacilityLocationLocalCodeMappingRequestApiModel
     public string LocalCode { get; set; } = string.Empty;
     public Guid? HSLOCId { get; set; }
 }
+
+public class HslocCodeApiModel
+{
+    public Guid Id { get; set; }
+    public string HSLOCCode { get; set; } = string.Empty;
+    public string CDCCode { get; set; } = string.Empty;
+    public string ShortDescription { get; set; } = string.Empty;
+    public string LongDescription { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+}
