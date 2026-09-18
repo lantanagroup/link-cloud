@@ -61,7 +61,8 @@ public class ApiEndPointLibraryTests
             ApiEndPointLibrary.NormalizationSteps.MappingDelete204,
             ApiEndPointLibrary.NormalizationSteps.MappingDelete400EmptyId,
             ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility204,
-            ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility400EmptyFacility
+            ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility400EmptyFacility,
+            ApiEndPointLibrary.NormalizationSteps.HslocGet200
         ]);
     }
 }
