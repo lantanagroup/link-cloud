@@ -152,16 +152,23 @@ public static class RunCleanupHelper
     {
         if (!string.IsNullOrWhiteSpace(facilityId))
         {
-            await AbortAndQuiesceFacilityAsync(
-                abortRegistry,
-                dataAcqClient,
-                censusClient,
-                reportClient,
-                output,
-                facilityId,
-                reportId,
-                abortTtl,
-                cancellationToken);
+            try
+            {
+                await AbortAndQuiesceFacilityAsync(
+                    abortRegistry,
+                    dataAcqClient,
+                    censusClient,
+                    reportClient,
+                    output,
+                    facilityId,
+                    reportId,
+                    abortTtl,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                output.WriteLine($"Warning: abort/quiesce failed during cancel cleanup: {ex.Message}");
+            }
         }
 
         try

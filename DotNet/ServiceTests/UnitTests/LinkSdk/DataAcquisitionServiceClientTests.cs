@@ -187,6 +187,24 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ValidateFhirServerConnectionAsync_CallsExpectedEndpoint()
+    {
+        using var server = new OneShotServer("{\"isConnected\":true}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ValidateFhirServerConnectionAsync("http://fhir.test/r4");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/connectionValidation/$validate", request.Path);
+        Assert.Contains("fhirServerUrl=", request.Query);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.IsConnected);
+        Assert.Null(result.Body.ErrorMessage);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task TestSftpConnectionAsync_PostsDetailsAndParsesResult()
     {
         const string response = """{"success":true,"message":"Connected.","files":[{"fileName":"census.dat","patients":[{"patientId":"12345","patientName":"Doe, John","admissionDate":"2023-07-07T13:06:43Z"}]}]}""";

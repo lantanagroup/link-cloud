@@ -18,6 +18,12 @@ public static class StartScenarioRequestResolver
     private const string MegaPatientTestNhsnOrganizationId = "10759";
 
     /// <summary>
+    /// Custom adhoc runs (including Mega Patient 18k) wait this long for report
+    /// submission. Validation of a large ABS bundle can take hours; Cancel aborts sooner.
+    /// </summary>
+    internal const int CustomMaxPollingDurationMinutes = 6 * 60;
+
+    /// <summary>
     /// Resolves the run options for a request. For non-Custom scenarios the static
     /// scenario-kind defaults win outright; Custom merges request overrides on top
     /// of defaults and falls back to extracting from <c>RunConfigurationJson</c>
@@ -40,7 +46,7 @@ public static class StartScenarioRequestResolver
             {
                 NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
             },
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 30, 30, false, true, defaultMeasures, [], [])
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, CustomMaxPollingDurationMinutes, 30, false, true, defaultMeasures, [], [])
             {
                 NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
             },
@@ -112,9 +118,9 @@ public static class StartScenarioRequestResolver
             ResourcesPerPatient = cohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? defaults.ResourcesPerPatient,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
-            // Keep an explicit hard timeout for custom runs so scheduled workflows
-            // fail-fast when end-of-period orchestration does not advance.
-            // Live windows need the reporting window plus time for EOP/finalization.
+            // Custom keeps a long hard timeout so mega-patient validation can finish.
+            // Live windows still need at least the reporting window plus EOP/finalization.
+            // Cancel, not this ceiling, is how an operator stops a run early.
             MaxPollingDurationMinutes = isLiveSimulation
                 ? Math.Max(defaults.MaxPollingDurationMinutes, reportingWindowMinutes + 30)
                 : defaults.MaxPollingDurationMinutes,

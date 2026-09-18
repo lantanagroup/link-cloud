@@ -42,8 +42,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     public Task<LinkApiResponse> GetFhirListConfigurationAsync(
         string facilityId,
+        bool includePatients = false,
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
+            .SetQueryParam("includePatients", includePatients ? "true" : null)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirListConfigurationAsync(
@@ -238,6 +240,13 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string facilityId,
         CancellationToken cancellationToken = default) =>
         SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
+        string fhirServerUrl,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FhirServerConnectionResult>(() => Request("data/connectionValidation/$validate")
+            .SetQueryParam("fhirServerUrl", fhirServerUrl)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
