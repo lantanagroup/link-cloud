@@ -24,8 +24,12 @@ export function DownloadLinkButton({
  // const {t} = useTranslation('onboarding');
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string>();
+  const isBlocked = Boolean(disabled || downloading);
 
   async function handleClick() {
+    if (isBlocked) {
+      return;
+    }
     setDownloading(true);
     setError(undefined);
     try {
@@ -50,9 +54,8 @@ export function DownloadLinkButton({
     <div className="nhsn-link__download-field">
       <button
         type="button"
-        className="nhsn-link__download-button"
-        onClick={handleClick}
-        disabled={disabled || downloading}>
+        className={`nhsn-link__download-button${isBlocked ? ' nhsn-link__download-button--busy' : ''}`}
+        onClick={handleClick}>
         <DownloadIcon />
         {buttonText}
       </button>
@@ -109,6 +112,7 @@ export interface FileUploadFieldProps {
 export function FileUploadField({id, label, accept, onSelect, disabled}: FileUploadFieldProps) {
   const {t} = useTranslation('common');
   const inputRef = useRef<HTMLInputElement>(null);
+  const chooseButtonRef = useRef<HTMLButtonElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -120,6 +124,9 @@ export function FileUploadField({id, label, accept, onSelect, disabled}: FileUpl
   }
 
   function handleChooseClick() {
+    if (disabled) {
+      return;
+    }
     inputRef.current?.click();
   }
 
@@ -130,10 +137,10 @@ export function FileUploadField({id, label, accept, onSelect, disabled}: FileUpl
       </label>
       <div className="nhsn-link__upload-control">
         <button
+          ref={chooseButtonRef}
           type="button"
-          className="nhsn-link__upload-choose-button"
-          onClick={handleChooseClick}
-          disabled={disabled}>
+          className={`nhsn-link__upload-choose-button${disabled ? ' nhsn-link__upload-choose-button--busy' : ''}`}
+          onClick={handleChooseClick}>
           {t('common:actions.chooseFile')}
         </button>
         <span className="nhsn-link__upload-filename">{fileName ?? t('common:actions.noFileChosen')}</span>
@@ -144,6 +151,7 @@ export function FileUploadField({id, label, accept, onSelect, disabled}: FileUpl
           type="file"
           accept={accept}
           tabIndex={-1}
+          onFocus={() => chooseButtonRef.current?.focus()}
           onChange={handleChange}
           disabled={disabled}
         />

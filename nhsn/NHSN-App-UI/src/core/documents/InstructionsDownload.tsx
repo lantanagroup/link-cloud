@@ -8,10 +8,11 @@ export interface InstructionsDownloadProps {
   description: string;
   /** Already translated: the link text, e.g. "Download PDF Instructions". */
   linkText: string;
+  headingId?: string;
 }
 
 /** Bordered instructions box + download link, matching `FhirStep.tsx`'s JWKS pattern. Opens in a new tab. */
-export function InstructionsDownload({href, description, linkText}: InstructionsDownloadProps) {
+export function InstructionsDownload({href, description, linkText, headingId}: InstructionsDownloadProps) {
   const descriptionId = useId();
   return (
     <div className="nhsn-link__instructions">
@@ -23,7 +24,7 @@ export function InstructionsDownload({href, description, linkText}: Instructions
         href={href}
         target="_blank"
         rel="noopener"
-        aria-describedby={descriptionId}>
+        aria-describedby={headingId ? `${headingId} ${descriptionId}` : descriptionId}>
         <svg
           width="16"
           height="16"

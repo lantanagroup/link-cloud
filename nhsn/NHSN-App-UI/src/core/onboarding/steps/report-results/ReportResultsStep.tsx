@@ -963,7 +963,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     patientId: string,
     dqmId: string | undefined,
   ) {
-    if (!detail || !dqmId) {
+    if (!detail || !dqmId || downloadingPatientId === patientId) {
       return;
     }
     setDownloadingPatientId(patientId);
@@ -1131,7 +1131,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
   }
 
   async function handleRefreshDetail() {
-    if (!viewingReportId) {
+    if (!viewingReportId || detailLoading) {
       return;
     }
     const result = await refetchDetail();
@@ -1358,9 +1358,8 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
           <div className="nhsn-link__report-results-detail-header-actions">
             <button
               type="button"
-              className="nhsn-link__report-results-icon-button"
+              className={`nhsn-link__report-results-icon-button${detailLoading ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
               onClick={handleRefreshDetail}
-              disabled={detailLoading}
               aria-label={t('common:actions.refresh')}>
               <RefreshIcon />
             </button>
@@ -1417,7 +1416,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             <h3 className="nhsn-link__report-results-detail-section-title">
               {t('onboarding:reportResults.detail.selectedMeasures')}
             </h3>
-            <div className="nhsn-link__report-results-table-scroll">
+            <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
               <table className="nhsn-link__report-results-table">
                 <thead>
                   <tr>
@@ -1524,7 +1523,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     count: dqmScopedPatients.length,
                   })}
                 </h3>
-                <div className="nhsn-link__report-results-table-scroll">
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                   <table className="nhsn-link__report-results-table nhsn-link__report-results-table--light-border nhsn-link__report-results-table--fixed">
                     <colgroup>
                       <col style={{ width: '9%' }} />
@@ -1688,14 +1687,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                           <td>
                             <button
                               type="button"
-                              className="nhsn-link__report-results-icon-button"
+                              className={`nhsn-link__report-results-icon-button${downloadingPatientId === row.patientId ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
                               onClick={() =>
                                 handleDownloadPatientReport(
                                   row.patientId,
                                   currentDqm,
                                 )
                               }
-                              disabled={downloadingPatientId === row.patientId}
                               aria-label={t(
                                 'onboarding:reportResults.detail.downloadPatientReport',
                               )}
@@ -1778,7 +1776,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               <h3 className="nhsn-link__report-results-detail-section-title">
                 {t('onboarding:reportResults.detail.queryPlan.planDetails')}
               </h3>
-              <div className="nhsn-link__report-results-table-scroll">
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                 <table className="nhsn-link__report-results-table">
                   <tbody>
                     <tr>
@@ -1804,7 +1802,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               <h3 className="nhsn-link__report-results-detail-section-title">
                 {t('onboarding:reportResults.detail.queryPlan.queries')}
               </h3>
-              <div className="nhsn-link__report-results-table-scroll">
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
@@ -2031,7 +2029,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     },
                   )}
                 </p>
-                <div className="nhsn-link__report-results-table-scroll">
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
@@ -2270,7 +2268,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             )}
           </h3>
           {locationOrgConfig ? (
-            <div className="nhsn-link__report-results-table-scroll">
+            <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
               <table className="nhsn-link__report-results-table">
                 <thead>
                   <tr>
@@ -2329,7 +2327,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             mappingEvidence &&
             (mappingEvidence.locationOrg &&
             mappingEvidence.locationOrg.matches.length > 0 ? (
-              <div className="nhsn-link__report-results-table-scroll">
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                 <table className="nhsn-link__report-results-table">
                   <thead>
                     <tr>
@@ -2434,7 +2432,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
             )}
           </h3>
-          <div className="nhsn-link__report-results-table-scroll">
+          <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
             <table className="nhsn-link__report-results-table">
               <thead>
                 <tr>
@@ -2506,7 +2504,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                 {hslocDataLoading ? (
                   <NHSNLoadingIndicator />
                 ) : (
-                  <div className="nhsn-link__report-results-table-scroll">
+                  <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                     <table className="nhsn-link__report-results-table">
                       <thead>
                         <tr>
@@ -2619,7 +2617,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     'onboarding:reportResults.detail.mappingEvidence.acquiredEncounterValueHeading',
                   )}
                 </h3>
-                <div className="nhsn-link__report-results-table-scroll">
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
@@ -2674,7 +2672,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                       'onboarding:reportResults.detail.mappingEvidence.codeSystem',
                     )}
                 </h4>
-                <div className="nhsn-link__report-results-table-scroll">
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
                   <table className="nhsn-link__report-results-table">
                     <thead>
                       <tr>
@@ -2869,7 +2867,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       )}
 
       {!loading && reports.length > 0 && (
-        <div className="nhsn-link__report-results-table-scroll">
+        <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
           <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
             <colgroup>
               <col style={{ width: '11%' }} />

@@ -4,6 +4,8 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/contracts';
 import {
+  AcronymText,
+  acronymTitle,
   Button,
   FieldLabel,
   NewTabAnnouncement,
@@ -263,9 +265,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
   return (
     <div className="nhsn-link__content nhsn-link__hsloc">
-      <PageHeader title={t('onboarding:hsloc.title')} />
+      <PageHeader title={acronymTitle(<AcronymText>{t('onboarding:hsloc.title')}</AcronymText>)} />
       <p className="nhsn-link__subtitle">
-        {t('onboarding:hsloc.subtitlePrefix')}{' '}
+        <AcronymText>{t('onboarding:hsloc.subtitlePrefix')}</AcronymText>{' '}
         <a
           href="https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html"
           target="_blank"
@@ -273,7 +275,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
           {t('onboarding:hsloc.subtitleLinkText')}
           <NewTabAnnouncement />
         </a>
-        {t('onboarding:hsloc.subtitleSuffix')}
+        <AcronymText>{t('onboarding:hsloc.subtitleSuffix')}</AcronymText>
       </p>
 
       <div className="nhsn-link__field-group">
@@ -281,7 +283,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
           label={t('onboarding:hsloc.title')}
           tabs={[
             {id: 'mapping', label: t('onboarding:hsloc.tabs.mapping')},
-            {id: 'reference', label: t('onboarding:hsloc.tabs.reference')}
+            {id: 'reference', label: <AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText>}
           ]}
           activeTab={tab}
           onTabChange={setTab}
@@ -290,7 +292,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
       {tab === 'mapping' && (
         <div className="nhsn-link__field-group">
-          <FieldLabel checked={false}>{t('onboarding:hsloc.mapping.listLabel')}</FieldLabel>
+          <FieldLabel checked={false}><AcronymText>{t('onboarding:hsloc.mapping.listLabel')}</AcronymText></FieldLabel>
           <RepeatableList<MappingRow>
             items={rows}
             onChange={setRows}
@@ -393,7 +395,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                 </select>
               </div>
               <p className="nhsn-link__hint-text">
-                {t('onboarding:hsloc.reference.resultCount', {count: filteredCodes.length, total: codes.length})}
+                <AcronymText>{t('onboarding:hsloc.reference.resultCount', {count: filteredCodes.length, total: codes.length})}</AcronymText>
               </p>
             </div>
 
@@ -412,7 +414,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                   {filteredCodes.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="nhsn-link__hsloc-empty-row">
-                        {t('onboarding:hsloc.reference.noResults')}
+                        <AcronymText>{t('onboarding:hsloc.reference.noResults')}</AcronymText>
                       </td>
                     </tr>
                   ) : (
@@ -456,7 +458,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                 {selectedRow.definition && <p className="nhsn-link__hint-text">{selectedRow.definition}</p>}
                 <FieldLabel checked={false}>{t('onboarding:hsloc.reference.detail.mappedHeading')}</FieldLabel>
                 {mappedRowsForSelected.length === 0 ? (
-                  <p className="nhsn-link__hint-text">{t('onboarding:hsloc.reference.detail.noneMapped')}</p>
+                  <p className="nhsn-link__hint-text"><AcronymText>{t('onboarding:hsloc.reference.detail.noneMapped')}</AcronymText></p>
                 ) : (
                   <ul className="nhsn-link__summary-list">
                     {mappedRowsForSelected.map((row, index) => (

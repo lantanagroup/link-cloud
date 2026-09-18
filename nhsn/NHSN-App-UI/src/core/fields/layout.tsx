@@ -36,14 +36,14 @@ export function Button({
   'aria-label': ariaLabel
 }: ButtonProps) {
   const {t} = useTranslation('common');
+  const isBlocked = Boolean(disabled || loading);
   return (
     <KendoButton
       type={type}
       themeColor={variant === 'primary' ? 'primary' : 'base'}
-      className={size === 'sm' ? 'nhsn-link__button--sm' : undefined}
-      disabled={disabled || loading}
+      className={`${size === 'sm' ? 'nhsn-link__button--sm ' : ''}${isBlocked ? 'nhsn-link__button--disabled' : ''}`.trim() || undefined}
       aria-label={ariaLabel}
-      onClick={onClick}>
+      onClick={isBlocked ? undefined : onClick}>
       {loading && (
         <span className="nhsn-link__button-spinner" role="status" aria-label={t('status.saving')} />
       )}
@@ -131,6 +131,41 @@ export function NewTabAnnouncement({id}: {id?: string}) {
       {t('a11y.opensInNewTab')}
     </span>
   );
+}
+
+// NVDA tries to pronounce these as words instead of spelling them out ("sloc",
+// "poi" like the food). Extend this map if another short-form starts doing
+// the same thing.
+const ACRONYM_SPELLINGS: Record<string, string> = {
+  HSLOC: 'H S L O C',
+  POI: 'P O I'
+};
+const ACRONYM_PATTERN = new RegExp(`\\b(${Object.keys(ACRONYM_SPELLINGS).join('|')})\\b`, 'g');
+
+/**
+ * Wraps any HSLOC/POI in already-translated text so it's spelled out letter
+ * by letter instead of mispronounced as a word, leaving the visible text
+ * exactly as translated.
+ */
+export function AcronymText({children}: {children: string}) {
+  return (
+    <>
+      {children.split(ACRONYM_PATTERN).map((part, index) =>
+        ACRONYM_SPELLINGS[part] ? (
+          <React.Fragment key={index}>
+            <span aria-hidden="true">{part}</span>
+            <span className="nhsn-link__visually-hidden">{ACRONYM_SPELLINGS[part]}</span>
+          </React.Fragment>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
+export function acronymTitle(node: React.ReactNode): string {
+  return node as unknown as string;
 }
 
 export interface SidePanelLayoutProps {

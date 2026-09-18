@@ -25,6 +25,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  function announceValidationMessage(message: string) {
+    setValidationError(null);
+    window.setTimeout(() => setValidationError(message), 0);
+  }
+
   const [baseUrl, setBaseUrl] = useState(fhir.fhirServerBaseUrl ?? '');
   const [maxConcurrentRequests, setMaxConcurrentRequests] = useState<number | undefined>(fhir.maxConcurrentRequests);
   const [maxRetries, setMaxRetries] = useState<number | undefined>(fhir.maxRetries);
@@ -119,6 +124,24 @@ export function FhirStep({onNext, onBack}: StepProps) {
   }
 
   async function handleTestConnection() {
+    const nextErrors = validateFhir(currentFieldValues());
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setTouched({
+        fhirServerBaseUrl: true,
+        maxConcurrentRequests: true,
+        maxRetries: true,
+        minAcquisitionPullTime: true,
+        maxAcquisitionPullTime: true,
+        lagDays: true,
+        lagHours: true,
+        lagMinutes: true
+      });
+      announceValidationMessage(t('onboarding:fhirServerInfo.messages.incomplete'));
+      return;
+    }
+    setValidationError(null);
+
     setTesting(true);
     setTestResult(null);
 
@@ -174,12 +197,12 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      setValidationError(t('onboarding:fhirServerInfo.messages.incomplete'));
+      announceValidationMessage(t('onboarding:fhirServerInfo.messages.incomplete'));
       return;
     }
 
     if (testedBaseUrl !== trimmedBaseUrl) {
-      setValidationError(t('onboarding:fhirServerInfo.messages.connectionNotTested'));
+      announceValidationMessage(t('onboarding:fhirServerInfo.messages.connectionNotTested'));
       return;
     }
 
