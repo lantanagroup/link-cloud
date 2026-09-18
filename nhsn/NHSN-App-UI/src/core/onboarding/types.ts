@@ -86,6 +86,7 @@ export interface CensusDraft {
    * may enter it.
    */
   hasCredentials?: boolean;
+  sftpConnectionTested?: boolean;
   acquisitionFrequency?: string;
   accuracyAcknowledged?: boolean;
 }

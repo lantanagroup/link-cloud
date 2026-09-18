@@ -14,7 +14,6 @@ import {
   Button,
   CheckboxField,
   DownloadLinkButton,
-  MessageContainer,
   NumberField,
   PageHeader,
   RequiredAsterisk,
@@ -131,8 +130,26 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     null,
   );
 
+  const persistedTestedSftpConfig =
+    census.sftpConnectionTested && census.sftpHost && census.sftpPort !== undefined
+      ? { host: census.sftpHost.trim(), port: census.sftpPort }
+      : null;
+  const [testedSftpConfig, setTestedSftpConfig] = useState<
+    { host: string; port: number } | null
+  >(persistedTestedSftpConfig);
+  const sftpConnectionVerified =
+    testedSftpConfig !== null &&
+    testedSftpConfig.host === census.sftpHost?.trim() &&
+    testedSftpConfig.port === census.sftpPort;
+
   const patientListsLive = user.capabilities?.patientListWithNames ?? false;
   const sftpListingLive = user.capabilities?.sftpFileListing ?? false;
+  const validationLive =
+    acquisition === "PatientList"
+      ? patientListsLive
+      : acquisition === "Sftp"
+        ? sftpListingLive
+        : false;
 
   const allListsQueried =
     acquisition === "PatientList" &&
@@ -185,7 +202,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     patch("census", {
       patientListIds: { ...census.patientListIds, [key]: value },
     });
-    if (census.accuracyAcknowledged) {
+    if (validationLive && census.accuracyAcknowledged) {
       revokeAcknowledgement();
       announceValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
     }
@@ -201,8 +218,9 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   }
 
   function updateSftpField(fields: Partial<typeof census>) {
-    patch("census", fields);
-    if (census.accuracyAcknowledged) {
+    const retested = "sftpHost" in fields || "sftpPort" in fields;
+    patch("census", retested ? { ...fields, sftpConnectionTested: false } : fields);
+    if (validationLive && census.accuracyAcknowledged) {
       revokeAcknowledgement();
       announceValidationMessage(
         t("onboarding:census.messages.testConnectionBeforeAck"),
@@ -270,6 +288,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     setValidationMessage(null);
     setTestingConnection(true);
     setConnectionResult(null);
+    setTestedSftpConfig(null);
     setSftpFiles(null);
     setSelectedFileName(null);
     if (census.accuracyAcknowledged) {
@@ -282,11 +301,13 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     const enteringCredentials = Boolean(
       sftpUsername.trim() && sftpPassword.trim(),
     );
+    const trimmedHost = census.sftpHost!.trim();
+    const port = census.sftpPort!;
 
     try {
       const result = await api.testSftpConnection({
-        host: census.sftpHost!.trim(),
-        port: census.sftpPort!,
+        host: trimmedHost,
+        port,
         remoteDirectory: census.sftpRemoteDirectory?.trim() || "/",
         removeAfterProcessing: Boolean(census.sftpRemoveAfterProcessing),
         ...(enteringCredentials
@@ -294,6 +315,8 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           : {}),
       });
       setConnectionResult(result);
+      setTestedSftpConfig(result.success ? { host: trimmedHost, port } : null);
+      patch("census", { sftpConnectionTested: result.success });
 
       if (enteringCredentials) {
         patch("census", { hasCredentials: true });
@@ -301,10 +324,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         setSftpPassword("");
       }
 
-      if (result.success) {
+      if (result.success && sftpListingLive) {
         setSftpFiles(await api.listSftpFiles());
       }
     } catch (cause) {
+      patch("census", { sftpConnectionTested: false });
       notifyError(
         cause instanceof Error
           ? cause.message
@@ -356,7 +380,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       announceValidationMessage(t("onboarding:census.messages.incomplete"));
       return;
     }
-    if (!census.accuracyAcknowledged) {
+    if (acquisition === "Sftp" && !sftpConnectionVerified) {
+      announceValidationMessage(t("onboarding:census.messages.connectionNotTested"));
+      return;
+    }
+    if (validationLive && !census.accuracyAcknowledged) {
       announceValidationMessage(t("onboarding:census.messages.notAcknowledged"));
       return;
     }
@@ -582,12 +610,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                   />
                 )}
 
-                {!patientListsLive && (
-                  <MessageContainer type="warning" showIcon>
-                    <span>{t("onboarding:messages.notConnected")}</span>
-                  </MessageContainer>
-                )}
-
                 {CENSUS_LIST_KEYS.map((key) => {
                   const state = listState[key];
                   return (
@@ -608,21 +630,23 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           onChange={(value) => updateListId(key, value)}
                           onBlur={() => refreshFieldError(`listId.${key}`)}
                         />
-                        <button
-                          type="button"
-                          className={`census-view-btn${selectedListKey === key ? " active" : ""}`}
-                          aria-label={t(
-                            "onboarding:census.epic.viewResultsAria",
-                            { list: t(LIST_LABEL_KEYS[key]) },
-                          )}
-                          disabled={!state?.result}
-                          onClick={() =>
-                            setSelectedListKey((prev) =>
-                              prev === key ? null : key,
-                            )
-                          }>
-                          <ViewResultsIcon />
-                        </button>
+                        {patientListsLive && (
+                          <button
+                            type="button"
+                            className={`census-view-btn${selectedListKey === key ? " active" : ""}`}
+                            aria-label={t(
+                              "onboarding:census.epic.viewResultsAria",
+                              { list: t(LIST_LABEL_KEYS[key]) },
+                            )}
+                            disabled={!state?.result}
+                            onClick={() =>
+                              setSelectedListKey((prev) =>
+                                prev === key ? null : key,
+                              )
+                            }>
+                            <ViewResultsIcon />
+                          </button>
+                        )}
                       </div>
                       <p className="nhsn-link__form-error" role="alert">{state?.error}</p>
                     </div>
@@ -631,22 +655,24 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
                 {frequencySection}
 
-                <div className="census-inline-actions">
-                  <Button
-                    onClick={handleValidateEpicLists}
-                    disabled={validatingLists}>
-                    {validatingLists
-                      ? t("onboarding:census.epic.validating")
-                      : t("onboarding:census.epic.validateButton")}
-                  </Button>
-                  {allListsQueried && (
-                    <DownloadLinkButton
-                      buttonText={t("onboarding:census.fields.exportResults")}
-                      fileName={exportFileName}
-                      onDownload={handleExportEpicResults}
-                    />
-                  )}
-                </div>
+                {patientListsLive && (
+                  <div className="census-inline-actions">
+                    <Button
+                      onClick={handleValidateEpicLists}
+                      disabled={validatingLists}>
+                      {validatingLists
+                        ? t("onboarding:census.epic.validating")
+                        : t("onboarding:census.epic.validateButton")}
+                    </Button>
+                    {allListsQueried && (
+                      <DownloadLinkButton
+                        buttonText={t("onboarding:census.fields.exportResults")}
+                        fileName={exportFileName}
+                        onDownload={handleExportEpicResults}
+                      />
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -774,54 +800,49 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                     : null}
                 </p>
 
-                {sftpFiles !== null && (
-                  <>
-                    {!sftpListingLive && (
-                      <MessageContainer type="warning" showIcon>
-                        <span>{t("onboarding:messages.notConnected")}</span>
-                      </MessageContainer>
-                    )}
-                    <div className="census-results">
-                      <div className="section-title">
-                        {t("onboarding:census.cerner.filesTitle")}
-                      </div>
-                      {(sftpFiles ?? []).length === 0 ? (
-                        <p className="subtitle">
-                          {t("onboarding:census.cerner.noFiles")}
-                        </p>
-                      ) : (
-                        (sftpFiles ?? []).map((file) => (
-                          <div className="census-file-row" key={file.fileName}>
-                            <span>{file.fileName}</span>
-                            <button
-                              type="button"
-                              className={`census-view-btn${selectedFileName === file.fileName ? " active" : ""}`}
-                              aria-label={t(
-                                "onboarding:census.cerner.viewResultsAria",
-                                { file: file.fileName },
-                              )}
-                              onClick={() =>
-                                setSelectedFileName((prev) =>
-                                  prev === file.fileName ? null : file.fileName,
-                                )
-                              }>
-                              <ViewResultsIcon />
-                            </button>
-                          </div>
-                        ))
-                      )}
+                {sftpListingLive && sftpFiles !== null && (
+                  <div className="census-results">
+                    <div className="section-title">
+                      {t("onboarding:census.cerner.filesTitle")}
                     </div>
-                  </>
+                    {(sftpFiles ?? []).length === 0 ? (
+                      <p className="subtitle">
+                        {t("onboarding:census.cerner.noFiles")}
+                      </p>
+                    ) : (
+                      (sftpFiles ?? []).map((file) => (
+                        <div className="census-file-row" key={file.fileName}>
+                          <span>{file.fileName}</span>
+                          <button
+                            type="button"
+                            className={`census-view-btn${selectedFileName === file.fileName ? " active" : ""}`}
+                            aria-label={t(
+                              "onboarding:census.cerner.viewResultsAria",
+                              { file: file.fileName },
+                            )}
+                            onClick={() =>
+                              setSelectedFileName((prev) =>
+                                prev === file.fileName ? null : file.fileName,
+                              )
+                            }>
+                            <ViewResultsIcon />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 )}
               </>
             )}
 
-            <CheckboxField
-              id="census-accuracy-ack"
-              label={t("onboarding:census.fields.accuracyAck")}
-              value={Boolean(census.accuracyAcknowledged)}
-              onChange={handleAckChange}
-            />
+            {validationLive && (
+              <CheckboxField
+                id="census-accuracy-ack"
+                label={t("onboarding:census.fields.accuracyAck")}
+                value={Boolean(census.accuracyAcknowledged)}
+                onChange={handleAckChange}
+              />
+            )}
 
             <p className="nhsn-link__form-error" role="alert">
               {validationMessage}
@@ -832,7 +853,10 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             <Button variant="secondary" onClick={onBack} disabled={saving}>
               {t("common:actions.back")}
             </Button>
-            <Button onClick={handleNext} disabled={saving} loading={saving}>
+            <Button
+              onClick={handleNext}
+              disabled={saving || (acquisition === "Sftp" && !sftpConnectionVerified)}
+              loading={saving}>
               {t("common:actions.continue")}
             </Button>
           </StepActions>

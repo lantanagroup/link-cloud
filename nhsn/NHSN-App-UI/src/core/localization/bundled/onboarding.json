@@ -228,6 +228,7 @@
     },
     "messages": {
       "incomplete": "Please complete all required fields before continuing.",
+      "connectionNotTested": "Test the connection before continuing.",
       "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
       "validateBeforeAck": "Click Validate before acknowledging that the results are accurate.",
       "testConnectionBeforeAck": "Click Validate before acknowledging that the results are accurate.",
