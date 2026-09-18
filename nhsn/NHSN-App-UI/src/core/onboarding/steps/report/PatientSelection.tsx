@@ -3,6 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {CensusListKey} from '../../../api/contracts';
 import {
+  AcronymText,
   Button,
   DownloadLinkButton,
   FileUploadField,
@@ -212,7 +213,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
 
   function renderCensus(which: 'previous' | 'new-pull', state: CensusState) {
     if (!acquisition) {
-      return <p className="form-hint">{t('onboarding:report.patients.census.vendorRequired')}</p>;
+      return <p className="form-hint"><AcronymText>{t('onboarding:report.patients.census.vendorRequired')}</AcronymText></p>;
     }
     if (state.loading) {
       return <InlineSpinner label={t('onboarding:report.patients.census.running')} />;
@@ -267,8 +268,9 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
               </p>
             ) : (
               <>
-                <div className="report-patient-scroll" tabIndex={0}>
+                <div className="report-patient-scroll" tabIndex={-1}>
                   <table>
+                    <caption className="nhsn-link__visually-hidden">{t('onboarding:report.patients.census.sourceLabel')}</caption>
                     <thead>
                       <tr>
                         <th scope="col">
@@ -319,8 +321,9 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     return (
       <div className="report-selected-patients">
         <div className="section-title">{t('onboarding:report.patients.census.selectedTitle')}</div>
-        <div className="report-patient-scroll" tabIndex={0}>
+        <div className="report-patient-scroll" tabIndex={-1}>
           <table>
+            <caption className="nhsn-link__visually-hidden">{t('onboarding:report.patients.census.selectedTitle')}</caption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:report.patients.columnPatientId')}</th>

@@ -285,6 +285,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           <InlineSpinner label={t('onboarding:locationOrg.locationType.searching')} />
         ) : (
           <CandidateTable
+            caption={t('onboarding:locationOrg.locationType.searchTitle', {vendor: vendorName})}
             candidates={candidates}
             selected={selectedCandidates}
             onToggle={(id, checked) => setSelectedCandidates(current => ({...current, [id]: checked}))}
@@ -336,17 +337,19 @@ interface CandidateTableProps {
   onToggle: (id: string, checked: boolean) => void;
   columnLabels: {id: string; alias: string; type: string; codings: string};
   emptyLabel: string;
+  caption: string;
 }
 
 /** Multi-select over search results. Columns match the POC's Cerner site-location table. */
-function CandidateTable({candidates, selected, onToggle, columnLabels, emptyLabel}: CandidateTableProps) {
+function CandidateTable({candidates, selected, onToggle, columnLabels, emptyLabel, caption}: CandidateTableProps) {
   if (candidates.length === 0) {
     return <p className="nhsn-link__hint-text">{emptyLabel}</p>;
   }
 
   return (
-    <div className="nhsn-link__table-scroll">
+    <div className="nhsn-link__table-scroll" tabIndex={-1}>
       <table className="nhsn-link__table">
+        <caption className="nhsn-link__visually-hidden">{caption}</caption>
         <thead>
           <tr>
             <th scope="col" className="nhsn-link__table-select-column" />

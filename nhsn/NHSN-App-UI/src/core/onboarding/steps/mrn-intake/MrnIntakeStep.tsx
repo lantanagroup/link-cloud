@@ -3,6 +3,7 @@ import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {MrnIdentifierRule, MrnIntake, MrnIntakeOptions, PatientIdentifier} from '../../../api/contracts';
 import {
+  AcronymText,
   Button,
   CheckboxField,
   FieldLabel,
@@ -199,7 +200,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
   return (
     <div className="nhsn-link__content nhsn-link__mrn-intake">
       <PageHeader title={t('onboarding:mrnIntake.title')} />
-      <p className="nhsn-link__subtitle">{t('onboarding:mrnIntake.intro1')}</p>
+      <p className="nhsn-link__subtitle"><AcronymText>{t('onboarding:mrnIntake.intro1')}</AcronymText></p>
       <p className="nhsn-link__subtitle">
         <Trans t={t} i18nKey="onboarding:mrnIntake.intro2" components={{b: <b />}} />
       </p>
@@ -253,9 +254,9 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       {/* ---------------------------------------------------------- user-facing MRN */}
       {draft.hasMultipleMrn === true && (
         <>
-          <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.userFacingMrn')}</div>
+          <div className="nhsn-link__section-title"><AcronymText>{t('onboarding:mrnIntake.sections.userFacingMrn')}</AcronymText></div>
           <div className="nhsn-link__field-group">
-            <FieldLabel checked={false}>{t('onboarding:mrnIntake.userFacing.question')}</FieldLabel>
+            <FieldLabel checked={false}><AcronymText>{t('onboarding:mrnIntake.userFacing.question')}</AcronymText></FieldLabel>
             {userFacingOptions.length === 0 ? (
               <p className="nhsn-link__hint-text">{t('onboarding:mrnIntake.userFacing.noOptionsHint')}</p>
             ) : (
@@ -314,8 +315,9 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.correspondingIdentifier')}</div>
       <p className="nhsn-link__hint-text">{t('onboarding:mrnIntake.identifierTable.hint')}</p>
 
-      <div className="nhsn-link__table-scroll nhsn-link__mrn-patient-table-scroll">
+      <div className="nhsn-link__table-scroll nhsn-link__mrn-patient-table-scroll" tabIndex={-1}>
         <table className="nhsn-link__table nhsn-link__mrn-patient-table">
+          <caption className="nhsn-link__visually-hidden">{t('onboarding:mrnIntake.sections.correspondingIdentifier')}</caption>
           <thead>
             <tr>
               <th scope="col">{t('onboarding:mrnIntake.identifierTable.columns.patientId')}</th>

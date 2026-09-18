@@ -129,16 +129,17 @@ function summarizeByCategory(issues: PreQualIssue[], acceptable: boolean): Categ
 
 type TFunc = ReturnType<typeof useTranslation>['t'];
 
-function PreQualCategoryTable({entries, onSelect, t}: {entries: CategorySummary[]; onSelect: (title: string) => void; t: TFunc}) {
+function PreQualCategoryTable({entries, onSelect, t, caption}: {entries: CategorySummary[]; onSelect: (title: string) => void; t: TFunc; caption: string}) {
   if (entries.length === 0) {
     return <p>{t('onboarding:reportResults.detail.preQual.noIssues')}</p>;
   }
   return (
-    <div className="nhsn-link__report-results-table-scroll">
+    <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
       {/* --fixed + colgroup: an auto-layout table resists shrinking below its unwrapped content
           width, which is wide enough here to force the whole (flex-shrunk) modal into horizontal
           overflow -- the same reason every other report-results table already uses this pair. */}
       <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
+        <caption className="nhsn-link__visually-hidden">{caption}</caption>
         <colgroup>
           <col style={{width: '28%'}} />
           <col style={{width: '14%'}} />
@@ -539,8 +540,9 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
         <p className="nhsn-link__subtitle">
           {t('onboarding:reportResults.detail.preQual.detailSubtitle', {count: detailRows.length, patientId, measure: measureName ?? ''})}
         </p>
-        <div className="nhsn-link__report-results-table-scroll">
+        <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
+            <caption className="nhsn-link__visually-hidden">{selectedCategory}</caption>
             <colgroup>
               <col style={{width: '40%'}} />
               <col style={{width: '40%'}} />
@@ -602,12 +604,12 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
               <h3 className="nhsn-link__report-results-detail-section-title">
                 {t('onboarding:reportResults.detail.preQual.unacceptableCategories')}
               </h3>
-              <PreQualCategoryTable entries={unacceptableSummary} onSelect={setSelectedCategory} t={t} />
+              <PreQualCategoryTable entries={unacceptableSummary} onSelect={setSelectedCategory} t={t} caption={t('onboarding:reportResults.detail.preQual.unacceptableCategories')} />
             </>
           )}
 
           <h3 className="nhsn-link__report-results-detail-section-title">{t('onboarding:reportResults.detail.preQual.acceptableCategories')}</h3>
-          <PreQualCategoryTable entries={acceptableSummary} onSelect={setSelectedCategory} t={t} />
+          <PreQualCategoryTable entries={acceptableSummary} onSelect={setSelectedCategory} t={t} caption={t('onboarding:reportResults.detail.preQual.acceptableCategories')} />
         </>
       )}
 

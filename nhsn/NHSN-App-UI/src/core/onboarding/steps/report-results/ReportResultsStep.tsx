@@ -22,6 +22,7 @@ import { HttpError } from '../../../api/http';
 import { PatientStatusTimelineModal } from './PatientStatusTimeline';
 import { PreQualResultsModal } from './PreQualResults';
 import {
+  AcronymText,
   Button,
   CheckboxField,
   MessageContainer,
@@ -1416,8 +1417,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             <h3 className="nhsn-link__report-results-detail-section-title">
               {t('onboarding:reportResults.detail.selectedMeasures')}
             </h3>
-            <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+            <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__report-results-table">
+                <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.selectedMeasures')}</caption>
                 <thead>
                   <tr>
                     <th scope="col">
@@ -1523,8 +1525,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     count: dqmScopedPatients.length,
                   })}
                 </h3>
-                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                   <table className="nhsn-link__report-results-table nhsn-link__report-results-table--light-border nhsn-link__report-results-table--fixed">
+                    <caption className="nhsn-link__visually-hidden">
+                      {t('onboarding:reportResults.detail.patientReportingStatus', {
+                        count: dqmScopedPatients.length,
+                      })}
+                    </caption>
                     <colgroup>
                       <col style={{ width: '9%' }} />
                       <col style={{ width: '12%' }} />
@@ -1767,7 +1774,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               <ul className="nhsn-link__summary-list">
                 <li>
                   <span>
-                    {t('onboarding:reportResults.detail.queryPlan.ehrType')}
+                    <AcronymText>{t('onboarding:reportResults.detail.queryPlan.ehrType')}</AcronymText>
                   </span>
                   <span>{parsedQueryPlan.ehrDescription ?? '—'}</span>
                 </li>
@@ -1776,8 +1783,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               <h3 className="nhsn-link__report-results-detail-section-title">
                 {t('onboarding:reportResults.detail.queryPlan.planDetails')}
               </h3>
-              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                 <table className="nhsn-link__report-results-table">
+                  <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.queryPlan.planDetails')}</caption>
                   <tbody>
                     <tr>
                       <td>
@@ -1802,8 +1810,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               <h3 className="nhsn-link__report-results-detail-section-title">
                 {t('onboarding:reportResults.detail.queryPlan.queries')}
               </h3>
-              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                 <table className="nhsn-link__report-results-table">
+                  <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.queryPlan.queries')}</caption>
                   <thead>
                     <tr>
                       <th scope="col">
@@ -2029,8 +2038,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     },
                   )}
                 </p>
-                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                   <table className="nhsn-link__report-results-table">
+                    <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.actions.viewAcquisitionLog')}</caption>
                     <thead>
                       <tr>
                         <th scope="col">
@@ -2268,8 +2278,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             )}
           </h3>
           {locationOrgConfig ? (
-            <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+            <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__report-results-table">
+                <caption className="nhsn-link__visually-hidden">
+                  {t(
+                    'onboarding:reportResults.detail.mappingEvidence.configuredLocationOrgMappings',
+                  )}
+                </caption>
                 <thead>
                   <tr>
                     {locationOrgConfig.headers.map((header) => (
@@ -2327,8 +2342,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             mappingEvidence &&
             (mappingEvidence.locationOrg &&
             mappingEvidence.locationOrg.matches.length > 0 ? (
-              <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                 <table className="nhsn-link__report-results-table">
+                  <caption className="nhsn-link__visually-hidden">
+                    {t(
+                      'onboarding:reportResults.detail.mappingEvidence.locationEvidenceHeading',
+                    )}
+                  </caption>
                   <thead>
                     <tr>
                       <th scope="col">
@@ -2432,8 +2452,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
             )}
           </h3>
-          <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+          <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
             <table className="nhsn-link__report-results-table">
+              <caption className="nhsn-link__visually-hidden">
+                {t(
+                  'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
+                )}
+              </caption>
               <thead>
                 <tr>
                   <th scope="col">
@@ -2504,8 +2529,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                 {hslocDataLoading ? (
                   <NHSNLoadingIndicator />
                 ) : (
-                  <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+                  <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                     <table className="nhsn-link__report-results-table">
+                      <caption className="nhsn-link__visually-hidden">
+                        {t(
+                          'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
+                        )}
+                      </caption>
                       <thead>
                         <tr>
                           <th scope="col">
@@ -2617,8 +2647,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                     'onboarding:reportResults.detail.mappingEvidence.acquiredEncounterValueHeading',
                   )}
                 </h3>
-                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                   <table className="nhsn-link__report-results-table">
+                    <caption className="nhsn-link__visually-hidden">
+                      {t(
+                        'onboarding:reportResults.detail.mappingEvidence.acquiredEncounterValueHeading',
+                      )}
+                    </caption>
                     <thead>
                       <tr>
                         <th scope="col">
@@ -2672,8 +2707,14 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                       'onboarding:reportResults.detail.mappingEvidence.codeSystem',
                     )}
                 </h4>
-                <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+                <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                   <table className="nhsn-link__report-results-table">
+                    <caption className="nhsn-link__visually-hidden">
+                      {group.codeSystem ||
+                        t(
+                          'onboarding:reportResults.detail.mappingEvidence.codeSystem',
+                        )}
+                    </caption>
                     <thead>
                       <tr>
                         <th scope="col">
@@ -2725,8 +2766,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                   'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
                 )}
               </h3>
-              <div className="nhsn-link__report-results-table-scroll">
+              <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                 <table className="nhsn-link__report-results-table">
+                  <caption className="nhsn-link__visually-hidden">
+                    {t(
+                      'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
+                    )}
+                  </caption>
                   <thead>
                     <tr>
                       <th scope="col">
@@ -2867,8 +2913,9 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       )}
 
       {!loading && reports.length > 0 && (
-        <div className="nhsn-link__report-results-table-scroll" tabIndex={0}>
+        <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
+            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.title')}</caption>
             <colgroup>
               <col style={{ width: '11%' }} />
               <col style={{ width: '26%' }} />

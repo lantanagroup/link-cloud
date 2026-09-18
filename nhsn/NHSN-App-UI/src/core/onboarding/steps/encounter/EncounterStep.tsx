@@ -353,8 +353,9 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   })}
                 </p>
 
-                <div className="encounter-table-scroll" tabIndex={0}>
+                <div className="encounter-table-scroll" tabIndex={-1}>
                   <table className="encounter-table">
+                    <caption className="nhsn-link__visually-hidden">{t('onboarding:encounter.tabs.reference')}</caption>
                     <thead>
                       <tr>
                         <th scope="col">{t('onboarding:encounter.reference.columns.system')}</th>

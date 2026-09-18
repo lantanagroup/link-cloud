@@ -486,8 +486,9 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           <span>{selectedListState.result.patientCount}</span>
         </li>
       </ul>
-      <div className="census-table-scroll">
+      <div className="census-table-scroll" tabIndex={-1}>
         <table>
+          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.epic.resultsTitle")}</caption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.epic.columns.patientId")}</th>
@@ -524,8 +525,9 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           <span>{selectedFile.patientIds.length}</span>
         </li>
       </ul>
-      <div className="census-table-scroll">
+      <div className="census-table-scroll" tabIndex={-1}>
         <table>
+          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.cerner.resultsTitle")}</caption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.cerner.columns.patientId")}</th>
@@ -560,6 +562,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         <NumberField
           id="census-frequency-hours"
           label={t("onboarding:census.fields.hoursLabel")}
+          required
           min={0}
           step={1}
           value={frequencyHours}
@@ -569,6 +572,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         <NumberField
           id="census-frequency-minutes"
           label={t("onboarding:census.fields.minutesLabel")}
+          required
           min={0}
           max={59}
           step={1}

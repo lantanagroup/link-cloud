@@ -329,6 +329,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     id={`hsloc-your-code-${index}`}
                     label={yourCodeLabel}
                     placeholder={yourCodeLabel}
+                    required
                     value={row.sourceDisplay}
                     error={sourceDisplayInvalid ? requiredFieldError : undefined}
                     onChange={sourceDisplay =>
@@ -339,12 +340,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     id={`hsloc-location-value-${index}`}
                     label={locationValueLabel}
                     placeholder={locationValueLabel}
+                    required
                     value={row.sourceCode}
                     error={sourceCodeInvalid ? requiredFieldError : sourceCodeDuplicate ? duplicateFieldError : undefined}
                     onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}})}
                   />
                   <div>
                     <select
+                      id={`hsloc-code-select-${index}`}
                       className={
                         hslocCodeInvalid
                           ? 'nhsn-link__hsloc-code-select nhsn-link__hsloc-code-select--error'
@@ -352,6 +355,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
                       }
                       aria-label={hslocCodeLabel}
                       aria-invalid={hslocCodeInvalid}
+                      aria-required="true"
+                      aria-describedby={hslocCodeInvalid ? `hsloc-code-error-${index}` : undefined}
+                      required
                       value={row.hslocCode}
                       onChange={event =>
                         onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: true}})
@@ -367,7 +373,11 @@ export function HslocStep({onNext, onBack}: StepProps) {
                         </optgroup>
                       ))}
                     </select>
-                    {hslocCodeInvalid && <p className="nhsn-link__hsloc-code-error-text">{requiredFieldError}</p>}
+                    {hslocCodeInvalid && (
+                      <p id={`hsloc-code-error-${index}`} className="nhsn-link__hsloc-code-error-text" role="alert">
+                        {requiredFieldError}
+                      </p>
+                    )}
                   </div>
                 </>
               );
@@ -417,8 +427,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
               </p>
             </div>
 
-            <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll" tabIndex={0}>
+            <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__table nhsn-link__hsloc-table">
+                <caption className="nhsn-link__visually-hidden"><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></caption>
                 <thead>
                   <tr>
                     <th scope="col">{t('onboarding:hsloc.reference.columns.category')}</th>

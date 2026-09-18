@@ -103,6 +103,7 @@
     "unexpected": "Algo salió mal. Inténtelo de nuevo."
   },
   "a11y": {
-    "opensInNewTab": "(se abre en una pestaña nueva)"
+    "opensInNewTab": "(se abre en una pestaña nueva)",
+    "table": "Tabla"
   }
 }
