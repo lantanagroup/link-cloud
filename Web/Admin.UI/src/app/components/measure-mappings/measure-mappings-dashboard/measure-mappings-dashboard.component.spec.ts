@@ -254,6 +254,28 @@ describe('MeasureMappingsDashboardComponent', () => {
     const notice = (fixture.nativeElement as HTMLElement).querySelector('.awaiting-dqm-notice');
     expect(notice).not.toBeNull();
     expect(notice!.textContent).toContain('1 measure');
+    expect(notice!.textContent).toContain('was');
+  });
+
+  /**
+   * The notice switches measure/measures, was/were and it/them on the count. Only the singular
+   * branch was covered, so the plural one could break without a test noticing.
+   */
+  it('says so in the plural when more than one measure is waiting', () => {
+    const alsoUnmapped: IMeasureMapping = { id: 'mm-4', measure: 'HTCDI', dqm: null, frequency: Frequency.Adhoc };
+
+    givenMappings([...mappings, unmapped, alsoUnmapped]);
+    fixture.detectChanges();
+
+    expect(component.awaitingDqmCount).toBe(2);
+
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.awaiting-dqm-notice');
+    expect(notice).not.toBeNull();
+
+    const text = notice!.textContent!;
+    expect(text).toContain('2 measures');
+    expect(text).toContain('were');
+    expect(text).toContain('them');
   });
 
   it('says nothing when every mapping has a dQM', () => {
