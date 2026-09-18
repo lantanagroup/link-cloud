@@ -93,13 +93,14 @@
       "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
       "invalidUrl": "Enter a valid, fully-qualified URL.",
       "invalidNumber": "Enter a whole number of zero or greater.",
-      "invalidNumberRange": "Enter a whole number within the allowed range.",
+      "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
       "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
-      "invalidFhirPath": "Enter a valid FHIRPath expression."
+      "invalidFhirPath": "Enter a valid FHIRPath expression.",
+      "lineFormat": "{{sheet}} {{location}}: {{message}}"
     }
   },
   "fhirServerInfo": {
