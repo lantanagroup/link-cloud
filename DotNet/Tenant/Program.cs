@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
@@ -159,12 +160,21 @@ namespace Tenant
             // can put its own behavior in front of it when enabled.
             builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
 
-            builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
+            var dmrpEnabled = builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(
+                mvcBuilder, ReportSchedulingJobs.ClassicJobGroup);
 
-            // Hosted services start in registration order, so the DMRP module's cleanup (flag off) or
-            // reconcile (flag on) hosted service - registered above, inside AddDmrpModule - must be
-            // registered before the classic scheduler starts the shared Quartz scheduler.
-            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            if (!dmrpEnabled)
+            {
+                // Only one owner of the shared Quartz scheduler at a time. With DMRP on,
+                // DmrpNightlyScheduleHostedService - registered above, inside AddDmrpModule - sweeps the
+                // classic jobs, reconciles its own, and starts and shuts the scheduler down; hosting
+                // ScheduleService alongside it would mean two starts and two shutdowns.
+                //
+                // ScheduleService stays registered as a singleton either way, because
+                // TenantFacilityOperations calls its per-facility Add/Update/Delete methods on every
+                // facility save. Those return early while the flag is on.
+                builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            }
 
             //Add problem details
             builder.Services.AddTenantProblemDetails(builder.Environment);
