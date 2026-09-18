@@ -124,6 +124,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
+            using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
             string facilityId = result.Message.Key;
 
             try

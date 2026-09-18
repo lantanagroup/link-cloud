@@ -12,6 +12,12 @@ public sealed class GenerationManifestSnapshot
     /// <summary>Ordered patient IDs.</summary>
     public IReadOnlyList<string> PatientIds { get; init; } = [];
 
+    /// <summary>
+    /// Patient IDs predicted to be submitted (qualify for at least one selected measure
+    /// and are included by cohort/inpatient-pattern rules).
+    /// </summary>
+    public IReadOnlyList<string> ExpectedSubmittedPatientIds { get; init; } = [];
+
     /// <summary>Selected measure type names.</summary>
     public IReadOnlyList<string> SelectedMeasures { get; init; } = [];
 
@@ -57,4 +63,10 @@ public sealed class GenerationManifestSnapshot
     /// </summary>
     public IReadOnlyDictionary<string, int> ExpectedAbsTotalCountsByType { get; init; }
         = new Dictionary<string, int>();
+
+    /// <summary>
+    /// Per-patient ABS template-cache key used to replay generated FHIR for download.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
 }

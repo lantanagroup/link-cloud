@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 public class FhirResourceConverter : JsonConverter<DomainResource>
 {
-    private readonly FhirJsonParser _fhirParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
+    private readonly FhirJsonDeserializer _fhirParser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
 
     public override DomainResource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

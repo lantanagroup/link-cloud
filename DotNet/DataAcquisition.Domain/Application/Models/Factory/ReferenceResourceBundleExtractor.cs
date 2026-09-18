@@ -45,22 +45,39 @@ public class ReferenceResourceBundleExtractor
             results.Add(ancestor);
         }
 
-        foreach (var property in ancestor.NamedChildren)
+        foreach (var element in ancestor.EnumerateElements())
         {
-            if (property.Value is ResourceReference reference)
+            foreach (var child in FlattenElement(element.Value))
             {
-                try
+                if (child is ResourceReference reference)
                 {
-                    ResourceIdentity identity = new(reference.Reference);
-                    if (validResourceTypes.Contains(identity.ResourceType))
+                    try
                     {
-                        results.Add(reference);
+                        ResourceIdentity identity = new(reference.Reference);
+                        if (validResourceTypes.Contains(identity.ResourceType))
+                        {
+                            results.Add(reference);
+                        }
                     }
+                    catch (Exception) { }
                 }
-                catch (Exception) { }
-            }
 
-            Walk(property.Value, results, validResourceTypes);
+                Walk(child, results, validResourceTypes);
+            }
+        }
+    }
+
+    private static IEnumerable<Base> FlattenElement(object? value)
+    {
+        switch (value)
+        {
+            case Base single:
+                yield return single;
+                break;
+            case IReadOnlyList<Base> list:
+                foreach (var item in list)
+                    yield return item;
+                break;
         }
     }
 }

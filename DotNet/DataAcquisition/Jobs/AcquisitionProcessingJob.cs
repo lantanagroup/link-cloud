@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -25,18 +26,21 @@ public class AcquisitionProcessingJob : IJob
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
+    private readonly ICacheService? _cache;
     private const int BatchSize = 100;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<long, ReadyToAcquire> readyToAcquireProducer,
-        IOptions<AcquisitionWorkerProcessorSettings> settings)
+        IOptions<AcquisitionWorkerProcessorSettings> settings,
+        ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
         _settings = settings?.Value ?? new AcquisitionWorkerProcessorSettings();
+        _cache = cache;
     }
 
     public async Task Execute(IJobExecutionContext context)
@@ -308,6 +312,10 @@ public class AcquisitionProcessingJob : IJob
                         {
                             { "X-Correlation-Id", Encoding.UTF8.GetBytes(request.CorrelationId?.ToString() ?? string.Empty) }
                         };
+                        KafkaHeaderHelper.ApplyIfPerformance(
+                            headers,
+                            await ReportMetricsModeCache.TryGetAsync(
+                                _cache, facilityId, request.ReportTrackingId, cancellationToken));
 
                         await _readyToAcquireProducer.ProduceAsync(
                             KafkaTopic.ReadyToAcquire.ToString(),
