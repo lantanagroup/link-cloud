@@ -42,6 +42,7 @@ public sealed class MongoIndexManager
         EnsureApiHealthRunIndexes();
         EnsureApiHealthRunResultIndexes();
         EnsureApiHealthExecutionRunIndexes();
+        EnsureCleanupReportIndexes();
     }
 
     // --- automation_org_resource_map_templates ---
@@ -238,6 +239,14 @@ public sealed class MongoIndexManager
             },
             unique: true,
             "ux_runId_serviceName_endpointKey");
+    }
+
+    // --- automation_cleanup_reports ---
+
+    private void EnsureCleanupReportIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoCleanupReportStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "FinishedAt", -1 } }, unique: false, "idx_finishedAt_desc");
     }
 
     // --- api_health_execution_runs ---

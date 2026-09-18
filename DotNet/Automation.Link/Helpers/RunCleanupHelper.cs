@@ -278,12 +278,17 @@ public static class RunCleanupHelper
         throw new InvalidOperationException($"{operation} failed (HTTP {response.StatusCode}).");
     }
 
+    /// <summary>
+    /// Automation.UI creates one facility per scenario run and uses the run GUID as the
+    /// facility id. Named production facilities and other GUID tenants (QA test facilities
+    /// that were never an Automation run) are not leftovers.
+    /// </summary>
     public static bool IsAutomationFacilityId(string? facilityId) =>
         Guid.TryParse(facilityId, out _);
 
     /// <summary>
-    /// GUID facilities whose run is terminal past <paramref name="grace"/>, plus GUID
-    /// facilities with no matching run. These still have configs; only hot work is stopped.
+    /// Automation.UI GUID facilities whose matching run is terminal past <paramref name="grace"/>.
+    /// GUID tenants with no Automation run record are not selected.
     /// </summary>
     public static IReadOnlyList<string> SelectQuiesceAutomationFacilities(
         IReadOnlyDictionary<string, string> facilities,
@@ -293,8 +298,8 @@ public static class RunCleanupHelper
         => SelectAutomationFacilities(facilities, runs, now, grace);
 
     /// <summary>
-    /// GUID facilities whose run has been terminal longer than <paramref name="retention"/>,
-    /// plus GUID orphans with no run record.
+    /// Automation.UI GUID facilities whose matching run has been terminal longer than
+    /// <paramref name="retention"/>. GUID tenants with no Automation run record are not selected.
     /// </summary>
     public static IReadOnlyList<string> SelectTeardownAutomationFacilities(
         IReadOnlyDictionary<string, string> facilities,
@@ -337,7 +342,6 @@ public static class RunCleanupHelper
         }
 
         return facilities.Keys
-            .Where(IsAutomationFacilityId)
             .Where(stale.Contains)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -366,19 +370,9 @@ public static class RunCleanupHelper
         IReadOnlyDictionary<string, string> facilities,
         IReadOnlyList<AutomationRunSummary> runs)
     {
-        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var run in runs)
-        {
-            if (IsAutomationFacilityId(run.FacilityId))
-                ids.Add(run.FacilityId!);
-            var runId = run.RunId.ToString();
-            if (IsAutomationFacilityId(runId))
-                ids.Add(runId);
-        }
-
+        var owned = OwnedAutomationFacilityIds(runs);
         return facilities.Keys
-            .Where(IsAutomationFacilityId)
-            .Where(ids.Contains)
+            .Where(owned.Contains)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -406,11 +400,27 @@ public static class RunCleanupHelper
                 Protect(protectedIds, run);
         }
 
+        var owned = OwnedAutomationFacilityIds(runs);
         return facilities.Keys
-            .Where(IsAutomationFacilityId)
+            .Where(owned.Contains)
             .Where(id => !protectedIds.Contains(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    internal static HashSet<string> OwnedAutomationFacilityIds(IReadOnlyList<AutomationRunSummary> runs)
+    {
+        var owned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var run in runs)
+        {
+            if (IsAutomationFacilityId(run.FacilityId))
+                owned.Add(run.FacilityId!);
+            var runId = run.RunId.ToString();
+            if (IsAutomationFacilityId(runId))
+                owned.Add(runId);
+        }
+
+        return owned;
     }
 
     private static void Protect(HashSet<string> protectedIds, AutomationRunSummary run)
