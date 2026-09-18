@@ -61,6 +61,16 @@ describe('CodeMapComponent', () => {
         };
         fixture.detectChanges();
         const isHSLOCMap = operationType === OperationType.HSLOCMap;
+        const hslocUrl = 'https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html';
+        expect(component.codeSystemMaps.at(0).get('targetSystem')?.disabled).toBe(isHSLOCMap);
+        expect(fixture.nativeElement.querySelector('input[formControlName="targetSystem"]').disabled).toBe(isHSLOCMap);
+        if (isHSLOCMap) {
+          expect(component.codeSystemMaps.at(0).get('targetSystem')?.value).toBe(hslocUrl);
+        }
+        component.addCodeSystemMap();
+        expect(component.codeSystemMaps.at(1).get('targetSystem')?.disabled).toBe(isHSLOCMap);
+        expect(component.codeSystemMaps.at(1).get('targetSystem')?.value).toBe(isHSLOCMap ? hslocUrl : '');
+        component.removeCodeSystemMap(1);
         const expectedName = isHSLOCMap ? 'HSLOC Location Mapping' : 'Map locations';
         const expectedDescription = isHSLOCMap
           ? 'Maps local Location codes to NHSN Healthcare Facility Patient Care Location (HSLOC) codes. Using this operation will also automatically enable CopyLocation operation and the CopyLocationAliasToTypeIteratively operation.'
@@ -108,7 +118,8 @@ describe('CodeMapComponent', () => {
         expect(request.calls.mostRecent().args[0].resourceTypes).toEqual(isHSLOCMap ? ['Location'] : ['Patient']);
         expect(request.calls.mostRecent().args[0].operation).toEqual(jasmine.objectContaining({
           Name: expectedName, Description: expectedDescription,
-          OperationType: operationType, FhirPath: isHSLOCMap ? 'type' : 'type.coding', CodeSystemMaps: codeSystemMaps
+          OperationType: operationType, FhirPath: isHSLOCMap ? 'type' : 'type.coding',
+          CodeSystemMaps: codeSystemMaps.map(map => ({...map, TargetSystem: isHSLOCMap ? hslocUrl : map.TargetSystem}))
         }));
       });
     }

@@ -59,6 +59,12 @@ public class TestScenarioDefinition
     /// </summary>
     public string NhsnOrganizationId { get; set; } = string.Empty;
 
+
+    /// <summary>
+    /// When true, this scenario uses DMRP enrollment to derive its reporting schedule.
+    /// </summary>
+    public bool EnableDmrp { get; set; }
+
     // ----- Housekeeping -----
 
     /// <summary>
