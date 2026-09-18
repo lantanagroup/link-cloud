@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Tenant.Migrations
 {
     [DbContext(typeof(TenantDbContext))]
-    [Migration("20260917204229_RecordUnmappedMeasureMappings")]
-    partial class RecordUnmappedMeasureMappings
+    [Migration("20260918215211_IndexMeasureMappingsByMeasure")]
+    partial class IndexMeasureMappingsByMeasure
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
