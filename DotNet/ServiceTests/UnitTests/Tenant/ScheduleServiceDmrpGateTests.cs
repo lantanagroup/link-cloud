@@ -95,4 +95,18 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
 
         (await ClassicJobCount()).Should().Be(0);
     }
+
+    /// <summary>
+    /// The other two public entry points. StartAsync is what assigns the scheduler field, and with the
+    /// flag on it is never called, so an ungated method here would not quietly do nothing - it would
+    /// throw a NullReferenceException on the first dereference.
+    /// </summary>
+    [Fact]
+    public async Task With_dmrp_on_the_remaining_entry_points_do_not_reach_for_the_scheduler()
+    {
+        var service = Create(dmrpEnabled: true);
+
+        await service.Invoking(s => s.DeleteJob("100")).Should().NotThrowAsync();
+        await service.Invoking(s => s.GetAllJobs()).Should().NotThrowAsync();
+    }
 }

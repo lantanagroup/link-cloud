@@ -18,8 +18,14 @@ namespace LantanaGroup.Link.Tenant.Services
     /// <summary>
     /// The classic per-facility report scheduling. Hosted only when DMRP is disabled: with the flag on
     /// DmrpNightlyScheduleHostedService owns the shared Quartz scheduler, and this class stays
-    /// registered as a plain singleton whose per-facility methods return without touching it.
+    /// registered as a plain singleton because TenantFacilityOperations still resolves it.
     /// </summary>
+    /// <remarks>
+    /// Every public method returns early while the flag is on. That is not only about leaving the
+    /// scheduler alone: StartAsync is what assigns <c>_scheduler</c>, and with the flag on it is never
+    /// called, so any method that reached a <c>_scheduler!</c> dereference would throw rather than
+    /// quietly do nothing.
+    /// </remarks>
     public class ScheduleService : IHostedService
     {
         public const string MONTHLY = ReportingPeriodMath.Monthly;
@@ -124,6 +130,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task DeleteJob(string facilityId, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             JobKey jobKey = new JobKey(facilityId, ReportSchedulingJobs.ClassicJobGroup);
 
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
@@ -269,6 +280,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task GetAllJobs(CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             var jobGroups = await _scheduler!.GetJobGroupNames(cancellationToken);
 
             foreach (string group in jobGroups)

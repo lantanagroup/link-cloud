@@ -173,6 +173,11 @@ namespace Tenant
                 // ScheduleService stays registered as a singleton either way, because
                 // TenantFacilityOperations calls its per-facility Add/Update/Delete methods on every
                 // facility save. Those return early while the flag is on.
+                //
+                // Keep this registration after the AddDmrpModule call above: hosted services start in
+                // registration order, and DmrpNightlyScheduleCleanupService - registered inside that
+                // call when the flag is off - has to sweep the module's zone jobs before ScheduleService
+                // starts the shared scheduler, or a zone job could fire with its services long gone.
                 builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
             }
 
