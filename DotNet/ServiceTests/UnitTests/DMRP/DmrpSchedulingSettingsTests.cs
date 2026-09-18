@@ -79,4 +79,36 @@ public class DmrpSchedulingSettingsTests
     {
         new DmrpSchedulingSettings { CatchUpNights = configured }.ResolvedCatchUpNights.Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("not a date")]
+    public void An_unset_or_unparseable_override_resolves_to_null(string? value)
+    {
+        new DmrpSchedulingSettings { ScheduledFireTimeOverride = value }
+            .ResolvedScheduledFireTimeOverride.Should().BeNull();
+    }
+
+    [Fact]
+    public void An_override_with_a_Z_suffix_resolves_to_that_utc_instant()
+    {
+        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-10-01T03:59:00Z" }
+            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void An_override_with_an_explicit_zero_offset_resolves_to_the_same_instant_as_Z()
+    {
+        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-10-01T03:59:00+00:00" }
+            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void An_override_with_a_non_utc_offset_is_adjusted_to_the_same_utc_instant()
+    {
+        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-09-30T23:59:00-04:00" }
+            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+    }
 }

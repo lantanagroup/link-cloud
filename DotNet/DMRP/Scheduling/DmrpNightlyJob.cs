@@ -82,6 +82,17 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
             var scheduling = _settings.Value.Scheduling;
             var scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
+
+            var overrideUtc = scheduling.ResolvedScheduledFireTimeOverride;
+            if (overrideUtc is not null)
+            {
+                _logger.LogWarning(
+                    "DMRP nightly job for zone {TimeZone} is using the configured scheduled-fire-time override {Override:O} instead of the trigger's scheduled time {ScheduledFireTimeUtc:O}. This is a QA aid and must not be set in production.",
+                    zoneId, overrideUtc.Value, scheduledUtc);
+
+                scheduledUtc = overrideUtc.Value;
+            }
+
             var comingMidnight = ReportingPeriods.ComingMidnight(scheduledUtc, timeZone, scheduling.ResolvedNightlyLocalTime);
             var periods = ReportingPeriods.StartingAt(comingMidnight);
 
