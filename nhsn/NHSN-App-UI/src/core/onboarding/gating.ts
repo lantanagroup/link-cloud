@@ -66,7 +66,7 @@ export function isUnlocked(
   if (index <= 0) {
     return index === 0;
   }
-  return steps.slice(0, index).every(step => step.isComplete(draft));
+  return steps.slice(0, index).every(step => step.isComplete(draft, user));
 }
 
 /** The furthest step the draft legitimately reaches — the fallback for a rejected target. */

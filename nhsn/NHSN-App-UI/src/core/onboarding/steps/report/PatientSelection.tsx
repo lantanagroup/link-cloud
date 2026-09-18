@@ -68,8 +68,14 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError, notifyInfo, notifySuccess} = useNotifications();
-  const {vendorProfile} = useOnboarding();
+  const {vendorProfile, user} = useOnboarding();
   const acquisition = vendorProfile?.censusAcquisition;
+  const validationLive =
+    acquisition === 'Sftp'
+      ? Boolean(user.capabilities?.sftpFileListing)
+      : acquisition === 'PatientList'
+        ? Boolean(user.capabilities?.patientListWithNames)
+        : false;
 
   const [tab, setTab] = useState<PatientTab>('manual');
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
@@ -365,8 +371,12 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
         tabs={[
           {id: 'manual', label: t('onboarding:report.patients.tabs.manual')},
           {id: 'csv', label: t('onboarding:report.patients.tabs.csv')},
-          {id: 'previous', label: t('onboarding:report.patients.tabs.previous')},
-          {id: 'new-pull', label: t('onboarding:report.patients.tabs.newPull')}
+          ...(validationLive
+            ? [
+                {id: 'previous' as const, label: t('onboarding:report.patients.tabs.previous')},
+                {id: 'new-pull' as const, label: t('onboarding:report.patients.tabs.newPull')}
+              ]
+            : [])
         ]}>
         {tab === 'manual' && (
           <div className="report-tab-body">
@@ -410,7 +420,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
           </div>
         )}
 
-        {tab === 'previous' && (
+        {validationLive && tab === 'previous' && (
           <div className="report-tab-body">
             <p className="nhsn-link__visually-hidden" role="alert">
               {previous.error}
@@ -419,7 +429,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
           </div>
         )}
 
-        {tab === 'new-pull' && (
+        {validationLive && tab === 'new-pull' && (
           <div className="report-tab-body">
             {acquisition && (
               <Button

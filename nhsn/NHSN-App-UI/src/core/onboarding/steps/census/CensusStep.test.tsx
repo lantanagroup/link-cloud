@@ -35,7 +35,16 @@ describe('CensusStep', () => {
 
   it('validates all six patient lists and previews the selected one', async () => {
     const user = userEvent.setup();
-    render(<AppRoot client={new MockApiClient()} baseUrl="/" />);
+    render(
+      <AppRoot
+        client={new MockApiClient(undefined, undefined, {
+          patientListWithNames: true,
+          fhirConnectionProbe: false,
+          sftpFileListing: false
+        })}
+        baseUrl="/"
+      />
+    );
 
     for (const label of listLabels) {
       const input = await screen.findByLabelText(label);
@@ -51,5 +60,67 @@ describe('CensusStep', () => {
     await user.click(viewButton);
 
     await waitFor(() => screen.getByText('List Results Preview'));
+  });
+
+  it('hides the fetch/view UI and still completes the step when patientListWithNames is off', async () => {
+    const user = userEvent.setup();
+    render(<AppRoot client={new MockApiClient()} baseUrl="/" />);
+
+    for (const label of listLabels) {
+      const input = await screen.findByLabelText(label);
+      await user.type(input, 'list-abc');
+    }
+    await user.type(await screen.findByLabelText('Hours'), '0');
+    await user.type(await screen.findByLabelText('Minutes'), '15');
+
+    expect(screen.queryByRole('button', {name: 'Validate Census Results'})).toBeNull();
+    expect(screen.queryByRole('button', {name: `View results for ${listLabels[0]}`})).toBeNull();
+    expect(screen.queryByLabelText(/accuracy/i)).toBeNull();
+
+    await user.click(await screen.findByRole('button', {name: 'Continue'}));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/onboarding/location-org');
+    });
+  });
+});
+
+describe('CensusStep - Cerner', () => {
+  beforeEach(async () => {
+    await ensureI18nInitialized();
+    window.localStorage.clear();
+
+    const draft = createEmptyDraft();
+    draft.currentStepId = 'census';
+    draft.unlockedStepIds = ['welcome', 'reporting-plan', 'facility-info', 'manual-upload', 'fhir', 'census'];
+    draft.facilityInfo = {timeZone: 'America/Chicago', vendor: 'Cerner'};
+    window.localStorage.setItem('nhsn-app-ui.mockDraft.MOCK-FACILITY-001', JSON.stringify(draft));
+    window.history.pushState({}, '', '/onboarding/census');
+  });
+
+  it('requires a successful connection test before Continue, regardless of sftpFileListing', async () => {
+    const user = userEvent.setup();
+    render(<AppRoot client={new MockApiClient()} baseUrl="/" />);
+
+    await user.type(await screen.findByLabelText('SFTP Host'), 'sftp.example.invalid');
+    await user.type(await screen.findByLabelText('SFTP Host URL Port'), '22');
+    await user.type(await screen.findByLabelText('Hours'), '0');
+    await user.type(await screen.findByLabelText('Minutes'), '15');
+
+    const continueButton = await screen.findByRole('button', {name: 'Continue'});
+    expect(continueButton.hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByText('SFTP Acquisition Results')).toBeNull();
+
+    await user.click(await screen.findByRole('button', {name: 'Test Connection'}));
+    await waitFor(() => expect(continueButton.hasAttribute('disabled')).toBe(false));
+
+    // sftpFileListing is off by default, so the fixture-backed file listing stays hidden
+    // even though the (real) connection test just succeeded.
+    expect(screen.queryByText('SFTP Acquisition Results')).toBeNull();
+
+    await user.click(continueButton);
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/onboarding/location-org');
+    });
   });
 });

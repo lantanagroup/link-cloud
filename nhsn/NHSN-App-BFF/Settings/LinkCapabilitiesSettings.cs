@@ -15,10 +15,12 @@ public class LinkCapabilitiesSettings
     // /api/data/connectionValidation/$validate exists.
     public bool FhirConnectionProbe { get; set; }
 
-    // Epic — blocked on the ehrPatientLists shape not yet carrying a patient collection.
+    // Epic — blocked on the ehrPatientLists shape not yet carrying a patient collection. Also
+    // hides the Census step's fetch/view UI (and the Report step's Previous/New Pull tabs)
+    // outright while false, rather than just annotating the fixture.
     public bool PatientListWithNames { get; set; }
 
-    // Cerner — LinkSdk has no sFTP coverage at all.
+    // Cerner — LinkSdk has no sFTP coverage at all. Same UI-hiding behavior as PatientListWithNames.
     public bool SftpFileListing { get; set; }
 
     // MRN Identifier Intake's rule builder — no LinkSdk client exposes a report patient's real

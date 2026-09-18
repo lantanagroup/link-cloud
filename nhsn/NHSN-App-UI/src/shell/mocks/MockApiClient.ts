@@ -34,7 +34,13 @@ const MOCK_SOURCES: C.SectionSource[] = [
 export class MockApiClient implements ApiClient {
   constructor(
     private readonly facilityId = 'MOCK-FACILITY-001',
-    private readonly facilityName = 'Mock Facility'
+    private readonly facilityName = 'Mock Facility',
+    // Default matches every non-development environment today.
+    private readonly capabilities: C.Capabilities = {
+      patientListWithNames: false,
+      fhirConnectionProbe: false,
+      sftpFileListing: false
+    }
   ) {}
 
   private get draftKey(): string {
@@ -59,13 +65,7 @@ export class MockApiClient implements ApiClient {
       availableNavigation: ['onboarding'],
       vendor: 'Epic',
       onboardingStatus: 'InProgress',
-      // Both off, matching every non-development environment. Steps must
-      // render their "not yet connected" state rather than showing fixtures.
-      capabilities: {
-        patientListWithNames: false,
-        fhirConnectionProbe: false,
-        sftpFileListing: false
-      }
+      capabilities: this.capabilities
     };
   }
 
