@@ -10,6 +10,7 @@ import type {
 } from "../../../api/contracts";
 import { InstructionsDownload } from "../../../documents";
 import {
+  AcronymText,
   Button,
   CheckboxField,
   DownloadLinkButton,
@@ -97,6 +98,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     null,
   );
 
+  function announceValidationMessage(message: string) {
+    setValidationMessage(null);
+    window.setTimeout(() => setValidationMessage(message), 0);
+  }
+
   const initialFrequency = parseHoursMinutesDuration(
     census.acquisitionFrequency,
   );
@@ -181,7 +187,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     });
     if (census.accuracyAcknowledged) {
       revokeAcknowledgement();
-      setValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
+      announceValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
     }
     setListState((prev) => {
       if (!prev[key]) {
@@ -198,7 +204,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     patch("census", fields);
     if (census.accuracyAcknowledged) {
       revokeAcknowledgement();
-      setValidationMessage(
+      announceValidationMessage(
         t("onboarding:census.messages.testConnectionBeforeAck"),
       );
     }
@@ -208,7 +214,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     const fieldErrors = validateCensus(draft, "PatientList");
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
-      setValidationMessage(t("onboarding:census.messages.incomplete"));
+      announceValidationMessage(t("onboarding:census.messages.incomplete"));
       return;
     }
 
@@ -257,6 +263,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     const fieldErrors = validateCensus(draft, "Sftp");
     setErrors(fieldErrors);
     if (fieldErrors.sftpHost || fieldErrors.sftpPort) {
+announceValidationMessage(t("onboarding:census.messages.incomplete"));
       return;
     }
 
@@ -310,7 +317,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
   function handleAckChange(checked: boolean) {
     if (checked && !resultsReady && !census.accuracyAcknowledged) {
-      setValidationMessage(
+      announceValidationMessage(
         t(
           acquisition === "Sftp"
             ? "onboarding:census.messages.testConnectionBeforeAck"
@@ -346,11 +353,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     const nextErrors = validateCensus(draft, acquisition);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      setValidationMessage(t("onboarding:census.messages.incomplete"));
+      announceValidationMessage(t("onboarding:census.messages.incomplete"));
       return;
     }
     if (!census.accuracyAcknowledged) {
-      setValidationMessage(t("onboarding:census.messages.notAcknowledged"));
+      announceValidationMessage(t("onboarding:census.messages.notAcknowledged"));
       return;
     }
     setValidationMessage(null);
@@ -509,12 +516,16 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   );
 
   const frequencySection = (
-    <div className="form-group" role="group" aria-labelledby="census-frequency-label">
+    <div
+      className="form-group"
+      role="group"
+      aria-labelledby="census-frequency-label"
+      aria-describedby="census-frequency-hint">
       <label className="census-field-label" id="census-frequency-label" htmlFor="census-frequency-hours">
         {t("onboarding:census.fields.frequencyLabel")}
         <RequiredAsterisk />
       </label>
-      <p className="form-hint">
+      <p className="form-hint" id="census-frequency-hint">
         {t("onboarding:census.fields.frequencyTooltip")}
       </p>
       <div className="census-triplet">
@@ -550,8 +561,8 @@ export function CensusStep({ onNext, onBack }: StepProps) {
         <div className="card">
           <div className="card-scroll">
             <PageHeader title={t("onboarding:census.title")} />
-            <p className="subtitle">{t("onboarding:census.intro1")}</p>
-            <p className="subtitle">{t("onboarding:census.intro2")}</p>
+            <p className="subtitle"><AcronymText>{t("onboarding:census.intro1")}</AcronymText></p>
+            <p className="subtitle"><AcronymText>{t("onboarding:census.intro2")}</AcronymText></p>
 
             {acquisition === "PatientList" && (
               <>
@@ -559,7 +570,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                   {t("onboarding:census.epic.sectionTitle")}
                 </h2>
                 <p className="subtitle" id="census-epic-subtitle">
-                  {t("onboarding:census.epic.subtitle")}
+                  <AcronymText>{t("onboarding:census.epic.subtitle")}</AcronymText>
                 </p>
 
                 {vendorProfile.documentKeys.censusInstructions && (
@@ -567,6 +578,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                     href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
                     description={t("onboarding:census.epic.instructionsHint")}
                     linkText={t("onboarding:census.epic.downloadInstructions")}
+                    headingId="census-epic-section-title"
                   />
                 )}
 
@@ -649,6 +661,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
                     href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
                     description={t("onboarding:census.cerner.instructionsHint")}
                     linkText={t("onboarding:census.cerner.downloadInstructions")}
+                    headingId="census-cerner-section-title"
                   />
                 )}
 

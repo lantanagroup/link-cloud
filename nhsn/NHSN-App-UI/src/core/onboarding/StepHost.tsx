@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NHSNLoadingIndicator } from '../fields';
+import { AcronymText, NHSNLoadingIndicator } from '../fields';
 import { getStep, visibleSteps } from './flow';
 import { isUnlocked } from './gating';
 import { useOnboarding } from './OnboardingProvider';
@@ -40,7 +40,7 @@ export function OnboardingStepsNav() {
                 onClick={() => goTo(entry.id)}>
                 <span className="nhsn-link__step-index">{index + 1}</span>
                 <span className="nhsn-link__step-label">
-                  {t(entry.labelKey)}
+                  <AcronymText>{t(entry.labelKey)}</AcronymText>
                   {complete && (
                     <span className="nhsn-link__visually-hidden">
                       {' '}

@@ -229,11 +229,13 @@ const FIELD_HINT_OPEN_CLASS = 'k-form-field--hint-open';
 const INFO_ICON_OPEN_CLASS = 'info-icon--open';
 const OPEN_SELECTOR = `.${FIELD_HINT_OPEN_CLASS}, .${INFO_ICON_OPEN_CLASS}`;
 const HINT_LABEL_SELECTOR = '.k-form-field:has(.k-form-hint) .k-label';
+const HOVER_SUPPRESSED_CLASS = 'nhsn-link__hint-hover-suppressed';
 
 function closeAllHintsExcept(keep: Element | null) {
   document.querySelectorAll(OPEN_SELECTOR).forEach((el) => {
     if (el !== keep) {
       el.classList.remove(FIELD_HINT_OPEN_CLASS, INFO_ICON_OPEN_CLASS);
+      el.classList.add(HOVER_SUPPRESSED_CLASS);
     }
   });
 }
@@ -258,6 +260,8 @@ function useHintLabelFocusability() {
         }
         label.dataset.hintTrigger = 'true';
 
+        const fieldLabelText = label.textContent?.trim() ?? '';
+
         const hintText = label.htmlFor
           ?     document.getElementById(`${label.htmlFor}_hint`)?.textContent ?? ''
           : '';
@@ -266,7 +270,7 @@ function useHintLabelFocusability() {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'nhsn-link__hint-trigger';
-        button.setAttribute('aria-label', 'More information');
+        button.setAttribute('aria-label', fieldLabelText);
         if (bubbleId) {
           button.setAttribute('aria-describedby', bubbleId);
         }
@@ -336,11 +340,26 @@ function useHintTooltips() {
       }
     }
 
+    function handleMouseOut(event: MouseEvent) {
+      const target = event.target as Element | null;
+      const holder = target?.closest(`.${HOVER_SUPPRESSED_CLASS}`);
+      if (!holder) {
+        return;
+      }
+      const related = event.relatedTarget as Node | null;
+      if (related && holder.contains(related)) {
+        return;
+      }
+      holder.classList.remove(HOVER_SUPPRESSED_CLASS);
+    }
+
     document.addEventListener('click', handleClick, true);
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mouseout', handleMouseOut);
     return () => {
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mouseout', handleMouseOut);
     };
   }, []);
 }

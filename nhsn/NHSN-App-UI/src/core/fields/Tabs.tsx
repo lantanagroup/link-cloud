@@ -2,8 +2,8 @@ import React, {useId, useRef} from 'react';
 
 export interface TabDefinition<T extends string> {
   id: T;
-  /** Already translated by the caller — components in this folder never call `t`. */
-  label: string;
+  /** Already translated by the caller — components in this folder never call `t`. Accepts a node so a caller can wrap part of it, e.g. `AcronymText`. */
+  label: React.ReactNode;
   disabled?: boolean;
 }
 

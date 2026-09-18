@@ -6,7 +6,8 @@ import React, {
   useMemo,
   useReducer,
   useRef,
-  useState
+  useState,
+  useTransition
 } from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
@@ -32,7 +33,7 @@ interface OnboardingContextValue {
   commitState: CommitResult | null;
   /** Navigates back to the home route once enrollment is complete. */
   goHome: () => void;
-  /** True while a save is in flight; steps disable their Next button on it. */
+  /** True while a save is in flight or the next step's code is still loading; steps disable their Next button on it. */
   saving: boolean;
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
@@ -90,6 +91,7 @@ export function OnboardingProvider({
     staleTime: Infinity
   });
   const [saving, setSaving] = useState(false);
+  const [isStepPending, startStepTransition] = useTransition();
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const pendingSaves = useRef(0);
   const dirtyRef = useRef(false);
@@ -249,9 +251,11 @@ export function OnboardingProvider({
 
   const completeGoTo = useCallback((stepId: StepId) => {
     persistedStep.current = `${stepId}:`;
-    setUrlTarget(undefined);
-    dispatch({type: 'step/unlock', stepId});
-    dispatch({type: 'step/goto', stepId});
+    startStepTransition(() => {
+      setUrlTarget(undefined);
+      dispatch({type: 'step/unlock', stepId});
+      dispatch({type: 'step/goto', stepId});
+    });
   }, []);
 
   const goTo = useCallback(
@@ -359,7 +363,7 @@ export function OnboardingProvider({
       vendorProfile,
       commitState,
       goHome: onGoHome,
-      saving,
+      saving: saving || isStepPending,
       patch,
       mirror,
       goTo,
@@ -380,6 +384,7 @@ export function OnboardingProvider({
       commitState,
       onGoHome,
       saving,
+      isStepPending,
       patch,
       mirror,
       goTo,
