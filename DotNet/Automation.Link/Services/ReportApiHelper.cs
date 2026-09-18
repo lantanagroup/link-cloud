@@ -289,7 +289,11 @@ public class ReportApiHelper
         _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
     }
 
-    public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
+    public async Task<bool> CheckSubmissionStatusAsync(
+        string reportId,
+        TestScenarioConfig config,
+        BackgroundDiagnosticsMonitor? diagnostics = null,
+        CancellationToken cancellationToken = default)
     {
         var pollingInterval = TimeSpan.FromSeconds(Math.Max(1, config.PollingIntervalSeconds));
         var hardTimeout = GetEffectiveSubmissionTimeout(config);
@@ -313,6 +317,7 @@ public class ReportApiHelper
                 : milestonePhaseStart + hardTimeout;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
                 {
                     if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
@@ -336,7 +341,7 @@ public class ReportApiHelper
                 // Entryless scheduled runs are valid when prediction says no
                 // patients should participate. In that case the report can reach a terminal
                 // status without ever emitting ReportEntriesCreated.
-                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
+                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
                 if (scheduleProbe.IsSuccessStatusCode
                     && scheduleProbe.Body?.Status.IsTerminal() == true)
                 {
@@ -347,7 +352,7 @@ public class ReportApiHelper
                     break;
                 }
 
-                await Task.Delay(pollingInterval);
+                await Task.Delay(pollingInterval, cancellationToken);
             }
 
             if (diagnostics.HasCriticalFailure)
@@ -386,6 +391,7 @@ public class ReportApiHelper
             : submissionPhaseStart + hardTimeout;
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
             {
                 if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
@@ -406,7 +412,7 @@ public class ReportApiHelper
             }
 
             string currentStatus;
-            var response = await _reportClient.GetScheduleAsync(reportId);
+            var response = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == (int)HttpStatusCode.NotFound)
@@ -443,7 +449,7 @@ public class ReportApiHelper
                 lastStatus = currentStatus;
             }
 
-            await Task.Delay(pollingInterval);
+            await Task.Delay(pollingInterval, cancellationToken);
         }
 
         _output.WriteLine($"Report {reportId} was not submitted before timeout.");
@@ -574,7 +580,7 @@ public class ReportApiHelper
         }
 
         _output.WriteLine(
-            $"[DIAG][DataAcq] Keep-alive: acquisition still progressing " +
+            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
             $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
             $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
         return true;

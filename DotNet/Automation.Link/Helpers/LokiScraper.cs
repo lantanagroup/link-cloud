@@ -539,16 +539,22 @@ public class LokiScraper
         return lines;
     }
 
-    public async Task<string?> GetValidationActivitySummaryAsync(TimeSpan lookback)
+    public async Task<string?> GetValidationActivitySummaryAsync(
+        TimeSpan lookback,
+        string? facilityId = null,
+        string? reportId = null)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        // ReadyForValidation "Processing ... patient ... report" is DEBUG (not shipped at Loki INFO).
-        // Current INFO/ERROR markers: Pre-qual skip, retrieve failures, ValidationComplete produce failures.
-        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |~ \"(?i)(Processing .+patient|Validation completed|Failed to send ValidationComplete|Unexpected error while retrieving|Pre-qual OperationOutcome)\" !~ \"(?i)({HarmlessPatterns})\"";
+        // Heartbeats and ReadyForValidation Processing lines are INFO. Token must match ValidationActivity.LogToken.
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |~ \"({ValidationActivity.LogToken}|Starting validation of Bundle|Retrieved patient bundle|Processing .+patient|Persisting)\" !~ \"(?i)({HarmlessPatterns})\"";
+        if (!string.IsNullOrWhiteSpace(facilityId))
+            query += $" |= \"{facilityId}\"";
+        if (!string.IsNullOrWhiteSpace(reportId))
+            query += $" |= \"{reportId}\"";
         try
         {
             var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
@@ -561,6 +567,7 @@ public class LokiScraper
                 return null;
 
             var logCount = 0;
+            var logLines = new List<string>();
             var patientIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var result in results)
@@ -572,7 +579,10 @@ public class LokiScraper
                 {
                     var logLine = value[1]?.ToString();
                     if (string.IsNullOrWhiteSpace(logLine)) continue;
+                    if (!ValidationActivity.MatchesRun(logLine, facilityId, reportId))
+                        continue;
                     logCount++;
+                    logLines.Add(logLine);
 
                     var patientMarker = "patient";
                     var idx = logLine.IndexOf(patientMarker, StringComparison.OrdinalIgnoreCase);
@@ -589,6 +599,10 @@ public class LokiScraper
 
             if (logCount == 0)
                 return null;
+
+            var heartbeat = ValidationActivity.Summarize(logLines, lookback);
+            if (!string.IsNullOrWhiteSpace(heartbeat))
+                return heartbeat;
 
             if (patientIds.Count > 0)
             {

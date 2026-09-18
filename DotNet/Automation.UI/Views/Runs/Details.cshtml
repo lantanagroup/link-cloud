@@ -715,10 +715,10 @@
         var cancelBtn = document.getElementById('btnCancelRun');
         if (cancelBtn) {
             cancelBtn.addEventListener('click', function () {
-                if (!confirm('Cancel this running test and cleanup all related service/FHIR data?')) return;
+                if (!confirm('Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.')) return;
 
                 cancelBtn.disabled = true;
-                cancelBtn.textContent = 'Cancelling…';
+                cancelBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Cancelling…';
 
                 fetch('@Url.Action("CancelJson", "Runs")', {
                     method: 'POST',
@@ -728,15 +728,24 @@
                     },
                     body: JSON.stringify({ id: runId })
                 })
-                .then(function (r) { return r.json(); })
-                .then(function () {
-                    swapCancelToDelete();
+                .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+                .then(function (res) {
+                    if (res.ok && res.body && res.body.success) {
+                        swapCancelToDelete();
+                        return;
+                    }
+                    cancelBtn.disabled = false;
+                    cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
+                    var reason = (res.body && (res.body.error || res.body.detail))
+                        ? (res.body.error || res.body.detail)
+                        : 'This run is not running.';
+                    alert(reason);
                 })
                 .catch(function (err) {
                     console.error('Cancel failed', err);
                     cancelBtn.disabled = false;
-                    cancelBtn.textContent = 'Cancel';
-                    alert('Unable to cancel the run. Please try again.');
+                    cancelBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
+                    alert('Cancel could not be completed. Refresh the page and check the run status.');
                 });
             });
         }

@@ -42,6 +42,18 @@ public class StartScenarioRequestResolverTests
 
         options.PatientCount.Should().Be(FhirBundleGenerator.DefaultPatientCount);
         options.ResourcesPerPatient.Should().Be(FhirBundleGenerator.DefaultResourcesPerPatient);
+        options.MaxPollingDurationMinutes.Should().Be(0);
+    }
+
+    [Fact]
+    public void Custom_scenario_waits_six_hours_for_submission()
+    {
+        StartScenarioRequestResolver.CustomMaxPollingDurationMinutes.Should().Be(6 * 60);
+
+        var options = StartScenarioRequestResolver.Resolve(
+            new StartScenarioRequest { Scenario = AutomationScenarioKind.Custom });
+
+        options.MaxPollingDurationMinutes.Should().Be(6 * 60);
     }
 
     [Fact]
@@ -77,7 +89,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(7);
         options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
-        options.MaxPollingDurationMinutes.Should().Be(30);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
@@ -596,7 +608,7 @@ public class StartScenarioRequestResolverTests
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(15);
-        options.MaxPollingDurationMinutes.Should().Be(45);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
     }
 
     [Fact]
@@ -612,7 +624,7 @@ public class StartScenarioRequestResolverTests
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(10);
-        options.MaxPollingDurationMinutes.Should().Be(40);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
     }
 
     [Theory]

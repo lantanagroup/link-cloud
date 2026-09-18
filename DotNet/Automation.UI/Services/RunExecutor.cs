@@ -768,7 +768,7 @@ internal sealed class RunExecutor
                 scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun)))
             {
                 await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
+                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics, cancellationToken);
                 await diagnostics.StopAsync();
 
                 if (!submitted)
@@ -876,7 +876,7 @@ internal sealed class RunExecutor
                     scrapeNormalizationResourceTypes: AutomationRunPollingPolicy.ScrapeNormalizationResourceTypes(scenarioConfig.IsMetricsRun));
 
                 await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);
+                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics, cancellationToken);
                 await regenDiagnostics.StopAsync();
 
                 if (!regenSubmitted)
@@ -1205,21 +1205,32 @@ internal sealed class RunExecutor
                 facilityId,
                 reportId);
 
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-                throw new OperationCanceledException("Run was cancelled.");
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
+            }
 
             state.FinishedAt = DateTimeOffset.UtcNow;
             AutomationRunMetricsDocument? metricsSnapshot = null;
             if (MetricsCapturePolicy.ShouldCapture(state.Options.IsMetricsRun, validatorsPassed: true))
             {
-                state.Status = AutomationRunStatus.CollectingMetrics;
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                    state.Status = AutomationRunStatus.CollectingMetrics;
+                }
                 await _orchestrator.CompleteRunAsync(state.RunId);
                 await callbacks.BroadcastStatus();
                 output.WriteLine("Collecting step timings… this can take about a minute.");
                 metricsSnapshot = await CaptureMetricsSnapshotAsync(
                     state, validatorResults, generationManifest, generationDurationMs, cancellationToken);
-                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-                    throw new OperationCanceledException("Run was cancelled.");
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                }
             }
             else
             {
@@ -1229,8 +1240,13 @@ internal sealed class RunExecutor
             if (state.Options.FailRunOnBenchmark
                 && metricsSnapshot?.Benchmark.Pass == false)
             {
-                state.Status = AutomationRunStatus.Failed;
-                state.Error = "Missed the time budget or saved limits: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                lock (state.Sync)
+                {
+                    if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                        throw new OperationCanceledException("Run was cancelled.");
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = "Missed the time budget or saved limits: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                }
                 metricsSnapshot.Outcome = state.Status.ToString();
                 var store = _hostServices.GetService<IRunMetricsStore>();
                 if (store != null)
@@ -1240,7 +1256,13 @@ internal sealed class RunExecutor
                 return;
             }
 
-            state.Status = AutomationRunStatus.Succeeded;
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
+                state.Status = AutomationRunStatus.Succeeded;
+                state.FinishedAt = DateTimeOffset.UtcNow;
+            }
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
         }
@@ -1250,16 +1272,25 @@ internal sealed class RunExecutor
         }
         catch (Exception ex)
         {
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+            bool cancelledAfterFault;
+            lock (state.Sync)
+            {
+                cancelledAfterFault = state.CancelRequested || state.Status == AutomationRunStatus.Cancelled;
+                if (!cancelledAfterFault)
+                {
+                    state.Status = AutomationRunStatus.Failed;
+                    state.Error = ex.Message;
+                    state.FinishedAt = DateTimeOffset.UtcNow;
+                }
+            }
+
+            if (cancelledAfterFault)
             {
                 _logger.LogInformation(ex, "Run {RunId} faulted after cancel request: {ExceptionType}", state.RunId, ex.GetType().Name);
                 return;
             }
 
             _logger.LogError(ex, "Run {RunId} failed", state.RunId);
-            state.Status = AutomationRunStatus.Failed;
-            state.Error = ex.Message;
-            state.FinishedAt = DateTimeOffset.UtcNow;
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
