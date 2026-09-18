@@ -13,7 +13,9 @@ public static class ReportingPeriodMath
 
     /// <summary>
     /// Start and end of the period containing <paramref name="localDate"/>, converted to UTC.
-    /// Weeks start on Sunday. The end is the last second of the period.
+    /// Weeks start on Sunday. The end is the last second of the period. When a period's local
+    /// boundary falls inside a DST gap (the clock jumps forward past it, so it never occurs), the
+    /// period begins at the first valid local instant after the gap instead of throwing.
     /// </summary>
     public static (DateTime StartUtc, DateTime EndUtc) ForFrequency(string frequency, DateTime localDate,
         TimeZoneInfo timeZone)
@@ -44,6 +46,41 @@ public static class ReportingPeriodMath
                     "Expected Daily, Weekly or Monthly.");
         }
 
-        return (TimeZoneInfo.ConvertTimeToUtc(start, timeZone), TimeZoneInfo.ConvertTimeToUtc(end, timeZone));
+        return (ToUtcAfterGap(start, timeZone), ToUtcAfterGap(end, timeZone));
+    }
+
+    /// <summary>
+    /// Converts <paramref name="local"/> to UTC, stepping forward minute by minute first if it falls
+    /// inside a DST gap (a local time skipped when the clock jumps forward) so the conversion never
+    /// throws. Bounded to <see cref="MaxGapMinutes"/> minutes; a gap wider than that is not a DST
+    /// transition this platform knows how to reason about, so it is reported rather than silently
+    /// walked past.
+    /// </summary>
+    private const int MaxGapMinutes = 180;
+
+    private static DateTime ToUtcAfterGap(DateTime local, TimeZoneInfo timeZone)
+    {
+        if (timeZone.IsInvalidTime(local))
+        {
+            var adjusted = local;
+            var minutesAdvanced = 0;
+
+            while (timeZone.IsInvalidTime(adjusted))
+            {
+                if (minutesAdvanced >= MaxGapMinutes)
+                {
+                    throw new InvalidOperationException(
+                        $"No valid local time found within {MaxGapMinutes} minutes after {local:O} in time zone " +
+                        $"'{timeZone.Id}'; this is wider than any known DST gap, so the period boundary was not advanced past it.");
+                }
+
+                adjusted = adjusted.AddMinutes(1);
+                minutesAdvanced++;
+            }
+
+            local = adjusted;
+        }
+
+        return TimeZoneInfo.ConvertTimeToUtc(local, timeZone);
     }
 }

@@ -101,4 +101,74 @@ public class ReportingPeriodMathTests
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    // Chile moves its clocks forward at local midnight when DST begins, so that night's 00:00 does
+    // not exist. A Daily or Monthly period whose local boundary lands there must not throw - it
+    // should begin at the first valid instant after the gap instead.
+    private static readonly TimeZoneInfo Santiago = TimeZoneInfo.FindSystemTimeZoneById("America/Santiago");
+
+    /// <summary>
+    /// The first September 2026 date on which Santiago local midnight falls inside the DST-start
+    /// gap. Computed from the zone itself rather than hardcoded, since the exact transition date is
+    /// set by Chilean law and this test should not assume it without checking.
+    /// </summary>
+    private static DateTime FindSeptemberDstGapStart(TimeZoneInfo tz, int year)
+    {
+        for (var day = 1; day <= 30; day++)
+        {
+            var candidate = new DateTime(year, 9, day, 0, 0, 0);
+            if (tz.IsInvalidTime(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"No September {year} DST-start gap found for {tz.Id}; the test's assumption about this zone no longer holds.");
+    }
+
+    [Fact]
+    public void Daily_period_starting_in_a_DST_gap_begins_at_the_first_valid_local_instant()
+    {
+        var gapDate = FindSeptemberDstGapStart(Santiago, 2026);
+        Santiago.IsInvalidTime(gapDate).Should().BeTrue("the test assumes local midnight itself is inside the gap");
+
+        var act = () => ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Daily, gapDate, Santiago);
+        act.Should().NotThrow();
+
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Daily, gapDate, Santiago);
+
+        // The gap is one hour; the first valid local instant is 01:00.
+        start.Should().Be(TimeZoneInfo.ConvertTimeToUtc(gapDate.AddHours(1), Santiago));
+        end.Should().Be(TimeZoneInfo.ConvertTimeToUtc(gapDate.AddDays(1).AddSeconds(-1), Santiago));
+    }
+
+    [Fact]
+    public void Monthly_period_in_the_gap_month_does_not_throw()
+    {
+        var gapDate = FindSeptemberDstGapStart(Santiago, 2026);
+
+        var act = () => ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Monthly, gapDate, Santiago);
+        act.Should().NotThrow();
+
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Monthly, gapDate, Santiago);
+
+        var monthStart = new DateTime(gapDate.Year, gapDate.Month, 1, 0, 0, 0);
+        start.Should().Be(TimeZoneInfo.ConvertTimeToUtc(monthStart, Santiago));
+        end.Should().Be(TimeZoneInfo.ConvertTimeToUtc(monthStart.AddMonths(1).AddSeconds(-1), Santiago));
+    }
+
+    /// <summary>Control: an ordinary day in the same DST-gap zone is unaffected by the fix.</summary>
+    [Fact]
+    public void Daily_period_on_an_ordinary_day_in_the_gap_zone_is_unaffected()
+    {
+        var gapDate = FindSeptemberDstGapStart(Santiago, 2026);
+        var normalDate = gapDate.AddDays(-1);
+        Santiago.IsInvalidTime(normalDate).Should().BeFalse("this date must be an ordinary day for the control to be meaningful");
+
+        var (start, end) = ReportingPeriodMath.ForFrequency(ReportingPeriodMath.Daily, normalDate, Santiago);
+
+        start.Should().Be(TimeZoneInfo.ConvertTimeToUtc(normalDate, Santiago));
+        end.Should().Be(TimeZoneInfo.ConvertTimeToUtc(normalDate.AddDays(1).AddSeconds(-1), Santiago));
+    }
 }
