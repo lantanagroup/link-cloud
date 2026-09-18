@@ -11,12 +11,14 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business;
 using LantanaGroup.Link.Tenant.Business.Managers;
@@ -83,7 +85,6 @@ namespace Tenant
 
             // Add services to the container.
             builder.Services.AddSingleton<ScheduleService>();
-            builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
 
             builder.Services.Configure<FacilityIdSettings>(builder.Configuration.GetSection(TenantConstants.AppSettingsSectionNames.FacilityIdSettings));
             builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<FacilityIdSettings>>().Value);
@@ -151,13 +152,34 @@ namespace Tenant
             // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
             // enabled, and is inert otherwise. Its entities live in TenantDbContext.
             builder.Services.AddScoped<IFacilityExistence, TenantFacilityExistence>();
-            builder.Services.AddScoped<IFacilityTimeZoneSource, TenantFacilityTimeZoneSource>();
+            builder.Services.AddScoped<TenantFacilityDirectory>();
+            builder.Services.AddScoped<IFacilityTimeZoneSource>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
+            builder.Services.AddScoped<IFacilityDirectory>(sp => sp.GetRequiredService<TenantFacilityDirectory>());
 
             // The facility endpoints resolve this rather than calling the manager, so the DMRP module
             // can put its own behavior in front of it when enabled.
             builder.Services.AddScoped<IFacilityOperations, TenantFacilityOperations>();
 
-            builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(mvcBuilder);
+            var dmrpEnabled = builder.AddDmrpModule<TenantDbContext, TenantFacilityOperations>(
+                mvcBuilder, ReportSchedulingJobs.ClassicJobGroup);
+
+            if (!dmrpEnabled)
+            {
+                // Only one owner of the shared Quartz scheduler at a time. With DMRP on,
+                // DmrpNightlyScheduleHostedService - registered above, inside AddDmrpModule - sweeps the
+                // classic jobs, reconciles its own, and starts and shuts the scheduler down; hosting
+                // ScheduleService alongside it would mean two starts and two shutdowns.
+                //
+                // ScheduleService stays registered as a singleton either way, because
+                // TenantFacilityOperations calls its per-facility Add/Update/Delete methods on every
+                // facility save. Those return early while the flag is on.
+                //
+                // Keep this registration after the AddDmrpModule call above: hosted services start in
+                // registration order, and DmrpNightlyScheduleCleanupService - registered inside that
+                // call when the flag is off - has to sweep the module's zone jobs before ScheduleService
+                // starts the shared scheduler, or a zone job could fire with its services long gone.
+                builder.Services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ScheduleService>());
+            }
 
             //Add problem details
             builder.Services.AddTenantProblemDetails(builder.Environment);

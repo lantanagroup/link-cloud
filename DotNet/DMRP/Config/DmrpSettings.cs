@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace LantanaGroup.Link.DMRP.Config
 {
     /// <summary>
@@ -19,6 +21,12 @@ namespace LantanaGroup.Link.DMRP.Config
         /// it turns a startup problem into a runtime call somewhere unexpected.
         /// </summary>
         public DmrpApiSettings Api { get; set; } = new();
+
+        /// <summary>
+        /// The nightly job that turns reporting plans into scheduled reports. Only read when
+        /// <see cref="Enabled"/> is true.
+        /// </summary>
+        public DmrpSchedulingSettings Scheduling { get; set; } = new();
     }
 
     /// <summary>
@@ -106,5 +114,90 @@ namespace LantanaGroup.Link.DMRP.Config
             && !string.IsNullOrWhiteSpace(TokenUrl)
             && !string.IsNullOrWhiteSpace(ClientId)
             && !string.IsNullOrWhiteSpace(ClientSecret);
+    }
+
+    /// <summary>
+    /// When and how hard the nightly scheduling job runs. Every value has a default and an accepted
+    /// range; a value outside the range falls back to the default rather than failing the boot,
+    /// matching <see cref="DmrpApiSettings.TimeoutSeconds"/>.
+    /// </summary>
+    public sealed class DmrpSchedulingSettings
+    {
+        public const string DefaultNightlyCron = "0 59 23 * * ?";
+        public const int DefaultConcurrency = 4;
+        public const int DefaultCatchUpNights = 3;
+
+        /// <summary>Quartz cron, evaluated in each facility timezone. Default 23:59 every night.</summary>
+        public string NightlyCron { get; set; } = DefaultNightlyCron;
+
+        /// <summary>How many facilities one fire works on at once. Range 1-32.</summary>
+        public int Concurrency { get; set; } = DefaultConcurrency;
+
+        /// <summary>
+        /// On how many nights at the start of a month a facility with no plan rows for that month is
+        /// refreshed from DMRP. Bounds fleet-wide probing of facilities that are enrolled in nothing.
+        /// Range 0-28; 0 disables catch-up.
+        /// </summary>
+        public int CatchUpNights { get; set; } = DefaultCatchUpNights;
+
+        /// <summary>
+        /// A QA aid: when set, every fire of the nightly job anchors its periods on this instant
+        /// instead of the trigger's scheduled time, so the month-end refresh and the Monthly
+        /// announcement can be rehearsed on any date. Must never be set in a production environment.
+        /// An unparseable value is ignored, treated the same as unset.
+        /// </summary>
+        public string? ScheduledFireTimeOverride { get; set; }
+
+        /// <summary>
+        /// <see cref="ScheduledFireTimeOverride"/> parsed as an ISO-8601 instant, or null when it is
+        /// unset, blank, or not parseable. An offset other than UTC is adjusted to UTC rather than
+        /// rejected, so "2026-09-30T23:59:00-04:00" resolves to the same instant as
+        /// "2026-10-01T03:59:00Z".
+        /// </summary>
+        public DateTimeOffset? ResolvedScheduledFireTimeOverride =>
+            !string.IsNullOrWhiteSpace(ScheduledFireTimeOverride)
+            && DateTimeOffset.TryParse(ScheduledFireTimeOverride, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+                ? parsed
+                : null;
+
+        public string ResolvedNightlyCron =>
+            !string.IsNullOrWhiteSpace(NightlyCron) && Quartz.CronExpression.IsValidExpression(NightlyCron)
+                ? NightlyCron
+                : DefaultNightlyCron;
+
+        /// <summary>
+        /// The local time of day <see cref="ResolvedNightlyCron"/> fires at, or null when the cron
+        /// does not name exactly one.
+        /// </summary>
+        /// <remarks>
+        /// Quartz's FireOnceNow misfire handling moves a recovered fire's scheduled time to the
+        /// recovery instant, so the fire time alone cannot say which night was missed. Comparing it
+        /// against this nominal time can: a fire that lands earlier in the local day than the cron
+        /// would ever fire is a recovery of the night before. A cron whose seconds, minutes or hours
+        /// field is a wildcard, list, range or step fires at more than one time of day and so has no
+        /// nominal time; it returns null and the comparison is skipped.
+        /// </remarks>
+        public TimeSpan? ResolvedNightlyLocalTime
+        {
+            get
+            {
+                var fields = ResolvedNightlyCron.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                if (fields.Length < 3
+                    || !int.TryParse(fields[0], out var seconds) || seconds is < 0 or > 59
+                    || !int.TryParse(fields[1], out var minutes) || minutes is < 0 or > 59
+                    || !int.TryParse(fields[2], out var hours) || hours is < 0 or > 23)
+                {
+                    return null;
+                }
+
+                return new TimeSpan(hours, minutes, seconds);
+            }
+        }
+
+        public int ResolvedConcurrency => Concurrency is >= 1 and <= 32 ? Concurrency : DefaultConcurrency;
+
+        public int ResolvedCatchUpNights => CatchUpNights is >= 0 and <= 28 ? CatchUpNights : DefaultCatchUpNights;
     }
 }

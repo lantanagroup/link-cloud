@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Tenant.Models.Messages;
+namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 public class ReportScheduledMessage
 {
@@ -7,5 +7,4 @@ public class ReportScheduledMessage
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string? ReportTrackingId { get; set; }
-
 }

@@ -441,6 +441,25 @@ global:
     required: false
     defaultValue: "30"
     consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:NightlyCron"
+    description: "Quartz cron expression for the DMRP nightly scheduling job, evaluated in each facility's timezone. One job runs per distinct facility timezone; on the last night of a month it refreshes next month's reporting plans from DMRP before producing ReportScheduled events for the periods starting at midnight. Must fire before local midnight. An invalid expression falls back to the default."
+    required: false
+    defaultValue: "0 59 23 * * ?"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:Concurrency"
+    description: "How many facilities one nightly fire processes at the same time (accepted range 1-32). Bounds the burst of DMRP API calls at month end. A value outside the range falls back to the default."
+    required: false
+    defaultValue: "4"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:CatchUpNights"
+    description: "On how many nights at the start of each month the nightly job refreshes from DMRP any facility that has no reporting plan rows for that month (accepted range 0-28, 0 disables). Repairs a failed month-end refresh without probing every unenrolled facility all month. A value outside the range falls back to the default."
+    required: false
+    defaultValue: "3"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:ScheduledFireTimeOverride"
+    description: "QA aid. An ISO-8601 UTC instant (for example 2026-10-01T03:59:00Z, which is 23:59 Eastern on 30 September). When set, every fire of the DMRP nightly job anchors its reporting periods on this instant instead of the trigger's scheduled time, so the month-end refresh and the Monthly announcement can be rehearsed on any date. Leave unset in production; the job logs a warning on every fire while it is set."
+    required: false
+    consumers: ["Tenant"]
 
 services:
   Account:
