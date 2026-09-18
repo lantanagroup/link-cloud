@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 // Scheduling is the DMRP nightly job's while the flag is on. Classic per-facility
                 // jobs left from before the flag would announce stale, snapshotted measure lists.
                 var classic = await _scheduler.GetJobKeys(
-                    GroupMatcher<JobKey>.GroupEquals(nameof(KafkaTopic.ReportScheduled)), cancellationToken);
+                    GroupMatcher<JobKey>.GroupEquals(ReportSchedulingJobs.ClassicJobGroup), cancellationToken);
 
                 if (classic.Count > 0)
                 {
@@ -130,7 +130,7 @@ namespace LantanaGroup.Link.Tenant.Services
             foreach (string frequency in frequencies)
             {
                 string jobKeyName = $"{facilityId}-{frequency}";
-                JobKey jobKey = new JobKey(jobKeyName, nameof(KafkaTopic.ReportScheduled));
+                JobKey jobKey = new JobKey(jobKeyName, ReportSchedulingJobs.ClassicJobGroup);
 
                 var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -143,7 +143,7 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task DeleteJob(string facilityId, CancellationToken cancellationToken = default)
         {
-            JobKey jobKey = new JobKey(facilityId, nameof(KafkaTopic.ReportScheduled));
+            JobKey jobKey = new JobKey(facilityId, ReportSchedulingJobs.ClassicJobGroup);
 
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -204,7 +204,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private async Task CreateJobAndTrigger(Facility facility, string frequency, CancellationToken cancellationToken = default)
         {
             string jobName = $"{facility.FacilityId}-{frequency}";
-            JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
+            JobKey jobKey = new JobKey(jobName, ReportSchedulingJobs.ClassicJobGroup);
 
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -243,7 +243,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return JobBuilder
                 .Create(typeof(ReportScheduledJob))
                 .StoreDurably()
-                .WithIdentity(jobName, nameof(KafkaTopic.ReportScheduled))
+                .WithIdentity(jobName, ReportSchedulingJobs.ClassicJobGroup)
                 .WithDescription($"{jobName}")
                 .UsingJobData(jobDataMap)
                 .Build();
