@@ -38,7 +38,7 @@ public class FhirControllerTests
     public FhirControllerTests()
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
-        var service = new FhirService(_mockCacheService.Object, new Mock<ILogger<FhirService>>().Object, Mock.Of<ITerminologyServiceMetrics>());
+        var service = new FhirService(_mockCacheService.Object, new Mock<ILogger<FhirService>>().Object, Mock.Of<ITerminologyServiceMetrics>(), TerminologyTestConfig.Options());
         _controller = new FhirController(service);
     }
 
@@ -326,4 +326,75 @@ public class FhirControllerTests
         Assert.Equal("Value set not found with ID missing-vs.", context.ProblemDetails.Detail);
         Assert.True(context.ProblemDetails.Extensions.ContainsKey("traceId"));
     }
+
+    #region Expansion paging (LEGLINK-968)
+
+    /// <summary>
+    /// Negative paging is client input that failed validation, so it is reported the same way as every
+    /// other malformed request on this controller: RFC 9457 Problem Details, not a FHIR
+    /// OperationOutcome (LEGLINK-887 settled the format).
+    /// </summary>
+    [Fact]
+    public void ExpandValueSet_WithNegativeCount_ReturnsBadRequestProblem()
+    {
+        var result = _controller.ExpandValueSet(null, ValueSetUrl, null, count: -1);
+
+        AssertProblem(result.Result, StatusCodes.Status400BadRequest, "Bad Request",
+            "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            "The 'count' parameter cannot be negative.");
+    }
+
+    /// <summary>
+    /// Paging is validated before the code group is looked up, so the 400 does not depend on the named
+    /// code system happening to be loaded. No cache is arranged here deliberately.
+    /// </summary>
+    [Fact]
+    public void GetCodeSystems_WithNegativeOffset_ReturnsBadRequestProblem()
+    {
+        var result = _controller.GetCodeSystems(CodeSystemUrl, null, offset: -1);
+
+        AssertProblem(result.Result, StatusCodes.Status400BadRequest, "Bad Request",
+            "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            "The 'offset' parameter cannot be negative.");
+    }
+
+    [Fact]
+    public void GetValueSets_WithNegativeCount_ReturnsBadRequestProblem()
+    {
+        var result = _controller.GetValueSets(ValueSetUrl, null, count: -1);
+
+        AssertProblem(result.Result, StatusCodes.Status400BadRequest, "Bad Request",
+            "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+            "The 'count' parameter cannot be negative.");
+    }
+
+    /// <summary>
+    /// The controller hands both parameters through rather than dropping one, which a direct call is
+    /// the cheapest way to pin.
+    /// </summary>
+    [Fact]
+    public void ExpandValueSet_PassesCountAndOffsetToTheService()
+    {
+        var codeGroup = BuildCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, CodeSystemUrl);
+        codeGroup.Resource = new ValueSet { Id = "test-group", Url = ValueSetUrl };
+        codeGroup.Codes[CodeSystemUrl] =
+        [
+            new Code { Value = "one", Display = "One" },
+            new Code { Value = "two", Display = "Two" },
+            new Code { Value = "three", Display = "Three" }
+        ];
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl, It.IsAny<string>()))
+            .Returns(codeGroup);
+
+        var result = _controller.ExpandValueSet(null, ValueSetUrl, null, count: 1, offset: 1);
+
+        var valueSet = Assert.IsType<ValueSet>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("two", Assert.Single(valueSet.Expansion.Contains).Code);
+        Assert.Equal(3, valueSet.Expansion.Total);
+        Assert.Equal(1, valueSet.Expansion.Offset);
+    }
+
+    #endregion
 }

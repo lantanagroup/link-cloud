@@ -16,7 +16,7 @@ public class FhirServiceMetricsTests
     {
         var cache = new Mock<ICodeGroupCacheService>();
         var metrics = new Mock<ITerminologyServiceMetrics>();
-        var service = new FhirService(cache.Object, Mock.Of<ILogger<FhirService>>(), metrics.Object);
+        var service = new FhirService(cache.Object, Mock.Of<ILogger<FhirService>>(), metrics.Object, TerminologyTestConfig.Options());
 
         service.ValidateCodeInCodeSystem("http://example.org/CodeSystem/missing", null, "abc", null, null);
 
@@ -39,7 +39,7 @@ public class FhirServiceMetricsTests
                 }
             });
         var metrics = new Mock<ITerminologyServiceMetrics>();
-        var service = new FhirService(cache.Object, Mock.Of<ILogger<FhirService>>(), metrics.Object);
+        var service = new FhirService(cache.Object, Mock.Of<ILogger<FhirService>>(), metrics.Object, TerminologyTestConfig.Options());
 
         using var scope = MetricsModeScope.Begin(true);
         service.ValidateCodeInCodeSystem("http://example.org/cs", null, "abc", null, null);
