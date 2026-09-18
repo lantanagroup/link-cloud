@@ -809,6 +809,14 @@ services:
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
       required: false
       defaultValue: "data/"
+    - key: "Terminology:DefaultExpansionPageSize"
+      description: "The number of codes returned by a ValueSet $expand, a non-summary GET /ValueSet?url= or a non-summary GET /CodeSystem?url= that names no count. Bounds the response for a caller that does not page; expansion.total still reports the full size so the caller can page from there. Must be at least 1 and no greater than Terminology:MaxExpansionPageSize, both validated at startup."
+      required: false
+      defaultValue: "1000"
+    - key: "Terminology:MaxExpansionPageSize"
+      description: "The largest page any single expansion request can obtain. A larger count is reduced to this rather than rejected, and the applied value is reported back in ValueSet.expansion.parameter. This is the ceiling on one request's peak allocation, which must not scale with the size of the code group. Must be at least 1, validated at startup."
+      required: false
+      defaultValue: "5000"
     - key: "Terminology:EnableCodeUploadEndpoint"
       description: "Enables the testing endpoints that replace a cached CodeSystem's or ValueSet's codes from an uploaded CSV (PUT /api/terminology/config/{code-systems|value-sets}/{id}/codes). The replacement is held in the memory of the single instance that served the request: nothing is written to Terminology:Path, and $reload-cache or a restart reverts it. Must remain false in production, and should only be enabled where the service runs a single instance, since an upload reaches one instance only."
       required: false
