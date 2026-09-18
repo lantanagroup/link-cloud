@@ -39,4 +39,8 @@ public class CapabilitiesResponse
     public bool FhirConnectionProbe { get; set; }
     public bool PatientListWithNames { get; set; }
     public bool SftpFileListing { get; set; }
+
+    // When true, a facility whose onboarding already completed keeps an "Onboarding" item in the
+    // main navigation and can freely revisit every step. See LinkCapabilitiesSettings.OnboardingRevisit.
+    public bool OnboardingRevisit { get; set; }
 }

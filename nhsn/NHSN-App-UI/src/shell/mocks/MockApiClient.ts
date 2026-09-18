@@ -65,7 +65,14 @@ export class MockApiClient implements ApiClient {
       availableNavigation: ['onboarding'],
       vendor: 'Epic',
       onboardingStatus: 'InProgress',
-      capabilities: this.capabilities
+      // Both off, matching every non-development environment. Steps must
+      // render their "not yet connected" state rather than showing fixtures.
+      capabilities: {
+        patientListWithNames: false,
+        fhirConnectionProbe: false,
+        sftpFileListing: false,
+        onboardingRevisit: false
+      }
     };
   }
 

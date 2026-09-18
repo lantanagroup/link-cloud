@@ -42,7 +42,9 @@ public class UserInfoService : IUserInfoService
         var availableNavigation = accessState != NhsnAccessState.Allowed
             ? Array.Empty<string>()
             : facilityIsOnboarded
-                ? ["configuration"]
+                ? _capabilities.OnboardingRevisit
+                    ? new[] { "configuration", "onboarding" }
+                    : new[] { "configuration" }
                 : new[] { "onboarding" };
 
         return new UserInfoResponse
@@ -65,7 +67,8 @@ public class UserInfoService : IUserInfoService
             {
                 FhirConnectionProbe = _capabilities.FhirConnectionProbe,
                 PatientListWithNames = _capabilities.PatientListWithNames,
-                SftpFileListing = _capabilities.SftpFileListing
+                SftpFileListing = _capabilities.SftpFileListing,
+                OnboardingRevisit = _capabilities.OnboardingRevisit
             }
         };
     }

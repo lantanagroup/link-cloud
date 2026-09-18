@@ -650,9 +650,11 @@ function PatientIdentifierDetail({
                       </Button>
                     </div>
                   ) : (
-                    <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
-                      {t('onboarding:mrnIntake.identifierTable.addRule')}
-                    </Button>
+                    <div className="nhsn-link__mrn-id-rule-action">
+                      <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
+                        {t('onboarding:mrnIntake.identifierTable.addRule')}
+                      </Button>
+                    </div>
                   ))}
               </div>
             );

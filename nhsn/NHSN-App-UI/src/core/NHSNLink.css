@@ -485,10 +485,6 @@
   outline-offset: 0;
 }
 
-.nhsn-link .k-button.k-button-primary:focus-visible {
-  outline-width: 3px;
-}
-
 .nhsn-link__step-actions .k-button:focus,
 .nhsn-link__step-actions .k-button.k-focus {
   box-shadow: none !important;
@@ -975,13 +971,8 @@
   border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
-.nhsn-link__hint-trigger:hover .nhsn-link__hint-trigger-bubble,
 .nhsn-link__step-panel .k-form-field--hint-open .nhsn-link__hint-trigger-bubble {
   display: block;
-}
-
-.nhsn-link__step-panel .k-form-field.nhsn-link__hint-hover-suppressed .nhsn-link__hint-trigger:hover .nhsn-link__hint-trigger-bubble {
-  display: none;
 }
 
 .nhsn-facility-info .k-dropdownlist {
@@ -1083,12 +1074,11 @@
   cursor: pointer;
 }
 
-.nhsn-link__download-button:hover:not(:disabled):not(.nhsn-link__download-button--busy) {
+.nhsn-link__download-button:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__download-button:disabled,
-.nhsn-link__download-button--busy {
+.nhsn-link__download-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1152,12 +1142,11 @@
   cursor: pointer;
 }
 
-.nhsn-link__upload-choose-button:hover:not(:disabled):not(.nhsn-link__upload-choose-button--busy) {
+.nhsn-link__upload-choose-button:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__upload-choose-button:disabled,
-.nhsn-link__upload-choose-button--busy {
+.nhsn-link__upload-choose-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1427,11 +1416,6 @@
 .nhsn-link .k-button.nhsn-link__button--sm {
   padding: 5px 12px;
   font-size: 12.5px;
-}
-
-.nhsn-link .k-button.nhsn-link__button--disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .nhsn-link__visually-hidden {
@@ -1898,13 +1882,8 @@
   border-top-color: var(--kendo-color-app-text, #1f2328);
 }
 
-.info-icon:hover .tooltip-bubble,
 .info-icon.info-icon--open .tooltip-bubble {
   display: block;
-}
-
-.info-icon.nhsn-link__hint-hover-suppressed:hover .tooltip-bubble {
-  display: none;
 }
 
 /* ---- modal (core/fields/overlays.tsx) */
@@ -2154,12 +2133,6 @@
   margin-bottom: 20px;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
-}
-
-.nhsn-link__report-results-table-scroll:focus,
-.nhsn-link__report-results-table-scroll:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 2px;
 }
 
 .nhsn-link__report-results-table {
@@ -2436,14 +2409,13 @@
   cursor: pointer;
 }
 
-.nhsn-link__report-results-icon-button:hover:not(:disabled):not(.nhsn-link__report-results-icon-button--busy) {
+.nhsn-link__report-results-icon-button:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
 /* A dimmed icon color reads as "not available" without fading the border to near-invisibility the
    way a blanket opacity would. */
-.nhsn-link__report-results-icon-button:disabled,
-.nhsn-link__report-results-icon-button--busy {
+.nhsn-link__report-results-icon-button:disabled {
   color: #9ca3af;
   cursor: not-allowed;
 }

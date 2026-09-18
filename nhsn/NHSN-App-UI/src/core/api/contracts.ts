@@ -42,6 +42,12 @@ export interface Capabilities {
   patientListWithNames: boolean;
   fhirConnectionProbe: boolean;
   sftpFileListing: boolean;
+  /**
+   * Not a real-vs-fixture adapter flag like the others above — a UX toggle. When true, a facility
+   * whose onboarding already completed keeps an "Onboarding" item in the main navigation and can
+   * freely revisit/edit every step; when false, onboarding is a one-way door once complete.
+   */
+  onboardingRevisit: boolean;
 }
 
 export interface UserInfoResponse {
