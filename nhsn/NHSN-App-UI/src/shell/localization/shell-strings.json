@@ -4,6 +4,8 @@
     "savedTestUsersTitle": "Saved test users",
     "noSavedUsers": "No test users have been saved yet. Answer \"who are you simulating?\" below.",
     "signedJwtPrefix": "Signed JWT",
+    "issuerLabel": "Issuer",
+    "keyIdLabel": "Key ID",
     "updateProfileTitle": "Update test profile",
     "createProfileTitle": "Create a lower-environment JWT test profile",
     "selectOrCreateDescription": "The standalone shell only initializes NHSNLink after a signed-JWT test profile has been selected. Use the shell controls on the left to configure the test identity, issuer, key id, and private key used by the lower-environment harness to sign the bearer token.",

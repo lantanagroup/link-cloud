@@ -6,6 +6,7 @@ import {BffApiClient} from "../../core/api/BffApiClient";
 import {MockApiClient} from "../mocks/MockApiClient";
 import {TestAuthApiClient} from "../auth/TestAuthApiClient";
 import {TestUserProfile} from "../auth/models";
+import {Select, type SelectOption} from "../../core/fields";
 import {
     loadActiveProfileId,
     loadProfiles,
@@ -86,15 +87,7 @@ export function FacilityHarness() {
     return new TestAuthApiClient(new BffApiClient("/api"), activeProfile);
   }, [mode, activeProfile]);
 
-  const sortedProfiles = useMemo(
-    () =>
-      [...profiles].sort(
-        (left, right) =>
-          new Date(right.lastUsedOn).getTime() -
-          new Date(left.lastUsedOn).getTime(),
-      ),
-    [profiles],
-  );
+  const sortedProfiles = profiles;
 
   function persist(
     nextProfiles: TestUserProfile[],
@@ -199,16 +192,18 @@ export function FacilityHarness() {
           <div className="shell__card">
             <h2>{t("shell.modeTitle")}</h2>
             <div className="shell__row">
-              <label htmlFor="harnessMode">{t("shell.modeLabel")}</label>
-              <select
+              <Select
                 id="harnessMode"
+                label={t("shell.modeLabel")}
                 value={mode}
-                onChange={(event) =>
-                  setMode(event.target.value as HarnessMode)
-                }>
-                <option value="bff">{t("shell.modeBff")}</option>
-                <option value="mock">{t("shell.modeMock")}</option>
-              </select>
+                options={
+                  [
+                    {value: "bff", label: t("shell.modeBff")},
+                    {value: "mock", label: t("shell.modeMock")},
+                  ] as Array<SelectOption<HarnessMode>>
+                }
+                onChange={(value) => setMode(value)}
+              />
             </div>
             <small>
               {mode === "mock"
@@ -223,19 +218,38 @@ export function FacilityHarness() {
               <p>{t("shell.noSavedUsers")}</p>
             ) : (
               <ul className="shell__list">
-                {sortedProfiles.map((profile) => (
-                  <li key={profile.id}>
+                {sortedProfiles.map((profile) => {
+                  const isActive = profile.id === activeId;
+                  return (
+                  <li
+                    key={profile.id}
+                    className={
+                      isActive ? "shell__list-item--active" : undefined
+                    }>
                     <button
-                      className={profile.id === activeId ? "active" : ""}
+                      className={isActive ? "active" : ""}
                       type="button"
                       onClick={() => activateProfile(profile.id)}>
-                      {profile.label}
+                      {isActive ? `✓ ${profile.label}` : profile.label}
                     </button>
                     <div className="shell__profile-meta">
-                      <small>
-                        {t("shell.signedJwtPrefix")} ({profile.issuer}
-                        {profile.keyId ? `; kid=${profile.keyId}` : ""})
+                      <small className="shell__meta-heading">
+                        {t("shell.signedJwtPrefix")}
                       </small>
+                      <small className="shell__meta-row">
+                        <span className="shell__meta-label">
+                          {t("shell.issuerLabel")}:
+                        </span>{" "}
+                        {profile.issuer}
+                      </small>
+                      {profile.keyId ? (
+                        <small className="shell__meta-row shell__meta-row--mono">
+                          <span className="shell__meta-label">
+                            {t("shell.keyIdLabel")}:
+                          </span>{" "}
+                          {profile.keyId}
+                        </small>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => editProfile(profile)}>
@@ -249,7 +263,8 @@ export function FacilityHarness() {
                       </button>
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
