@@ -85,8 +85,9 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
       <p className="nhsn-link__subtitle">{t('onboarding:reportingPlan.subtitle')}</p>
 
       {hasSchedule ? (
-        <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={0}>
+        <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__reporting-plan-table">
+            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportingPlan.title')}</caption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:reportingPlan.columns.month')}</th>

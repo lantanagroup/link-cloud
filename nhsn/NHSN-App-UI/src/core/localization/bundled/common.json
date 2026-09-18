@@ -87,6 +87,7 @@
     "message": "You have unsaved changes on this step. Save them before continuing, or discard them?"
   },
   "a11y": {
-    "opensInNewTab": "(opens in a new tab)"
+    "opensInNewTab": "(opens in a new tab)",
+    "table": "Table"
   }
 }
