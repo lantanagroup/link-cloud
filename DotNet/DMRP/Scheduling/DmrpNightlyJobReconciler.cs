@@ -1,4 +1,5 @@
 using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Quartz;
@@ -56,7 +57,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
             {
                 // The facility API validates timezones, so this is a row that predates that check.
-                _logger.LogError(ex, "No DMRP nightly job for timezone {TimeZone}: the platform does not know it.", timeZoneId);
+                _logger.LogError(ex, "No DMRP nightly job for timezone {TimeZone}: the platform does not know it.", timeZoneId.SanitizeForLog());
                 return;
             }
 
@@ -77,7 +78,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 {
                     await scheduler.ScheduleJob(job, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
 
-                    _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).", timeZoneId, cron);
+                    _logger.LogInformation("Scheduled DMRP nightly job for timezone {TimeZone} ({Cron}).", timeZoneId.SanitizeForLog(), cron.SanitizeForLog());
                     return;
                 }
                 catch (ObjectAlreadyExistsException ex)
@@ -85,7 +86,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                     // Another cluster node's ReconcileAllAsync won the race between our CheckExists
                     // and this ScheduleJob. Fall through to the verify/reschedule logic below instead
                     // of crashing the loser out of the hosted service's StartAsync.
-                    _logger.LogDebug(ex, "DMRP nightly job for timezone {TimeZone} was scheduled by another node; verifying its trigger.", timeZoneId);
+                    _logger.LogDebug(ex, "DMRP nightly job for timezone {TimeZone} was scheduled by another node; verifying its trigger.", timeZoneId.SanitizeForLog());
                 }
             }
 
@@ -102,7 +103,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 await scheduler.RescheduleJob(existing.Key, BuildTrigger(jobKey, cron, timeZone), cancellationToken);
 
                 _logger.LogInformation("Rescheduled DMRP nightly job for timezone {TimeZone}: {OldCron} -> {NewCron}.",
-                    timeZoneId, existing.CronExpressionString, cron);
+                    timeZoneId.SanitizeForLog(), existing.CronExpressionString.SanitizeForLog(), cron.SanitizeForLog());
             }
         }
 
@@ -139,7 +140,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             foreach (var orphan in existing.Where(k => !wanted.Contains(k.Name, StringComparer.Ordinal)))
             {
                 await scheduler.DeleteJob(orphan, cancellationToken);
-                _logger.LogInformation("Removed DMRP nightly job for timezone {TimeZone}: no facility uses it.", orphan.Name);
+                _logger.LogInformation("Removed DMRP nightly job for timezone {TimeZone}: no facility uses it.", orphan.Name.SanitizeForLog());
             }
         }
 

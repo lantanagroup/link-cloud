@@ -221,6 +221,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
