@@ -216,8 +216,8 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// <response code="202">The updated mapping.</response>
         /// <response code="400">
         /// The body's id does not match the URL, a required field is missing or too long, the dQM is
-        /// not present in MeasureEval, or the change would collide with an existing measure
-        /// pair.
+        /// not present in MeasureEval, or the change would name a measure another mapping already
+        /// holds.
         /// </response>
         /// <response code="404">No measure mapping has that Id.</response>
         /// <response code="502">

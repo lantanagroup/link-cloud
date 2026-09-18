@@ -17,8 +17,8 @@ namespace LantanaGroup.Link.DMRP.Data.Repository.Mappings
                 .HasMaxLength(255);
 
             // Nullable: a measure the sync recorded but nobody has mapped yet has no dQM. The unique
-            // index below still holds one row per (measure, dQM) pair, so a measure can have at most
-            // one unmapped placeholder.
+            // index below is on the measure alone, so that measure holds exactly one row whether or
+            // not a dQM has been supplied for it, and completing it fills this column in place.
             builder.Property(m => m.DQM)
                 .HasMaxLength(255);
 
