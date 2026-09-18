@@ -5,6 +5,7 @@ import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.LinkConfig;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
@@ -84,11 +85,23 @@ public class ValidationService {
     }
 
     public List<Result> validate(IBaseResource resource) {
+        return validate(resource, null, null);
+    }
+
+    public List<Result> validate(IBaseResource resource, String facilityId, String reportId) {
         try {
+            String detail = "FHIR resource";
             if (resource instanceof Bundle bundle) {
-                logger.info("Starting validation of Bundle with {} entries", bundle.getEntry().size());
+                detail = "FHIR bundle " + bundle.getEntry().size() + " entries";
+                logger.info("Starting validation of Bundle with {} entries facility={} report={}",
+                        bundle.getEntry().size(),
+                        LogUtils.sanitize(facilityId),
+                        LogUtils.sanitize(reportId));
             }
-            ValidationResult validationResult = fhirValidator.validateWithResult(resource);
+            ValidationResult validationResult;
+            try (ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(logger, detail, facilityId, reportId)) {
+                validationResult = fhirValidator.validateWithResult(resource);
+            }
             List<Result> results = validationResult.getMessages().stream()
                     .map(Result::fromMessage)
                     .toList();
