@@ -24,6 +24,12 @@ public static class AutomationRunStatusExtensions
             or AutomationRunStatus.LiveWindowOpen
             or AutomationRunStatus.ReportFinalization;
 
+    /// <summary>
+    /// A second Cancel after the run is already Cancelled is success, not a failure.
+    /// </summary>
+    public static bool IsSuccessfulCancelTarget(this AutomationRunStatus status)
+        => status.IsCancellable() || status == AutomationRunStatus.Cancelled;
+
     public static bool IsInProgress(this AutomationRunStatus status)
         => status is AutomationRunStatus.Running
             or AutomationRunStatus.LiveWindowOpen
