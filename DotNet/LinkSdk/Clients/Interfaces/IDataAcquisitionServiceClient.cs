@@ -67,6 +67,7 @@ public interface IDataAcquisitionServiceClient
         string fhirServerUrl,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
     /// Tests SFTP connection details without a saved configuration, optionally previewing the patients in
     /// each Cerner extract. The request body is not captured in the response, because it carries the password.
     /// </summary>

@@ -204,6 +204,7 @@ public class DataAcquisitionServiceClientTests
         Assert.Null(result.Body.ErrorMessage);
     }
 
+    [Fact]
     public async System.Threading.Tasks.Task TestSftpConnectionAsync_PostsDetailsAndParsesResult()
     {
         const string response = """{"success":true,"message":"Connected.","files":[{"fileName":"census.dat","patients":[{"patientId":"12345","patientName":"Doe, John","admissionDate":"2023-07-07T13:06:43Z"}]}]}""";
