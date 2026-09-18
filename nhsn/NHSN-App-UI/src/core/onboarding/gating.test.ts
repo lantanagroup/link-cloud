@@ -117,6 +117,40 @@ describe('isUnlocked', () => {
   it('always allows the first step', () => {
     expect(isUnlocked('welcome', createEmptyDraft(), user)).toBe(true);
   });
+
+  it('unlocks every step once onboarded, when the OnboardingRevisit capability is on', () => {
+    const onboardedUser: UserInfoResponse = {
+      ...user,
+      isOnboarded: true,
+      capabilities: {
+        patientListWithNames: false,
+        fhirConnectionProbe: false,
+        sftpFileListing: false,
+        onboardingRevisit: true
+      }
+    };
+    // Never unlocked, never observed as complete -- still reachable in revisit mode.
+    expect(isUnlocked('report-results', createEmptyDraft(), onboardedUser)).toBe(true);
+  });
+
+  it('does not unlock every step just from being onboarded, without the capability', () => {
+    const onboardedUser: UserInfoResponse = {...user, isOnboarded: true};
+    expect(isUnlocked('report-results', createEmptyDraft(), onboardedUser)).toBe(false);
+  });
+
+  it('does not unlock every step from the capability alone, before onboarding completes', () => {
+    const flaggedUser: UserInfoResponse = {
+      ...user,
+      isOnboarded: false,
+      capabilities: {
+        patientListWithNames: false,
+        fhirConnectionProbe: false,
+        sftpFileListing: false,
+        onboardingRevisit: true
+      }
+    };
+    expect(isUnlocked('report-results', createEmptyDraft(), flaggedUser)).toBe(false);
+  });
 });
 
 describe('furthestLegalStep', () => {

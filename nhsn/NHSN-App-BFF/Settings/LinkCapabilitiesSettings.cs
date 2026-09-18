@@ -26,4 +26,12 @@ public class LinkCapabilitiesSettings
     // MRN Identifier Intake's rule builder — no LinkSdk client exposes a report patient's real
     // Patient.identifier array yet. See IPatientIdentifierGateway's doc comment.
     public bool PatientIdentifierLookup { get; set; }
+
+    // Not a real-vs-fixture adapter flag like the others above — a UX toggle. When true, a facility
+    // whose onboarding already completed keeps an "Onboarding" item in the main navigation and can
+    // freely revisit/edit every step; when false (the default), onboarding is a one-way door and
+    // the wizard is unreachable once complete. Reuses this settings class purely for its existing
+    // appsettings -> UserInfoResponse.Capabilities -> frontend plumbing, not because this fits the
+    // "real vs fixture" theme.
+    public bool OnboardingRevisit { get; set; }
 }

@@ -80,7 +80,19 @@
   font-style: italic;
 }
 
-.nhsn-link__mrn-id-rule-action,
+/* Rule already added: badge + Edit/Remove stay on the field's row, pushed to
+   the right, matching the POC's .mrn-id-rule-action (index.html:356). */
+.nhsn-link__mrn-id-rule-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Editing/adding a rule needs room for the operator select and value field,
+   so - unlike the action row above - it takes the full row width. */
 .nhsn-link__mrn-id-rule-editor {
   display: flex;
   flex-wrap: wrap;
@@ -89,8 +101,14 @@
   width: 100%;
 }
 
+/* Pill badge, matching the POC's .mrn-id-rule-badge (index.html:357) and this
+   app's other status pills (NHSNLink.css's .nhsn-link__status-pill). */
 .nhsn-link__mrn-id-rule-badge {
+  display: inline-block;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--kendo-color-success, #157347);
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  background: var(--kendo-color-border, #d0d7de);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
 }

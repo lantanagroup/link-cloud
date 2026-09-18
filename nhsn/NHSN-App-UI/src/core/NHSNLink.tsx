@@ -70,6 +70,8 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
     void setAppLocale(locale);
   }, [locale]);
 
+  const onboardingRevisitEnabled = Boolean(userInfo?.capabilities?.onboardingRevisit);
+
   const navigationSections = useMemo<NavigationSection[]>(() => {
     if (!userInfo || userInfo.accessState !== 'Allowed') {
       return [];
@@ -78,12 +80,17 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
     const facilityItems: NavigationItem[] = userInfo.isOnboarded
       ? [
           { key: 'home', label: t('navigation.home') },
+          // Only present once onboarding already completed, and only behind the
+          // OnboardingRevisit capability -- with it off, onboarding stays a one-way door.
+          ...(onboardingRevisitEnabled
+            ? [{ key: 'onboarding' as const, label: t('navigation.onboarding') }]
+            : []),
           { key: 'configuration', label: t('navigation.configuration') },
         ]
       : [{ key: 'onboarding', label: t('navigation.onboarding') }];
 
     return [{ heading: t('navigation.facility'), items: facilityItems }];
-  }, [t, userInfo]);
+  }, [t, userInfo, onboardingRevisitEnabled]);
 
   if (loading) {
     return (
@@ -139,7 +146,10 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
     setRoute(nextRoute);
   }
 
-  const showOnboarding = !userInfo.isOnboarded;
+  // Onboarding stays mounted past completion only when the facility is revisiting it
+  // deliberately (routed to /onboarding) under the OnboardingRevisit capability -- otherwise,
+  // once isOnboarded flips true, onboarding is a one-way door straight to the main shell.
+  const showOnboarding = !userInfo.isOnboarded || (onboardingRevisitEnabled && route === 'onboarding');
 
   return (
     <div className="nhsn-link">
@@ -194,7 +204,10 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
           />
 
           <main className="nhsn-link__grid">
-            {route === 'home' && <Home userInfo={userInfo} />}
+            {/* Reaching this branch with route === 'onboarding' only happens with the
+                OnboardingRevisit capability off (or a stale link) after completion --
+                falls back to Home rather than rendering nothing. */}
+            {(route === 'home' || route === 'onboarding') && <Home userInfo={userInfo} />}
             {route === 'configuration' && userInfo.isOnboarded && (
               <ConfigurationScreen />
             )}

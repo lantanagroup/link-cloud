@@ -58,6 +58,12 @@ export function isUnlocked(
   draft: FacilityDraft,
   user: UserInfoResponse
 ): boolean {
+  // A facility that already completed onboarding, on a build where the OnboardingRevisit
+  // capability is on, can browse every step freely -- there is no "next required step" left to
+  // protect, and the whole point of revisiting is to jump around out of the original order.
+  if (user.isOnboarded && user.capabilities?.onboardingRevisit) {
+    return true;
+  }
   if (!draft.unlockedStepIds.includes(stepId)) {
     return false;
   }
