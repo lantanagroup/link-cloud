@@ -1,11 +1,15 @@
+using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Hsloc;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -43,6 +47,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IOrganizationLocationConfigurationGateway _organizationLocationGateway;
     private readonly IEncounterMappingService _encounterMappingService;
     private readonly IHslocMappingService _hslocMappingService;
+    private readonly IPatientsOfInterestService _patientsOfInterestService;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -59,6 +64,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IOrganizationLocationConfigurationGateway organizationLocationGateway,
         IEncounterMappingService encounterMappingService,
         IHslocMappingService hslocMappingService,
+        IPatientsOfInterestService patientsOfInterestService,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -74,6 +80,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _organizationLocationGateway = organizationLocationGateway;
         _encounterMappingService = encounterMappingService;
         _hslocMappingService = hslocMappingService;
+        _patientsOfInterestService = patientsOfInterestService;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -93,6 +100,274 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         // Read back rather than echoing the request, so the response reflects what the owning
         // services actually hold and a value Link normalised or rejected shows up immediately.
         return await _readService.GetAsync(cancellationToken);
+    }
+
+    // Writes whichever sections a validated manual-upload import sheet held - unlike SaveAsync,
+    // this can touch several sections in one call (an import sheet covers Fhir, Census, LocationOrg,
+    // Hsloc and Encounter at once) rather than being scoped to a single step. Only called once
+    // ManualUploadTemplateService has already validated the sheet (Accepted=true) - nothing here
+    // validates again. Returns the re-read draft so the caller reports back what was actually saved,
+    // not what was parsed.
+    public async Task<ImportSaveResult> SaveImportedFieldsAsync(ImportedFields fields, CancellationToken cancellationToken = default)
+    {
+        var facilityId = _userContext.RequireFacilityId();
+        var sftpCredentialsSaved = false;
+        bool? fhirConnectionTested = null;
+        var sectionErrors = new List<ImportSectionSaveError>();
+
+        void RecordFailure(string section, string? detail)
+        {
+            if (detail is not null)
+            {
+                sectionErrors.Add(new ImportSectionSaveError { Section = section, Detail = detail });
+            }
+        }
+
+        await using (var writeLock = await _writeLock.AcquireAsync(facilityId, cancellationToken))
+        {
+            if (fields.Fhir is { } fhir)
+            {
+                var fhirSection = new FhirSection
+                {
+                    FhirServerBaseUrl = fhir.FhirServerBaseUrl,
+                    MaxConcurrentRequests = fhir.MaxConcurrentRequests,
+                    MaxRetries = fhir.MaxRetries,
+                    MinAcquisitionPullTime = fhir.MinAcquisitionPullTime,
+                    MaxAcquisitionPullTime = fhir.MaxAcquisitionPullTime,
+                    LagDuration = fhir.LagDuration
+                };
+                var (fhirSaved, fhirDetail) = await TrySectionAsync(facilityId, "fhir", () => WriteFhirSectionAsync(facilityId, fhirSection, cancellationToken));
+                RecordFailure("fhir", fhirDetail);
+
+                // Test Connection is a BFF-only concern for the import path - the frontend never
+                // triggers it itself here. Only worth attempting once the required fields actually
+                // made it to Tenant; skipping (rather than testing an unsaved config) is what "if
+                // not, keep it not tested" means. Explicitly recorded either way - including false -
+                // so a stale "tested" flag from a previous, unrelated save never lingers after an
+                // import that changed the URL but couldn't verify it.
+                fhirConnectionTested = fhirSaved && await TestFhirConnectionQuietlyAsync(fhirSection.FhirServerBaseUrl!, cancellationToken);
+                await UpdateFhirConnectionTestedAsync(facilityId, fhirConnectionTested.Value, cancellationToken);
+            }
+
+            if (fields.Census is { } census)
+            {
+                var (_, censusDetail) = await TrySectionAsync(facilityId, "census", () => WriteCensusSectionAsync(facilityId, new CensusSection
+                {
+                    PatientListIds = census.PatientListIds ?? new Dictionary<string, string>(),
+                    SftpHost = census.SftpHost,
+                    SftpPort = census.SftpPort,
+                    SftpRemoteDirectory = census.SftpRemoteDirectory,
+                    SftpRemoveAfterProcessing = census.SftpRemoveAfterProcessing,
+                    AcquisitionFrequency = census.AcquisitionFrequency
+                }, cancellationToken));
+                RecordFailure("census", censusDetail);
+
+                // Secrets: saved straight to Data Acquisition and never round-tripped anywhere else
+                // (not persisted to the draft, not included in the response this method returns).
+                if (!string.IsNullOrWhiteSpace(census.SftpUsername) && !string.IsNullOrWhiteSpace(census.SftpPassword))
+                {
+                    var (credsSaved, credsDetail) = await TrySectionAsync(facilityId, "census.sftpCredentials", () => _patientsOfInterestService.SaveSftpCredentialsAsync(new SftpCredentialsRequest
+                    {
+                        Username = census.SftpUsername,
+                        Password = census.SftpPassword
+                    }, cancellationToken));
+                    sftpCredentialsSaved = credsSaved;
+                    RecordFailure("census", credsDetail);
+                }
+            }
+
+            if (fields.LocationOrg is { } locationOrg)
+            {
+                var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", () => WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                {
+                    Method = locationOrg.Method,
+                    ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
+                    LocationTypes = locationOrg.LocationTypes?
+                        .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
+                        .ToList() ?? [],
+                    LocationIdentifiers = locationOrg.LocationIdentifiers?
+                        .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
+                        .ToList() ?? [],
+                    CustomFhirPath = locationOrg.CustomFhirPath
+                }, cancellationToken));
+                RecordFailure("location-org", locationOrgDetail);
+            }
+
+            if (fields.Hsloc?.Mappings is { Count: > 0 } hslocMappings)
+            {
+                var (_, hslocDetail) = await TrySectionAsync(facilityId, "hsloc", () => _hslocMappingService.SaveAsync(
+                    hslocMappings.Select(m => new HslocMapping
+                    {
+                        SourceCode = m.SourceCode,
+                        SourceDisplay = m.SourceDisplay,
+                        HslocCode = m.HslocCode
+                    }).ToList(),
+                    cancellationToken));
+                RecordFailure("hsloc", hslocDetail);
+            }
+
+            if (fields.Encounter?.Mappings is { Count: > 0 } encounterMappings)
+            {
+                var (_, encounterDetail) = await TrySectionAsync(facilityId, "encounter", () => _encounterMappingService.SaveAsync(
+                    encounterMappings.Select(m => new EncounterMapping
+                    {
+                        System = m.System,
+                        Code = m.Code,
+                        EncounterType = m.EncounterType
+                    }).ToList(),
+                    cancellationToken));
+                RecordFailure("encounter", encounterDetail);
+
+                // CodeSystems is a BFF-only cache (see SaveWorkflowStateAsync's "encounter" case)
+                // that OnboardingReadService.GetAsync always echoes back verbatim, never reconciled
+                // against Normalization's own mappings - so leaving it untouched here would let a
+                // stale system from a previous online session or import survive next to this
+                // sheet's own systems forever. The sheet is the source of truth for this step on
+                // import, same as ManualUploadStep's own client-side patch of codeSystems.
+                var sheetCodeSystems = encounterMappings.Select(m => m.System).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                await UpdateEncounterCodeSystemsAsync(facilityId, sheetCodeSystems, cancellationToken);
+            }
+
+            await writeLock.CommitAsync(cancellationToken);
+        }
+
+        var envelope = await _readService.GetAsync(cancellationToken);
+        return new ImportSaveResult
+        {
+            Draft = envelope.Draft ?? new FacilityDraftResponse(),
+            SftpCredentialsSaved = sftpCredentialsSaved,
+            FhirConnectionTested = fhirConnectionTested,
+            SectionErrors = sectionErrors
+        };
+    }
+
+    // Reachability only - swallows any failure into "not tested" rather than letting a flaky FHIR
+    // server or a network hiccup take the rest of the import down with it. A quiet false here just
+    // means the facility sees an untested connection on the FHIR step, same as if no one had
+    // clicked Test Connection yet - not an import failure.
+    //
+    // result.Simulated means IFhirConfigurationGateway.TestConnectionAsync isn't backed by a real
+    // probe in this deployment (LinkCapabilities.FhirConnectionProbe is off) - it always reports
+    // Success without ever having reached the facility's actual server. Persisting that as
+    // ConnectionTested would tell the facility their FHIR endpoint was verified when nothing was
+    // actually checked, so a simulated result counts as not tested, same as a real failure would.
+    private async Task<bool> TestFhirConnectionQuietlyAsync(string fhirServerBaseUrl, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _facilityAdministrationService.TestFhirConnectionAsync(fhirServerBaseUrl, cancellationToken);
+            return result.Success && !result.Simulated;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or LinkServiceException)
+        {
+            _logger.LogWarning(ex, "Manual-upload auto Test Connection failed for base URL {FhirServerBaseUrl}.", fhirServerBaseUrl);
+            return false;
+        }
+    }
+
+    // Same merge-one-slice-only shape as SaveWorkflowStateAsync's own "fhir" case, just reachable
+    // outside a step-scoped save: SaveImportedFieldsAsync can set this without currentStepId being
+    // "fhir" at all, since an import touches every section in one call.
+    private async Task UpdateFhirConnectionTestedAsync(string facilityId, bool connectionTested, CancellationToken cancellationToken)
+    {
+        var stored = await _draftStore.GetAsync(facilityId, cancellationToken);
+        var state = stored.State with { Fhir = new FhirWorkflowState { ConnectionTested = connectionTested } };
+        await _draftStore.SaveAsync(facilityId, new StoredDraft { State = state, UnlockedStepIds = stored.UnlockedStepIds }, cancellationToken);
+    }
+
+    // Same shape as UpdateFhirConnectionTestedAsync, for the "encounter" case: SaveImportedFieldsAsync
+    // can set this without currentStepId being "encounter" at all, since an import touches every
+    // section in one call.
+    private async Task UpdateEncounterCodeSystemsAsync(string facilityId, List<string> codeSystems, CancellationToken cancellationToken)
+    {
+        var stored = await _draftStore.GetAsync(facilityId, cancellationToken);
+        var state = stored.State with { Encounter = new EncounterWorkflowState { CodeSystems = codeSystems } };
+        await _draftStore.SaveAsync(facilityId, new StoredDraft { State = state, UnlockedStepIds = stored.UnlockedStepIds }, cancellationToken);
+    }
+
+    // Each section a manual-upload sheet touches is written independently, so a precondition one
+    // section's owning service enforces (Census patient lists needing a FHIR base URL already on
+    // file; FHIR itself needing both pull times, not just the sheet's) never takes the rest of the
+    // sheet's otherwise-valid sections down with it. ManualUploadTemplateService has already
+    // validated every cell's own format - what's caught here is a cross-service precondition that
+    // isn't, and can't be, checked from the sheet alone. Returns whether the write actually reached
+    // the owning service (so callers that need to know - Fhir's own Test Connection follow-up,
+    // Census's HasCredentials - don't have to re-derive it from what was merely parsed) plus a
+    // human-readable reason on failure, so the facility sees why a value they entered didn't save
+    // instead of just finding it blank later.
+    private async Task<(bool Success, string? Detail)> TrySectionAsync(string facilityId, string section, Func<Task> write)
+    {
+        try
+        {
+            await write();
+            return (true, null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // A BFF-side precondition the write itself enforces before calling out at all (e.g.
+            // Census patient lists needing a FHIR base URL already on file).
+            _logger.LogWarning(ex, "Manual-upload section {Section} for facility {FacilityId} was not saved.", section, facilityId);
+            return (false, ex.Message);
+        }
+        catch (LinkServiceException ex)
+        {
+            // The downstream Link service itself rejected the write (e.g. Data Acquisition 400s an
+            // Organization Identification payload it considers invalid) - same "don't let one
+            // section's failure take the rest of the sheet down with it" policy as above, just a
+            // different failure surface: this one only happens once a real network call is made.
+            _logger.LogWarning(
+                ex,
+                "Manual-upload section {Section} for facility {FacilityId} was not saved: {Service}.{Operation} returned {StatusCode}.",
+                section, facilityId, ex.Service, ex.Operation, ex.StatusCode);
+            return (false, ExtractDetail(ex));
+        }
+    }
+
+    // Best-effort read of the downstream service's own explanation out of its response body, which
+    // is never a uniform shape across Link services (see LinkServiceException's own remarks) - tries
+    // RFC7807 ProblemDetails' "detail" first (e.g. Data Acquisition's FHIRPath validator), then ASP.NET
+    // model-validation's { "Field": ["message"] } shape (e.g. Data Acquisition's SFTP host validator),
+    // and falls back to the exception's own normalized summary when the body is empty or neither shape
+    // matches, rather than showing the facility raw JSON or nothing at all.
+    private static string ExtractDetail(LinkServiceException ex)
+    {
+        if (string.IsNullOrWhiteSpace(ex.RawBody))
+        {
+            return ex.Message;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(ex.RawBody);
+            var root = document.RootElement;
+
+            if (root.TryGetProperty("detail", out var detailProperty) && detailProperty.ValueKind == JsonValueKind.String)
+            {
+                return detailProperty.GetString() ?? ex.Message;
+            }
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                var messages = root.EnumerateObject()
+                    .Where(property => property.Value.ValueKind == JsonValueKind.Array)
+                    .SelectMany(property => property.Value.EnumerateArray())
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString())
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .ToList();
+
+                if (messages.Count > 0)
+                {
+                    return string.Join(' ', messages);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON, or not a shape we recognize - fall through to the exception's own summary.
+        }
+
+        return ex.Message;
     }
 
     // Merges the saved step's workflow slice onto what's stored, leaving every other step alone —
@@ -258,11 +533,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 break;
 
             case "location-org":
-                await _organizationLocationGateway.SaveAsync(new OrganizationLocationConfigurationSave
-                {
-                    FacilityId = facility.FacilityId,
-                    LocationOrg = draft.LocationOrg
-                }, cancellationToken);
+                await WriteLocationOrgSectionAsync(facility.FacilityId, draft.LocationOrg, cancellationToken);
                 break;
 
             case "encounter":
@@ -286,11 +557,75 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         }
     }
 
+    private async Task WriteCensusSectionAsync(string facilityId, CensusSection census, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(census.AcquisitionFrequency))
+        {
+            await _censusGateway.SaveAcquisitionFrequencyAsync(facilityId, census.AcquisitionFrequency, cancellationToken);
+        }
+
+        if (census.PatientListIds is { Count: > 0 })
+        {
+            // PatientListGateway.SaveConfigurationAsync embeds the facility's FHIR base URL in the
+            // payload it sends Data Acquisition, so it throws if that isn't on file yet. The online
+            // flow can't hit this - FHIR is step 5, Census step 6, gating.ts won't unlock the second
+            // without the first already saved - but a manual-upload sheet can carry Census fields
+            // without a complete FHIR section (nothing is required anymore, see
+            // ManualUploadTemplateService), landing here before FHIR exists. That's a real, known
+            // precondition gap, not a request failure, so it's logged and skipped rather than
+            // thrown - same as WriteFhirSectionAsync does when ITS prerequisites are incomplete -
+            // instead of failing the whole save (locationOrg/hsloc/encounter included) over one
+            // section not being ready yet.
+            try
+            {
+                await _patientListGateway.SaveConfigurationAsync(facilityId, census.PatientListIds, cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Census patient list configuration for facility {FacilityId} was not saved: FHIR server info must be saved first.",
+                    facilityId);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(census.SftpHost) && census.SftpPort is not null)
+        {
+            // A facility can only have one census acquisition method in Data Acquisition — a
+            // facility switching from Epic to Cerner would otherwise fail to save with a
+            // stale FHIR List configuration still on record.
+            await _patientListGateway.DeleteConfigurationIfExistsAsync(facilityId, cancellationToken);
+
+            await _sftpConfigurationGateway.SaveConfigurationAsync(facilityId, new SftpConfig
+            {
+                Host = census.SftpHost,
+                Port = census.SftpPort.Value,
+                RemoteDirectory = census.SftpRemoteDirectory ?? "/",
+                RemoveAfterProcessing = census.SftpRemoveAfterProcessing ?? false
+            }, cancellationToken);
+        }
+    }
+
+    private async Task WriteLocationOrgSectionAsync(string facilityId, LocationOrgSection locationOrg, CancellationToken cancellationToken)
+    {
+        await _organizationLocationGateway.SaveAsync(new OrganizationLocationConfigurationSave
+        {
+            FacilityId = facilityId,
+            LocationOrg = locationOrg
+        }, cancellationToken);
+    }
+
     private async Task WriteFhirSectionAsync(string facilityId, FhirSection fhir, CancellationToken cancellationToken)
     {
+        // FhirServerBaseUrl, MaxConcurrentRequests and BOTH pull times are hard requirements of
+        // FacilityAdministrationService.UpdateFhirServerInfoAsync itself - MinAcquisitionPullTime/
+        // MaxAcquisitionPullTime are parsed with TimeSpan.TryParseExact("hh\:mm") and it throws
+        // rather than defaulting when that fails, so an empty string is not a valid "not set" value
+        // here the way it is for other optional fields. Only maxRetries has a real default (0 is a
+        // valid value in its own 0-10 range check) - everything else in this guard is load-bearing,
+        // not a leftover overly-strict check.
         if (string.IsNullOrWhiteSpace(fhir.FhirServerBaseUrl) ||
             fhir.MaxConcurrentRequests is null ||
-            fhir.MaxRetries is null ||
             string.IsNullOrWhiteSpace(fhir.MinAcquisitionPullTime) ||
             string.IsNullOrWhiteSpace(fhir.MaxAcquisitionPullTime))
         {
@@ -303,7 +638,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         {
             FhirServerBaseUrl = fhir.FhirServerBaseUrl,
             MaxConcurrentRequests = fhir.MaxConcurrentRequests.Value,
-            MaxRetries = fhir.MaxRetries.Value,
+            MaxRetries = fhir.MaxRetries ?? 0,
             MinAcquisitionPullTime = fhir.MinAcquisitionPullTime,
             MaxAcquisitionPullTime = fhir.MaxAcquisitionPullTime,
             LagDays = lagDays,

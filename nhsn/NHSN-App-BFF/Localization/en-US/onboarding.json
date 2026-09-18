@@ -80,12 +80,25 @@
     "imported": "Imported {{imported}} of {{total}} field(s) from {{fileName}}.",
     "readError": "Could not read that file — make sure it is the .xlsx import sheet downloaded from this page.",
     "uploadRejected": "The file could not be imported. Please check the file and try again.",
+    "downloadErrorsFile": "Download Sheet with Errors Marked",
+    "downloadErrorsHint": "Downloads your uploaded sheet with an added column noting the error on each flagged row - fix those rows and upload it again.",
     "errors": {
       "invalidFormat": "The file is not a valid import sheet.",
+      "facilityMismatch": "Facility ID mismatch: this import sheet was generated for a different facility. Download your own facility's import sheet and try again.",
+      "vendorMismatch": "Vendor mismatch: this import sheet is for a different EHR vendor than your facility is configured for. Download the correct import sheet and try again.",
+      "saveFailed": "Could not be saved: {{detail}}",
       "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
       "invalidUrl": "Enter a valid, fully-qualified URL.",
       "invalidNumber": "Enter a whole number of zero or greater.",
-      "invalidLocationMethod": "Enter a valid organization identification method."
+      "invalidNumberRange": "Enter a whole number within the allowed range.",
+      "invalidLocationMethod": "Enter a valid organization identification method.",
+      "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
+      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
+      "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
+      "invalidFhirId": "Enter a valid FHIR id.",
+      "invalidFhirPath": "Enter a valid FHIRPath expression.",
+      "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it or leave it blank to select one online.",
+      "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it or leave it blank to select one online."
     }
   },
   "fhirServerInfo": {

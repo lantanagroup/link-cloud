@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {LocationCandidate, LocationMethod} from '../../../api/contracts';
@@ -18,6 +18,7 @@ import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import type {LocationIdentifierEntry, LocationTypeEntry} from '../../types';
+import {findIncompleteLocationIdentifierIndexes, findIncompleteLocationTypeIndexes} from './validate';
 
 /** Organization Identification. Methods and instructions PDF both come from `vendorProfile` - no vendor name here. */
 export function LocationOrgStep({onNext, onBack}: StepProps) {
@@ -35,6 +36,23 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const activeMethod =
     locationOrg.method && methods.includes(locationOrg.method) ? locationOrg.method : undefined;
 
+  // Nothing saved yet - either no one has picked a method online, or an imported sheet's method
+  // didn't parse into one the vendor profile recognizes. Rather than land on no tab at all, default
+  // to the vendor's first method - unless a custom FHIRPath was actually entered with no location
+  // identifiers alongside it, in which case that's the tab with real data to show.
+  useEffect(() => {
+    if (activeMethod || methods.length === 0) {
+      return;
+    }
+    const hasCustomFhirPath = Boolean(locationOrg.customFhirPath?.trim());
+    const hasLocationIdentifiers = (locationOrg.locationIdentifiers?.length ?? 0) > 0;
+    const defaultMethod =
+      hasCustomFhirPath && !hasLocationIdentifiers && methods.includes('custom-fhir-path')
+        ? 'custom-fhir-path'
+        : methods[0];
+    patch('locationOrg', {method: defaultMethod});
+  }, [activeMethod, methods, locationOrg.customFhirPath, locationOrg.locationIdentifiers, patch]);
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [candidates, setCandidates] = useState<LocationCandidate[]>([]);
@@ -43,6 +61,21 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const managingOrganizations = locationOrg.managingOrganizationIds ?? [];
   const locationTypes = locationOrg.locationTypes ?? [];
   const locationIdentifiers = locationOrg.locationIdentifiers ?? [];
+
+  // Only the active method's rows can block Continue - a different method's rows just sit hidden
+  // in the draft, unrelated to what's being configured right now (same reasoning as `activeMethod`
+  // itself only ever showing one method's fields at a time).
+  const incompleteLocationTypeIndexes = useMemo(
+    () => new Set(findIncompleteLocationTypeIndexes(locationTypes)),
+    [locationTypes]
+  );
+  const incompleteLocationIdentifierIndexes = useMemo(
+    () => new Set(findIncompleteLocationIdentifierIndexes(locationIdentifiers)),
+    [locationIdentifiers]
+  );
+  const hasIncompleteRows =
+    (activeMethod === 'location-type' && incompleteLocationTypeIndexes.size > 0) ||
+    (activeMethod === 'location-identifier' && incompleteLocationIdentifierIndexes.size > 0);
 
   function handleMethodChange(method: LocationMethod) {
     patch('locationOrg', {method});
@@ -119,24 +152,32 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               addLabel={t('onboarding:locationOrg.locationType.add')}
               removeLabel={t('common:actions.remove')}
               emptyLabel={t('onboarding:locationOrg.noneAdded')}
-              renderItem={(row, index, onRowChange) => (
-                <>
-                  <TextField
-                    id={`location-type-code-${index}`}
-                    label={t('onboarding:locationOrg.locationType.codeLabel')}
-                    placeholder={t('onboarding:locationOrg.locationType.codeLabel')}
-                    value={row.code}
-                    onChange={code => onRowChange({...row, code})}
-                  />
-                  <TextField
-                    id={`location-type-alias-${index}`}
-                    label={t('onboarding:locationOrg.locationType.aliasLabel')}
-                    placeholder={t('onboarding:locationOrg.locationType.aliasLabel')}
-                    value={row.alias}
-                    onChange={alias => onRowChange({...row, alias})}
-                  />
-                </>
-              )}
+              renderItem={(row, index, onRowChange) => {
+                // Only flag a half-filled row (one side typed, the other still blank) - a freshly
+                // added, entirely untouched row isn't wrong yet, just unfinished, so it stays quiet
+                // until the facility actually starts it.
+                const partial = Boolean(row.code.trim()) !== Boolean(row.alias.trim());
+                return (
+                  <>
+                    <TextField
+                      id={`location-type-code-${index}`}
+                      label={t('onboarding:locationOrg.locationType.codeLabel')}
+                      placeholder={t('onboarding:locationOrg.locationType.codeLabel')}
+                      value={row.code}
+                      error={partial && !row.code.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      onChange={code => onRowChange({...row, code})}
+                    />
+                    <TextField
+                      id={`location-type-alias-${index}`}
+                      label={t('onboarding:locationOrg.locationType.aliasLabel')}
+                      placeholder={t('onboarding:locationOrg.locationType.aliasLabel')}
+                      value={row.alias}
+                      error={partial && !row.alias.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      onChange={alias => onRowChange({...row, alias})}
+                    />
+                  </>
+                );
+              }}
             />
           </div>
         </>
@@ -184,24 +225,29 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               addLabel={t('onboarding:locationOrg.locationIdentifier.add')}
               removeLabel={t('common:actions.remove')}
               emptyLabel={t('onboarding:locationOrg.noneAdded')}
-              renderItem={(row, index, onRowChange) => (
-                <>
-                  <TextField
-                    id={`location-identifier-system-${index}`}
-                    label={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
-                    placeholder={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
-                    value={row.system}
-                    onChange={system => onRowChange({...row, system})}
-                  />
-                  <TextField
-                    id={`location-identifier-code-${index}`}
-                    label={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
-                    placeholder={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
-                    value={row.code}
-                    onChange={code => onRowChange({...row, code})}
-                  />
-                </>
-              )}
+              renderItem={(row, index, onRowChange) => {
+                const partial = Boolean(row.system.trim()) !== Boolean(row.code.trim());
+                return (
+                  <>
+                    <TextField
+                      id={`location-identifier-system-${index}`}
+                      label={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
+                      placeholder={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
+                      value={row.system}
+                      error={partial && !row.system.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      onChange={system => onRowChange({...row, system})}
+                    />
+                    <TextField
+                      id={`location-identifier-code-${index}`}
+                      label={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
+                      placeholder={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
+                      value={row.code}
+                      error={partial && !row.code.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      onChange={code => onRowChange({...row, code})}
+                    />
+                  </>
+                );
+              }}
             />
           </div>
         </>
@@ -253,11 +299,17 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         )}
       </Modal>
 
+      {hasIncompleteRows && (
+        <p className="nhsn-link__form-error" role="alert">
+          {t('onboarding:locationOrg.errors.incompleteRows')}
+        </p>
+      )}
+
       <StepActions saving={saving}>
         <Button variant="secondary" onClick={onBack} disabled={saving}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={onNext} disabled={saving} loading={saving}>
+        <Button onClick={onNext} disabled={saving || hasIncompleteRows} loading={saving}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

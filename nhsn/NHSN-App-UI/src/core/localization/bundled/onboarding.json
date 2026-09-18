@@ -12,7 +12,8 @@
     "report": "Generate Test Report",
     "reportResults": "Report Results",
     "mrnIntake": "MRN Identifier Intake",
-    "complete": "Enrollment Complete"
+    "complete": "Enrollment Complete",
+    "hasErrors": "This step has validation errors."
   },
   "welcome": {
     "title": "Welcome to DQM Onboarding",
@@ -86,10 +87,19 @@
     "uploadRejected": "The file could not be imported. Please check the file and try again.",
     "errors": {
       "invalidFormat": "The file is not a valid import sheet.",
+      "facilityMismatch": "Facility ID mismatch: this import sheet was generated for a different facility. Download your own facility's import sheet and try again.",
+      "vendorMismatch": "Vendor mismatch: this import sheet is for a different EHR vendor than your facility is configured for. Download the correct import sheet and try again.",
+      "saveFailed": "Could not be saved: {{detail}}",
       "invalidVendor": "Enter a valid EHR vendor (Epic or Cerner).",
       "invalidUrl": "Enter a valid, fully-qualified URL.",
       "invalidNumber": "Enter a whole number of zero or greater.",
-      "invalidLocationMethod": "Enter a valid organization identification method."
+      "invalidNumberRange": "Enter a whole number within the allowed range.",
+      "invalidLocationMethod": "Enter a valid organization identification method.",
+      "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
+      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
+      "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
+      "invalidFhirId": "Enter a valid FHIR id.",
+      "invalidFhirPath": "Enter a valid FHIRPath expression."
     }
   },
   "fhirServerInfo": {
@@ -129,7 +139,6 @@
       "invalidLagDays": "Days must be a whole number between 0 and 30.",
       "invalidLagHours": "Hours must be a whole number between 0 and 23.",
       "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
-      "lagDurationRequired": "At least one of Days, Hours, or Minutes must be greater than zero.",
       "loadError": "Unable to load FHIR server information.",
       "saveSuccess": "FHIR server information saved.",
       "saveError": "Unable to save FHIR server information.",
@@ -141,7 +150,8 @@
     },
     "errors": {
       "baseUrlRequired": "FHIR Server Base URL is required.",
-      "fieldRequired": "This field is required."
+      "fieldRequired": "This field is required.",
+      "pullTimePairRequired": "Min and Max Acquisition Pull Time must both be provided together."
     }
   },
   "census": {
@@ -192,11 +202,11 @@
         "remoteDirectoryHint": "Path to the directory on the SFTP server (use '/' for root)",
         "removeAfterProcessingLabel": "Remove files after processing"
       },
-      "testConnection": "Test Connection",
-      "testing": "Testing connection…",
-      "testSuccess": "Connection test succeeded.",
-      "testFailure": "Connection test failed.",
-      "testError": "Unable to test the connection.",
+      "testConnection": "Validate Results",
+      "testing": "Validating…",
+      "testSuccess": "Validation succeeded.",
+      "testFailure": "Validation failed.",
+      "testError": "Unable to validate the results.",
       "filesTitle": "SFTP Acquisition Results",
       "noFiles": "No files found.",
       "viewResultsAria": "View results for {{file}}",
@@ -220,7 +230,7 @@
       "incomplete": "Please complete all required fields before continuing.",
       "notAcknowledged": "Acknowledge that the results are accurate before continuing.",
       "validateBeforeAck": "Click Validate before acknowledging that the results are accurate.",
-      "testConnectionBeforeAck": "Click Test Connection before acknowledging that the results are accurate.",
+      "testConnectionBeforeAck": "Click Validate before acknowledging that the results are accurate.",
       "vendorRequired": "Complete Facility Information before configuring patients of interest.",
       "ackError": "Unable to record the acknowledgement."
     },
@@ -287,6 +297,10 @@
       "searchError": "Unable to search for Site locations.",
       "candidatesAdded": "Added {{count}} location to Location Type.",
       "candidatesAdded_other": "Added {{count}} locations to Location Type."
+    },
+    "errors": {
+      "rowIncomplete": "This field is required.",
+      "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },

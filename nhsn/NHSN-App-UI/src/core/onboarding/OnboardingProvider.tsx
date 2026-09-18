@@ -38,6 +38,11 @@ interface OnboardingContextValue {
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
   mirror: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
+  /** Steps flagged with a validation error (currently: sections a failed manual-upload import
+   *  touched) - drives the red exclamation mark next to a step's name in the nav. */
+  errorStepIds: ReadonlySet<StepId>;
+  /** Replaces the whole set - each new import attempt should reflect only its own errors. */
+  setErrorStepIds: (stepIds: Iterable<StepId>) => void;
   goTo: (stepId: StepId) => void;
   goNext: () => void;
   goBack: () => void;
@@ -97,6 +102,11 @@ export function OnboardingProvider({
   const dirtyRef = useRef(false);
   const lastSavedDraftRef = useRef<FacilityDraft>();
   const [pendingStepId, setPendingStepId] = useState<StepId | null>(null);
+  const [errorStepIds, setErrorStepIdsState] = useState<ReadonlySet<StepId>>(() => new Set());
+
+  const setErrorStepIds = useCallback((stepIds: Iterable<StepId>) => {
+    setErrorStepIdsState(new Set(stepIds));
+  }, []);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
     setCommitState(envelope.commitState);
@@ -366,6 +376,8 @@ export function OnboardingProvider({
       saving: saving || isStepPending,
       patch,
       mirror,
+      errorStepIds,
+      setErrorStepIds,
       goTo,
       goNext,
       goBack,
@@ -387,6 +399,8 @@ export function OnboardingProvider({
       isStepPending,
       patch,
       mirror,
+      errorStepIds,
+      setErrorStepIds,
       goTo,
       goNext,
       goBack,

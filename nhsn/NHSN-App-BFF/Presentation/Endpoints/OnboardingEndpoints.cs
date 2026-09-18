@@ -84,8 +84,10 @@ public class OnboardingEndpoints : IApi
                     "Parses the uploaded workbook and validates every recognized cell. Returns " +
                     "accepted=false with per-cell errors rather than a 4xx when the file parses " +
                     "but a value fails validation — that is a form-completion problem, not a " +
-                    "request problem. Writes nothing; the caller saves the draft separately once " +
-                    "the file is accepted.";
+                    "request problem. A fully valid sheet is saved immediately, in this same call; " +
+                    "any section that fails at save time (a cross-service precondition or a " +
+                    "downstream validator the sheet's own format checks can't catch) is reported " +
+                    "back as an additional per-cell error rather than failing the request.";
                 return operation;
             });
 

@@ -80,7 +80,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError} = useNotifications();
-  const {patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, vendorProfile} = useOnboarding();
 
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<HslocTab>('mapping');
@@ -88,6 +88,19 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const hasSyncedInitialLoad = useRef(false);
+
+  // A manual-upload row whose HSLOC Reference Code didn't resolve against the reference table comes
+  // back from the import with a blank hslocCode, specifically so the facility can still see the
+  // location and pick a code for it here - see ManualUploadTemplateService.BuildHslocAsync. It can
+  // never appear in api.getHslocMappings() below, though: Normalization's hsloc-mappings row is
+  // foreign-keyed to a resolved HSLOC id, so a mapping with no code was never actually persisted.
+  // Captured once, at mount - not read again below - so a later edit to this same source code (which
+  // does persist) isn't shadowed by the stale pending copy on a second render.
+  const pendingImportRowsRef = useRef(
+    (draft.hsloc.mappings ?? [])
+      .filter(mapping => !mapping.hslocCode.trim() && mapping.sourceCode.trim())
+      .map(toMappingRow)
+  );
 
   const {
     data: codes = [],
@@ -123,7 +136,12 @@ export function HslocStep({onNext, onBack}: StepProps) {
         if (!mounted) {
           return;
         }
-        setRows(mappings.map(toMappingRow));
+        const persisted = mappings.map(toMappingRow);
+        const persistedSourceCodes = new Set(persisted.map(row => row.sourceCode.trim().toLowerCase()));
+        const pending = pendingImportRowsRef.current.filter(
+          row => !persistedSourceCodes.has(row.sourceCode.trim().toLowerCase())
+        );
+        setRows([...persisted, ...pending]);
       })
       .catch(cause => {
         notifyError(cause instanceof Error ? cause.message : t('onboarding:hsloc.messages.loadError'));
@@ -481,7 +499,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
         <Button variant="secondary" onClick={onBack} disabled={busy}>
           {t('common:actions.back')}
         </Button>
-        <Button onClick={handleNext} disabled={busy}>
+        <Button onClick={handleNext} disabled={busy || incompleteRowIndexes.size > 0}>
           {t('common:actions.continue')}
         </Button>
       </StepActions>

@@ -21,6 +21,7 @@
     <PackageVersion Include="Confluent.Kafka.Extensions.Diagnostics" Version="0.5.0" />
     <PackageVersion Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.4.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="ClosedXML" Version="0.104.2" />
     <PackageVersion Include="CronExpressionDescriptor" Version="2.48.0" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="DistributedLock.Redis" Version="1.1.1" />
