@@ -1,6 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Controllers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Link.Authorization.Policies;
