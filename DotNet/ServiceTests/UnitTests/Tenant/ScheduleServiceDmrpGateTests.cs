@@ -97,9 +97,11 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The other two public entry points. StartAsync is what assigns the scheduler field, and with the
-    /// flag on it is never called, so an ungated method here would not quietly do nothing - it would
-    /// throw a NullReferenceException on the first dereference.
+    /// The remaining public entry points. StartAsync is what assigns the scheduler field, and with the
+    /// flag on it is never called, so a method that reached for it here would not quietly do nothing -
+    /// it would throw a NullReferenceException on the first dereference. StopAsync is covered too: the
+    /// host should never call it in this mode, but it is not worth trusting the host to remember that
+    /// when a null guard costs nothing.
     /// </summary>
     [Fact]
     public async Task With_dmrp_on_the_remaining_entry_points_do_not_reach_for_the_scheduler()
@@ -108,5 +110,6 @@ public class ScheduleServiceDmrpGateTests : IAsyncLifetime
 
         await service.Invoking(s => s.DeleteJob("100")).Should().NotThrowAsync();
         await service.Invoking(s => s.GetAllJobs()).Should().NotThrowAsync();
+        await service.Invoking(s => s.StopAsync(CancellationToken.None)).Should().NotThrowAsync();
     }
 }

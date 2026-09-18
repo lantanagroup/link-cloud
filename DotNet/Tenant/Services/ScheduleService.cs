@@ -21,10 +21,11 @@ namespace LantanaGroup.Link.Tenant.Services
     /// registered as a plain singleton because TenantFacilityOperations still resolves it.
     /// </summary>
     /// <remarks>
-    /// Every public method returns early while the flag is on. That is not only about leaving the
-    /// scheduler alone: StartAsync is what assigns <c>_scheduler</c>, and with the flag on it is never
-    /// called, so any method that reached a <c>_scheduler!</c> dereference would throw rather than
-    /// quietly do nothing.
+    /// Every public method returns early while the flag is on, except the <see cref="IHostedService"/>
+    /// pair, which the host calls only when DMRP is off. That is not only about leaving the scheduler
+    /// alone: StartAsync is what assigns <c>_scheduler</c>, so any other method that reached a
+    /// <c>_scheduler!</c> dereference would throw rather than quietly do nothing. StopAsync null-guards
+    /// the scheduler it never started, rather than relying on the host to keep that promise.
     /// </remarks>
     public class ScheduleService : IHostedService
     {
@@ -74,10 +75,8 @@ namespace LantanaGroup.Link.Tenant.Services
             await _scheduler.Start(cancellationToken);
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            await _scheduler!.Shutdown(cancellationToken);
-        }
+        public Task StopAsync(CancellationToken cancellationToken) =>
+            _scheduler?.Shutdown(cancellationToken) ?? Task.CompletedTask;
 
         public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
         {
