@@ -171,12 +171,13 @@ jobs:
             --configuration Debug \
             --no-restore
 
-      # ---- PR-safe Backend E2E categories run CONCURRENTLY against the SAME stack. ----
-      # Each `dotnet test` is launched in the background with its stdout/stderr
-      # redirected to a dedicated log file. After they all finish we emit each
-      # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
-      # renders a separate, collapsible section per test category instead of
-      # interleaving everything into one wall of text.
+      # ---- PR-safe Backend E2E categories against a SINGLE shared stack. ----
+      # API Stability seeds ApiHealthScenario (1 patient) and asserts ABS
+      # prediction against that seed. Running it in parallel with the 1000-resource
+      # Adhoc categories made DA miss ServiceRequest/Observation on the seed
+      # patient (different type each rerun). Run it first on a quiet stack, then
+      # the remaining categories concurrently. Each `dotnet test` writes its own
+      # log; after they finish we wrap those logs in ::group:: markers.
       - name: Backend E2E Tests
         shell: bash
         run: |
@@ -185,22 +186,53 @@ jobs:
           mkdir -p ./Tests/BackendE2ETests/TestResults
           mkdir -p ./test-logs
 
+          run_one() {
+            local NAME="$1" CATEGORY="$2" TRX="$3"
+            local SLUG LOG
+            SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+            LOG="./test-logs/${SLUG}.log"
+            echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
+            (
+              dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --no-build \
+                --no-restore \
+                --filter "Category=${CATEGORY}" \
+                --logger "trx;LogFileName=${TRX}" \
+                --logger "console;verbosity=detailed" \
+                --results-directory ./Tests/BackendE2ETests/TestResults
+            ) > "$LOG" 2>&1
+          }
+
           # name|category|trx-file
-          TESTS=(
+          API_STABILITY="API Stability|ApiStabilityTest|api-stability-test-results.trx"
+          PARALLEL_TESTS=(
             "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
             "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
-            "API Stability|ApiStabilityTest|api-stability-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
             "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )
 
-          declare -a PIDS
           declare -a NAMES
           declare -a LOGS
+          declare -a EXITS
+          FAILED=0
 
-          for entry in "${TESTS[@]}"; do
+          IFS='|' read -r NAME CATEGORY TRX <<< "$API_STABILITY"
+          SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+          LOG="./test-logs/${SLUG}.log"
+          NAMES+=("$NAME")
+          LOGS+=("$LOG")
+          if run_one "$NAME" "$CATEGORY" "$TRX"; then
+            EXITS+=("0")
+          else
+            EXITS+=("$?")
+            FAILED=1
+          fi
+
+          declare -a PIDS
+          for entry in "${PARALLEL_TESTS[@]}"; do
             IFS='|' read -r NAME CATEGORY TRX <<< "$entry"
             SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
             LOG="./test-logs/${SLUG}.log"
@@ -219,9 +251,7 @@ jobs:
             LOGS+=("$LOG")
           done
 
-          # Wait for every test run, capture individual exit codes.
-          FAILED=0
-          declare -a EXITS
+          # Wait for the parallel categories. EXITS already has API Stability.
           for i in "${!PIDS[@]}"; do
             if wait "${PIDS[$i]}"; then
               EXITS+=("0")
