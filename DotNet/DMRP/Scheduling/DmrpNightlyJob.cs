@@ -76,7 +76,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                 // The same fall-back as the reconciler: a zone the platform does not know is a job
                 // that can never produce a correct period, so say so and fire nothing rather than
                 // throw into Quartz's misfire handling every night.
-                _logger.LogError(ex, "DMRP nightly fire for timezone {TimeZone} did nothing: the platform does not know it.", zoneId);
+                _logger.LogError(ex, "DMRP nightly fire for timezone {TimeZone} did nothing: the platform does not know it.", zoneId.SanitizeForLog());
                 return;
             }
 
@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             {
                 _logger.LogWarning(
                     "DMRP nightly job for zone {TimeZone} is using the configured scheduled-fire-time override {Override:O} instead of the trigger's scheduled time {ScheduledFireTimeUtc:O}. This is a QA aid and must not be set in production.",
-                    zoneId, overrideUtc.Value, scheduledUtc);
+                    zoneId.SanitizeForLog(), overrideUtc.Value, scheduledUtc);
 
                 scheduledUtc = overrideUtc.Value;
             }
@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
             _logger.LogInformation(
                 "DMRP nightly fire for zone {TimeZone}: {FacilityCount} facilities, periods starting {ComingMidnight}: {Frequencies}",
-                zoneId, facilities.Count, comingMidnight, string.Join(",", periods.Select(p => p.Frequency)));
+                zoneId.SanitizeForLog(), facilities.Count, comingMidnight, string.Join(",", periods.Select(p => p.Frequency)));
 
             using var producer = _producerFactory.CreateProducer(new ProducerConfig());
             using var gate = new SemaphoreSlim(scheduling.ResolvedConcurrency);
@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
 
             _logger.LogInformation(
                 "DMRP nightly fire for zone {TimeZone} done: {Emitted} emitted, {Skipped} skipped, {Failed} failed",
-                zoneId,
+                zoneId.SanitizeForLog(),
                 outcomes.Count(o => o == DmrpFireOutcome.Emitted),
                 outcomes.Count(o => o == DmrpFireOutcome.Skipped),
                 outcomes.Count(o => o == DmrpFireOutcome.Failed));
@@ -179,7 +179,7 @@ namespace LantanaGroup.Link.DMRP.Scheduling
                     {
                         _logger.LogWarning(
                             "Facility {FacilityId} has weekly measure mapping(s) ({Dqms}); the DMRP nightly job does not produce weekly reports.",
-                            facility.FacilityId.SanitizeForLog(), string.Join(",", schedule.Weekly));
+                            facility.FacilityId.SanitizeForLog(), string.Join(",", schedule.Weekly).SanitizeForLog());
                     }
 
                     var dqms = period.Frequency switch
