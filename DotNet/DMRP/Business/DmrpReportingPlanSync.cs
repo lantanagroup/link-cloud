@@ -313,58 +313,77 @@ namespace LantanaGroup.Link.DMRP.Business
             var measures = entries.Select(e => e.Measure).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var byMeasure = await ReadMappingsAsync(measures, cancellationToken);
+            var recordedMeasures = new List<string>();
 
-            var missing = measures.Where(measure => !byMeasure.ContainsKey(measure)).ToList();
-
-            if (missing.Count == 0)
+            // Two passes at most. Losing the race means a concurrent sync recorded some of what this
+            // one meant to, and the rest still has nothing: reading back and stopping there would
+            // leave those measures off the mappings page until some later sync happened to run, which
+            // is the gap this recording exists to close. So take what the winner wrote and record
+            // what it did not. A second conflict is no longer a race with a live caller and surfaces.
+            for (var attempt = 1; attempt <= 2; attempt++)
             {
-                return byMeasure;
-            }
+                var missing = measures.Where(measure => !byMeasure.ContainsKey(measure)).ToList();
 
-            var recorded = new List<MeasureMapping>(missing.Count);
-
-            foreach (var measure in missing)
-            {
-                // Frequency stays Adhoc rather than becoming nullable: it already means "belongs to no
-                // reporting frequency", which is exactly what a measure with no dQM schedules.
-                var placeholder = new MeasureMapping
+                if (missing.Count == 0)
                 {
-                    Measure = measure,
-                    DQM = null,
-                    Frequency = Frequency.Adhoc
-                };
-
-                await _measureMappings.AddAsync(placeholder, cancellationToken);
-
-                recorded.Add(placeholder);
-                byMeasure[measure] = new MeasureMappingRef(placeholder.Id, HasDqm: false);
-            }
-
-            try
-            {
-                // Saved on its own rather than with the reporting plans: a mapping is worth keeping
-                // whatever becomes of this run's plans, and a lost race here says nothing about them.
-                await _measureMappings.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception exception) when (DuplicateMeasureMapping.Matches(exception))
-            {
-                _logger.LogInformation(exception,
-                    "A concurrent sync recorded a measure mapping first; reading back what it wrote.");
-
-                // Removing an entity that is still Added detaches it rather than scheduling a delete,
-                // which leaves the context clean for the read below.
-                foreach (var placeholder in recorded)
-                {
-                    _measureMappings.Remove(placeholder);
+                    break;
                 }
 
-                return await ReadMappingsAsync(measures, cancellationToken);
+                var recorded = new List<MeasureMapping>(missing.Count);
+
+                foreach (var measure in missing)
+                {
+                    // Frequency stays Adhoc rather than becoming nullable: it already means "belongs
+                    // to no reporting frequency", which is exactly what a measure with no dQM
+                    // schedules.
+                    var placeholder = new MeasureMapping
+                    {
+                        Measure = measure,
+                        DQM = null,
+                        Frequency = Frequency.Adhoc
+                    };
+
+                    await _measureMappings.AddAsync(placeholder, cancellationToken);
+
+                    recorded.Add(placeholder);
+                    byMeasure[measure] = new MeasureMappingRef(placeholder.Id, HasDqm: false);
+                }
+
+                try
+                {
+                    // Saved on its own rather than with the reporting plans: a mapping is worth
+                    // keeping whatever becomes of this run's plans, and a lost race here says nothing
+                    // about them.
+                    await _measureMappings.SaveChangesAsync(cancellationToken);
+
+                    recordedMeasures.AddRange(missing);
+                    break;
+                }
+                catch (Exception exception) when (attempt == 1 && DuplicateMeasureMapping.Matches(exception))
+                {
+                    _logger.LogInformation(exception,
+                        "A concurrent sync recorded a measure mapping first; reading back what it wrote "
+                        + "and recording the measures it did not.");
+
+                    // Removing an entity that is still Added detaches it rather than scheduling a
+                    // delete, which leaves the context clean for the read below.
+                    foreach (var placeholder in recorded)
+                    {
+                        _measureMappings.Remove(placeholder);
+                    }
+
+                    byMeasure = await ReadMappingsAsync(measures, cancellationToken);
+                }
             }
 
-            _logger.LogInformation(
-                "Recorded {Count} measure(s) DMRP reported that Link has no dQM for: {Measures}. "
-                + "They are on the measure mappings page awaiting a dQM and schedule nothing until one is set.",
-                missing.Count, string.Join(", ", missing.Select(measure => measure.SanitizeForLog())));
+            if (recordedMeasures.Count > 0)
+            {
+                _logger.LogInformation(
+                    "Recorded {Count} measure(s) DMRP reported that Link has no dQM for: {Measures}. "
+                    + "They are on the measure mappings page awaiting a dQM and schedule nothing until one is set.",
+                    recordedMeasures.Count,
+                    string.Join(", ", recordedMeasures.Select(measure => measure.SanitizeForLog())));
+            }
 
             return byMeasure;
         }
