@@ -240,6 +240,13 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
+        string fhirServerUrl,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FhirServerConnectionResult>(() => Request("data/connectionValidation/$validate")
+            .SetQueryParam("fhirServerUrl", fhirServerUrl)
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
         SftpTestConnectionRequestApiModel request,
         bool includeFileContent = false,
