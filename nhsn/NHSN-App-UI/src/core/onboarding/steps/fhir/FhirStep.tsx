@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, InfoTooltip, NewTabAnnouncement, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
+import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
@@ -243,7 +243,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               {t('onboarding:fhirServerInfo.subtitleFhirLinkText')}
               <NewTabAnnouncement />
             </a>{' '}
-            {t('onboarding:fhirServerInfo.subtitleSuffix')}
+            <AcronymText>{t('onboarding:fhirServerInfo.subtitleSuffix')}</AcronymText>
           </p>
 
           <TextField
@@ -265,7 +265,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               </div>
               <div className="instructions-box">
                 <p id="fhir-jwks-instructions-desc">
-                  {t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}
+                  <AcronymText>{t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}</AcronymText>
                 </p>
                 <a
                   className="download-link"

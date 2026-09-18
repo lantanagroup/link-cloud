@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ImportedFields} from '../../../api/contracts';
-import {Button, DownloadLinkButton, FileUploadField, MessageContainer, PageHeader, StepActions} from '../../../fields';
+import {AcronymText, Button, DownloadLinkButton, FileUploadField, MessageContainer, PageHeader, StepActions} from '../../../fields';
 import {isStepId, type StepId} from '../../types';
 import type {DraftSections} from '../../reducer';
 import type {StepProps} from '../../flow';
@@ -70,10 +70,16 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
         .filter((section): section is StepId => Boolean(section) && isStepId(section!));
       setErrorStepIds(affectedSteps);
 
+      // `sheet`/`cell`/`label` are literal text pulled straight from the uploaded spreadsheet (the
+      // sheet's real tab name, its own cell address, its own column-B field label) - never
+      // translated, since they're identifying data about the file, not UI copy. Only the sentence
+      // structure around them (`errors.lineFormat`) and the instruction itself (`messageKey`) are
+      // localized.
       const errorLines = result.cellErrors.length
         ? result.cellErrors.map(cellError => {
             const location = cellError.label ? `${cellError.cell} (${cellError.label})` : cellError.cell;
-            return `${cellError.sheet} ${location}: ${t(cellError.messageKey, {detail: cellError.detail})}`;
+            const message = t(cellError.messageKey, {detail: cellError.detail});
+            return t('onboarding:manualUpload.errors.lineFormat', {sheet: cellError.sheet, location, message});
           })
         : undefined;
 
@@ -137,13 +143,13 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
             })}
       </p>
       <p className="nhsn-link__visually-hidden" role="alert">
-        {error?.join(' ')}
+        {error && <AcronymText>{error.join(' ')}</AcronymText>}
       </p>
       {error && error.length > 0 && (
         <MessageContainer type="error" showIcon>
           <ul className="nhsn-link__error-list">
             {error.map((line, index) => (
-              <li key={index}>{line}</li>
+              <li key={index}><AcronymText>{line}</AcronymText></li>
             ))}
           </ul>
         </MessageContainer>

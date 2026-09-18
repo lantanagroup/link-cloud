@@ -106,6 +106,7 @@
     "unexpected": "Something went wrong. Please try again."
   },
   "a11y": {
-    "opensInNewTab": "(opens in a new tab)"
+    "opensInNewTab": "(opens in a new tab)",
+    "table": "Table"
   }
 }

@@ -257,6 +257,9 @@ function toggleFieldHint(field: Element) {
   const isOpen = field.classList.contains(FIELD_HINT_OPEN_CLASS);
   closeAllHintsExcept(isOpen ? null : field);
   field.classList.toggle(FIELD_HINT_OPEN_CLASS, !isOpen);
+  if (!isOpen) {
+    field.classList.remove(HOVER_SUPPRESSED_CLASS);
+  }
 }
 
 /**
@@ -313,6 +316,14 @@ function useHintLabelFocusability() {
   }, []);
 }
 
+function resolveTrigger(target: Element): {fieldTrigger: Element | null; infoIconTrigger: Element | null} {
+  const label = target.closest('.k-label');
+  const field = label?.closest('.k-form-field') ?? null;
+  const fieldTrigger = field?.querySelector('.k-form-hint') ? field : null;
+  const infoIconTrigger = target.closest('.info-icon');
+  return {fieldTrigger, infoIconTrigger};
+}
+
 function useHintTooltips() {
   useHintLabelFocusability();
   useEffect(() => {
@@ -322,11 +333,7 @@ function useHintTooltips() {
         return;
       }
 
-      const label = target.closest('.k-label');
-      const field = label?.closest('.k-form-field') ?? null;
-      const fieldTrigger = field?.querySelector('.k-form-hint') ? field : null;
-      const infoIconTrigger = target.closest('.info-icon');
-
+      const {fieldTrigger, infoIconTrigger} = resolveTrigger(target);
       const trigger = fieldTrigger ?? infoIconTrigger;
       if (!trigger) {
         if (!target.closest('.k-form-hint, .tooltip-bubble')) {
@@ -344,6 +351,9 @@ function useHintTooltips() {
         const isOpen = trigger.classList.contains(INFO_ICON_OPEN_CLASS);
         closeAllHintsExcept(isOpen ? null : trigger);
         trigger.classList.toggle(INFO_ICON_OPEN_CLASS, !isOpen);
+        if (!isOpen) {
+      trigger.classList.remove(HOVER_SUPPRESSED_CLASS);
+        }
       }
     }
 
@@ -366,13 +376,45 @@ function useHintTooltips() {
       holder.classList.remove(HOVER_SUPPRESSED_CLASS);
     }
 
+    function handleFocusIn(event: FocusEvent) {
+      const target = event.target as Element | null;
+      if (!target) {
+        return;
+      }
+      const {fieldTrigger, infoIconTrigger} = resolveTrigger(target);
+      const trigger = fieldTrigger ?? infoIconTrigger;
+      if (!trigger) {
+        return;
+      }
+      const openClass = fieldTrigger ? FIELD_HINT_OPEN_CLASS : INFO_ICON_OPEN_CLASS;
+      closeAllHintsExcept(trigger);
+      trigger.classList.add(openClass);
+      trigger.classList.remove(HOVER_SUPPRESSED_CLASS);
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+      const target = event.target as Element | null;
+      if (!target) {
+        return;
+      }
+      const {fieldTrigger, infoIconTrigger} = resolveTrigger(target);
+      if (!fieldTrigger && !infoIconTrigger) {
+        return;
+      }
+      closeAllHintsExcept(null);
+    }
+
     document.addEventListener('click', handleClick, true);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('mouseout', handleMouseOut);
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
     return () => {
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mouseout', handleMouseOut);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
     };
   }, []);
 }
