@@ -138,7 +138,8 @@ export function NewTabAnnouncement({id}: {id?: string}) {
 // the same thing.
 const ACRONYM_SPELLINGS: Record<string, string> = {
   HSLOC: 'H S L O C',
-  POI: 'P O I'
+  POI: 'P O I',
+  EHR: 'E H R'
 };
 const ACRONYM_PATTERN = new RegExp(`\\b(${Object.keys(ACRONYM_SPELLINGS).join('|')})\\b`, 'g');
 
@@ -166,6 +167,21 @@ export function AcronymText({children}: {children: string}) {
 
 export function acronymTitle(node: React.ReactNode): string {
   return node as unknown as string;
+}
+
+/**
+ * A table's visually-hidden `<caption>`, always ending in "Table" - NVDA's
+ * continuous/Say-All reading speaks a caption's own text but doesn't reliably
+ * also announce the "table" role the way landing on it via Tab/object
+ * navigation does, so the word has to be part of the caption text itself.
+ */
+export function TableCaption({children}: {children: React.ReactNode}) {
+  const {t} = useTranslation('common');
+  return (
+    <caption className="nhsn-link__visually-hidden">
+      {children} {t('a11y.table')}
+    </caption>
+  );
 }
 
 export interface SidePanelLayoutProps {
