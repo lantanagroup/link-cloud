@@ -7,7 +7,11 @@ namespace LantanaGroup.Link.DMRP.Business
     /// the digital quality measure Link evaluates patients against.
     /// </summary>
     /// <param name="Measure">The NHSN measure (module) the facility enrolled in, such as HOB.</param>
-    /// <param name="DQM">The dQM the measure maps to, or empty when Link has no mapping for it.</param>
+    /// <param name="DQM">
+    /// The dQM the measure maps to. Absent in two shapes, because an enrollment can fall short of a
+    /// dQM in two ways: null when a mapping exists but names no dQM yet, and empty when the plan row
+    /// points at no mapping at all. Anything testing for "no dQM" has to treat both as absent.
+    /// </param>
     /// <param name="Frequency">
     /// How often the dQM is reported, or null when Link has no mapping for the measure. The cadence
     /// is the mapping's, so an enrollment waiting to be mapped has none -- naming one would put a

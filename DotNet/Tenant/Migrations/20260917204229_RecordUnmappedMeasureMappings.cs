@@ -13,8 +13,13 @@ namespace LantanaGroup.Link.Tenant.Migrations
             // The old index allowed one measure to carry several dQMs; the new one does not. Stop with
             // a message that says what to do rather than letting CREATE INDEX fail on a duplicate key,
             // which reports the collision without saying why it is now a collision.
+            // TABLOCKX/HOLDLOCK, because the check and the index creation are not the same
+            // instant. Tenant applies migrations at startup (AutoMigrateEF, on by default), so during
+            // a rolling deploy the instances still serving traffic can insert a second row for a
+            // measure in between and leave the migration to fail on CREATE INDEX. The lock is held to
+            // the end of the migration's transaction, which covers both.
             migrationBuilder.Sql(@"
-IF EXISTS (SELECT 1 FROM [MeasureMappings] GROUP BY [Measure] HAVING COUNT(*) > 1)
+IF EXISTS (SELECT 1 FROM [MeasureMappings] WITH (TABLOCKX, HOLDLOCK) GROUP BY [Measure] HAVING COUNT(*) > 1)
     THROW 50000, 'MeasureMappings holds more than one row for the same measure. A measure now maps to exactly one dQM, so the duplicates must be resolved before this migration can be applied.', 1;
 ");
 
