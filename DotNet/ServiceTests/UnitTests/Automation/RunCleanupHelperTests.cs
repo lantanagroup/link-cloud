@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LantanaGroup.Automation;
 using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Models;
@@ -264,6 +265,36 @@ public class RunCleanupHelperTests
         report.Verify(
             c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task CleanupCancelledRun_still_expunges_when_quiesce_fails()
+    {
+        var da = new Mock<IDataAcquisitionServiceClient>();
+        da.Setup(c => c.CancelAcquisitionLogsByFilterAsync(It.IsAny<object>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("DA down"));
+        var census = new Mock<ICensusServiceClient>();
+        census.Setup(c => c.DisableFacilityJobsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
+        var report = new Mock<IReportServiceClient>();
+        report.Setup(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
+        report.Setup(c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
+
+        var act = async () => await RunCleanupHelper.CleanupCancelledRunAsync(
+            da.Object,
+            census.Object,
+            report.Object,
+            new InMemoryPipelineAbortRegistry(),
+            new FhirDataLoader("http://localhost"),
+            new NullOutput(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            TimeSpan.FromDays(14),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
