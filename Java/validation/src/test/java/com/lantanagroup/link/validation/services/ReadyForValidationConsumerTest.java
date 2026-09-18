@@ -190,7 +190,7 @@ public class ReadyForValidationConsumerTest {
         when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
         when(blobStorageService.download("myfile.ndjson"))
                 .thenReturn(BinaryData.fromBytes(new byte[0]));
-        when(validationService.validate(bundle)).thenReturn(Collections.emptyList());
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
 
         ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
         record.headers().add(Headers.METRICS_MODE, Headers.getBytes("performance"));
