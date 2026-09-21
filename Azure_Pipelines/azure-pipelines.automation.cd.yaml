@@ -55,11 +55,16 @@ steps:
       workingDirectory: '$(Build.SourcesDirectory)'
       arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
+  - task: NuGetAuthenticate@1
+    displayName: Authenticate Shared_BOTW_Feed
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
+      feedsToUse: config
+      nugetConfigPath: nuget.config
   
   - task: DotNetCoreCLI@2
     displayName: Build

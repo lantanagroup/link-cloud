@@ -329,6 +329,6 @@ public class AcquisitionProcessorBackgroundServiceTests
 
         return (Task)method.Invoke(
             _service,
-            [_scopeProvider, _mockLogManager.Object, LogId, CancellationToken.None])!;
+            [_scopeProvider, _mockLogManager.Object, LogId, false, CancellationToken.None])!;
     }
 }

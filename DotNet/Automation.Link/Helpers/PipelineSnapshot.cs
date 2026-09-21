@@ -44,6 +44,7 @@ public class PipelineSnapshot
 
         await WriteReportSnapshot(output, facilityId, scheduleId);
         await WriteDataAcquisitionSnapshot(output, facilityId, reportId);
+        await WriteOrganizationLocationSnapshot(output, facilityId);
         await WriteNormalizationSnapshot(output, facilityId, normalizationSuiteSnapshot);
         await WriteTenantSnapshot(output, facilityId);
         await WriteValidationSnapshot(output, facilityId, reportId);
@@ -87,6 +88,18 @@ public class PipelineSnapshot
                 output.WriteLine($"[Snapshot][ReportEntry]         {entries.Count} row(s) | " +
                                  $"Reporting: {string.Join(", ", byReporting)} | " +
                                  $"Submission: {string.Join(", ", bySubmission)}");
+
+                foreach (var entry in entries.Take(25))
+                {
+                    var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr =>
+                        $"{mr.ReportType}:{mr.Status}"));
+                    output.WriteLine(
+                        $"[Snapshot][ReportEntry]         patient={entry.PatientId} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
+                        (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $" measures=[{measureStatuses}]"));
+                }
+
+                if (entries.Count > 25)
+                    output.WriteLine($"[Snapshot][ReportEntry]         ... {entries.Count - 25} more patient(s)");
             }
 
             var measureReports = await _reader.GetEntryMeasureReportsAsync(scheduleId);
@@ -138,11 +151,75 @@ public class PipelineSnapshot
             output.WriteLine($"[Snapshot][FhirQueryConfig]     {(hasConfig ? "exists" : "NOT FOUND")}");
 
             var plans = await _reader.GetQueryPlansAsync(facilityId);
-            output.WriteLine($"[Snapshot][QueryPlan]           {plans.Count} plan(s)");
+            output.WriteLine($"[Snapshot][QueryPlan]           {plans.Count} plan(s)" +
+                             (plans.Count > 0 ? $" | {string.Join(", ", plans.Select(p => p.Type))}" : ""));
+
+            var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+            foreach (var log in logs.Take(40))
+            {
+                var types = string.Join(",", log.FhirQueries.SelectMany(q => q.ResourceTypes).Distinct());
+                var acquired = log.ResourceAcquiredIds.Count;
+                output.WriteLine(
+                    $"[Snapshot][DataAcqLog]          log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}] acquired={acquired}");
+            }
+
+            if (logs.Count > 40)
+                output.WriteLine($"[Snapshot][DataAcqLog]          ... {logs.Count - 40} more log(s)");
         }
         catch (Exception ex)
         {
             output.WriteLine($"[Snapshot][DataAcq] Error querying DataAcquisition DB: {ex.Message}");
+        }
+    }
+
+    private async Task WriteOrganizationLocationSnapshot(IAutomationOutput output, string facilityId)
+    {
+        try
+        {
+            var configs = await _reader.GetOrganizationLocationConfigurationsAsync(facilityId);
+            var mappings = await _reader.GetOrganizationLocationMappingsAsync(facilityId);
+            var encounterMappings = await _reader.GetEncounterMappingsAsync(facilityId);
+
+            var activeConfigs = configs.Count(c => c.IsActive);
+            var activeConditions = configs.Where(c => c.IsActive).Sum(c => c.ConditionsCount);
+            var activeMappings = mappings.Count(m => m.IsActive);
+            var orgMappings = mappings.Count(m => m.IsActive && m.IsOrgLocation);
+            var orgEncounters = encounterMappings.Count(m => m.MappedToOrg);
+
+            output.WriteLine(
+                $"[Snapshot][OrgLocation]         configs={configs.Count} activeConfigs={activeConfigs} activeConditions={activeConditions} " +
+                $"locationMappings={mappings.Count} active={activeMappings} isOrgLocation={orgMappings} " +
+                $"encounterMappings={encounterMappings.Count} mappedToOrg={orgEncounters}");
+
+            foreach (var mapping in mappings.Take(20))
+            {
+                output.WriteLine(
+                    $"[Snapshot][OrgLocation]         location={mapping.LocationId} active={mapping.IsActive} isOrgLocation={mapping.IsOrgLocation} partOf={mapping.PartOfValue ?? "-"}");
+            }
+
+            if (mappings.Count > 20)
+                output.WriteLine($"[Snapshot][OrgLocation]         ... {mappings.Count - 20} more location mapping(s)");
+
+            foreach (var mapping in encounterMappings.Take(20))
+            {
+                var locationIds = string.Join(",", mapping.EncounterLocations.Select(l => l.LocationId));
+                output.WriteLine(
+                    $"[Snapshot][EncounterMapping]    patient={mapping.PatientId} encounter={mapping.EncounterId} mappedToOrg={mapping.MappedToOrg} locations=[{locationIds}]");
+            }
+
+            if (encounterMappings.Count > 20)
+                output.WriteLine($"[Snapshot][EncounterMapping]    ... {encounterMappings.Count - 20} more encounter mapping(s)");
+
+            if (activeConfigs > 0 && encounterMappings.Count > 0 && orgEncounters == 0)
+            {
+                output.WriteLine(
+                    "[Snapshot][OrgLocation]         WARNING: org-location mapping is configured but no encounters are MappedToOrg. " +
+                    "Non-org encounters are stripped from the MeasureEval bundle, which yields empty Initial Population and no ABS patient files.");
+            }
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"[Snapshot][OrgLocation] Error querying org-location mapping state: {ex.Message}");
         }
     }
 

@@ -22,7 +22,7 @@ jobs:
     outputs: 
       run_job: ${{ steps.should.outputs.run_job }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -47,11 +47,10 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    # PR-safe Backend E2E categories run in parallel against a SINGLE shared
-    # docker compose stack (one build, one up). Each `dotnet test`
-    # invocation writes to its own log file and is then rendered as its own
-    # collapsible ::group:: in the Actions UI so logs are segmented per
-    # category instead of interleaved.
+    # PR-safe Backend E2E against a SINGLE shared docker compose stack
+    # (one build, one up). API Stability runs first; the remaining
+    # categories run concurrently. Each `dotnet test` log is rendered as
+    # its own collapsible ::group:: in the Actions UI.
     name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
@@ -65,11 +64,12 @@ jobs:
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
       LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
+      AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       LEFTOVER_CLEANUP_ENABLED: "false"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -79,7 +79,7 @@ jobs:
           docker buildx bake --file docker-compose.yml \
             --set *.cache-from=type=gha,scope=e2e-docker \
             --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker   # <-- makes images visible to `docker compose`
+            --set *.output=type=docker
 
       - name: Start services
         run: docker compose up --no-build -d
@@ -155,6 +155,14 @@ jobs:
       # with "The process cannot access the file ... being used by another
       # process" (MSB4018). Building once and passing --no-build/--no-restore
       # to each parallel run avoids the contention.
+      - name: Authenticate Shared_BOTW_Feed
+        run: |
+          dotnet nuget update source Shared_BOTW_Feed \
+            --username az \
+            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
       - name: Restore & build BackendE2ETests
         run: |
           dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
@@ -162,12 +170,13 @@ jobs:
             --configuration Debug \
             --no-restore
 
-      # ---- PR-safe Backend E2E categories run CONCURRENTLY against the SAME stack. ----
-      # Each `dotnet test` is launched in the background with its stdout/stderr
-      # redirected to a dedicated log file. After they all finish we emit each
-      # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
-      # renders a separate, collapsible section per test category instead of
-      # interleaving everything into one wall of text.
+      # ---- PR-safe Backend E2E categories against a SINGLE shared stack. ----
+      # API Stability seeds ApiHealthScenario (1 patient) and asserts ABS
+      # prediction against that seed. Running it in parallel with the 1000-resource
+      # Adhoc categories made DA miss ServiceRequest/Observation on the seed
+      # patient (different type each rerun). Run it first on a quiet stack, then
+      # the remaining categories concurrently. Each `dotnet test` writes its own
+      # log; after they finish we wrap those logs in ::group:: markers.
       - name: Backend E2E Tests
         shell: bash
         run: |
@@ -176,22 +185,53 @@ jobs:
           mkdir -p ./Tests/BackendE2ETests/TestResults
           mkdir -p ./test-logs
 
+          run_one() {
+            local NAME="$1" CATEGORY="$2" TRX="$3"
+            local SLUG LOG
+            SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+            LOG="./test-logs/${SLUG}.log"
+            echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
+            (
+              dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --no-build \
+                --no-restore \
+                --filter "Category=${CATEGORY}" \
+                --logger "trx;LogFileName=${TRX}" \
+                --logger "console;verbosity=detailed" \
+                --results-directory ./Tests/BackendE2ETests/TestResults
+            ) > "$LOG" 2>&1
+          }
+
           # name|category|trx-file
-          TESTS=(
+          API_STABILITY="API Stability|ApiStabilityTest|api-stability-test-results.trx"
+          PARALLEL_TESTS=(
             "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
             "Adhoc Report Daily ACH|AdhocReportDailyAchTest|adhoc-report-daily-ach-test-results.trx"
-            "API Stability|ApiStabilityTest|api-stability-test-results.trx"
             "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
             "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
             "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
             "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
           )
 
-          declare -a PIDS
           declare -a NAMES
           declare -a LOGS
+          declare -a EXITS
+          FAILED=0
 
-          for entry in "${TESTS[@]}"; do
+          IFS='|' read -r NAME CATEGORY TRX <<< "$API_STABILITY"
+          SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+          LOG="./test-logs/${SLUG}.log"
+          NAMES+=("$NAME")
+          LOGS+=("$LOG")
+          if run_one "$NAME" "$CATEGORY" "$TRX"; then
+            EXITS+=("0")
+          else
+            EXITS+=("$?")
+            FAILED=1
+          fi
+
+          declare -a PIDS
+          for entry in "${PARALLEL_TESTS[@]}"; do
             IFS='|' read -r NAME CATEGORY TRX <<< "$entry"
             SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
             LOG="./test-logs/${SLUG}.log"
@@ -210,9 +250,7 @@ jobs:
             LOGS+=("$LOG")
           done
 
-          # Wait for every test run, capture individual exit codes.
-          FAILED=0
-          declare -a EXITS
+          # Wait for the parallel categories. EXITS already has API Stability.
           for i in "${!PIDS[@]}"; do
             if wait "${PIDS[$i]}"; then
               EXITS+=("0")
@@ -283,20 +321,34 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
 
+      - name: Authenticate Shared_BOTW_Feed
+        run: |
+          dotnet nuget update source Shared_BOTW_Feed \
+            --username az \
+            --password "${{ secrets.AZURE_ARTIFACTS_PAT }}" \
+            --store-password-in-clear-text \
+            --configfile nuget.config
+
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          key: ${{ runner.os }}-nuget-v2-${{ hashFiles('**/packages.lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ runner.os }}-nuget-v2-
+
+      # Drop any Thetis 1.0.0 that a previous run packed locally (NU1403 vs lock file).
+      - name: Drop cached Thetis packages
+        run: |
+          rm -rf "${HOME}/.nuget/packages/lantanagroup.thetis.generation.abstractions" \
+                 "${HOME}/.nuget/packages/lantanagroup.thetis.generation.engine"
 
       # Pulled up-front so the integration fixtures (Testcontainers) don't
       # spend their per-test pull budget on the cold pull. Retry up to 3 times
@@ -366,7 +418,7 @@ jobs:
 
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK
         uses: actions/setup-java@v3
@@ -411,7 +463,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

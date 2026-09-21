@@ -14,6 +14,25 @@ docker compose down -v --remove-orphans       # tear everything down (resets vol
 
 Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, admin-bff 8063, kafka 9092, kafka-ui 9095, loki 3100, grafana 3000, azurite 10000, mssql 1433, mongo 17017). The root `.env` provides default credentials used by compose.
 
+### Azure Artifacts (Thetis)
+
+Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source with no credentials, so `dotnet restore` / `dotnet build link-cloud.sln` and `docker compose build` 401 until the machine is authenticated. `packageSourceMapping` keeps every other package on nuget.org.
+
+You can also add `Shared_BOTW_Feed` as a NuGet source in Visual Studio (Tools > Options > NuGet Package Manager > Package Sources) using `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json`, then sign into the `lantanagroup` Azure DevOps org. Repo `nuget.config` already lists that source, so opening this branch in VS usually shows it without adding it by hand. VS restore then uses your Azure DevOps login instead of a PAT, if the account has Read on the feed.
+
+Otherwise create a PAT and put it in the environment:
+
+1. In Azure DevOps, open User settings (avatar) > Personal access tokens > New Token.
+2. Organization: `lantanagroup`. Scope: **Packaging > Read**. Create and copy the token.
+3. In PowerShell:
+
+```powershell
+$env:AZURE_ARTIFACTS_PAT = "<token>"
+dotnet nuget update source Shared_BOTW_Feed --username az --password $env:AZURE_ARTIFACTS_PAT --store-password-in-clear-text --configfile nuget.config
+```
+
+`docker compose` reads the same `AZURE_ARTIFACTS_PAT` environment variable as the `feed_accesstoken` secret (see `docker-compose.yml`). Set it in the shell before `docker compose build` / `up`, or in a local `.env` next to the compose file (do not commit the token). CI uses the `AZURE_ARTIFACTS_PAT` GitHub/Azure secret.
+
 ### .NET
 
 ```powershell

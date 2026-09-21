@@ -23,6 +23,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
@@ -882,6 +883,11 @@ public class PatientDataServiceTests
         Assert.NotNull(capturedTags);
         Assert.DoesNotContain(capturedTags, tag => tag.Key == "patient_id");
         Assert.DoesNotContain(capturedTags, tag => tag.Key == "correlation_id");
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.RetryAttempts);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ReportTrackingId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ResourceId);
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.FacilityId);
+        Assert.Contains(capturedTags, tag => tag.Key == DiagnosticNames.Phase);
     }
 
     [Fact]
@@ -964,6 +970,9 @@ public class PatientDataServiceTests
         Assert.NotNull(capturedTags);
         Assert.Contains(capturedTags, tag => tag.Key == "patient_id" && (tag.Value?.ToString() ?? string.Empty) == "patient-1");
         Assert.Contains(capturedTags, tag => tag.Key == "correlation_id" && (tag.Value?.ToString() ?? string.Empty) == "corr-1");
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.RetryAttempts);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ReportTrackingId);
+        Assert.DoesNotContain(capturedTags, tag => tag.Key == DiagnosticNames.ResourceId);
     }
 
     [Fact]

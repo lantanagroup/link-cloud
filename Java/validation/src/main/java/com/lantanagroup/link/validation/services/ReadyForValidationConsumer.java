@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
@@ -93,23 +94,32 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
         String payloadUri = record.value().getPayloadUri();
-        Bundle bundle = getBundleFromBlobStorage(payloadUri);
-        if (bundle == null) {
-            bundle = getBundleViaRest(facilityId, patientId, reportId);
+        Bundle bundle;
+        try (Timer fetchTimer = Timer.start()) {
+            bundle = getBundleFromBlobStorage(payloadUri);
+            if (bundle == null) {
+                bundle = getBundleViaRest(facilityId, patientId, reportId);
+            }
+            _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
+                    bundle != null ? bundle.getEntry().size() : 0,
+                    LogUtils.sanitize(facilityId),
+                    LogUtils.sanitize(reportId));
+            if (Headers.isPerformanceMode(record.headers())) {
+                Attributes fetchAttributes = Attributes.builder()
+                        .put(DiagnosticNames.FACILITY_ID, facilityId)
+                        .build();
+                validationMetrics.recordReportFetchDuration(fetchTimer.getMilliseconds(), fetchAttributes);
+            }
         }
-        _logger.info("Retrieved patient bundle with {} entries facility={} report={}",
-                bundle != null ? bundle.getEntry().size() : 0,
-                LogUtils.sanitize(facilityId),
-                LogUtils.sanitize(reportId));
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
         appendPreQualOperationOutcome(bundle, results, payloadUri);
-        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, record.headers());
     }
 
     /**
-        * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
+     * When enabled, builds the pre-qualification OperationOutcome for the patient's submitted-category
      * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
-        * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
+     * there is no blob storage or payload URI (e.g. local/dev), or when there are no submitted findings.
      */
     private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
         if (!preQualificationConfig.isWritePreQualOperationOutcome()) {
@@ -202,10 +212,10 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         try (Timer timer = Timer.start()) {
             results = validationService.validate(bundle, facilityId, reportId);
             _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
-
-            attributes = buildMetricAttributes(bundle, results, correlationId, facilityId, patientId, reportId);
-            validationMetrics.addToValidationCounter(attributes);
-            validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
+            Attributes durationAttributes = Attributes.builder()
+                    .put(DiagnosticNames.FACILITY_ID, facilityId)
+                    .build();
+            validationMetrics.recordValidationDuration(timer.getMilliseconds(), durationAttributes);
         }
 
         for (Result result : results) {
@@ -218,6 +228,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
              ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
                      _logger, "categorizing " + results.size() + " results", facilityId, reportId)) {
             categorizationService.categorize(results);
+            attributes = buildMetricAttributes(results, facilityId);
+            validationMetrics.addToValidationCounter(attributes);
+            addIssueMetrics(results, attributes);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
         List<Result> submittedResults = results.stream()
@@ -237,40 +250,40 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         return results;
     }
 
-    private Attributes buildMetricAttributes(Bundle bundle, List<Result> results, String correlationId, String facilityId, String patientId, String reportId) {
+    private Attributes buildMetricAttributes(List<Result> results, String facilityId) {
+        int[] counts = countIssuesBySeverity(results);
+        String validationOutcome = (counts[0] == 0 && counts[1] == 0) ? "Passed" : "Failed";
+        return Attributes.builder()
+                .put(DiagnosticNames.FACILITY_ID, facilityId)
+                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
+                .build();
+    }
 
-        int resourceCount = bundle.getEntry().size();
-        int totalIssueCount = 0;
-        int uncategorizedIssueCount = 0;
-        int acceptableIssueCount = 0;
-        int unacceptableIssueCount = 0;
+    private void addIssueMetrics(List<Result> results, Attributes baseAttributes) {
+        int[] counts = countIssuesBySeverity(results);
+        validationMetrics.addIssues("uncategorized", counts[0], baseAttributes);
+        validationMetrics.addIssues("unacceptable", counts[1], baseAttributes);
+        validationMetrics.addIssues("acceptable", counts[2], baseAttributes);
+    }
+
+    /**
+     * @return [uncategorized, unacceptable, acceptable]
+     */
+    private static int[] countIssuesBySeverity(List<Result> results) {
+        int uncategorized = 0;
+        int unacceptable = 0;
+        int acceptable = 0;
         for (Result result : results) {
-            totalIssueCount++;
             List<Category> categories = result.getCategories();
             if (categories == null || categories.isEmpty()) {
-                uncategorizedIssueCount++;
+                uncategorized++;
+            } else if (categories.stream().allMatch(Category::isAcceptable)) {
+                acceptable++;
             } else {
-                if (categories.stream().allMatch(Category::isAcceptable)) {
-                    acceptableIssueCount++;
-                } else {
-                    unacceptableIssueCount++;
-                }
+                unacceptable++;
             }
         }
-        String validationOutcome = (uncategorizedIssueCount == 0 && unacceptableIssueCount == 0) ? "Passed" : "Failed";
-
-        return Attributes.builder()
-                .put(DiagnosticNames.CORRELATION_ID, correlationId)
-                .put(DiagnosticNames.FACILITY_ID, facilityId)
-                .put(DiagnosticNames.PATIENT_ID, patientId)
-                .put(DiagnosticNames.REPORT_TRACKING_ID, reportId)
-                .put(DiagnosticNames.RESOURCE_COUNT, resourceCount)
-                .put(DiagnosticNames.VALIDATION_OUTCOME, validationOutcome)
-                .put(DiagnosticNames.ISSUE_COUNT_TOTAL, totalIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNCATEGORIZED, uncategorizedIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_UNACCEPTABLE, unacceptableIssueCount)
-                .put(DiagnosticNames.ISSUE_COUNT_ACCEPTABLE, acceptableIssueCount)
-                .build();
+        return new int[] { uncategorized, unacceptable, acceptable };
     }
 
     private void produceValidationCompleteRecord(
@@ -279,16 +292,30 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             String patientId,
             String reportId,
             List<Result> results) {
+        produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results, null);
+    }
+
+    private void produceValidationCompleteRecord(
+            String correlationId,
+            String facilityId,
+            String patientId,
+            String reportId,
+            List<Result> results,
+            org.apache.kafka.common.header.Headers inboundHeaders) {
         ValidationComplete value = new ValidationComplete();
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
         value.setValid(results.stream()
-                .flatMap(result -> result.getCategories().stream())
+                .flatMap(result -> {
+                    List<Category> categories = result.getCategories();
+                    return categories == null ? Stream.empty() : categories.stream();
+                })
                 .allMatch(Category::isAcceptable));
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
         if (correlationId != null) {
             headers.add(Headers.CORRELATION_ID, Headers.getBytes(correlationId));
         }
+        Headers.copyMetricsMode(inboundHeaders, headers);
         try {
             // Use .get() to make the send synchronous and wait for broker confirmation
             validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers)).get();
