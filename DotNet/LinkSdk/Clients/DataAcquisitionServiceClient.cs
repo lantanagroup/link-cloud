@@ -73,18 +73,6 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         return SendAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
 
-    /// <summary>
-    /// URL-only FHIR reachability probe used while the FHIR Server Information form is still being
-    /// filled out, before any configuration has been saved. DataAcquisition does not expose an
-    /// unscoped <c>GET /api/data/connectionValidation/$validate</c> route yet, so this returns a
-    /// synthetic success and makes no network call. TODO: forward to the real endpoint once it exists.
-    /// </summary>
-    public Task<LinkApiResponse> ValidateConnectionAsync(
-        string? fhirServerBaseUrl = null,
-        CancellationToken cancellationToken = default) =>
-        SyntheticSuccessAsync("GET", "data/connectionValidation/$validate",
-            "{\"isConnected\":true,\"message\":\"Synthetic success - endpoint not yet implemented in DataAcquisition.\"}");
-
     public Task<LinkApiResponse> GetFhirListConfigurationAsync(
         string facilityId,
         bool includePatients = false,
@@ -438,21 +426,6 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .PostJsonAsync(new { }, cancellationToken: cancellationToken));
 
     /// <summary>
-    /// Ad-hoc "test and preview": test unsaved sFTP connection details typed into the form and
-    /// (when <paramref name="includeFileContent"/> is set) return every file with its patients
-    /// attached, in one call. DataAcquisition does not expose an unscoped
-    /// <c>POST /api/data/sftp-configurations/test-connection</c> route yet, so this returns a
-    /// synthetic success and makes no network call. TODO: forward to the real endpoint once it exists.
-    /// </summary>
-    public Task<LinkApiResponse> TestSftpConnectionAdHocAsync(
-        object connectionDetails,
-        bool includeFileContent = false,
-        CancellationToken cancellationToken = default) =>
-        SyntheticSuccessAsync("POST",
-            $"data/sftp-configurations/test-connection?includeFileContent={includeFileContent.ToString().ToLowerInvariant()}",
-            "{\"success\":true,\"message\":\"Synthetic success - endpoint not yet implemented in DataAcquisition.\",\"files\":[]}");
-
-    /// <summary>
     /// Retrieves the paged/filterable sFTP acquisition logs: <c>GET /api/data/sftp-logs</c>.
     /// </summary>
     public Task<LinkApiResponse> SearchSftpLogsAsync(
@@ -479,18 +452,4 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         if (includeDeleted.HasValue) request = request.SetQueryParam("includeDeleted", includeDeleted.Value);
         return SendAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
-
-    /// <summary>
-    /// Returns a synthetic 2xx <see cref="LinkApiResponse"/> for onboarding endpoints that the SDK
-    /// is expected to expose but that have no backend route yet. Makes no network call.
-    /// </summary>
-    private static Task<LinkApiResponse> SyntheticSuccessAsync(string method, string relativePath, string rawBody = "{}") =>
-        Task.FromResult(new LinkApiResponse
-        {
-            StatusCode = 200,
-            RawBody = rawBody,
-            ContentType = "application/json",
-            RequestMethod = method,
-            RequestUrl = relativePath,
-        });
 }

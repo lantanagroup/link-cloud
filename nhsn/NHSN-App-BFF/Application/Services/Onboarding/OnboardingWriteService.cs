@@ -245,18 +245,12 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     // server or a network hiccup take the rest of the import down with it. A quiet false here just
     // means the facility sees an untested connection on the FHIR step, same as if no one had
     // clicked Test Connection yet - not an import failure.
-    //
-    // result.Simulated means IFhirConfigurationGateway.TestConnectionAsync isn't backed by a real
-    // probe in this deployment (LinkCapabilities.FhirConnectionProbe is off) - it always reports
-    // Success without ever having reached the facility's actual server. Persisting that as
-    // ConnectionTested would tell the facility their FHIR endpoint was verified when nothing was
-    // actually checked, so a simulated result counts as not tested, same as a real failure would.
     private async Task<bool> TestFhirConnectionQuietlyAsync(string fhirServerBaseUrl, CancellationToken cancellationToken)
     {
         try
         {
             var result = await _facilityAdministrationService.TestFhirConnectionAsync(fhirServerBaseUrl, cancellationToken);
-            return result.Success && !result.Simulated;
+            return result.Success;
         }
         catch (Exception ex) when (ex is InvalidOperationException or LinkServiceException)
         {

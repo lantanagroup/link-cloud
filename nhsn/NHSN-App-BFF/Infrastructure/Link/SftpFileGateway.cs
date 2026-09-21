@@ -2,11 +2,12 @@ using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
-// ISftpFileGateway over LinkSdk's IDataAcquisitionServiceClient.TestSftpConnectionAsync, which
-// tests the facility's already-saved configuration and credentials.
+// ISftpFileGateway over LinkSdk's IDataAcquisitionServiceClient: the saved-configuration test and
+// the ad-hoc test that previews the report directory.
 internal sealed class SftpFileGateway : ISftpFileGateway
 {
     private const string ServiceName = "DataAcquisition";
@@ -51,6 +52,62 @@ internal sealed class SftpFileGateway : ISftpFileGateway
                 : "onboarding:census.cerner.testFailure",
             Detail = wire?.Message
         };
+    }
+
+    public async Task<SftpPreviewResult> TestConnectionWithPreviewAsync(SftpConfig config, CancellationToken cancellationToken = default)
+    {
+        var request = new SftpTestConnectionRequestApiModel
+        {
+            HostName = config.Host,
+            HostUrlPort = config.Port,
+            Username = config.Username ?? string.Empty,
+            Password = config.Password ?? string.Empty,
+            ReportDirectory = config.RemoteDirectory
+        };
+
+        var response = await _dataAcquisitionClient.TestSftpConnectionAsync(request, includeFileContent: true, cancellationToken);
+
+        // 400 means Data Acquisition rejected the connection details before trying them — a failed
+        // test to report, not a Link-service failure.
+        if (response.StatusCode == StatusCodes.Status400BadRequest)
+        {
+            return new SftpPreviewResult(
+                new ConnectionResult
+                {
+                    Success = false,
+                    MessageKey = "onboarding:census.cerner.testFailure",
+                    Detail = LinkResponseHandler.ProblemDetail(response.RawBody)
+                },
+                []);
+        }
+
+        var result = LinkResponseHandler.Require(response, ServiceName, nameof(TestConnectionWithPreviewAsync));
+
+        // The endpoint does not report when it read the directory, so every file is stamped with
+        // the time of this call.
+        var queriedAt = DateTimeOffset.UtcNow;
+        var files = (result.Files ?? [])
+            .Select(file => new SftpFile
+            {
+                FileName = file.FileName,
+                QueriedAt = queriedAt,
+                PatientIds = file.Patients
+                    .Select(patient => patient.PatientId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .ToList()
+            })
+            .ToList();
+
+        return new SftpPreviewResult(
+            new ConnectionResult
+            {
+                Success = result.Success,
+                MessageKey = result.Success
+                    ? "onboarding:census.cerner.testSuccess"
+                    : "onboarding:census.cerner.testFailure",
+                Detail = result.Message
+            },
+            files);
     }
 
     private sealed record SftpConnectionTestResultWire

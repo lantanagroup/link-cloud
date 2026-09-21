@@ -6,7 +6,7 @@ using LantanaGroup.Link.Sdk.Clients;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
 // IPatientListGateway over LinkSdk's IDataAcquisitionServiceClient for the FHIR List configuration
-// (the six patient list ids). QueryAsync stays a fixture — see its own interface doc comment.
+// (the six patient list ids), and the patients currently on each list.
 internal sealed class PatientListGateway : IPatientListGateway
 {
     private const string ServiceName = "DataAcquisition";
@@ -77,26 +77,29 @@ internal sealed class PatientListGateway : IPatientListGateway
         _logger.LogInformation("Deleted FHIR List configuration for facility {FacilityId}.", facilityId);
     }
 
-    // Fixture-only: see IPatientListGateway.QueryAsync's doc comment. No SDK call — Data
-    // Acquisition's read endpoint doesn't return matched patients yet.
-    public Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default)
+    // Data Acquisition reads every configured list from the EHR when includePatients is set, so this
+    // is one EHR round trip per list; the other five lists' patients are discarded. An unknown key
+    // or an unconfigured list answers with no patients rather than an error.
+    public async Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default)
     {
-        var patientIds = Enumerable.Range(1, Random.Shared.Next(5, 51))
-            .Select(i => $"SIMULATED-PATIENT-{i:D4}")
-            .ToArray();
+        var wire = await FetchAsync(facilityId, cancellationToken, includePatients: true);
+        var patientIds = PatientListConfigurationMapper.FindList(wire, listKey)?.Patients?
+            .Select(patient => patient.Id)
+            .OfType<string>()
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToArray() ?? [];
 
-        return Task.FromResult(new CensusListResult
+        return new CensusListResult
         {
             ListKey = listKey,
             PatientCount = patientIds.Length,
-            PatientIds = patientIds,
-            Simulated = true
-        });
+            PatientIds = patientIds
+        };
     }
 
-    private async Task<PatientListConfigurationWire?> FetchAsync(string facilityId, CancellationToken cancellationToken)
+    private async Task<PatientListConfigurationWire?> FetchAsync(string facilityId, CancellationToken cancellationToken, bool includePatients = false)
     {
-        var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, cancellationToken: cancellationToken);
+        var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, includePatients, cancellationToken);
         return LinkResponseHandler.OptionalFromRawBody<PatientListConfigurationWire>(response, ServiceName, nameof(GetConfigurationAsync));
     }
 

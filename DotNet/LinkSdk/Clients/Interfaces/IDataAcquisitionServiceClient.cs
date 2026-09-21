@@ -24,9 +24,6 @@ public interface IDataAcquisitionServiceClient
         DateTime? end = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>URL-only FHIR reachability probe before any configuration is saved. No backend route yet — returns a synthetic success.</summary>
-    Task<LinkApiResponse> ValidateConnectionAsync(string? fhirServerBaseUrl = null, CancellationToken cancellationToken = default);
-
     Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatients = false, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
@@ -104,9 +101,6 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> DeleteSftpCredentialsAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> TestSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
-
-    /// <summary>Ad-hoc test-and-preview against unsaved sFTP details. No unscoped backend route yet — returns a synthetic success.</summary>
-    Task<LinkApiResponse> TestSftpConnectionAdHocAsync(object connectionDetails, bool includeFileContent = false, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> SearchSftpLogsAsync(
         string? facilityId = null,

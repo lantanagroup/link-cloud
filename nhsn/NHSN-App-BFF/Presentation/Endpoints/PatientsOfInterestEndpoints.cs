@@ -3,9 +3,8 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
-// The census step. Cerner's sFTP side and Epic's patient-list side are both fixture-backed —
-// Cerner because LinkSdk has no sFTP coverage yet, Epic pending client confirmation of the
-// list shape — so every simulated response carries simulated: true.
+// The census step: Cerner's sFTP connection test and file preview, and Epic's patient lists, all
+// served live by Data Acquisition.
 public class PatientsOfInterestEndpoints : IApi
 {
     public void RegisterEndpoints(WebApplication app)
@@ -29,10 +28,10 @@ public class PatientsOfInterestEndpoints : IApi
             {
                 operation.Summary = "Test a Cerner sFTP connection and cache the files it returns.";
                 operation.Description =
-                    "Cerner only. Tests the given connection details and returns success. Files " +
-                    "and their patients are cached for GetSftpFiles, not returned here — there is " +
-                    "no separate per-file preview call. Fixture-backed: every response carries " +
-                    "simulated: true.";
+                    "Cerner only. Saves the given connection details, then tests them. When a " +
+                    "username and password are supplied, the files in the report directory and " +
+                    "their patients are cached for GetSftpFiles, not returned here; a test that " +
+                    "leaves them blank checks the saved credentials and lists no files.";
                 return operation;
             });
 
@@ -68,7 +67,8 @@ public class PatientsOfInterestEndpoints : IApi
             {
                 operation.Summary = "Run one of Epic's six patient-list census queries.";
                 operation.Description =
-                    "Epic only. Fixture-backed: every response carries simulated: true.";
+                    "Epic only. Reads the list's current patients from the facility's EHR through " +
+                    "Data Acquisition. An unknown or unconfigured list returns no patients.";
                 return operation;
             });
 

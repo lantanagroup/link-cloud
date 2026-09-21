@@ -80,6 +80,30 @@ internal static class LinkResponseHandler
         }
     }
 
+    // The "detail" of an RFC 7807 problem body, for failures that are reported to the user as an
+    // outcome rather than thrown. Null when the body is empty or not a problem document.
+    public static string? ProblemDetail(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(rawBody);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                   && document.RootElement.TryGetProperty("detail", out var detail)
+                   && detail.ValueKind == JsonValueKind.String
+                ? detail.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static void EnsureSuccess(int statusCode, string? traceId, string? rawBody, string? requestUrl, string service, string operation)
     {
         if (statusCode is >= 200 and < 300)
