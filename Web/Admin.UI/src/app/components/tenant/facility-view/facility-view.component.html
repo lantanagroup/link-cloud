@@ -253,11 +253,12 @@
               Resubmit...
             </button>
             <button type="button"
-                    *ngIf="(element.status === 'New' || element.status === 'EndOfPeriod') && !element.isDeleted"
-                    class="link-button secondary"
+                    *ngIf="isInProgressStatus(element.status) && !element.isDeleted"
+                    class="link-button error"
+                    matTooltip="Stop this in-progress report"
                     (click)="onAbortReport(element.id)">
-              <mat-icon>cancel</mat-icon>
-              Abort...
+              <fa-icon [icon]="faBan"></fa-icon>
+              Abort
             </button>
           </td>
         </ng-container>
@@ -266,8 +267,8 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="warn"
-                    *ngIf="(element.status === 'Submitted' || element.status === 'CompletedNotSubmitted' || element.status === 'Scheduled') && !element.isDeleted"
-                    matTooltip="Soft delete this report"
+                    *ngIf="canCleanUp(element.status) && !element.isDeleted"
+                    matTooltip="Clean up this report"
                     (click)="onSoftDeleteReport(element.id)">
               <mat-icon>delete</mat-icon>
             </button>
