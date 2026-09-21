@@ -38,7 +38,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError} = useNotifications();
-  const {draft, patch, saving} = useOnboarding();
+  const {draft, patch, saving, savingDirection} = useOnboarding();
 
   const [groups, setGroups] = useState<CodeSystemGroupState[]>(() =>
     buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? [])
@@ -243,16 +243,16 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               title: t('onboarding:encounter.title'),
               footer: (
                 <StepActions saving={saving}>
-                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={savingDirection === 'next'}>
                     {t('common:actions.continue')}
                   </Button>
                 </StepActions>
               )
             },
-      [t, loading, saving, stableOnBack, stableHandleNext]
+      [t, loading, saving, savingDirection, stableOnBack, stableHandleNext]
     )
   );
 

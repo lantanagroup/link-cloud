@@ -452,6 +452,7 @@
       "requesting": "Requesting report"
     },
     "messages": {
+      "incomplete": "Please complete all fields before continuing.",
       "requestError": "Unable to request the report.",
       "requested": "Report {{reportId}} requested.",
       "measuresLoadError": "Your facility's available measures could not be retrieved."

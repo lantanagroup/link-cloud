@@ -28,6 +28,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [advanceAfterRequest, setAdvanceAfterRequest] = useState(false);
 
@@ -85,13 +86,20 @@ export function ReportStep({onNext, onBack}: StepProps) {
     return touched[field] && errors[field] ? t(errors[field]) : undefined;
   }
 
+  function announceValidationMessage(message: string) {
+    setValidationError(null);
+    window.setTimeout(() => setValidationError(message), 0);
+  }
+
   async function handleGenerate() {
     setTouched({measures: true, startDate: true, endDate: true, patientIds: true});
     const nextErrors = validateReport(draftForValidation());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
+      announceValidationMessage(t('onboarding:report.messages.incomplete'));
       return;
     }
+    setValidationError(null);
 
     setRequesting(true);
     try {
@@ -146,7 +154,6 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const validMeasureNames = new Set(availableMeasures.map(measure => measure.name));
   const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
 
-  const isFormValid = Object.keys(validateReport(draftForValidation())).length === 0;
   const stableOnBack = useStableCallback(onBack);
   const stableHandleGenerate = useStableCallback(handleGenerate);
 
@@ -164,14 +171,14 @@ export function ReportStep({onNext, onBack}: StepProps) {
                   </Button>
                   <Button
                     onClick={stableHandleGenerate}
-                    disabled={saving || requesting || !isFormValid}
+                    disabled={saving || requesting}
                     loading={requesting}>
                     {t('onboarding:report.actions.generate')}
                   </Button>
                 </StepActions>
               )
             },
-      [t, loading, saving, requesting, stableOnBack, stableHandleGenerate, isFormValid]
+      [t, loading, saving, requesting, stableOnBack, stableHandleGenerate]
     )
   );
 
@@ -243,6 +250,10 @@ export function ReportStep({onNext, onBack}: StepProps) {
               patch('report', {patientIds: next});
               clearFieldError('patientIds');
             }} />
+
+          <p className="nhsn-link__form-error" role="alert">
+            {validationError}
+          </p>
     </div>
   );
 }

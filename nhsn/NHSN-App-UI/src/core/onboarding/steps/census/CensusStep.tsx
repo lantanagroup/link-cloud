@@ -88,7 +88,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const { t } = useTranslation(["onboarding", "common"]);
   const api = useApiClient();
   const { notifyError } = useNotifications();
-  const { draft, patch, saving, user, vendorProfile } = useOnboarding();
+  const { draft, patch, saving, savingDirection, user, vendorProfile } = useOnboarding();
   const census = draft.census;
   const acquisition = vendorProfile?.censusAcquisition;
 
@@ -407,19 +407,19 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           </StepActions>
         ) : (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === "back"}>
               {t("common:actions.back")}
             </Button>
             <Button
               onClick={stableHandleNext}
               disabled={saving || (acquisition === "Sftp" && !sftpConnectionVerified)}
-              loading={saving}>
+              loading={savingDirection === "next"}>
               {t("common:actions.continue")}
             </Button>
           </StepActions>
         )
       }),
-      [t, vendorProfile, stableOnBack, saving, stableHandleNext, acquisition, sftpConnectionVerified]
+      [t, vendorProfile, stableOnBack, saving, savingDirection, stableHandleNext, acquisition, sftpConnectionVerified]
     )
   );
 

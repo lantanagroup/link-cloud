@@ -41,8 +41,9 @@ export function Button({
     <KendoButton
       type={type}
       themeColor={variant === 'primary' ? 'primary' : 'base'}
-      className={`${size === 'sm' ? 'nhsn-link__button--sm ' : ''}${isBlocked ? 'nhsn-link__button--disabled' : ''}`.trim() || undefined}
+      className={size === 'sm' ? 'nhsn-link__button--sm' : undefined}
       aria-label={ariaLabel}
+      disabled={isBlocked}
       onClick={isBlocked ? undefined : onClick}>
       {loading && (
         <span className="nhsn-link__button-spinner" role="status" aria-label={t('status.saving')} />
