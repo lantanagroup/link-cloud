@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
@@ -88,7 +89,8 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         {
             await processor.EnqueueAsync(new AcquisitionWorkItem(
                 LogId: logId,
-                FacilityId: value.FacilityId
+                FacilityId: value.FacilityId,
+                IsPerformanceMode: KafkaHeaderHelper.IsPerformanceMode(consumeResult.Message?.Headers)
             ), cancellationToken);
             _logger.LogInformation("Queued LogId {LogId} for facility {FacilityId}", logId, value.FacilityId);
         }

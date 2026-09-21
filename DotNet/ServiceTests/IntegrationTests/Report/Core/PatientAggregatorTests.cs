@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
@@ -218,7 +219,7 @@ namespace IntegrationTests.Report.Core
             var aggregator = BuildAggregator(scope, includeOrganization: false);
             var result = await aggregator.AggregateToABS(patientId, schedule);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
             var lines = await ReadOutputBlobLinesAsync(result.BlobName);
             var hasOrganization = lines.Any(line =>
             {
@@ -263,7 +264,7 @@ namespace IntegrationTests.Report.Core
             var aggregator = BuildAggregator(scope, includeOrganization: true);
             var result = await aggregator.AggregateToABS(patientId, schedule);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
             var lines = await ReadOutputBlobLinesAsync(result.BlobName);
             var orgLine = lines.FirstOrDefault(line =>
             {
@@ -310,7 +311,7 @@ namespace IntegrationTests.Report.Core
             var aggregator = BuildAggregator(scope, includeOrganization: true);
             var result = await aggregator.AggregateToABS(patientId, schedule);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonDeserializerPermissive;
             var lines = await ReadOutputBlobLinesAsync(result.BlobName);
             var hasOrganization = lines.Any(line =>
             {

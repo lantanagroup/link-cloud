@@ -15,6 +15,18 @@
     </div>
 
     @* --- Summary bar --- *@
+    <div class="au-table-toolbar mb-3 rounded border bg-white" id="healthToolbar">
+        <input type="search" id="healthSearch" class="form-control form-control-sm" placeholder="Filter tests by name, service, or reason…" />
+        <select id="healthResult" class="form-select form-select-sm" style="max-width:12rem;">
+            <option value="">All results</option>
+            <option value="pass">Passed</option>
+            <option value="fail">Failed</option>
+            <option value="skip">Skipped</option>
+            <option value="na">Not run</option>
+        </select>
+        <span class="au-table-count" id="healthCount"></span>
+    </div>
+
     <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
         <span class="badge bg-secondary" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
         <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
@@ -113,7 +125,7 @@
                                     </tr>
                                 }
 
-                                <tr data-endpoint-key="@key" data-informational="@(ep.Definition.IsInformational ? "true" : "false")" data-stale="@(isStale ? "true" : "false")" data-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
+                                <tr data-endpoint-key="@key" data-informational="@(ep.Definition.IsInformational ? "true" : "false")" data-stale="@(isStale ? "true" : "false")" data-included="@(service.IsIncludedInLatestRun ? "true" : "false")" data-result="@(isSkipped ? "skip" : hasPassed == true ? "pass" : hasPassed == false ? "fail" : "na")">
                                     <td class="@(ep.Definition.GroupName != null ? "ps-4" : "")">
                                         <span>@ep.Definition.EndpointName</span>
                                         @if (!string.IsNullOrWhiteSpace(ep.Definition.Description))
@@ -624,6 +636,7 @@
         const skipEl = document.getElementById('sumSkip');
         if (skipEl) skipEl.textContent = `${skip} skipped`;
         document.getElementById('sumPending').textContent = `${pending} not run`;
+        applyHealthFilter();
 
         // Update per-service accordion badges
         document.querySelectorAll('.svc-summary').forEach(badge => {
@@ -951,6 +964,52 @@
             content.innerHTML = '<p class="text-danger text-center">Failed to load history.</p>';
         }
     }
+
+    function applyHealthFilter() {
+        const searchEl = document.getElementById('healthSearch');
+        const resultEl = document.getElementById('healthResult');
+        const q = (searchEl && searchEl.value ? searchEl.value : '').trim().toLowerCase();
+        const want = resultEl ? resultEl.value : '';
+        let visible = 0;
+        let total = 0;
+        document.querySelectorAll('tr[data-endpoint-key]').forEach(row => {
+            total++;
+            const badge = row.querySelector('.cell-result .badge');
+            const label = badge ? badge.textContent.trim().toUpperCase() : '';
+            let result = row.dataset.result || 'na';
+            if (label === 'PASS') result = 'pass';
+            else if (label === 'FAIL') result = 'fail';
+            else if (label === 'SKIP') result = 'skip';
+            else if (label === 'N/A') result = 'na';
+            const hay = (row.innerText || '').toLowerCase();
+            const ok = (!q || hay.indexOf(q) >= 0) && (!want || result === want);
+            row.classList.toggle('au-row-hidden', !ok);
+            if (ok) visible++;
+        });
+        document.querySelectorAll('.row-group-header').forEach(header => {
+            let next = header.nextElementSibling;
+            let any = false;
+            while (next && !next.classList.contains('row-group-header')) {
+                if (next.matches && next.matches('tr[data-endpoint-key]') && !next.classList.contains('au-row-hidden'))
+                    any = true;
+                next = next.nextElementSibling;
+            }
+            header.classList.toggle('au-row-hidden', !any);
+        });
+        document.querySelectorAll('.accordion-item.au-health-accordion').forEach(card => {
+            const any = card.querySelector('tr[data-endpoint-key]:not(.au-row-hidden)');
+            card.style.display = any ? '' : 'none';
+        });
+        const count = document.getElementById('healthCount');
+        if (count)
+            count.textContent = visible === total ? total + ' tests' : 'Showing ' + visible + ' of ' + total;
+    }
+
+    const healthSearch = document.getElementById('healthSearch');
+    const healthResult = document.getElementById('healthResult');
+    if (healthSearch) healthSearch.addEventListener('input', applyHealthFilter);
+    if (healthResult) healthResult.addEventListener('change', applyHealthFilter);
+    applyHealthFilter();
 })();
 </script>
 <style>

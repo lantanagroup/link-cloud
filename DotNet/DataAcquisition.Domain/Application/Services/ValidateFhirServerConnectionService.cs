@@ -7,6 +7,7 @@ using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 {
@@ -123,7 +124,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                         $"The FHIR server at {metadataUrl} returned a {resource?.TypeName ?? "null"} resource rather than the expected CapabilityStatement.");
                 }
             }
-            catch (Exception ex) when (ex is FormatException || ex is StructuralTypeException)
+            catch (Exception ex) when (ex is FormatException || ex is StructuralTypeException || ex is JsonException)
             {
                 _logger.LogWarning(ex, "FHIR server {FhirServerUrl} did not return a parsable CapabilityStatement", metadataUrl.SanitizeForLog());
 

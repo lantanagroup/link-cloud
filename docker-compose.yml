@@ -718,6 +718,9 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Telemetry__EnableTelemetry: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
       Redis__Password: ${REDIS_PASS}
       LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
     volumes:
@@ -729,6 +732,9 @@ services:
       dockerfile: DotNet/Automation.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
+      secrets:
+        - feed_accesstoken
     networks:
       - link-nw
     depends_on:
@@ -1026,6 +1032,9 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
+      secrets:
+        - feed_accesstoken
     networks:
       - link-nw
     healthcheck:
@@ -1099,6 +1108,10 @@ services:
 networks:
   link-nw:
      
+secrets:
+  feed_accesstoken:
+    environment: AZURE_ARTIFACTS_PAT
+
 volumes:
   kafka_data:
     driver: local
