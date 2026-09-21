@@ -18,7 +18,7 @@ Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, adm
 
 Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source with no credentials, so `dotnet restore` / `dotnet build link-cloud.sln` and `docker compose build` 401 until the machine is authenticated. `packageSourceMapping` keeps every other package on nuget.org.
 
-Visual Studio can sign into the `lantanagroup` Azure DevOps org and restore without a PAT, if your account has Read on the feed.
+You can also add `Shared_BOTW_Feed` as a NuGet source in Visual Studio (Tools > Options > NuGet Package Manager > Package Sources) using `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json`, then sign into the `lantanagroup` Azure DevOps org. Repo `nuget.config` already lists that source, so opening this branch in VS usually shows it without adding it by hand. VS restore then uses your Azure DevOps login instead of a PAT, if the account has Read on the feed.
 
 Otherwise create a PAT and put it in the environment:
 

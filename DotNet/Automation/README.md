@@ -5,7 +5,7 @@ generation, predictive pipeline modeling, and reusable automation primitives. It
 dependency on any Link-specific service; host projects compose it with environment-specific
 orchestration.
 
-Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Authenticate once per machine before `dotnet restore` of Automation / Automation.UI / MockFhirServer. How to create a Packaging-Read PAT and set `AZURE_ARTIFACTS_PAT` for restore and docker compose is in `DEVELOPMENT.md`.
+Thetis generation packages (`LantanaGroup.Thetis.Generation.Abstractions` / `Engine`) come from Azure Artifacts feed `Shared_BOTW_Feed`. Authenticate once per machine before `dotnet restore` of Automation / Automation.UI / MockFhirServer. You can add `Shared_BOTW_Feed` as a NuGet source in Visual Studio and sign into Azure DevOps, or create a Packaging-Read PAT and set `AZURE_ARTIFACTS_PAT` for CLI restore and docker compose. Both are in `DEVELOPMENT.md`.
 
 ```
 dotnet nuget update source Shared_BOTW_Feed --username az --password %AZURE_ARTIFACTS_PAT% --store-password-in-clear-text --configfile nuget.config
