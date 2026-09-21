@@ -293,7 +293,7 @@
                             </div>
                           }
                         }
-                        @if (op.operationType === OperationType.CodeMap) {
+                        @if (op.operationType === OperationType.CodeMap || op.operationType === OperationType.HSLOCMap) {
                           <div class="operations-details-row">
                             <div>
                               <div class="data-label">
@@ -391,7 +391,7 @@
                             </div>
                           }
                         }
-                        @if (op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.CopyLocation && op.operationType !== OperationType.CopyLocationAliasToTypeIteratively && op.operationType !== OperationType.RemoveExtensions) {
+                        @if (op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.HSLOCMap && op.operationType !== OperationType.CopyLocation && op.operationType !== OperationType.CopyLocationAliasToTypeIteratively && op.operationType !== OperationType.RemoveExtensions) {
                           <p class="no-results-subtext">
                             Unknown operation type: {{ op.operationType }}. No additional details
                             available.

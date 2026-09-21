@@ -5,6 +5,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
@@ -273,7 +274,11 @@ public class ReportApiHelper
         _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
     }
 
-    public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
+    public async Task<bool> CheckSubmissionStatusAsync(
+        string reportId,
+        TestScenarioConfig config,
+        BackgroundDiagnosticsMonitor? diagnostics = null,
+        CancellationToken cancellationToken = default)
     {
         var pollingInterval = TimeSpan.FromSeconds(Math.Max(1, config.PollingIntervalSeconds));
         var hardTimeout = GetEffectiveSubmissionTimeout(config);
@@ -297,6 +302,7 @@ public class ReportApiHelper
                 : milestonePhaseStart + hardTimeout;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
                 {
                     if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
@@ -318,20 +324,20 @@ public class ReportApiHelper
                 }
 
                 // Entryless scheduled runs are valid when prediction says no
-                // patients should participate. In that case the report can transition
-                // to Submitted without ever emitting ReportEntriesCreated.
-                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
+                // patients should participate. In that case the report can reach a terminal
+                // status without ever emitting ReportEntriesCreated.
+                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
                 if (scheduleProbe.IsSuccessStatusCode
-                    && scheduleProbe.Body?.Status == ScheduleStatus.Submitted)
+                    && scheduleProbe.Body?.Status.IsTerminal() == true)
                 {
                     milestoneReached = true;
                     var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
                     _output.WriteLine(
-                        $"Milestone '{milestoneToAwait}' was not observed, but report is already Submitted after {elapsed:F0}s. Continuing.");
+                        $"Milestone '{milestoneToAwait}' was not observed, but report is already terminal ({scheduleProbe.Body.Status}) after {elapsed:F0}s. Continuing.");
                     break;
                 }
 
-                await Task.Delay(pollingInterval);
+                await Task.Delay(pollingInterval, cancellationToken);
             }
 
             if (diagnostics.HasCriticalFailure)
@@ -370,6 +376,7 @@ public class ReportApiHelper
             : submissionPhaseStart + hardTimeout;
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
             {
                 if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
@@ -390,7 +397,7 @@ public class ReportApiHelper
             }
 
             string currentStatus;
-            var response = await _reportClient.GetScheduleAsync(reportId);
+            var response = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == (int)HttpStatusCode.NotFound)
@@ -427,7 +434,7 @@ public class ReportApiHelper
                 lastStatus = currentStatus;
             }
 
-            await Task.Delay(pollingInterval);
+            await Task.Delay(pollingInterval, cancellationToken);
         }
 
         _output.WriteLine($"Report {reportId} was not submitted before timeout.");
@@ -462,10 +469,10 @@ public class ReportApiHelper
             if (!entriesResponse.IsSuccessStatusCode || entriesResponse.Body == null)
             {
                 if (allowEntrylessTerminal
-                    && scheduleResponse.Body.Status == ScheduleStatus.Submitted)
+                    && scheduleResponse.Body.Status.IsTerminal())
                 {
                     _output.WriteLine(
-                        $"Report {reportId} reached Submitted with no report-entry payload available; treating as terminal entryless report.");
+                        $"Report {reportId} reached terminal status {scheduleResponse.Body.Status} with no report-entry payload available; treating as terminal entryless report.");
                     return new ReportTerminalState([], []);
                 }
 
@@ -483,7 +490,7 @@ public class ReportApiHelper
                 lastState = state;
             }
 
-            if (scheduleResponse.Body.Status == ScheduleStatus.Submitted && !hasIncompleteEntries)
+            if (scheduleResponse.Body.Status.IsTerminal() && !hasIncompleteEntries)
             {
                 var entryPatientIds = entries
                     .Select(e => e.PatientId)
@@ -518,7 +525,8 @@ public class ReportApiHelper
             or ReportingStatus.FailedValidation;
 
         var submissionTerminal = entry.SubmissionStatus is SubmissionStatus.Submitted
-            or SubmissionStatus.NotEligable;
+            or SubmissionStatus.NotEligable
+            or SubmissionStatus.NotSubmitted;
 
         return reportingTerminal && submissionTerminal;
     }
@@ -557,7 +565,7 @@ public class ReportApiHelper
         }
 
         _output.WriteLine(
-            $"[DIAG][DataAcq] Keep-alive: acquisition still progressing " +
+            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
             $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
             $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
         return true;

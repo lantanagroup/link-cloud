@@ -279,11 +279,13 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
      * Summary mode used when HAPI asks us to resolve a bound ValueSet.
      * <p>
      * Deliberately {@link SummaryEnum#TRUE}: {@code _summary=false} is the condition that makes the Link
-     * terminology service enumerate every code of the value set into {@code ValueSet.expansion.contains}
-     * (see {@code Terminology/Services/FhirService.cs}), which for large value sets is the client-side
-     * trigger for terminology-service memory exhaustion. The expansion is not read by this class -- when
-     * the resolved ValueSet carries a canonical URL, {@link #validateCodeInValueSet} uses only that URL and
-     * routes validation through {@code $validate-code}. The Link terminology service's summary handling is
+     * terminology service enumerate the value set's codes into {@code ValueSet.expansion.contains}
+     * (see {@code Terminology/Services/FhirService.cs}). That response is now bounded to a configured
+     * page (LEGLINK-968), so it is no longer the memory-exhaustion trigger this comment used to cite --
+     * but requesting it would still make the server build an expansion, and would return one page of a
+     * set this class never reads. The expansion is not read here: when the resolved ValueSet carries a
+     * canonical URL, {@link #validateCodeInValueSet} uses only that URL and routes validation through
+     * {@code $validate-code}. The Link terminology service's summary handling is
      * bespoke rather than element-filtering: at {@code _summary=true} it still returns the stored ValueSet
      * with its {@code compose} intact, so downstream chain members (e.g. HAPI's in-memory terminology
      * support) can still expand it in-process.

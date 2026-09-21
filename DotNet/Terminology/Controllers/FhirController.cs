@@ -130,13 +130,34 @@ public class FhirController(FhirService fhirService) : Controller
     /// ValueSet resources. Returns a 400 Bad Request response if neither <paramref name="url"/>
     /// nor <paramref name="summary"/> are provided.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of codes to embed in the expansion. Omitting it applies the configured
+    /// default page size; a value above the configured maximum is reduced to that maximum rather than
+    /// rejected; zero returns the total with no codes. Ignored when <paramref name="summary"/> is true.
+    /// </param>
+    /// <param name="offset">
+    /// The zero-based index of the first code to embed, for paging. Defaults to zero. Ignored when
+    /// <paramref name="summary"/> is true.
+    /// </param>
     [HttpGet("ValueSet")]
+    [SwaggerOperation(
+        Summary = "Search for value sets.",
+        Description = "Without _summary=true and with a url, the response embeds one page of the value "
+                      + "set's codes in ValueSet.expansion, bounded by count and offset. "
+                      + "expansion.total reports the full number of codes, expansion.offset the page "
+                      + "returned, and expansion.parameter the count and offset actually applied. With "
+                      + "_summary=true, count and offset are ignored and the stored resource is "
+                      + "returned unexpanded.")]
     public ActionResult<Bundle> GetValueSets([FromQuery] string? url,
-        [FromQuery(Name = "_summary")] SummaryType? summary)
+        [FromQuery(Name = "_summary")] SummaryType? summary,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary));
+            // count and offset bind as int? and are never compared against cached terminology content,
+            // so they do not go through the sanitizers the string parameters need.
+            return Ok(fhirService.GetValueSets(url?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {
@@ -158,14 +179,29 @@ public class FhirController(FhirService fhirService) : Controller
     /// An <see cref="ActionResult{T}"/> containing the expanded <see cref="ValueSet"/>
     /// if it exists, or appropriate error responses such as 404 Not Found or 500 Internal Server Error.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of codes to return. Omitting it applies the configured default page size; a
+    /// value above the configured maximum is reduced to that maximum rather than rejected; zero returns
+    /// expansion.total with no codes.
+    /// </param>
+    /// <param name="offset">The zero-based index of the first code to return. Defaults to zero.</param>
     [HttpGet("ValueSet/$expand")]
     [HttpGet("ValueSet/{id}/$expand")]
+    [SwaggerOperation(
+        Summary = "Expand a value set into one page of its codes.",
+        Description = "The expansion is always bounded. count and offset are the FHIR $expand paging "
+                      + "parameters, not _count. expansion.total reports the full size, and "
+                      + "expansion.offset and expansion.parameter report the page actually returned, so "
+                      + "a client can page through the whole value set. filter, includeDesignations, "
+                      + "activeOnly and date are not supported.")]
     public ActionResult<ValueSet> ExpandValueSet([FromRoute] string? id, [FromQuery] string? url,
-        [FromQuery] string? date)
+        [FromQuery] string? date,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.ExpandValueSet(id?.Sanitize(), url?.Sanitize(), date?.Sanitize()));
+            return Ok(fhirService.ExpandValueSet(id?.Sanitize(), url?.Sanitize(), date?.Sanitize(), count, offset));
         }
         catch (ArgumentException ex)
         {
@@ -224,12 +260,31 @@ public class FhirController(FhirService fhirService) : Controller
     /// CodeSystem resources. Returns a 400 Bad Request response if neither the <paramref name="url"/>
     /// nor <paramref name="summary"/> is provided.
     /// </returns>
+    /// <param name="count">
+    /// The maximum number of concepts to return. Omitting it applies the configured default page size;
+    /// a value above the configured maximum is reduced to that maximum rather than rejected; zero
+    /// returns no concepts. Ignored when <paramref name="summary"/> is true.
+    /// </param>
+    /// <param name="offset">
+    /// The zero-based index of the first concept to return. Defaults to zero. Ignored when
+    /// <paramref name="summary"/> is true.
+    /// </param>
     [HttpGet("CodeSystem")]
-    public ActionResult<Bundle> GetCodeSystems([FromQuery] string? url, [FromQuery(Name = "_summary")] SummaryType? summary)
+    [SwaggerOperation(
+        Summary = "Search for code systems.",
+        Description = "Without _summary=true and with a url, the response carries one page of the code "
+                      + "system's concepts, bounded by count and offset. CodeSystem.count always "
+                      + "reports the full number of distinct concepts, and CodeSystem.content reports "
+                      + "fragment whenever the page is a subset. With _summary=true, count and offset "
+                      + "are ignored and behaviour is unchanged.")]
+    public ActionResult<Bundle> GetCodeSystems([FromQuery] string? url,
+        [FromQuery(Name = "_summary")] SummaryType? summary,
+        [FromQuery(Name = "count")] int? count = null,
+        [FromQuery(Name = "offset")] int? offset = null)
     {
         try
         {
-            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary));
+            return Ok(fhirService.GetCodeSystems(url?.Sanitize(), summary, count, offset));
         }
         catch (ArgumentException ex)
         {

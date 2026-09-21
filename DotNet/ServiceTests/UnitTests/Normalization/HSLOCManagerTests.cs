@@ -2,6 +2,8 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Normalization.Domain.Queries;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Text;
@@ -13,14 +15,22 @@ namespace UnitTests.Normalization;
 public class HSLOCManagerTests : IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly MemoryCache _memoryCache = new(new MemoryCacheOptions());
+    private readonly HSLOCLookupCache _lookupCache;
 
     public HSLOCManagerTests()
     {
+        _lookupCache = new HSLOCLookupCache(_memoryCache);
         _connection = new SqliteConnection("Data Source=:memory:");
         _connection.Open();
     }
 
-    public void Dispose() => _connection.Dispose();
+    public void Dispose()
+    {
+        _connection.Dispose();
+        _lookupCache.Dispose();
+        _memoryCache.Dispose();
+    }
 
     private NormalizationDbContext CreateContext()
     {
@@ -32,8 +42,54 @@ public class HSLOCManagerTests : IDisposable
         return context;
     }
 
-    private static HSLOCManager CreateManager(NormalizationDbContext context) =>
-        new(context, new Mock<ILogger<HSLOCManager>>().Object);
+    private HSLOCManager CreateManager(NormalizationDbContext context) =>
+        new(context, new Mock<ILogger<HSLOCManager>>().Object, _lookupCache);
+
+    [Theory]
+    [InlineData("all")]
+    [InlineData("version")]
+    [InlineData("id")]
+    [InlineData("update")]
+    public async Task Mutations_InvalidateActiveLookup(string mutation)
+    {
+        using var context = CreateContext();
+        var code = new HSLOC { HSLOCCode = "A1", Version = "2025" };
+        context.HSLOCS.Add(code);
+        await context.SaveChangesAsync();
+        var queries = new HSLOCQueries(context, _lookupCache);
+        Assert.Single(await queries.GetActiveLookup());
+        var manager = CreateManager(context);
+
+        switch (mutation)
+        {
+            case "all":
+                await manager.DeleteAll();
+                break;
+            case "version":
+                await manager.DeleteByVersion("2025");
+                break;
+            case "id":
+                await manager.DeleteById(code.Id);
+                break;
+            case "update":
+                await using (var csv = CreateCsv("cdc,short,B2,long"))
+                {
+                    await manager.Update("2025", "2026", csv);
+                }
+                break;
+        }
+
+        var lookup = await queries.GetActiveLookup();
+        Assert.False(lookup.ContainsKey("A1"));
+        if (mutation == "update")
+        {
+            Assert.Equal("B2", Assert.Single(lookup).Key);
+        }
+        else
+        {
+            Assert.Empty(lookup);
+        }
+    }
 
     private static MemoryStream CreateCsv(params string[] rows)
     {

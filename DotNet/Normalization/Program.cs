@@ -77,6 +77,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.AddResourceCache(builder.Configuration);
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
@@ -205,6 +206,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IVendorVersionResolver, VendorVersionResolver>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
     builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+    builder.Services.AddSingleton<IHSLOCLookupCache, HSLOCLookupCache>();
     builder.Services.AddScoped<IHSLOCManager, HSLOCManager>();
     builder.Services.AddScoped<IFacilityLocationManager, FacilityLocationManager>();
     builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
@@ -222,6 +224,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
     builder.Services.AddSingleton<CodeMapOperationService>();
+    builder.Services.AddSingleton<HSLOCMapOperationService>();
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
     builder.Services.AddSingleton<CopyLocationOperationService>();
     builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();

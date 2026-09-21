@@ -163,7 +163,8 @@ namespace IntegrationTests.Report
                     sp.GetRequiredService<BlobStorageService>(),
                     sp.GetRequiredService<SubmitPayloadProducer>(),
                     sp.GetRequiredService<AuditableEventOccurredProducer>(),
-                    sp.GetRequiredService<IReportEntryManager>()));
+                    sp.GetRequiredService<IReportEntryManager>(),
+                    sp.GetRequiredService<IReportScheduledManager>()));
 
             builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
             builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);
@@ -192,6 +193,7 @@ namespace IntegrationTests.Report
             builder.Services.AddSingleton<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
             builder.Services.AddSingleton<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
 
+            builder.Services.AddSingleton<IPipelineAbortRegistry, InMemoryPipelineAbortRegistry>();
             builder.Services.AddTransient<PatientEventListener>();
             builder.Services.AddTransient<ReportScheduledListener>();
             builder.Services.AddTransient<MeasureReportGeneratedListener>();

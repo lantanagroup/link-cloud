@@ -125,11 +125,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeGroupCacheService>();
     builder.Services.AddSingleton<ICodeGroupCacheService>(sp => sp.GetRequiredService<CodeGroupCacheService>());
     builder.Services.AddSingleton<FhirService>();
+    builder.Services.AddSingleton<ICodeSearchService, CodeSearchService>();
 
     builder.Services.AddOptions<TerminologyConfig>()
         .Bind(builder.Configuration.GetSection(TerminologyConstants.AppSettingsSectionNames.Terminology))
         .Validate(cfg => !string.IsNullOrWhiteSpace(cfg.Path), "Terminology:Path is required")
         .Validate(cfg => Directory.Exists(cfg.Path), "Terminology:Path does not exist")
+        // A page size below 1 would make every expansion empty, and a default above the maximum would
+        // be silently clamped on every request. Both are misconfigurations that hide themselves in the
+        // responses, so they fail startup here rather than being discovered from an empty expansion.
+        .Validate(cfg => cfg.MaxExpansionPageSize >= 1, "Terminology:MaxExpansionPageSize must be at least 1")
+        .Validate(cfg => cfg.DefaultExpansionPageSize >= 1, "Terminology:DefaultExpansionPageSize must be at least 1")
+        .Validate(cfg => cfg.DefaultExpansionPageSize <= cfg.MaxExpansionPageSize,
+            "Terminology:DefaultExpansionPageSize must not exceed Terminology:MaxExpansionPageSize")
         .ValidateOnStart();
 
     builder.Services.AddHostedService<Startup>();

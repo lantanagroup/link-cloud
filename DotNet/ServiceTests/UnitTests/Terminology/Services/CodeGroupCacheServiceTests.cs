@@ -1,6 +1,7 @@
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Terminology.Application.Exceptions;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -1393,4 +1394,108 @@ http://test.system,123,Test Display,Active,Extra Value";
         protected internal override Task<string> ReadAllTextAsync(string path) =>
             Task.FromResult(_fileContents[path]);
     }
+
+    #region Concept index (LEGLINK-968)
+
+    /// <summary>
+    /// The de-duplicated concept list is built by the loader rather than by the first request that
+    /// reads it, so no request pays an O(codes) cost.
+    /// </summary>
+    [Fact]
+    public async Task ProcessCodeSystemCsv_PrewarmsTheConceptIndex()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs");
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal(new[] { "123", "456", "789" }, codeGroup.DistinctConcepts.Select(c => c.Value).ToArray());
+
+        // The same instance every time: a per-call rebuild would be the cost this exists to remove.
+        Assert.Same(codeGroup.DistinctConcepts, codeGroup.DistinctConcepts);
+    }
+
+    /// <summary>
+    /// A code listed twice collapses to one concept keeping the later display, which is what
+    /// GroupBy/Last produced per request before the index existed (LEGLINK-599/814).
+    /// </summary>
+    [Fact]
+    public void ProcessCodeSystemCsv_WithDuplicateCode_IndexesItOnceWithTheLastDisplay()
+    {
+        var codeGroup = LoadCodeSystemCsv("code,display\r\n123,First\r\n456,Other\r\n123,Last\r\n");
+
+        Assert.Equal(new[] { "123", "456" }, codeGroup.DistinctConcepts.Select(c => c.Value).ToArray());
+        Assert.Equal("Last", codeGroup.DistinctConcepts[0].Display);
+    }
+
+    [Fact]
+    public void ProcessCodeSystemCsv_WithHeaderOnlyCsv_ProducesAnEmptyConceptIndex()
+    {
+        var codeGroup = LoadCodeSystemCsv("code,display\r\n");
+
+        Assert.Empty(codeGroup.DistinctConcepts);
+    }
+
+    /// <summary>
+    /// ReplaceCodesFromCsv builds a replacement CodeGroup rather than mutating the cached one, which is
+    /// what makes the never-invalidated index safe. This pins that: the replaced group's index reflects
+    /// the uploaded codes, not the ones loaded from disk.
+    /// </summary>
+    [Fact]
+    public async Task ReplaceCodesFromCsv_ProducesAFreshConceptIndex()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildServiceWithLoadedGroups(memoryCache);
+        await service.LoadCache();
+
+        var original = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs");
+        Assert.NotNull(original);
+        Assert.Equal(3, original.DistinctConcepts.Count);
+
+        service.ReplaceCodesFromCsv(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs", null, "code,display\r\nZZZ,Injected\r\n");
+
+        var replaced = service.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, "test-cs");
+        Assert.NotNull(replaced);
+        Assert.Equal(new[] { "ZZZ" }, replaced.DistinctConcepts.Select(c => c.Value).ToArray());
+
+        // The previously cached instance is untouched, so a request already reading it is unaffected.
+        Assert.Equal(3, original.DistinctConcepts.Count);
+    }
+
+    /// <summary>
+    /// Runs ProcessCodeSystemCsv against a real service and returns the group it populated.
+    /// </summary>
+    private CodeGroup LoadCodeSystemCsv(string csvData)
+    {
+        var mockCache = new Mock<IMemoryCache>();
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var mockService = new Mock<CodeGroupCacheService>(
+            _loggerMock.Object, mockCache.Object, mockConfig.Object)
+        {
+            CallBase = true
+        };
+
+        mockService.Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()));
+
+        var codeGroup = new CodeGroup
+        {
+            Id = "test-id",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Url = "http://test.codesystem",
+            Version = "1.0",
+            Resource = new CodeSystem { Id = "test-id", Url = "http://test.codesystem", Version = "1.0" }
+        };
+
+        using var csv = CreateCsvReader(csvData);
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv, CancellationToken.None);
+
+        return codeGroup;
+    }
+
+    #endregion
 }

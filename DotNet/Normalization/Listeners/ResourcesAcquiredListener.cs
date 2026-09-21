@@ -18,11 +18,13 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Normalization.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -41,6 +43,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
+    private readonly HSLOCMapOperationService _hslocMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
     private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
@@ -61,6 +64,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IProducer<ResourceKey, ResourcesNormalizedValue> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
+        HSLOCMapOperationService hslocMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService,
         CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
@@ -89,6 +93,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
         _copyPropertyOperationService = copyPropertyOperationService;
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
+        _hslocMapOperationService = hslocMapOperationService ?? throw new ArgumentNullException(nameof(hslocMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
         _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
@@ -217,20 +222,54 @@ public class ResourcesAcquiredListener : BackgroundService
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
+        using var scope = _scopeFactory.CreateScope();
+        var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+        if (abortRegistry != null)
+        {
+            var facilityId = result.Message.Key.FacilityId;
+            if (await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
+            {
+                _logger.LogDebug(
+                    "Skipping ResourcesAcquired for aborted facility FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    facilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+                await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
+                return;
+            }
+
+            var remaining = new List<ScheduledReport>();
+            foreach (var schedule in result.Message.Value.ScheduledReports ?? [])
+            {
+                if (await abortRegistry.IsAbortedAsync(facilityId, schedule.ReportTrackingId, cancellationToken))
+                    continue;
+                remaining.Add(schedule);
+            }
+
+            if (remaining.Count == 0)
+            {
+                _logger.LogDebug(
+                    "Skipping ResourcesAcquired; every scheduled report is aborted FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                    facilityId.SanitizeForLog(),
+                    correlationId.SanitizeForLog());
+                await _resourceCachePurger.PurgeAsync(result.Message.Value, "pipeline aborted", cancellationToken);
+                return;
+            }
+
+            result.Message.Value.ScheduledReports = remaining;
+        }
+
         IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
-        using (var scope = _scopeFactory.CreateScope())
+        var mappingOutcomes = new MappingOutcomeAccumulator();
+
+        await RegisterConfiguredCodeMapsAsync(
+            scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
+
+        foreach (var cacheKey in cacheKeys)
         {
-            var mappingOutcomes = new MappingOutcomeAccumulator();
-
-            await RegisterConfiguredCodeMapsAsync(
-                scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
-
-            foreach (var cacheKey in cacheKeys)
-            {
-                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
+            ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -257,6 +296,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
                 else
                 {
+                    var hslocMappingResults = new List<HSLOCMappingResult>();
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
                     foreach (var resource in resources)
                     {
@@ -287,6 +327,7 @@ public class ResourcesAcquiredListener : BackgroundService
                             {
                                 OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.HSLOCMap => await _hslocMapOperationService.ProcessOperationAsync((HSLOCMapOperation)operation, resource, resources.OfType<Location>().ToList<DomainResource>(), cancellationToken),
                                 OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken: cancellationToken),
                                 OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken: cancellationToken),
@@ -308,6 +349,12 @@ public class ResourcesAcquiredListener : BackgroundService
                                                     new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
                                                     new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
                                                         operationResult.SuccessCode == OperationStatus.Success);
+                                }
+                                
+                                if(operation.OperationType == OperationType.HSLOCMap)
+                                {
+                                    _logger.LogDebug("HSLOCMap operation produced {CodeMappingCount} code mappings for {FacilityId}/{ResourceType}/{ResourceId}.", operationResult.CodeMapping?.Count ?? 0, result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                    hslocMappingResults.AddRange(BuildHSLOCMappingResults(result.Message.Key.FacilityId, resource, operationResult));
                                 }
                             }
                             else
@@ -340,42 +387,100 @@ public class ResourcesAcquiredListener : BackgroundService
                             resource.Id.SanitizeForLog(),
                             stepSummaryText);
                     }
+
+                    try{
+                        var facilityLocationLocalCodeMappingManager = scope.ServiceProvider.GetRequiredService<IFacilityLocationLocalCodeMappingManager>();
+                        await facilityLocationLocalCodeMappingManager.UpdateFacilityLocationLocalCodeMappings(result.Message.Key.FacilityId, hslocMappingResults, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(
+                            exception,
+                            "Failed to save HSLOC map results for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                            result.Message.Key.FacilityId.SanitizeForLog(),
+                            correlationId.SanitizeForLog());
+
+                        throw new TransientException("Failed to save HSLOC map results.", exception);
+                    }
                 }
 
-                await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
-                copiedKeys.Add(cacheKey);
-            }
-
-            if (cacheKeys.Count == 0)
-            {
-                _logger.LogInformation(
-                    "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
-                    result.Message.Key.FacilityId.SanitizeForLog(),
-                    correlationId.SanitizeForLog());
-            }
-
-            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
-
-            // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
-            // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
-            // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
-            // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
-            // avoidable noise on the topic, and this order also means a produce failure here can be
-            // swallowed without the pipeline caring, because the pipeline's own message is already out.
-            //
-            // Produced even when nothing was acquired: the configured code maps are declared up front, so
-            // this still reports them with zero counts, which is what separates "nothing reached the map"
-            // from "no map is configured".
-            await ProduceMappingOutcomeEvaluatedMessage(
-                result.Message.Key.FacilityId,
-                result.Message.Key.PatientId,
-                correlationId,
-                result.Message.Value,
-                mappingOutcomes,
-                cancellationToken);
-
-            await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+            await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            copiedKeys.Add(cacheKey);
         }
+
+        if (cacheKeys.Count == 0)
+        {
+            _logger.LogInformation(
+                "ResourcesAcquired listed no cache keys for FacilityId={FacilityId}, CorrelationId={CorrelationId}. Producing ResourcesNormalized so the pipeline can complete.",
+                result.Message.Key.FacilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+
+        await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
+
+        // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
+        // ResourcesAcquired message is redelivered and reprocessed; produced first, the outcome would
+        // then be produced a second time for the same pass. Report merges by (CorrelationId, QueryType)
+        // and replaces that pass, so the duplicate is harmless rather than double-counted -- but it is
+        // avoidable noise on the topic, and this order also means a produce failure here can be
+        // swallowed without the pipeline caring, because the pipeline's own message is already out.
+        //
+        // Produced even when nothing was acquired: the configured code maps are declared up front, so
+        // this still reports them with zero counts, which is what separates "nothing reached the map"
+        // from "no map is configured".
+        await ProduceMappingOutcomeEvaluatedMessage(
+            result.Message.Key.FacilityId,
+            result.Message.Key.PatientId,
+            correlationId,
+            result.Message.Value,
+            mappingOutcomes,
+            cancellationToken);
+
+        await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+    }
+
+    private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
+    {
+        var hslocMappingResults = new List<HSLOCMappingResult>();
+        if(operationResult == null || operationResult.SuccessCode == OperationStatus.Failure || resource is not Location location)
+        {
+            return hslocMappingResults;
+        }
+        var hslocMappingResult = new HSLOCMappingResult(facilityId, (Location)resource);
+        foreach (var mapping in operationResult.CodeMapping ?? [])
+        {
+            var sourceSystem = mapping.SourceSystem ?? string.Empty;
+            if (mapping.MappedCodes != null)
+            {
+                foreach (var mappedCode in mapping.MappedCodes)
+                {
+                    hslocMappingResult.LocationTypeCodes.Add(new HSLOCMappingResultCode
+                    {
+                        SourceSystem = sourceSystem,
+                        SourceCode = mappedCode.SourceCode,
+                        TargetCode = mappedCode.TargetCode
+                    });
+                }
+            }
+            if (mapping.UnmappedCodes != null)
+            {
+                foreach (var unmappedCode in mapping.UnmappedCodes)
+                {
+                    hslocMappingResult.LocationTypeCodes.Add(new HSLOCMappingResultCode
+                    {
+                        SourceSystem = sourceSystem,
+                        SourceCode = unmappedCode,
+                        TargetCode = null
+                    });
+                }
+            }
+        }
+        hslocMappingResults.Add(hslocMappingResult);
+        return hslocMappingResults;
     }
 
     private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)
@@ -483,7 +588,8 @@ public class ResourcesAcquiredListener : BackgroundService
             {
                 var dbEntity = sequence.OperationResourceType?.Operation;
 
-                if (dbEntity is null || dbEntity.IsDisabled || dbEntity.OperationType != OperationType.CodeMap.ToString())
+                if (dbEntity is null || dbEntity.IsDisabled ||
+                    (dbEntity.OperationType != OperationType.CodeMap.ToString() && dbEntity.OperationType != OperationType.HSLOCMap.ToString()))
                 {
                     continue;
                 }

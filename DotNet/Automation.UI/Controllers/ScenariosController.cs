@@ -54,6 +54,9 @@ public class ScenariosController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Scenario name is required.");
 
+        if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
+            return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
+
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
@@ -603,6 +606,7 @@ public class ScenariosController(
             Seed = source.Seed,
             PatientCount = source.PatientCount,
             NhsnOrganizationId = source.NhsnOrganizationId,
+            EnableDmrp = source.EnableDmrp,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
