@@ -55,6 +55,20 @@ export class MeasureMappingsDashboardComponent implements OnInit, OnDestroy {
   measureMappings: IMeasureMapping[] = [];
   paginationMetadata: PaginationMetadata = new PaginationMetadata();
   dataSource = new MatTableDataSource<IMeasureMapping>([]);
+
+  /**
+   * A mapping the DMRP sync recorded for a measure Link has no dQM for. It is a prompt, not a
+   * fault: the facilities enrolled in that measure report nothing for it until a dQM is set,
+   * and setting it here is what starts them.
+   */
+  needsDqm(mapping: IMeasureMapping): boolean {
+    return !mapping.dqm?.trim();
+  }
+
+  /** How many rows on the page still need one, for the prompt above the table. */
+  get awaitingDqmCount(): number {
+    return this.measureMappings.filter(mapping => this.needsDqm(mapping)).length;
+  }
   displayedColumns: string[] = ['measure', 'dqm', 'frequency', 'actions'];
 
   readonly frequencyOptions = MEASURE_MAPPING_FREQUENCIES;
