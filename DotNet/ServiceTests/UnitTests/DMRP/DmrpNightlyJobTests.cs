@@ -164,9 +164,9 @@ public class DmrpNightlyJobTests
     [Fact]
     public async Task A_scheduled_fire_time_override_rehearses_month_end_on_a_mid_month_fire()
     {
-        // 23:59 UTC on Oct 31 - the QA override anchors the periods there even though the trigger
+        // 23:59 local on Oct 31 - the QA override anchors the periods there even though the trigger
         // itself fired mid-month.
-        _settings.Scheduling.ScheduledFireTimeOverride = "2026-10-31T23:59:00Z";
+        _settings.Scheduling.ScheduledFireTimeOverride = "2026-10-31T23:59:00";
         _source
             .Setup(s => s.GetForPeriodAsync("100", 11, 2026, It.IsAny<CancellationToken>()))
             .ReturnsAsync([
@@ -181,6 +181,38 @@ public class DmrpNightlyJobTests
             .Should().BeEquivalentTo([ReportingPeriodMath.Daily, ReportingPeriodMath.Monthly]);
         _produced.Should().AllSatisfy(m =>
             ((ReportScheduledMessage)m.Value).StartDate.Should().Be(new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public async Task The_override_is_read_as_wall_clock_time_in_the_zone_jobs_own_timezone()
+    {
+        // The same value means a different instant per zone: 23:59 on Oct 31 in New York is
+        // 03:59Z on Nov 1 (EDT, the clocks change an hour later that night), so the periods it
+        // anchors start at Nov 1 00:00 Eastern = 04:00Z.
+        const string newYork = "America/New_York";
+        _directory
+            .Setup(d => d.GetActiveInTimeZoneAsync(newYork, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new ScheduledFacility("100", newYork)]);
+        _settings.Scheduling.ScheduledFireTimeOverride = "2026-10-31T23:59:00";
+
+        await CreateJob().Execute(ContextFiredAt(NightOfOctober14, newYork));
+
+        _sync.Verify(s => s.SyncAsync("100", 11, 2026, It.IsAny<CancellationToken>()), Times.Once);
+        _produced.Should().AllSatisfy(m =>
+            ((ReportScheduledMessage)m.Value).StartDate.Should().Be(new DateTime(2026, 11, 1, 4, 0, 0, DateTimeKind.Utc)));
+    }
+
+    [Fact]
+    public async Task An_override_carrying_an_offset_is_ignored_not_guessed()
+    {
+        // A UTC instant would be a different local night in every zone, so it is refused and the
+        // fire behaves as if no override were set: mid-month, Daily only, no DMRP call.
+        _settings.Scheduling.ScheduledFireTimeOverride = "2026-11-01T03:59:00Z";
+
+        await CreateJob().Execute(ContextFiredAt(NightOfOctober14));
+
+        _sync.Verify(s => s.SyncAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _produced.Should().ContainSingle().Which.Value.As<ReportScheduledMessage>().Frequency.Should().Be("Daily");
     }
 
     [Fact]

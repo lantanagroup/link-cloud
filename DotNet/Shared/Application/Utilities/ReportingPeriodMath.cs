@@ -58,7 +58,7 @@ public static class ReportingPeriodMath
     /// </summary>
     private const int MaxGapMinutes = 180;
 
-    private static DateTime ToUtcAfterGap(DateTime local, TimeZoneInfo timeZone)
+    public static DateTime ToUtcAfterGap(DateTime local, TimeZoneInfo timeZone)
     {
         if (timeZone.IsInvalidTime(local))
         {

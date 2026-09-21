@@ -91,24 +91,39 @@ public class DmrpSchedulingSettingsTests
             .ResolvedScheduledFireTimeOverride.Should().BeNull();
     }
 
-    [Fact]
-    public void An_override_with_a_Z_suffix_resolves_to_that_utc_instant()
+    [Theory]
+    [InlineData("2026-09-30T23:59:00")]
+    [InlineData("2026-09-30T23:59")]
+    [InlineData("2026-09-30 23:59:00")]
+    public void An_override_without_an_offset_resolves_to_that_local_wall_clock_time(string value)
     {
-        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-10-01T03:59:00Z" }
-            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+        var resolved = new DmrpSchedulingSettings { ScheduledFireTimeOverride = value }.ResolvedScheduledFireTimeOverride;
+
+        resolved.Should().Be(new DateTime(2026, 9, 30, 23, 59, 0));
+        resolved!.Value.Kind.Should().Be(DateTimeKind.Unspecified);
     }
 
-    [Fact]
-    public void An_override_with_an_explicit_zero_offset_resolves_to_the_same_instant_as_Z()
+    [Theory]
+    [InlineData("2026-10-01T03:59:00Z")]
+    [InlineData("2026-10-01T03:59:00+00:00")]
+    [InlineData("2026-09-30T23:59:00-04:00")]
+    public void An_override_carrying_an_offset_is_rejected_rather_than_guessed(string value)
     {
-        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-10-01T03:59:00+00:00" }
-            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+        // The value is read in each facility timezone; an instant would mean a different local
+        // night per zone, so it is refused instead of silently converted.
+        var settings = new DmrpSchedulingSettings { ScheduledFireTimeOverride = value };
+
+        settings.ResolvedScheduledFireTimeOverride.Should().BeNull();
+        settings.ScheduledFireTimeOverrideIsInvalid.Should().BeTrue();
     }
 
-    [Fact]
-    public void An_override_with_a_non_utc_offset_is_adjusted_to_the_same_utc_instant()
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("not a date", true)]
+    public void Invalid_means_set_but_unusable(string? value, bool expected)
     {
-        new DmrpSchedulingSettings { ScheduledFireTimeOverride = "2026-09-30T23:59:00-04:00" }
-            .ResolvedScheduledFireTimeOverride.Should().Be(new DateTimeOffset(2026, 10, 1, 3, 59, 0, TimeSpan.Zero));
+        new DmrpSchedulingSettings { ScheduledFireTimeOverride = value }
+            .ScheduledFireTimeOverrideIsInvalid.Should().Be(expected);
     }
 }

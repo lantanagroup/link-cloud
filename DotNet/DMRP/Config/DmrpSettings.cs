@@ -143,23 +143,41 @@ namespace LantanaGroup.Link.DMRP.Config
         /// <summary>
         /// A QA aid: when set, every fire of the nightly job anchors its periods on this instant
         /// instead of the trigger's scheduled time, so the month-end refresh and the Monthly
-        /// announcement can be rehearsed on any date. Must never be set in a production environment.
-        /// An unparseable value is ignored, treated the same as unset.
+        /// announcement can be rehearsed on any date. Written as local wall-clock time with no
+        /// offset, e.g. "2026-09-30T23:59:00", read in each facility's timezone. Must never be set
+        /// in a production environment. A value that is not in that form is ignored, with a warning.
         /// </summary>
         public string? ScheduledFireTimeOverride { get; set; }
 
         /// <summary>
-        /// <see cref="ScheduledFireTimeOverride"/> parsed as an ISO-8601 instant, or null when it is
-        /// unset, blank, or not parseable. An offset other than UTC is adjusted to UTC rather than
-        /// rejected, so "2026-09-30T23:59:00-04:00" resolves to the same instant as
-        /// "2026-10-01T03:59:00Z".
+        /// <see cref="ScheduledFireTimeOverride"/> parsed as a wall-clock date and time with no
+        /// offset (<c>DateTimeKind.Unspecified</c>), or null when it is unset, blank, or not in that
+        /// form. Each zone job reads it in its own timezone, so "2026-09-30T23:59:00" is the last
+        /// night of September for every facility, whatever zone it is in. A value carrying a Z or an
+        /// offset is refused rather than converted: an instant would be a different local night in
+        /// each zone, which is never what a rehearsal means.
         /// </summary>
-        public DateTimeOffset? ResolvedScheduledFireTimeOverride =>
+        public DateTime? ResolvedScheduledFireTimeOverride =>
             !string.IsNullOrWhiteSpace(ScheduledFireTimeOverride)
-            && DateTimeOffset.TryParse(ScheduledFireTimeOverride, CultureInfo.InvariantCulture,
-                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
+            && DateTime.TryParseExact(ScheduledFireTimeOverride.Trim(), OverrideFormats,
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
                 ? parsed
                 : null;
+
+        /// <summary>
+        /// True when <see cref="ScheduledFireTimeOverride"/> is set but does not resolve, so the job
+        /// can say why it is ignoring it rather than silently running without it.
+        /// </summary>
+        public bool ScheduledFireTimeOverrideIsInvalid =>
+            !string.IsNullOrWhiteSpace(ScheduledFireTimeOverride) && ResolvedScheduledFireTimeOverride is null;
+
+        private static readonly string[] OverrideFormats =
+        [
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm"
+        ];
 
         public string ResolvedNightlyCron =>
             !string.IsNullOrWhiteSpace(NightlyCron) && Quartz.CronExpression.IsValidExpression(NightlyCron)
