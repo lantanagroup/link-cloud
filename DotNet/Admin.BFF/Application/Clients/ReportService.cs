@@ -260,7 +260,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             return await _client.GetAsync($"api/schedules/facilities/{Uri.EscapeDataString(facilityId)}?blocking=true", cancellationToken);
         }
 
-        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken, bool allowInProgress = false)
         {
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
@@ -269,7 +269,11 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            return await _client.DeleteAsync($"api/schedules/{Uri.EscapeDataString(reportScheduleId)}", cancellationToken);
+            var path = $"api/schedules/{Uri.EscapeDataString(reportScheduleId)}";
+            if (allowInProgress)
+                path += "?allowInProgress=true";
+
+            return await _client.DeleteAsync(path, cancellationToken);
         }
 
         public async Task<HttpResponseMessage> RestoreReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
