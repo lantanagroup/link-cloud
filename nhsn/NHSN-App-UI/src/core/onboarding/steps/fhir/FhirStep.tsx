@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
@@ -47,6 +47,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
     persistedTestedBaseUrl ? {success: true, message: t('onboarding:fhirServerInfo.messages.testSuccess')} : null
   );
   const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(persistedTestedBaseUrl);
+
+  const testResultRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (testing || testResult) {
+      scrollNearestContainerToBottom(testResultRef.current);
+    }
+  }, [testing, testResult]);
 
   const [readyToAdvance, setReadyToAdvance] = useState(false);
 
@@ -464,7 +471,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
           </p>
 
           {(testing || testResult) && (
-            <div className="fhir-test-result" role="status">
+            <div className="fhir-test-result" role="status" ref={testResultRef}>
               {testing ? (
                 <span className="result-spinner" aria-hidden="true" />
               ) : (
@@ -482,6 +489,18 @@ export function FhirStep({onNext, onBack}: StepProps) {
 }
 
 export default FhirStep;
+
+function scrollNearestContainerToBottom(element: HTMLElement | null): void {
+  let node = element?.parentElement ?? null;
+  while (node) {
+    const {overflowY} = window.getComputedStyle(node);
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      node.scrollTo({top: node.scrollHeight, behavior: 'smooth'});
+      return;
+    }
+    node = node.parentElement;
+  }
+}
 
 /** A letter can never be part of a valid HH:MM time, so it's blocked at every keystroke. */
 function digitsOnly(value: string): string {
