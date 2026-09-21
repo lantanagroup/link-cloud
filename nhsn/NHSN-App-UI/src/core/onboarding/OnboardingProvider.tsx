@@ -19,6 +19,7 @@ import {useNotifications} from '../notifications/NotificationProvider';
 import {furthestLegalStep, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
 import {draftReducer, type DraftAction, type DraftSections} from './reducer';
+import {useStableCallback} from './StepChrome';
 import {createEmptyDraft, migrateDraft, type FacilityDraft, type StepId, type StepTarget, type StepView} from './types';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -51,6 +52,7 @@ interface OnboardingContextValue {
   closeView: () => void;
   reloadDraft: () => Promise<void>;
   dispatch: React.Dispatch<DraftAction>;
+  registerStepValidator: (validate: (() => boolean) | null) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -66,6 +68,15 @@ export function useOnboarding(): OnboardingContextValue {
 /** Selector hook so a step re-renders on its own slice rather than the whole draft. */
 export function useDraftSection<K extends keyof DraftSections>(section: K): DraftSections[K] {
   return useOnboarding().draft[section] as DraftSections[K];
+}
+
+export function useStepValidator(validate: () => boolean) {
+  const {registerStepValidator} = useOnboarding();
+  const stableValidate = useStableCallback(validate);
+  useEffect(() => {
+    registerStepValidator(stableValidate);
+    return () => registerStepValidator(null);
+  }, [registerStepValidator, stableValidate]);
 }
 
 export function OnboardingProvider({
@@ -103,11 +114,16 @@ export function OnboardingProvider({
   const pendingSaves = useRef(0);
   const dirtyRef = useRef(false);
   const lastSavedDraftRef = useRef<FacilityDraft>();
+  const activeValidatorRef = useRef<(() => boolean) | null>(null);
   const [pendingStepId, setPendingStepId] = useState<StepId | null>(null);
   const [errorStepIds, setErrorStepIdsState] = useState<ReadonlySet<StepId>>(() => new Set());
 
   const setErrorStepIds = useCallback((stepIds: Iterable<StepId>) => {
     setErrorStepIdsState(new Set(stepIds));
+  }, []);
+
+  const registerStepValidator = useCallback((validate: (() => boolean) | null) => {
+    activeValidatorRef.current = validate;
   }, []);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
@@ -286,12 +302,16 @@ export function OnboardingProvider({
     }
     const stepId = pendingStepId;
     setPendingStepId(null);
+    if (activeValidatorRef.current && !activeValidatorRef.current()) {
+      notifyError(t('unsavedChanges.messages.incomplete'));
+      return;
+    }
     persistDraft(draft).then(saved => {
       if (saved) {
         completeGoTo(stepId);
       }
     });
-  }, [pendingStepId, draft, persistDraft, completeGoTo]);
+  }, [pendingStepId, draft, persistDraft, completeGoTo, notifyError, t]);
 
   const confirmDiscardChanges = useCallback(() => {
     if (pendingStepId === null) {
@@ -339,9 +359,9 @@ export function OnboardingProvider({
     }
     const previous = previousStepId(target.stepId, draft, user);
     if (previous) {
-      advanceTo(previous, 'back');
+      goTo(previous);
     }
-  }, [target, draft, user, advanceTo]);
+  }, [target, draft, user, goTo]);
 
   const openView = useCallback((view: StepView) => {
     setUrlTarget(undefined);
@@ -389,7 +409,8 @@ export function OnboardingProvider({
       openView,
       closeView,
       reloadDraft,
-      dispatch
+      dispatch,
+      registerStepValidator
     }),
     [
       loadState,
@@ -412,6 +433,7 @@ export function OnboardingProvider({
       goBack,
       openView,
       closeView,
+      registerStepValidator,
       reloadDraft
     ]
   );
@@ -423,6 +445,8 @@ export function OnboardingProvider({
         open={pendingStepId !== null}
         title={t('unsavedChanges.title')}
         onClose={() => setPendingStepId(null)}
+        showCloseButton
+        closeLabel={t('actions.close')}
         footer={
           <>
             <Button variant="secondary" onClick={confirmDiscardChanges}>

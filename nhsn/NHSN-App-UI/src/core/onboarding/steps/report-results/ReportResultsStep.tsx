@@ -39,7 +39,7 @@ import {
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import type { StepProps } from '../../flow';
-import { useOnboarding } from '../../OnboardingProvider';
+import { useOnboarding, useStepValidator } from '../../OnboardingProvider';
 import { useStableCallback, useStepChrome } from '../../StepChrome';
 import type { LocationOrgDraft } from '../../types';
 import { buildGroups, decodeTarget, encodeTarget } from '../encounter/EncounterStep';
@@ -1204,16 +1204,25 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     }
   }
 
-  function handleNext() {
+  function validateStep(): boolean {
     if (!reportAccuracyAcknowledged) {
       setValidationMessage(
         t('onboarding:reportResults.messages.notAcknowledged'),
       );
-      return;
+      return false;
     }
     setValidationMessage(null);
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateStep()) {
+      return;
+    }
     onNext();
   }
+
+  useStepValidator(validateStep);
 
   const stableHandleViewQueryPlan = useStableCallback(handleViewQueryPlan);
   const stableHandleViewAcquisitionLog = useStableCallback(handleViewAcquisitionLog);

@@ -14,7 +14,7 @@ import {
 } from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {PatientSelection} from './PatientSelection';
 import {enteredPatientIds, validateReport, type FieldErrors} from './validate';
@@ -93,15 +93,22 @@ export function ReportStep({onNext, onBack}: StepProps) {
     window.setTimeout(() => setValidationError(message), 0);
   }
 
-  async function handleGenerate() {
+  function validateStep(): boolean {
     setTouched({measures: true, startDate: true, endDate: true, patientIds: true});
     const nextErrors = validateReport(draftForValidation());
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       announceValidationMessage(t('onboarding:report.messages.incomplete'));
-      return;
+      return false;
     }
     setValidationError(null);
+    return true;
+  }
+
+  async function handleGenerate() {
+    if (!validateStep()) {
+      return;
+    }
 
     setRequesting(true);
     try {
@@ -155,6 +162,8 @@ export function ReportStep({onNext, onBack}: StepProps) {
   // filtered out here instead.
   const validMeasureNames = new Set(availableMeasures.map(measure => measure.name));
   const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
+
+  useStepValidator(validateStep);
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleGenerate = useStableCallback(handleGenerate);

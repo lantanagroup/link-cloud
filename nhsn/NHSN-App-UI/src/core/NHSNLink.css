@@ -1936,10 +1936,42 @@
   max-height: 92vh;
 }
 
+.nhsn-link__modal-header {
+  display: flex;
+  flex-grow: 0;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .nhsn-link__modal-title {
   flex: none;
-  margin: 0 0 10px 0;
+  margin: 0 !important;
   font-size: 17px;
+  line-height: 1.2;
+}
+
+.nhsn-link__modal-close {
+  display: flex;
+  flex-grow: 0;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--kendo-color-on-app-surface, #1a1a1a);
+  font-size: 20px;
+  line-height: 1;
+  padding-bottom: 5px;
+  cursor: pointer;
+}
+
+.nhsn-link__modal-close:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
 }
 
 .nhsn-link__modal-body {
@@ -2349,6 +2381,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 2px;
+  justify-content: flex-end;
 }
 
 .nhsn-link__report-results-icon-button {

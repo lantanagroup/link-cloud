@@ -3,7 +3,7 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
 import './FhirStep.css';
@@ -177,7 +177,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
     }
   }
 
-  function handleNext() {
+  function validateStep(): boolean {
     setTouched({
       fhirServerBaseUrl: true,
       maxConcurrentRequests: true,
@@ -203,16 +203,24 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
     if (Object.keys(nextErrors).length > 0) {
       announceValidationMessage(t('onboarding:fhirServerInfo.messages.incomplete'));
-      return;
+      return false;
     }
 
     if (testedBaseUrl !== trimmedBaseUrl) {
       announceValidationMessage(t('onboarding:fhirServerInfo.messages.connectionNotTested'));
-      return;
+      return false;
     }
 
     setValidationError(null);
+    return true;
+  }
 
+  function handleNext() {
+    if (!validateStep()) {
+      return;
+    }
+
+    const trimmedBaseUrl = baseUrl.trim();
     patch('fhir', {
       fhirServerBaseUrl: trimmedBaseUrl,
       maxConcurrentRequests: maxConcurrentRequests!,
@@ -224,6 +232,8 @@ export function FhirStep({onNext, onBack}: StepProps) {
     });
     setReadyToAdvance(true);
   }
+
+  useStepValidator(validateStep);
 
   const jwksInstructionsKey = vendorProfile?.documentKeys.jwksInstructions;
   const vendorDisplayName = vendorProfile?.displayName ?? '';

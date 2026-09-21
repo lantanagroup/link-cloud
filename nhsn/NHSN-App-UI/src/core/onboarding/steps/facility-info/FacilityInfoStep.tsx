@@ -14,7 +14,7 @@ import {
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import type { StepProps } from '../../flow';
-import { useOnboarding } from '../../OnboardingProvider';
+import { useOnboarding, useStepValidator } from '../../OnboardingProvider';
 import { useStableCallback, useStepChrome } from '../../StepChrome';
 import type { FacilityInfoDraft } from '../../types';
 import { validateFacilityInfo, type FieldErrors } from './validate';
@@ -69,16 +69,23 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
     setTouched((prev) => ({ ...prev, [field]: true }));
   }
 
-  function handleNext() {
+  function validateStep(): boolean {
     setTouched({ timeZone: true, vendor: true });
     const fieldErrors = validateFacilityInfo(draft);
     setErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) {
       setValidationError(t('onboarding:facilityInfo.messages.incomplete'));
-      return;
+      return false;
     }
 
     setValidationError(null);
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateStep()) {
+      return;
+    }
     onNext();
   }
 
@@ -92,6 +99,8 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
       setValidationError(null);
     }
   }
+
+  useStepValidator(validateStep);
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleNext = useStableCallback(handleNext);

@@ -30,7 +30,7 @@ import {
   parseHoursMinutesDuration,
 } from "../../../shared/duration";
 import type { StepProps } from "../../flow";
-import { useOnboarding } from "../../OnboardingProvider";
+import { useOnboarding, useStepValidator } from "../../OnboardingProvider";
 import { useStableCallback, useStepChrome } from "../../StepChrome";
 import { CENSUS_LIST_KEYS, validateCensus, type FieldErrors } from "./validate";
 import "./CensusStep.css";
@@ -376,24 +376,33 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       });
   }
 
-  function handleNext() {
+  function validateStep(): boolean {
     const nextErrors = validateCensus(draft, acquisition);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       announceValidationMessage(t("onboarding:census.messages.incomplete"));
-      return;
+      return false;
     }
     if (acquisition === "Sftp" && !sftpConnectionVerified) {
       announceValidationMessage(t("onboarding:census.messages.connectionNotTested"));
-      return;
+      return false;
     }
     if (validationLive && !census.accuracyAcknowledged) {
       announceValidationMessage(t("onboarding:census.messages.notAcknowledged"));
-      return;
+      return false;
     }
     setValidationMessage(null);
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateStep()) {
+      return;
+    }
     onNext();
   }
+
+  useStepValidator(validateStep);
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleNext = useStableCallback(handleNext);

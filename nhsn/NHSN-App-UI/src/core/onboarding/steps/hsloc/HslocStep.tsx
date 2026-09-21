@@ -22,7 +22,7 @@ import {
 } from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes} from './validate';
 import './HslocStep.css';
@@ -254,13 +254,20 @@ export function HslocStep({onNext, onBack}: StepProps) {
     return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [codes]);
 
-  async function handleNext() {
+  function validateStep(): boolean {
     if (incompleteRowIndexes.size > 0) {
       notifyError(t('onboarding:hsloc.messages.incomplete'));
-      return;
+      return false;
     }
     if (duplicateRowIndexes.size > 0) {
       notifyError(t('onboarding:hsloc.messages.duplicate'));
+      return false;
+    }
+    return true;
+  }
+
+  async function handleNext() {
+    if (!validateStep()) {
       return;
     }
 
@@ -277,6 +284,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
       setSubmitting(false);
     }
   }
+
+  useStepValidator(validateStep);
 
   const busy = saving || submitting;
   const stableOnBack = useStableCallback(onBack);
