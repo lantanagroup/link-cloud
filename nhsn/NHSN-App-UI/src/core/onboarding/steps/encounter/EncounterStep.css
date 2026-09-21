@@ -289,7 +289,7 @@
 
 .encounter-mapping .encounter-filters .k-dropdownlist.k-focus,
 .encounter-mapping .encounter-filters .k-dropdownlist:focus {
-  border-color: var(--encounter-blue);
+  border-color: var(--encounter-gray-200);
   outline: 2px solid var(--encounter-blue);
   outline-offset: 1px;
   box-shadow: none;

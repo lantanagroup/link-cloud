@@ -173,6 +173,10 @@ export interface DateFieldProps extends BaseFieldProps<string> {
 const DATE_DISPLAY_FORMAT = 'dd-MM-yyyy';
 const DATE_MASK = {year: 'yyyy', month: 'mm', day: 'dd'};
 
+function markCalendarAsApplication(instance: {element: HTMLDivElement | null} | null) {
+  instance?.element?.setAttribute('role', 'application');
+}
+
 function DateCalendarWithFooter(props: CalendarProps) {
   const {t} = useTranslation('common');
   const emitChange = (value: Date | null) =>
@@ -180,7 +184,13 @@ function DateCalendarWithFooter(props: CalendarProps) {
 
   return (
     <>
-      <Calendar {...props} />
+      <Calendar
+        {...props}
+        _ref={instance => {
+          props._ref?.(instance);
+          markCalendarAsApplication(instance);
+        }}
+      />
       <div className="nhsn-link__date-popup-footer">
         <button type="button" className="nhsn-link__date-popup-footer-link" onClick={() => emitChange(null)}>
           {t('actions.clear')}

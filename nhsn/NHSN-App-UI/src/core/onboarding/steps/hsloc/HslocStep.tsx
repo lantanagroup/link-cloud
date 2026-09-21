@@ -5,15 +5,18 @@ import {useApiClient} from '../../../api/ApiClientContext';
 import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/contracts';
 import {
   AcronymText,
+  acronymLabel,
   acronymTitle,
   Button,
   FieldLabel,
+  HeadingPause,
   NewTabAnnouncement,
   NHSNLoadingIndicator,
   RepeatableList,
   SidePanel,
   SidePanelLayout,
   StepActions,
+  TableCaption,
   Tabs,
   TextField
 } from '../../../fields';
@@ -285,7 +288,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
         loading
           ? null
           : {
-              title: acronymTitle(<AcronymText>{t('onboarding:hsloc.title')}</AcronymText>),
+              title: acronymTitle(<HeadingPause><AcronymText>{t('onboarding:hsloc.title')}</AcronymText></HeadingPause>),
               footer: (
                 <StepActions saving={busy}>
                   <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
@@ -321,17 +324,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
       <div className="nhsn-link__field-group">
         <Tabs<HslocTab>
-          label={t('onboarding:hsloc.title')}
+          label={acronymLabel(t('onboarding:hsloc.title'))}
           tabs={[
             {id: 'mapping', label: t('onboarding:hsloc.tabs.mapping')},
             {id: 'reference', label: <AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText>}
           ]}
           activeTab={tab}
-          onTabChange={setTab}
-        />
-      </div>
-
-      {tab === 'mapping' && (
+          onTabChange={setTab}>
+          {tab === 'mapping' && (
         <div className="nhsn-link__field-group">
           <FieldLabel checked={false}><AcronymText>{t('onboarding:hsloc.mapping.listLabel')}</AcronymText></FieldLabel>
           <RepeatableList<MappingRow>
@@ -452,7 +452,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
             <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__table nhsn-link__hsloc-table">
-                <caption className="nhsn-link__visually-hidden"><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></caption>
+                <TableCaption><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></TableCaption>
                 <thead>
                   <tr>
                     <th scope="col">{t('onboarding:hsloc.reference.columns.category')}</th>
@@ -527,7 +527,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
             )}
           </SidePanel>
         </SidePanelLayout>
-      )}
+          )}
+        </Tabs>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import React, {useMemo} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, MessageContainer, NHSNLoadingIndicator, StepActions} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, MessageContainer, NHSNLoadingIndicator, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStepChrome} from '../../StepChrome';
@@ -68,7 +68,7 @@ export function CompleteStep(_props: StepProps) {
         loading
           ? null
           : {
-              title: t('onboarding:complete.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:complete.title')}</HeadingPause>),
               footer: (
                 <StepActions>
                   <Button onClick={goHome}>{t('common:actions.returnToHome')}</Button>

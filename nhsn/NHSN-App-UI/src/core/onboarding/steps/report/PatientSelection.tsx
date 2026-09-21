@@ -12,6 +12,7 @@ import {
   MessageContainer,
   RepeatableList,
   RequiredAsterisk,
+  TableCaption,
   Tabs,
   TextField
 } from '../../../fields';
@@ -270,7 +271,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
               <>
                 <div className="report-patient-scroll" tabIndex={-1}>
                   <table>
-                    <caption className="nhsn-link__visually-hidden">{t('onboarding:report.patients.census.sourceLabel')}</caption>
+                    <TableCaption>{t('onboarding:report.patients.census.sourceLabel')}</TableCaption>
                     <thead>
                       <tr>
                         <th scope="col">
@@ -323,7 +324,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
         <div className="section-title">{t('onboarding:report.patients.census.selectedTitle')}</div>
         <div className="report-patient-scroll" tabIndex={-1}>
           <table>
-            <caption className="nhsn-link__visually-hidden">{t('onboarding:report.patients.census.selectedTitle')}</caption>
+            <TableCaption>{t('onboarding:report.patients.census.selectedTitle')}</TableCaption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:report.patients.columnPatientId')}</th>

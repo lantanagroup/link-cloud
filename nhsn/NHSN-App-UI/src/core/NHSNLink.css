@@ -469,9 +469,14 @@
   border-radius: 8px;
 }
 
-.nhsn-link .k-button.k-button-primary:hover:not(:disabled) {
+.nhsn-link .k-button.k-button-primary:hover:not(:disabled):not(.nhsn-link__button--disabled) {
   background: var(--kendo-color-primary-hover, #063f78);
   border-color: var(--kendo-color-primary-hover, #063f78);
+}
+
+.nhsn-link .k-button.k-button-primary.nhsn-link__button--disabled:hover {
+  background: var(--kendo-color-primary, #0057b7);
+  border-color: var(--kendo-color-primary, #0057b7);
 }
 
 .nhsn-link .k-button.k-button-base {
@@ -484,13 +489,23 @@
   border-radius: 8px;
 }
 
-.nhsn-link .k-button.k-button-base:hover:not(:disabled) {
+.nhsn-link .k-button.k-button-base:hover:not(:disabled):not(.nhsn-link__button--disabled) {
   background: var(--kendo-color-base-hover, #eef0f3);
+  border-color: var(--kendo-color-primary, #0057b7);
+}
+
+.nhsn-link .k-button.k-button-base.nhsn-link__button--disabled:hover {
+  background: var(--kendo-color-app-surface, #ffffff);
   border-color: var(--kendo-color-primary, #0057b7);
 }
 
 .nhsn-link .k-button:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nhsn-link .k-button.nhsn-link__button--disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -854,7 +869,8 @@
   align-self: flex-start;
 }
 
-.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label,
+.nhsn-link__step-panel .k-label:has(+ .nhsn-link__hint-trigger) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -862,7 +878,8 @@
 
 /* The flex row's own `gap` already spaces the asterisk from the label text -
    the block-layout `margin-left` above would double up with it here. */
-.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label svg {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label svg,
+.nhsn-link__step-panel .k-label:has(+ .nhsn-link__hint-trigger) svg {
   margin-left: 0;
 }
 
@@ -883,7 +900,7 @@
   pointer-events: auto;
 }
 
-.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label:has(.nhsn-link__hint-trigger)::after {
+.nhsn-link__step-panel .k-form-field:has(.k-form-hint) .k-label:has(+ .nhsn-link__hint-trigger)::after {
   content: none;
 }
 
@@ -907,9 +924,15 @@
   pointer-events: auto;
 }
 
-.nhsn-link__step-panel .k-form-field--hint-open .nhsn-link__hint-trigger {
+.nhsn-link__step-panel .k-form-field--hint-open .nhsn-link__hint-trigger,
+.info-icon.info-icon--open {
   background: var(--hint-badge-open-bg, var(--kendo-color-primary, #0057b7));
   color: var(--kendo-color-on-inverse, #ffffff);
+}
+
+.nhsn-link__step-panel .k-form-field:not(.nhsn-link__hint-hover-suppressed) .nhsn-link__hint-trigger:hover .nhsn-link__hint-trigger-bubble,
+.info-icon:not(.nhsn-link__hint-hover-suppressed):hover .tooltip-bubble {
+  display: block;
 }
 
 .nhsn-link__hint-trigger:focus-visible {
@@ -1051,11 +1074,12 @@
   cursor: pointer;
 }
 
-.nhsn-link__download-button:hover:not(:disabled) {
+.nhsn-link__download-button:hover:not(:disabled):not(.nhsn-link__download-button--busy) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__download-button:disabled {
+.nhsn-link__download-button:disabled,
+.nhsn-link__download-button--busy {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1119,11 +1143,12 @@
   cursor: pointer;
 }
 
-.nhsn-link__upload-choose-button:hover:not(:disabled) {
+.nhsn-link__upload-choose-button:hover:not(:disabled):not(.nhsn-link__upload-choose-button--busy) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
-.nhsn-link__upload-choose-button:disabled {
+.nhsn-link__upload-choose-button:disabled,
+.nhsn-link__upload-choose-button--busy {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -1502,6 +1527,15 @@
   background: var(--kendo-color-primary, #0b5cab);
   color: var(--kendo-color-on-primary, #ffffff);
   box-shadow: none;
+}
+
+.nhsn-link__date-popup .k-calendar-td.k-focus .k-link,
+.nhsn-link__date-popup .k-calendar-td.k-focus .k-calendar-cell-inner,
+.nhsn-link__date-popup .k-calendar-td.k-today.k-focus .k-link,
+.nhsn-link__date-popup .k-calendar-td.k-today.k-focus .k-calendar-cell-inner,
+.nhsn-link__date-popup .k-calendar-td.k-selected.k-focus .k-link,
+.nhsn-link__date-popup .k-calendar-td.k-selected.k-focus .k-calendar-cell-inner {
+  box-shadow: 0 0 0 2px #000000 inset !important;
 }
 
 /* ---- chip multi-select (core/fields/ChipMultiSelect.tsx) */
@@ -2330,13 +2364,14 @@
   cursor: pointer;
 }
 
-.nhsn-link__report-results-icon-button:hover:not(:disabled) {
+.nhsn-link__report-results-icon-button:hover:not(:disabled):not(.nhsn-link__report-results-icon-button--busy) {
   background: var(--kendo-color-base-hover, #f2f4f7);
 }
 
 /* A dimmed icon color reads as "not available" without fading the border to near-invisibility the
    way a blanket opacity would. */
-.nhsn-link__report-results-icon-button:disabled {
+.nhsn-link__report-results-icon-button:disabled,
+.nhsn-link__report-results-icon-button--busy {
   color: #9ca3af;
   cursor: not-allowed;
 }

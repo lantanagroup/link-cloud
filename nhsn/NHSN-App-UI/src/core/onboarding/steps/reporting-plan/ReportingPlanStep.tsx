@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
-import {Button, MessageContainer, StepActions} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions, TableCaption} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -67,7 +67,7 @@ function buildReportingPlanRows(referenceDate: Date): ReportingPlanRow[] {
 
 export function ReportingPlanStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving} = useOnboarding();
+  const {saving, savingDirection} = useOnboarding();
 
   // Built locally on every visit — deterministic in the current month, so
   // nothing needs to be persisted for it to survive a reload.
@@ -86,19 +86,19 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:reportingPlan.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:reportingPlan.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving || !hasSchedule} loading={saving}>
+            <Button onClick={stableOnNext} disabled={saving || !hasSchedule} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableOnNext, hasSchedule]
+      [t, saving, savingDirection, stableOnBack, stableOnNext, hasSchedule]
     )
   );
 
@@ -109,7 +109,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
       {hasSchedule ? (
         <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__reporting-plan-table">
-            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportingPlan.title')}</caption>
+            <TableCaption>{t('onboarding:reportingPlan.title')}</TableCaption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:reportingPlan.columns.month')}</th>
