@@ -911,6 +911,7 @@
   width: 15px;
   height: 15px;
   flex: 0 0 15px;
+  margin-left: 6px;
   border: none;
   border-radius: 50%;
   background: var(--hint-badge-bg, var(--kendo-color-border, #d0d7de));
