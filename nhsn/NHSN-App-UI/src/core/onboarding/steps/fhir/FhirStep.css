@@ -12,57 +12,6 @@
 
   color: var(--fhir-gray-800);
   font-size: 15px;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.fhir-server-info .card {
-  background: var(--kendo-color-app-surface, #ffffff);
-  border: 1px solid var(--fhir-gray-200);
-  border-radius: var(--fhir-radius);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.fhir-server-info .card-scroll {
-  padding: 0 32px 28px;
-  border-radius: inherit;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.fhir-server-info .card-scroll > * {
-  flex-shrink: 0;
-}
-
-.fhir-server-info .page-header {
-  padding: 0;
-  border-bottom: none !important;
-  display: block;
-}
-
-.fhir-server-info .page-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
-}
-
-.fhir-server-info .page-header-title:focus {
-  outline: none;
-}
-
-.fhir-server-info .page-header-buttons {
-  display: none;
 }
 
 .fhir-server-info .subtitle {
@@ -140,12 +89,6 @@
 
 .fhir-server-info .download-link:hover {
   background: var(--fhir-gray-100);
-}
-
-.fhir-server-info .card .nhsn-link__step-actions {
-  position: static;
-  margin: 0;
-  padding: 16px 32px 28px;
 }
 
 .fhir-server-info .triplet {

@@ -3,10 +3,11 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
-import {Button, NewTabAnnouncement, NHSNLoadingIndicator, PageHeader, Select, StepActions, Tabs, TextField} from '../../../fields';
+import {Button, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {findIncompleteRowKeys} from './validate';
 import './EncounterStep.css';
 
@@ -230,16 +231,38 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     setReadyToAdvance(true);
   }
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: t('onboarding:encounter.title'),
+              footer: (
+                <StepActions saving={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                    {t('common:actions.continue')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [t, loading, saving, stableOnBack, stableHandleNext]
+    )
+  );
+
   if (loading) {
     return <NHSNLoadingIndicator />;
   }
 
   return (
     <div className="encounter-mapping">
-      <div className="card">
-        <div className="card-scroll">
-          <PageHeader title={t('onboarding:encounter.title')} />
-          <p className="subtitle">
+        <p className="subtitle">
             <Trans
               t={t}
               i18nKey="onboarding:encounter.subtitle"
@@ -441,18 +464,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               </div>
             </div>
           )}
-
-        </div>
-
-        <StepActions saving={saving}>
-          <Button variant="secondary" onClick={onBack} disabled={saving}>
-            {t('common:actions.back')}
-          </Button>
-          <Button onClick={handleNext} disabled={saving} loading={saving}>
-            {t('common:actions.continue')}
-          </Button>
-        </StepActions>
-      </div>
     </div>
   );
 }

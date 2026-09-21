@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as XLSX from "xlsx";
 import { useApiClient } from "../../../api/ApiClientContext";
@@ -15,7 +15,6 @@ import {
   CheckboxField,
   DownloadLinkButton,
   NumberField,
-  PageHeader,
   RequiredAsterisk,
   SidePanel,
   SidePanelLayout,
@@ -29,6 +28,7 @@ import {
 } from "../../../shared/duration";
 import type { StepProps } from "../../flow";
 import { useOnboarding } from "../../OnboardingProvider";
+import { useStableCallback, useStepChrome } from "../../StepChrome";
 import { CENSUS_LIST_KEYS, validateCensus, type FieldErrors } from "./validate";
 import "./CensusStep.css";
 
@@ -392,22 +392,43 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     onNext();
   }
 
-  if (!vendorProfile) {
-    return (
-      <div className="census-poi">
-        <div className="card">
-          <div className="card-scroll">
-            <PageHeader title={t("onboarding:census.title")} />
-            <p className="subtitle">
-              {t("onboarding:census.messages.vendorRequired")}
-            </p>
-          </div>
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t("onboarding:census.title"),
+        footer: !vendorProfile ? (
           <StepActions>
-            <Button variant="secondary" onClick={onBack}>
+            <Button variant="secondary" onClick={stableOnBack}>
               {t("common:actions.back")}
             </Button>
           </StepActions>
-        </div>
+        ) : (
+          <StepActions saving={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+              {t("common:actions.back")}
+            </Button>
+            <Button
+              onClick={stableHandleNext}
+              disabled={saving || (acquisition === "Sftp" && !sftpConnectionVerified)}
+              loading={saving}>
+              {t("common:actions.continue")}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, vendorProfile, stableOnBack, saving, stableHandleNext, acquisition, sftpConnectionVerified]
+    )
+  );
+
+  if (!vendorProfile) {
+    return (
+      <div className="census-poi">
+        <p className="subtitle">
+          {t("onboarding:census.messages.vendorRequired")}
+        </p>
       </div>
     );
   }
@@ -589,13 +610,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
   return (
     <div className="census-poi">
-      <SidePanelLayout>
-        <div className="card">
-          <div className="card-scroll">
-            <PageHeader title={t("onboarding:census.title")} />
-            <p className="subtitle"><AcronymText>{t("onboarding:census.intro1")}</AcronymText></p>
-            <p className="subtitle"><AcronymText>{t("onboarding:census.intro2")}</AcronymText></p>
+      <p className="subtitle"><AcronymText>{t("onboarding:census.intro1")}</AcronymText></p>
+      <p className="subtitle"><AcronymText>{t("onboarding:census.intro2")}</AcronymText></p>
 
+      <SidePanelLayout>
+        <div>
             {acquisition === "PatientList" && (
               <>
                 <h2 className="census-section-heading" id="census-epic-section-title">
@@ -851,19 +870,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             <p className="nhsn-link__form-error" role="alert">
               {validationMessage}
             </p>
-          </div>
-
-          <StepActions saving={saving}>
-            <Button variant="secondary" onClick={onBack} disabled={saving}>
-              {t("common:actions.back")}
-            </Button>
-            <Button
-              onClick={handleNext}
-              disabled={saving || (acquisition === "Sftp" && !sftpConnectionVerified)}
-              loading={saving}>
-              {t("common:actions.continue")}
-            </Button>
-          </StepActions>
         </div>
         {acquisition === "PatientList" && epicResultsPanel}
         {acquisition === "Sftp" && sftpResultsPanel}

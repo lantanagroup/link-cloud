@@ -1,9 +1,11 @@
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AcronymText, NHSNLoadingIndicator } from '../fields';
+import { AcronymText, NHSNLoadingIndicator, PageHeader } from '../fields';
 import { getStep, visibleSteps } from './flow';
 import { isUnlocked } from './gating';
 import { useOnboarding } from './OnboardingProvider';
+import { StepChromeContext } from './StepChrome';
+import type { StepChrome } from './StepChrome';
 
 export function OnboardingStepsNav() {
   const { t } = useTranslation(['onboarding', 'common']);
@@ -60,6 +62,7 @@ export function OnboardingStepsNav() {
 export function StepHost() {
   const { t } = useTranslation(['onboarding', 'common']);
   const { loadState, error, target } = useOnboarding();
+  const [chrome, setChrome] = useState<StepChrome | null>(null);
 
   if (loadState === 'loading') {
     return <NHSNLoadingIndicator />;
@@ -78,9 +81,15 @@ export function StepHost() {
   return (
     <section className="nhsn-link__step-panel" aria-live="polite">
       {step ? (
-        <Suspense fallback={<NHSNLoadingIndicator />}>
-          <StepBody />
-        </Suspense>
+        <div className={chrome ? 'nhsn-link__content' : 'nhsn-link__content nhsn-link__content--bare'}>
+          {chrome && <PageHeader title={chrome.title} />}
+          <StepChromeContext.Provider value={setChrome}>
+            <Suspense fallback={<NHSNLoadingIndicator />}>
+              <StepBody />
+            </Suspense>
+          </StepChromeContext.Provider>
+          {chrome?.footer}
+        </div>
       ) : (
         <div className="nhsn-link__state">
           {t('onboarding:messages.stepUnavailable')}

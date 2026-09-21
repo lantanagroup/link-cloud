@@ -8,7 +8,6 @@ import {
   FieldLabel,
   InlineSpinner,
   Modal,
-  PageHeader,
   RepeatableList,
   StepActions,
   Tabs,
@@ -17,6 +16,7 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import type {LocationIdentifierEntry, LocationTypeEntry} from '../../types';
 import {findIncompleteLocationIdentifierIndexes, findIncompleteLocationTypeIndexes} from './validate';
 
@@ -115,9 +115,30 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
   const anySelected = candidates.some(candidate => selectedCandidates[candidate.id]);
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableOnNext = useStableCallback(onNext);
+
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t('onboarding:locationOrg.title'),
+        footer: (
+          <StepActions saving={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+              {t('common:actions.back')}
+            </Button>
+            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={saving}>
+              {t('common:actions.continue')}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, saving, stableOnBack, stableOnNext, hasIncompleteRows]
+    )
+  );
+
   return (
-    <div className="nhsn-link__content nhsn-link__location-org">
-      <PageHeader title={t('onboarding:locationOrg.title')} />
+    <div className="nhsn-link__location-org">
       <p className="nhsn-link__subtitle">{t('onboarding:locationOrg.intro')}</p>
 
       {methods.length > 0 && (
@@ -305,15 +326,6 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           {t('onboarding:locationOrg.errors.incompleteRows')}
         </p>
       )}
-
-      <StepActions saving={saving}>
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={onNext} disabled={saving || hasIncompleteRows} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
     </div>
   );
 }

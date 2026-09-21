@@ -11,69 +11,12 @@
 
   color: var(--report-gray-800);
   font-size: 15px;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.report-generate .card {
-  background: var(--kendo-color-app-surface, #ffffff);
-  border: 1px solid var(--report-gray-200);
-  border-radius: var(--report-radius);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.report-generate .card-scroll {
-  padding: 0 32px 28px;
-  border-radius: inherit;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.report-generate .card-scroll > * {
-  flex-shrink: 0;
-}
-
-.report-generate .page-header {
-  padding: 0;
-  border-bottom: none !important;
-  display: block;
-}
-
-.report-generate .page-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
-}
-
-.report-generate .page-header-title:focus {
-  outline: none;
-}
-
-.report-generate .page-header-buttons {
-  display: none;
 }
 
 .report-generate .subtitle {
   color: var(--report-gray-600);
   margin: 0 0 22px;
   font-size: 14px;
-}
-
-.report-generate .card .nhsn-link__step-actions {
-  position: static;
-  margin: 0;
-  padding: 16px 32px 28px;
 }
 
 .report-generate .triplet {

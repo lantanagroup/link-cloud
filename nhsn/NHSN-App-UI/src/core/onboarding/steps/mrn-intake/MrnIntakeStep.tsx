@@ -10,7 +10,6 @@ import {
   MessageContainer,
   Modal,
   NHSNLoadingIndicator,
-  PageHeader,
   RepeatableList,
   Select,
   StepActions,
@@ -20,6 +19,7 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {
   findRuleForElement,
   identifierElementValue,
@@ -190,16 +190,40 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
     onNext();
   }
 
+  const busy = saving || submitting;
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleComplete = useStableCallback(handleComplete);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: t('onboarding:mrnIntake.title'),
+              footer: (
+                <StepActions saving={busy}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button onClick={stableHandleComplete} disabled={busy} loading={busy}>
+                    {t('onboarding:mrnIntake.actions.complete')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [t, loading, busy, stableOnBack, stableHandleComplete]
+    )
+  );
+
   if (loading) {
     return <NHSNLoadingIndicator />;
   }
 
-  const busy = saving || submitting;
   const selectedPatient = patients.find(patient => patient.patientId === selectedPatientId) ?? null;
 
   return (
-    <div className="nhsn-link__content nhsn-link__mrn-intake">
-      <PageHeader title={t('onboarding:mrnIntake.title')} />
+    <div className="nhsn-link__mrn-intake">
       <p className="nhsn-link__subtitle"><AcronymText>{t('onboarding:mrnIntake.intro1')}</AcronymText></p>
       <p className="nhsn-link__subtitle">
         <Trans t={t} i18nKey="onboarding:mrnIntake.intro2" components={{b: <b />}} />
@@ -519,15 +543,6 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
           <span role="alert">{submitError}</span>
         </MessageContainer>
       )}
-
-      <StepActions saving={busy}>
-        <Button variant="secondary" onClick={onBack} disabled={busy}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={handleComplete} disabled={busy} loading={busy}>
-          {t('onboarding:mrnIntake.actions.complete')}
-        </Button>
-      </StepActions>
     </div>
   );
 }

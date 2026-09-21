@@ -369,6 +369,16 @@
   isolation: isolate;
 }
 
+.nhsn-link__step-panel > .nhsn-link__content--bare {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+}
+
 .nhsn-link__step-panel > .nhsn-link__content > * {
   flex-shrink: 0;
 }
@@ -423,11 +433,20 @@
   background-color: var(--kendo-color-app-surface, #ffffff);
 }
 
+.nhsn-link__step-panel .page-header {
+  padding: 0;
+  border-bottom: none !important;
+}
+
+.nhsn-link__step-panel .page-header-buttons {
+  display: none;
+}
+
 .nhsn-link__subtitle {
   color: var(--kendo-color-app-text-subtle, #5a5f69);
   line-height: 1.6;
   font-size: 14px;
-  max-width: 70ch;
+  max-width: none;
   margin: 0 0 22px;
 }
 
@@ -696,34 +715,7 @@
 
 /* ------------------------------------------- facility-info (onboarding POC parity) */
 
-.nhsn-facility-info {
-  padding: 0 32px 28px;
-  border: 1px solid var(--kendo-color-border, #d0d7de);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.nhsn-facility-info .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-.nhsn-link__reporting-plan .page-header,
-.nhsn-link__manual-upload .page-header,
-.nhsn-link__complete .page-header,
-.nhsn-link__welcome .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-.nhsn-link__reporting-plan .nhsn-link__subtitle,
-.nhsn-link__manual-upload .nhsn-link__subtitle,
-.nhsn-link__complete .nhsn-link__subtitle,
-.nhsn-link__welcome .nhsn-link__subtitle {
-  max-width: none;
-}
-
-.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll {
+.nhsn-link__reporting-plan-table-scroll {
   display: block;
   width: 100%;
   flex: 1 1 auto;
@@ -735,8 +727,8 @@
   border-radius: 8px;
 }
 
-.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll:focus,
-.nhsn-link__reporting-plan .nhsn-link__reporting-plan-table-scroll:focus-visible {
+.nhsn-link__reporting-plan-table-scroll:focus,
+.nhsn-link__reporting-plan-table-scroll:focus-visible {
   outline: 2px solid #000000;
   outline-offset: 2px;
 }
@@ -827,23 +819,8 @@
   text-align: right;
 }
 
-.nhsn-facility-info .page-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px 0;
-  color: var(--kendo-color-app-text, #1f2328);
-}
-
-.nhsn-facility-info .page-header-buttons {
-  display: none;
-}
-
 .nhsn-facility-info .nhsn-link__subtitle {
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
-  font-size: 14px;
   line-height: 1.5;
-  max-width: none;
-  margin: 0 0 22px 0;
 }
 
 .nhsn-facility-info .nhsn-link__field {
@@ -1210,10 +1187,7 @@
     overflow: visible;
   }
 
-  .nhsn-link__step-panel > .nhsn-link__content,
-  .fhir-server-info,
-  .fhir-server-info .card,
-  .fhir-server-info .card-scroll {
+  .nhsn-link__step-panel > .nhsn-link__content {
     flex: none;
     height: auto;
     overflow: visible;
@@ -1227,8 +1201,7 @@
     padding-bottom: 28px;
   }
 
-  .nhsn-link__step-panel .nhsn-link__step-actions,
-  .fhir-server-info .card .nhsn-link__step-actions {
+  .nhsn-link__step-panel .nhsn-link__step-actions {
     position: static;
     margin: 1.5rem 0 0;
     padding: 0;
@@ -2031,25 +2004,7 @@
 
 /* ---------------------------------------------- organization identification */
 
-/* Suppresses the package's default page-header border/padding, like every other step does. */
-.nhsn-link__location-org .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-/* .nhsn-link__content has no top padding, so with the page-header's own padding
-   suppressed above, its border/shadow reads as missing along the top edge -
-   give the step back its own breathing room instead. */
-.nhsn-link__location-org.nhsn-link__content {
-  /* padding-top: 28px; */
-}
-
-.nhsn-link__location-org .page-header-buttons {
-  display: none;
-}
-
 .nhsn-link__location-org .nhsn-link__subtitle {
-  max-width: none;
   margin-bottom: 16px;
 }
 
@@ -2069,21 +2024,7 @@
 }
 
 /* ---------------------------------------------- location identification (HSLOC) */
-.nhsn-link__hsloc .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-.nhsn-link__hsloc.nhsn-link__content {
-  /* padding-top: 28px; */
-}
-
-.nhsn-link__hsloc .page-header-buttons {
-  display: none;
-}
-
 .nhsn-link__hsloc .nhsn-link__subtitle {
-  max-width: none;
   margin-bottom: 16px;
 }
 
@@ -2097,19 +2038,6 @@
 }
 
 /* ---------------------------------------------- report results step */
-
-.nhsn-link__report-results .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-.nhsn-link__report-results .page-header-buttons {
-  display: none;
-}
-
-.nhsn-link__report-results .nhsn-link__subtitle {
-  max-width: none;
-}
 
 .nhsn-link__report-results-actions {
   display: flex;
@@ -2381,13 +2309,6 @@
   color: var(--kendo-color-app-text-subtle, #5a5f69);
 }
 
-.nhsn-link__report-results-detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .nhsn-link__report-results-detail-header-actions {
   flex: none;
   display: flex;
@@ -2456,18 +2377,6 @@
 
 .nhsn-link__report-results-legend-count {
   color: var(--kendo-color-app-text-subtle, #5a5f69);
-}
-
-/* ---------------------------------------------- MRN identifier intake */
-
-/* Suppresses the package's default page-header border/padding, like every other step does. */
-.nhsn-link__mrn-intake .page-header {
-  padding: 0;
-  border-bottom: none !important;
-}
-
-.nhsn-link__mrn-intake .nhsn-link__subtitle {
-  max-width: none;
 }
 
 /* ---------------------------------------------- patient status timeline modal */

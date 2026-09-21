@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
@@ -6,13 +6,13 @@ import type { EhrVendor } from '../../../api/contracts';
 import {
   Button,
   NHSNLoadingIndicator,
-  PageHeader,
   Select,
   StepActions,
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import type { StepProps } from '../../flow';
 import { useOnboarding } from '../../OnboardingProvider';
+import { useStableCallback, useStepChrome } from '../../StepChrome';
 import type { FacilityInfoDraft } from '../../types';
 import { validateFacilityInfo, type FieldErrors } from './validate';
 
@@ -90,13 +90,37 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
     }
   }
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: t('onboarding:facilityInfo.title'),
+              footer: (
+                <StepActions saving={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                    {t('common:actions.continue')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [t, loading, saving, stableOnBack, stableHandleNext]
+    )
+  );
+
   if (loading) {
     return <NHSNLoadingIndicator />;
   }
 
   return (
-    <div className="nhsn-link__content nhsn-facility-info">
-      <PageHeader title={t('onboarding:facilityInfo.title')} />
+    <div className="nhsn-facility-info">
       <p className="nhsn-link__subtitle">
         {t('onboarding:facilityInfo.intro')}
       </p>
@@ -157,15 +181,6 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
       <p className="nhsn-link__form-error" role="alert">
         {validationError}
       </p>
-
-      <StepActions saving={saving}>
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={handleNext} disabled={saving} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
     </div>
   );
 }
