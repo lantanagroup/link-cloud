@@ -41,9 +41,8 @@ export function Button({
     <KendoButton
       type={type}
       themeColor={variant === 'primary' ? 'primary' : 'base'}
-      className={size === 'sm' ? 'nhsn-link__button--sm' : undefined}
+      className={`${size === 'sm' ? 'nhsn-link__button--sm ' : ''}${isBlocked ? 'nhsn-link__button--disabled' : ''}`.trim() || undefined}
       aria-label={ariaLabel}
-      disabled={isBlocked}
       onClick={isBlocked ? undefined : onClick}>
       {loading && (
         <span className="nhsn-link__button-spinner" role="status" aria-label={t('status.saving')} />
@@ -168,6 +167,19 @@ export function AcronymText({children}: {children: string}) {
 
 export function acronymTitle(node: React.ReactNode): string {
   return node as unknown as string;
+}
+
+export function acronymLabel(text: string): string {
+  return text.replace(ACRONYM_PATTERN, match => ACRONYM_SPELLINGS[match] ?? match);
+}
+
+export function HeadingPause({children}: {children: React.ReactNode}) {
+  return (
+    <>
+      {children}
+      <span className="nhsn-link__visually-hidden">.</span>
+    </>
+  );
 }
 
 /**

@@ -253,12 +253,48 @@ function closeAllHintsExcept(keep: Element | null) {
   });
 }
 
+let suppressHintFocusHandling = false;
+
+function reannounceOnReopen(trigger: HTMLElement) {
+  if (document.activeElement !== trigger) {
+    return;
+  }
+  suppressHintFocusHandling = true;
+  trigger.blur();
+  window.setTimeout(() => {
+    trigger.focus();
+    suppressHintFocusHandling = false;
+  }, 50);
+}
+
+function stripHintDescribedBy(control: Element, hintId: string) {
+  const describedBy = control.getAttribute('aria-describedby');
+  if (!describedBy) {
+    return;
+  }
+  const tokens = describedBy.split(/\s+/).filter(Boolean);
+  if (!tokens.includes(hintId)) {
+    return;
+  }
+  const withoutHint = tokens.filter((token) => token !== hintId).join(' ');
+  if (withoutHint) {
+    control.setAttribute('aria-describedby', withoutHint);
+  } else {
+    control.removeAttribute('aria-describedby');
+  }
+}
+
 function toggleFieldHint(field: Element) {
   const isOpen = field.classList.contains(FIELD_HINT_OPEN_CLASS);
   closeAllHintsExcept(isOpen ? null : field);
   field.classList.toggle(FIELD_HINT_OPEN_CLASS, !isOpen);
-  if (!isOpen) {
-    field.classList.remove(HOVER_SUPPRESSED_CLASS);
+  if (isOpen) {
+    return;
+  }
+  field.classList.remove(HOVER_SUPPRESSED_CLASS);
+  const trigger = field.querySelector<HTMLElement>('.nhsn-link__hint-trigger');
+  if (trigger) {
+    reannounceOnReopen(trigger);
   }
 }
 
@@ -278,10 +314,15 @@ function useHintLabelFocusability() {
 
         const fieldLabelText = label.textContent?.trim() ?? '';
 
-        const hintText = label.htmlFor
-          ?     document.getElementById(`${label.htmlFor}_hint`)?.textContent ?? ''
-          : '';
+        const hintId = label.htmlFor ? `${label.htmlFor}_hint` : undefined;
+        const hintText = hintId ? document.getElementById(hintId)?.textContent ?? '' : '';
         const bubbleId = label.htmlFor ? `${label.htmlFor}_hint_bubble` : undefined;
+
+        const control = label.htmlFor ? document.getElementById(label.htmlFor) : null;
+        if (control && hintId) {
+          control.dataset.stripHintId = hintId;
+          stripHintDescribedBy(control, hintId);
+        }
 
         const button = document.createElement('button');
         button.type = 'button';
@@ -295,31 +336,51 @@ function useHintLabelFocusability() {
         const bubble = document.createElement('span');
         bubble.className = 'nhsn-link__hint-trigger-bubble';
         bubble.setAttribute('role', 'tooltip');
+        bubble.setAttribute('aria-hidden', 'true');
         if (bubbleId) {
           bubble.id = bubbleId;
         }
         bubble.textContent = hintText;
         button.appendChild(bubble);
 
-        label.appendChild(button);
+        label.insertAdjacentElement('afterend', button);
       });
     }
 
     tagLabels(document);
     const observer = new MutationObserver((mutations) => {
-      if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
+      let sawNewNodes = false;
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes') {
+          const target = mutation.target as HTMLElement;
+          const hintId = target.dataset.stripHintId;
+          if (hintId) {
+            stripHintDescribedBy(target, hintId);
+          }
+          return;
+        }
+        if (mutation.addedNodes.length > 0) {
+          sawNewNodes = true;
+        }
+      });
+      if (sawNewNodes) {
         tagLabels(document);
       }
     });
-    observer.observe(document.body, {childList: true, subtree: true});
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-describedby']
+    });
     return () => observer.disconnect();
   }, []);
 }
 
 function resolveTrigger(target: Element): {fieldTrigger: Element | null; infoIconTrigger: Element | null} {
-  const label = target.closest('.k-label');
+  const label = target.closest('.k-label, .nhsn-link__hint-trigger');
   const field = label?.closest('.k-form-field') ?? null;
-  const fieldTrigger = field?.querySelector('.k-form-hint') ? field : null;
+  const fieldTrigger = field?.querySelector('.k-form-hint, .nhsn-link__hint-trigger') ? field : null;
   const infoIconTrigger = target.closest('.info-icon');
   return {fieldTrigger, infoIconTrigger};
 }
@@ -352,7 +413,8 @@ function useHintTooltips() {
         closeAllHintsExcept(isOpen ? null : trigger);
         trigger.classList.toggle(INFO_ICON_OPEN_CLASS, !isOpen);
         if (!isOpen) {
-      trigger.classList.remove(HOVER_SUPPRESSED_CLASS);
+          trigger.classList.remove(HOVER_SUPPRESSED_CLASS);
+          reannounceOnReopen(trigger as HTMLElement);
         }
       }
     }
@@ -377,6 +439,9 @@ function useHintTooltips() {
     }
 
     function handleFocusIn(event: FocusEvent) {
+      if (suppressHintFocusHandling) {
+        return;
+      }
       const target = event.target as Element | null;
       if (!target) {
         return;
@@ -386,6 +451,9 @@ function useHintTooltips() {
       if (!trigger) {
         return;
       }
+      if (!target.matches(':focus-visible')) {
+        return;
+      }
       const openClass = fieldTrigger ? FIELD_HINT_OPEN_CLASS : INFO_ICON_OPEN_CLASS;
       closeAllHintsExcept(trigger);
       trigger.classList.add(openClass);
@@ -393,6 +461,9 @@ function useHintTooltips() {
     }
 
     function handleFocusOut(event: FocusEvent) {
+      if (suppressHintFocusHandling) {
+        return;
+      }
       const target = event.target as Element | null;
       if (!target) {
         return;

@@ -10,15 +10,18 @@ import type {
 } from "../../../api/contracts";
 import { InstructionsDownload } from "../../../documents";
 import {
+  acronymTitle,
   AcronymText,
   Button,
   CheckboxField,
   DownloadLinkButton,
+  HeadingPause,
   NumberField,
   RequiredAsterisk,
   SidePanel,
   SidePanelLayout,
   StepActions,
+  TableCaption,
   TextField,
 } from "../../../fields";
 import { useNotifications } from "../../../notifications/NotificationProvider";
@@ -398,7 +401,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
   useStepChrome(
     useMemo(
       () => ({
-        title: t("onboarding:census.title"),
+        title: acronymTitle(<HeadingPause>{t("onboarding:census.title")}</HeadingPause>),
         footer: !vendorProfile ? (
           <StepActions>
             <Button variant="secondary" onClick={stableOnBack}>
@@ -509,7 +512,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       </ul>
       <div className="census-table-scroll" tabIndex={-1}>
         <table>
-          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.epic.resultsTitle")}</caption>
+          <TableCaption>{t("onboarding:census.epic.resultsTitle")}</TableCaption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.epic.columns.patientId")}</th>
@@ -548,7 +551,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       </ul>
       <div className="census-table-scroll" tabIndex={-1}>
         <table>
-          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.cerner.resultsTitle")}</caption>
+          <TableCaption>{t("onboarding:census.cerner.resultsTitle")}</TableCaption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.cerner.columns.patientId")}</th>
@@ -867,9 +870,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
               />
             )}
 
-            <p className="nhsn-link__form-error" role="alert">
-              {validationMessage}
-            </p>
+            <div aria-live="off">
+              <p className="nhsn-link__form-error" role="alert">
+                {validationMessage}
+              </p>
+            </div>
         </div>
         {acquisition === "PatientList" && epicResultsPanel}
         {acquisition === "Sftp" && sftpResultsPanel}

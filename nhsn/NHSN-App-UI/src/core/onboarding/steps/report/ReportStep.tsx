@@ -4,9 +4,11 @@ import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {AvailableMeasure} from '../../../api/contracts';
 import {
+  acronymTitle,
   Button,
   ChipMultiSelect,
   DateField,
+  HeadingPause,
   NHSNLoadingIndicator,
   StepActions
 } from '../../../fields';
@@ -163,7 +165,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
         loading
           ? null
           : {
-              title: t('onboarding:report.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:report.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={saving}>
                   <Button variant="secondary" onClick={stableOnBack} disabled={saving || requesting}>

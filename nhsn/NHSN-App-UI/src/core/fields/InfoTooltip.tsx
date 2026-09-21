@@ -13,7 +13,7 @@ export function InfoTooltip({label, content}: InfoTooltipProps) {
   return (
     <button type="button" className="info-icon" aria-label={label} aria-describedby={bubbleId}>
       ?
-      <span id={bubbleId} className="tooltip-bubble" role="tooltip">
+      <span id={bubbleId} className="tooltip-bubble" role="tooltip" aria-hidden="true">
         {content}
       </span>
     </button>

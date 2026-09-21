@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
 import type { EhrVendor } from '../../../api/contracts';
 import {
+  AcronymText,
+  acronymTitle,
   Button,
+  HeadingPause,
   NHSNLoadingIndicator,
   Select,
   StepActions,
@@ -99,7 +102,7 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
         loading
           ? null
           : {
-              title: t('onboarding:facilityInfo.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:facilityInfo.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={saving}>
                   <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
@@ -156,7 +159,7 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
       <div className="nhsn-link__field">
         <Select
           id="facilityEhrVendor"
-          label={t('onboarding:facilityInfo.fields.ehrVendorLabel')}
+          label={acronymTitle(<AcronymText>{t('onboarding:facilityInfo.fields.ehrVendorLabel')}</AcronymText>)}
           placeholder={t('onboarding:facilityInfo.fields.ehrVendorPlaceholder')}
           required
           error={touched.vendor && errors.vendor ? t(errors.vendor) : undefined}
@@ -178,9 +181,11 @@ export function FacilityInfoStep({ onNext, onBack }: StepProps) {
         />
       </div>
 
-      <p className="nhsn-link__form-error" role="alert">
-        {validationError}
-      </p>
+      <div aria-live="off">
+        <p className="nhsn-link__form-error" role="alert">
+          {validationError}
+        </p>
+      </div>
     </div>
   );
 }

@@ -22,6 +22,7 @@ export interface TabsProps<T extends string> {
 export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, children}: TabsProps<T>) {
   const prefix = useId();
   const listRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   const tabId = (id: T) => `${prefix}-tab-${id}`;
   const panelId = `${prefix}-panel`;
@@ -99,7 +100,12 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
               // Roving tabindex: one stop for the whole list, arrows move within it.
               tabIndex={tab.id === rovingId ? 0 : -1}
               disabled={tab.disabled}
-              onClick={() => onTabChange(tab.id)}>
+              onClick={() => {
+                onTabChange(tab.id);
+                if (children !== undefined) {
+                  window.setTimeout(() => panelRef.current?.focus(), 50);
+                }
+              }}>
               {tab.label}
             </button>
           );
@@ -108,6 +114,7 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
 
       {children !== undefined && (
         <div
+          ref={panelRef}
           id={panelId}
           role="tabpanel"
           aria-labelledby={activeTab && tabs.some(tab => tab.id === activeTab) ? tabId(activeTab) : undefined}

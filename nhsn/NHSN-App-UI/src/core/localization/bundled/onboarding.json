@@ -313,7 +313,7 @@
     "subtitleSuffix": ". To support this, the form below contains fields to map local Location codes to HSLOC codes.",
     "tabs": {
       "mapping": "Location Mapping",
-      "reference": "HSLOC Reference Table"
+      "reference": "HSLOC Reference"
     },
     "mapping": {
       "listLabel": "HSLOC Code Mappings",
@@ -380,7 +380,7 @@
     "subtitle": "The NHSN measures evaluated by Link conform to the FHIR <uscore>US Core</uscore> implementation guide. This guide is a set of rules and best practices that help healthcare providers share patient information accross the United States. In this rule set, all patient FHIR <encounters>Encounters</encounters> must have an Encounter Type (e.g. e-mail consultation, surgical day-care, skilled nursing, rehabilitation) that maps to Patient Encounter Procedure SNOMED or CPT codes. More information on those requirements can be found <valueset>here</valueset>. Below is a form to associate your local Encounter.type codes to their corresponding SMOMED or CPT codes.",
     "tabs": {
       "mapping": "Encounter Mapping",
-      "reference": "CPT / SNOMED Reference Table"
+      "reference": "CPT / SNOMED Reference"
     },
     "fields": {
       "codeSystemsLabel": "Encounter.type Code Systems",

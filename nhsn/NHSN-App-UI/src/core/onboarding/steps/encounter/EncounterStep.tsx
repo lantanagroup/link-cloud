@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
-import {Button, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, Tabs, TextField} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, TableCaption, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
@@ -240,7 +240,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
         loading
           ? null
           : {
-              title: t('onboarding:encounter.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:encounter.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={saving}>
                   <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
@@ -305,8 +305,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               {id: 'reference', label: t('onboarding:encounter.tabs.reference')}
             ]}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+            onTabChange={setActiveTab}>
 
           {activeTab === 'mapping' && (
             <div>
@@ -378,7 +377,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
 
                 <div className="encounter-table-scroll" tabIndex={-1}>
                   <table className="encounter-table">
-                    <caption className="nhsn-link__visually-hidden">{t('onboarding:encounter.tabs.reference')}</caption>
+                    <TableCaption>{t('onboarding:encounter.tabs.reference')}</TableCaption>
                     <thead>
                       <tr>
                         <th scope="col">{t('onboarding:encounter.reference.columns.system')}</th>
@@ -464,6 +463,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               </div>
             </div>
           )}
+          </Tabs>
     </div>
   );
 }

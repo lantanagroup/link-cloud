@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
-import {Button, MessageContainer, StepActions} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions, TableCaption} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -86,7 +86,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:reportingPlan.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:reportingPlan.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
@@ -109,7 +109,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
       {hasSchedule ? (
         <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__reporting-plan-table">
-            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportingPlan.title')}</caption>
+            <TableCaption>{t('onboarding:reportingPlan.title')}</TableCaption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:reportingPlan.columns.month')}</th>
