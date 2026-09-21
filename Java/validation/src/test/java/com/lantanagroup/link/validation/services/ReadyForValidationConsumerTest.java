@@ -528,6 +528,41 @@ public class ReadyForValidationConsumerTest {
         verify(validationMetrics).recordValidationDuration(anyDouble(), any());
     }
 
+    @Test
+    void process_recordsIssueMetricsAfterCategorize() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+        doAnswer(invocation -> {
+            result.setCategories(List.of(categoryWithAcceptable(true)));
+            return null;
+        }).when(categorizationService).categorize(any());
+
+        consumer.process(buildRecord(null));
+
+        verify(validationMetrics).addIssues(eq("acceptable"), eq(1L), any());
+        verify(validationMetrics, never()).addIssues(eq("uncategorized"), anyLong(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_nullCategories_stillProducesValidationComplete() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(captor.capture())).thenReturn(future);
+        when(future.get()).thenReturn(null);
+
+        consumer.process(buildRecord(null));
+
+        assertNotNull(captor.getValue().value());
+        assertTrue(captor.getValue().value().isValid());
+    }
+
     // -------------------------------------------------------------------------
     // Pre-qualification OperationOutcome append
     // -------------------------------------------------------------------------

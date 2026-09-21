@@ -34,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
@@ -211,11 +212,10 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         try (Timer timer = Timer.start()) {
             results = validationService.validate(bundle, facilityId, reportId);
             _logger.debug("Validation completed with {} results in {} seconds", results.size(), String.format("%.2f", timer.getSeconds()));
-
-            attributes = buildMetricAttributes(results, facilityId);
-            validationMetrics.addToValidationCounter(attributes);
-            validationMetrics.recordValidationDuration(timer.getMilliseconds(), attributes);
-            addIssueMetrics(results, attributes);
+            Attributes durationAttributes = Attributes.builder()
+                    .put(DiagnosticNames.FACILITY_ID, facilityId)
+                    .build();
+            validationMetrics.recordValidationDuration(timer.getMilliseconds(), durationAttributes);
         }
 
         for (Result result : results) {
@@ -228,6 +228,9 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
              ValidationProgressHeartbeat ignored = ValidationProgressHeartbeat.start(
                      _logger, "categorizing " + results.size() + " results", facilityId, reportId)) {
             categorizationService.categorize(results);
+            attributes = buildMetricAttributes(results, facilityId);
+            validationMetrics.addToValidationCounter(attributes);
+            addIssueMetrics(results, attributes);
             validationMetrics.recordCategorizationDuration(timer.getMilliseconds(), attributes);
         }
         List<Result> submittedResults = results.stream()
@@ -303,7 +306,10 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
         value.setValid(results.stream()
-                .flatMap(result -> result.getCategories().stream())
+                .flatMap(result -> {
+                    List<Category> categories = result.getCategories();
+                    return categories == null ? Stream.empty() : categories.stream();
+                })
                 .allMatch(Category::isAcceptable));
         org.apache.kafka.common.header.Headers headers = new RecordHeaders();
         if (correlationId != null) {
