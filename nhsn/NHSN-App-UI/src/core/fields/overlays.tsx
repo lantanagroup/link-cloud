@@ -9,6 +9,10 @@ export interface ModalProps {
   /** Action buttons. The caller supplies them so the dialog owns no verbs. */
   footer?: React.ReactNode;
   size?: 'small' | 'medium' | 'large' | 'xlarge';
+  /** Renders a dismiss button next to the title that calls `onClose`. Opt-in: most dialogs drive dismissal entirely through footer actions. */
+  showCloseButton?: boolean;
+  /** Already translated. Required when `showCloseButton` is true. */
+  closeLabel?: string;
 }
 
 const FOCUSABLE =
@@ -20,7 +24,16 @@ const FOCUSABLE =
  * Rendered inline, not portalled: the embed build's selector rewrite only
  * reaches nodes inside this component's own subtree.
  */
-export function Modal({open, title, onClose, children, footer, size = 'medium'}: ModalProps) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  size = 'medium',
+  showCloseButton = false,
+  closeLabel
+}: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusTo = useRef<Element | null>(null);
@@ -83,9 +96,16 @@ export function Modal({open, title, onClose, children, footer, size = 'medium'}:
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}>
-        <h2 className="nhsn-link__modal-title" id={titleId}>
-          {title}
-        </h2>
+        <div className="nhsn-link__modal-header">
+          <h2 className="nhsn-link__modal-title" id={titleId}>
+            {title}
+          </h2>
+          {showCloseButton && (
+            <button type="button" className="nhsn-link__modal-close" aria-label={closeLabel} onClick={onClose}>
+              &times;
+            </button>
+          )}
+        </div>
         <div className="nhsn-link__modal-body">{children}</div>
         {footer && <div className="nhsn-link__modal-actions">{footer}</div>}
       </div>
