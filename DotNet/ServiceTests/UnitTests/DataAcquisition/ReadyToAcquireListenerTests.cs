@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -134,6 +135,35 @@ public class ReadyToAcquireListenerTests
             DaRequestStatus.Pending,
             It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteListenerAsync_WhenPerformanceHeader_EnqueuesWorkItemInPerformanceMode()
+    {
+        var logManagerMock = new Mock<IDataAcquisitionLogManager>();
+        logManagerMock
+            .Setup(m => m.TrySetLogToQueuedAsync(321, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        AcquisitionWorkItem? enqueued = null;
+        var processor = new TestAcquisitionProcessorBackgroundService
+        {
+            OnEnqueueAsync = (item, _) =>
+            {
+                enqueued = item;
+                return ValueTask.CompletedTask;
+            }
+        };
+
+        var listener = CreateListener(logManagerMock, processor);
+        var consume = CreateConsumeResult(321, "facility-perf");
+        consume.Message.Headers = new Headers();
+        KafkaHeaderHelper.ApplyIfPerformance(consume.Message.Headers, "performance");
+
+        await listener.InvokeExecuteListenerAsync(consume, CancellationToken.None);
+
+        Assert.NotNull(enqueued);
+        Assert.True(enqueued!.IsPerformanceMode);
     }
 
     private static TestReadyToAcquireListener CreateListener(

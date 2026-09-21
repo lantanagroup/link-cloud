@@ -84,6 +84,18 @@ public class DashboardStatsAggregatorTests
     }
 
     [Fact]
+    public async Task Collecting_metrics_counts_as_running_not_succeeded()
+    {
+        var store = StoreReturning(Run(AutomationRunStatus.CollectingMetrics));
+
+        var stats = await new DashboardStatsAggregator(store.Object).BuildAsync(inMemoryRuns: []);
+
+        stats.Running.Should().Be(1);
+        stats.Succeeded.Should().Be(0);
+        stats.Failed.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Persisted_run_is_not_double_counted_when_also_present_in_memory()
     {
         var sharedId = Guid.NewGuid();

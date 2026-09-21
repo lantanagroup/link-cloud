@@ -21,7 +21,7 @@ public class FhirServiceTests
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
         _mockLogger = new Mock<ILogger<FhirService>>();
-        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object, TerminologyTestConfig.Options());
+        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object, Mock.Of<ITerminologyServiceMetrics>(), TerminologyTestConfig.Options());
 
         string valueSet1 = @"
 {
@@ -1780,6 +1780,7 @@ public class FhirServiceTests
     private FhirService PagedService(int defaultPageSize, int maxPageSize) => new(
         _mockCacheService.Object,
         _mockLogger.Object,
+        Mock.Of<ITerminologyServiceMetrics>(),
         TerminologyTestConfig.Options(defaultPageSize, maxPageSize));
 
     private static List<Code> Codes(params string[] values) =>

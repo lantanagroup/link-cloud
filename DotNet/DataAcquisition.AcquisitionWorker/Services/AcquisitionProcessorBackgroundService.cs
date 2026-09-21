@@ -117,6 +117,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
     private async Task ProcessWorkItemAsync(AcquisitionWorkItem item, CancellationToken ct)
     {
+        using var metricsMode = MetricsModeScope.Begin(item.IsPerformanceMode);
         using var scope = _serviceProvider.CreateScope();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
@@ -195,7 +196,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     note: $"[{DateTime.UtcNow:O}] Patient not reportable (no org-mapped encounters); acquisition skipped.",
                     cancellationToken: ct);
 
-                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
                 return;
             }
         }
@@ -252,7 +253,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
 
             // Inline tail check if all siblings are terminal, produce AcquisitionComplete.
-            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
         }
         catch (Exception ex)
         {
@@ -262,7 +263,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             // so attempt the tail check to avoid stalling downstream.
             try
             {
-                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, item.IsPerformanceMode, ct);
             }
             catch (Exception tailEx)
             {
@@ -271,7 +272,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         }
     }
 
-    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
+    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, bool isPerformanceMode, CancellationToken ct)
     {
         TailCompletionResult? tailResult = null;
         try
@@ -297,6 +298,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
                     Encoding.UTF8.GetBytes(tailResult.CorrelationId))
             };
+            KafkaHeaderHelper.ApplyIfPerformance(headers, isPerformanceMode ? "performance" : null);
 
             if (!string.IsNullOrEmpty(tailResult.TraceParentId))
             {
