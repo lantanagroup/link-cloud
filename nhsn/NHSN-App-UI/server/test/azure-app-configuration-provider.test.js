@@ -44,7 +44,7 @@ test('loads the organized keys and enables Key Vault reference resolution', asyn
   );
 
   assert.equal(receivedConnectionString, 'Endpoint=https://example.test;Id=id;Secret=secret');
-  assert.equal(SERVICE_LABEL, 'NhsnAppUI');
+  assert.equal(SERVICE_LABEL, 'NHSNAppUIHarness');
   assert.equal(receivedOptions.selectors.length, 2);
   assert.deepEqual(receivedOptions.selectors, [
     { keyFilter: KEY_FILTER, labelFilter: LabelFilter.Null },
