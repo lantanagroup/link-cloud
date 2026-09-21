@@ -1,38 +1,56 @@
-﻿using LantanaGroup.Link.Shared.Application.Extensions;
+﻿using LantanaGroup.Link.DMRP.Config;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Quartz;
 using Quartz.Impl.Matchers;
 using Quartz.Spi;
 
 namespace LantanaGroup.Link.Tenant.Services
 {
+    /// <summary>
+    /// The classic per-facility report scheduling. Hosted only when DMRP is disabled: with the flag on
+    /// DmrpNightlyScheduleHostedService owns the shared Quartz scheduler, and this class stays
+    /// registered as a plain singleton because TenantFacilityOperations still resolves it.
+    /// </summary>
+    /// <remarks>
+    /// Every public method returns early while the flag is on, except the <see cref="IHostedService"/>
+    /// pair, which the host calls only when DMRP is off. That is not only about leaving the scheduler
+    /// alone: StartAsync is what assigns <c>_scheduler</c>, so any other method that reached a
+    /// <c>_scheduler!</c> dereference would throw rather than quietly do nothing. StopAsync null-guards
+    /// the scheduler it never started, rather than relying on the host to keep that promise.
+    /// </remarks>
     public class ScheduleService : IHostedService
     {
-        public const string MONTHLY = "Monthly";
-        public const string WEEKLY = "Weekly";
-        public const string DAILY = "Daily";
+        public const string MONTHLY = ReportingPeriodMath.Monthly;
+        public const string WEEKLY = ReportingPeriodMath.Weekly;
+        public const string DAILY = ReportingPeriodMath.Daily;
 
         private IScheduler? _scheduler;
 
         private readonly ILogger<ScheduleService> _logger;
         private readonly ISchedulerFactory _schedulerFactory;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly bool _dmrpEnabled;
 
         public ScheduleService(
             ILogger<ScheduleService> logger,
             ISchedulerFactory schedulerFactory,
             IServiceScopeFactory serviceScopeFactory,
-            IJobFactory jobFactory)
+            IJobFactory jobFactory,
+            IOptions<DmrpSettings> dmrpSettings)
         {
             _logger = logger;
             _schedulerFactory = schedulerFactory;
             _scopeFactory = serviceScopeFactory;
+            _dmrpEnabled = dmrpSettings.Value.Enabled;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -57,13 +75,16 @@ namespace LantanaGroup.Link.Tenant.Services
             await _scheduler.Start(cancellationToken);
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            await _scheduler!.Shutdown(cancellationToken);
-        }
+        public Task StopAsync(CancellationToken cancellationToken) =>
+            _scheduler?.Shutdown(cancellationToken) ?? Task.CompletedTask;
 
         public async Task AddJobsForFacility(Facility facility, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             // Create a job and trigger for monthly reports
             if (facility.ScheduledReports.Monthly.Length > 0)
             {
@@ -85,12 +106,17 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task DeleteJobsForFacility(string facilityId, List<string>? frequencies = null, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             frequencies ??= new List<string> { MONTHLY, WEEKLY, DAILY };
 
             foreach (string frequency in frequencies)
             {
                 string jobKeyName = $"{facilityId}-{frequency}";
-                JobKey jobKey = new JobKey(jobKeyName, nameof(KafkaTopic.ReportScheduled));
+                JobKey jobKey = new JobKey(jobKeyName, ReportSchedulingJobs.ClassicJobGroup);
 
                 var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -103,7 +129,12 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task DeleteJob(string facilityId, CancellationToken cancellationToken = default)
         {
-            JobKey jobKey = new JobKey(facilityId, nameof(KafkaTopic.ReportScheduled));
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
+            JobKey jobKey = new JobKey(facilityId, ReportSchedulingJobs.ClassicJobGroup);
 
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -115,6 +146,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task UpdateJobsForFacility(Facility updatedFacility, Facility existingFacility, CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             List<string> frequencies = new List<string>();
 
             if (!updatedFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x).SequenceEqual(existingFacility.ScheduledReports.Monthly.Distinct().OrderBy(x => x)))
@@ -159,7 +195,7 @@ namespace LantanaGroup.Link.Tenant.Services
         private async Task CreateJobAndTrigger(Facility facility, string frequency, CancellationToken cancellationToken = default)
         {
             string jobName = $"{facility.FacilityId}-{frequency}";
-            JobKey jobKey = new JobKey(jobName, nameof(KafkaTopic.ReportScheduled));
+            JobKey jobKey = new JobKey(jobName, ReportSchedulingJobs.ClassicJobGroup);
 
             var job = await _scheduler!.GetJobDetail(jobKey, cancellationToken);
 
@@ -198,7 +234,7 @@ namespace LantanaGroup.Link.Tenant.Services
             return JobBuilder
                 .Create(typeof(ReportScheduledJob))
                 .StoreDurably()
-                .WithIdentity(jobName, nameof(KafkaTopic.ReportScheduled))
+                .WithIdentity(jobName, ReportSchedulingJobs.ClassicJobGroup)
                 .WithDescription($"{jobName}")
                 .UsingJobData(jobDataMap)
                 .Build();
@@ -243,6 +279,11 @@ namespace LantanaGroup.Link.Tenant.Services
 
         public async Task GetAllJobs(CancellationToken cancellationToken = default)
         {
+            if (_dmrpEnabled)
+            {
+                return;
+            }
+
             var jobGroups = await _scheduler!.GetJobGroupNames(cancellationToken);
 
             foreach (string group in jobGroups)

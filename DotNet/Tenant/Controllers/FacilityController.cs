@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -222,6 +223,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
@@ -248,6 +250,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (ScheduledReportsNotAcceptedException ex)
             {
                 return BadRequestProblem(ex.Message);
+            }
+            catch (DmrpApiException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "DMRP could not be reached");
             }
             catch (ApplicationException ex)
             {
