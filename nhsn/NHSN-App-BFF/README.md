@@ -152,7 +152,7 @@ For larger independently managed resource sets, a persistent volume or other mou
 
 The JWT validation settings below have no file-based defaults. Docker Compose supplies them as
 environment variables for the local stack; deployed environments must provision them in Azure App
-Configuration under either no label or the exact service label `NHSN-App-BFF`:
+Configuration under either no label or the exact service label `NHSNAppBFF`:
 
 | Setting | Docker Compose environment variable | Azure App Configuration key | Required |
 |---|---|---|---|

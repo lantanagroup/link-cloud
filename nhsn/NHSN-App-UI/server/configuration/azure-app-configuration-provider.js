@@ -4,7 +4,7 @@ const { CONFIGURATION_KEYS } = require('./configuration-keys');
 
 const CONNECTION_STRING_ENVIRONMENT_VARIABLE = 'ConnectionStrings__AzureAppConfiguration';
 const KEY_FILTER = '/nhsn_app_ui/*';
-const SERVICE_LABEL = 'NhsnAppUI';
+const SERVICE_LABEL = 'NHSNAppUIHarness';
 const LOG_PREFIX = '[NHSN-App-UI configuration] [AzureAppConfiguration]';
 
 function logInfo(logger, message) {

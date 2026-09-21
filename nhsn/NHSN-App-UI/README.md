@@ -62,7 +62,7 @@ variables, Azure App Configuration, or hard-coded defaults. To enable Azure App 
 The server loads only `/nhsn_app_ui/*` values in these two AAC scopes:
 
 1. Values with no label.
-2. Values labeled exactly `NhsnAppUI`.
+2. Values labeled exactly `NHSNAppUIHarness`.
 
 The labeled values are loaded second and override matching unlabeled values. Values carrying any
 other label are not selected by the server.
