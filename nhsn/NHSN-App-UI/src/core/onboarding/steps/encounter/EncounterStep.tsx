@@ -58,6 +58,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+  const [validationRequested, setValidationRequested] = useState(false);
   // Captured once, at mount -- not a "have we run yet" flag, because StrictMode invokes
   // effects twice on mount against the same committed state, and a boolean flag would be
   // flipped by the first invocation and wrongly let the second one patch.
@@ -226,6 +227,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   }
 
   function handleNext() {
+    setValidationRequested(true);
     const {codeSystems, mappings} = flattenGroups(groups);
     patch('encounter', {codeSystems, mappings});
     setReadyToAdvance(true);
@@ -326,6 +328,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   group={group}
                   referenceCodes={referenceCodes}
                   incompleteRowKeys={incompleteRowKeys}
+                  showValidation={validationRequested}
                   onCodeSystemChange={value => updateCodeSystem(group.groupKey, value)}
                   onRemoveGroup={() => removeCodeSystem(group.groupKey)}
                   onAddRow={() => addMappingRow(group.groupKey)}
@@ -476,6 +479,7 @@ interface CodeSystemBlockProps {
   group: CodeSystemGroupState;
   referenceCodes: EncounterCode[];
   incompleteRowKeys: Set<string>;
+  showValidation: boolean;
   onCodeSystemChange: (value: string) => void;
   onRemoveGroup: () => void;
   onAddRow: () => void;
@@ -487,6 +491,7 @@ function CodeSystemBlock({
   group,
   referenceCodes,
   incompleteRowKeys,
+  showValidation,
   onCodeSystemChange,
   onRemoveGroup,
   onAddRow,
@@ -533,6 +538,7 @@ function CodeSystemBlock({
               row={row}
               referenceCodes={referenceCodes}
               incomplete={incompleteRowKeys.has(row.rowKey)}
+              showValidation={showValidation}
               onChange={rowPatch => onUpdateRow(row.rowKey, rowPatch)}
               onRemove={() => onRemoveRow(row.rowKey)} />
           ))}
@@ -551,19 +557,34 @@ interface MappingRowProps {
   row: MappingRowState;
   referenceCodes: EncounterCode[];
   incomplete: boolean;
+  showValidation: boolean;
   onChange: (rowPatch: Partial<MappingRowState>) => void;
   onRemove: () => void;
 }
 
-function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: MappingRowProps) {
+function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, onRemove}: MappingRowProps) {
   const {t} = useTranslation('onboarding');
   const incompleteHintId = `encounter-row-hint-${row.rowKey}`;
   const selected = referenceCodes.find(code => code.system === row.targetSystem && code.code === row.targetCode);
   const [query, setQuery] = useState(selected ? referenceLabel(selected) : '');
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [touched, setTouched] = useState(false);
   const blurTimeout = useRef<number>();
   const listboxId = `encounter-code-listbox-${row.rowKey}`;
+  const showIncomplete = incomplete && touched;
+
+  useEffect(() => {
+    if (showValidation && incomplete) {
+      setTouched(true);
+    }
+  }, [showValidation, incomplete]);
+
+  function handleRowBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null) && incomplete) {
+      setTouched(true);
+    }
+  }
 
   useEffect(() => {
     setQuery(selected ? referenceLabel(selected) : '');
@@ -628,89 +649,91 @@ function MappingRow({row, referenceCodes, incomplete, onChange, onRemove}: Mappi
   }
 
   return (
-    <div className={incomplete ? 'repeat-row repeat-row--incomplete' : 'repeat-row'}>
-      <input
-        type="text"
-        aria-label={t('encounter.fields.localCodeLabel')}
-        aria-describedby={incomplete ? incompleteHintId : undefined}
-        placeholder={t('encounter.fields.localCodePlaceholder') ?? ''}
-        value={row.localValue}
-        onChange={event => onChange({localValue: event.target.value})} />
-
-      <div className="encounter-code-picker">
+    <div className="repeat-row-group" onBlur={handleRowBlur}>
+      <div className={showIncomplete ? 'repeat-row repeat-row--incomplete' : 'repeat-row'}>
         <input
           type="text"
-          role="combobox"
-          aria-label={t('encounter.fields.targetCodeLabel')}
-          aria-describedby={incomplete ? incompleteHintId : undefined}
-          aria-expanded={open}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          aria-activedescendant={
-            open && highlightedIndex >= 0 && highlightedIndex < matches.length ? optionId(matches[highlightedIndex]) : undefined
-          }
-          placeholder={t('encounter.fields.targetCodePlaceholder') ?? ''}
-          value={query}
-          onFocus={event => {
-            event.target.select();
-            setOpen(true);
-          }}
-          onChange={event => {
-            setQuery(event.target.value);
-            setOpen(true);
-          }}
-          onKeyDown={handleTargetCodeKeyDown}
-          onBlur={() => {
-            blurTimeout.current = window.setTimeout(() => {
-              setOpen(false);
-              setQuery(selected ? referenceLabel(selected) : '');
-            }, 150);
-          }} />
-        {open && (
-          <div id={listboxId} className="encounter-code-dropdown" role="listbox">
-            {matches.length === 0 ? (
-              <div className="encounter-code-option encounter-code-option-empty">
-                {t('encounter.fields.targetCodeNoMatches')}
-              </div>
-            ) : (
-              matches.map((code, index) => (
-                <div
-                  key={encodeTarget(code.system, code.code)}
-                  id={optionId(code)}
-                  role="option"
-                  aria-selected={code.system === row.targetSystem && code.code === row.targetCode}
-                  className={
-                    index === highlightedIndex ? 'encounter-code-option encounter-code-option--highlighted' : 'encounter-code-option'
-                  }
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  onMouseDown={event => {
-                    event.preventDefault();
-                    selectMatch(code);
-                  }}>
-                  <span className="encounter-code-option-system">{systemBadgeLabel(code.system)}</span>{' '}
-                  <span className="encounter-code-option-code">{code.code}</span> — {code.display}
+          aria-label={t('encounter.fields.localCodeLabel')}
+          aria-describedby={showIncomplete ? incompleteHintId : undefined}
+          placeholder={t('encounter.fields.localCodePlaceholder') ?? ''}
+          value={row.localValue}
+          onChange={event => onChange({localValue: event.target.value})} />
+
+        <div className="encounter-code-picker">
+          <input
+            type="text"
+            role="combobox"
+            aria-label={t('encounter.fields.targetCodeLabel')}
+            aria-describedby={showIncomplete ? incompleteHintId : undefined}
+            aria-expanded={open}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={
+              open && highlightedIndex >= 0 && highlightedIndex < matches.length ? optionId(matches[highlightedIndex]) : undefined
+            }
+            placeholder={t('encounter.fields.targetCodePlaceholder') ?? ''}
+            value={query}
+            onFocus={event => {
+              event.target.select();
+              setOpen(true);
+            }}
+            onChange={event => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={handleTargetCodeKeyDown}
+            onBlur={() => {
+              blurTimeout.current = window.setTimeout(() => {
+                setOpen(false);
+                setQuery(selected ? referenceLabel(selected) : '');
+              }, 150);
+            }} />
+          {open && (
+            <div id={listboxId} className="encounter-code-dropdown" role="listbox">
+              {matches.length === 0 ? (
+                <div className="encounter-code-option encounter-code-option-empty">
+                  {t('encounter.fields.targetCodeNoMatches')}
                 </div>
-              ))
-            )}
-          </div>
-        )}
+              ) : (
+                matches.map((code, index) => (
+                  <div
+                    key={encodeTarget(code.system, code.code)}
+                    id={optionId(code)}
+                    role="option"
+                    aria-selected={code.system === row.targetSystem && code.code === row.targetCode}
+                    className={
+                      index === highlightedIndex ? 'encounter-code-option encounter-code-option--highlighted' : 'encounter-code-option'
+                    }
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    onMouseDown={event => {
+                      event.preventDefault();
+                      selectMatch(code);
+                    }}>
+                    <span className="encounter-code-option-system">{systemBadgeLabel(code.system)}</span>{' '}
+                    <span className="encounter-code-option-code">{code.code}</span> — {code.display}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onRemove}
+          aria-label={
+            row.localValue ? t('encounter.fields.removeMappingAriaLabel', {code: row.localValue}) : t('encounter.fields.removeMapping')
+          }>
+          {t('encounter.fields.removeMapping')}
+        </Button>
       </div>
 
-      {incomplete && (
+      {showIncomplete && (
         <span id={incompleteHintId} className="encounter-row-hint">
           {t('encounter.fields.incompleteRowHint')}
         </span>
       )}
-
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={onRemove}
-        aria-label={
-          row.localValue ? t('encounter.fields.removeMappingAriaLabel', {code: row.localValue}) : t('encounter.fields.removeMapping')
-        }>
-        {t('encounter.fields.removeMapping')}
-      </Button>
     </div>
   );
 }
