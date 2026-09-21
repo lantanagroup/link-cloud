@@ -69,6 +69,8 @@ serviceMeta:
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
   MeasureEval:           { label: "MeasureEval",           runtime: "java" }
   MockDmrpApi:           { label: "MockDmrpApi",           runtime: "dotnet" }
+  NHSNAppBFF:            { label: "NHSNAppBFF",            runtime: "dotnet" }
+  NHSNAppUIHarness:      { label: "NHSNAppUIHarness",      runtime: "node" }
   Normalization:         { label: "Normalization",         runtime: "dotnet" }
   Notification:          { label: "Notification",          runtime: "dotnet" }
   QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
@@ -720,6 +722,37 @@ services:
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
       defaultValue: "false"
+  NHSNAppUIHarness:
+    - key: "/nhsn_app_ui/bff/base_url"
+      description: "Internal BFF proxy target used by the standalone NHSN-App-UI test harness server. BFF_BASE_URL overrides this value; when neither is supplied the server uses http://nhsn-app-bff:8079/api."
+      required: false
+      defaultValue: "http://nhsn-app-bff:8079/api"
+    - key: "/nhsn_app_ui/server/port"
+      description: "Port on which the standalone NHSN-App-UI test harness server listens. PORT overrides this value; when neither is supplied the server listens on 8080. Docker Compose explicitly sets PORT to 8090 for its 8090:8090 mapping."
+      required: false
+      defaultValue: "8080"
+    - key: "/nhsn_app_ui/default_jwt/issuer"
+      description: "Default JWT issuer pre-populated by the standalone NHSN-App-UI test harness. Required in deployed environment stores; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_ISSUER instead."
+      required: true
+    - key: "/nhsn_app_ui/default_jwt/key_id"
+      description: "Default JWT key id pre-populated by the standalone NHSN-App-UI test harness. Required in deployed environment stores; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_KEY_ID instead."
+      required: true
+    - key: "/nhsn_app_ui/default_jwt/private_key_pem"
+      description: "PKCS#8 private key PEM used only by the standalone NHSN-App-UI test harness to sign lower-environment JWTs. Required in deployed environment stores and must be an Azure Key Vault reference; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM instead. Never place the private key literal in an App Configuration export."
+      required: true
+      sensitive: true
+  NHSNAppBFF:
+    - key: "NhsnJwt:Issuer"
+      description: "Issuer the NHSN-App-BFF requires on NHSN App JWTs. Required in deployed environment stores; local Docker Compose supplies NhsnJwt__Issuer instead. The service rejects a blank issuer during startup."
+      required: true
+    - key: "NhsnJwt:PublicCertificatePem"
+      description: "PEM-encoded public certificate the NHSN-App-BFF uses to validate ES256 JWT signatures. Required in deployed environment stores; local Docker Compose supplies NhsnJwt__PublicCertificatePem instead. This is a public certificate, not the private signing key."
+      required: true
+      sensitive: true
+    - key: "NhsnJwt:AccessRequestUrl"
+      description: "A URL to a location the user should be redirected in the browser when they do not have access to the NHSN App UI; perhaps to request access."
+      defaultValue: "https://example.org/request-nhsnlink-access"
+      required: false
   Normalization:
     - key: "ResourceCache:CacheImplementation"
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
@@ -903,11 +936,11 @@ $defs:
     properties:
       label:
         type: "string"
-        description: "The App Configuration label this service selects at startup. Hardcoded per service (a compile-time constant in .NET, the bootstrap.yml label-filter in Java), so it cannot be changed without a redeploy. Must match exactly, including case and spaces."
+        description: "The App Configuration label this service selects at startup. Hardcoded per service (a compile-time constant in .NET, the bootstrap.yml label-filter in Java, or the provider module in Node), so it cannot be changed without a redeploy. Must match exactly, including case and spaces."
       runtime:
         type: "string"
-        enum: ["dotnet", "java"]
-        description: "Which runtime the service is. Determines key notation: .NET reads 'Section:Key' rows, Java reads '/section/key' rows which the Spring provider maps to 'section.key'."
+        enum: ["dotnet", "java", "node"]
+        description: "Which runtime the service is. Determines key notation: .NET reads 'Section:Key' rows; Java reads '/section/key' rows which the Spring provider maps to 'section.key'; Node services define and map their selected key hierarchy explicitly."
   environmentEntry:
     type: "object"
     additionalProperties: false
@@ -949,8 +982,8 @@ $defs:
         description: "An optional default value for the configuration key, if applicable."
       runtime:
         type: "string"
-        enum: ["dotnet", "java"]
-        description: "Overrides the runtime inferred from the owning service, for the rare entry whose notation does not match its section. Needed for Java-notation keys listed under 'global', which has no owning service."
+        enum: ["dotnet", "java", "node"]
+        description: "Overrides the runtime inferred from the owning service, for the rare entry whose notation does not match its section. Needed for non-.NET notation keys listed under 'global', which has no owning service."
       consumers:
         type: "array"
         items:
