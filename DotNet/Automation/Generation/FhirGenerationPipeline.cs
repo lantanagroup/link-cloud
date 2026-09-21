@@ -633,16 +633,20 @@ public static class FhirGenerationPipeline
         // measure's MeasureReport does not contain the patient's resources, so its SDE
         // semantics do not contribute to the intersection of exclusions that determines
         // whether a resource reaches ABS.
-        var effectiveProfile = IndexPatientEntries(
+        //
+        // PopulateManifest org-maps acquired encounters before CQL so IP windows match
+        // MeasureEval (DA strips non-org encounters). Q/NQ still uses every in-period
+        // generated encounter.
+        var effectiveProfile = AbsSubmissionPredictor.PopulateManifest(
             manifestBuilder,
             patientId,
             profile,
             entries,
             measures,
-            sharedSimEntries,
             acquisitionSimulation,
             generationClinicalPeriodStart,
             generationClinicalPeriodEnd,
+            sharedSimEntries,
             output,
             measureBundleJsons);
 
@@ -737,16 +741,16 @@ public static class FhirGenerationPipeline
             eligibilities,
             ClinicalScenarioId: detection.DetectedClinicalScenarioId ?? imported.DetectedClinicalScenarioId);
 
-        var effectiveProfile = IndexPatientEntries(
+        var effectiveProfile = AbsSubmissionPredictor.PopulateManifest(
             manifestBuilder,
             patientId,
             profile,
             entries,
             measures,
-            sharedSimEntries,
             acquisitionSimulation,
             generationClinicalPeriodStart,
             generationClinicalPeriodEnd,
+            sharedSimEntries,
             output,
             measureBundleJsons);
 
@@ -773,84 +777,6 @@ public static class FhirGenerationPipeline
         return (patientId, bundleCount);
     }
 
-    /// <summary>
-    /// Shared generated/imported post-processing: period eligibility, CQL SDE keys,
-    /// acquisition simulation, and manifest rows. Callers still own materialization
-    /// (Thetis vs fetch/parse) and whether to POST the bundles.
-    /// </summary>
-    private static PatientProfile IndexPatientEntries(
-        GenerationManifest.IncrementalBuilder manifestBuilder,
-        string patientId,
-        PatientProfile profile,
-        List<Bundle.EntryComponent> entries,
-        IReadOnlyList<ProfiledMeasureType> measures,
-        List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
-        AcquisitionSimulationConfig? acquisitionSimulation,
-        DateTime? generationClinicalPeriodStart,
-        DateTime? generationClinicalPeriodEnd,
-        IAutomationOutput output,
-        IReadOnlyList<string>? measureBundleJsons = null)
-    {
-        HashSet<string>? cqlFilteredKeys = null;
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
-        var effectiveProfile = profile;
-
-        if (cqlInput != null)
-        {
-            if (generationClinicalPeriodStart.HasValue || generationClinicalPeriodEnd.HasValue)
-            {
-                cqlInput = cqlInput with
-                {
-                    MeasurementPeriodStart = generationClinicalPeriodStart ?? DateTime.MinValue,
-                    MeasurementPeriodEnd = generationClinicalPeriodEnd ?? DateTime.MaxValue
-                };
-            }
-
-            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
-                patientId,
-                profile,
-                measures,
-                cqlInput,
-                generationClinicalPeriodStart,
-                generationClinicalPeriodEnd,
-                output);
-
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var bundles = ResolveMeasureBundles(measureBundleJsons, measures, qualifyingMeasures);
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(bundles, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
-
-        manifestBuilder.AddPatient(patientId, effectiveProfile);
-        manifestBuilder.AddEntries(patientId, entries);
-
-        if (acquisitionSimulation != null)
-        {
-            var patientSimEntries = AbsSubmissionPredictor.IndexEntries(entries);
-            var acquiredKeys = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
-                patientId,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.QueryPlan,
-                acquisitionSimulation.ClinicalPeriodStart,
-                acquisitionSimulation.ClinicalPeriodEnd,
-                output,
-                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
-            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
-                acquiredKeys,
-                patientSimEntries,
-                sharedSimEntries,
-                acquisitionSimulation.OrganizationLocationConditionFhirPaths,
-                cqlFilteredKeys);
-            manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
-        }
-
-        return effectiveProfile;
-    }
-
     private static string FormatMeasureEligibilityLabel(
         IReadOnlyList<ProfiledMeasureType> measures,
         PatientProfile profile)
@@ -865,78 +791,6 @@ public static class FhirGenerationPipeline
             };
             return $"{shortName}={(profile.QualifiesFor(m) ? "Q" : "NQ")}";
         }));
-
-    private static PatientProfile ApplyMeasurementPeriodEligibilityPrediction(
-        string patientId,
-        PatientProfile profile,
-        IReadOnlyList<ProfiledMeasureType> measures,
-        CqlFilterSimulator.PatientCqlInput cqlInput,
-        DateTime? measurementPeriodStart,
-        DateTime? measurementPeriodEnd,
-        IAutomationOutput output)
-    {
-        if (!measurementPeriodStart.HasValue || !measurementPeriodEnd.HasValue)
-            return profile;
-
-        var constrainedInput = cqlInput with
-        {
-            MeasurementPeriodStart = measurementPeriodStart.Value,
-            MeasurementPeriodEnd = measurementPeriodEnd.Value
-        };
-
-        var adjusted = new Dictionary<ProfiledMeasureType, MeasureEligibility>(profile.MeasureEligibilities);
-        var downgraded = new List<string>();
-
-        foreach (var measure in measures)
-        {
-            if (!adjusted.TryGetValue(measure, out var eligibility)
-                || eligibility != MeasureEligibility.Qualifying)
-            {
-                continue;
-            }
-
-            var hasInPeriodIpOverlap = MeasureInitialPopulationResolver.Resolve([measure], constrainedInput).Count > 0;
-            if (hasInPeriodIpOverlap)
-                continue;
-
-            adjusted[measure] = MeasureEligibility.NonQualifying;
-            downgraded.Add(measure.ToString());
-        }
-
-        if (downgraded.Count > 0)
-        {
-            output.WriteLine(
-                $"  [prediction] Patient {patientId}: downgraded to NQ for {string.Join(", ", downgraded)} due to no initial-population encounter overlap with report period.");
-        }
-
-        return profile with { MeasureEligibilities = adjusted };
-    }
-
-    private static IReadOnlyList<string> ResolveMeasureBundles(
-        IReadOnlyList<string>? measureBundleJsons,
-        IReadOnlyList<ProfiledMeasureType> allMeasures,
-        IReadOnlyList<ProfiledMeasureType> qualifyingMeasures)
-    {
-        if (measureBundleJsons != null
-            && allMeasures.Count > 0
-            && measureBundleJsons.Count == allMeasures.Count)
-        {
-            return allMeasures
-                .Select((measure, index) => (measure, json: measureBundleJsons[index]))
-                .Where(pair => qualifyingMeasures.Contains(pair.measure) && !string.IsNullOrWhiteSpace(pair.json))
-                .Select(pair => pair.json)
-                .ToList();
-        }
-
-        if (measureBundleJsons != null
-            && measureBundleJsons.Count > 0
-            && measureBundleJsons.Count == qualifyingMeasures.Count)
-        {
-            return measureBundleJsons.Where(json => !string.IsNullOrWhiteSpace(json)).ToList();
-        }
-
-        return qualifyingMeasures.Select(measure => ProfiledMeasureCatalog.ReadBundleJson(measure)).ToList();
-    }
 
     // ------------------------------------------------------------------
     //  Shared infrastructure generation
