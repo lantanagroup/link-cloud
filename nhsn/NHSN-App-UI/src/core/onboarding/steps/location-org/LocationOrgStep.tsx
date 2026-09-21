@@ -25,7 +25,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError, notifySuccess} = useNotifications();
-  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
 
   const locationOrg = draft.locationOrg;
   const methods = vendorProfile?.locationMethods ?? [];
@@ -124,16 +124,16 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         title: t('onboarding:locationOrg.title'),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={saving}>
+            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableOnNext, hasIncompleteRows]
+      [t, saving, savingDirection, stableOnBack, stableOnNext, hasIncompleteRows]
     )
   );
 

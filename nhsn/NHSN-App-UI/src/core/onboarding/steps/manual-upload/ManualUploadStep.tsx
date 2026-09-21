@@ -12,7 +12,7 @@ import {useStableCallback, useStepChrome} from '../../StepChrome';
 /** Manual Upload Option: download the import sheet, complete it offline, upload it back. */
 export function ManualUploadStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving, patch, user, setErrorStepIds} = useOnboarding();
+  const {saving, savingDirection, patch, user, setErrorStepIds} = useOnboarding();
   const api = useApiClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string[]>();
@@ -115,16 +115,16 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
         title: t('onboarding:manualUpload.title'),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving} loading={saving}>
+            <Button onClick={stableOnNext} disabled={saving} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableOnNext]
+      [t, saving, savingDirection, stableOnBack, stableOnNext]
     )
   );
 

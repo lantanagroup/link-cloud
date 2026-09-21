@@ -18,7 +18,7 @@ import './FhirStep.css';
 export function FhirStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
-  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
   const fhir = draft.fhir;
   const [initialLagDays, initialLagHours, initialLagMinutes] = parseIso8601Duration(fhir.lagDuration);
 
@@ -220,8 +220,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
   const jwksInstructionsKey = vendorProfile?.documentKeys.jwksInstructions;
   const vendorDisplayName = vendorProfile?.displayName ?? '';
-  const connectionVerified = testedBaseUrl !== null && testedBaseUrl === baseUrl.trim();
-  const isFormValid = Object.keys(validateFhir(currentFieldValues())).length === 0;
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleTestConnection = useStableCallback(handleTestConnection);
@@ -233,19 +231,19 @@ export function FhirStep({onNext, onBack}: StepProps) {
         title: t('onboarding:fhirServerInfo.title'),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
             <Button onClick={stableHandleTestConnection} disabled={testing}>
               {t('common:actions.testConnection')}
             </Button>
-            <Button onClick={stableHandleNext} disabled={saving || !isFormValid || !connectionVerified} loading={saving}>
+            <Button onClick={stableHandleNext} disabled={saving} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableHandleTestConnection, testing, stableHandleNext, isFormValid, connectionVerified]
+      [t, saving, savingDirection, stableOnBack, stableHandleTestConnection, testing, stableHandleNext]
     )
   );
 

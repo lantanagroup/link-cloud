@@ -682,6 +682,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     patch,
     mirror,
     saving,
+    savingDirection,
     goTo,
     openView,
     closeView,
@@ -1249,10 +1250,10 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               title: t('onboarding:reportResults.title'),
               footer: (
                 <StepActions saving={saving}>
-                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={savingDirection === 'next'}>
                     {t('common:actions.continue')}
                   </Button>
                 </StepActions>
@@ -1262,6 +1263,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
         viewingDetail,
         t,
         saving,
+        savingDirection,
         closeView,
         stableHandleViewQueryPlan,
         stableHandleViewAcquisitionLog,

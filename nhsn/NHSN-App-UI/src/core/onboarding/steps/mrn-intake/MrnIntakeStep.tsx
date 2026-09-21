@@ -52,7 +52,7 @@ const EMPTY_OPTIONS: MrnIntakeOptions = {multipleMrnTypes: [], varianceTypes: []
 export function MrnIntakeStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
-  const {dispatch, saving} = useOnboarding();
+  const {dispatch, saving, savingDirection} = useOnboarding();
   const {notifyError} = useNotifications();
 
   const [loading, setLoading] = useState(true);
@@ -203,16 +203,16 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
               title: t('onboarding:mrnIntake.title'),
               footer: (
                 <StepActions saving={busy}>
-                  <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={busy} loading={savingDirection === 'back'}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleComplete} disabled={busy} loading={busy}>
+                  <Button onClick={stableHandleComplete} disabled={busy} loading={submitting || savingDirection === 'next'}>
                     {t('onboarding:mrnIntake.actions.complete')}
                   </Button>
                 </StepActions>
               )
             },
-      [t, loading, busy, stableOnBack, stableHandleComplete]
+      [t, loading, busy, savingDirection, submitting, stableOnBack, stableHandleComplete]
     )
   );
 
