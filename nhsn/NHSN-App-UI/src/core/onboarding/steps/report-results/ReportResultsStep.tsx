@@ -22,9 +22,11 @@ import { HttpError } from '../../../api/http';
 import { PatientStatusTimelineModal } from './PatientStatusTimeline';
 import { PreQualResultsModal } from './PreQualResults';
 import {
+  acronymTitle,
   AcronymText,
   Button,
   CheckboxField,
+  HeadingPause,
   MessageContainer,
   Modal,
   NewTabAnnouncement,
@@ -32,6 +34,7 @@ import {
   Select,
   StepActions,
   Tabs,
+  TableCaption,
   TextField,
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
@@ -682,6 +685,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     patch,
     mirror,
     saving,
+    savingDirection,
     goTo,
     openView,
     closeView,
@@ -1222,7 +1226,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       () =>
         viewingDetail
           ? {
-              title: t('onboarding:reportResults.detail.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={saving}>
                   <Button variant="secondary" onClick={closeView}>
@@ -1246,13 +1250,13 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               )
             }
           : {
-              title: t('onboarding:reportResults.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:reportResults.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={saving}>
-                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={savingDirection === 'next'}>
                     {t('common:actions.continue')}
                   </Button>
                 </StepActions>
@@ -1262,6 +1266,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
         viewingDetail,
         t,
         saving,
+        savingDirection,
         closeView,
         stableHandleViewQueryPlan,
         stableHandleViewAcquisitionLog,
@@ -1478,7 +1483,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             </h3>
             <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__report-results-table">
-                <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.selectedMeasures')}</caption>
+                <TableCaption>{t('onboarding:reportResults.detail.selectedMeasures')}</TableCaption>
                 <thead>
                   <tr>
                     <th scope="col">
@@ -1586,11 +1591,11 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
                 </h3>
                 <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                   <table className="nhsn-link__report-results-table nhsn-link__report-results-table--light-border nhsn-link__report-results-table--fixed">
-                    <caption className="nhsn-link__visually-hidden">
+                    <TableCaption>
                       {t('onboarding:reportResults.detail.patientReportingStatus', {
                         count: dqmScopedPatients.length,
                       })}
-                    </caption>
+                    </TableCaption>
                     <colgroup>
                       <col style={{ width: '9%' }} />
                       <col style={{ width: '12%' }} />
@@ -2953,7 +2958,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       {!loading && reports.length > 0 && (
         <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
-            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.title')}</caption>
+            <TableCaption>{t('onboarding:reportResults.title')}</TableCaption>
             <colgroup>
               <col style={{ width: '11%' }} />
               <col style={{ width: '26%' }} />

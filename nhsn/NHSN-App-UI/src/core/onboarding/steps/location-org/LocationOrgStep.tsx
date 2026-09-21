@@ -4,8 +4,10 @@ import {useApiClient} from '../../../api/ApiClientContext';
 import type {LocationCandidate, LocationMethod} from '../../../api/contracts';
 import {InstructionsDownload} from '../../../documents';
 import {
+  acronymTitle,
   Button,
   FieldLabel,
+  HeadingPause,
   InlineSpinner,
   Modal,
   RepeatableList,
@@ -25,7 +27,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError, notifySuccess} = useNotifications();
-  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
 
   const locationOrg = draft.locationOrg;
   const methods = vendorProfile?.locationMethods ?? [];
@@ -121,20 +123,33 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:locationOrg.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:locationOrg.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={saving}>
+            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableOnNext, hasIncompleteRows]
+      [t, saving, savingDirection, stableOnBack, stableOnNext, hasIncompleteRows]
     )
+  );
+
+  const customFhirPathContent = (
+    <div className="nhsn-link__field-group nhsn-link__field-group--labeled">
+      <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.customFhirPath.tooltip')}>{t('onboarding:locationOrg.customFhirPath.label')}</FieldLabel>
+      <TextField
+        id="custom-fhir-path"
+        label={t('onboarding:locationOrg.customFhirPath.label')}
+        placeholder={t('onboarding:locationOrg.customFhirPath.placeholder')}
+        value={locationOrg.customFhirPath ?? ''}
+        onChange={customFhirPath => patch('locationOrg', {customFhirPath})}
+      />
+    </div>
   );
 
   return (
@@ -148,12 +163,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
             label={t('onboarding:locationOrg.methodLabel')}
             tabs={methods.map(method => ({id: method, label: t(METHOD_LABEL_KEYS[method])}))}
             activeTab={activeMethod}
-            onTabChange={handleMethodChange}
-          />
-        </div>
-      )}
-
-      {activeMethod === 'location-type' && (
+            onTabChange={handleMethodChange}>
+            {activeMethod === 'location-type' && (
         <>
           <p className="nhsn-link__subtitle">
             {t('onboarding:locationOrg.locationType.intro')}
@@ -274,18 +285,12 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         </>
       )}
 
-      {(activeMethod === 'custom-fhir-path' || methods.length === 0) && (
-        <div className="nhsn-link__field-group nhsn-link__field-group--labeled">
-          <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.customFhirPath.tooltip')}>{t('onboarding:locationOrg.customFhirPath.label')}</FieldLabel>
-          <TextField
-            id="custom-fhir-path"
-            label={t('onboarding:locationOrg.customFhirPath.label')}
-            placeholder={t('onboarding:locationOrg.customFhirPath.placeholder')}
-            value={locationOrg.customFhirPath ?? ''}
-            onChange={customFhirPath => patch('locationOrg', {customFhirPath})}
-          />
+            {activeMethod === 'custom-fhir-path' && customFhirPathContent}
+          </Tabs>
         </div>
       )}
+
+      {methods.length === 0 && customFhirPathContent}
 
       <Modal
         open={searchOpen}
@@ -322,9 +327,11 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
       </Modal>
 
       {hasIncompleteRows && (
-        <p className="nhsn-link__form-error" role="alert">
-          {t('onboarding:locationOrg.errors.incompleteRows')}
-        </p>
+        <div aria-live="off">
+          <p className="nhsn-link__form-error" role="alert">
+            {t('onboarding:locationOrg.errors.incompleteRows')}
+          </p>
+        </div>
       )}
     </div>
   );

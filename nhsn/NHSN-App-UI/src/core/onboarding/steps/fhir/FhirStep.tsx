@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
+import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -18,7 +18,7 @@ import './FhirStep.css';
 export function FhirStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
-  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
   const fhir = draft.fhir;
   const [initialLagDays, initialLagHours, initialLagMinutes] = parseIso8601Duration(fhir.lagDuration);
 
@@ -227,8 +227,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
 
   const jwksInstructionsKey = vendorProfile?.documentKeys.jwksInstructions;
   const vendorDisplayName = vendorProfile?.displayName ?? '';
-  const connectionVerified = testedBaseUrl !== null && testedBaseUrl === baseUrl.trim();
-  const isFormValid = Object.keys(validateFhir(currentFieldValues())).length === 0;
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleTestConnection = useStableCallback(handleTestConnection);
@@ -237,22 +235,22 @@ export function FhirStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:fhirServerInfo.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:fhirServerInfo.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
-            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
             <Button onClick={stableHandleTestConnection} disabled={testing}>
               {t('common:actions.testConnection')}
             </Button>
-            <Button onClick={stableHandleNext} disabled={saving || !isFormValid || !connectionVerified} loading={saving}>
+            <Button onClick={stableHandleNext} disabled={saving} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, stableOnBack, stableHandleTestConnection, testing, stableHandleNext, isFormValid, connectionVerified]
+      [t, saving, savingDirection, stableOnBack, stableHandleTestConnection, testing, stableHandleNext]
     )
   );
 
@@ -466,9 +464,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
             </p>
           </div>
 
-          <p className="nhsn-link__form-error" role="alert">
-            {validationError}
-          </p>
+          <div aria-live="off">
+            <p className="nhsn-link__form-error" role="alert">
+              {validationError}
+            </p>
+          </div>
 
           {(testing || testResult) && (
             <div className="fhir-test-result" role="status" ref={testResultRef}>

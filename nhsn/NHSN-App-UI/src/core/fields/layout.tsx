@@ -169,6 +169,19 @@ export function acronymTitle(node: React.ReactNode): string {
   return node as unknown as string;
 }
 
+export function acronymLabel(text: string): string {
+  return text.replace(ACRONYM_PATTERN, match => ACRONYM_SPELLINGS[match] ?? match);
+}
+
+export function HeadingPause({children}: {children: React.ReactNode}) {
+  return (
+    <>
+      {children}
+      <span className="nhsn-link__visually-hidden">.</span>
+    </>
+  );
+}
+
 /**
  * A table's visually-hidden `<caption>`, always ending in "Table" - NVDA's
  * continuous/Say-All reading speaks a caption's own text but doesn't reliably

@@ -35,6 +35,7 @@ interface OnboardingContextValue {
   goHome: () => void;
   /** True while a save is in flight or the next step's code is still loading; steps disable their Next button on it. */
   saving: boolean;
+  savingDirection: 'next' | 'back' | null;
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
   mirror: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
@@ -96,6 +97,7 @@ export function OnboardingProvider({
     staleTime: Infinity
   });
   const [saving, setSaving] = useState(false);
+  const [navDirection, setNavDirection] = useState<'next' | 'back' | null>(null);
   const [isStepPending, startStepTransition] = useTransition();
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const pendingSaves = useRef(0);
@@ -306,12 +308,14 @@ export function OnboardingProvider({
   }, [pendingStepId, completeGoTo]);
 
   const advanceTo = useCallback(
-    (stepId: StepId) => {
+    (stepId: StepId, direction: 'next' | 'back') => {
       if (!dirtyRef.current) {
         completeGoTo(stepId);
         return;
       }
+      setNavDirection(direction);
       persistDraft(draft).then(saved => {
+        setNavDirection(null);
         if (saved) {
           completeGoTo(stepId);
         }
@@ -323,7 +327,7 @@ export function OnboardingProvider({
   const goNext = useCallback(() => {
     const next = nextStepId(target.stepId, draft, user);
     if (next) {
-      advanceTo(next);
+      advanceTo(next, 'next');
     }
   }, [target.stepId, draft, user, advanceTo]);
 
@@ -335,7 +339,7 @@ export function OnboardingProvider({
     }
     const previous = previousStepId(target.stepId, draft, user);
     if (previous) {
-      advanceTo(previous);
+      advanceTo(previous, 'back');
     }
   }, [target, draft, user, advanceTo]);
 
@@ -374,6 +378,7 @@ export function OnboardingProvider({
       commitState,
       goHome: onGoHome,
       saving: saving || isStepPending,
+      savingDirection: saving ? navDirection : null,
       patch,
       mirror,
       errorStepIds,
@@ -396,6 +401,7 @@ export function OnboardingProvider({
       commitState,
       onGoHome,
       saving,
+      navDirection,
       isStepPending,
       patch,
       mirror,
