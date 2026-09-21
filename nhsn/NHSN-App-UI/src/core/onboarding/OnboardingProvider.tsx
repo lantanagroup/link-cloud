@@ -259,39 +259,13 @@ export function OnboardingProvider({
     }
   }, [draft, loadState, persistDraft]);
 
-  const completeGoTo = useCallback(
-    // `baseline` defaults to the live `draft` -- correct for every caller except
-    // confirmDiscardChanges, which passes the just-restored lastSavedDraftRef explicitly
-    (stepId: StepId, baseline: FacilityDraft = draft) => {
-      // completeGoTo pre-marks persistedStep.current (below) before dispatching, specifically so
-      // the effect above never re-persists this same transition -- which means that effect can
-      // never be the one to flush a step's unlock either. A step reached for the first time must
-      // be saved right here, unconditionally of dirtyRef: unlike a field edit, step/unlock only
-      // ever updates local reducer state, so without this a step's unlock lives only in memory
-      // until some later, unrelated dirty save happens to carry it along -- or never, if none
-      // does. A reload before that drops the step back to locked: it loses its "done" checkmark
-      // in the nav (gating.ts's isUnlocked reads false), and a deep link back to it gets bounced
-      // to furthestLegalStep.
-      //
-      // Baseline is the live draft, not lastSavedDraftRef, because not every field that belongs in
-      // this save goes through patch()/dirtyRef -- e.g. ReportResultsStep's accuracy acknowledgement
-      // is mirror()'d in from its own server-authoritative source, never dirtying the draft, so a
-      // save keyed only off "was dirtyRef ever true" would silently drop it. draft already reflects
-      // that: it equals lastSavedDraftRef plus any of the caller's own pending patch()es (already
-      // flushed separately by whichever of advanceTo/confirmSaveAndContinue called this) plus any
-      // mirrored, non-dirty updates -- exactly what should be persisted alongside this unlock.
-      persistedStep.current = `${stepId}:`;
-      if (!baseline.unlockedStepIds.includes(stepId)) {
-        void persistDraft(draftReducer(baseline, {type: 'step/goto', stepId}));
-      }
-      startStepTransition(() => {
-        setUrlTarget(undefined);
-        dispatch({type: 'step/unlock', stepId});
-        dispatch({type: 'step/goto', stepId});
-      });
-    },
-    [draft, persistDraft]
-  );
+  const completeGoTo = useCallback((stepId: StepId) => {
+    startStepTransition(() => {
+      setUrlTarget(undefined);
+      dispatch({type: 'step/unlock', stepId});
+      dispatch({type: 'step/goto', stepId});
+    });
+  }, []);
 
   const goTo = useCallback(
     (stepId: StepId) => {
@@ -328,11 +302,8 @@ export function OnboardingProvider({
       dispatch({type: 'draft/loaded', draft: restored});
     }
     dirtyRef.current = false;
-    // Passed explicitly: `draft` is still the discarded edits until the dispatch above applies,
-    // and completeGoTo's default baseline (the live draft) would otherwise persist exactly what
-    // this action means to discard.
-    completeGoTo(stepId, restored ?? draft);
-  }, [pendingStepId, completeGoTo, draft]);
+    completeGoTo(stepId);
+  }, [pendingStepId, completeGoTo]);
 
   const advanceTo = useCallback(
     (stepId: StepId) => {
