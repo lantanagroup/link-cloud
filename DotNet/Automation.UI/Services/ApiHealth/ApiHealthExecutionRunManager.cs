@@ -4,6 +4,7 @@ using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Shared.Application.Models;
 
 namespace Automation.UI.Services.ApiHealth;
 
@@ -15,6 +16,7 @@ public sealed class ApiHealthExecutionRunManager(
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
+    private const string ServiceInfoEndpointName = "Service Info GET → 200";
     private static readonly TimeSpan CompletedRunRetention = TimeSpan.FromHours(6);
     private const int MaxCompletedRunsToRetain = 200;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -369,9 +371,12 @@ public sealed class ApiHealthExecutionRunManager(
             .Select(d => d.Key)
             .ToHashSet();
 
+        var commit = GetServiceCommit(results);
+
         foreach (var result in results)
         {
             result.RunId = run.RunId;
+            result.Commit = commit;
         }
 
         await store.SaveRunResultsAsync(
@@ -384,6 +389,38 @@ public sealed class ApiHealthExecutionRunManager(
         {
             var json = JsonSerializer.Serialize(result, _jsonOptions);
             AddEvent(run, "result", json);
+        }
+    }
+
+    private static string? GetServiceCommit(IReadOnlyList<ApiTestRunResult> results)
+    {
+        var serviceInfoResult = results.FirstOrDefault(result =>
+            string.Equals(
+                result.EndpointName,
+                ServiceInfoEndpointName,
+                StringComparison.Ordinal)
+            && result.Passed
+            && !string.IsNullOrWhiteSpace(result.ResponseBody));
+
+        if (serviceInfoResult == null)
+            return null;
+
+        try
+        {
+            var serviceInfo = JsonSerializer.Deserialize<ServiceInformation>(
+                serviceInfoResult.ResponseBody,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            return string.IsNullOrWhiteSpace(serviceInfo?.Commit)
+                ? null
+                : serviceInfo.Commit;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
