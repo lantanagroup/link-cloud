@@ -1,17 +1,18 @@
 ﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Controls whether a generated patient should qualify for the measure's Initial Population.
+/// Derived initial-population outcome for a measure, predicted from the clinical
+/// shape (or classified from imported FHIR). Not a generation switch.
 /// </summary>
 public enum MeasureEligibility
 {
     /// <summary>
-    /// Generated to satisfy the selected measure's Initial Population criteria.
+    /// Clinical shape is predicted to satisfy the measure's Initial Population.
     /// </summary>
     Qualifying,
 
     /// <summary>
-    /// Generated to avoid the selected measure's Initial Population criteria.
+    /// Clinical shape is predicted not to satisfy the measure's Initial Population.
     /// </summary>
     NonQualifying
 }

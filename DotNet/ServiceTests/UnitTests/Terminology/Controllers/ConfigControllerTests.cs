@@ -53,7 +53,7 @@ public class ConfigControllerTests
     public ConfigControllerTests()
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
-        _fhirService = new FhirService(_mockCacheService.Object, Mock.Of<ILogger<FhirService>>(), TerminologyTestConfig.Options());
+        _fhirService = new FhirService(_mockCacheService.Object, Mock.Of<ILogger<FhirService>>(), Mock.Of<ITerminologyServiceMetrics>(), TerminologyTestConfig.Options());
 
         // The upload endpoints are enabled for most tests; BuildController(false) covers the
         // production configuration where the feature is off.

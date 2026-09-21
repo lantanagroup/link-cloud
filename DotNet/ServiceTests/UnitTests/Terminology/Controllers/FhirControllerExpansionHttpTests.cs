@@ -74,6 +74,7 @@ public class FhirControllerExpansionHttpTests
             {
                 services.AddLogging();
                 services.AddSingleton(cache.Object);
+                services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
                 services.AddSingleton(TerminologyTestConfig.Options(DefaultPageSize, MaxPageSize));
                 services.AddSingleton<FhirService>();
                 services.AddControllers(options =>
