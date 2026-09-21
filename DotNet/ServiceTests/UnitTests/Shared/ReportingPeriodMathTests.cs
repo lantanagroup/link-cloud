@@ -171,4 +171,21 @@ public class ReportingPeriodMathTests
         start.Should().Be(TimeZoneInfo.ConvertTimeToUtc(normalDate, Santiago));
         end.Should().Be(TimeZoneInfo.ConvertTimeToUtc(normalDate.AddDays(1).AddSeconds(-1), Santiago));
     }
+
+    [Fact]
+    public void ToUtcAfterGap_converts_a_valid_local_time_in_the_zones_offset()
+    {
+        ReportingPeriodMath.ToUtcAfterGap(new DateTime(2026, 9, 30, 23, 59, 0), Minus5)
+            .Should().Be(new DateTime(2026, 10, 1, 4, 59, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void ToUtcAfterGap_steps_past_a_skipped_local_time()
+    {
+        // 2026-03-08 02:30 does not exist in Chicago: clocks jump from 02:00 CST to 03:00 CDT.
+        var chicago = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
+
+        ReportingPeriodMath.ToUtcAfterGap(new DateTime(2026, 3, 8, 2, 30, 0), chicago)
+            .Should().Be(new DateTime(2026, 3, 8, 8, 0, 0, DateTimeKind.Utc));
+    }
 }

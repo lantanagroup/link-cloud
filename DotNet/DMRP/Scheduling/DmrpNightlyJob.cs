@@ -83,14 +83,23 @@ namespace LantanaGroup.Link.DMRP.Scheduling
             var scheduling = _settings.Value.Scheduling;
             var scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
 
-            var overrideUtc = scheduling.ResolvedScheduledFireTimeOverride;
-            if (overrideUtc is not null)
+            // The override is wall-clock time read in this zone, so one configured value is the same
+            // local night for every zone job. Converted with the gap-aware helper so a value inside a
+            // DST gap cannot throw.
+            if (scheduling.ResolvedScheduledFireTimeOverride is { } overrideLocal)
+            {
+                var overrideUtc = new DateTimeOffset(ReportingPeriodMath.ToUtcAfterGap(overrideLocal, timeZone), TimeSpan.Zero);
+                _logger.LogWarning(
+                    "DMRP nightly job for zone {TimeZone} is using the configured scheduled-fire-time override {OverrideLocal:s} local ({OverrideUtc:O}) instead of the trigger's scheduled time {ScheduledFireTimeUtc:O}. This is a QA aid and must not be set in production.",
+                    zoneId.SanitizeForLog(), overrideLocal, overrideUtc, scheduledUtc);
+
+                scheduledUtc = overrideUtc;
+            }
+            else if (scheduling.ScheduledFireTimeOverrideIsInvalid)
             {
                 _logger.LogWarning(
-                    "DMRP nightly job for zone {TimeZone} is using the configured scheduled-fire-time override {Override:O} instead of the trigger's scheduled time {ScheduledFireTimeUtc:O}. This is a QA aid and must not be set in production.",
-                    zoneId.SanitizeForLog(), overrideUtc.Value, scheduledUtc);
-
-                scheduledUtc = overrideUtc.Value;
+                    "DMRP nightly job for zone {TimeZone} is ignoring the configured scheduled-fire-time override '{Override}': it must be a local date and time with no offset, e.g. 2026-09-30T23:59:00.",
+                    zoneId.SanitizeForLog(), scheduling.ScheduledFireTimeOverride.SanitizeForLog());
             }
 
             var comingMidnight = ReportingPeriods.ComingMidnight(scheduledUtc, timeZone, scheduling.ResolvedNightlyLocalTime);
