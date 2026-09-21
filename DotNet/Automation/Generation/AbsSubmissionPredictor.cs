@@ -286,7 +286,7 @@ public static class AbsSubmissionPredictor
             return measureBundleJsons.Where(json => !string.IsNullOrWhiteSpace(json)).ToList();
         }
 
-        return qualifyingMeasures.Select(ProfiledMeasureCatalog.ReadBundleJson).ToList();
+        return qualifyingMeasures.Select(measure => ProfiledMeasureCatalog.ReadBundleJson(measure)).ToList();
     }
 
     private static CqlFilterSimulator.PatientCqlInput RestrictEncountersToAcquired(
