@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
 
-        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default, bool allowInProgress = false);
         Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
         Task<PagedConfigModel<ReportSummaryApiModel>> GetReportSummaries(
             string? facilityId, ReportStatus? status, string? sortBy, SortOrder? sortOrder,
@@ -410,7 +411,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 batch = await _context.ReportSchedule
                     .Where(r => r.FacilityId == facilityId &&
-                                r.Status == ScheduleStatus.Submitted &&
+                                ScheduleStatusExtensions.TerminalStatuses.Contains(r.Status) &&
                                 (deleted
                                     ? !r.IsDeleted.HasValue || r.IsDeleted == false
                                     : r.IsDeleted == true))
@@ -431,7 +432,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             while (batch.Count == BatchSize);
         }
 
-        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default, bool allowInProgress = false)
         {
             var entity = await _context.ReportSchedule
                 .FirstOrDefaultAsync(r => r.Id == reportTrackingId && (!r.IsDeleted.HasValue || r.IsDeleted == false), cancellationToken);
@@ -439,7 +440,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (entity == null)
                 throw new InvalidOperationException($"Report schedule with ID '{reportTrackingId}' not found.");
 
-            if (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod)
+            if (!allowInProgress && (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod))
                 throw new InvalidOperationException($"Report schedule '{reportTrackingId}' is currently in progress and cannot be deleted.");
 
             if (entity.Status == ScheduleStatus.Scheduled)
@@ -569,7 +570,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                             ReportTypes = reportSchedule.ReportTypes.Select(reportType => reportType.ReportType).ToList(),
                             Status = reportSchedule.IsDeleted == true
                             ? ReportStatus.Canceled
-                                : reportSchedule.Status == ScheduleStatus.Submitted
+                                : ScheduleStatusExtensions.TerminalStatuses.Contains(reportSchedule.Status)
                                 ? ReportStatus.Completed
                                     : reportSchedule.Status == ScheduleStatus.New ||
                                       reportSchedule.Status == ScheduleStatus.Scheduled ||

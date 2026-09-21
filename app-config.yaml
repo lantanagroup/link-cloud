@@ -69,8 +69,8 @@ serviceMeta:
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
   MeasureEval:           { label: "MeasureEval",           runtime: "java" }
   MockDmrpApi:           { label: "MockDmrpApi",           runtime: "dotnet" }
-  NhsnAppBFF:            { label: "NHSN-App-BFF",          runtime: "dotnet" }
-  NhsnAppUI:             { label: "NhsnAppUI",             runtime: "node" }
+  NHSNAppBFF:            { label: "NHSNAppBFF",            runtime: "dotnet" }
+  NHSNAppUIHarness:      { label: "NHSNAppUIHarness",      runtime: "node" }
   Normalization:         { label: "Normalization",         runtime: "dotnet" }
   Notification:          { label: "Notification",          runtime: "dotnet" }
   QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
@@ -703,7 +703,7 @@ services:
       description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
       required: false
       defaultValue: "false"
-  NhsnAppUI:
+  NHSNAppUIHarness:
     - key: "/nhsn_app_ui/bff/base_url"
       description: "Internal BFF proxy target used by the standalone NHSN-App-UI test harness server. BFF_BASE_URL overrides this value; when neither is supplied the server uses http://nhsn-app-bff:8079/api."
       required: false
@@ -715,22 +715,21 @@ services:
     - key: "/nhsn_app_ui/default_jwt/issuer"
       description: "Default JWT issuer pre-populated by the standalone NHSN-App-UI test harness. Required in deployed environment stores; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_ISSUER instead."
       required: true
-      sensitive: true
     - key: "/nhsn_app_ui/default_jwt/key_id"
       description: "Default JWT key id pre-populated by the standalone NHSN-App-UI test harness. Required in deployed environment stores; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_KEY_ID instead."
       required: true
-      sensitive: true
     - key: "/nhsn_app_ui/default_jwt/private_key_pem"
       description: "PKCS#8 private key PEM used only by the standalone NHSN-App-UI test harness to sign lower-environment JWTs. Required in deployed environment stores and must be an Azure Key Vault reference; local Docker Compose supplies NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM instead. Never place the private key literal in an App Configuration export."
       required: true
       sensitive: true
-  NhsnAppBFF:
+  NHSNAppBFF:
     - key: "NhsnJwt:Issuer"
       description: "Issuer the NHSN-App-BFF requires on NHSN App JWTs. Required in deployed environment stores; local Docker Compose supplies NhsnJwt__Issuer instead. The service rejects a blank issuer during startup."
       required: true
     - key: "NhsnJwt:PublicCertificatePem"
       description: "PEM-encoded public certificate the NHSN-App-BFF uses to validate ES256 JWT signatures. Required in deployed environment stores; local Docker Compose supplies NhsnJwt__PublicCertificatePem instead. This is a public certificate, not the private signing key."
       required: true
+      sensitive: true
     - key: "NhsnJwt:AccessRequestUrl"
       description: "A URL to a location the user should be redirected in the browser when they do not have access to the NHSN App UI; perhaps to request access."
       defaultValue: "https://example.org/request-nhsnlink-access"
@@ -843,6 +842,14 @@ services:
       description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
       required: false
       defaultValue: "data/"
+    - key: "Terminology:DefaultExpansionPageSize"
+      description: "The number of codes returned by a ValueSet $expand, a non-summary GET /ValueSet?url= or a non-summary GET /CodeSystem?url= that names no count. Bounds the response for a caller that does not page; expansion.total still reports the full size so the caller can page from there. Must be at least 1 and no greater than Terminology:MaxExpansionPageSize, both validated at startup."
+      required: false
+      defaultValue: "1000"
+    - key: "Terminology:MaxExpansionPageSize"
+      description: "The largest page any single expansion request can obtain. A larger count is reduced to this rather than rejected, and the applied value is reported back in ValueSet.expansion.parameter. This is the ceiling on one request's peak allocation, which must not scale with the size of the code group. Must be at least 1, validated at startup."
+      required: false
+      defaultValue: "5000"
     - key: "Terminology:EnableCodeUploadEndpoint"
       description: "Enables the testing endpoints that replace a cached CodeSystem's or ValueSet's codes from an uploaded CSV (PUT /api/terminology/config/{code-systems|value-sets}/{id}/codes). The replacement is held in the memory of the single instance that served the request: nothing is written to Terminology:Path, and $reload-cache or a restart reverts it. Must remain false in production, and should only be enabled where the service runs a single instance, since an upload reaches one instance only."
       required: false

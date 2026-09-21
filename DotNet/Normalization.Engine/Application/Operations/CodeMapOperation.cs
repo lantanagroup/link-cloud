@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.Normalization.Application.Operations
 {
     public class CodeMapOperation : IOperation
     {
-        public OperationType OperationType => OperationType.CodeMap;
+        public virtual OperationType OperationType => OperationType.CodeMap;
         public string Name { get; set; }
         public string Description { get; set; }
         public string FhirPath { get; private set; }

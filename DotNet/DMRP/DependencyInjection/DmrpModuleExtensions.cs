@@ -94,9 +94,19 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.
             builder.Services.AddScoped<IReportingPlanScheduleProjector, ReportingPlanScheduleProjector>();
+            builder.Services.AddScoped<IFacilityReportingPeriodResolver, FacilityReportingPeriodResolver>();
             builder.Services.AddScoped<IFacilityReportingPlanLookAhead, FacilityReportingPlanLookAhead>();
 
             builder.Services.TryAddSingleton(TimeProvider.System);
+
+            if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityTimeZoneSource)))
+            {
+                throw new InvalidOperationException(
+                    $"The host application must register an {nameof(IFacilityTimeZoneSource)} before calling " +
+                    $"{nameof(AddDmrpModule)}. " +
+                    $"The module needs to know the timezone of a facility to resolve its reporting period, " + 
+                    "which is the month the facility is in by its own timezone, not UTC.");
+            }
 
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what
             // puts the module's behavior in front of the host's without moving a route. The host's own
@@ -112,7 +122,8 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // implementation type itself - to hand it dependencies of its own - has satisfied the same
             // requirement.
             var hostRegisteredItsOperations = builder.Services.Any(d =>
-                d.ServiceType == typeof(IFacilityOperations) || d.ServiceType == typeof(THostFacilityOperations));
+                d.ServiceType == typeof(IFacilityOperations) ||
+                 d.ServiceType == typeof(THostFacilityOperations));
 
             if (!hostRegisteredItsOperations)
             {

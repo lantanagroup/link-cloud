@@ -3,6 +3,10 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Man
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.HttpModels;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Application.Models.Operations;
+using LantanaGroup.Link.Normalization.Domain;
+using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using Microsoft.Extensions.DependencyInjection;
@@ -117,6 +121,129 @@ namespace IntegrationTests.Normalization
                 Description = "Test",
                 IsDisabled = false
             };
+        }
+
+        [Theory]
+        [InlineData(false, "active", true)]
+        [InlineData(true, "active", true)]
+        [InlineData(false, "inactive", false)]
+        [InlineData(true, "inactive", false)]
+        [InlineData(false, "unknown", false)]
+        [InlineData(true, "unknown", false)]
+        [InlineData(false, "cdc", false)]
+        [InlineData(true, "cdc", false)]
+        public async Task SaveHSLOCMap_RequiresActiveHSLOCCode(bool update, string codeKind, bool expectedSuccess)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var context = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+            var prefix = Guid.NewGuid().ToString();
+            context.HSLOCS.AddRange(
+                new HSLOC { HSLOCCode = prefix + "active", CDCCode = prefix + "cdc", IsActive = true },
+                new HSLOC { HSLOCCode = prefix + "inactive", IsActive = false });
+            await context.SaveChangesAsync();
+
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = nameof(OperationType.HSLOCMap);
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            OperationModel? original = null;
+            if (update)
+            {
+                var created = await manager.CreateOperation(model);
+                Assert.True(created.IsSuccess, created.ErrorMessage);
+                original = Assert.IsType<OperationModel>(created.ObjectResult);
+            }
+
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation(
+                [new CodeSystemMap("urn:local", MappingTargetSystems.HslocUrl, new Dictionary<string, CodeMap>
+                {
+                    ["valid"] = new CodeMap(prefix + "active", "Active"),
+                    ["candidate"] = new CodeMap(prefix + codeKind, "Candidate")
+                })]));
+            var result = update
+                ? await manager.UpdateOperation(new UpdateOperationModel
+                {
+                    Id = original!.Id, FacilityId = model.FacilityId, Name = model.Name,
+                    OperationJson = model.OperationJson, ResourceTypes = model.ResourceTypes
+                })
+                : await manager.CreateOperation(model);
+
+            Assert.Equal(expectedSuccess, result.IsSuccess);
+            if (!expectedSuccess)
+            {
+                Assert.Contains(prefix + codeKind, result.ErrorMessage);
+                var saved = await queries.Search(new OperationSearchModel { FacilityId = model.FacilityId });
+                if (update)
+                    Assert.Equal(original!.OperationJson, Assert.Single(saved.Records).OperationJson);
+                else
+                    Assert.Empty(saved.Records);
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CreateOperation_DuplicateHSLOCMap_IsRejected(bool disabled)
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = OperationType.HSLOCMap.ToString();
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            model.IsDisabled = disabled;
+
+            var first = await manager.CreateOperation(model);
+            Assert.True(first.IsSuccess, first.ErrorMessage);
+
+            model.IsDisabled = false;
+            var duplicate = await manager.CreateOperation(model);
+            Assert.False(duplicate.IsSuccess);
+            Assert.Equal("Only one HSLOC Map operation is allowed per facility.", duplicate.ErrorMessage);
+            var records = await queries.Search(new OperationSearchModel { FacilityId = model.FacilityId, IncludeDisabled = true });
+            Assert.Single(records.Records);
+
+            model.FacilityId = Guid.NewGuid().ToString();
+            var otherFacility = await manager.CreateOperation(model);
+            Assert.True(otherFacility.IsSuccess, otherFacility.ErrorMessage);
+        }
+
+        [Fact]
+        public async Task UpdateOperation_HSLOCMap_AllowsSelfButRejectsOccupiedFacility()
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var manager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+            var queries = scope.ServiceProvider.GetRequiredService<IOperationQueries>();
+            var model = GetValidCreateModelWithFacility(Guid.NewGuid().ToString(), ["Location"]);
+            model.OperationType = OperationType.HSLOCMap.ToString();
+            model.OperationJson = JsonSerializer.Serialize(new HSLOCMapOperation([]));
+            var first = await manager.CreateOperation(model);
+            Assert.True(first.IsSuccess, first.ErrorMessage);
+            var original = Assert.IsType<OperationModel>(first.ObjectResult);
+
+            var update = new UpdateOperationModel
+            {
+                Id = original.Id,
+                FacilityId = model.FacilityId,
+                OperationJson = model.OperationJson,
+                ResourceTypes = model.ResourceTypes,
+                Name = "Updated HSLOC map",
+                IsDisabled = true
+            };
+            var selfUpdate = await manager.UpdateOperation(update);
+            Assert.True(selfUpdate.IsSuccess, selfUpdate.ErrorMessage);
+
+            model.FacilityId = Guid.NewGuid().ToString();
+            var second = await manager.CreateOperation(model);
+            Assert.True(second.IsSuccess, second.ErrorMessage);
+
+            update.FacilityId = model.FacilityId;
+            var duplicate = await manager.UpdateOperation(update);
+            Assert.False(duplicate.IsSuccess);
+            Assert.Equal("Only one HSLOC Map operation is allowed per facility.", duplicate.ErrorMessage);
+            var unchanged = await queries.Get(original.Id, original.FacilityId);
+            Assert.Equal(original.FacilityId, unchanged.FacilityId);
         }
 
         [Fact]

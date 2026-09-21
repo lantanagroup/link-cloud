@@ -27,6 +27,13 @@ namespace IntegrationTests.DMRP
         public Mock<IFacilityExistence> FacilityExistenceMock { get; } = new();
 
         /// <summary>
+        /// Stands in for the host's record of where each facility is. Defaults to UTC for every facility,
+        /// so a test that does not care about timezones is anchored exactly as it was before the reads
+        /// took the facility's timezone into account.
+        /// </summary>
+        public Mock<IFacilityTimeZoneSource> FacilityTimeZoneSourceMock { get; } = new();
+
+        /// <summary>
         /// Stands in for the host's facility operations, which the module puts its own behavior in front
         /// of. Tests that care what the host was asked to do set this up; the rest leave it with its
         /// default behavior.
@@ -92,8 +99,10 @@ namespace IntegrationTests.DMRP
             });
 
             ResetFacilityExistence();
+            ResetFacilityTimeZoneSource();
 
             builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
+            builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityTimeZoneSourceMock.Object);
 
             // The module puts its own behavior in front of the host's facility operations rather than
             // supplying them, so the fixture stands in for the host here as it does for the facility
@@ -130,6 +139,19 @@ namespace IntegrationTests.DMRP
             FacilityExistenceMock
                 .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
+        }
+
+        /// <summary>
+        /// Restores the default "every facility is in UTC" stub, dropping any setup a test added to the
+        /// shared mock.
+        /// </summary>
+        public void ResetFacilityTimeZoneSource()
+        {
+            FacilityTimeZoneSourceMock.Reset();
+
+            FacilityTimeZoneSourceMock
+                .Setup(s => s.GetTimeZoneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync("UTC");
         }
 
         public void Dispose()

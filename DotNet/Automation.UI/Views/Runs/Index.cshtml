@@ -35,13 +35,31 @@
 </style>
 
 <div class="container mt-4">
-    <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
-    <p class="text-muted mb-3">Dashboard overview, quick-launch tests, and run history.</p>
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
+        <p class="text-muted mb-0">Dashboard overview, quick-launch tests, and run history.</p>
+    </div>
 
     @if (TempData["RunStartError"] is string runStartError && !string.IsNullOrWhiteSpace(runStartError))
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-1"></i> @runStartError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["LeftoverCleanupError"] is string leftoverCleanupError && !string.IsNullOrWhiteSpace(leftoverCleanupError))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> @leftoverCleanupError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["LeftoverCleanup"] is string leftoverCleanup && !string.IsNullOrWhiteSpace(leftoverCleanup))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="bi bi-recycle me-1"></i> @leftoverCleanup
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -769,7 +787,7 @@
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-cancel-run');
         if (!btn) return;
-        if (!confirm('Cancel this running test?')) return;
+        if (!confirm('Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.')) return;
         var runId = btn.getAttribute('data-run-id');
         btn.disabled = true;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -781,25 +799,21 @@
         })
         .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
         .then(function (res) {
-            // Honor the server's success flag. Previously this branch called
-            // refreshDashboard() regardless, so a {success:false} response (e.g.
-            // when the run existed only in Mongo with no in-memory state to
-            // cancel) looked like "nothing happened" to the user.
             if (res.ok && res.body && res.body.success) {
                 refreshDashboard();
                 return;
             }
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-x-circle"></i>';
-            var reason = (res.body && res.body.error)
-                ? res.body.error
-                : 'The server could not cancel this run. It may have already finished or been cancelled elsewhere.';
-            alert('Unable to cancel: ' + reason);
+            var reason = (res.body && (res.body.error || res.body.detail))
+                ? (res.body.error || res.body.detail)
+                : 'This run is not running.';
+            alert(reason);
         })
         .catch(function () {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-x-circle"></i>';
-            alert('Unable to cancel.');
+            alert('Cancel could not be completed. Refresh the page and check the run status.');
         });
     });
 

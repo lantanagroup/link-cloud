@@ -1,4 +1,5 @@
 ﻿using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Shared.Application.Models.Terminology;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
@@ -20,7 +21,7 @@ public class FhirServiceTests
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
         _mockLogger = new Mock<ILogger<FhirService>>();
-        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object);
+        _service = new FhirService(_mockCacheService.Object, _mockLogger.Object, TerminologyTestConfig.Options());
 
         string valueSet1 = @"
 {
@@ -1761,6 +1762,429 @@ public class FhirServiceTests
 
         // Assert
         Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    #endregion
+
+    #region Expansion paging (LEGLINK-968)
+
+    private const string PagedValueSetId = "paged-vs";
+    private const string PagedCodeSystemUrl = "http://paged.test/CodeSystem";
+    private const string PagedSystemA = "http://paged.test/system-a";
+    private const string PagedSystemB = "http://paged.test/system-b";
+
+    /// <summary>
+    /// A service whose expansion bounds are small enough that a page boundary is reachable with a
+    /// handful of codes.
+    /// </summary>
+    private FhirService PagedService(int defaultPageSize, int maxPageSize) => new(
+        _mockCacheService.Object,
+        _mockLogger.Object,
+        TerminologyTestConfig.Options(defaultPageSize, maxPageSize));
+
+    private static List<Code> Codes(params string[] values) =>
+        values.Select(value => new Code { Value = value, Display = $"Display {value}" }).ToList();
+
+    /// <summary>
+    /// A value set whose codes span two code systems, seeded in reverse ordinal order so a test that
+    /// passes only because the dictionary happened to enumerate in the right order will fail.
+    /// </summary>
+    private CodeGroup ArrangePagedValueSet()
+    {
+        var codeGroup = new CodeGroup
+        {
+            Id = PagedValueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Url = "http://paged.test/ValueSet",
+            Resource = new ValueSet { Id = PagedValueSetId, Url = "http://paged.test/ValueSet" },
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { PagedSystemB, Codes("b1", "b2", "b3") },
+                { PagedSystemA, Codes("a1", "a2", "a3") }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, PagedValueSetId, It.IsAny<string>()))
+            .Returns(codeGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, codeGroup.Url!, It.IsAny<string>()))
+            .Returns(codeGroup);
+
+        return codeGroup;
+    }
+
+    private CodeGroup ArrangePagedCodeSystem(params Code[] codes)
+    {
+        var codeGroup = new CodeGroup
+        {
+            Id = "paged-cs",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Url = PagedCodeSystemUrl,
+            // not-present is what the licensed-terminology resources carry on disk (LEGLINK-921), and
+            // it is the value the summary path upgrades to complete, so seeding it here means that
+            // upgrade is actually exercised rather than skipped over a null.
+            Resource = new CodeSystem
+            {
+                Id = "paged-cs",
+                Url = PagedCodeSystemUrl,
+                Content = CodeSystemContentMode.NotPresent
+            },
+            Codes = codes.Length == 0
+                ? new Dictionary<string, List<Code>>()
+                : new Dictionary<string, List<Code>> { { PagedCodeSystemUrl, codes.ToList() } }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, PagedCodeSystemUrl, It.IsAny<string>()))
+            .Returns(codeGroup);
+
+        return codeGroup;
+    }
+
+    private static CodeSystem SingleCodeSystem(Bundle bundle) =>
+        Assert.IsType<CodeSystem>(Assert.Single(bundle.Entry).Resource);
+
+    private static ValueSet SingleValueSet(Bundle bundle) =>
+        Assert.IsType<ValueSet>(Assert.Single(bundle.Entry).Resource);
+
+    /// <summary>Flattens the nested per-system grouper shape the ValueSet search returns.</summary>
+    private static List<string> LeafCodes(ValueSet.ExpansionComponent expansion) =>
+        expansion.Contains.SelectMany(grouper => grouper.Contains).Select(code => code.Code).ToList();
+
+    [Fact]
+    public void ExpandValueSet_WithNoCount_ReturnsTheConfiguredDefaultPage()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(defaultPageSize: 2, maxPageSize: 5).ExpandValueSet(PagedValueSetId, null, null);
+
+        Assert.Equal(2, result.Expansion.Contains.Count);
+        Assert.Equal(6, result.Expansion.Total);
+        Assert.Equal(0, result.Expansion.Offset);
+    }
+
+    [Fact]
+    public void ExpandValueSet_WithCount_ReturnsThatManyCodes()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 5).ExpandValueSet(PagedValueSetId, null, null, count: 4);
+
+        Assert.Equal(4, result.Expansion.Contains.Count);
+    }
+
+    /// <summary>
+    /// Systems are walked in ordinal order regardless of how the dictionary enumerates, or page 2 is
+    /// not stable against page 1.
+    /// </summary>
+    [Fact]
+    public void ExpandValueSet_OrdersSystemsOrdinally()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 100).ExpandValueSet(PagedValueSetId, null, null, count: 100);
+
+        Assert.Equal(
+            new[] { "a1", "a2", "a3", "b1", "b2", "b3" },
+            result.Expansion.Contains.Select(c => c.Code).ToArray());
+        Assert.Equal(
+            new[] { PagedSystemA, PagedSystemA, PagedSystemA, PagedSystemB, PagedSystemB, PagedSystemB },
+            result.Expansion.Contains.Select(c => c.System).ToArray());
+    }
+
+    [Fact]
+    public void ExpandValueSet_WithOffsetSpanningSystems_ContinuesIntoTheNextSystem()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 100).ExpandValueSet(PagedValueSetId, null, null, count: 2, offset: 2);
+
+        Assert.Equal(new[] { "a3", "b1" }, result.Expansion.Contains.Select(c => c.Code).ToArray());
+        Assert.Equal(PagedSystemA, result.Expansion.Contains[0].System);
+        Assert.Equal(PagedSystemB, result.Expansion.Contains[1].System);
+        Assert.Equal(2, result.Expansion.Offset);
+    }
+
+    /// <summary>
+    /// The acceptance criterion in one test: paging all the way through returns every code exactly
+    /// once, in order, with no gap and no repeat at a page boundary.
+    /// </summary>
+    [Fact]
+    public void ExpandValueSet_PagedEndToEnd_YieldsEveryCodeExactlyOnce()
+    {
+        ArrangePagedValueSet();
+        var service = PagedService(2, 100);
+
+        var seen = new List<string>();
+        var offset = 0;
+
+        while (true)
+        {
+            var page = service.ExpandValueSet(PagedValueSetId, null, null, count: 2, offset: offset);
+
+            Assert.Equal(6, page.Expansion.Total);
+            Assert.Equal(offset, page.Expansion.Offset);
+
+            if (page.Expansion.Contains.Count == 0)
+            {
+                break;
+            }
+
+            seen.AddRange(page.Expansion.Contains.Select(c => c.Code));
+            offset += 2;
+        }
+
+        Assert.Equal(new[] { "a1", "a2", "a3", "b1", "b2", "b3" }, seen.ToArray());
+    }
+
+    [Fact]
+    public void ExpandValueSet_WithCountAboveTheMaximum_ClampsAndEchoesTheAppliedCount()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 3).ExpandValueSet(PagedValueSetId, null, null, count: 999_999);
+
+        Assert.Equal(3, result.Expansion.Contains.Count);
+
+        // The echoed parameter reports what was applied, not what was asked for, so a clamped response
+        // says so rather than just looking short.
+        var applied = result.Expansion.Parameter.Single(p => p.Name == "count");
+        Assert.Equal(3, ((Integer)applied.Value).Value);
+    }
+
+    [Fact]
+    public void ExpandValueSet_WithCountZero_ReturnsTheTotalAndNoCodes()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 100).ExpandValueSet(PagedValueSetId, null, null, count: 0);
+
+        Assert.Empty(result.Expansion.Contains);
+        Assert.Equal(6, result.Expansion.Total);
+    }
+
+    [Fact]
+    public void ExpandValueSet_WithOffsetBeyondTheEnd_ReturnsAnEmptyPageWithTheTotal()
+    {
+        ArrangePagedValueSet();
+
+        var result = PagedService(2, 100).ExpandValueSet(PagedValueSetId, null, null, count: 2, offset: 99);
+
+        Assert.Empty(result.Expansion.Contains);
+        Assert.Equal(6, result.Expansion.Total);
+        Assert.Equal(99, result.Expansion.Offset);
+    }
+
+    [Theory]
+    [InlineData(-1, null)]
+    [InlineData(null, -1)]
+    public void ExpandValueSet_WithNegativePaging_Throws(int? count, int? offset)
+    {
+        ArrangePagedValueSet();
+
+        Assert.Throws<ArgumentException>(
+            () => PagedService(2, 100).ExpandValueSet(PagedValueSetId, null, null, count, offset));
+    }
+
+    /// <summary>
+    /// Paging is validated before the value set is looked up, so a request that is both malformed and
+    /// names a value set that is not loaded is reported as the bad request it is, not as a 404.
+    /// </summary>
+    [Fact]
+    public void ExpandValueSet_WithNegativeCountAndUnknownValueSet_ReportsTheBadRequest()
+    {
+        Assert.Throws<ArgumentException>(
+            () => PagedService(2, 100).ExpandValueSet("no-such-value-set", null, null, count: -1));
+    }
+
+    [Fact]
+    public void ExpandValueSet_PopulatesTheExpansionEnvelope()
+    {
+        ArrangePagedValueSet();
+
+        var expansion = PagedService(2, 100)
+            .ExpandValueSet(PagedValueSetId, null, null, count: 2, offset: 1).Expansion;
+
+        // Presence, not exact values: the identifier is a fresh GUID and the timestamp is "now".
+        Assert.StartsWith("urn:uuid:", expansion.Identifier);
+        Assert.False(string.IsNullOrEmpty(expansion.Timestamp));
+        Assert.Equal(6, expansion.Total);
+        Assert.Equal(1, expansion.Offset);
+        Assert.Equal(2, ((Integer)expansion.Parameter.Single(p => p.Name == "count").Value).Value);
+        Assert.Equal(1, ((Integer)expansion.Parameter.Single(p => p.Name == "offset").Value).Value);
+    }
+
+    [Fact]
+    public void GetValueSets_NonSummary_BoundsTheEmbeddedExpansionAndReportsTheTotal()
+    {
+        var codeGroup = ArrangePagedValueSet();
+
+        var bundle = PagedService(2, 100).GetValueSets(codeGroup.Url, null);
+        var expansion = SingleValueSet(bundle).Expansion;
+
+        Assert.Equal(new[] { "a1", "a2" }, LeafCodes(expansion).ToArray());
+
+        // total counts the codes, not the per-system grouping entries wrapping them.
+        Assert.Equal(6, expansion.Total);
+        Assert.Equal(0, expansion.Offset);
+    }
+
+    [Fact]
+    public void GetValueSets_NonSummary_KeepsTheNestedGrouperShape()
+    {
+        var codeGroup = ArrangePagedValueSet();
+
+        var expansion = SingleValueSet(PagedService(2, 100).GetValueSets(codeGroup.Url, null, count: 3)).Expansion;
+
+        var grouper = Assert.Single(expansion.Contains);
+        Assert.Equal(PagedSystemA, grouper.System);
+        Assert.Null(grouper.Code);
+        Assert.Equal(new[] { "a1", "a2", "a3" }, grouper.Contains.Select(c => c.Code).ToArray());
+    }
+
+    /// <summary>
+    /// A page straddling a system boundary opens a second grouper holding only the codes that fell
+    /// inside the page.
+    /// </summary>
+    [Fact]
+    public void GetValueSets_NonSummary_PageSpanningSystems_EmitsAGrouperPerSystem()
+    {
+        var codeGroup = ArrangePagedValueSet();
+
+        var expansion = SingleValueSet(
+            PagedService(2, 100).GetValueSets(codeGroup.Url, null, count: 2, offset: 2)).Expansion;
+
+        Assert.Equal(2, expansion.Contains.Count);
+        Assert.Equal(PagedSystemA, expansion.Contains[0].System);
+        Assert.Equal(new[] { "a3" }, expansion.Contains[0].Contains.Select(c => c.Code).ToArray());
+        Assert.Equal(PagedSystemB, expansion.Contains[1].System);
+        Assert.Equal(new[] { "b1" }, expansion.Contains[1].Contains.Select(c => c.Code).ToArray());
+    }
+
+    [Fact]
+    public void GetValueSets_PagedEndToEnd_YieldsEveryCodeExactlyOnce()
+    {
+        var codeGroup = ArrangePagedValueSet();
+        var service = PagedService(2, 100);
+
+        var seen = new List<string>();
+
+        for (var offset = 0; ; offset += 2)
+        {
+            var expansion = SingleValueSet(
+                service.GetValueSets(codeGroup.Url, null, count: 2, offset: offset)).Expansion;
+            var codes = LeafCodes(expansion);
+
+            if (codes.Count == 0)
+            {
+                break;
+            }
+
+            seen.AddRange(codes);
+        }
+
+        Assert.Equal(new[] { "a1", "a2", "a3", "b1", "b2", "b3" }, seen.ToArray());
+    }
+
+    /// <summary>AC 6: summary mode is untouched, including when paging parameters are supplied.</summary>
+    [Fact]
+    public void GetValueSets_WithSummaryTrue_IgnoresCountAndOffset()
+    {
+        var codeGroup = ArrangePagedValueSet();
+
+        var valueSet = SingleValueSet(
+            PagedService(2, 100).GetValueSets(codeGroup.Url, SummaryType.True, count: 1, offset: 5));
+
+        Assert.Null(valueSet.Expansion);
+    }
+
+    [Fact]
+    public void GetCodeSystems_NonSummary_PagesConceptsAndReportsAFragment()
+    {
+        ArrangePagedCodeSystem(Codes("c1", "c2", "c3", "c4").ToArray());
+
+        var codeSystem = SingleCodeSystem(PagedService(2, 100).GetCodeSystems(PagedCodeSystemUrl, null));
+
+        Assert.Equal(new[] { "c1", "c2" }, codeSystem.Concept.Select(c => c.Code).ToArray());
+
+        // count is the full concept total even though only a page is carried, and the partial list is
+        // described as a fragment rather than as the complete code system.
+        Assert.Equal(4, codeSystem.Count);
+        Assert.Equal(CodeSystemContentMode.Fragment, codeSystem.Content);
+    }
+
+    [Fact]
+    public void GetCodeSystems_NonSummary_WhenThePageCoversEverything_ContentIsComplete()
+    {
+        ArrangePagedCodeSystem(Codes("c1", "c2").ToArray());
+
+        var codeSystem = SingleCodeSystem(PagedService(10, 100).GetCodeSystems(PagedCodeSystemUrl, null));
+
+        Assert.Equal(2, codeSystem.Concept.Count);
+        Assert.Equal(CodeSystemContentMode.Complete, codeSystem.Content);
+    }
+
+    [Fact]
+    public void GetCodeSystems_NonSummary_WithCountZero_ReportsNotPresent()
+    {
+        ArrangePagedCodeSystem(Codes("c1", "c2").ToArray());
+
+        var codeSystem = SingleCodeSystem(
+            PagedService(10, 100).GetCodeSystems(PagedCodeSystemUrl, null, count: 0));
+
+        Assert.Empty(codeSystem.Concept);
+        Assert.Equal(2, codeSystem.Count);
+        Assert.Equal(CodeSystemContentMode.NotPresent, codeSystem.Content);
+    }
+
+    /// <summary>
+    /// De-duplication happens before paging, so a duplicated code does not consume a slot and leave the
+    /// page short (LEGLINK-814 semantics, now served from the memoized index).
+    /// </summary>
+    [Fact]
+    public void GetCodeSystems_NonSummary_DuplicatesDoNotConsumeAPageSlot()
+    {
+        ArrangePagedCodeSystem(
+            new Code { Value = "dup", Display = "First" },
+            new Code { Value = "other", Display = "Other" },
+            new Code { Value = "dup", Display = "Last" });
+
+        var codeSystem = SingleCodeSystem(
+            PagedService(2, 100).GetCodeSystems(PagedCodeSystemUrl, null, count: 2));
+
+        Assert.Equal(new[] { "dup", "other" }, codeSystem.Concept.Select(c => c.Code).ToArray());
+        Assert.Equal("Last", codeSystem.Concept[0].Display);
+        Assert.Equal(2, codeSystem.Count);
+        Assert.Equal(CodeSystemContentMode.Complete, codeSystem.Content);
+    }
+
+    /// <summary>
+    /// A CSV with a header and no data rows leaves Codes empty, which the old Codes.Keys.First()
+    /// turned into a 500.
+    /// </summary>
+    [Fact]
+    public void GetCodeSystems_NonSummary_WithEmptyCodes_DoesNotThrow()
+    {
+        ArrangePagedCodeSystem();
+
+        var codeSystem = SingleCodeSystem(PagedService(2, 100).GetCodeSystems(PagedCodeSystemUrl, null));
+
+        Assert.Empty(codeSystem.Concept);
+        Assert.Equal(0, codeSystem.Count);
+    }
+
+    [Fact]
+    public void GetCodeSystems_WithSummaryTrue_IgnoresCountAndOffset()
+    {
+        ArrangePagedCodeSystem(Codes("c1", "c2", "c3").ToArray());
+
+        var codeSystem = SingleCodeSystem(
+            PagedService(2, 100).GetCodeSystems(PagedCodeSystemUrl, SummaryType.True, count: 1, offset: 2));
+
+        Assert.Empty(codeSystem.Concept);
+        Assert.Null(codeSystem.Count);
+        Assert.Equal(CodeSystemContentMode.Complete, codeSystem.Content);
     }
 
     #endregion

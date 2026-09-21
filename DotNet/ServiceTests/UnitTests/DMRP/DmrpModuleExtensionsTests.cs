@@ -40,6 +40,7 @@ namespace UnitTests.DMRP
 
             // Stands in for what the real host registers before it adds the module.
             builder.Services.AddScoped<IFacilityOperations, HostFacilityOperations>();
+            builder.Services.AddSingleton(Mock.Of<IFacilityTimeZoneSource>());
 
             return builder;
         }
@@ -153,6 +154,71 @@ namespace UnitTests.DMRP
             builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
 
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
+        }
+
+        [Fact]
+        public void AddDmrpModule_registers_the_reporting_period_resolver()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            var registration = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(IFacilityReportingPeriodResolver));
+            Assert.Equal(typeof(FacilityReportingPeriodResolver), registration.ImplementationType);
+        }
+
+        /// <summary>
+        /// Where a facility is lives in the host's records, which the module cannot see. Like the
+        /// existence check, the host supplies it and the module adds no registration of its own.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_leaves_the_time_zone_source_to_the_host()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityTimeZoneSource>();
+
+            var hostSource = Mock.Of<IFacilityTimeZoneSource>();
+            builder.Services.AddSingleton(hostSource);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+
+            var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityTimeZoneSource));
+            Assert.Same(hostSource, registration.ImplementationInstance);
+        }
+
+        /// <summary>
+        /// Without a timezone source the module would start, then fail every facility save and every
+        /// look-ahead read that needs a period, as a resolve error far from the cause. Fail at startup
+        /// instead, naming what is missing.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_throws_when_the_host_registers_no_time_zone_source()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityTimeZoneSource>();
+
+            var mvcBuilder = builder.Services.AddControllers();
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+
+            Assert.Contains(nameof(IFacilityTimeZoneSource), exception.Message);
+        }
+
+        /// <summary>
+        /// A module that is off needs nothing from the host, so a missing timezone source is not an error.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_does_not_require_a_time_zone_source_when_disabled()
+        {
+            var builder = CreateBuilder(enabled: false);
+            builder.Services.RemoveAll<IFacilityTimeZoneSource>();
+
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
+                builder.Services.AddControllers());
+
+            Assert.False(registered);
         }
 
         /// <summary>

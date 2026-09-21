@@ -63,6 +63,7 @@ public class FhirControllerHttpTests
             {
                 services.AddLogging();
                 services.AddSingleton(cache.Object);
+                services.AddSingleton(TerminologyTestConfig.Options());
                 services.AddSingleton<FhirService>();
                 services.AddControllers(options =>
                     {
