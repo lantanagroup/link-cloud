@@ -540,8 +540,10 @@ public class ReadyForValidationConsumerTest {
 
         consumer.process(buildRecord(null));
 
+        // addIssueMetrics always emits all three buckets; categorize makes this result acceptable.
         verify(validationMetrics).addIssues(eq("acceptable"), eq(1L), any());
-        verify(validationMetrics, never()).addIssues(eq("uncategorized"), anyLong(), any());
+        verify(validationMetrics).addIssues(eq("uncategorized"), eq(0L), any());
+        verify(validationMetrics).addIssues(eq("unacceptable"), eq(0L), any());
     }
 
     @Test
