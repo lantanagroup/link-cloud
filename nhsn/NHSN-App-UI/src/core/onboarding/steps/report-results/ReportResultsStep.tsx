@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
@@ -29,7 +29,6 @@ import {
   Modal,
   NewTabAnnouncement,
   NHSNLoadingIndicator,
-  PageHeader,
   Select,
   StepActions,
   Tabs,
@@ -38,6 +37,7 @@ import {
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import type { StepProps } from '../../flow';
 import { useOnboarding } from '../../OnboardingProvider';
+import { useStableCallback, useStepChrome } from '../../StepChrome';
 import type { LocationOrgDraft } from '../../types';
 import { buildGroups, decodeTarget, encodeTarget } from '../encounter/EncounterStep';
 import { METHOD_LABEL_KEYS } from '../location-org/LocationOrgStep';
@@ -1211,6 +1211,68 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     onNext();
   }
 
+  const stableHandleViewQueryPlan = useStableCallback(handleViewQueryPlan);
+  const stableHandleViewAcquisitionLog = useStableCallback(handleViewAcquisitionLog);
+  const stableHandleExportSummary = useStableCallback(handleExportSummary);
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        viewingDetail
+          ? {
+              title: t('onboarding:reportResults.detail.title'),
+              footer: (
+                <StepActions saving={saving}>
+                  <Button variant="secondary" onClick={closeView}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button variant="secondary" onClick={stableHandleViewQueryPlan}>
+                    {t('onboarding:reportResults.detail.actions.viewQueryPlan')}
+                  </Button>
+                  <Button variant="secondary" onClick={stableHandleViewAcquisitionLog}>
+                    {t('onboarding:reportResults.detail.actions.viewAcquisitionLog')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={stableHandleExportSummary}
+                    loading={exporting}
+                    disabled={exporting}>
+                    <DownloadIcon />
+                    {t('onboarding:reportResults.detail.actions.exportSummary')}
+                  </Button>
+                </StepActions>
+              )
+            }
+          : {
+              title: t('onboarding:reportResults.title'),
+              footer: (
+                <StepActions saving={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button onClick={stableHandleNext} disabled={saving} loading={saving}>
+                    {t('common:actions.continue')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [
+        viewingDetail,
+        t,
+        saving,
+        closeView,
+        stableHandleViewQueryPlan,
+        stableHandleViewAcquisitionLog,
+        stableHandleExportSummary,
+        exporting,
+        stableOnBack,
+        stableHandleNext
+      ]
+    )
+  );
+
   if (viewingDetail) {
     const friendlyDetailMeasures = detail
       ? friendlyMeasuresFor(
@@ -1353,18 +1415,15 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     });
 
     return (
-      <div className="nhsn-link__content nhsn-link__report-results">
-        <div className="nhsn-link__report-results-detail-header">
-          <PageHeader title={t('onboarding:reportResults.detail.title')} />
-          <div className="nhsn-link__report-results-detail-header-actions">
-            <button
-              type="button"
-              className={`nhsn-link__report-results-icon-button${detailLoading ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
-              onClick={handleRefreshDetail}
-              aria-label={t('common:actions.refresh')}>
-              <RefreshIcon />
-            </button>
-          </div>
+      <>
+        <div className="nhsn-link__report-results-detail-header-actions">
+          <button
+            type="button"
+            className={`nhsn-link__report-results-icon-button${detailLoading ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
+            onClick={handleRefreshDetail}
+            aria-label={t('common:actions.refresh')}>
+            <RefreshIcon />
+          </button>
         </div>
 
         <p className="nhsn-link__visually-hidden" role="alert">
@@ -1719,26 +1778,6 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
             )}
           </>
         )}
-
-        <StepActions saving={saving}>
-          <Button variant="secondary" onClick={closeView}>
-            {t('common:actions.back')}
-          </Button>
-          <Button variant="secondary" onClick={handleViewQueryPlan}>
-            {t('onboarding:reportResults.detail.actions.viewQueryPlan')}
-          </Button>
-          <Button variant="secondary" onClick={handleViewAcquisitionLog}>
-            {t('onboarding:reportResults.detail.actions.viewAcquisitionLog')}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={handleExportSummary}
-            loading={exporting}
-            disabled={exporting}>
-            <DownloadIcon />
-            {t('onboarding:reportResults.detail.actions.exportSummary')}
-          </Button>
-        </StepActions>
 
         <Modal
           open={queryPlanOpen}
@@ -2873,13 +2912,12 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
               </MessageContainer>
             )}
         </Modal>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="nhsn-link__content nhsn-link__report-results">
-      <PageHeader title={t('onboarding:reportResults.title')} />
+    <>
       <p className="nhsn-link__subtitle">
         {t('onboarding:reportResults.subtitle')}
       </p>
@@ -3026,16 +3064,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
       <p className="nhsn-link__form-error" role="alert">
         {validationMessage}
       </p>
-
-      <StepActions saving={saving}>
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={handleNext} disabled={saving} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
-    </div>
+    </>
   );
 }
 

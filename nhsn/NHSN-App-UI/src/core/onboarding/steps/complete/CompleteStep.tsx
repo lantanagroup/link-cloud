@@ -2,9 +2,10 @@ import React, {useMemo} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {Button, MessageContainer, NHSNLoadingIndicator, PageHeader, StepActions} from '../../../fields';
+import {Button, MessageContainer, NHSNLoadingIndicator, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStepChrome} from '../../StepChrome';
 import {migrateDraft} from '../../types';
 
 /**
@@ -59,13 +60,31 @@ export function CompleteStep(_props: StepProps) {
     ];
   }, [draft, user, vendorProfile, commitState, t]);
 
-  if (!envelope && !error) {
+  const loading = !envelope && !error;
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: t('onboarding:complete.title'),
+              footer: (
+                <StepActions>
+                  <Button onClick={goHome}>{t('common:actions.returnToHome')}</Button>
+                </StepActions>
+              )
+            },
+      [t, loading, goHome]
+    )
+  );
+
+  if (loading) {
     return <NHSNLoadingIndicator />;
   }
 
   return (
-    <div className="nhsn-link__content nhsn-link__complete">
-      <PageHeader title={t('onboarding:complete.title')} />
+    <>
       <p className="nhsn-link__subtitle">{t('onboarding:complete.subtitle')}</p>
 
       <p className="nhsn-link__visually-hidden" role="alert">
@@ -85,11 +104,7 @@ export function CompleteStep(_props: StepProps) {
           </li>
         ))}
       </ul>
-
-      <StepActions>
-        <Button onClick={goHome}>{t('common:actions.returnToHome')}</Button>
-      </StepActions>
-    </div>
+    </>
   );
 }
 

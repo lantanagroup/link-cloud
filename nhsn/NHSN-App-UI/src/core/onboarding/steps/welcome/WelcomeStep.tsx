@@ -1,8 +1,9 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Trans, useTranslation} from 'react-i18next';
-import {Button, NewTabAnnouncement, PageHeader, StepActions} from '../../../fields';
+import {Button, NewTabAnnouncement, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 
 /**
  * The flow's intro screen.
@@ -15,10 +16,26 @@ export function WelcomeStep({onNext}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const {saving, user} = useOnboarding();
 
-  return (
-    <div className="nhsn-link__content nhsn-link__welcome">
-      <PageHeader title={t('onboarding:welcome.title')} />
+  const stableOnNext = useStableCallback(onNext);
 
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t('onboarding:welcome.title'),
+        footer: (
+          <StepActions saving={saving}>
+            <Button onClick={stableOnNext} disabled={saving} loading={saving}>
+              {t('common:actions.continue')}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, saving, stableOnNext]
+    )
+  );
+
+  return (
+    <>
       <p className="nhsn-link__subtitle">
         <Trans
           t={t}
@@ -51,13 +68,7 @@ export function WelcomeStep({onNext}: StepProps) {
 
       <h2>{t('onboarding:welcome.workflowTitle')}</h2>
       <p className="nhsn-link__subtitle">{t('onboarding:welcome.workflowBody')}</p>
-
-      <StepActions saving={saving}>
-        <Button onClick={onNext} disabled={saving} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
-    </div>
+    </>
   );
 }
 

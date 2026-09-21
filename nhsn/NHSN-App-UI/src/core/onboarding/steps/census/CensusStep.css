@@ -1,10 +1,3 @@
-/*
- * Mirrors FhirStep.css's card/card-scroll/page-header treatment so the two
- * longer, multi-section steps share one visual language rather than each
- * inventing its own. See FhirStep.css for the rules this is intentionally
- * kept in step with.
- */
-
 .census-poi {
   --census-blue: var(--kendo-color-primary, #0057b7);
   --census-blue-dark: var(--kendo-color-primary-hover, #032659);
@@ -18,10 +11,6 @@
 
   color: var(--census-gray-800);
   font-size: 15px;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 /*
@@ -36,53 +25,6 @@
 .census-poi .nhsn-link__side-panel .census-table-scroll th {
   background: #eaf2fc;
   color: var(--census-blue-dark);
-}
-
-.census-poi .card {
-  background: var(--kendo-color-app-surface, #ffffff);
-  border: 1px solid var(--census-gray-200);
-  border-radius: var(--census-radius);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.census-poi .card-scroll {
-  padding: 0 32px 28px;
-  border-radius: inherit;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.census-poi .card-scroll > * {
-  flex-shrink: 0;
-}
-
-.census-poi .page-header {
-  padding: 0;
-  border-bottom: none !important;
-  display: block;
-}
-
-.census-poi .page-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
-}
-
-.census-poi .page-header-title:focus {
-  outline: none;
-}
-
-.census-poi .page-header-buttons {
-  display: none;
 }
 
 .census-poi .subtitle {
@@ -115,12 +57,6 @@
   color: var(--census-gray-600);
   font-size: 13px;
   margin: -8px 0 18px;
-}
-
-.census-poi .card .nhsn-link__step-actions {
-  position: static;
-  margin: 0;
-  padding: 16px 32px 28px;
 }
 
 .census-poi .k-form-field {

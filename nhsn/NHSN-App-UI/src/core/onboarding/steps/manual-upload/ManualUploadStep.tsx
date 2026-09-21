@@ -1,12 +1,13 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ImportedFields} from '../../../api/contracts';
-import {AcronymText, Button, DownloadLinkButton, FileUploadField, MessageContainer, PageHeader, StepActions} from '../../../fields';
+import {AcronymText, Button, DownloadLinkButton, FileUploadField, MessageContainer, StepActions} from '../../../fields';
 import {isStepId, type StepId} from '../../types';
 import type {DraftSections} from '../../reducer';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 
 /** Manual Upload Option: download the import sheet, complete it offline, upload it back. */
 export function ManualUploadStep({onNext, onBack}: StepProps) {
@@ -105,9 +106,30 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
     }
   }
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableOnNext = useStableCallback(onNext);
+
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t('onboarding:manualUpload.title'),
+        footer: (
+          <StepActions saving={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+              {t('common:actions.back')}
+            </Button>
+            <Button onClick={stableOnNext} disabled={saving} loading={saving}>
+              {t('common:actions.continue')}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, saving, stableOnBack, stableOnNext]
+    )
+  );
+
   return (
-    <div className="nhsn-link__content nhsn-link__manual-upload">
-      <PageHeader title={t('onboarding:manualUpload.title')} />
+    <div className="nhsn-link__manual-upload">
       <p className="nhsn-link__subtitle">{t('onboarding:manualUpload.intro')}</p>
 
       <DownloadLinkButton
@@ -154,15 +176,6 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
           </ul>
         </MessageContainer>
       )}
-
-      <StepActions saving={saving}>
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={onNext} disabled={saving} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
     </div>
   );
 }

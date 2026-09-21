@@ -1,8 +1,9 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
-import {Button, MessageContainer, PageHeader, StepActions} from '../../../fields';
+import {Button, MessageContainer, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 
 /**
  * Mockup measures and schedule. No reporting plan service exists in the Link
@@ -79,9 +80,30 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
   }, []);
   const hasSchedule = rows.length > 0;
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableOnNext = useStableCallback(onNext);
+
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t('onboarding:reportingPlan.title'),
+        footer: (
+          <StepActions saving={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+              {t('common:actions.back')}
+            </Button>
+            <Button onClick={stableOnNext} disabled={saving || !hasSchedule} loading={saving}>
+              {t('common:actions.continue')}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, saving, stableOnBack, stableOnNext, hasSchedule]
+    )
+  );
+
   return (
-    <div className="nhsn-link__content nhsn-link__reporting-plan">
-      <PageHeader title={t('onboarding:reportingPlan.title')} />
+    <>
       <p className="nhsn-link__subtitle">{t('onboarding:reportingPlan.subtitle')}</p>
 
       {hasSchedule ? (
@@ -120,16 +142,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
           <span role="alert">{t('onboarding:reportingPlan.scheduleUnavailable')}</span>
         </MessageContainer>
       )}
-
-      <StepActions saving={saving}>
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={onNext} disabled={saving || !hasSchedule} loading={saving}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
-    </div>
+    </>
   );
 }
 

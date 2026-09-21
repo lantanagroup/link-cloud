@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
@@ -8,12 +8,12 @@ import {
   ChipMultiSelect,
   DateField,
   NHSNLoadingIndicator,
-  PageHeader,
   StepActions
 } from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {PatientSelection} from './PatientSelection';
 import {enteredPatientIds, validateReport, type FieldErrors} from './validate';
 import './ReportStep.css';
@@ -147,6 +147,33 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
 
   const isFormValid = Object.keys(validateReport(draftForValidation())).length === 0;
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleGenerate = useStableCallback(handleGenerate);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: t('onboarding:report.title'),
+              footer: (
+                <StepActions saving={saving}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={saving || requesting}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button
+                    onClick={stableHandleGenerate}
+                    disabled={saving || requesting || !isFormValid}
+                    loading={requesting}>
+                    {t('onboarding:report.actions.generate')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [t, loading, saving, requesting, stableOnBack, stableHandleGenerate, isFormValid]
+    )
+  );
 
   if (loading) {
     return <NHSNLoadingIndicator />;
@@ -154,9 +181,6 @@ export function ReportStep({onNext, onBack}: StepProps) {
 
   return (
     <div className="report-generate">
-      <div className="card">
-        <div className="card-scroll">
-          <PageHeader title={t('onboarding:report.title')} />
           <p className="subtitle">{t('onboarding:report.subtitle')}</p>
 
           <ChipMultiSelect
@@ -219,20 +243,6 @@ export function ReportStep({onNext, onBack}: StepProps) {
               patch('report', {patientIds: next});
               clearFieldError('patientIds');
             }} />
-        </div>
-
-        <StepActions saving={saving}>
-          <Button variant="secondary" onClick={onBack} disabled={saving || requesting}>
-            {t('common:actions.back')}
-          </Button>
-          <Button
-            onClick={handleGenerate}
-            disabled={saving || requesting || !isFormValid}
-            loading={requesting}>
-            {t('onboarding:report.actions.generate')}
-          </Button>
-        </StepActions>
-      </div>
     </div>
   );
 }

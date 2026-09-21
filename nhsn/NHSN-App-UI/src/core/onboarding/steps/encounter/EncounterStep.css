@@ -11,53 +11,7 @@
 
   color: var(--encounter-gray-800);
   font-size: 15px;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
   container-type: inline-size;
-}
-
-.encounter-mapping .card {
-  background: #ffffff;
-  border: 1px solid var(--encounter-gray-200);
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(20, 30, 50, 0.06);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  isolation: isolate;
-}
-
-.encounter-mapping .card-scroll {
-  padding: 0 32px 28px;
-  border-radius: inherit;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.encounter-mapping .page-header {
-  padding: 0;
-  border-bottom: none !important;
-  display: block;
-}
-
-.encounter-mapping .page-header-title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0 0 6px;
-  color: var(--encounter-gray-800);
-}
-
-.encounter-mapping .page-header-title:focus {
-  outline: none;
-}
-
-.encounter-mapping .page-header-buttons {
-  display: none;
 }
 
 .encounter-mapping .subtitle {
@@ -121,21 +75,15 @@
   margin-bottom: 12.5px;
 }
 
-.encounter-mapping .card .nhsn-link__step-actions {
-  position: static;
-  margin: 0;
-  padding: 16px 32px 28px;
-}
-
 /* -------------------------------------------------- buttons (POC .btn / .btn-secondary / .btn-sm) */
 
-.encounter-mapping .card-scroll .k-button {
+.encounter-mapping .k-button {
   border-radius: 6px;
   font-weight: 600;
   box-shadow: none;
 }
 
-.encounter-mapping .card-scroll .k-button.k-button-base {
+.encounter-mapping .k-button.k-button-base {
   background: #ffffff;
   color: var(--encounter-blue);
   border: 1px solid var(--encounter-blue);
@@ -143,11 +91,11 @@
   font-size: 14px;
 }
 
-.encounter-mapping .card-scroll .k-button.k-button-base:hover {
+.encounter-mapping .k-button.k-button-base:hover {
   background: var(--encounter-gray-100);
 }
 
-.encounter-mapping .card-scroll .k-button.nhsn-link__button--sm {
+.encounter-mapping .k-button.nhsn-link__button--sm {
   padding: 5px 12px;
   font-size: 12.5px;
 }

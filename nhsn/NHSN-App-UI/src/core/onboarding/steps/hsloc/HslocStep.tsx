@@ -10,7 +10,6 @@ import {
   FieldLabel,
   NewTabAnnouncement,
   NHSNLoadingIndicator,
-  PageHeader,
   RepeatableList,
   SidePanel,
   SidePanelLayout,
@@ -21,6 +20,7 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes} from './validate';
 import './HslocStep.css';
 
@@ -275,15 +275,38 @@ export function HslocStep({onNext, onBack}: StepProps) {
     }
   }
 
+  const busy = saving || submitting;
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () =>
+        loading
+          ? null
+          : {
+              title: acronymTitle(<AcronymText>{t('onboarding:hsloc.title')}</AcronymText>),
+              footer: (
+                <StepActions saving={busy}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
+                    {t('common:actions.back')}
+                  </Button>
+                  <Button onClick={stableHandleNext} disabled={busy || incompleteRowIndexes.size > 0}>
+                    {t('common:actions.continue')}
+                  </Button>
+                </StepActions>
+              )
+            },
+      [t, loading, busy, stableOnBack, stableHandleNext, incompleteRowIndexes]
+    )
+  );
+
   if (loading) {
     return <NHSNLoadingIndicator />;
   }
 
-  const busy = saving || submitting;
-
   return (
-    <div className="nhsn-link__content nhsn-link__hsloc">
-      <PageHeader title={acronymTitle(<AcronymText>{t('onboarding:hsloc.title')}</AcronymText>)} />
+    <div className="nhsn-link__hsloc">
       <p className="nhsn-link__subtitle">
         <AcronymText>{t('onboarding:hsloc.subtitlePrefix')}</AcronymText>{' '}
         <a
@@ -505,15 +528,6 @@ export function HslocStep({onNext, onBack}: StepProps) {
           </SidePanel>
         </SidePanelLayout>
       )}
-
-      <StepActions saving={busy}>
-        <Button variant="secondary" onClick={onBack} disabled={busy}>
-          {t('common:actions.back')}
-        </Button>
-        <Button onClick={handleNext} disabled={busy || incompleteRowIndexes.size > 0}>
-          {t('common:actions.continue')}
-        </Button>
-      </StepActions>
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, PageHeader, RequiredAsterisk, StepActions, TextField} from '../../../fields';
+import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
+import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
 import './FhirStep.css';
 
@@ -46,7 +47,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
     persistedTestedBaseUrl ? {success: true, message: t('onboarding:fhirServerInfo.messages.testSuccess')} : null
   );
   const [testedBaseUrl, setTestedBaseUrl] = useState<string | null>(persistedTestedBaseUrl);
-  const cardScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [readyToAdvance, setReadyToAdvance] = useState(false);
 
@@ -56,15 +56,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
       onNext();
     }
   }, [readyToAdvance, onNext]);
-
-  useEffect(() => {
-    if (testing || testResult) {
-      const container = cardScrollRef.current;
-      if (container) {
-        container.scrollTo({top: container.scrollHeight, behavior: 'smooth'});
-      }
-    }
-  }, [testing, testResult]);
 
   // Any field on this page invalidates a prior Test Connection - not just the base URL. The
   // reachability check itself only depends on the URL, but the whole point of testing is "this
@@ -232,11 +223,34 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const connectionVerified = testedBaseUrl !== null && testedBaseUrl === baseUrl.trim();
   const isFormValid = Object.keys(validateFhir(currentFieldValues())).length === 0;
 
+  const stableOnBack = useStableCallback(onBack);
+  const stableHandleTestConnection = useStableCallback(handleTestConnection);
+  const stableHandleNext = useStableCallback(handleNext);
+
+  useStepChrome(
+    useMemo(
+      () => ({
+        title: t('onboarding:fhirServerInfo.title'),
+        footer: (
+          <StepActions saving={saving}>
+            <Button variant="secondary" onClick={stableOnBack} disabled={saving}>
+              {t('common:actions.back')}
+            </Button>
+            <Button onClick={stableHandleTestConnection} disabled={testing}>
+              {t('common:actions.testConnection')}
+            </Button>
+            <Button onClick={stableHandleNext} disabled={saving || !isFormValid || !connectionVerified} loading={saving}>
+              {t('common:actions.continue')}
+            </Button>
+          </StepActions>
+        )
+      }),
+      [t, saving, stableOnBack, stableHandleTestConnection, testing, stableHandleNext, isFormValid, connectionVerified]
+    )
+  );
+
   return (
     <div className="fhir-server-info">
-      <div className="card">
-        <div className="card-scroll" ref={cardScrollRef}>
-          <PageHeader title={t('onboarding:fhirServerInfo.title')} />
           <p className="subtitle">
             {t('onboarding:fhirServerInfo.subtitlePrefix')}{' '}
             <a href="https://hl7.org/fhir/R4/summary.html" target="_blank" rel="noreferrer">
@@ -463,20 +477,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               <span>{testing ? t('onboarding:fhirServerInfo.messages.testing') : testResult!.message}</span>
             </div>
           )}
-        </div>
-
-        <StepActions saving={saving}>
-          <Button variant="secondary" onClick={onBack} disabled={saving}>
-            {t('common:actions.back')}
-          </Button>
-          <Button onClick={handleTestConnection} disabled={testing}>
-            {t('common:actions.testConnection')}
-          </Button>
-          <Button onClick={handleNext} disabled={saving || !isFormValid || !connectionVerified} loading={saving}>
-            {t('common:actions.continue')}
-          </Button>
-        </StepActions>
-      </div>
     </div>
   );
 }
