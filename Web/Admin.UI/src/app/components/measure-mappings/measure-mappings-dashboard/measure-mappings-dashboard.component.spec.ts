@@ -21,6 +21,17 @@ describe('MeasureMappingsDashboardComponent', () => {
     { id: 'mm-2', measure: 'TRIM', dqm: 'AchMonthly', frequency: Frequency.Weekly }
   ];
 
+  /** What the DMRP sync records for a measure Link has no dQM for. */
+  const unmapped: IMeasureMapping = { id: 'mm-3', measure: 'HOB', dqm: null, frequency: Frequency.Adhoc };
+
+  /** Stubs the list for one test, so the shared fixture keeps its own record count. */
+  function givenMappings(records: IMeasureMapping[]): void {
+    measureMappingService.searchMeasureMappings.and.returnValue(of({
+      records,
+      metadata: { pageSize: 10, pageNumber: 0, totalCount: records.length, totalPages: 1 }
+    }));
+  }
+
   const pagedResponse: IPagedMeasureMapping = {
     records: mappings,
     metadata: { pageSize: 10, pageNumber: 0, totalCount: 2, totalPages: 1 }
@@ -217,6 +228,62 @@ describe('MeasureMappingsDashboardComponent', () => {
     component.onDelete(mappings[0]);
 
     expect(measureMappingService.deleteMeasureMapping).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The row is a prompt rather than a fault: until a dQM is set, every facility enrolled in that
+   * measure reports nothing for it, and this page is the only place that says so.
+   */
+  it('marks a mapping the sync recorded as needing a dQM', () => {
+    givenMappings([...mappings, unmapped]);
+    fixture.detectChanges();
+
+    expect(component.needsDqm(unmapped)).toBeTrue();
+    expect(component.needsDqm(mappings[0])).toBeFalse();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.awaiting-dqm')).not.toBeNull();
+  });
+
+  it('counts the mappings still awaiting a dQM and says so above the table', () => {
+    givenMappings([...mappings, unmapped]);
+    fixture.detectChanges();
+
+    expect(component.awaitingDqmCount).toBe(1);
+
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.awaiting-dqm-notice');
+    expect(notice).not.toBeNull();
+    expect(notice!.textContent).toContain('1 measure');
+    expect(notice!.textContent).toContain('was');
+  });
+
+  /**
+   * The notice switches measure/measures, was/were and it/them on the count. Only the singular
+   * branch was covered, so the plural one could break without a test noticing.
+   */
+  it('says so in the plural when more than one measure is waiting', () => {
+    const alsoUnmapped: IMeasureMapping = { id: 'mm-4', measure: 'HTCDI', dqm: null, frequency: Frequency.Adhoc };
+
+    givenMappings([...mappings, unmapped, alsoUnmapped]);
+    fixture.detectChanges();
+
+    expect(component.awaitingDqmCount).toBe(2);
+
+    const notice = (fixture.nativeElement as HTMLElement).querySelector('.awaiting-dqm-notice');
+    expect(notice).not.toBeNull();
+
+    const text = notice!.textContent!;
+    expect(text).toContain('2 measures');
+    expect(text).toContain('were');
+    expect(text).toContain('them');
+  });
+
+  it('says nothing when every mapping has a dQM', () => {
+    givenMappings(mappings);
+    fixture.detectChanges();
+
+    expect(component.awaitingDqmCount).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.awaiting-dqm-notice')).toBeNull();
   });
 
   it('offers add, edit and delete controls', () => {
