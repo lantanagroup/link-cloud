@@ -4,15 +4,19 @@ import {useApiClient} from '../../../api/ApiClientContext';
 import type {MrnIdentifierRule, MrnIntake, MrnIntakeOptions, PatientIdentifier} from '../../../api/contracts';
 import {
   AcronymText,
+  acronymLabel,
+  acronymTitle,
   Button,
   CheckboxField,
   FieldLabel,
+  HeadingPause,
   MessageContainer,
   Modal,
   NHSNLoadingIndicator,
   RepeatableList,
   Select,
   StepActions,
+  TableCaption,
   TextField,
   YesNoField
 } from '../../../fields';
@@ -200,7 +204,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
         loading
           ? null
           : {
-              title: t('onboarding:mrnIntake.title'),
+              title: acronymTitle(<HeadingPause>{t('onboarding:mrnIntake.title')}</HeadingPause>),
               footer: (
                 <StepActions saving={busy}>
                   <Button variant="secondary" onClick={stableOnBack} disabled={busy} loading={savingDirection === 'back'}>
@@ -286,7 +290,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
             ) : (
               <CheckboxGroup<string>
                 idPrefix="mrn-user-facing"
-                groupLabel={t('onboarding:mrnIntake.userFacing.question')}
+                groupLabel={acronymLabel(t('onboarding:mrnIntake.userFacing.question'))}
                 options={userFacingOptions}
                 values={draft.userFacingIdentifierNames}
                 onChange={userFacingIdentifierNames => update({userFacingIdentifierNames})}
@@ -341,7 +345,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
 
       <div className="nhsn-link__table-scroll nhsn-link__mrn-patient-table-scroll" tabIndex={-1}>
         <table className="nhsn-link__table nhsn-link__mrn-patient-table">
-          <caption className="nhsn-link__visually-hidden">{t('onboarding:mrnIntake.sections.correspondingIdentifier')}</caption>
+          <TableCaption>{t('onboarding:mrnIntake.sections.correspondingIdentifier')}</TableCaption>
           <thead>
             <tr>
               <th scope="col">{t('onboarding:mrnIntake.identifierTable.columns.patientId')}</th>

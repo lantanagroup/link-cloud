@@ -37,6 +37,7 @@ export function ChipMultiSelect<T extends string>({
   const id = useFieldId(base.id);
   const prefix = useId();
   const listId = `${prefix}-list`;
+  const labelTextId = `${prefix}-label-text`;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [filter, setFilter] = useState('');
@@ -127,7 +128,7 @@ export function ChipMultiSelect<T extends string>({
   return (
     <div className="nhsn-link__chip-select-field">
       <label className="nhsn-link__chip-select-label" htmlFor={id}>
-        {base.label}
+        <span id={labelTextId}>{base.label}</span>
         {base.required && <RequiredAsterisk />}
         {base.hint && <InfoTooltip label={base.label} content={base.hint} />}
       </label>
@@ -158,6 +159,7 @@ export function ChipMultiSelect<T extends string>({
           className="nhsn-link__chip-select-input"
           role="combobox"
           autoComplete="off"
+          aria-labelledby={labelTextId}
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"

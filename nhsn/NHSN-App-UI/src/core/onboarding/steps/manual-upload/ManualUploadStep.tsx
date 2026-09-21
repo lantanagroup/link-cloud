@@ -2,7 +2,16 @@ import React, {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ImportedFields} from '../../../api/contracts';
-import {AcronymText, Button, DownloadLinkButton, FileUploadField, MessageContainer, StepActions} from '../../../fields';
+import {
+  acronymTitle,
+  AcronymText,
+  Button,
+  DownloadLinkButton,
+  FileUploadField,
+  HeadingPause,
+  MessageContainer,
+  StepActions
+} from '../../../fields';
 import {isStepId, type StepId} from '../../types';
 import type {DraftSections} from '../../reducer';
 import type {StepProps} from '../../flow';
@@ -112,7 +121,7 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:manualUpload.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:manualUpload.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>

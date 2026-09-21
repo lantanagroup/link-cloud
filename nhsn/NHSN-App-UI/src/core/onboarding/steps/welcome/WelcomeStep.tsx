@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {Trans, useTranslation} from 'react-i18next';
-import {Button, NewTabAnnouncement, StepActions} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -21,7 +21,7 @@ export function WelcomeStep({onNext}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:welcome.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:welcome.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
             <Button onClick={stableOnNext} disabled={saving} loading={saving}>

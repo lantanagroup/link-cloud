@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import {AcronymText, Button, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
+import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -228,7 +228,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
   useStepChrome(
     useMemo(
       () => ({
-        title: t('onboarding:fhirServerInfo.title'),
+        title: acronymTitle(<HeadingPause>{t('onboarding:fhirServerInfo.title')}</HeadingPause>),
         footer: (
           <StepActions saving={saving}>
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
@@ -457,9 +457,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
             </p>
           </div>
 
-          <p className="nhsn-link__form-error" role="alert">
-            {validationError}
-          </p>
+          <div aria-live="off">
+            <p className="nhsn-link__form-error" role="alert">
+              {validationError}
+            </p>
+          </div>
 
           {(testing || testResult) && (
             <div className="fhir-test-result" role="status">
