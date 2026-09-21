@@ -4,6 +4,8 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -13,6 +15,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -25,6 +28,13 @@ namespace UnitTests.DMRP
     [Trait("Category", "UnitTests")]
     public class DmrpModuleExtensionsTests
     {
+        /// <summary>
+        /// Stands in for the host's classic job group. Deliberately not the real
+        /// <c>ReportSchedulingJobs.ClassicJobGroup</c>: the module is supposed to carry whatever the
+        /// host names, and a value only these tests use is what shows it does.
+        /// </summary>
+        private const string ClassicGroup = "HostClassicReportJobs";
+
         private static WebApplicationBuilder CreateBuilder(bool? enabled)
         {
             var builder = WebApplication.CreateBuilder();
@@ -40,7 +50,10 @@ namespace UnitTests.DMRP
 
             // Stands in for what the real host registers before it adds the module.
             builder.Services.AddScoped<IFacilityOperations, HostFacilityOperations>();
-            builder.Services.AddSingleton(Mock.Of<IFacilityTimeZoneSource>());
+
+            var facilityDirectory = Mock.Of<IFacilityDirectory>();
+            builder.Services.AddSingleton(facilityDirectory);
+            builder.Services.AddSingleton<IFacilityTimeZoneSource>(facilityDirectory);
 
             return builder;
         }
@@ -73,7 +86,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.True(registered);
             Assert.Contains(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -90,7 +103,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             // The module must not stand up a context of its own; it repositories over the host's.
             var repository = Assert.Single(builder.Services,
@@ -106,7 +119,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled: true);
             var mvcBuilder = builder.Services.AddControllers();
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             Assert.Contains(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
@@ -140,7 +153,7 @@ namespace UnitTests.DMRP
 
             builder.Services.AddSingleton(hostLookup);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
             Assert.Same(hostLookup, registration.ImplementationInstance);
@@ -151,7 +164,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityExistence));
         }
@@ -161,11 +174,62 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services,
                 d => d.ServiceType == typeof(IFacilityReportingPeriodResolver));
             Assert.Equal(typeof(FacilityReportingPeriodResolver), registration.ImplementationType);
+        }
+
+        /// <summary>
+        /// Enabled, the module reconciles its zone jobs at boot rather than leaving a stale or
+        /// missing job for the classic scheduler's shared Quartz scheduler to fire (or not) blind.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_registers_the_reconciler_and_boot_reconcile_hosted_service_when_enabled()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
+
+            Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
+
+            var hostedService = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(IHostedService));
+            Assert.Equal(typeof(DmrpNightlyScheduleHostedService), hostedService.ImplementationType);
+        }
+
+        /// <summary>
+        /// The hosted service deletes the host's classic jobs before it starts the scheduler, so it
+        /// needs the group they are in. The host names it; the module only carries it through.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_carries_the_hosts_classic_job_group_to_the_hosted_service()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
+
+            var registration = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(DmrpSchedulingHostOptions));
+            var options = Assert.IsType<DmrpSchedulingHostOptions>(registration.ImplementationInstance);
+            Assert.Equal(ClassicGroup, options.ClassicJobGroup);
+        }
+
+        /// <summary>
+        /// A blank group would have the hosted service sweep Quartz's own default group at every boot.
+        /// Refuse it where the host can see it rather than at the first start.
+        /// </summary>
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void AddDmrpModule_throws_when_the_host_names_no_classic_job_group(string classicJobGroup)
+        {
+            var builder = CreateBuilder(enabled: true);
+            var mvcBuilder = builder.Services.AddControllers();
+
+            Assert.Throws<ArgumentException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, classicJobGroup));
         }
 
         /// <summary>
@@ -181,7 +245,7 @@ namespace UnitTests.DMRP
             var hostSource = Mock.Of<IFacilityTimeZoneSource>();
             builder.Services.AddSingleton(hostSource);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityTimeZoneSource));
             Assert.Same(hostSource, registration.ImplementationInstance);
@@ -201,9 +265,27 @@ namespace UnitTests.DMRP
             var mvcBuilder = builder.Services.AddControllers();
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
 
             Assert.Contains(nameof(IFacilityTimeZoneSource), exception.Message);
+        }
+
+        /// <summary>
+        /// Without a facility directory the nightly job would have no way to enumerate facilities.
+        /// Fail at startup instead of leaving the job to fail silently every time it fires.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_throws_when_the_host_registers_no_facility_directory()
+        {
+            var builder = CreateBuilder(enabled: true);
+            builder.Services.RemoveAll<IFacilityDirectory>();
+
+            var mvcBuilder = builder.Services.AddControllers();
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
+
+            Assert.Contains(nameof(IFacilityDirectory), exception.Message);
         }
 
         /// <summary>
@@ -216,9 +298,28 @@ namespace UnitTests.DMRP
             builder.Services.RemoveAll<IFacilityTimeZoneSource>();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.False(registered);
+        }
+
+        /// <summary>
+        /// Disabled, the module still registers the reconciler and a cleanup hosted service, so any
+        /// jobs left over from a previous run with the flag on are swept before the classic
+        /// scheduler starts its shared Quartz scheduler.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_registers_the_reconciler_and_boot_cleanup_hosted_service_when_disabled()
+        {
+            var builder = CreateBuilder(enabled: false);
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
+
+            Assert.Contains(builder.Services, d => d.ServiceType == typeof(IDmrpNightlyJobReconciler));
+
+            var hostedService = Assert.Single(builder.Services,
+                d => d.ServiceType == typeof(IHostedService));
+            Assert.Equal(typeof(DmrpNightlyScheduleCleanupService), hostedService.ImplementationType);
         }
 
         /// <summary>
@@ -236,7 +337,7 @@ namespace UnitTests.DMRP
             var mvcBuilder = builder.Services.AddControllers();
 
             var exception = Assert.Throws<InvalidOperationException>(() =>
-                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder));
+                builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup));
 
             Assert.Contains(nameof(IFacilityOperations), exception.Message);
         }
@@ -253,7 +354,7 @@ namespace UnitTests.DMRP
             builder.Services.AddScoped(_ => new HostFacilityOperations());
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.True(registered);
         }
@@ -269,7 +370,7 @@ namespace UnitTests.DMRP
             builder.Services.RemoveAll<IFacilityOperations>();
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ClassicGroup);
 
             Assert.False(registered);
         }
@@ -279,7 +380,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: true);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             using var provider = BuildProviderWithModuleDependencies(builder);
             using var scope = provider.CreateScope();
@@ -297,7 +398,7 @@ namespace UnitTests.DMRP
         {
             var builder = CreateBuilder(enabled: false);
 
-            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers());
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(), ClassicGroup);
 
             var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(IFacilityOperations));
 
@@ -316,6 +417,11 @@ namespace UnitTests.DMRP
             builder.Services.AddScoped(_ => Mock.Of<IEntityRepository<FacilityReportingPlan>>());
             builder.Services.AddScoped(_ => Mock.Of<IFacilityExistence>());
 
+            // DmrpFacilityOperations now also takes IDmrpNightlyJobReconciler, which needs Quartz's
+            // ISchedulerFactory to construct. Nothing here calls CreateAsync/UpdateAsync/RestoreAsync,
+            // so the in-memory registration only has to make the graph resolvable.
+            builder.Services.RegisterQuartzDatabaseInTest();
+
             return builder.Services.BuildServiceProvider();
         }
 
@@ -327,7 +433,7 @@ namespace UnitTests.DMRP
             var builder = CreateBuilder(enabled);
             var mvcBuilder = builder.Services.AddControllers();
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.False(registered);
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IEntityRepository<MeasureMapping>));
@@ -353,7 +459,7 @@ namespace UnitTests.DMRP
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             mvcBuilder.AddApplicationPart(dmrpAssembly);
 
-            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder);
+            var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.False(registered);
             Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
