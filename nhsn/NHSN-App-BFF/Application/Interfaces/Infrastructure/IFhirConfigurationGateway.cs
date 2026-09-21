@@ -11,13 +11,13 @@ public interface IFhirConfigurationGateway
     Task SaveAsync(FhirConfigurationSave request, CancellationToken cancellationToken = default);
 
     // URL-only FHIR reachability probe, before any configuration has been saved:
-    // IDataAcquisitionServiceClient.ValidateConnectionAsync. DataAcquisition does not expose an
-    // unscoped validate route yet, so that SDK method answers with a synthetic success today and
-    // makes no network call — see its own doc comment. A true result here means "not rejected by
-    // Link", not "reachable", until that backend route exists; FacilityAdministrationService
-    // reports this honestly to the caller via ConnectionResult.Simulated.
-    Task<bool> TestConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default);
+    // IDataAcquisitionServiceClient.ValidateFhirServerConnectionAsync, which has Data Acquisition
+    // request the server's /metadata CapabilityStatement. A rejected URL or an unreachable server
+    // is a failed probe, not an error; Detail carries Data Acquisition's explanation.
+    Task<FhirConnectionProbeResult> TestConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default);
 }
+
+public sealed record FhirConnectionProbeResult(bool IsConnected, string? Detail = null);
 
 public sealed record FhirConfigurationSave
 {

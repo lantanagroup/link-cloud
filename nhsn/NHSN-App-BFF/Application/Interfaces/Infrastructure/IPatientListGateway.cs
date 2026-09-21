@@ -20,8 +20,7 @@ public interface IPatientListGateway
     // sFTP configuration, for the same one-census-method-per-facility reason as above.
     Task DeleteConfigurationIfExistsAsync(string facilityId, CancellationToken cancellationToken = default);
 
-    // Fixture-only: the spec adds firstName/lastName as scalars on a six-row configuration model, one
-    // name per list, not the patient collection the screen needs. The client needs to confirm the
-    // intended shape; this port and its caller do not change once that lands, only the adapter does.
+    // The patients currently on one of the six lists, read live from the facility's EHR through Data
+    // Acquisition. Empty when the key is unknown or that list is not configured.
     Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default);
 }

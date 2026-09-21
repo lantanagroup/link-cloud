@@ -35,6 +35,19 @@ internal sealed record EhrPatientListWire
 
     [JsonPropertyName("fhirId")]
     public string? FhirId { get; init; }
+
+    // Only present on GET api/data/{facilityId}/fhirQueryList?includePatients=true.
+    [JsonPropertyName("patients")]
+    public List<EhrPatientListPatientWire>? Patients { get; init; }
+}
+
+internal sealed record EhrPatientListPatientWire
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
 }
 
 // Outbound shape for POST/PUT api/data/fhirQueryList — both bind the same FhirListConfigurationModel
@@ -88,6 +101,19 @@ internal static class PatientListConfigurationMapper
         }
 
         return result;
+    }
+
+    // The configured list behind one of the frontend's CensusListKey strings, or null when the key
+    // is unknown or that list is not configured.
+    public static EhrPatientListWire? FindList(PatientListConfigurationWire? source, string listKey)
+    {
+        var entry = ListKeys.FirstOrDefault(candidate => candidate.Key == listKey);
+        if (entry.Key is null || source is null)
+        {
+            return null;
+        }
+
+        return source.EHRPatientLists.FirstOrDefault(list => list.Status == entry.Status && list.TimeFrame == entry.TimeFrame);
     }
 
     // Every one of the six keys must carry a non-empty id — Data Acquisition rejects anything but

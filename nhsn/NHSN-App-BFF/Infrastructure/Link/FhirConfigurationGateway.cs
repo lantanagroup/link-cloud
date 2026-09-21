@@ -71,9 +71,19 @@ internal sealed class FhirConfigurationGateway : IFhirConfigurationGateway
         }
     }
 
-    public async Task<bool> TestConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
+    public async Task<FhirConnectionProbeResult> TestConnectionAsync(string fhirServerBaseUrl, CancellationToken cancellationToken = default)
     {
-        var response = await _dataAcquisitionClient.ValidateConnectionAsync(fhirServerBaseUrl, cancellationToken);
-        return response.IsSuccessStatusCode;
+        var response = await _dataAcquisitionClient.ValidateFhirServerConnectionAsync(fhirServerBaseUrl, cancellationToken);
+
+        // 400 means Data Acquisition rejected the URL; 502 means the server could not be reached or
+        // did not answer as a FHIR server (see ConnectionValidationController). Both are a failed
+        // test to report, not a Link-service failure.
+        if (response.StatusCode is StatusCodes.Status400BadRequest or StatusCodes.Status502BadGateway)
+        {
+            return new FhirConnectionProbeResult(false, LinkResponseHandler.ProblemDetail(response.RawBody));
+        }
+
+        var result = LinkResponseHandler.Require(response, ServiceName, nameof(TestConnectionAsync));
+        return new FhirConnectionProbeResult(result.IsConnected, result.ErrorMessage);
     }
 }

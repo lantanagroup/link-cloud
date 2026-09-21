@@ -21,7 +21,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
     private readonly IFacilityGateway _facilityGateway;
     private readonly IFhirConfigurationGateway _fhirConfigurationGateway;
     private readonly IQueryDispatchGateway _queryDispatchGateway;
-    private readonly LinkCapabilitiesSettings _linkCapabilities;
 
     public FacilityAdministrationService(
         NhsnAppDbContext dbContext,
@@ -29,8 +28,7 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         IFacilityWriteLock writeLock,
         IFacilityGateway facilityGateway,
         IFhirConfigurationGateway fhirConfigurationGateway,
-        IQueryDispatchGateway queryDispatchGateway,
-        IOptions<LinkCapabilitiesSettings> linkCapabilities)
+        IQueryDispatchGateway queryDispatchGateway)
     {
         _dbContext = dbContext;
         _userContext = userContext;
@@ -38,7 +36,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         _facilityGateway = facilityGateway;
         _fhirConfigurationGateway = fhirConfigurationGateway;
         _queryDispatchGateway = queryDispatchGateway;
-        _linkCapabilities = linkCapabilities.Value;
     }
 
     public async Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default)
@@ -191,13 +188,13 @@ public class FacilityAdministrationService : IFacilityAdministrationService
             return new ConnectionResult { Success = false, MessageKey = "fhirServerInfo.messages.invalidBaseUrl" };
         }
 
-        var reachable = await _fhirConfigurationGateway.TestConnectionAsync(fhirServerBaseUrl, cancellationToken);
+        var probe = await _fhirConfigurationGateway.TestConnectionAsync(fhirServerBaseUrl, cancellationToken);
 
         return new ConnectionResult
         {
-            Success = reachable,
-            MessageKey = reachable ? "fhirServerInfo.messages.testSuccess" : "fhirServerInfo.messages.testFailure",
-            Simulated = !_linkCapabilities.FhirConnectionProbe
+            Success = probe.IsConnected,
+            MessageKey = probe.IsConnected ? "fhirServerInfo.messages.testSuccess" : "fhirServerInfo.messages.testFailure",
+            Detail = probe.Detail
         };
     }
 
