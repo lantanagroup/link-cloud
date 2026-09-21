@@ -142,7 +142,8 @@
 }
 
 .encounter-mapping .encounter-row-hint {
-  flex-basis: 100%;
+  display: block;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--encounter-red);
 }
