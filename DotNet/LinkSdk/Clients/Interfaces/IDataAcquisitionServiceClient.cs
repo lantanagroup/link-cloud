@@ -27,8 +27,7 @@ public interface IDataAcquisitionServiceClient
     /// <summary>URL-only FHIR reachability probe before any configuration is saved. No backend route yet — returns a synthetic success.</summary>
     Task<LinkApiResponse> ValidateConnectionAsync(string? fhirServerBaseUrl = null, CancellationToken cancellationToken = default);
 
-    /// <summary>Reads the FHIR patient-list configuration; pass <paramref name="includePatientName"/> to request matched patients per list.</summary>
-    Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatientName, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatients = false, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
 

@@ -22,6 +22,45 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
+    public Task<LinkApiResponse<string>> ExpandValueSetAsync(
+        string? id = null,
+        string? url = null,
+        string? date = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/ValueSet/$expand")
+            : Request($"terminology/fhir/ValueSet/{id}/$expand");
+        if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
+        if (!string.IsNullOrWhiteSpace(date)) request = request.SetQueryParam("date", date);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> GetValueSetsAsync(
+        string? url = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Request("terminology/fhir/ValueSet");
+        if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> LookupCodeInCodeSystemAsync(
+        string? system = null,
+        string? code = null,
+        string? version = null,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/CodeSystem/$lookup")
+            : Request($"terminology/fhir/CodeSystem/{id}/$lookup");
+        if (!string.IsNullOrWhiteSpace(system)) request = request.SetQueryParam("system", system);
+        if (!string.IsNullOrWhiteSpace(code)) request = request.SetQueryParam("code", code);
+        if (!string.IsNullOrWhiteSpace(version)) request = request.SetQueryParam("version", version);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
     /// <inheritdoc />
     // Flurl drops a null query parameter, so an unsupplied filter is omitted from the URL rather than
     // sent empty -- which matters here, because the service rejects a blank codeSystem or valueSet

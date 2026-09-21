@@ -87,26 +87,11 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     public Task<LinkApiResponse> GetFhirListConfigurationAsync(
         string facilityId,
+        bool includePatients = false,
         CancellationToken cancellationToken = default) =>
-        GetFhirListConfigurationAsync(facilityId, includePatientName: false, cancellationToken);
-
-    /// <summary>
-    /// Reads the FHIR patient-list configuration for a facility. When
-    /// <paramref name="includePatientName"/> is <see langword="true"/> the caller is asking for each
-    /// list together with the patients matched to it (queriedAt, patientCount, patients[]).
-    /// The DataAcquisition read endpoint does not honour this query parameter yet, so today it is
-    /// forwarded harmlessly and ignored. TODO: drop this note once the backend supports it.
-    /// </summary>
-    public Task<LinkApiResponse> GetFhirListConfigurationAsync(
-        string facilityId,
-        bool includePatientName,
-        CancellationToken cancellationToken = default)
-    {
-        var request = Request($"data/{facilityId}/fhirQueryList");
+        SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
             .SetQueryParam("includePatients", includePatients ? "true" : null)
-        if (includePatientName) request = request.SetQueryParam("includePatientName", true);
-        return SendAsync(() => request.GetAsync(cancellationToken: cancellationToken));
-    }
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirListConfigurationAsync(
         object request,
@@ -342,4 +327,170 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("includeFileContent", includeFileContent ? "true" : "false")
             .PostJsonAsync(request, cancellationToken: cancellationToken),
             captureRequestBody: false);
+
+    // ----- Organization location configuration (update / delete) -----
+
+    /// <summary>
+    /// Saves/updates the organization location configuration (Managing Org / Location Identifier /
+    /// Custom FHIR Path selection) for a facility: <c>PUT /api/data/location-config/facility/{facilityId}</c>.
+    /// </summary>
+    public Task<LinkApiResponse> UpdateOrganizationLocationConfigurationAsync(
+        string facilityId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/facility/{facilityId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Removes the organization location configuration for a facility:
+    /// <c>DELETE /api/data/location-config/facility/{facilityId}</c>.
+    /// </summary>
+    public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    // ----- Organization location mappings -----
+
+    /// <summary>
+    /// Saves the resolved organization/location mapping (including a Cerner "Site" search result):
+    /// <c>PUT /api/data/location-mappings/{id}</c>.
+    /// </summary>
+    public Task<LinkApiResponse> UpdateOrganizationLocationMappingAsync(
+        int id,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-mappings/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    // ----- sFTP acquisition configuration (Cerner) -----
+
+    public Task<LinkApiResponse> GetSftpConfigurationByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/sftp-configurations/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> GetOrganizationSftpConfigurationAsync(
+        string organizationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateSftpConfigurationAsync(
+        string organizationId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateSftpConfigurationAsync(
+        string organizationId,
+        string configurationId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/{configurationId}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteSftpConfigurationAsync(
+        string organizationId,
+        string configurationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/{configurationId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Saves the write-only sFTP credentials for an organization (never read back once saved):
+    /// <c>PUT /api/data/{organizationId}/sftp-configurations/credentials</c>.
+    /// </summary>
+    public Task<LinkApiResponse> UpdateSftpCredentialsAsync(
+        string organizationId,
+        object credentials,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/credentials")
+            .PutJsonAsync(credentials, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteSftpCredentialsAsync(
+        string organizationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/credentials")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Reads whether sFTP credentials already exist for an organization, without exposing the
+    /// values: <c>GET /api/data/{organizationId}/sftp-configurations/credentials/status</c>.
+    /// </summary>
+    public Task<LinkApiResponse> GetSftpCredentialStatusAsync(
+        string organizationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/credentials/status")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Tests the connection against the saved sFTP configuration:
+    /// <c>POST /api/data/{organizationId}/sftp-configurations/test-connection</c>.
+    /// </summary>
+    public Task<LinkApiResponse> TestSftpConnectionAsync(
+        string organizationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/test-connection")
+            .PostJsonAsync(new { }, cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Ad-hoc "test and preview": test unsaved sFTP connection details typed into the form and
+    /// (when <paramref name="includeFileContent"/> is set) return every file with its patients
+    /// attached, in one call. DataAcquisition does not expose an unscoped
+    /// <c>POST /api/data/sftp-configurations/test-connection</c> route yet, so this returns a
+    /// synthetic success and makes no network call. TODO: forward to the real endpoint once it exists.
+    /// </summary>
+    public Task<LinkApiResponse> TestSftpConnectionAdHocAsync(
+        object connectionDetails,
+        bool includeFileContent = false,
+        CancellationToken cancellationToken = default) =>
+        SyntheticSuccessAsync("POST",
+            $"data/sftp-configurations/test-connection?includeFileContent={includeFileContent.ToString().ToLowerInvariant()}",
+            "{\"success\":true,\"message\":\"Synthetic success - endpoint not yet implemented in DataAcquisition.\",\"files\":[]}");
+
+    /// <summary>
+    /// Retrieves the paged/filterable sFTP acquisition logs: <c>GET /api/data/sftp-logs</c>.
+    /// </summary>
+    public Task<LinkApiResponse> SearchSftpLogsAsync(
+        string? facilityId = null,
+        string? status = null,
+        string? acquisitionType = null,
+        string? subType = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? sortBy = null,
+        string? sortOrder = null,
+        bool? includeDeleted = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Request("data/sftp-logs")
+            .SetQueryParam("pageNumber", pageNumber)
+            .SetQueryParam("pageSize", pageSize);
+        if (!string.IsNullOrWhiteSpace(facilityId)) request = request.SetQueryParam("facilityId", facilityId);
+        if (!string.IsNullOrWhiteSpace(status)) request = request.SetQueryParam("status", status);
+        if (!string.IsNullOrWhiteSpace(acquisitionType)) request = request.SetQueryParam("acquisitionType", acquisitionType);
+        if (!string.IsNullOrWhiteSpace(subType)) request = request.SetQueryParam("subType", subType);
+        if (!string.IsNullOrWhiteSpace(sortBy)) request = request.SetQueryParam("sortBy", sortBy);
+        if (!string.IsNullOrWhiteSpace(sortOrder)) request = request.SetQueryParam("sortOrder", sortOrder);
+        if (includeDeleted.HasValue) request = request.SetQueryParam("includeDeleted", includeDeleted.Value);
+        return SendAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    /// <summary>
+    /// Returns a synthetic 2xx <see cref="LinkApiResponse"/> for onboarding endpoints that the SDK
+    /// is expected to expose but that have no backend route yet. Makes no network call.
+    /// </summary>
+    private static Task<LinkApiResponse> SyntheticSuccessAsync(string method, string relativePath, string rawBody = "{}") =>
+        Task.FromResult(new LinkApiResponse
+        {
+            StatusCode = 200,
+            RawBody = rawBody,
+            ContentType = "application/json",
+            RequestMethod = method,
+            RequestUrl = relativePath,
+        });
 }

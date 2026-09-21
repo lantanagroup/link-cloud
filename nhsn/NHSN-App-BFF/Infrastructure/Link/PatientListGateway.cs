@@ -96,7 +96,7 @@ internal sealed class PatientListGateway : IPatientListGateway
 
     private async Task<PatientListConfigurationWire?> FetchAsync(string facilityId, CancellationToken cancellationToken)
     {
-        var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, cancellationToken);
+        var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, cancellationToken: cancellationToken);
         return LinkResponseHandler.OptionalFromRawBody<PatientListConfigurationWire>(response, ServiceName, nameof(GetConfigurationAsync));
     }
 
