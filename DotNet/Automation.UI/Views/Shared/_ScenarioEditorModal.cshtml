@@ -523,6 +523,7 @@
         // controls, but a save stays Unspecified until the user changes that mode
         // or the vendor. That keeps the old system-piece fallback and Epic vendor.
         var legacyFacilityMode = false;
+        var legacyPieceIds = null;
         var modal = document.getElementById('scenarioModal');
         var backdrop = document.getElementById('scenarioModalBackdrop');
         var modalTitle = document.getElementById('modalTitle');
@@ -1477,6 +1478,11 @@
         document.getElementById('AlaCarteVendor').addEventListener('input', function () {
             legacyFacilityMode = false;
         });
+        ['QueryPlanTemplate', 'NormalizationSuite', 'OrganizationResourceMap'].forEach(function (id) {
+            document.getElementById(id).addEventListener('change', function () {
+                legacyFacilityMode = false;
+            });
+        });
         document.getElementById('FacilityTemplate').addEventListener('change', syncFacilityModeUi);
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
@@ -2122,9 +2128,9 @@
                 facilityConfigurationMode: isFacilityMode() ? 'Facility' : (legacyFacilityMode ? 'Unspecified' : 'AlaCarte'),
                 facilityTemplateId: isFacilityMode() ? (document.getElementById('FacilityTemplate').value || null) : null,
                 vendorName: (!isFacilityMode() && !legacyFacilityMode) ? ((document.getElementById('AlaCarteVendor').value || '').trim() || null) : null,
-                queryPlanTemplateId: isFacilityMode() ? null : (document.getElementById('QueryPlanTemplate').value || null),
-                normalizationSuiteId: isFacilityMode() ? null : (document.getElementById('NormalizationSuite').value || null),
-                organizationResourceMapTemplateId: isFacilityMode() ? null : (document.getElementById('OrganizationResourceMap').value || null),
+                queryPlanTemplateId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.queryPlanTemplateId : (document.getElementById('QueryPlanTemplate').value || null)),
+                normalizationSuiteId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.normalizationSuiteId : (document.getElementById('NormalizationSuite').value || null)),
+                organizationResourceMapTemplateId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.organizationResourceMapTemplateId : (document.getElementById('OrganizationResourceMap').value || null)),
                 reportPeriodStart: startVal ? (startVal + 'T00:00:00Z') : null,
                 reportPeriodEnd: endVal ? (endVal + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
@@ -2160,6 +2166,11 @@
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             var facilityMode = data.facilityConfigurationMode;
             legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
+            legacyPieceIds = legacyFacilityMode ? {
+                queryPlanTemplateId: data.queryPlanTemplateId || null,
+                normalizationSuiteId: data.normalizationSuiteId || null,
+                organizationResourceMapTemplateId: data.organizationResourceMapTemplateId || null
+            } : null;
             if (legacyFacilityMode) facilityMode = 'AlaCarte';
             document.getElementById('FacilityModeFacility').checked = facilityMode === 'Facility';
             document.getElementById('FacilityModeAlaCarte').checked = facilityMode !== 'Facility';
@@ -2179,12 +2190,15 @@
             document.getElementById('ReportPeriodEnd').value = isoToDateValue(data.reportPeriodEnd);
             var qp = document.getElementById('QueryPlanTemplate');
             if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
+            else if (legacyFacilityMode) qp.value = '';
             else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
             var ns = document.getElementById('NormalizationSuite');
             if (data.normalizationSuiteId) ns.value = data.normalizationSuiteId;
+            else if (legacyFacilityMode) ns.value = '';
             else selectDefaultNormalizationSuite();
             var orm = document.getElementById('OrganizationResourceMap');
             if (data.organizationResourceMapTemplateId) orm.value = data.organizationResourceMapTemplateId;
+            else if (legacyFacilityMode) orm.value = '';
             else selectDefaultOrganizationResourceMap();
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             var ids = data.selectedMeasureIds || [];
@@ -2304,6 +2318,7 @@
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
                 legacyFacilityMode = false;
+                legacyPieceIds = null;
                 document.getElementById('FacilityModeFacility').checked = true;
                 document.getElementById('FacilityModeAlaCarte').checked = false;
                 selectDefaultFacilityTemplate();

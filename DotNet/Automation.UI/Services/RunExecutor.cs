@@ -1994,7 +1994,7 @@ internal sealed class RunExecutor
     {
         if (template == null)
         {
-            output.WriteLine($"No Organization Resource Map template resolved for facility '{facilityId}'. Skipping org-location configuration create.");
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
             return;
         }
 
@@ -2024,6 +2024,8 @@ internal sealed class RunExecutor
                 output.WriteLine($"Org-location configuration for facility '{facilityId}' already matches template '{template.Name}'. Skipping create.");
                 return;
             }
+
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
         }
 
         var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
@@ -2041,6 +2043,29 @@ internal sealed class RunExecutor
                 $"Failed to create organization location configuration for facility '{facilityId}' from template '{template.Name}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
 
         output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
+    }
+
+    private static async Task ClearOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!existing.IsSuccessStatusCode || existing.Body is not { Count: > 0 })
+        {
+            output.WriteLine($"No organization location configuration to clear for facility '{facilityId}'.");
+            return;
+        }
+
+        var deleted = await dataAcqClient.DeleteOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clear organization location configuration for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine($"Cleared {existing.Body.Count} organization location configuration(s) for facility '{facilityId}'.");
     }
 
     private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
@@ -2366,7 +2391,29 @@ internal sealed class RunExecutor
         var runtimeSequences = new List<NormalizationRuntimeSequenceStep>();
         if (resolution.Operations.Count == 0)
         {
-            output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            if (existingOperations.Count > 0)
+            {
+                var deletedOps = await normalizationClient.DeleteFacilityOperationsAsync(facilityId, cancellationToken);
+                if (!deletedOps.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to clear normalization operations for facility '{facilityId}'. HTTP {deletedOps.StatusCode}: {deletedOps.RawBody ?? "(no body)"}");
+                }
+
+                var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
+                if (!deletedSequences.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
+                }
+
+                output.WriteLine($"Cleared {existingOperations.Count} normalization operation(s) for facility '{facilityId}' because the suite has none.");
+            }
+            else
+            {
+                output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            }
+
             return new NormalizationFacilitySetup(resolution, runtimeSequences);
         }
 

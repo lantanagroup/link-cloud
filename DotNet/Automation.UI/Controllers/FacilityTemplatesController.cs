@@ -44,6 +44,12 @@ public class FacilityTemplatesController(
             .Distinct()
             .ToList();
 
+        if (model.EnableOrganizationLocationMapping && !model.OrganizationResourceMapTemplateId.HasValue)
+            return BadRequest("Organization location mapping is on, so an organization resource map is required.");
+
+        if (!model.AllowPatientConfigurationsOutsideSet && model.AllowedPatientConfigurationIds.Count == 0)
+            return BadRequest("A closed patient configuration set needs at least one patient configuration.");
+
         if (!model.EnableOrganizationLocationMapping)
             model.OrganizationResourceMapTemplateId = null;
 

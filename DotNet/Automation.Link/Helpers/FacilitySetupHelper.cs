@@ -26,6 +26,94 @@ public static class FacilitySetupHelper
     /// Legacy callers omit the vendor and still create an Epic facility.
     /// An explicit vendor is sent as given. An explicit blank vendor is omitted.
     /// </summary>
+    private static async Task ApplyExplicitVendorAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        FacilityModel existing,
+        string? vendorName,
+        bool dmrpEnabled,
+        CancellationToken cancellationToken)
+    {
+        var desired = ResolveVendor(vendorName, vendorExplicit: true);
+        var desiredName = desired?.Name;
+        var currentName = existing.Vendor?.Name;
+        if (string.Equals(currentName, desiredName, StringComparison.OrdinalIgnoreCase))
+        {
+            output.WriteLine($"Facility '{existing.FacilityId}' already uses vendor '{currentName ?? "(none)"}'.");
+            return;
+        }
+
+        Guid? vendorVersionId = null;
+        if (!string.IsNullOrWhiteSpace(desiredName))
+            vendorVersionId = await EnsureVendorVersionIdAsync(facilityClient, output, desiredName, cancellationToken);
+
+        var updated = await facilityClient.UpdateAsync(existing.FacilityId!, new FacilityModel
+        {
+            Id = existing.Id,
+            FacilityId = existing.FacilityId,
+            FacilityName = existing.FacilityName,
+            TimeZone = string.IsNullOrWhiteSpace(existing.TimeZone) ? FacilityTimeZone : existing.TimeZone,
+            Vendor = desired,
+            VendorVersionId = vendorVersionId,
+            ScheduledReports = dmrpEnabled
+                ? MonthlySchedule([])
+                : existing.ScheduledReports ?? MonthlySchedule([])
+        }, cancellationToken);
+
+        if (!updated.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to update vendor for facility '{existing.FacilityId}'. HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine($"Updated facility '{existing.FacilityId}' vendor from '{currentName ?? "(none)"}' to '{desiredName ?? "(none)"}'.");
+    }
+
+    private static async Task<Guid> EnsureVendorVersionIdAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
+        var vendors = await facilityClient.GetVendorsAsync(cancellationToken);
+        var vendor = vendors.IsSuccessStatusCode
+            ? vendors.Body?.FirstOrDefault(v => string.Equals(v.Name, vendorName, StringComparison.OrdinalIgnoreCase))
+            : null;
+
+        if (vendor?.Id is not Guid vendorId)
+        {
+            var created = await facilityClient.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, cancellationToken);
+            if (!created.IsSuccessStatusCode || created.Body?.Id is not Guid createdId)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to create vendor '{vendorName}'. HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+            }
+
+            vendorId = createdId;
+            output.WriteLine($"Created vendor '{vendorName}'.");
+        }
+
+        var versions = await facilityClient.GetVendorVersionsAsync(vendorId, cancellationToken);
+        var versionId = versions.IsSuccessStatusCode
+            ? versions.Body?.Select(v => v.Id).FirstOrDefault(id => id.HasValue)
+            : null;
+        if (versionId is Guid existingVersionId)
+            return existingVersionId;
+
+        var createdVersion = await facilityClient.CreateVendorVersionAsync(new CreateVendorVersionModel
+        {
+            VendorId = vendorId,
+            Version = "automation"
+        }, cancellationToken);
+        if (!createdVersion.IsSuccessStatusCode || createdVersion.Body?.Id is not Guid newVersionId)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create a vendor version for '{vendorName}'. HTTP {createdVersion.StatusCode}: {createdVersion.RawBody ?? "(no body)"}");
+        }
+
+        return newVersionId;
+    }
+
     private static VendorModel? ResolveVendor(string? vendorName, bool vendorExplicit)
     {
         if (!vendorExplicit)
@@ -77,6 +165,13 @@ public static class FacilitySetupHelper
         if (existing.IsSuccessStatusCode && existing.Body != null)
         {
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
+            if (vendorExplicit)
+            {
+                var dmrpEnabledForUpdate = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
+                await ApplyExplicitVendorAsync(
+                    facilityClient, output, existing.Body, vendorName, dmrpEnabledForUpdate, cancellationToken);
+            }
+
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
             return;
         }
@@ -677,6 +772,12 @@ public static class FacilitySetupHelper
         if (existing.IsSuccessStatusCode && existing.Body != null)
         {
             output.WriteLine($"Facility '{facilityId}' already exists.");
+            if (vendorExplicit)
+            {
+                await ApplyExplicitVendorAsync(
+                    facilityClient, output, existing.Body, vendorName, dmrpEnabled: true, cancellationToken);
+            }
+
             await WaitForFacilityReadConsistencyAsync(
                 facilityClient,
                 output,

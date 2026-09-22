@@ -240,6 +240,16 @@
     document.getElementById('facilityBackdrop').addEventListener('click', hide);
     document.getElementById('facilitySave').addEventListener('click', async function () {
         errors.style.display = 'none';
+        if (document.getElementById('facilityOrgMapping').checked && !document.getElementById('facilityOrm').value) {
+            errors.textContent = 'Organization location mapping is on, so an organization resource map is required.';
+            errors.style.display = '';
+            return;
+        }
+        if (!document.getElementById('facilityAllowOutside').checked && selectedPatients().length === 0) {
+            errors.textContent = 'A closed patient configuration set needs at least one patient configuration.';
+            errors.style.display = '';
+            return;
+        }
         const body = {
             id: document.getElementById('facilityId').value || '00000000-0000-0000-0000-000000000000',
             name: document.getElementById('facilityName').value,

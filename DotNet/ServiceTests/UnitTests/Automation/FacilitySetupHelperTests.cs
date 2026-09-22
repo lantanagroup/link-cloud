@@ -107,6 +107,48 @@ public class FacilitySetupHelperTests
     }
 
     [Fact]
+    public async Task Updates_the_vendor_when_a_reused_facility_switches_template()
+    {
+        GivenDmrpIsDisabled();
+        var versionId = Guid.NewGuid();
+        var vendorId = Guid.NewGuid();
+
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel
+            {
+                FacilityId = FacilityId,
+                FacilityName = FacilityId,
+                TimeZone = "America/Chicago",
+                Vendor = new VendorModel { Name = "Epic" },
+                ScheduledReports = new TenantScheduledReportConfig { Monthly = [MeasureId], Daily = [], Weekly = [] }
+            }));
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Cerner" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorVersionModel { Id = versionId, VendorId = vendorId, Version = "automation" }));
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        var updated = Assert.Single(_updated);
+        Assert.Equal("Cerner", updated.Vendor?.Name);
+        Assert.Equal(versionId, updated.VendorVersionId);
+        Assert.Equal([MeasureId], updated.ScheduledReports.Monthly);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
     public async Task Leaves_the_dmrp_module_alone_when_it_is_not_enabled()
     {
         GivenDmrpIsDisabled();
