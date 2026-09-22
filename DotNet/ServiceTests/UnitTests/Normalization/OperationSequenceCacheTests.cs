@@ -211,6 +211,49 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task RemovingAResourceType_DeletesOnlyThatOperationResourceTypeSequences()
+    {
+        using var harness = new Harness();
+        var operationId = await harness.SeedOperationAsync("facility-a", "Copy", CopyJson);
+        var encounter = new LantanaGroup.Link.Normalization.Domain.Entities.ResourceType { Id = Guid.NewGuid(), Name = "Encounter" };
+        harness.WriterContext.ResourceTypes.Add(encounter);
+        harness.WriterContext.OperationResourceTypes.Add(new OperationResourceType
+        {
+            Id = Guid.NewGuid(),
+            OperationId = operationId,
+            ResourceTypeId = encounter.Id
+        });
+        await harness.WriterContext.SaveChangesAsync();
+        await harness.WriterManager.CreateOperationSequences(Sequence("facility-a", operationId));
+        await harness.WriterManager.CreateOperationSequences(Sequence("facility-a", "Encounter", operationId));
+        var otherOperationId = await harness.SeedAndSequenceAsync("facility-b", "Other");
+        await harness.WarmAsync("facility-b");
+
+        var updated = await harness.WriterManager.UpdateOperation(new UpdateOperationModel
+        {
+            Id = operationId,
+            FacilityId = "facility-a",
+            Name = "Copy",
+            Description = "Copy",
+            OperationJson = CopyJson,
+            ResourceTypes = ["Encounter"]
+        });
+
+        Assert.True(updated.IsSuccess, updated.ErrorMessage);
+        Assert.Equal(1, await harness.ReaderContext.OperationSequences.CountAsync(sequence => sequence.FacilityId == "facility-b"));
+        var otherBeforeReload = harness.ReaderCounter.SequenceCommands;
+        var kept = Assert.Single(await harness.ReaderQueries.Search(Typed("facility-b")));
+        Assert.Equal(otherBeforeReload, harness.ReaderCounter.SequenceCommands);
+        Assert.Equal(otherOperationId, kept.OperationResourceType.OperationId);
+        Assert.Empty(await harness.ReaderQueries.Search(Typed("facility-a")));
+        Assert.Equal(operationId, Assert.Single(await harness.ReaderQueries.Search(new OperationSequenceSearchModel
+        {
+            FacilityId = "facility-a",
+            ResourceType = "Encounter"
+        })).OperationResourceType.OperationId);
+    }
+
+    [Fact]
     public async Task UnchangedFacility_DoesNotQuerySequencesOnTheNextSearch()
     {
         using var harness = new Harness();
@@ -275,10 +318,15 @@ public class OperationSequenceCacheTests
 
     private static CreateOperationSequencesModel Sequence(string facilityId, params Guid[] operationIds)
     {
+        return Sequence(facilityId, "Patient", operationIds);
+    }
+
+    private static CreateOperationSequencesModel Sequence(string facilityId, string resourceType, params Guid[] operationIds)
+    {
         return new CreateOperationSequencesModel
         {
             FacilityId = facilityId,
-            ResourceType = "Patient",
+            ResourceType = resourceType,
             OperationSequences = operationIds.Select((operationId, index) => new CreateOperationSequenceModel
             {
                 OperationId = operationId,

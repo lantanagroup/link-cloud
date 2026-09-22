@@ -286,7 +286,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                             FacilityId = model.FacilityId,
                             ResourceType = resourceType,
                             OperationSequences = createSequences,
-                        });
+                        }, cancellationToken);
                     }
                 }
 
@@ -481,7 +481,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
          [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -495,7 +495,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {
@@ -518,7 +518,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -527,7 +527,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorVersionId = vendorVersionId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {

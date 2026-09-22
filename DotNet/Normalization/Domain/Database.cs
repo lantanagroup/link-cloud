@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
         IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
+        bool HasActiveTransaction { get; }
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task RollbackTransactionAsync();
         Task CommitTransactionAsync();
@@ -41,6 +42,8 @@ namespace LantanaGroup.Link.Normalization.Domain
             OperationResourceTypes = operationResourceTypeMaps;
             VendorVersionOperationPresets = vendorOperationPresets;
         }
+
+        public bool HasActiveTransaction => _dbContext.Database.CurrentTransaction != null;
 
         public async Task<IDbContextTransaction> BeginTransactionAsync()
         {

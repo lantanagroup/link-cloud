@@ -68,7 +68,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionOperationPresetModel))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model)
+    public async Task<ActionResult<VendorVersionOperationPresetModel>> Post(VendorVersionOperationPresetPostModel model, CancellationToken cancellationToken = default)
     {
         if (model.VendorVersionId == null || model.VendorVersionId == Guid.Empty)
         {
@@ -86,7 +86,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
             {
                 VendorVersionId = model.VendorVersionId.Value,
                 OperationResourceTypeId = model.OperationResourceTypeId.Value
-            });
+            }, cancellationToken);
 
             return CreatedAtAction(nameof(Get), new { presetId = preset.Id }, preset);
         }
@@ -103,11 +103,11 @@ public class VendorVersionOperationPresetsController : ControllerBase
     [HttpDelete("{vendorVersionId:guid}/{presetId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Delete(Guid vendorVersionId, Guid presetId)
+    public async Task<IActionResult> Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default)
     {
         try
         {
-            await _presetManager.Delete(vendorVersionId, presetId);
+            await _presetManager.Delete(vendorVersionId, presetId, cancellationToken);
             return NoContent();
         }
         catch (Exception exception)

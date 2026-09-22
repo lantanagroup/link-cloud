@@ -9,8 +9,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers;
 
 public interface IVendorVersionOperationPresetManager
 {
-    Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model);
-    Task Delete(Guid vendorVersionId, Guid presetId);
+    Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model, CancellationToken cancellationToken = default);
+    Task Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default);
 }
 
 public class VendorVersionOperationPresetManager : IVendorVersionOperationPresetManager
@@ -35,7 +35,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         _operationSequenceQueries = operationSequenceQueries;
     }
 
-    public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model)
+    public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model, CancellationToken cancellationToken = default)
     {
         var operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId);
         var operation = await _database.Operations.GetAsync(operationResourceType.OperationId);
@@ -44,7 +44,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
             throw new InvalidOperationException("HSLOC Map operations cannot be assigned to vendors.");
         }
 
-        await _vendorVersionResolver.ResolveAsync([model.VendorVersionId]);
+        await _vendorVersionResolver.ResolveAsync([model.VendorVersionId], cancellationToken);
 
         var preset = await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset
         {
@@ -53,14 +53,17 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
             CreateDate = DateTime.UtcNow
         });
 
+        await using var transaction = await _database.BeginTransactionAsync();
         await _database.SaveChangesAsync();
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
-            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id));
+            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return (await _presetQueries.Get(preset.Id))!;
     }
 
-    public async Task Delete(Guid vendorVersionId, Guid presetId)
+    public async Task Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default)
     {
         var preset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(candidate =>
             candidate.Id == presetId && candidate.VendorVersionId == vendorVersionId);
@@ -80,13 +83,16 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
             {
                 OperationId = operationResourceType.OperationId,
                 VendorVersionId = vendorVersionId
-            });
+            }, cancellationToken);
             return;
         }
 
         _database.VendorVersionOperationPresets.Remove(preset);
+        await using var transaction = await _database.BeginTransactionAsync();
         await _database.SaveChangesAsync();
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
-            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationResourceType.OperationId));
+            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationResourceType.OperationId, cancellationToken),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }
