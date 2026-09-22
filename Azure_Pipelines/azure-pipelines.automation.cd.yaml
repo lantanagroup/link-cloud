@@ -94,6 +94,9 @@ steps:
   - task: Docker@2
     displayName: "Build & Push Automation Docker Image"
     condition: always()
+    env:
+      DOCKER_BUILDKIT: 1
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
@@ -103,6 +106,7 @@ steps:
         latest
         $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
+      arguments: '--secret id=feed_accesstoken,env=SYSTEM_ACCESSTOKEN'
 
   - task: PublishPipelineArtifact@1
     inputs:
