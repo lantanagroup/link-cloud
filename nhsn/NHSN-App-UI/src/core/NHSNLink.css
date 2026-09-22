@@ -1435,6 +1435,38 @@
   position: relative;
 }
 
+/* ---- password visibility toggle (core/fields/inputs.tsx PasswordField) */
+
+.nhsn-link__password-row {
+  position: relative;
+}
+
+.nhsn-link__password-row .k-input {
+  padding-inline-end: 34px;
+}
+
+.nhsn-link__password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--kendo-color-app-text-subtle, #565e64);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.nhsn-link__password-toggle:hover {
+  color: var(--kendo-color-app-text, #2b323b);
+}
+
 .nhsn-link__date-popup .k-popup {
   padding: 0;
   border: 1px solid var(--kendo-color-border, #dde1e6);

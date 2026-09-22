@@ -66,7 +66,7 @@ export function validateMrnIntake(draft: MrnIntakeDraft): FieldErrors {
       errors.isCalledMrn = 'onboarding:mrnIntake.errors.selectYesNo';
     }
     if (draft.isCalledMrn === false && !draft.otherTermUsed?.trim()) {
-      errors.otherTermUsed = 'onboarding:mrnIntake.errors.fieldRequired';
+      errors.otherTermUsed = 'onboarding:mrnIntake.errors.describeOtherTerm';
     }
     if (draft.canSearchByIdentifier === undefined) {
       errors.canSearchByIdentifier = 'onboarding:mrnIntake.errors.selectYesNo';
