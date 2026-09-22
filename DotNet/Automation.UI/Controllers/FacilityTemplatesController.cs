@@ -39,7 +39,7 @@ public class FacilityTemplatesController(
         model.Name = model.Name.Trim();
         model.Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description.Trim();
         model.VendorName = string.IsNullOrWhiteSpace(model.VendorName) ? null : model.VendorName.Trim();
-        model.AllowedPatientConfigurationIds = model.AllowedPatientConfigurationIds
+        model.AllowedPatientConfigurationIds = (model.AllowedPatientConfigurationIds ?? [])
             .Where(id => id != Guid.Empty)
             .Distinct()
             .ToList();

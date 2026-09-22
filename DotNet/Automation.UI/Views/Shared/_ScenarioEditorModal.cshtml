@@ -519,6 +519,10 @@
         var SYSTEM_PNEUMONIA_Q = '00000000-0000-0000-3000-000000000001';
         var SYSTEM_PNEUMONIA_NQ = '00000000-0000-0000-3000-000000000004';
         var pcCohortRow = null;
+        // Legacy scenarios have no facility mode. Opening one shows the ala carte
+        // controls, but a save stays Unspecified until the user changes that mode
+        // or the vendor. That keeps the old system-piece fallback and Epic vendor.
+        var legacyFacilityMode = false;
         var modal = document.getElementById('scenarioModal');
         var backdrop = document.getElementById('scenarioModalBackdrop');
         var modalTitle = document.getElementById('modalTitle');
@@ -1458,8 +1462,21 @@
         document.getElementById('EnableDmrp').addEventListener('change', function () {
             syncDmrpUi();
         });
-        document.getElementById('FacilityModeFacility').addEventListener('change', syncFacilityModeUi);
-        document.getElementById('FacilityModeAlaCarte').addEventListener('change', syncFacilityModeUi);
+        document.getElementById('FacilityModeFacility').addEventListener('change', function () {
+            legacyFacilityMode = false;
+            syncFacilityModeUi();
+        });
+        document.getElementById('FacilityModeAlaCarte').addEventListener('change', function () {
+            if (legacyFacilityMode) {
+                legacyFacilityMode = false;
+                var vendor = document.getElementById('AlaCarteVendor');
+                if (vendor && !(vendor.value || '').trim()) vendor.value = 'Epic';
+            }
+            syncFacilityModeUi();
+        });
+        document.getElementById('AlaCarteVendor').addEventListener('input', function () {
+            legacyFacilityMode = false;
+        });
         document.getElementById('FacilityTemplate').addEventListener('change', syncFacilityModeUi);
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
@@ -2102,9 +2119,9 @@
                 enableDmrp: document.getElementById('EnableDmrp').checked,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
-                facilityConfigurationMode: isFacilityMode() ? 'Facility' : 'AlaCarte',
+                facilityConfigurationMode: isFacilityMode() ? 'Facility' : (legacyFacilityMode ? 'Unspecified' : 'AlaCarte'),
                 facilityTemplateId: isFacilityMode() ? (document.getElementById('FacilityTemplate').value || null) : null,
-                vendorName: isFacilityMode() ? null : ((document.getElementById('AlaCarteVendor').value || '').trim() || null),
+                vendorName: (!isFacilityMode() && !legacyFacilityMode) ? ((document.getElementById('AlaCarteVendor').value || '').trim() || null) : null,
                 queryPlanTemplateId: isFacilityMode() ? null : (document.getElementById('QueryPlanTemplate').value || null),
                 normalizationSuiteId: isFacilityMode() ? null : (document.getElementById('NormalizationSuite').value || null),
                 organizationResourceMapTemplateId: isFacilityMode() ? null : (document.getElementById('OrganizationResourceMap').value || null),
@@ -2142,13 +2159,14 @@
             document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
             var facilityMode = data.facilityConfigurationMode;
-            if (!facilityMode || facilityMode === 'Unspecified') facilityMode = 'AlaCarte';
+            legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
+            if (legacyFacilityMode) facilityMode = 'AlaCarte';
             document.getElementById('FacilityModeFacility').checked = facilityMode === 'Facility';
             document.getElementById('FacilityModeAlaCarte').checked = facilityMode !== 'Facility';
             var facilitySelect = document.getElementById('FacilityTemplate');
             if (data.facilityTemplateId) facilitySelect.value = data.facilityTemplateId;
             else selectDefaultFacilityTemplate();
-            document.getElementById('AlaCarteVendor').value = data.vendorName || '';
+            document.getElementById('AlaCarteVendor').value = data.vendorName || (legacyFacilityMode ? 'Epic' : '');
             // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
             function isoToDateValue(s) {
                 if (!s) return '';
@@ -2285,6 +2303,7 @@
                 document.getElementById('CleanupServiceData').checked = false;
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
+                legacyFacilityMode = false;
                 document.getElementById('FacilityModeFacility').checked = true;
                 document.getElementById('FacilityModeAlaCarte').checked = false;
                 selectDefaultFacilityTemplate();

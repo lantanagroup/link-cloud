@@ -3,7 +3,6 @@ using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using LantanaGroup.Automation.Generation;
-using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.AutomationUI;
 
@@ -83,7 +82,7 @@ public class FacilityTemplateTests
     }
 
     [Fact]
-    public async Task Binder_copies_the_template_and_does_not_keep_ala_carte_ids()
+    public async System.Threading.Tasks.Task Binder_copies_the_template_and_does_not_keep_ala_carte_ids()
     {
         var template = FacilityTemplateSeedService.BuildTemplates().Single(t => t.Id == FacilityTemplateCatalog.CernerId);
         var store = new FakeFacilityTemplateStore(template);
@@ -107,7 +106,7 @@ public class FacilityTemplateTests
     }
 
     [Fact]
-    public async Task Binder_turns_org_mapping_off_when_the_template_says_so()
+    public async System.Threading.Tasks.Task Binder_turns_org_mapping_off_when_the_template_says_so()
     {
         var template = new FacilityTemplate
         {
@@ -130,17 +129,17 @@ public class FacilityTemplateTests
 
     private sealed class FakeFacilityTemplateStore(FacilityTemplate template) : IFacilityTemplateStore
     {
-        public Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default) =>
-            Task.FromResult(new List<FacilityTemplate> { template });
+        public System.Threading.Tasks.Task<List<FacilityTemplate>> GetAllAsync(CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(new List<FacilityTemplate> { template });
 
-        public Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
-            Task.FromResult(id == template.Id ? template : null);
+        public System.Threading.Tasks.Task<FacilityTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult(id == template.Id ? template : null);
 
-        public Task<FacilityTemplate?> GetDefaultAsync(CancellationToken ct = default) =>
-            Task.FromResult<FacilityTemplate?>(template.IsDefault ? template : null);
+        public System.Threading.Tasks.Task<FacilityTemplate?> GetDefaultAsync(CancellationToken ct = default) =>
+            System.Threading.Tasks.Task.FromResult<FacilityTemplate?>(template.IsDefault ? template : null);
 
-        public Task UpsertAsync(FacilityTemplate template, CancellationToken ct = default) => Task.CompletedTask;
-        public Task SetDefaultAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+        public System.Threading.Tasks.Task UpsertAsync(FacilityTemplate template, CancellationToken ct = default) => System.Threading.Tasks.Task.CompletedTask;
+        public System.Threading.Tasks.Task SetDefaultAsync(Guid id, CancellationToken ct = default) => System.Threading.Tasks.Task.CompletedTask;
+        public System.Threading.Tasks.Task DeleteAsync(Guid id, CancellationToken ct = default) => System.Threading.Tasks.Task.CompletedTask;
     }
 }
