@@ -1147,10 +1147,6 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
   }
 
   function handleGenerateNew() {
-    if (reports.some((report) => report.status === 'Pending')) {
-      notifyError(t('onboarding:reportResults.messages.reportPending'));
-      return;
-    }
     goTo('report');
   }
 
