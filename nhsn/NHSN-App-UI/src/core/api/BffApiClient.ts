@@ -355,16 +355,25 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
-  getJwksInstructionsUrl(vendor: string): string {
-    return `${this.bffBaseUrl}/static/jwks-instructions/${encodeURIComponent(vendor)}`;
+  // ------------------------------------------------------------ vendor instruction PDFs
+
+  async getJwksInstructionsPdf(vendor: string): Promise<Blob> {
+    const {data} = await this.http.get<Blob>(`/static/jwks-instructions/${encodeURIComponent(vendor)}`, {
+      responseType: 'blob'
+    });
+    return data;
   }
 
-  getLocationOrgResolutionUrl(): string {
-    return `${this.bffBaseUrl}/static/location-org-resolution`;
+  async getLocationOrgResolutionPdf(): Promise<Blob> {
+    const {data} = await this.http.get<Blob>('/static/location-org-resolution', {responseType: 'blob'});
+    return data;
   }
 
-  getCensusInstructionsUrl(vendor: string): string {
-    return `${this.bffBaseUrl}/static/census-instructions/${encodeURIComponent(vendor)}`;
+  async getCensusInstructionsPdf(vendor: string): Promise<Blob> {
+    const {data} = await this.http.get<Blob>(`/static/census-instructions/${encodeURIComponent(vendor)}`, {
+      responseType: 'blob'
+    });
+    return data;
   }
 }
 

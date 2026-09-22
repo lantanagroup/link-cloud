@@ -623,19 +623,22 @@ export class MockApiClient implements ApiClient {
     ];
   }
 
-  getJwksInstructionsUrl(vendor: string): string {
+  async getJwksInstructionsPdf(vendor: string): Promise<Blob> {
+    await tick();
     const body = `Simulated ${vendor} JWKS instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
-    return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
+    return new Blob([body], {type: 'text/plain;charset=utf-8'});
   }
 
-  getLocationOrgResolutionUrl(): string {
+  async getLocationOrgResolutionPdf(): Promise<Blob> {
+    await tick();
     const body = 'Simulated Location Org Resolution PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.';
-    return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
+    return new Blob([body], {type: 'text/plain;charset=utf-8'});
   }
 
-  getCensusInstructionsUrl(vendor: string): string {
+  async getCensusInstructionsPdf(vendor: string): Promise<Blob> {
+    await tick();
     const body = `Simulated ${vendor} census instructions PDF.\n\nNo backend is connected in mock mode — against the real BFF this downloads the actual instructions PDF.`;
-    return URL.createObjectURL(new Blob([body], {type: 'text/plain;charset=utf-8'}));
+    return new Blob([body], {type: 'text/plain;charset=utf-8'});
   }
 
   private buildReport(request: C.ReportRequest): C.ReportSummary {
