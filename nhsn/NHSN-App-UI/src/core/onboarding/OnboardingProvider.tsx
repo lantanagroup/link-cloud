@@ -49,6 +49,9 @@ interface OnboardingContextValue {
 
   patch: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
   mirror: <K extends keyof DraftSections>(section: K, patch: Partial<DraftSections[K]>) => void;
+  /** Saves the current draft immediately, outside the normal step-transition save. Resolves false
+   *  (and shows the usual save-rejection notification) if the save failed. */
+  save: () => Promise<boolean>;
   /** Steps flagged with a validation error (currently: sections a failed manual-upload import
    *  touched) - drives the red exclamation mark next to a step's name in the nav. */
   errorStepIds: ReadonlySet<StepId>;
@@ -400,6 +403,8 @@ export function OnboardingProvider({
     dispatch({type: 'section/patch', section, patch: sectionPatch});
   }, []);
 
+  const save = useCallback(() => persistDraft(draft), [persistDraft, draft]);
+
   const vendorProfile = useMemo(
     () => vendorProfiles.find(profile => profile.vendor === draft.facilityInfo.vendor),
     [vendorProfiles, draft.facilityInfo.vendor]
@@ -419,6 +424,7 @@ export function OnboardingProvider({
       savingDirection: saving ? navDirection : null,
       patch,
       mirror,
+      save,
       errorStepIds,
       setErrorStepIds,
       goTo,
@@ -444,6 +450,7 @@ export function OnboardingProvider({
       isStepPending,
       patch,
       mirror,
+      save,
       errorStepIds,
       setErrorStepIds,
       goTo,

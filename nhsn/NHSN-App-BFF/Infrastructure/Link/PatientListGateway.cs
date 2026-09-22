@@ -116,6 +116,19 @@ internal sealed class PatientListGateway : IPatientListGateway
     private async Task<PatientListConfigurationWire?> FetchAsync(string facilityId, CancellationToken cancellationToken, bool includePatients = false)
     {
         var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, includePatients, cancellationToken);
+
+        // Only reachable when includePatients is true - Data Acquisition throws this when one of the
+        // facility's lists can't be read from the EHR (most often a FhirId that doesn't exist there).
+        // Its own detail names the failing FhirId, which the generic LinkServiceException/502 handler
+        // would otherwise discard in favor of "DataAcquisition returned 424."
+        if (response.StatusCode == StatusCodes.Status424FailedDependency)
+        {
+            throw new PatientListRetrievalFailedException(
+                facilityId,
+                LinkResponseHandler.ProblemDetail(response.RawBody)
+                    ?? "One of the facility's patient lists could not be read from the EHR.");
+        }
+
         return LinkResponseHandler.OptionalFromRawBody<PatientListConfigurationWire>(response, ServiceName, nameof(GetConfigurationAsync));
     }
 

@@ -92,7 +92,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const { t } = useTranslation(["onboarding", "common"]);
   const api = useApiClient();
   const { notifyError } = useNotifications();
-  const { draft, patch, saving, savingDirection, user, vendorProfile } = useOnboarding();
+  const { draft, patch, save, saving, savingDirection, user, vendorProfile } = useOnboarding();
   const census = draft.census;
   const acquisition = vendorProfile?.censusAcquisition;
 
@@ -255,6 +255,15 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     setValidationMessage(null);
     setSelectedListKey(null);
     setValidatingLists(true);
+
+    // The list-query endpoints read the facility's already-saved list ids from Data Acquisition,
+    // not the draft, so the ids on screen must be persisted before querying against them.
+    const saved = await save();
+    if (!saved) {
+      setValidatingLists(false);
+      return;
+    }
+
     if (census.accuracyAcknowledged) {
       revokeAcknowledgement();
     }

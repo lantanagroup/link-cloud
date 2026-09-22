@@ -151,6 +151,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddLinkGateways(builder.Configuration);
     builder.Services.AddExceptionHandler<FacilityWriteLockExceptionHandler>();
     builder.Services.AddExceptionHandler<InvalidFhirConfigurationExceptionHandler>();
+    builder.Services.AddExceptionHandler<PatientListRetrievalFailedExceptionHandler>();
     builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
 
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
