@@ -258,6 +258,10 @@ export function CensusStep({ onNext, onBack }: StepProps) {
       return;
     }
 
+    // save() above just cleared the step's dirty flag; mark it dirty again so
+    // leaving without hitting Continue still prompts to save or discard.
+    patch("census", {});
+
     if (census.accuracyAcknowledged) {
       revokeAcknowledgement();
     }
