@@ -269,6 +269,18 @@ export class MockApiClient implements ApiClient {
     return {listKey: key, patientCount: count, patientIds: ids(count), simulated: true};
   }
 
+  async queryPatientLists(): Promise<C.CensusListResult[]> {
+    const keys: C.CensusListKey[] = [
+      'admit-lt-24',
+      'admit-24-to-48',
+      'admit-gt-48',
+      'discharge-lt-24',
+      'discharge-24-to-48',
+      'discharge-gt-48'
+    ];
+    return Promise.all(keys.map(key => this.queryPatientList(key)));
+  }
+
   async listSftpFiles(): Promise<C.SftpFile[]> {
     await tick();
     const queriedAt = new Date().toISOString();

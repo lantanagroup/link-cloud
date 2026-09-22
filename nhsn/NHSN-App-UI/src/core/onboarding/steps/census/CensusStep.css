@@ -7,6 +7,7 @@
   --census-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
   --census-gray-800: var(--kendo-color-app-text, #1f2328);
   --census-red: var(--kendo-color-error, #cc1b22);
+  --census-orange: var(--kendo-color-warning, #b25e00);
   --census-radius: 8px;
 
   color: var(--census-gray-800);
@@ -171,6 +172,22 @@
   border-radius: 50%;
   vertical-align: middle;
   animation: census-spin 0.7s linear infinite;
+}
+
+.census-poi .census-list-field.is-untested .k-label::after {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--census-orange);
+  color: var(--kendo-color-on-inverse, #ffffff);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
 }
 
 @keyframes census-spin {

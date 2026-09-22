@@ -41,6 +41,7 @@ export class TestAuthApiClient implements ApiClient {
   testFhirConnection: ApiClient['testFhirConnection'] = c => this.inner.testFhirConnection(c);
 
   queryPatientList: ApiClient['queryPatientList'] = k => this.inner.queryPatientList(k);
+  queryPatientLists = () => this.inner.queryPatientLists();
   listSftpFiles = () => this.inner.listSftpFiles();
   testSftpConnection: ApiClient['testSftpConnection'] = c => this.inner.testSftpConnection(c);
   saveSftpCredentials: ApiClient['saveSftpCredentials'] = c => this.inner.saveSftpCredentials(c);

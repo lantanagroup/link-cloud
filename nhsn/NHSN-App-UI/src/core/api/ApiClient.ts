@@ -94,6 +94,8 @@ export interface ApiClient {
 
   // patients of interest
   queryPatientList(key: CensusListKey): Promise<CensusListResult>;
+  /** All six lists in one call. Preferred over calling queryPatientList six times. */
+  queryPatientLists(): Promise<CensusListResult[]>;
   listSftpFiles(): Promise<SftpFile[]>;
   testSftpConnection(config: SftpConfig): Promise<ConnectionResult>;
   /** Write-only: forwarded to Data Acquisition, never persisted here, never read back. */

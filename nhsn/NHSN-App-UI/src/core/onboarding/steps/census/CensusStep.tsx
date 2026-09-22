@@ -8,7 +8,7 @@ import type {
   ConnectionResult,
   SftpFile,
 } from "../../../api/contracts";
-import { TimeoutError } from "../../../api/http";
+import { HttpError, TimeoutError } from "../../../api/http";
 import { InstructionsDownload } from "../../../documents";
 import {
   acronymTitle,
@@ -50,6 +50,10 @@ interface ListQueryState {
   result?: CensusListResult;
   queriedAt?: string;
   error?: string;
+  /** Read successfully before a later list in the same call failed - no patient data, just known-good. */
+  verified?: boolean;
+  /** Never attempted because an earlier list in the same call failed first. */
+  untested?: boolean;
 }
 
 function buildXlsxBlob(headers: string[], rows: string[][]): Blob {
@@ -258,8 +262,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
       return;
     }
 
-    // save() above just cleared the step's dirty flag; mark it dirty again so
-    // leaving without hitting Continue still prompts to save or discard.
+    // save() above just cleared the dirty flag; mark it dirty again so leaving still prompts.
     patch("census", {});
 
     if (census.accuracyAcknowledged) {
@@ -271,32 +274,46 @@ export function CensusStep({ onNext, onBack }: StepProps) {
       ),
     );
 
-    await Promise.all(
-      CENSUS_LIST_KEYS.map(async (key) => {
-        try {
-          const result = await api.queryPatientList(key);
-          setListState((prev) => ({
-            ...prev,
-            [key]: {
-              querying: false,
-              result,
-              queriedAt: new Date().toISOString(),
-            },
-          }));
-        } catch (cause) {
-          setListState((prev) => ({
-            ...prev,
-            [key]: {
-              querying: false,
-              error:
-                cause instanceof Error
-                  ? cause.message
-                  : t("onboarding:census.epic.queryError"),
-            },
-          }));
-        }
-      }),
-    );
+    // One call for all six lists - per-key calls would each surface the same shared-fetch error.
+    try {
+      const results = await api.queryPatientLists();
+      const queriedAt = new Date().toISOString();
+      setListState(
+        Object.fromEntries(
+          results.map((result) => [
+            result.listKey,
+            { querying: false, result, queriedAt },
+          ]),
+        ),
+      );
+    } catch (cause) {
+      const message =
+        cause instanceof Error ? cause.message : t("onboarding:census.epic.queryError");
+      const failedKey =
+        cause instanceof HttpError ? asCensusListKey(cause.listKey) : undefined;
+
+      if (failedKey) {
+        // Data Acquisition reads the six lists in this same order and stops at the first
+        // failure, so everything before it already came back clean and everything after it
+        // was never attempted.
+        const failedIndex = CENSUS_LIST_KEYS.indexOf(failedKey);
+        setListState(
+          Object.fromEntries(
+            CENSUS_LIST_KEYS.map((key, index) => [
+              key,
+              index < failedIndex
+                ? { querying: false, verified: true }
+                : key === failedKey
+                  ? { querying: false, error: message }
+                  : { querying: false, untested: true },
+            ]),
+          ),
+        );
+      } else {
+        setListState({});
+        announceValidationMessage(message);
+      }
+    }
     setValidatingLists(false);
   }
 
@@ -675,32 +692,57 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       <p className="subtitle"><AcronymText>{t("onboarding:census.intro1")}</AcronymText></p>
       <p className="subtitle"><AcronymText>{t("onboarding:census.intro2")}</AcronymText></p>
 
+      {acquisition === "PatientList" && (
+        <>
+          <h2 className="census-section-heading" id="census-epic-section-title">
+            {t("onboarding:census.epic.sectionTitle")}
+          </h2>
+          <p className="subtitle" id="census-epic-subtitle">
+            <AcronymText>{t("onboarding:census.epic.subtitle")}</AcronymText>
+          </p>
+
+          {vendorProfile.documentKeys.censusInstructions && (
+            <InstructionsDownload
+              onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
+              fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
+              description={t("onboarding:census.epic.instructionsHint")}
+              linkText={t("onboarding:census.epic.downloadInstructions")}
+              headingId="census-epic-section-title"
+            />
+          )}
+        </>
+      )}
+
+      {acquisition === "Sftp" && (
+        <>
+          <div className="section-title" id="census-cerner-section-title">
+            {t("onboarding:census.cerner.sectionTitle")}
+          </div>
+
+          {vendorProfile.documentKeys.censusInstructions && (
+            <InstructionsDownload
+              onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
+              fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
+              description={t("onboarding:census.cerner.instructionsHint")}
+              linkText={t("onboarding:census.cerner.downloadInstructions")}
+              headingId="census-cerner-section-title"
+            />
+          )}
+        </>
+      )}
+
       <SidePanelLayout>
         <div>
             {acquisition === "PatientList" && (
               <>
-                <h2 className="census-section-heading" id="census-epic-section-title">
-                  {t("onboarding:census.epic.sectionTitle")}
-                </h2>
-                <p className="subtitle" id="census-epic-subtitle">
-                  <AcronymText>{t("onboarding:census.epic.subtitle")}</AcronymText>
-                </p>
-
-                {vendorProfile.documentKeys.censusInstructions && (
-                  <InstructionsDownload
-                    onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
-                    fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
-                    description={t("onboarding:census.epic.instructionsHint")}
-                    linkText={t("onboarding:census.epic.downloadInstructions")}
-                    headingId="census-epic-section-title"
-                  />
-                )}
-
                 {CENSUS_LIST_KEYS.map((key) => {
                   const state = listState[key];
+                  const fieldError = errors[`listId.${key}`]
+                    ? t(errors[`listId.${key}`])
+                    : state?.error;
                   return (
                     <div
-                      className={`form-group census-list-field${state?.result ? " is-validated" : ""}${state?.querying ? " is-querying" : ""}`}
+                      className={`form-group census-list-field${state?.result || state?.verified ? " is-validated" : ""}${state?.querying ? " is-querying" : ""}${state?.untested ? " is-untested" : ""}`}
                       key={key}>
                       <div className="census-list-input-row">
                         <TextField
@@ -708,11 +750,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           label={t(LIST_LABEL_KEYS[key])}
                           required
                           value={census.patientListIds?.[key] ?? ""}
-                          error={
-                            errors[`listId.${key}`]
-                              ? t(errors[`listId.${key}`])
-                              : undefined
-                          }
+                          error={fieldError}
                           onChange={(value) => updateListId(key, value)}
                           onBlur={() => refreshFieldError(`listId.${key}`)}
                         />
@@ -734,7 +772,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           </button>
                         )}
                       </div>
-                      <p className="nhsn-link__form-error" role="alert">{state?.error}</p>
                     </div>
                   );
                 })}
@@ -764,20 +801,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
             {acquisition === "Sftp" && (
               <>
-                <div className="section-title" id="census-cerner-section-title">
-                  {t("onboarding:census.cerner.sectionTitle")}
-                </div>
-
-                {vendorProfile.documentKeys.censusInstructions && (
-                  <InstructionsDownload
-                    onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
-                    fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
-                    description={t("onboarding:census.cerner.instructionsHint")}
-                    linkText={t("onboarding:census.cerner.downloadInstructions")}
-                    headingId="census-cerner-section-title"
-                  />
-                )}
-
                 <TextField
                   id="census-sftp-host"
                   label={t("onboarding:census.cerner.fields.hostLabel")}
@@ -975,6 +998,12 @@ function frequencyMinutesError(value: number | undefined): string | undefined {
   return Number.isInteger(value) && value >= 0 && value <= 59
     ? undefined
     : "onboarding:census.errors.frequencyMinutesInvalid";
+}
+
+function asCensusListKey(value: string | undefined): CensusListKey | undefined {
+  return value && (CENSUS_LIST_KEYS as readonly string[]).includes(value)
+    ? (value as CensusListKey)
+    : undefined;
 }
 
 function formatDateTime(iso?: string): string {
