@@ -83,7 +83,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         // timezone comes from the fixture's shared stub, which answers UTC unless a test says otherwise.
         var periodResolver = new FacilityReportingPeriodResolver(
             sp.GetRequiredService<ILogger<FacilityReportingPeriodResolver>>(), _clock,
-            _fixture.FacilityTimeZoneSourceMock.Object);
+            _fixture.FacilityDirectoryMock.Object);
 
         _controller = new FacilityReportingPlansController(logger, manager, queries, lookAhead, _sync,
             _fixture.FacilityExistenceMock.Object, periodResolver)
@@ -98,7 +98,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
-        _fixture.ResetFacilityTimeZoneSource();
+        _fixture.ResetFacilityDirectory();
     }
 
     public void Dispose()
@@ -106,7 +106,7 @@ public class FacilityReportingPlansControllerTests : IDisposable
         ClearReportingPlans();
 
         _fixture.ResetFacilityExistence();
-        _fixture.ResetFacilityTimeZoneSource();
+        _fixture.ResetFacilityDirectory();
         _scope.Dispose();
     }
 
@@ -873,12 +873,12 @@ public class FacilityReportingPlansControllerTests : IDisposable
     private static readonly DateTimeOffset PagoPagoInOctober = new(2026, 11, 1, 5, 0, 0, TimeSpan.Zero);
 
     private void GivenFacilityTimeZone(string? timeZone) =>
-        _fixture.FacilityTimeZoneSourceMock
+        _fixture.FacilityDirectoryMock
             .Setup(s => s.GetTimeZoneAsync(FacilityId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(timeZone);
 
     private void VerifyTimeZoneLookups(Times times) =>
-        _fixture.FacilityTimeZoneSourceMock.Verify(
+        _fixture.FacilityDirectoryMock.Verify(
             s => s.GetTimeZoneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), times);
 
     private static List<(int Year, int Month)> PeriodsOf(IActionResult result) =>

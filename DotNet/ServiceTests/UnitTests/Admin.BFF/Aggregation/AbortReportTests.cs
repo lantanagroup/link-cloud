@@ -84,6 +84,7 @@ public class AbortReportTests
         var cancelCalled = false;
         var deleteScheduleCalled = false;
         var deleteLogsCalled = false;
+        string? deleteSchedulePath = null;
 
         var handler = new MockHttpMessageHandler(request =>
         {
@@ -98,6 +99,7 @@ public class AbortReportTests
             if (request.Method == HttpMethod.Delete && path.Contains($"api/schedules/{ReportId}"))
             {
                 deleteScheduleCalled = true;
+                deleteSchedulePath = path;
                 return NoContent();
             }
             if (request.Method == HttpMethod.Delete && path.Contains($"api/data/acquisition-logs/report/{ReportId}"))
@@ -116,6 +118,7 @@ public class AbortReportTests
         Assert.True(await abort.IsAbortedAsync(null, ReportId));
         Assert.True(cancelCalled);
         Assert.True(deleteScheduleCalled);
+        Assert.Contains("allowInProgress=true", deleteSchedulePath, StringComparison.OrdinalIgnoreCase);
         Assert.True(deleteLogsCalled);
     }
 

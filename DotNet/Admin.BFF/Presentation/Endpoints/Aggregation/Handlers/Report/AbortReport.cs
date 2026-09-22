@@ -97,7 +97,7 @@ public static class AbortReport
         HttpResponseMessage reportResponse;
         try
         {
-            reportResponse = await reportService.SoftDeleteReportScheduleAsync(context.User, reportScheduleId, context.RequestAborted);
+            reportResponse = await reportService.SoftDeleteReportScheduleAsync(context.User, reportScheduleId, context.RequestAborted, allowInProgress: true);
         }
         catch (Exception ex)
         {

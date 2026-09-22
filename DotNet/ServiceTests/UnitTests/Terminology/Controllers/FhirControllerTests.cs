@@ -38,7 +38,7 @@ public class FhirControllerTests
     public FhirControllerTests()
     {
         _mockCacheService = new Mock<ICodeGroupCacheService>();
-        var service = new FhirService(_mockCacheService.Object, new Mock<ILogger<FhirService>>().Object, TerminologyTestConfig.Options());
+        var service = new FhirService(_mockCacheService.Object, new Mock<ILogger<FhirService>>().Object, Mock.Of<ITerminologyServiceMetrics>(), TerminologyTestConfig.Options());
         _controller = new FhirController(service);
     }
 

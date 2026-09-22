@@ -602,9 +602,7 @@ public class PatientDataService : IPatientDataService
                 var tags = new List<KeyValuePair<string, object?>>
                 {
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, log.FacilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, log.ReportTrackingId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString())),
-                    new KeyValuePair<string, object?>(DiagnosticNames.RetryAttempts, log.RetryAttempts)
+                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString()))
                 };
 
                 if (_telemetrySettings.CurrentValue.PatientTags)

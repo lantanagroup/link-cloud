@@ -19,6 +19,7 @@ public sealed record RunSnapshotMeta
     public string ReportId { get; init; } = string.Empty;
     public DateTimeOffset StartedAt { get; init; }
     public bool IsActive { get; init; } = true;
+    public bool IsMetricsRun { get; init; }
 }
 
 /// <summary>

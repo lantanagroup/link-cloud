@@ -1,6 +1,4 @@
-﻿using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 
 namespace Automation.UI.Services;
 
@@ -22,14 +20,13 @@ public static class ScenarioConfigBuilder
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
         };
 
-        var bundleLocations = options.SelectedMeasures
-            .Select(ProfiledMeasureCatalog.GetBundleLocation)
+        var inlineJsons = options.MeasureBundleJsons
+            .Where(j => !string.IsNullOrWhiteSpace(j))
             .ToList();
 
         return new TestScenarioConfig
         {
-            MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
-            AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
+            MeasureBundleJsons = inlineJsons,
             StartDate = options.ReportPeriodStart.HasValue
                 ? options.ReportPeriodStart.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
                 : "2023-01-01T00:00:00Z",
@@ -43,7 +40,8 @@ public static class ScenarioConfigBuilder
             PollingIntervalSeconds = options.PollingIntervalSeconds,
             MaxPollingDurationMinutes = options.MaxPollingDurationMinutes,
             DownloadFileName = downloadFileName,
-            LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes
+            LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes,
+            IsMetricsRun = options.IsMetricsRun
         };
     }
 }

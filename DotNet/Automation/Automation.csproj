@@ -9,7 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ServiceTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Hl7.Fhir.R4" />
+    <PackageReference Include="LantanaGroup.Thetis.Generation.Abstractions" />
+    <PackageReference Include="LantanaGroup.Thetis.Generation.Engine" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="RestSharp" />
   </ItemGroup>
 

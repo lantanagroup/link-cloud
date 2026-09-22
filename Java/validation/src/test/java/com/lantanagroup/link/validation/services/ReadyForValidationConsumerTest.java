@@ -180,6 +180,23 @@ public class ReadyForValidationConsumerTest {
 
         verify(blobStorageService).download("myfile.ndjson");
         verify(reportClient, never()).getSubmissionModel(any(), any(), any());
+        verify(validationMetrics, never()).recordReportFetchDuration(anyDouble(), any());
+    }
+
+    @Test
+    void process_withPerformanceHeader_recordsReportFetchDuration() throws Exception {
+        IParser parser = mock(IParser.class);
+        when(fhirContext.newNDJsonParser()).thenReturn(parser);
+        when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
+        when(blobStorageService.download("myfile.ndjson"))
+                .thenReturn(BinaryData.fromBytes(new byte[0]));
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(Collections.emptyList());
+
+        ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record = buildRecord(PAYLOAD_URI);
+        record.headers().add(Headers.METRICS_MODE, Headers.getBytes("performance"));
+        consumer.process(record);
+
+        verify(validationMetrics).recordReportFetchDuration(anyDouble(), any());
     }
 
     @Test
@@ -509,6 +526,43 @@ public class ReadyForValidationConsumerTest {
 
         verify(validationMetrics).addToValidationCounter(any());
         verify(validationMetrics).recordValidationDuration(anyDouble(), any());
+    }
+
+    @Test
+    void process_recordsIssueMetricsAfterCategorize() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+        doAnswer(invocation -> {
+            result.setCategories(List.of(categoryWithAcceptable(true)));
+            return null;
+        }).when(categorizationService).categorize(any());
+
+        consumer.process(buildRecord(null));
+
+        // addIssueMetrics always emits all three buckets; categorize makes this result acceptable.
+        verify(validationMetrics).addIssues(eq("acceptable"), eq(1L), any());
+        verify(validationMetrics).addIssues(eq("uncategorized"), eq(0L), any());
+        verify(validationMetrics).addIssues(eq("unacceptable"), eq(0L), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void process_nullCategories_stillProducesValidationComplete() throws Exception {
+        Result result = new Result();
+        stubRestRetrieval();
+        when(validationService.validate(bundle, FACILITY_ID, REPORT_ID)).thenReturn(List.of(result));
+
+        ArgumentCaptor<ProducerRecord<String, ValidationComplete>> captor =
+                ArgumentCaptor.forClass(ProducerRecord.class);
+        CompletableFuture<SendResult<String, ValidationComplete>> future = mock(CompletableFuture.class);
+        when(validationCompleteTemplate.send(captor.capture())).thenReturn(future);
+        when(future.get()).thenReturn(null);
+
+        consumer.process(buildRecord(null));
+
+        assertNotNull(captor.getValue().value());
+        assertTrue(captor.getValue().value().isValid());
     }
 
     // -------------------------------------------------------------------------

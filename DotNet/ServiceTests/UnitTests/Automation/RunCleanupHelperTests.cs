@@ -281,7 +281,7 @@ public class RunCleanupHelperTests
             deactivateSchedules: false);
 
         report.Verify(
-            c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
         report.Verify(
             c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
@@ -298,7 +298,7 @@ public class RunCleanupHelperTests
         census.Setup(c => c.DisableFacilityJobsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
         var report = new Mock<IReportServiceClient>();
-        report.Setup(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        report.Setup(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
         report.Setup(c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });

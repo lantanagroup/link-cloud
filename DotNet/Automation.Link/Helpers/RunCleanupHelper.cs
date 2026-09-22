@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -267,6 +267,73 @@ public static class RunCleanupHelper
 
         throw new InvalidOperationException(
             $"Tenant leftover teardown could not confirm delete for '{facilityId}' (HTTP {remaining.StatusCode}).");
+    }
+
+    /// <summary>
+    /// Deepest per-run history purge: optionally tear down leftover Automation facility work,
+    /// soft-delete the Admin.UI report schedule when ReportId is a GUID, then delete the run snapshot.
+    /// Weekly and custom-range history purge both call this so Admin reports are not left orphaned (LEGLINK-1275).
+    /// </summary>
+    /// <param name="teardownFacility">
+    /// When true, tear down the run's GUID automation facility (weekly history purge).
+    /// Custom-range history-only requests pass false so unchecked teardown is honored.
+    /// </param>
+    /// <param name="alreadyTornDownFacilityIds">
+    /// Facilities already torn down in the same pass (custom-range with both options); skip repeating teardown.
+    /// </param>
+    public static async Task PurgeRunHistoryAsync(
+        IFacilityServiceClient facilityClient,
+        INormalizationServiceClient normalizationClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
+        ICensusServiceClient censusClient,
+        IReportServiceClient reportClient,
+        IPipelineAbortRegistry? abortRegistry,
+        ISnapshotStore snapshotStore,
+        IAutomationOutput output,
+        AutomationRunSummary run,
+        TimeSpan abortTtl,
+        CancellationToken cancellationToken = default,
+        bool teardownFacility = true,
+        ISet<string>? alreadyTornDownFacilityIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(reportClient);
+        ArgumentNullException.ThrowIfNull(snapshotStore);
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(output);
+
+        if (teardownFacility
+            && !string.IsNullOrWhiteSpace(run.FacilityId)
+            && IsAutomationFacilityId(run.FacilityId)
+            && (alreadyTornDownFacilityIds is null
+                || !alreadyTornDownFacilityIds.Contains(run.FacilityId)))
+        {
+            await CleanupLeftoverFacilityAsync(
+                facilityClient,
+                normalizationClient,
+                dataAcqClient,
+                queryDispatchClient,
+                censusClient,
+                reportClient,
+                abortRegistry,
+                output,
+                run.FacilityId,
+                abortTtl,
+                cancellationToken);
+        }
+
+        // Report delete requires a GUID; seed/non-GUID ids have no external schedule to soft-delete.
+        // allowInProgress matches Admin AbortReport: terminal Automation runs may still have New/EndOfPeriod schedules.
+        if (!string.IsNullOrWhiteSpace(run.ReportId) && Guid.TryParse(run.ReportId, out _))
+        {
+            var scheduleResult = await reportClient.SoftDeleteScheduleAsync(
+                run.ReportId,
+                cancellationToken,
+                allowInProgress: true);
+            EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{run.ReportId}'", 404);
+        }
+
+        await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
     }
 
     public static void EnsureApiSuccess(LinkApiResponse response, string operation, params int[] allowedStatusCodes)
