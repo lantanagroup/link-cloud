@@ -684,7 +684,8 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
                 {vendorProfile.documentKeys.censusInstructions && (
                   <InstructionsDownload
-                    href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
+                    onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
+                    fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
                     description={t("onboarding:census.epic.instructionsHint")}
                     linkText={t("onboarding:census.epic.downloadInstructions")}
                     headingId="census-epic-section-title"
@@ -765,7 +766,8 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
                 {vendorProfile.documentKeys.censusInstructions && (
                   <InstructionsDownload
-                    href={api.getCensusInstructionsUrl(vendorProfile.vendor)}
+                    onDownload={() => api.getCensusInstructionsPdf(vendorProfile.vendor)}
+                    fileName={`${vendorProfile.displayName}_Census_Instructions.pdf`}
                     description={t("onboarding:census.cerner.instructionsHint")}
                     linkText={t("onboarding:census.cerner.downloadInstructions")}
                     headingId="census-cerner-section-title"

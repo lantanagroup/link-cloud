@@ -1078,6 +1078,7 @@
 
 .nhsn-link__download-button:hover:not(:disabled):not(.nhsn-link__download-button--busy) {
   background: var(--kendo-color-base-hover, #f2f4f7);
+  border-color: currentColor;
 }
 
 .nhsn-link__download-button:disabled,
@@ -1814,6 +1815,7 @@
 
 .nhsn-link__document-link:hover:not(:disabled) {
   background: var(--kendo-color-base-hover, #f2f4f7);
+  border-color: currentColor;
 }
 
 .nhsn-link__document-link:disabled {
