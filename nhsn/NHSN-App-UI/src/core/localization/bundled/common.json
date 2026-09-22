@@ -86,7 +86,7 @@
     "title": "Unsaved changes",
     "message": "You have unsaved changes on this step. Save them before continuing, or discard them?",
     "messages": {
-      "incomplete": "Please resolve the issues on this step before saving."
+      "incomplete": "Please review the highlighted items before proceeding."
     }
   },
   "a11y": {
