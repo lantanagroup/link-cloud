@@ -61,19 +61,6 @@ steps:
   inputs:
     versionSpec: '20.x'
 
-# Verify repository files
-- task: Bash@3
-  displayName: 'Verify Repository Files'
-  inputs:
-    targetType: 'inline'
-    script: |
-      echo "GitHub repo:"
-      ls -lah "$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI"
-
-      echo
-      echo "React Core package:"
-      ls -lah "$(reactCorePackage)"
-
 # Get Git commit
 - task: Bash@3
   displayName: 'Get Git Commit'
