@@ -421,7 +421,20 @@ public sealed class LeftoverRunCleanupService(
                     run.RunId.ToString(), cancellationToken);
                 try
                 {
-                    await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
+                    var output = new LoggerAutomationOutput(logger, run.FacilityId ?? run.RunId.ToString());
+                    await RunCleanupHelper.PurgeRunHistoryAsync(
+                        facilityClient,
+                        normalizationClient,
+                        dataAcqClient,
+                        queryDispatchClient,
+                        censusClient,
+                        reportClient,
+                        abortRegistry,
+                        snapshotStore,
+                        output,
+                        run,
+                        settings.AbortTtl,
+                        cancellationToken);
                     purged.Add(run.RunId);
                 }
                 catch (Exception ex)

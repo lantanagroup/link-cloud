@@ -269,6 +269,55 @@ public static class RunCleanupHelper
             $"Tenant leftover teardown could not confirm delete for '{facilityId}' (HTTP {remaining.StatusCode}).");
     }
 
+    /// <summary>
+    /// Deepest per-run history purge: tear down leftover Automation facility work when present,
+    /// soft-delete the Admin.UI report schedule when ReportId is set, then delete the run snapshot.
+    /// Weekly and custom-range history purge both call this so Admin reports are not left orphaned (LEGLINK-1275).
+    /// </summary>
+    public static async Task PurgeRunHistoryAsync(
+        IFacilityServiceClient facilityClient,
+        INormalizationServiceClient normalizationClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
+        ICensusServiceClient censusClient,
+        IReportServiceClient reportClient,
+        IPipelineAbortRegistry? abortRegistry,
+        ISnapshotStore snapshotStore,
+        IAutomationOutput output,
+        AutomationRunSummary run,
+        TimeSpan abortTtl,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reportClient);
+        ArgumentNullException.ThrowIfNull(snapshotStore);
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(output);
+
+        if (!string.IsNullOrWhiteSpace(run.FacilityId) && IsAutomationFacilityId(run.FacilityId))
+        {
+            await CleanupLeftoverFacilityAsync(
+                facilityClient,
+                normalizationClient,
+                dataAcqClient,
+                queryDispatchClient,
+                censusClient,
+                reportClient,
+                abortRegistry,
+                output,
+                run.FacilityId,
+                abortTtl,
+                cancellationToken);
+        }
+
+        if (!string.IsNullOrWhiteSpace(run.ReportId))
+        {
+            var scheduleResult = await reportClient.SoftDeleteScheduleAsync(run.ReportId, cancellationToken);
+            EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{run.ReportId}'", 404);
+        }
+
+        await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
+    }
+
     public static void EnsureApiSuccess(LinkApiResponse response, string operation, params int[] allowedStatusCodes)
     {
         if (response.IsSuccessStatusCode)
