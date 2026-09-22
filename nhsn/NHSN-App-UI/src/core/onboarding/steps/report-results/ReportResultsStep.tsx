@@ -736,7 +736,6 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     staleTime: Infinity,
   });
   const queryClient = useQueryClient();
-  const [acknowledging, setAcknowledging] = useState(false);
 
   useEffect(() => {
     if (latestReportId) {
@@ -1177,31 +1176,14 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
 
   // Real, report-scoped acknowledgement (AcknowledgementKind.ReportAccuracy, contextId the report
   // id) -- the same append-only attestation mechanism the Census step already uses, just keyed by
-  // report instead of facility. Recorded immediately on toggle, not deferred to Continue, matching
-  // the Census pattern. A successful PUT already tells us the new value -- write it straight into
-  // the query cache rather than re-fetching it right back over the network.
-  async function handleAckChange(checked: boolean) {
+  // report instead of facility. Deferred to Continue, matching the Census pattern: toggling the
+  // checkbox only updates the local query cache, and handleNext is what actually PUTs it.
+  function handleAckChange(checked: boolean) {
     if (!latestReportId) {
       return;
     }
-    setAcknowledging(true);
-    try {
-      await api.acknowledgeReport(latestReportId, {
-        kind: 'ReportAccuracy',
-        accepted: checked,
-        statementKey: 'report-accuracy',
-      });
-      queryClient.setQueryData(reportAcknowledgementQueryKey, checked);
-      setValidationMessage(null);
-    } catch (cause) {
-      notifyError(
-        cause instanceof Error
-          ? cause.message
-          : t('onboarding:reportResults.messages.ackError'),
-      );
-    } finally {
-      setAcknowledging(false);
-    }
+    queryClient.setQueryData(reportAcknowledgementQueryKey, checked);
+    setValidationMessage(null);
   }
 
   function validateStep(): boolean {
@@ -1215,8 +1197,22 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     return true;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (!validateStep()) {
+      return;
+    }
+    try {
+      await api.acknowledgeReport(latestReportId!, {
+        kind: 'ReportAccuracy',
+        accepted: true,
+        statementKey: 'report-accuracy',
+      });
+    } catch (cause) {
+      notifyError(
+        cause instanceof Error
+          ? cause.message
+          : t('onboarding:reportResults.messages.ackError'),
+      );
       return;
     }
     onNext();
@@ -3071,7 +3067,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
           label={t('onboarding:reportResults.fields.accuracyAck')}
           value={Boolean(reportAccuracyAcknowledged)}
           onChange={handleAckChange}
-          disabled={!latestReportId || acknowledging}
+          disabled={!latestReportId}
         />
       </div>
 

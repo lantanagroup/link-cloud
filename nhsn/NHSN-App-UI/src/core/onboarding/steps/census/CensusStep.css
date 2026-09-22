@@ -7,7 +7,6 @@
   --census-gray-600: var(--kendo-color-app-text-subtle, #5a5f69);
   --census-gray-800: var(--kendo-color-app-text, #1f2328);
   --census-red: var(--kendo-color-error, #cc1b22);
-  --census-orange: var(--kendo-color-warning, #b25e00);
   --census-radius: 8px;
 
   color: var(--census-gray-800);
@@ -145,22 +144,6 @@
   margin-bottom: 18px;
 }
 
-.census-poi .census-list-field.is-validated .k-label::after {
-  content: '\2713';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 8px;
-  border-radius: 50%;
-  background: var(--kendo-color-success, #1e5f25);
-  color: var(--kendo-color-on-inverse, #ffffff);
-  font-size: 10px;
-  font-weight: 700;
-  vertical-align: middle;
-}
-
 .census-poi .census-list-field.is-querying .k-label::after {
   content: '';
   display: inline-block;
@@ -172,22 +155,6 @@
   border-radius: 50%;
   vertical-align: middle;
   animation: census-spin 0.7s linear infinite;
-}
-
-.census-poi .census-list-field.is-untested .k-label::after {
-  content: '!';
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 8px;
-  border-radius: 50%;
-  background: var(--census-orange);
-  color: var(--kendo-color-on-inverse, #ffffff);
-  font-size: 11px;
-  font-weight: 700;
-  vertical-align: middle;
 }
 
 @keyframes census-spin {
@@ -205,6 +172,12 @@
 .census-poi .census-list-input-row .k-form-field {
   flex: 1;
   margin-bottom: 0;
+}
+
+.census-poi .census-list-input-row .info-icon {
+  flex: 0 0 auto;
+  margin-top: 38px;
+  margin-left: 0;
 }
 
 .census-poi .census-view-btn {

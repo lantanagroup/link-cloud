@@ -17,6 +17,7 @@ import {
   CheckboxField,
   DownloadLinkButton,
   HeadingPause,
+  InfoTooltip,
   NumberField,
   RequiredAsterisk,
   SidePanel,
@@ -742,7 +743,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                     : state?.error;
                   return (
                     <div
-                      className={`form-group census-list-field${state?.result || state?.verified ? " is-validated" : ""}${state?.querying ? " is-querying" : ""}${state?.untested ? " is-untested" : ""}`}
+                      className={`form-group census-list-field${state?.querying ? " is-querying" : ""}`}
                       key={key}>
                       <div className="census-list-input-row">
                         <TextField
@@ -754,6 +755,26 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           onChange={(value) => updateListId(key, value)}
                           onBlur={() => refreshFieldError(`listId.${key}`)}
                         />
+                        {(state?.result || state?.verified) && (
+                          <InfoTooltip
+                            icon="✓"
+                            variant="success"
+                            label={t("onboarding:census.epic.listValidatedAria", {
+                              list: t(LIST_LABEL_KEYS[key]),
+                            })}
+                            content={t("onboarding:census.epic.listValidatedTooltip")}
+                          />
+                        )}
+                        {state?.untested && (
+                          <InfoTooltip
+                            icon="!"
+                            variant="warning"
+                            label={t("onboarding:census.epic.listUntestedAria", {
+                              list: t(LIST_LABEL_KEYS[key]),
+                            })}
+                            content={t("onboarding:census.epic.listUntestedTooltip")}
+                          />
+                        )}
                         {patientListsLive && (
                           <button
                             type="button"
