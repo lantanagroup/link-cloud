@@ -41,49 +41,53 @@ public sealed class ReferenceDataService : IReferenceDataService
         _logger = logger;
     }
 
-    // Curated US time zone ids, in display order.
-    private static readonly string[] OrderedTimezoneIds =
+    // The IANA time zones for the US and its territories - matches the onboarding POC's own
+    // US_TIME_ZONES list (NHSN-Onboarding-POC/index.html) verbatim, one entry per distinct
+    // zone rather than one per region, since several (e.g. the Indiana and North Dakota
+    // counties) have historically diverged on DST even though they currently agree.
+    private static readonly (string Id, string Label)[] UsTimezoneDefinitions =
     {
-        "America/New_York",
-        "America/Detroit",
-        "America/Kentucky/Louisville",
-        "America/Kentucky/Monticello",
-        "America/Indiana/Indianapolis",
-        "America/Indiana/Vincennes",
-        "America/Indiana/Winamac",
-        "America/Indiana/Marengo",
-        "America/Indiana/Petersburg",
-        "America/Indiana/Vevay",
-        "America/Indiana/Tell_City",
-        "America/Indiana/Knox",
-        "America/Chicago",
-        "America/Menominee",
-        "America/North_Dakota/Center",
-        "America/North_Dakota/New_Salem",
-        "America/North_Dakota/Beulah",
-        "America/Denver",
-        "America/Boise",
-        "America/Phoenix",
-        "America/Los_Angeles",
-        "America/Anchorage",
-        "America/Juneau",
-        "America/Sitka",
-        "America/Metlakatla",
-        "America/Yakutat",
-        "America/Nome",
-        "America/Adak",
-        "Pacific/Honolulu",
-        "America/Puerto_Rico",
-        "Pacific/Guam",
-        "Pacific/Saipan",
-        "Pacific/Pago_Pago"
+        ("America/New_York", "Eastern Time"),
+        ("America/Detroit", "Eastern Time"),
+        ("America/Kentucky/Louisville", "Eastern Time"),
+        ("America/Kentucky/Monticello", "Eastern Time"),
+        ("America/Indiana/Indianapolis", "Eastern Time"),
+        ("America/Indiana/Vincennes", "Eastern Time"),
+        ("America/Indiana/Winamac", "Eastern Time"),
+        ("America/Indiana/Marengo", "Eastern Time"),
+        ("America/Indiana/Petersburg", "Eastern Time"),
+        ("America/Indiana/Vevay", "Eastern Time"),
+        ("America/Indiana/Tell_City", "Central Time"),
+        ("America/Indiana/Knox", "Central Time"),
+        ("America/Chicago", "Central Time"),
+        ("America/Menominee", "Central Time"),
+        ("America/North_Dakota/Center", "Central Time"),
+        ("America/North_Dakota/New_Salem", "Central Time"),
+        ("America/North_Dakota/Beulah", "Central Time"),
+        ("America/Denver", "Mountain Time"),
+        ("America/Boise", "Mountain Time"),
+        ("America/Phoenix", "Mountain Time (no DST)"),
+        ("America/Los_Angeles", "Pacific Time"),
+        ("America/Anchorage", "Alaska Time"),
+        ("America/Juneau", "Alaska Time"),
+        ("America/Sitka", "Alaska Time"),
+        ("America/Metlakatla", "Alaska Time"),
+        ("America/Yakutat", "Alaska Time"),
+        ("America/Nome", "Alaska Time"),
+        ("America/Adak", "Hawaii-Aleutian Time"),
+        ("Pacific/Honolulu", "Hawaii Time (no DST)"),
+        ("America/Puerto_Rico", "Atlantic Time (Puerto Rico / US Virgin Islands)"),
+        ("Pacific/Guam", "Chamorro Time (Guam)"),
+        ("Pacific/Saipan", "Chamorro Time (N. Mariana Islands)"),
+        ("Pacific/Pago_Pago", "Samoa Time (American Samoa)")
     };
-
-    private static readonly Lazy<IReadOnlyList<TimezoneResponse>> Timezones = new(BuildTimezones);
 
     public IReadOnlyList<VendorProfile> GetVendorProfiles() => VendorProfileCatalog.All;
 
-    public IReadOnlyList<TimezoneResponse> GetTimezones() => Timezones.Value;
+    // Built fresh on every call rather than cached, so the displayed UTC offset keeps tracking
+    // Daylight Saving Time across the BFF's lifetime instead of freezing at whatever offset was
+    // in effect the first time this ran.
+    public IReadOnlyList<TimezoneResponse> GetTimezones() => BuildTimezones();
 
     public async Task<IReadOnlyList<EncounterCode>> GetEncounterCodesAsync(CancellationToken cancellationToken = default)
     {
@@ -200,12 +204,28 @@ public sealed class ReferenceDataService : IReferenceDataService
         return codes;
     }
 
-    private static IReadOnlyList<TimezoneResponse> BuildTimezones() =>
-        OrderedTimezoneIds
-            .Select(id => new TimezoneResponse
+    private static IReadOnlyList<TimezoneResponse> BuildTimezones()
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        return UsTimezoneDefinitions
+            .Select(zone =>
             {
-                Id = id,
-                DisplayName = $"{id} — {TimeZoneInfo.FindSystemTimeZoneById(id).DisplayName}"
+                var offset = TimeZoneInfo.FindSystemTimeZoneById(zone.Id).GetUtcOffset(now);
+                return new TimezoneResponse
+                {
+                    Id = zone.Id,
+                    DisplayName = $"{zone.Id} — (UTC{FormatOffset(offset)}) {zone.Label}",
+                    BaseUtcOffset = offset
+                };
             })
+            // Ascending, most-negative offset first (e.g. Pago Pago) to most-positive last (e.g.
+            // Guam) - ties (the many zones sharing a region's current offset) keep the array's
+            // declaration order via OrderBy's stable sort.
+            .OrderBy(zone => zone.BaseUtcOffset)
             .ToArray();
+    }
+
+    private static string FormatOffset(TimeSpan offset) =>
+        $"{(offset < TimeSpan.Zero ? "-" : "+")}{offset.Duration():hh\\:mm}";
 }
