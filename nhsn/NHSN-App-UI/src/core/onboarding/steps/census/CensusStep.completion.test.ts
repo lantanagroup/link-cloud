@@ -75,11 +75,21 @@ describe('census step completion', () => {
     expect(isComplete(draft, userWith({sftpFileListing: false}))).toBe(false);
   });
 
-  it('stays incomplete if the acknowledged frequency is under 15 minutes', () => {
+  it('stays incomplete if the acknowledged frequency is under 5 minutes', () => {
     const draft = createEmptyDraft();
     draft.census.sftpHost = 'sftp.example.invalid';
     draft.census.sftpPort = 22;
-    draft.census.acquisitionFrequency = 'PT0H5M';
+    draft.census.acquisitionFrequency = 'PT0H4M';
+    draft.census.sftpConnectionTested = true;
+    draft.census.accuracyAcknowledged = true;
+    expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(false);
+  });
+
+  it('stays incomplete if the acknowledged frequency is over 24 hours', () => {
+    const draft = createEmptyDraft();
+    draft.census.sftpHost = 'sftp.example.invalid';
+    draft.census.sftpPort = 22;
+    draft.census.acquisitionFrequency = 'PT25H0M';
     draft.census.sftpConnectionTested = true;
     draft.census.accuracyAcknowledged = true;
     expect(isComplete(draft, userWith({sftpFileListing: true}))).toBe(false);

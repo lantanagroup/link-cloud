@@ -114,11 +114,13 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const initialFrequency = parseHoursMinutesDuration(
     census.acquisitionFrequency,
   );
+  // A 0 in either part is the same as not having entered it - both are
+  // optional and default to 0 on save - so show it blank rather than "0".
   const [frequencyHours, setFrequencyHours] = useState<number | undefined>(
-    initialFrequency?.hours,
+    initialFrequency?.hours || undefined,
   );
   const [frequencyMinutes, setFrequencyMinutes] = useState<number | undefined>(
-    initialFrequency?.minutes,
+    initialFrequency?.minutes || undefined,
   );
 
   const [listState, setListState] = useState<
@@ -199,7 +201,10 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   ) {
     setFrequencyHours(hours);
     setFrequencyMinutes(minutes);
-    if (frequencyHoursError(hours) || frequencyMinutesError(minutes)) {
+    if (
+      frequencyHoursError(hours) ||
+      frequencyMinutesError(minutes, minutesFloor(hours))
+    ) {
       // Leave the last valid persisted duration alone instead of silently
       // clamping a negative/out-of-range entry down to 0 behind the user's back.
       return;
@@ -411,7 +416,10 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
   function validateStep(): boolean {
     const nextErrors = validateCensus(draft, acquisition);
     const hoursError = frequencyHoursError(frequencyHours);
-    const minutesError = frequencyMinutesError(frequencyMinutes);
+    const minutesError = frequencyMinutesError(
+      frequencyMinutes,
+      minutesFloor(frequencyHours),
+    );
     if (hoursError) {
       nextErrors.frequencyHours = hoursError;
     }
@@ -653,7 +661,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         <NumberField
           id="census-frequency-hours"
           label={t("onboarding:census.fields.hoursLabel")}
-          required
           min={0}
           step={1}
           value={frequencyHours}
@@ -668,14 +675,14 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         <NumberField
           id="census-frequency-minutes"
           label={t("onboarding:census.fields.minutesLabel")}
-          required
           min={0}
-          max={59}
           step={1}
           value={frequencyMinutes}
           error={
-            frequencyMinutesError(frequencyMinutes)
-              ? t(frequencyMinutesError(frequencyMinutes)!)
+            frequencyMinutesError(frequencyMinutes, minutesFloor(frequencyHours))
+              ? t(frequencyMinutesError(frequencyMinutes, minutesFloor(frequencyHours))!, {
+                  min: minutesFloor(frequencyHours),
+                })
               : undefined
           }
           onChange={(value) => updateFrequency(frequencyHours, value)}
@@ -751,7 +758,13 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           label={t(LIST_LABEL_KEYS[key])}
                           required
                           value={census.patientListIds?.[key] ?? ""}
-                          error={fieldError}
+                          error={
+                            errors[`listId.${key}`]
+                              ? t(errors[`listId.${key}`], {
+                                  list: t(LIST_LABEL_KEYS[key]),
+                                })
+                              : undefined
+                          }
                           onChange={(value) => updateListId(key, value)}
                           onBlur={() => refreshFieldError(`listId.${key}`)}
                         />
@@ -826,6 +839,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                   id="census-sftp-host"
                   label={t("onboarding:census.cerner.fields.hostLabel")}
                   required
+                  maxLength={128}
                   placeholder={t("onboarding:census.cerner.fields.hostPlaceholder")}
                   value={census.sftpHost ?? ""}
                   error={errors.sftpHost ? t(errors.sftpHost) : undefined}
@@ -1004,19 +1018,32 @@ function scrollNearestContainerToBottom(element: HTMLElement | null): void {
 }
 
 function frequencyHoursError(value: number | undefined): string | undefined {
-  if (value === undefined) {
+
+  if (value === undefined || value === null) {
     return undefined;
   }
-  return Number.isInteger(value) && value >= 0
+  return Number.isInteger(value) && value >= 0 && value <= 23
     ? undefined
     : "onboarding:census.errors.frequencyHoursInvalid";
 }
 
-function frequencyMinutesError(value: number | undefined): string | undefined {
-  if (value === undefined) {
+/**
+ * Minutes alone must clear the overall 5-minute floor since hours defaults to
+ * 0 when left blank; once hours has a value, that floor is already met, so
+ * minutes reverts to its plain 0-59 range.
+ */
+function minutesFloor(hours: number | undefined): number {
+  return hours === undefined || hours === null ? 5 : 0;
+}
+
+function frequencyMinutesError(
+  value: number | undefined,
+  floor: number,
+): string | undefined {
+  if (value === undefined || value === null) {
     return undefined;
   }
-  return Number.isInteger(value) && value >= 0 && value <= 59
+  return Number.isInteger(value) && value >= floor && value <= 59
     ? undefined
     : "onboarding:census.errors.frequencyMinutesInvalid";
 }

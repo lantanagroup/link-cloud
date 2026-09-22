@@ -108,7 +108,7 @@
       "invalidMaxConcurrentRequests": "El máximo de solicitudes simultáneas debe ser un número entero de 1 o más.",
       "invalidMaxRetries": "El máximo de reintentos debe ser un número entero entre 0 y 10.",
       "invalidPullTime": "Ingrese una hora válida de 24 horas en formato HH:MM.",
-      "invalidLagDays": "Los días deben ser un número entero entre 0 y 30.",
+      "invalidLagDays": "Los días deben ser un número entero entre 0 y 59.",
       "invalidLagHours": "Las horas deben ser un número entero entre 0 y 23.",
       "invalidLagMinutes": "Los minutos deben ser un número entero entre 0 y 59.",
       "lagDurationRequired": "Al menos uno de los campos Días, Horas o Minutos debe ser mayor que cero.",

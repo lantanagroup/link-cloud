@@ -7,9 +7,14 @@ import {
   FormNumericTextBox,
   FormRadioGroup,
   FormSwitch,
-  FormTextArea
+  FormTextArea,
+  MistFormLabel
 } from '@nhsn/nhsn-react-core';
 import {Calendar, type CalendarChangeEvent, type CalendarProps} from '@progress/kendo-react-dateinputs';
+import {FieldWrapper} from '@progress/kendo-react-form';
+import {Input} from '@progress/kendo-react-inputs';
+import {Error as KendoError, Hint} from '@progress/kendo-react-labels';
+import {FaEye, FaEyeSlash} from 'react-icons/fa';
 import {toRenderProps, useFieldId, valueOf, type BaseFieldProps} from './fieldProps';
 
 function trimOnBlur(base: BaseFieldProps<string>, skip?: boolean) {
@@ -32,18 +37,83 @@ export interface TextFieldProps extends BaseFieldProps<string> {
 
 export function TextField({placeholder, maxLength, type = 'text', ...base}: TextFieldProps) {
   const id = useFieldId(base.id);
-  return FormInput(
-    toRenderProps({...base, id}, {
-      type,
-      placeholder,
-      maxLength,
-      // These values are never worth the browser re-suggesting - onboarding
-      // data, not something like a saved address - and its suggestion list
-      // overlaps a repeatable list's rows when one is open.
-      autoComplete: 'off',
-      onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? ''),
-      onBlur: trimOnBlur(base, type === 'password')
-    })
+  const isPassword = type === 'password';
+
+  if (!isPassword) {
+    return FormInput(
+      toRenderProps({...base, id}, {
+        type,
+        placeholder,
+        maxLength,
+        // These values are never worth the browser re-suggesting - onboarding
+        // data, not something like a saved address - and its suggestion list
+        // overlaps a repeatable list's rows when one is open.
+        autoComplete: 'off',
+        onChange: (event: unknown) => base.onChange(valueOf<string>(event) ?? ''),
+        onBlur: trimOnBlur(base)
+      })
+    );
+  }
+
+  return (
+    <PasswordField
+      {...base}
+      id={id}
+      placeholder={placeholder}
+      maxLength={maxLength}
+    />
+  );
+}
+
+/**
+ * Mirrors FormInput's own markup (label, input row, hint/error) instead of
+ * wrapping its output, so the reveal toggle can sit inside the same
+ * position-relative row as the input and stay vertically centered on it no
+ * matter how tall the label or hint text is.
+ */
+function PasswordField({placeholder, maxLength, ...base}: Omit<TextFieldProps, 'type'>) {
+  const id = useFieldId(base.id);
+  const [revealed, setRevealed] = useState(false);
+  const showValidationMessage = Boolean(base.error);
+  const showHint = !showValidationMessage && base.hint;
+  const hintId = showHint ? `${id}_hint` : '';
+  const errorId = showValidationMessage ? `${id}_error` : '';
+
+  return (
+    <FieldWrapper>
+      <MistFormLabel editorId={id} editorValid={!base.error} editorDisabled={base.disabled} required={base.required ? 1 : 0}>
+        {base.label}
+      </MistFormLabel>
+      <div className="vertical-flex nhsn-link__password-row">
+        <Input
+          valid={!base.error}
+          type={revealed ? 'text' : 'password'}
+          id={id}
+          name={id}
+          disabled={base.disabled}
+          ariaDescribedBy={`${hintId} ${errorId}`}
+          value={base.value ?? ''}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          autoComplete="off"
+          required={Boolean(base.required)}
+          formNoValidate
+          onInvalid={() => undefined}
+          onChange={(event: unknown) => base.onChange(valueOf<string>(event) ?? '')}
+          onBlur={trimOnBlur(base, true)}
+        />
+        <button
+          type="button"
+          className="nhsn-link__password-toggle"
+          onClick={() => setRevealed(prev => !prev)}
+          aria-label={revealed ? 'Hide password' : 'Show password'}
+          aria-pressed={revealed}>
+          {revealed ? <FaEye /> : <FaEyeSlash />}
+        </button>
+      </div>
+      {showHint && <Hint id={hintId}>{base.hint}</Hint>}
+      {showValidationMessage && <KendoError id={errorId}>{base.error}</KendoError>}
+    </FieldWrapper>
   );
 }
 
@@ -62,16 +132,27 @@ export function NumberField({min, max, step, ...base}: NumberFieldProps) {
       min,
       max,
       step,
+      // Every caller of this field wants a whole number - 'n0' keeps Kendo
+      // from formatting/accepting fractional digits.
+      format: 'n0',
       // The package destructures customProp and reads customProp?.onBlur.
       customProp: {},
-      onChange: (event: unknown) => base.onChange(valueOf<number>(event)),
-      onKeyDown: blockMinus
-        ? (event: React.KeyboardEvent) => {
-            if (event.key === '-') {
-              event.preventDefault();
-            }
-          }
-        : undefined
+      onChange: (event: unknown) => {
+        const value = valueOf<number>(event);
+        base.onChange(
+          value === null || value === undefined ? value : Math.trunc(value)
+        );
+      },
+      onKeyDown: (event: React.KeyboardEvent) => {
+        if (blockMinus && event.key === '-') {
+          event.preventDefault();
+        }
+        // Blocks both '.' and locale decimal separators (e.g. ',') - typing a
+        // fraction into a whole-number field should do nothing, not round later.
+        if (event.key === '.' || event.key === ',') {
+          event.preventDefault();
+        }
+      }
     })
   );
 }
