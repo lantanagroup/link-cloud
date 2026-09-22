@@ -242,7 +242,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         <>
           {instructionsKey && (
             <InstructionsDownload
-              href={api.getLocationOrgResolutionUrl()}
+              onDownload={() => api.getLocationOrgResolutionPdf()}
+              fileName="Location_Org_Resolution.pdf"
               description={t('onboarding:locationOrg.locationIdentifier.instructions')}
               linkText={t('onboarding:locationOrg.locationIdentifier.downloadPdf')}
             />
