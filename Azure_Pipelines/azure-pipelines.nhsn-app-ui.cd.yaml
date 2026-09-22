@@ -63,14 +63,20 @@ steps:
 
 # Get Git commit
 - task: Bash@3
-  displayName: 'Get Git Commit'
   inputs:
     targetType: 'inline'
     script: |
-      cd "$(Build.SourcesDirectory)"
       GIT_COMMIT=$(git rev-parse --short HEAD)
       echo "GIT_COMMIT: ${GIT_COMMIT}"
       echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+- task: PythonScript@0
+  displayName: "Inject Service Info"
+  inputs:
+    scriptSource: 'filePath'
+    scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+    workingDirectory: '$(Build.SourcesDirectory)'
+    arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
 # Copy into Packages Folder
 - task: Bash@3
