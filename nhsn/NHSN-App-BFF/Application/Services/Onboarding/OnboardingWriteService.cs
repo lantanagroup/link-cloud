@@ -1,4 +1,3 @@
-using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Encounter;
@@ -11,6 +10,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -315,54 +315,17 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 section, facilityId, ex.Service, ex.Operation, ex.StatusCode);
             return (false, ExtractDetail(ex));
         }
+        catch (InvalidFhirConfigurationException ex)
+        {
+            // Data Acquisition rejected facility-entered configuration (e.g. a patient list id it
+            // considers invalid) - same policy as LinkServiceException above, just a distinct type
+            // so the online save path can map it to its own translated message.
+            _logger.LogWarning(ex, "Manual-upload section {Section} for facility {FacilityId} was not saved.", section, facilityId);
+            return (false, ex.Message);
+        }
     }
 
-    // Best-effort read of the downstream service's own explanation out of its response body, which
-    // is never a uniform shape across Link services (see LinkServiceException's own remarks) - tries
-    // RFC7807 ProblemDetails' "detail" first (e.g. Data Acquisition's FHIRPath validator), then ASP.NET
-    // model-validation's { "Field": ["message"] } shape (e.g. Data Acquisition's SFTP host validator),
-    // and falls back to the exception's own normalized summary when the body is empty or neither shape
-    // matches, rather than showing the facility raw JSON or nothing at all.
-    private static string ExtractDetail(LinkServiceException ex)
-    {
-        if (string.IsNullOrWhiteSpace(ex.RawBody))
-        {
-            return ex.Message;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(ex.RawBody);
-            var root = document.RootElement;
-
-            if (root.TryGetProperty("detail", out var detailProperty) && detailProperty.ValueKind == JsonValueKind.String)
-            {
-                return detailProperty.GetString() ?? ex.Message;
-            }
-
-            if (root.ValueKind == JsonValueKind.Object)
-            {
-                var messages = root.EnumerateObject()
-                    .Where(property => property.Value.ValueKind == JsonValueKind.Array)
-                    .SelectMany(property => property.Value.EnumerateArray())
-                    .Where(item => item.ValueKind == JsonValueKind.String)
-                    .Select(item => item.GetString())
-                    .Where(message => !string.IsNullOrWhiteSpace(message))
-                    .ToList();
-
-                if (messages.Count > 0)
-                {
-                    return string.Join(' ', messages);
-                }
-            }
-        }
-        catch (JsonException)
-        {
-            // Not JSON, or not a shape we recognize - fall through to the exception's own summary.
-        }
-
-        return ex.Message;
-    }
+    private static string ExtractDetail(LinkServiceException ex) => LinkResponseHandler.ProblemDetail(ex.RawBody) ?? ex.Message;
 
     // Merges the saved step's workflow slice onto what's stored, leaving every other step alone —
     // same reason as the Link write: a whole-blob replace would let a stale tab wipe every other

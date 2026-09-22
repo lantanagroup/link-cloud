@@ -19,7 +19,15 @@ function hasRealDomain(hostname: string): boolean {
   return labels.length >= 2 && labels.every(label => label.length > 0);
 }
 
+// RFC 3986 requires percent-encoding for these characters; .NET's Uri.IsWellFormedUriString -
+// what Data Acquisition validates the saved value against server-side - rejects any of them
+// appearing unescaped, even though the URL constructor below happily accepts and re-encodes them.
+const UNSAFE_URL_CHARACTERS = /[\x00-\x1F\x7F <>"{}|\\^`[\]]/;
+
 export function isValidHttpUrl(value: string): boolean {
+  if (UNSAFE_URL_CHARACTERS.test(value)) {
+    return false;
+  }
   try {
     const url = new URL(value);
     return (url.protocol === 'http:' || url.protocol === 'https:') &&

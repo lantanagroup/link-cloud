@@ -35,6 +35,16 @@ export class HttpError extends Error {
     const value = this.problem?.extensions?.['downstreamTraceId'];
     return typeof value === 'string' ? value : undefined;
   }
+
+  /**
+   * A stable, translatable code for problems that need to say more than a
+   * status code - e.g. which piece of facility-entered data was rejected and
+   * why. Undefined for everything else, including plain downstream failures.
+   */
+  get errorCode(): string | undefined {
+    const value = this.problem?.extensions?.['errorCode'];
+    return typeof value === 'string' ? value : undefined;
+  }
 }
 
 export class TimeoutError extends Error {

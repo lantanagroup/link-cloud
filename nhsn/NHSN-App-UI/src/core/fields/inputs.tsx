@@ -53,12 +53,14 @@ export interface NumberFieldProps extends BaseFieldProps<number> {
   step?: number;
 }
 
-export function NumberField({min, max: _max, step, ...base}: NumberFieldProps) {
+export function NumberField({min, max, step, ...base}: NumberFieldProps) {
   const id = useFieldId(base.id);
   const blockMinus = min !== undefined && min >= 0;
 
   return FormNumericTextBox(
     toRenderProps({...base, id}, {
+      min,
+      max,
       step,
       // The package destructures customProp and reads customProp?.onBlur.
       customProp: {},

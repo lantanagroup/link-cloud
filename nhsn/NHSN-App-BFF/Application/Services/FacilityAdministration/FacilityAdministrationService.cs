@@ -6,6 +6,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -98,7 +99,12 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
     private static bool IsValidFhirServerUrl(string? value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var parsedBaseUrl) ||
+        // IsWellFormedUriString rejects what TryCreate alone doesn't: unescaped characters like '<'
+        // or '[' that TryCreate silently re-encodes instead of refusing. Data Acquisition's own FHIR
+        // List validation enforces the same rule - matching it here means a bad URL is caught at
+        // this step's save instead of surfacing later, when Census carries it forward.
+        if (!Uri.IsWellFormedUriString(value, UriKind.Absolute) ||
+            !Uri.TryCreate(value, UriKind.Absolute, out var parsedBaseUrl) ||
             (parsedBaseUrl.Scheme != Uri.UriSchemeHttp && parsedBaseUrl.Scheme != Uri.UriSchemeHttps))
         {
             return false;
@@ -117,7 +123,13 @@ public class FacilityAdministrationService : IFacilityAdministrationService
     {
         if (!IsValidFhirServerUrl(request.FhirServerBaseUrl))
         {
-            throw new InvalidOperationException("FhirServerBaseUrl must be a valid absolute URL using http or https with a real host.");
+            // InvalidFhirConfigurationException, not InvalidOperationException: this one needs a
+            // translated message on the frontend (see OnboardingProvider's SAVE_ERROR_CODE_KEYS),
+            // which requires a status/errorCode a registered exception handler actually produces.
+            throw new InvalidFhirConfigurationException(
+                facilityId,
+                "invalidFhirServerBaseUrl",
+                "FhirServerBaseUrl must be a valid absolute URL using http or https with a real host.");
         }
 
         if (request.MaxConcurrentRequests < 1)

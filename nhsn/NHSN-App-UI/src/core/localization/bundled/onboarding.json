@@ -208,6 +208,7 @@
       "testSuccess": "Validation succeeded.",
       "testFailure": "Validation failed.",
       "testError": "Unable to validate the results.",
+      "testTimeout": "The connection attempt took too long. Verify the host and port are correct and reachable, then try again.",
       "filesTitle": "SFTP Acquisition Results",
       "noFiles": "No files found.",
       "viewResultsAria": "View results for {{file}}",
@@ -234,7 +235,8 @@
       "validateBeforeAck": "Click Validate before acknowledging that the results are accurate.",
       "testConnectionBeforeAck": "Click Validate before acknowledging that the results are accurate.",
       "vendorRequired": "Complete Facility Information before configuring patients of interest.",
-      "ackError": "Unable to record the acknowledgement."
+      "ackError": "Unable to record the acknowledgement.",
+      "saveRejected": "The patients of interest configuration could not be saved. Double-check the values and try again."
     },
     "errors": {
       "listIdRequired": "This field is required.",
@@ -243,7 +245,9 @@
       "hostInvalid": "Enter a hostname or IP address, not a URL (e.g. sftp.example.com, not http://sftp.example.com).",
       "portRequired": "SFTP Host URL Port is required.",
       "portInvalid": "Enter a valid port between 1 and 65535.",
-      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes."
+      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes.",
+      "frequencyHoursInvalid": "Enter a whole number of hours, 0 or greater.",
+      "frequencyMinutesInvalid": "Enter a whole number of minutes between 0 and 59."
     }
   },
   "locationOrg": {

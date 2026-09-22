@@ -150,6 +150,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddLinkGateways(builder.Configuration);
     builder.Services.AddExceptionHandler<FacilityWriteLockExceptionHandler>();
+    builder.Services.AddExceptionHandler<InvalidFhirConfigurationExceptionHandler>();
     builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
 
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
@@ -272,14 +273,7 @@ static void SetupMiddleware(WebApplication app)
         NhsnAppSeedData.SeedAsync(dbContext).GetAwaiter().GetResult();
     }
 
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseDeveloperExceptionPage();
-    }
-    else
-    {
-        app.UseExceptionHandler();
-    }
+    app.UseExceptionHandler();
 
     app.ConfigureSwagger();
     app.UseRouting();
