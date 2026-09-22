@@ -17,7 +17,7 @@ import {HttpError} from '../api/http';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
 import {Button, Modal} from '../fields';
 import {useNotifications} from '../notifications/NotificationProvider';
-import {furthestLegalStep, nextStepId, previousStepId, resolveStep} from './gating';
+import {furthestLegalStep, isUnlocked, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
 import {draftReducer, type DraftAction, type DraftSections} from './reducer';
 import {useStableCallback} from './StepChrome';
@@ -246,6 +246,8 @@ export function OnboardingProvider({
       pendingSaves.current += 1;
       setSaving(true);
 
+      const previousVendor = lastSavedDraftRef.current?.facilityInfo.vendor;
+
       const outcome = saveChain.current
         .catch(() => undefined)
         .then(async () => {
@@ -253,6 +255,19 @@ export function OnboardingProvider({
             await api.saveDraft(toSave);
             lastSavedDraftRef.current = toSave;
             dirtyRef.current = false;
+
+            if (previousVendor && toSave.facilityInfo.vendor && previousVendor !== toSave.facilityInfo.vendor) {
+              // The BFF just revoked the census step's accuracy acknowledgement server-side as a
+              // side effect of this vendor change - reload so the now-pending census (and every
+              // step gated behind it) shows up instead of the stale in-memory draft. A failed
+              // reload here shouldn't surface as a save failure - the save itself succeeded.
+              try {
+                await reloadDraft();
+              } catch {
+                // Next navigation/reload picks up the server's state regardless.
+              }
+            }
+
             return true;
           } catch (cause) {
             const translationKey = cause instanceof HttpError && cause.errorCode
@@ -276,7 +291,7 @@ export function OnboardingProvider({
       saveChain.current = outcome;
       return outcome;
     },
-    [api, notifyError, t]
+    [api, notifyError, t, reloadDraft]
   );
 
   // Persist at transitions. popstate cannot be cancelled, so a dirty-navigation
@@ -345,8 +360,9 @@ export function OnboardingProvider({
       dispatch({type: 'draft/loaded', draft: restored});
     }
     dirtyRef.current = false;
-    completeGoTo(stepId);
-  }, [pendingStepId, completeGoTo]);
+    const target = restored && !isUnlocked(stepId, restored, user) ? furthestLegalStep(restored, user) : stepId;
+    completeGoTo(target);
+  }, [pendingStepId, completeGoTo, user]);
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
