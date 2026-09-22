@@ -106,7 +106,11 @@ export const STEPS: Step[] = [
         return false;
       }
       const frequency = parseHoursMinutesDuration(c.acquisitionFrequency);
-      return Boolean(frequency) && frequency!.hours * 60 + frequency!.minutes >= 15;
+      if (!frequency) {
+        return false;
+      }
+      const totalMinutes = frequency.hours * 60 + frequency.minutes;
+      return totalMinutes >= 5 && totalMinutes <= 1440;
     }
   },
   {

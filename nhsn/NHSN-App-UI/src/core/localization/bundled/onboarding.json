@@ -96,7 +96,7 @@
       "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
-      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
+      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 59 days.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
       "invalidFhirPath": "Enter a valid FHIRPath expression.",
@@ -134,12 +134,15 @@
     "messages": {
       "incomplete": "Please complete all fields before continuing.",
       "invalidBaseUrl": "Enter a valid URL starting with http:// or https:// (e.g. https://ehr.example.org/fhir/r4).",
+      "maxConcurrentRequestsRequired": "Max Concurrent Requests is required.",
       "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number between 1 and 8.",
       "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
       "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
-      "invalidLagDays": "Days must be a whole number between 0 and 30.",
+      "pullTimeRangeInvalid": "Min Acquisition Pull Time must be earlier than Max Acquisition Pull Time.",
+      "invalidLagDays": "Days must be a whole number between 0 and 59.",
       "invalidLagHours": "Hours must be a whole number between 0 and 23.",
       "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
+      "lagDurationRequired": "At least one of Days, Hours, or Minutes must be greater than zero.",
       "loadError": "Unable to load FHIR server information.",
       "saveSuccess": "FHIR server information saved.",
       "saveError": "Unable to save FHIR server information.",
@@ -151,7 +154,6 @@
     },
     "errors": {
       "baseUrlRequired": "FHIR Server Base URL is required.",
-      "fieldRequired": "This field is required.",
       "pullTimePairRequired": "Min and Max Acquisition Pull Time must both be provided together."
     }
   },
@@ -243,15 +245,17 @@
       "saveRejected": "The patients of interest configuration could not be saved. Double-check the values and try again."
     },
     "errors": {
-      "listIdRequired": "This field is required.",
+      "listIdRequired": "{{list}} List Id is required.",
       "listIdDuplicate": "Duplicate IDs are not allowed. Please ensure all entered IDs are unique.",
       "hostRequired": "SFTP Host URL is required.",
+      "hostTooLong": "SFTP Host URL cannot exceed 128 characters.",
       "hostInvalid": "Enter a hostname or IP address, not a URL (e.g. sftp.example.com, not http://sftp.example.com).",
       "portRequired": "SFTP Host URL Port is required.",
       "portInvalid": "Enter a valid port between 1 and 65535.",
-      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes.",
-      "frequencyHoursInvalid": "Enter a whole number of hours, 0 or greater.",
-      "frequencyMinutesInvalid": "Enter a whole number of minutes between 0 and 59."
+      "frequencyTooShort": "Census Acquisition Frequency must be at least 5 minutes.",
+      "frequencyTooLong": "Census Acquisition Frequency must be no more than 24 hours.",
+      "frequencyHoursInvalid": "Enter a whole number of hours between 0 and 23.",
+      "frequencyMinutesInvalid": "Enter a whole number of minutes between {{min}} and 59."
     }
   },
   "locationOrg": {
@@ -818,7 +822,7 @@
       "selectYesNo": "Please select Yes or No.",
       "selectAtLeastOne": "Please select at least one option.",
       "describeOtherIdentifier": "Please describe the other identifier.",
-      "fieldRequired": "This field is required.",
+      "describeOtherTerm": "Please describe the term used.",
       "addAtLeastOneRule": "Please add at least one rule.",
       "ruleValueRequired": "Please provide a value for every rule that requires one.",
       "describeOtherVariance": "Please describe the other variance.",

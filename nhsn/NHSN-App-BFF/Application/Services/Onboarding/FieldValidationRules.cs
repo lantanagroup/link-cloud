@@ -13,7 +13,7 @@ public static class FieldValidationRules
     public const int MaxConcurrentRequestsCap = 8;
     public const int MaxRetriesMin = 0;
     public const int MaxRetriesCap = 10;
-    public const int LagDurationCapMinutes = 30 * 24 * 60; // 30 days
+    public const int LagDurationCapMinutes = 59 * 24 * 60; // 59 days
     public const int CensusFrequencyMinMinutes = 5;
     public const int CensusFrequencyMaxMinutes = 24 * 60;
     public const int SftpPortMin = 1;
