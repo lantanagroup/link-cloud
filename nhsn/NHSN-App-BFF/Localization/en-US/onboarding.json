@@ -179,7 +179,8 @@
         "patientCount": "Patient Count"
       },
       "columns": {
-        "patientId": "FHIR Patient Id"
+        "patientId": "FHIR Patient Id",
+        "patientName": "Patient Name"
       }
     },
     "cerner": {

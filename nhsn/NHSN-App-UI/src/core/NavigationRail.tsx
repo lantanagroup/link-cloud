@@ -82,7 +82,9 @@ export function NavigationRail({
                       <button
                         type="button"
                         className={`nhsn-link__nav-button${activeRoute === item.key ? " nhsn-link__nav-button--active" : ""}`}
-                        onClick={() => onNavigate(item.key)}>
+                        onClick={() => {
+                          if (item.key !== activeRoute) onNavigate(item.key);
+                        }}>
                         {item.label}
                       </button>
                     </li>

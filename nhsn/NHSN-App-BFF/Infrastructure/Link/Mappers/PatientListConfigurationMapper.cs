@@ -121,19 +121,23 @@ internal static class PatientListConfigurationMapper
     {
         return ListKeys.Select(entry =>
         {
-            var patientIds = FindList(source, entry.Key)?.Patients?
-                .Select(patient => patient.Id)
-                .OfType<string>()
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .ToArray() ?? [];
+            var patients = ToCensusPatients(FindList(source, entry.Key));
 
             return new CensusListResult
             {
                 ListKey = entry.Key,
-                PatientCount = patientIds.Length,
-                PatientIds = patientIds
+                PatientCount = patients.Length,
+                Patients = patients
             };
         }).ToList();
+    }
+
+    public static CensusPatient[] ToCensusPatients(EhrPatientListWire? list)
+    {
+        return list?.Patients?
+            .Where(patient => !string.IsNullOrWhiteSpace(patient.Id))
+            .Select(patient => new CensusPatient { Id = patient.Id!, Name = patient.Name })
+            .ToArray() ?? [];
     }
 
     // Every one of the six keys must carry a non-empty id — Data Acquisition rejects anything but
