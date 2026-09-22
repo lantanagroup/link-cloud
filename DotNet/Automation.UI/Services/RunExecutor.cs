@@ -256,17 +256,31 @@ internal sealed class RunExecutor
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
-            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
-            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
+            var honorFacilityPieces = state.Options.HonorExplicitFacilityPieces;
+            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(
+                state.Options.NormalizationSuiteId, cancellationToken, honorFacilityPieces);
+            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(
+                state.Options.OrganizationResourceMapTemplateId, cancellationToken, honorFacilityPieces);
             var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
             // Resolve the query plan template early so the acquisition simulator uses the
             // same plan the scenario is configured with (not always the built-in default).
-            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
+            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(
+                state.Options.QueryPlanTemplateId, cancellationToken, honorFacilityPieces);
             var queryPlanInput = queryPlanResolution.Input;
-            var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+            var effectiveQueryPlan = queryPlanInput;
+            if (effectiveQueryPlan == null)
+            {
+                if (honorFacilityPieces)
+                {
+                    throw new InvalidOperationException(
+                        "No query plan is configured for this run. Choose one on the facility template or in ala carte mode.");
+                }
+
+                effectiveQueryPlan = QueryPlanDefaults.GetDefaultAsInput();
+            }
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
 
@@ -519,7 +533,9 @@ internal sealed class RunExecutor
                     facilityClient,
                     output,
                     facilityId,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)
@@ -572,7 +588,9 @@ internal sealed class RunExecutor
                     facilityClient,
                     output,
                     facilityId,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
 
                 pipelineDataReader.InvalidateCache();
 
@@ -634,7 +652,9 @@ internal sealed class RunExecutor
                     output,
                     facilityId,
                     measureIds,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
@@ -642,9 +662,17 @@ internal sealed class RunExecutor
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution, patientIds);
             normalizationResolution = normalizationSetup.Resolution;
             var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
+            var ehrDescription = effectiveQueryPlan.EhrDescription;
+            if (string.IsNullOrWhiteSpace(ehrDescription))
+            {
+                ehrDescription = honorFacilityPieces
+                    ? state.Options.VendorName ?? string.Empty
+                    : "Epic";
+            }
+
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureIds, "Epic", queryPlanInput);
+                output, facilityId, measureIds, ehrDescription, queryPlanInput);
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),

@@ -10,7 +10,7 @@ namespace Automation.UI.Services;
 /// </summary>
 public sealed class QueryPlanTemplateSeedService : IHostedService
 {
-    private static readonly Guid SystemDefaultId = new("00000000-0000-0000-1000-000000000001");
+    private static readonly Guid SystemDefaultId = FacilityTemplateCatalog.SystemQueryPlanId;
 
     private readonly IQueryPlanTemplateStore _store;
     private readonly ILogger<QueryPlanTemplateSeedService> _logger;
@@ -57,6 +57,19 @@ public sealed class QueryPlanTemplateSeedService : IHostedService
             _logger.LogDebug("Refreshed system default query plan template: {Id}", SystemDefaultId);
         }
 
+        await UpsertNamedCopyAsync(
+            FacilityTemplateCatalog.EpicQueryPlanId,
+            "Epic",
+            "Epic query plan. Same acquired resources as the system default. EHR description is Epic, from ehr-test3 patient 019eb19d-249b-7ea8-8ddf-0e82340c1776.",
+            "Epic",
+            cancellationToken);
+        await UpsertNamedCopyAsync(
+            FacilityTemplateCatalog.CernerQueryPlanId,
+            "Cerner",
+            "Cerner query plan. Same acquired resources as the system default. EHR description is Cerner, from ehr-test3 patient 019eb19f-a2a6-7de1-ae39-fa67552a7899.",
+            "Cerner",
+            cancellationToken);
+
         // Enforce single-default invariant.
         var allTemplates = await _store.GetAllAsync(cancellationToken);
         var selectedDefaultId = allTemplates
@@ -74,6 +87,30 @@ public sealed class QueryPlanTemplateSeedService : IHostedService
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private async Task UpsertNamedCopyAsync(
+        Guid id,
+        string name,
+        string description,
+        string ehrDescription,
+        CancellationToken cancellationToken)
+    {
+        var defaultInput = QueryPlanDefaults.GetDefaultAsInput();
+        var template = new QueryPlanTemplate
+        {
+            Id = id,
+            Name = name,
+            Description = description,
+            IsSystem = true,
+            IsDefault = false,
+            EhrDescription = ehrDescription,
+            LookBack = defaultInput.LookBack ?? "P0D",
+            InitialQueries = defaultInput.InitialQueries.Select(ToQueryEntry).ToList(),
+            SupplementalQueries = defaultInput.SupplementalQueries.Select(ToQueryEntry).ToList(),
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await _store.UpsertAsync(template, cancellationToken);
+    }
 
     private static QueryEntry ToQueryEntry(QueryPlanQueryEntry src) => new()
     {

@@ -68,7 +68,42 @@ public class FacilitySetupHelperTests
 
         var created = Assert.Single(_created);
         Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
+        Assert.Equal("Epic", created.Vendor?.Name);
         Assert.Empty(_updated);
+    }
+
+    [Fact]
+    public async Task Posts_the_named_vendor_when_the_caller_sets_one()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        Assert.Equal("Cerner", Assert.Single(_created).Vendor?.Name);
+    }
+
+    [Fact]
+    public async Task Omits_the_vendor_when_the_caller_explicitly_leaves_it_blank()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: " ",
+            vendorExplicit: true);
+
+        Assert.Null(Assert.Single(_created).Vendor);
     }
 
     [Fact]

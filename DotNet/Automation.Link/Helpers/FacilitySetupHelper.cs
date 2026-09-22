@@ -22,16 +22,33 @@ public static class FacilitySetupHelper
     /// </summary>
     private const string FacilityTimeZone = "America/Chicago";
 
+    /// <summary>
+    /// Legacy callers omit the vendor and still create an Epic facility.
+    /// An explicit vendor is sent as given. An explicit blank vendor is omitted.
+    /// </summary>
+    private static VendorModel? ResolveVendor(string? vendorName, bool vendorExplicit)
+    {
+        if (!vendorExplicit)
+            return new VendorModel { Name = "Epic" };
+
+        if (string.IsNullOrWhiteSpace(vendorName))
+            return null;
+
+        return new VendorModel { Name = vendorName.Trim() };
+    }
+
     public static async Task EnsureFacilityAsync(
         IFacilityServiceClient facilityClient,
         IDmrpServiceClient dmrpClient,
         IAutomationOutput output,
         string facilityId,
         string? measureId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false)
     {
         await EnsureFacilityAsync(facilityClient, dmrpClient, output, facilityId,
-            measureId != null ? [measureId] : [], cancellationToken);
+            measureId != null ? [measureId] : [], cancellationToken, vendorName, vendorExplicit);
     }
 
     /// <summary>
@@ -52,7 +69,9 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         List<string> measureIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
         if (existing.IsSuccessStatusCode && existing.Body != null)
@@ -69,10 +88,7 @@ public static class FacilitySetupHelper
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = new VendorModel
-            {
-                Name = "Epic"
-            },
+            Vendor = ResolveVendor(vendorName, vendorExplicit),
             // Empty under DMRP, and not merely unselected: a request that names any report is refused
             // outright. The measures are enrolled below instead.
             ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds)
@@ -89,7 +105,7 @@ public static class FacilitySetupHelper
         if (dmrpEnabled)
         {
             await EnrollFacilityInDmrpMeasuresAsync(facilityClient, dmrpClient, output, facilityId,
-                measureIds, cancellationToken);
+                measureIds, cancellationToken, vendorName, vendorExplicit);
         }
     }
 
@@ -150,7 +166,9 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         List<string> measureIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? vendorName,
+        bool vendorExplicit)
     {
         if (measureIds.Count == 0)
         {
@@ -174,10 +192,7 @@ public static class FacilitySetupHelper
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = new VendorModel
-            {
-                Name = "Epic"
-            },
+            Vendor = ResolveVendor(vendorName, vendorExplicit),
             ScheduledReports = MonthlySchedule([])
         }, cancellationToken);
 
@@ -653,7 +668,9 @@ public static class FacilitySetupHelper
     IFacilityServiceClient facilityClient,
     IAutomationOutput output,
     string facilityId,
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default,
+    string? vendorName = null,
+    bool vendorExplicit = false)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
 
@@ -674,10 +691,7 @@ public static class FacilitySetupHelper
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = new VendorModel
-            {
-                Name = "Epic"
-            },
+            Vendor = ResolveVendor(vendorName, vendorExplicit),
             ScheduledReports = MonthlySchedule([])
         }, cancellationToken);
 
@@ -699,7 +713,9 @@ public static class FacilitySetupHelper
     IFacilityServiceClient facilityClient,
     IAutomationOutput output,
     string facilityId,
-    CancellationToken cancellationToken = default)
+    CancellationToken cancellationToken = default,
+    string? vendorName = null,
+    bool vendorExplicit = false)
     {
         var updated = await facilityClient.UpdateAsync(
             facilityId,
@@ -708,10 +724,7 @@ public static class FacilitySetupHelper
                 FacilityId = facilityId,
                 FacilityName = facilityId,
                 TimeZone = FacilityTimeZone,
-                Vendor = new VendorModel
-                {
-                    Name = "Epic"
-                },
+                Vendor = ResolveVendor(vendorName, vendorExplicit),
                 ScheduledReports = MonthlySchedule([])
             },
             cancellationToken);
