@@ -65,6 +65,7 @@ steps:
 - task: Bash@3
   inputs:
     targetType: 'inline'
+    workingDirectory: '$(Pipeline.Workspace)/link-cloud'
     script: |
       GIT_COMMIT=$(git rev-parse --short HEAD)
       echo "GIT_COMMIT: ${GIT_COMMIT}"
