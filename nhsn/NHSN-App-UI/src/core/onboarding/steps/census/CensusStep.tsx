@@ -141,6 +141,13 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     }
   }, [testingConnection, connectionResult]);
 
+  const validationMessageRef = useRef<HTMLParagraphElement | null>(null);
+  useEffect(() => {
+    if (validationMessage) {
+      scrollNearestContainerToBottom(validationMessageRef.current);
+    }
+  }, [validationMessage]);
+
   const persistedTestedSftpConfig =
     census.sftpConnectionTested && census.sftpHost && census.sftpPort !== undefined
       ? { host: census.sftpHost.trim(), port: census.sftpPort }
@@ -199,19 +206,6 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
   function revokeAcknowledgement() {
     patch("census", { accuracyAcknowledged: false });
-    api
-      .acknowledgeCensus({
-        kind: "CensusAccuracy",
-        accepted: false,
-        statementKey: "census-accuracy",
-      })
-      .catch((cause) => {
-        notifyError(
-          cause instanceof Error
-            ? cause.message
-            : t("onboarding:census.messages.ackError"),
-        );
-      });
   }
 
   function updateListId(key: CensusListKey, value: string) {
@@ -390,20 +384,6 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     }
 
     patch("census", { accuracyAcknowledged: true });
-    api
-      .acknowledgeCensus({
-        kind: "CensusAccuracy",
-        accepted: true,
-        statementKey: "census-accuracy",
-      })
-      .catch((cause) => {
-        notifyError(
-          cause instanceof Error
-            ? cause.message
-            : t("onboarding:census.messages.ackError"),
-        );
-        patch("census", { accuracyAcknowledged: false });
-      });
   }
 
   function validateStep(): boolean {
@@ -433,10 +413,28 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     return true;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (!validateStep()) {
       return;
     }
+
+    if (validationLive) {
+      try {
+        await api.acknowledgeCensus({
+          kind: "CensusAccuracy",
+          accepted: true,
+          statementKey: "census-accuracy",
+        });
+      } catch (cause) {
+        notifyError(
+          cause instanceof Error
+            ? cause.message
+            : t("onboarding:census.messages.ackError"),
+        );
+        return;
+      }
+    }
+
     onNext();
   }
 
@@ -929,7 +927,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             )}
 
             <div aria-live="off">
-              <p className="nhsn-link__form-error" role="alert">
+              <p ref={validationMessageRef} className="nhsn-link__form-error" role="alert">
                 {validationMessage}
               </p>
             </div>
