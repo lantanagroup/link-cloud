@@ -665,7 +665,7 @@ services:
   # only where the mock is deployed, and never in a production store.
   MockDmrpApi:
     - key: "MockDmrpApi:Enabled"
-      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped, so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
+      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 (schema migration still runs when ConnectionStrings:DatabaseConnection is configured, and is skipped when it is not), so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
       required: false
       defaultValue: "false"
     - key: "MockDmrpApi:AuthClientId"
