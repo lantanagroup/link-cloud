@@ -19,17 +19,20 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
     private readonly IOperationManager _operationManager;
     private readonly IVendorVersionOperationPresetQueries _presetQueries;
     private readonly IVendorVersionResolver _vendorVersionResolver;
+    private readonly IOperationSequenceQueries _operationSequenceQueries;
 
     public VendorVersionOperationPresetManager(
         IDatabase database,
         IOperationManager operationManager,
         IVendorVersionOperationPresetQueries presetQueries,
-        IVendorVersionResolver vendorVersionResolver)
+        IVendorVersionResolver vendorVersionResolver,
+        IOperationSequenceQueries operationSequenceQueries)
     {
         _database = database;
         _operationManager = operationManager;
         _presetQueries = presetQueries;
         _vendorVersionResolver = vendorVersionResolver;
+        _operationSequenceQueries = operationSequenceQueries;
     }
 
     public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model)
@@ -51,6 +54,8 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         });
 
         await _database.SaveChangesAsync();
+        await _operationSequenceQueries.InvalidateFacilitiesAsync(
+            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id));
 
         return (await _presetQueries.Get(preset.Id))!;
     }
@@ -81,5 +86,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
         _database.VendorVersionOperationPresets.Remove(preset);
         await _database.SaveChangesAsync();
+        await _operationSequenceQueries.InvalidateFacilitiesAsync(
+            await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationResourceType.OperationId));
     }
 }

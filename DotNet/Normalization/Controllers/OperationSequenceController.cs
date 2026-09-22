@@ -48,12 +48,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("A FacilityId must be provided");
                 }
 
+                // Admin reads stay off the listener cache so a GET cannot return a sequence
+                // another replica has not reloaded yet, and cannot pin a partial key in that cache.
                 var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
                     ResourceType = resourceType,
                     ResourceTypeId = resourceTypeId,
                     FacilityId = facilityId
-                });
+                }, useCache: false);
 
                 return Ok(results);
             }

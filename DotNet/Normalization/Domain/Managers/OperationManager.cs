@@ -175,6 +175,18 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return taskResult;
                 }
 
+                var previousFacilityId = operation.FacilityId;
+                var affectedFacilities = await _operationSequenceQueries.FacilitiesReferencingOperationAsync(model.Id, cancellationToken);
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    affectedFacilities.Add(model.FacilityId);
+                }
+
+                if (!string.IsNullOrEmpty(previousFacilityId))
+                {
+                    affectedFacilities.Add(previousFacilityId);
+                }
+
                 operation.FacilityId = model.FacilityId;
                 operation.Name = model.Name;
                 operation.Description = model.Description;
@@ -186,6 +198,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorVersionIds);
+                await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
 
                 taskResult.IsSuccess = true;
                 taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
@@ -254,6 +267,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await _database.SaveChangesAsync();
+                await InvalidateCachedSequencesAsync(operationId, CancellationToken.None);
             }
         }
 
@@ -326,6 +340,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await _database.SaveChangesAsync();
         }
 
+        private async Task InvalidateCachedSequencesAsync(Guid operationId, CancellationToken cancellationToken, params string?[] additionalFacilityIds)
+        {
+            var facilityIds = await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationId, cancellationToken);
+            facilityIds.AddRange(additionalFacilityIds.Where(id => !string.IsNullOrEmpty(id))!);
+            await _operationSequenceQueries.InvalidateFacilitiesAsync(facilityIds, cancellationToken);
+        }
+
         public async Task<bool> DeleteOperation(DeleteOperationModel model)
         {
             if (string.IsNullOrEmpty(model.FacilityId) && model.VendorVersionId == null)
@@ -336,6 +357,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             using var transaction = await _database.BeginTransactionAsync();
 
             var modifiedRecords = 0;
+            var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);
+            if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                affectedFacilities.Add(model.FacilityId);
+            }
 
             try
             {
@@ -365,6 +391,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                         foreach (var operation in operations.Records)
                         {
+                            foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id))
+                            {
+                                affectedFacilities.Add(facilityId);
+                            }
+
                             if (!string.IsNullOrEmpty(model.FacilityId))
                             {
                                 await DeleteOperationSequence(new DeleteOperationSequencesModel()
@@ -397,6 +428,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (modifiedRecords > 0)
             {
+                await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities);
                 await transaction.CommitAsync();
                 return true;
             }
@@ -457,6 +489,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             await _database.SaveChangesAsync();
+            await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId);
 
             return await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
             {
@@ -483,6 +516,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 sequences.ForEach(_database.OperationSequences.Remove);
 
                 await _database.SaveChangesAsync();
+                await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId);
 
                 return true;
             }

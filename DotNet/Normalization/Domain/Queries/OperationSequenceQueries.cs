@@ -14,7 +14,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<OperationSequenceModel> Get(string resourceType, string? facilityId);
         Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default);
-        void ClearCache(OperationSequenceSearchModel model);
+        Task ClearCache(OperationSequenceSearchModel model, CancellationToken cancellationToken = default);
+        Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
+        Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     }
 
     public class OperationSequenceQueries : IOperationSequenceQueries
@@ -51,7 +54,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).Single();
         }
 
-        private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId) BuildCacheKey(OperationSequenceSearchModel model) => (model.FacilityId, model.ResourceType, model.ResourceTypeId);
+        private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId, long Revision) BuildCacheKey(OperationSequenceSearchModel model, long revision) => (model.FacilityId, model.ResourceType, model.ResourceTypeId, revision);
 
 
         public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default)
@@ -61,7 +64,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 return await QueryAsync(model, cancellationToken);
             }
 
-            var cacheKey = BuildCacheKey(model);
+            // The revision lives in the database, so a write committed on any replica changes the key
+            // this process computes. Unchanged facilities keep their entries.
+            var revision = await _dbContext.OperationSequenceCacheRevisions.AsNoTracking()
+                .Where(row => row.FacilityId == model.FacilityId)
+                .Select(row => row.Revision)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var cacheKey = BuildCacheKey(model, revision);
             if (_cache.TryGetValue(cacheKey, out List<OperationSequenceModel>? cacheResult) && cacheResult != null)
             {
                 return cacheResult;
@@ -73,8 +83,74 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             return result;
         }
 
-        public void ClearCache(OperationSequenceSearchModel model) {
-            _cache.Remove(BuildCacheKey(model));
+        public Task ClearCache(OperationSequenceSearchModel model, CancellationToken cancellationToken = default)
+        {
+            return InvalidateFacilityAsync(model.FacilityId, cancellationToken);
+        }
+
+        public async Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return;
+            }
+
+            const int maxAttempts = 3;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var revision = await _dbContext.OperationSequenceCacheRevisions
+                    .FirstOrDefaultAsync(row => row.FacilityId == facilityId, cancellationToken);
+                if (revision == null)
+                {
+                    _dbContext.OperationSequenceCacheRevisions.Add(new OperationSequenceCacheRevision
+                    {
+                        FacilityId = facilityId,
+                        Revision = 1
+                    });
+                }
+                else
+                {
+                    revision.Revision++;
+                }
+
+                try
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    return;
+                }
+                catch (DbUpdateException) when (attempt < maxAttempts)
+                {
+                    foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceCacheRevision>().ToList())
+                    {
+                        if (entry.State == EntityState.Added)
+                        {
+                            entry.State = EntityState.Detached;
+                        }
+                        else
+                        {
+                            await entry.ReloadAsync(cancellationToken);
+                        }
+                    }
+                }
+            }
+        }
+
+        public async Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default)
+        {
+            foreach (var facilityId in facilityIds.Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal))
+            {
+                await InvalidateFacilityAsync(facilityId, cancellationToken);
+            }
+        }
+
+        public Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationSequences.AsNoTracking()
+                .Where(sequence => sequence.OperationResourceType.OperationId == operationId)
+                .Select(sequence => sequence.FacilityId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
         }
 
         private async Task<List<OperationSequenceModel>> QueryAsync(OperationSequenceSearchModel model, CancellationToken cancellationToken)
