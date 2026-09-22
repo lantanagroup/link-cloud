@@ -13,6 +13,7 @@ import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
+import {HttpError} from '../api/http';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
 import {Button, Modal} from '../fields';
 import {useNotifications} from '../notifications/NotificationProvider';
@@ -23,6 +24,14 @@ import {useStableCallback} from './StepChrome';
 import {createEmptyDraft, migrateDraft, type FacilityDraft, type StepId, type StepTarget, type StepView} from './types';
 
 type LoadState = 'loading' | 'ready' | 'error';
+
+// Maps a BFF ProblemDetails errorCode (HttpError.errorCode) to a translation key, so a save
+// rejection shows a localized message instead of the BFF's English-only Detail text. Codes with no
+// entry here fall back to that raw Detail - see persistDraft below.
+const SAVE_ERROR_CODE_KEYS: Record<string, string> = {
+  invalidFhirServerBaseUrl: 'onboarding:fhirServerInfo.messages.invalidBaseUrl',
+  invalidPatientListConfiguration: 'onboarding:census.messages.saveRejected'
+};
 
 interface OnboardingContextValue {
   loadState: LoadState;
@@ -243,7 +252,16 @@ export function OnboardingProvider({
             dirtyRef.current = false;
             return true;
           } catch (cause) {
-            notifyError(cause instanceof Error ? cause.message : t('errors.saveFailed'));
+            const translationKey = cause instanceof HttpError && cause.errorCode
+              ? SAVE_ERROR_CODE_KEYS[cause.errorCode]
+              : undefined;
+            notifyError(
+              translationKey
+                ? t(translationKey)
+                : cause instanceof Error
+                  ? cause.message
+                  : t('errors.saveFailed')
+            );
             return false;
           } finally {
             pendingSaves.current -= 1;

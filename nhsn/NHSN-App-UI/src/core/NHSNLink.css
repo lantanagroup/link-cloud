@@ -36,6 +36,7 @@
 .nhsn-link * {
   scrollbar-width: thin;
   scrollbar-color: var(--nhsn-scrollbar-thumb) transparent;
+  box-sizing: border-box;
 }
 
 .nhsn-link::-webkit-scrollbar,

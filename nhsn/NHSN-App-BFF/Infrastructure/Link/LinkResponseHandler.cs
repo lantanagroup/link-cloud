@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Sdk.ApiClient;
+using System.Linq;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
@@ -80,8 +81,12 @@ internal static class LinkResponseHandler
         }
     }
 
-    // The "detail" of an RFC 7807 problem body, for failures that are reported to the user as an
-    // outcome rather than thrown. Null when the body is empty or not a problem document.
+    // Best-effort read of a downstream Link service's own explanation out of its response body,
+    // which is never a uniform shape across services: tries RFC7807 ProblemDetails' "detail" first,
+    // then ASP.NET's ValidationProblemDetails { "errors": { "Field": ["msg"] } } wrapper, then the
+    // bare ModelState dictionary shape { "Field": ["msg"] } a manual BadRequest(ModelState) produces.
+    // Returns null when the body is empty, unparseable, or matches none of the above - callers fall
+    // back to their own summary rather than showing raw JSON or nothing at all.
     public static string? ProblemDetail(string? rawBody)
     {
         if (string.IsNullOrWhiteSpace(rawBody))
@@ -92,11 +97,32 @@ internal static class LinkResponseHandler
         try
         {
             using var document = JsonDocument.Parse(rawBody);
-            return document.RootElement.ValueKind == JsonValueKind.Object
-                   && document.RootElement.TryGetProperty("detail", out var detail)
-                   && detail.ValueKind == JsonValueKind.String
-                ? detail.GetString()
-                : null;
+            var root = document.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+            {
+                return detail.GetString();
+            }
+
+            if (root.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Object)
+            {
+                root = errors;
+            }
+
+            var messages = root.EnumerateObject()
+                .Where(property => property.Value.ValueKind == JsonValueKind.Array)
+                .SelectMany(property => property.Value.EnumerateArray())
+                .Where(item => item.ValueKind == JsonValueKind.String)
+                .Select(item => item.GetString())
+                .Where(message => !string.IsNullOrWhiteSpace(message))
+                .ToList();
+
+            return messages.Count > 0 ? string.Join(' ', messages) : null;
         }
         catch (JsonException)
         {

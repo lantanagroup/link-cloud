@@ -1,6 +1,8 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
@@ -54,14 +56,28 @@ internal sealed class PatientListGateway : IPatientListGateway
         if (existing is null)
         {
             var createResponse = await _dataAcquisitionClient.CreateFhirListConfigurationAsync(payload, cancellationToken);
-            LinkResponseHandler.EnsureSuccess(createResponse, ServiceName, nameof(SaveConfigurationAsync));
+            EnsureConfigurationSaved(createResponse, facilityId);
             _logger.LogInformation("Created FHIR List configuration for facility {FacilityId}.", facilityId);
             return;
         }
 
         var updateResponse = await _dataAcquisitionClient.UpdateFhirListConfigurationAsync(payload, cancellationToken);
-        LinkResponseHandler.EnsureSuccess(updateResponse, ServiceName, nameof(SaveConfigurationAsync));
+        EnsureConfigurationSaved(updateResponse, facilityId);
         _logger.LogInformation("Updated FHIR List configuration for facility {FacilityId}.", facilityId);
+    }
+
+    // A 400 here is Data Acquisition's own model validation rejecting the payload - most often the
+    // FHIR Server Base URL, which it checks more strictly than our own onboarding validation does.
+    private static void EnsureConfigurationSaved(LinkApiResponse response, string facilityId)
+    {
+        if (response.StatusCode == StatusCodes.Status400BadRequest)
+        {
+            var detail = LinkResponseHandler.ProblemDetail(response.RawBody)
+                ?? "The patient list configuration is invalid.";
+            throw new InvalidFhirConfigurationException(facilityId, "invalidPatientListConfiguration", detail);
+        }
+
+        LinkResponseHandler.EnsureSuccess(response, ServiceName, nameof(SaveConfigurationAsync));
     }
 
     public async Task DeleteConfigurationIfExistsAsync(string facilityId, CancellationToken cancellationToken = default)

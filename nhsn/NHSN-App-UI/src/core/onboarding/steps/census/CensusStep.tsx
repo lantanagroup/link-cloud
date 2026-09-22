@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as XLSX from "xlsx";
 import { useApiClient } from "../../../api/ApiClientContext";
@@ -8,6 +8,7 @@ import type {
   ConnectionResult,
   SftpFile,
 } from "../../../api/contracts";
+import { TimeoutError } from "../../../api/http";
 import { InstructionsDownload } from "../../../documents";
 import {
   acronymTitle,
@@ -133,6 +134,13 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     null,
   );
 
+  const sftpTestResultRef = useRef<HTMLParagraphElement | null>(null);
+  useEffect(() => {
+    if (testingConnection || connectionResult) {
+      scrollNearestContainerToBottom(sftpTestResultRef.current);
+    }
+  }, [testingConnection, connectionResult]);
+
   const persistedTestedSftpConfig =
     census.sftpConnectionTested && census.sftpHost && census.sftpPort !== undefined
       ? { host: census.sftpHost.trim(), port: census.sftpPort }
@@ -179,6 +187,11 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   ) {
     setFrequencyHours(hours);
     setFrequencyMinutes(minutes);
+    if (frequencyHoursError(hours) || frequencyMinutesError(minutes)) {
+      // Leave the last valid persisted duration alone instead of silently
+      // clamping a negative/out-of-range entry down to 0 behind the user's back.
+      return;
+    }
     patch("census", {
       acquisitionFrequency: buildHoursMinutesDuration(hours ?? 0, minutes ?? 0),
     });
@@ -332,11 +345,19 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       }
     } catch (cause) {
       patch("census", { sftpConnectionTested: false });
-      notifyError(
-        cause instanceof Error
-          ? cause.message
-          : t("onboarding:census.cerner.testError"),
-      );
+      if (cause instanceof TimeoutError) {
+        setConnectionResult({
+          success: false,
+          messageKey: "onboarding:census.cerner.testFailure",
+          detail: t("onboarding:census.cerner.testTimeout"),
+        });
+      } else {
+        notifyError(
+          cause instanceof Error
+            ? cause.message
+            : t("onboarding:census.cerner.testError"),
+        );
+      }
     } finally {
       setTestingConnection(false);
     }
@@ -378,6 +399,14 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
   function validateStep(): boolean {
     const nextErrors = validateCensus(draft, acquisition);
+    const hoursError = frequencyHoursError(frequencyHours);
+    const minutesError = frequencyMinutesError(frequencyMinutes);
+    if (hoursError) {
+      nextErrors.frequencyHours = hoursError;
+    }
+    if (minutesError) {
+      nextErrors.frequencyMinutes = minutesError;
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       announceValidationMessage(t("onboarding:census.messages.incomplete"));
@@ -599,6 +628,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           min={0}
           step={1}
           value={frequencyHours}
+          error={
+            frequencyHoursError(frequencyHours)
+              ? t(frequencyHoursError(frequencyHours)!)
+              : undefined
+          }
           onChange={(value) => updateFrequency(value, frequencyMinutes)}
           onBlur={() => refreshFieldError("acquisitionFrequency")}
         />
@@ -610,6 +644,11 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           max={59}
           step={1}
           value={frequencyMinutes}
+          error={
+            frequencyMinutesError(frequencyMinutes)
+              ? t(frequencyMinutesError(frequencyMinutes)!)
+              : undefined
+          }
           onChange={(value) => updateFrequency(frequencyHours, value)}
           onBlur={() => refreshFieldError("acquisitionFrequency")}
         />
@@ -817,6 +856,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                 </div>
 
                 <p
+                  ref={sftpTestResultRef}
                   role="status"
                   aria-live="polite"
                   className={`census-connection-status${
@@ -893,6 +933,36 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 }
 
 export default CensusStep;
+
+function scrollNearestContainerToBottom(element: HTMLElement | null): void {
+  let node = element?.parentElement ?? null;
+  while (node) {
+    const { overflowY } = window.getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") {
+      node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+      return;
+    }
+    node = node.parentElement;
+  }
+}
+
+function frequencyHoursError(value: number | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return Number.isInteger(value) && value >= 0
+    ? undefined
+    : "onboarding:census.errors.frequencyHoursInvalid";
+}
+
+function frequencyMinutesError(value: number | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return Number.isInteger(value) && value >= 0 && value <= 59
+    ? undefined
+    : "onboarding:census.errors.frequencyMinutesInvalid";
+}
 
 function formatDateTime(iso?: string): string {
   if (!iso) {
