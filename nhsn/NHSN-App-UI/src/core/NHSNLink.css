@@ -15,6 +15,7 @@
   background: var(--kendo-color-surface, #f7f9fc);
   height: 100vh;
   overflow: hidden;
+  position: relative;
   --nhsn-scrollbar-thumb: var(--kendo-color-border, #d0d7de);
   --nhsn-scrollbar-thumb-hover: var(--kendo-color-app-text-subtle, #5a5f69);
 }
