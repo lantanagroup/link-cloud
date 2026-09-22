@@ -91,18 +91,37 @@ steps:
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
 
+  # Build and push are separate steps because buildAndPush ignores `arguments`, and the
+  # image build needs the Shared_BOTW_Feed token for the LantanaGroup.Thetis.* packages.
+  # NuGetAuthenticate above only covers restores on the agent, not inside the container.
+  # The token goes in as a BuildKit secret (the Dockerfile's feed_accesstoken mount) rather
+  # than a build arg so it does not end up in the image history.
   - task: Docker@2
-    displayName: "Build & Push Automation Docker Image"
+    displayName: "Build Automation Docker Image"
     condition: always()
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
-      command: 'buildAndPush'
+      command: 'build'
       Dockerfile: $(dockerPath)
       tags: |
         latest
         $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
+      arguments: '--secret id=feed_accesstoken,env=FEED_ACCESSTOKEN'
+    env:
+      FEED_ACCESSTOKEN: $(System.AccessToken)
+
+  - task: Docker@2
+    displayName: "Push Automation Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(registry-repo-name)
+      command: 'push'
+      tags: |
+        latest
+        $(MyTag)
 
   - task: PublishPipelineArtifact@1
     inputs:
