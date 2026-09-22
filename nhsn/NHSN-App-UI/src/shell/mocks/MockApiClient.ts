@@ -22,6 +22,77 @@ import {isValidHttpUrl} from '../../core/onboarding/steps/fhir/validate';
 const DRAFT_KEY_PREFIX = 'nhsn-app-ui.mockDraft.';
 const LATENCY_MS = 120;
 
+// Mirrors ReferenceDataService.UsTimezoneDefinitions on the BFF, which in turn matches the
+// onboarding POC's own US_TIME_ZONES list verbatim: every IANA zone for the US and its
+// territories, one entry per distinct zone rather than one per region (several, like the
+// Indiana and North Dakota counties, have historically diverged on DST even though they
+// currently agree).
+const US_TIMEZONE_DEFINITIONS: ReadonlyArray<{id: string; label: string}> = [
+  {id: 'America/New_York', label: 'Eastern Time'},
+  {id: 'America/Detroit', label: 'Eastern Time'},
+  {id: 'America/Kentucky/Louisville', label: 'Eastern Time'},
+  {id: 'America/Kentucky/Monticello', label: 'Eastern Time'},
+  {id: 'America/Indiana/Indianapolis', label: 'Eastern Time'},
+  {id: 'America/Indiana/Vincennes', label: 'Eastern Time'},
+  {id: 'America/Indiana/Winamac', label: 'Eastern Time'},
+  {id: 'America/Indiana/Marengo', label: 'Eastern Time'},
+  {id: 'America/Indiana/Petersburg', label: 'Eastern Time'},
+  {id: 'America/Indiana/Vevay', label: 'Eastern Time'},
+  {id: 'America/Indiana/Tell_City', label: 'Central Time'},
+  {id: 'America/Indiana/Knox', label: 'Central Time'},
+  {id: 'America/Chicago', label: 'Central Time'},
+  {id: 'America/Menominee', label: 'Central Time'},
+  {id: 'America/North_Dakota/Center', label: 'Central Time'},
+  {id: 'America/North_Dakota/New_Salem', label: 'Central Time'},
+  {id: 'America/North_Dakota/Beulah', label: 'Central Time'},
+  {id: 'America/Denver', label: 'Mountain Time'},
+  {id: 'America/Boise', label: 'Mountain Time'},
+  {id: 'America/Phoenix', label: 'Mountain Time (no DST)'},
+  {id: 'America/Los_Angeles', label: 'Pacific Time'},
+  {id: 'America/Anchorage', label: 'Alaska Time'},
+  {id: 'America/Juneau', label: 'Alaska Time'},
+  {id: 'America/Sitka', label: 'Alaska Time'},
+  {id: 'America/Metlakatla', label: 'Alaska Time'},
+  {id: 'America/Yakutat', label: 'Alaska Time'},
+  {id: 'America/Nome', label: 'Alaska Time'},
+  {id: 'America/Adak', label: 'Hawaii-Aleutian Time'},
+  {id: 'Pacific/Honolulu', label: 'Hawaii Time (no DST)'},
+  {id: 'America/Puerto_Rico', label: 'Atlantic Time (Puerto Rico / US Virgin Islands)'},
+  {id: 'Pacific/Guam', label: 'Chamorro Time (Guam)'},
+  {id: 'Pacific/Saipan', label: 'Chamorro Time (N. Mariana Islands)'},
+  {id: 'Pacific/Pago_Pago', label: 'Samoa Time (American Samoa)'}
+];
+
+function currentUtcOffsetMinutes(timeZone: string, at: Date): number {
+  const offsetPart = new Intl.DateTimeFormat('en-US', {timeZone, timeZoneName: 'longOffset'})
+    .formatToParts(at)
+    .find(part => part.type === 'timeZoneName')?.value;
+  const match = /GMT([+-])(\d{2}):(\d{2})/.exec(offsetPart ?? '');
+  if (!match) {
+    return 0;
+  }
+  const sign = match[1] === '-' ? -1 : 1;
+  return sign * (Number(match[2]) * 60 + Number(match[3]));
+}
+
+function formatUtcOffset(totalMinutes: number): string {
+  const sign = totalMinutes < 0 ? '-' : '+';
+  const magnitude = Math.abs(totalMinutes);
+  const hours = Math.floor(magnitude / 60).toString().padStart(2, '0');
+  const minutes = (magnitude % 60).toString().padStart(2, '0');
+  return `${sign}${hours}:${minutes}`;
+}
+
+// Sorted by current offset, ascending: most-negative (e.g. Pago Pago) first, most-positive
+// (e.g. Guam) last. Ties - the many zones sharing a region's current offset - keep the
+// array's declaration order, since Array#sort is stable.
+function buildTimezones(): C.Timezone[] {
+  const now = new Date();
+  return US_TIMEZONE_DEFINITIONS.map(zone => ({...zone, offsetMinutes: currentUtcOffsetMinutes(zone.id, now)}))
+    .sort((a, b) => a.offsetMinutes - b.offsetMinutes)
+    .map(zone => ({id: zone.id, displayName: `${zone.id} — (UTC${formatUtcOffset(zone.offsetMinutes)}) ${zone.label}`}));
+}
+
 // Every section healthy - mock mode reads from localStorage, so nothing can be unavailable.
 // Build a step's Unavailable state against the real BFF with a service stopped, not against this.
 const MOCK_SOURCES: C.SectionSource[] = [
@@ -173,41 +244,7 @@ export class MockApiClient implements ApiClient {
 
   async getTimezones(): Promise<C.Timezone[]> {
     await tick();
-    return [
-      {id: 'America/New_York', displayName: 'America/New_York — Eastern Time'},
-      {id: 'America/Detroit', displayName: 'America/Detroit — Eastern Time'},
-      {id: 'America/Kentucky/Louisville', displayName: 'America/Kentucky/Louisville — Eastern Time'},
-      {id: 'America/Kentucky/Monticello', displayName: 'America/Kentucky/Monticello — Eastern Time'},
-      {id: 'America/Indiana/Indianapolis', displayName: 'America/Indiana/Indianapolis — Eastern Time'},
-      {id: 'America/Indiana/Vincennes', displayName: 'America/Indiana/Vincennes — Eastern Time'},
-      {id: 'America/Indiana/Winamac', displayName: 'America/Indiana/Winamac — Eastern Time'},
-      {id: 'America/Indiana/Marengo', displayName: 'America/Indiana/Marengo — Eastern Time'},
-      {id: 'America/Indiana/Petersburg', displayName: 'America/Indiana/Petersburg — Eastern Time'},
-      {id: 'America/Indiana/Vevay', displayName: 'America/Indiana/Vevay — Eastern Time'},
-      {id: 'America/Indiana/Tell_City', displayName: 'America/Indiana/Tell_City — Central Time'},
-      {id: 'America/Indiana/Knox', displayName: 'America/Indiana/Knox — Central Time'},
-      {id: 'America/Chicago', displayName: 'America/Chicago — Central Time'},
-      {id: 'America/Menominee', displayName: 'America/Menominee — Central Time'},
-      {id: 'America/North_Dakota/Center', displayName: 'America/North_Dakota/Center — Central Time'},
-      {id: 'America/North_Dakota/New_Salem', displayName: 'America/North_Dakota/New_Salem — Central Time'},
-      {id: 'America/North_Dakota/Beulah', displayName: 'America/North_Dakota/Beulah — Central Time'},
-      {id: 'America/Denver', displayName: 'America/Denver — Mountain Time'},
-      {id: 'America/Boise', displayName: 'America/Boise — Mountain Time'},
-      {id: 'America/Phoenix', displayName: 'America/Phoenix — Mountain Time (no DST)'},
-      {id: 'America/Los_Angeles', displayName: 'America/Los_Angeles — Pacific Time'},
-      {id: 'America/Anchorage', displayName: 'America/Anchorage — Alaska Time'},
-      {id: 'America/Juneau', displayName: 'America/Juneau — Alaska Time'},
-      {id: 'America/Sitka', displayName: 'America/Sitka — Alaska Time'},
-      {id: 'America/Metlakatla', displayName: 'America/Metlakatla — Alaska Time'},
-      {id: 'America/Yakutat', displayName: 'America/Yakutat — Alaska Time'},
-      {id: 'America/Nome', displayName: 'America/Nome — Alaska Time'},
-      {id: 'America/Adak', displayName: 'America/Adak — Hawaii-Aleutian Time'},
-      {id: 'Pacific/Honolulu', displayName: 'Pacific/Honolulu — Hawaii Time (no DST)'},
-      {id: 'America/Puerto_Rico', displayName: 'America/Puerto_Rico — Atlantic Time (Puerto Rico / US Virgin Islands)'},
-      {id: 'Pacific/Guam', displayName: 'Pacific/Guam — Chamorro Time (Guam)'},
-      {id: 'Pacific/Saipan', displayName: 'Pacific/Saipan — Chamorro Time (N. Mariana Islands)'},
-      {id: 'Pacific/Pago_Pago', displayName: 'Pacific/Pago_Pago — Samoa Time (American Samoa)'}
-    ];
+    return buildTimezones();
   }
 
   async getMeasures(): Promise<C.Measure[]> {
