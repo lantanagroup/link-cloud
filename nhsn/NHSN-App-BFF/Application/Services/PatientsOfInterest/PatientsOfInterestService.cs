@@ -82,6 +82,9 @@ public sealed class PatientsOfInterestService : IPatientsOfInterestService
     public Task<CensusListResult> QueryPatientListAsync(string listKey, CancellationToken cancellationToken = default) =>
         _patientListGateway.QueryAsync(_userContext.RequireFacilityId(), listKey, cancellationToken);
 
+    public Task<IReadOnlyList<CensusListResult>> QueryPatientListsAsync(CancellationToken cancellationToken = default) =>
+        _patientListGateway.QueryAllAsync(_userContext.RequireFacilityId(), cancellationToken);
+
     public Task SaveSftpCredentialsAsync(SftpCredentialsRequest request, CancellationToken cancellationToken = default) =>
         _sftpConfigurationGateway.SaveCredentialsAsync(
             _userContext.RequireFacilityId(), request.Username, request.Password, cancellationToken);

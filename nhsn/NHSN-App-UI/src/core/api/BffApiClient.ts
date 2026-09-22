@@ -179,6 +179,11 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
+  async queryPatientLists(): Promise<CensusListResult[]> {
+    const {data} = await this.http.get<CensusListResult[]>('/patients-of-interest/list-queries');
+    return data;
+  }
+
   async listSftpFiles(): Promise<SftpFile[]> {
     const {data} = await this.http.get<SftpFile[]>('/patients-of-interest/sftp-files');
     return data;

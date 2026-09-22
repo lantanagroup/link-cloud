@@ -113,6 +113,27 @@ internal sealed class PatientListGateway : IPatientListGateway
         };
     }
 
+    // On a 424, re-throws naming which of the six keys the failing FhirId belongs to, so the caller
+    // can blame one field instead of all six.
+    public async Task<IReadOnlyList<CensusListResult>> QueryAllAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        PatientListConfigurationWire? wire;
+        try
+        {
+            wire = await FetchAsync(facilityId, cancellationToken, includePatients: true);
+        }
+        catch (PatientListRetrievalFailedException ex)
+        {
+            var configuredIds = await GetConfigurationAsync(facilityId, cancellationToken);
+            var failingKey = configuredIds
+                .FirstOrDefault(pair => ex.Message.Contains(pair.Value, StringComparison.OrdinalIgnoreCase))
+                .Key;
+            throw new PatientListRetrievalFailedException(facilityId, ex.Message, failingKey);
+        }
+
+        return PatientListConfigurationMapper.ToCensusListResults(wire);
+    }
+
     private async Task<PatientListConfigurationWire?> FetchAsync(string facilityId, CancellationToken cancellationToken, bool includePatients = false)
     {
         var response = await _dataAcquisitionClient.GetFhirListConfigurationAsync(facilityId, includePatients, cancellationToken);

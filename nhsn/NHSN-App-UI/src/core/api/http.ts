@@ -45,6 +45,12 @@ export class HttpError extends Error {
     const value = this.problem?.extensions?.['errorCode'];
     return typeof value === 'string' ? value : undefined;
   }
+
+  /** Which census list field a QueryPatientLists 424 blames. Undefined when it can't be determined. */
+  get listKey(): string | undefined {
+    const value = this.problem?.extensions?.['listKey'];
+    return typeof value === 'string' ? value : undefined;
+  }
 }
 
 export class TimeoutError extends Error {
@@ -180,8 +186,24 @@ async function readProblem(response: Response): Promise<ProblemDetails | undefin
     if (!text) {
       return undefined;
     }
-    const parsed = JSON.parse(text) as ProblemDetails;
-    return typeof parsed === 'object' && parsed !== null ? parsed : { detail: text };
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { detail: text };
+    }
+
+    // ASP.NET Core's ProblemDetails serializer writes Extensions as sibling top-level
+    // properties, not nested under an "extensions" key - so anything beyond the RFC 7807
+    // members (type/title/status/detail/instance) is one.
+    const { type, title, status, detail, instance: _instance, ...extensions } =
+      parsed as Record<string, unknown>;
+    return {
+      type: typeof type === 'string' ? type : undefined,
+      title: typeof title === 'string' ? title : undefined,
+      status: typeof status === 'number' ? status : undefined,
+      detail: typeof detail === 'string' ? detail : undefined,
+      traceId: typeof extensions.traceId === 'string' ? extensions.traceId : undefined,
+      extensions
+    };
   } catch {
     return undefined;
   }

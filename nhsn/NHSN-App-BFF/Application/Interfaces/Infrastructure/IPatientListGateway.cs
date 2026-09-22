@@ -23,4 +23,7 @@ public interface IPatientListGateway
     // The patients currently on one of the six lists, read live from the facility's EHR through Data
     // Acquisition. Empty when the key is unknown or that list is not configured.
     Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default);
+
+    // All six lists in one Data Acquisition round trip. Preferred over calling QueryAsync six times.
+    Task<IReadOnlyList<CensusListResult>> QueryAllAsync(string facilityId, CancellationToken cancellationToken = default);
 }

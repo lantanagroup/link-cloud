@@ -72,6 +72,28 @@ public class PatientsOfInterestEndpoints : IApi
                 return operation;
             });
 
+        group.MapGet("/list-queries", async (
+                IPatientsOfInterestService service,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await service.QueryPatientListsAsync(cancellationToken);
+                return Results.Ok(result);
+            })
+            .WithName("QueryPatientLists")
+            .Produces<IReadOnlyList<CensusListResult>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status424FailedDependency)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Run all six of Epic's patient-list census queries in one call.";
+                operation.Description =
+                    "Epic only. Data Acquisition resolves every configured list from the EHR in a " +
+                    "single round trip, so a FhirId it can't read fails the whole call (424) rather " +
+                    "than just its own list; the problem's listKey extension names which of the six " +
+                    "fields that id belongs to, when it can be determined.";
+                return operation;
+            });
+
         group.MapPut("/sftp-credentials", async (
                 SftpCredentialsRequest request,
                 IPatientsOfInterestService service,

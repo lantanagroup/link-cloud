@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.Mappers;
 
@@ -114,6 +115,25 @@ internal static class PatientListConfigurationMapper
         }
 
         return source.EHRPatientLists.FirstOrDefault(list => list.Status == entry.Status && list.TimeFrame == entry.TimeFrame);
+    }
+
+    public static IReadOnlyList<CensusListResult> ToCensusListResults(PatientListConfigurationWire? source)
+    {
+        return ListKeys.Select(entry =>
+        {
+            var patientIds = FindList(source, entry.Key)?.Patients?
+                .Select(patient => patient.Id)
+                .OfType<string>()
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToArray() ?? [];
+
+            return new CensusListResult
+            {
+                ListKey = entry.Key,
+                PatientCount = patientIds.Length,
+                PatientIds = patientIds
+            };
+        }).ToList();
     }
 
     // Every one of the six keys must carry a non-empty id — Data Acquisition rejects anything but

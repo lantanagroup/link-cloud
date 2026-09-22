@@ -14,6 +14,9 @@ public interface IPatientsOfInterestService
     // Epic.
     Task<CensusListResult> QueryPatientListAsync(string listKey, CancellationToken cancellationToken = default);
 
+    // Epic. All six lists in one call, for the Census step's "Validate" preview.
+    Task<IReadOnlyList<CensusListResult>> QueryPatientListsAsync(CancellationToken cancellationToken = default);
+
     // Cerner. Write-only — never echoed back, and the values are not retained by the BFF either.
     Task SaveSftpCredentialsAsync(SftpCredentialsRequest request, CancellationToken cancellationToken = default);
 

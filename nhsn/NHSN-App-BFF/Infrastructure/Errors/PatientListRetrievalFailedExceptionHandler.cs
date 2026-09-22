@@ -30,7 +30,8 @@ public sealed class PatientListRetrievalFailedExceptionHandler : IExceptionHandl
             {
                 Status = StatusCodes.Status424FailedDependency,
                 Title = "A patient list could not be read from the EHR.",
-                Detail = retrievalException.Message
+                Detail = retrievalException.Message,
+                Extensions = { ["listKey"] = retrievalException.ListKey }
             }
         });
     }
