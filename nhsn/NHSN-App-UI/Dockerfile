@@ -14,3 +14,4 @@ COPY --from=build /app/dist ./dist
 
 EXPOSE 8080
 CMD ["node", "server/main.js"]
+#
