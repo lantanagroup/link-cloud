@@ -75,7 +75,7 @@ steps:
   displayName: "Inject Service Info"
   inputs:
     scriptSource: 'filePath'
-    scriptPath: $(Pipeline.Workspace)/link-cloud/scripts/set_service_info.py
+    scriptPath: $(Pipeline.Workspace)/link-cloud/Scripts/set_service_info.py
     workingDirectory: '$(Pipeline.Workspace)/link-cloud'
     arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
