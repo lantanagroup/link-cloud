@@ -101,10 +101,6 @@ jobs:
         serviceName: admin-ui
         repoName: admin-ui
 
-      app-bff:
-        serviceName: app-bff
-        repoName: app-bff
-
       audit:
         serviceName: audit
         repoName: audit
@@ -238,11 +234,6 @@ jobs:
         repoName: admin-ui
         containerName: admin-ui
         healthUrl: https://$(env)-admin.nhsnlink.org/
-      app-bff:
-        serviceName: app-bff
-        repoName: app-bff
-        containerName: app-bff
-        healthUrl: https://$(env)-app-bff.nhsnlink.org/
       audit:
         serviceName: audit
         repoName: audit
