@@ -71,13 +71,13 @@ steps:
       echo "GIT_COMMIT: ${GIT_COMMIT}"
       echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
 
-# - task: PythonScript@0
-#   displayName: "Inject Service Info"
-#   inputs:
-#     scriptSource: 'filePath'
-#     scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
-#     workingDirectory: '$(Build.SourcesDirectory)'
-#     arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+- task: PythonScript@0
+  displayName: "Inject Service Info"
+  inputs:
+    scriptSource: 'filePath'
+    scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+    workingDirectory: '$(Pipeline.Workspace)/link-cloud'
+    arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
 # Copy into Packages Folder
 - task: Bash@3
