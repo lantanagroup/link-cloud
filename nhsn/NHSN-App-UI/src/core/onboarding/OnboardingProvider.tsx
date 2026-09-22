@@ -361,8 +361,11 @@ export function OnboardingProvider({
     }
     dirtyRef.current = false;
     const target = restored && !isUnlocked(stepId, restored, user) ? furthestLegalStep(restored, user) : stepId;
+    if (target !== stepId) {
+      notifyError(t('unsavedChanges.messages.discardRelocked'));
+    }
     completeGoTo(target);
-  }, [pendingStepId, completeGoTo, user]);
+  }, [pendingStepId, completeGoTo, user, notifyError, t]);
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
