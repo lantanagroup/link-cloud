@@ -796,6 +796,10 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                               "onboarding:census.epic.viewResultsAria",
                               { list: t(LIST_LABEL_KEYS[key]) },
                             )}
+                            title={t(
+                              "onboarding:census.epic.viewResultsAria",
+                              { list: t(LIST_LABEL_KEYS[key]) },
+                            )}
                             disabled={!state?.result}
                             onClick={() =>
                               setSelectedListKey((prev) =>
@@ -963,6 +967,10 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                             type="button"
                             className={`census-view-btn${selectedFileName === file.fileName ? " active" : ""}`}
                             aria-label={t(
+                              "onboarding:census.cerner.viewResultsAria",
+                              { file: file.fileName },
+                            )}
+                            title={t(
                               "onboarding:census.cerner.viewResultsAria",
                               { file: file.fileName },
                             )}

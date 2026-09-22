@@ -86,7 +86,8 @@
     "title": "Unsaved changes",
     "message": "You have unsaved changes on this step. Save them before continuing, or discard them?",
     "messages": {
-      "incomplete": "Please review the highlighted items before proceeding."
+      "incomplete": "Please review the highlighted items before proceeding.",
+      "discardRelocked": "Discarding those changes locked this step again. Complete and save it before continuing."
     }
   },
   "a11y": {
