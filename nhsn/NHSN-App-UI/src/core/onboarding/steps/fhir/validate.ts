@@ -42,9 +42,14 @@ const PULL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const MAX_CONCURRENT_REQUESTS_CAP = 8;
 
-// Mirrors the BFF's FieldValidationRules.LagDurationCapMinutes (30 days), shared with the
+// Mirrors the BFF's FieldValidationRules.LagDurationCapMinutes (59 days), shared with the
 // manual-upload import path - keep the two in sync, they've drifted apart before.
-const LAG_DAYS_CAP = 30;
+const LAG_DAYS_CAP = 59;
+
+function toMinutesSinceMidnight(pullTime: string): number {
+  const [hours, minutes] = pullTime.split(':').map(Number);
+  return hours * 60 + minutes;
+}
 
 export function validateFhir(values: FhirFieldValues): FieldErrors {
   const errors: FieldErrors = {};
@@ -57,7 +62,7 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
   }
 
   if (values.maxConcurrentRequests == null) {
-    errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.errors.fieldRequired';
+    errors.maxConcurrentRequests = 'onboarding:fhirServerInfo.messages.maxConcurrentRequestsRequired';
   } else if (
     !Number.isInteger(values.maxConcurrentRequests) ||
     values.maxConcurrentRequests < 1 ||
@@ -73,7 +78,7 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   if (!values.minAcquisitionPullTime) {
     if (values.maxAcquisitionPullTime) {
-      errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+      errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.pullTimePairRequired';
     }
   } else if (!PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
     errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
@@ -81,32 +86,39 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
 
   if (!values.maxAcquisitionPullTime) {
     if (values.minAcquisitionPullTime) {
-      errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.fieldRequired';
+      errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.pullTimePairRequired';
     }
   } else if (!PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
     errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
-  if (values.lagDays == null) {
-    errors.lagDays = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > LAG_DAYS_CAP) {
+  // Only compare once both sides are individually well-formed - comparing against a pattern
+  // failure would just bury the more useful "invalidPullTime" error under a confusing one.
+  if (
+    !errors.minAcquisitionPullTime &&
+    !errors.maxAcquisitionPullTime &&
+    values.minAcquisitionPullTime &&
+    values.maxAcquisitionPullTime &&
+    toMinutesSinceMidnight(values.minAcquisitionPullTime) >= toMinutesSinceMidnight(values.maxAcquisitionPullTime)
+  ) {
+    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+  }
+
+  if (values.lagDays != null && (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > LAG_DAYS_CAP)) {
     errors.lagDays = 'onboarding:fhirServerInfo.messages.invalidLagDays';
   }
 
-  if (values.lagHours == null) {
-    errors.lagHours = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.lagHours) || values.lagHours < 0 || values.lagHours > 23) {
+  if (values.lagHours != null && (!Number.isInteger(values.lagHours) || values.lagHours < 0 || values.lagHours > 23)) {
     errors.lagHours = 'onboarding:fhirServerInfo.messages.invalidLagHours';
   }
 
-  if (values.lagMinutes == null) {
-    errors.lagMinutes = 'onboarding:fhirServerInfo.errors.fieldRequired';
-  } else if (!Number.isInteger(values.lagMinutes) || values.lagMinutes < 0 || values.lagMinutes > 59) {
+  if (values.lagMinutes != null && (!Number.isInteger(values.lagMinutes) || values.lagMinutes < 0 || values.lagMinutes > 59)) {
     errors.lagMinutes = 'onboarding:fhirServerInfo.messages.invalidLagMinutes';
   }
 
   const lagFieldsValid = !errors.lagDays && !errors.lagHours && !errors.lagMinutes;
-  if (lagFieldsValid && (values.lagDays! + values.lagHours! + values.lagMinutes!) === 0) {
+  if (lagFieldsValid && (values.lagDays ?? 0) + (values.lagHours ?? 0) + (values.lagMinutes ?? 0) === 0) {
     errors.lagDuration = 'onboarding:fhirServerInfo.messages.lagDurationRequired';
   }
 

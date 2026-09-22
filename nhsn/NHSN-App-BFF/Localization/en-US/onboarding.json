@@ -93,7 +93,7 @@
       "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
-      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 30 days.",
+      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 59 days.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
       "invalidFhirPath": "Enter a valid FHIRPath expression.",
@@ -136,7 +136,7 @@
       "invalidMaxConcurrentRequests": "Max Concurrent Requests must be a whole number of 1 or greater.",
       "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
       "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
-      "invalidLagDays": "Days must be a whole number between 0 and 30.",
+      "invalidLagDays": "Days must be a whole number between 0 and 59.",
       "invalidLagHours": "Hours must be a whole number between 0 and 23.",
       "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
       "lagDurationRequired": "At least one of Days, Hours, or Minutes must be greater than zero.",
@@ -230,13 +230,15 @@
       "saveRejected": "The patients of interest configuration could not be saved. Double-check the values and try again."
     },
     "errors": {
-      "listIdRequired": "This field is required.",
+      "listIdRequired": "{{list}} List Id is required.",
       "hostRequired": "SFTP Host URL is required.",
+      "hostTooLong": "SFTP Host URL cannot exceed 128 characters.",
       "portRequired": "SFTP Host URL Port is required.",
       "portInvalid": "Enter a valid port between 1 and 65535.",
-      "frequencyTooShort": "Census Acquisition Frequency must be at least 15 minutes.",
-      "frequencyHoursInvalid": "Enter a whole number of hours, 0 or greater.",
-      "frequencyMinutesInvalid": "Enter a whole number of minutes between 0 and 59."
+      "frequencyTooShort": "Census Acquisition Frequency must be at least 5 minutes.",
+      "frequencyTooLong": "Census Acquisition Frequency must be no more than 24 hours.",
+      "frequencyHoursInvalid": "Enter a whole number of hours between 0 and 23.",
+      "frequencyMinutesInvalid": "Enter a whole number of minutes between {{min}} and 59."
     }
   },
   "locationOrg": {
