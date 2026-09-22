@@ -1,7 +1,10 @@
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
@@ -27,11 +30,13 @@ namespace IntegrationTests.DMRP
         public Mock<IFacilityExistence> FacilityExistenceMock { get; } = new();
 
         /// <summary>
-        /// Stands in for the host's record of where each facility is. Defaults to UTC for every facility,
-        /// so a test that does not care about timezones is anchored exactly as it was before the reads
-        /// took the facility's timezone into account.
+        /// Stands in for the host's directory of facilities - both where a single one is, and which
+        /// ones exist by timezone for the nightly job. Defaults every facility to UTC, so a test that
+        /// does not care about timezones is anchored exactly as it was before the reads took the
+        /// facility's timezone into account. Registered for both <see cref="IFacilityTimeZoneSource"/>
+        /// and <see cref="IFacilityDirectory"/>, since the latter extends the former.
         /// </summary>
-        public Mock<IFacilityTimeZoneSource> FacilityTimeZoneSourceMock { get; } = new();
+        public Mock<IFacilityDirectory> FacilityDirectoryMock { get; } = new();
 
         /// <summary>
         /// Stands in for the host's facility operations, which the module puts its own behavior in front
@@ -67,6 +72,18 @@ namespace IntegrationTests.DMRP
                 _mock.RestoreAsync(facility, cancellationToken);
         }
 
+        /// <summary>
+        /// The real <see cref="IDmrpReportingPlanSync"/> talks to the DMRP API over HTTP, which this
+        /// fixture has no server for. A facility create now refreshes from DMRP before deriving its
+        /// schedule, so every create needs a sync that succeeds without reaching out; the schedule
+        /// tests here care about rows already seeded in the database, not about what a sync would add.
+        /// </summary>
+        private sealed class NoOpReportingPlanSync : IDmrpReportingPlanSync
+        {
+            public Task<DmrpSyncResult> SyncAsync(string facilityId, int month, int year,
+                CancellationToken cancellationToken = default) => Task.FromResult(DmrpSyncResult.Nothing);
+        }
+
         private readonly WebApplication _host;
         private readonly string _dbPath;
 
@@ -99,22 +116,28 @@ namespace IntegrationTests.DMRP
             });
 
             ResetFacilityExistence();
-            ResetFacilityTimeZoneSource();
+            ResetFacilityDirectory();
 
             builder.Services.AddSingleton<IFacilityExistence>(FacilityExistenceMock.Object);
-            builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityTimeZoneSourceMock.Object);
+            builder.Services.AddSingleton<IFacilityTimeZoneSource>(FacilityDirectoryMock.Object);
+            builder.Services.AddSingleton<IFacilityDirectory>(FacilityDirectoryMock.Object);
 
             // The module puts its own behavior in front of the host's facility operations rather than
             // supplying them, so the fixture stands in for the host here as it does for the facility
             // lookup above. The module needs a named type, so the mock is reached through one.
             builder.Services.AddScoped(_ => new HostFacilityOperations(FacilityOperationsMock.Object));
 
+            builder.Services.RegisterQuartzDatabaseInTest();
+
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(
-                builder.Services.AddControllers());
+                builder.Services.AddControllers(), ReportSchedulingJobs.ClassicJobGroup);
             if (!registered)
             {
                 throw new InvalidOperationException("The DMRP module did not register; the fixture cannot resolve its services.");
             }
+
+            // Registered after the module so it overrides the real, HTTP-backed sync the module wired up.
+            builder.Services.AddScoped<IDmrpReportingPlanSync, NoOpReportingPlanSync>();
 
             builder.Services.AddLogging();
 
@@ -145,11 +168,11 @@ namespace IntegrationTests.DMRP
         /// Restores the default "every facility is in UTC" stub, dropping any setup a test added to the
         /// shared mock.
         /// </summary>
-        public void ResetFacilityTimeZoneSource()
+        public void ResetFacilityDirectory()
         {
-            FacilityTimeZoneSourceMock.Reset();
+            FacilityDirectoryMock.Reset();
 
-            FacilityTimeZoneSourceMock
+            FacilityDirectoryMock
                 .Setup(s => s.GetTimeZoneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync("UTC");
         }

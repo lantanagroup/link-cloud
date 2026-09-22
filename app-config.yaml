@@ -447,6 +447,25 @@ global:
     required: false
     defaultValue: "30"
     consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:NightlyCron"
+    description: "Quartz cron expression for the DMRP nightly scheduling job, evaluated in each facility's timezone. One job runs per distinct facility timezone; on the last night of a month it refreshes next month's reporting plans from DMRP before producing ReportScheduled events for the periods starting at midnight. Must fire before local midnight. An invalid expression falls back to the default."
+    required: false
+    defaultValue: "0 59 23 * * ?"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:Concurrency"
+    description: "How many facilities one nightly fire processes at the same time (accepted range 1-32). Bounds the burst of DMRP API calls at month end. A value outside the range falls back to the default."
+    required: false
+    defaultValue: "4"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:CatchUpNights"
+    description: "On how many nights at the start of each month the nightly job refreshes from DMRP any facility that has no reporting plan rows for that month (accepted range 0-28, 0 disables). Repairs a failed month-end refresh without probing every unenrolled facility all month. A value outside the range falls back to the default."
+    required: false
+    defaultValue: "3"
+    consumers: ["Tenant"]
+  - key: "DMRP:Scheduling:ScheduledFireTimeOverride"
+    description: "QA aid. A local date and time with no offset (for example 2026-09-30T23:59:00), read in each facility's timezone the same way NightlyCron is. When set, every fire of the DMRP nightly job anchors its reporting periods on that wall-clock moment instead of the trigger's scheduled time, so the month-end refresh and the Monthly announcement can be rehearsed on any date. A value carrying a Z or a UTC offset is ignored with a warning. Leave unset in production; the job logs a warning on every fire while it is set."
+    required: false
+    consumers: ["Tenant"]
 
 services:
   Account:
@@ -646,7 +665,7 @@ services:
   # only where the mock is deployed, and never in a production store.
   MockDmrpApi:
     - key: "MockDmrpApi:Enabled"
-      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped, so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
+      description: "Master switch for the mock DMRP surface. Absent or false means every route except /health and /api/mock-dmrp/info answers 503 (schema migration still runs when ConnectionStrings:DatabaseConnection is configured, and is skipped when it is not), so an environment that wants the mock must provision this as true and a production store keeps it out by never carrying the row at all. The service does NOT consult the environment name: every deployed Link namespace runs as ASPNETCORE_ENVIRONMENT=Production, dev, qa and test included, so an earlier IsProduction() check disabled the mock everywhere it was actually deployed (LEGLINK-1048)."
       required: false
       defaultValue: "false"
     - key: "MockDmrpApi:AuthClientId"

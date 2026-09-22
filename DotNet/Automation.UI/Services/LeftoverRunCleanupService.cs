@@ -421,7 +421,27 @@ public sealed class LeftoverRunCleanupService(
                     run.RunId.ToString(), cancellationToken);
                 try
                 {
-                    await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
+                    var output = new LoggerAutomationOutput(logger, run.FacilityId ?? run.RunId.ToString());
+                    // Weekly history-purge always wants per-run facility teardown.
+                    // Custom-range honors the independent teardownFacilities checkbox; skip IDs the facility loop already handled.
+                    var teardownInPurge = mode == "history-purge" || teardownFacilities;
+                    await RunCleanupHelper.PurgeRunHistoryAsync(
+                        facilityClient,
+                        normalizationClient,
+                        dataAcqClient,
+                        queryDispatchClient,
+                        censusClient,
+                        reportClient,
+                        abortRegistry,
+                        snapshotStore,
+                        output,
+                        run,
+                        settings.AbortTtl,
+                        cancellationToken,
+                        teardownFacility: teardownInPurge,
+                        alreadyTornDownFacilityIds: tornDown.Count > 0
+                            ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
+                            : null);
                     purged.Add(run.RunId);
                 }
                 catch (Exception ex)

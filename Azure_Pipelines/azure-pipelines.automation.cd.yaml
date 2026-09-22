@@ -91,18 +91,35 @@ steps:
         Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
         Write-Host "Set MyTag to: $myTag1"
 
+  # buildAndPush ignores `arguments`, so the feed secret never reached docker build
+  # (ADO warning on build 139467). Split build/push so BuildKit --secret applies.
   - task: Docker@2
-    displayName: "Build & Push Automation Docker Image"
+    displayName: "Build Automation Docker Image"
     condition: always()
+    env:
+      DOCKER_BUILDKIT: 1
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     inputs:
       containerRegistry: $(containerRegistry) # Variable Group
       repository: $(registry-repo-name)
-      command: 'buildAndPush'
+      command: 'build'
       Dockerfile: $(dockerPath)
       tags: |
         latest
         $(MyTag)
       buildContext: '$(Build.Repository.LocalPath)'
+      arguments: '--secret id=feed_accesstoken,env=SYSTEM_ACCESSTOKEN'
+
+  - task: Docker@2
+    displayName: "Push Automation Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(registry-repo-name)
+      command: 'push'
+      tags: |
+        latest
+        $(MyTag)
 
   - task: PublishPipelineArtifact@1
     inputs:

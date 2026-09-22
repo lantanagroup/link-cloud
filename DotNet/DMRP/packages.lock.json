@@ -8,6 +8,15 @@
         "resolved": "1.2.11",
         "contentHash": "jQXu7G9Ik6BDcS5506RV1CI184pG5eHwvqzrB5zEivciW7KiZ9iHM8ZTyu5o/TGt55woagJGUVsJYw4aBjRfEQ=="
       },
+      "Quartz": {
+        "type": "Direct",
+        "requested": "[3.18.1, )",
+        "resolved": "3.18.1",
+        "contentHash": "q/n/gKLcApDlTk90BRNvj6P8HKR+vbtZEQxo5BAbeEoN5e/8/aqRuG6yH7tVg02CeAXAD40boS74s9hVnh4XDw==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "2.1.1"
+        }
+      },
       "AngleSharp": {
         "type": "Transitive",
         "resolved": "0.17.1",
@@ -2316,15 +2325,6 @@
         "contentHash": "OOvpqR/j2Pb6+tWhHNODIbSJ53Or/MDtTiXEyrsWI02K2lLAgvBFcxUOrHggS/8015cYR3AdSaXv6NZrkz5yQA==",
         "dependencies": {
           "OpenTelemetry.Api": "[1.15.0, 2.0.0)"
-        }
-      },
-      "Quartz": {
-        "type": "CentralTransitive",
-        "requested": "[3.18.1, )",
-        "resolved": "3.18.1",
-        "contentHash": "q/n/gKLcApDlTk90BRNvj6P8HKR+vbtZEQxo5BAbeEoN5e/8/aqRuG6yH7tVg02CeAXAD40boS74s9hVnh4XDw==",
-        "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "2.1.1"
         }
       },
       "Quartz.AspNetCore": {
