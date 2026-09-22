@@ -371,12 +371,20 @@ public sealed class ApiHealthExecutionRunManager(
             .Select(d => d.Key)
             .ToHashSet();
 
-        var commit = GetServiceCommit(results);
+        var serviceInfo = GetServiceInformation(results);
 
         foreach (var result in results)
         {
             result.RunId = run.RunId;
-            result.Commit = commit;
+            result.Commit = string.IsNullOrWhiteSpace(serviceInfo?.Commit)
+                ? null
+                : serviceInfo.Commit;
+            result.Build = string.IsNullOrWhiteSpace(serviceInfo?.Build)
+                ? null
+                : serviceInfo.Build;
+            result.Version = string.IsNullOrWhiteSpace(serviceInfo?.Version)
+                ? null
+                : serviceInfo.Version;
         }
 
         await store.SaveRunResultsAsync(
@@ -392,7 +400,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private static string? GetServiceCommit(IReadOnlyList<ApiTestRunResult> results)
+    private static ServiceInformation? GetServiceInformation(IReadOnlyList<ApiTestRunResult> results)
     {
         var serviceInfoResult = results.FirstOrDefault(result =>
             string.Equals(
@@ -407,16 +415,12 @@ public sealed class ApiHealthExecutionRunManager(
 
         try
         {
-            var serviceInfo = JsonSerializer.Deserialize<ServiceInformation>(
+            return JsonSerializer.Deserialize<ServiceInformation>(
                 serviceInfoResult.ResponseBody,
                 new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
-
-            return string.IsNullOrWhiteSpace(serviceInfo?.Commit)
-                ? null
-                : serviceInfo.Commit;
         }
         catch (JsonException)
         {

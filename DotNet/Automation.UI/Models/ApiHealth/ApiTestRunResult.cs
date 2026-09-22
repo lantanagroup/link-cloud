@@ -45,6 +45,16 @@ public sealed class ApiTestRunResult
     /// </summary>
     public string? Commit { get; set; }
 
+    /// <summary>
+    /// Build of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Build { get; set; }
+
+    /// <summary>
+    /// Version of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Version { get; set; }
+
     // --- Diagnostic fields (populated from LinkApiResponse) ---
 
     /// <summary>The full URL that was called (e.g., https://host/api/normalization/operations/facility/xyz).</summary>

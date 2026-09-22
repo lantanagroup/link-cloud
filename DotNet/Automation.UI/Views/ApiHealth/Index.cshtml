@@ -921,18 +921,20 @@
             const data = await getJson(`/ApiHealth/History?endpointKey=${encodeURIComponent(key)}&pageNumber=${page}&pageSize=15`);
             if (data.runs.length === 0) { content.innerHTML = '<p class="text-muted text-center">No history yet.</p>'; return; }
 
-            let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th><th>Commit #</th></tr></thead><tbody>';
+            let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th><th>Commit #</th><th>Build</th><th>Version</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
                 const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
                 const normalizedError = normalizeText(r.errorMessage);
                 const error = normalizedError ? `<small class="text-danger">${escapeHtml(normalizedError)}</small>` : 'N/A';
                 const commit = r.commit ? `<code>${escapeHtml(r.commit)}</code>` : '<span class="text-muted">N/A</span>';
-                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td><td>${commit}</td></tr>`;
+                const build = r.build ? `<code>${escapeHtml(r.build)}</code>` : '<span class="text-muted">N/A</span>';
+                const version = r.version ? `<code>${escapeHtml(r.version)}</code>` : '<span class="text-muted">N/A</span>';
+                        html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td><td>${commit}</td><td>${build}</td><td>${version}</td></tr>`;
                 // Expandable detail row
                 const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
                 const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
                 const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
-                html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="6" class="ps-3 py-2"><dl class="row mb-0 small">
+                html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="8" class="ps-3 py-2"><dl class="row mb-0 small">
                     <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'N/A')} ${escapeHtml(r.requestUrl || 'N/A')}</code></dd>
                     ${requestBodyHtml}${traceHtml}${responseHtml}
                     <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${r.durationMs}ms</dd>
