@@ -9,7 +9,8 @@ public class FacilityTemplatesController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
-    IPatientConfigurationStore patientConfigurationStore) : Controller
+    IPatientConfigurationStore patientConfigurationStore,
+    IScenarioStore scenarioStore) : Controller
 {
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -85,6 +86,14 @@ public class FacilityTemplatesController(
             return StatusCode(StatusCodes.Status403Forbidden, "System template cannot be deleted.");
         if (template.IsDefault)
             return Conflict("The system facility config cannot be deleted.");
+
+        var usedBy = (await scenarioStore.GetAllAsync(ct))
+            .Where(s => s.FacilityConfigurationMode == FacilityConfigurationMode.Facility
+                && s.FacilityTemplateId == request.Id)
+            .Select(s => s.Name)
+            .ToList();
+        if (usedBy.Count > 0)
+            return Conflict($"This facility template is used by {string.Join(", ", usedBy)}. Remove it from those scenarios before deleting it.");
 
         await store.DeleteAsync(request.Id, ct);
         return Ok();

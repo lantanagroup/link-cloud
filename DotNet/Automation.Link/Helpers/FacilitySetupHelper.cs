@@ -114,6 +114,25 @@ public static class FacilitySetupHelper
         return newVersionId;
     }
 
+    /// <summary>
+    /// Tenant stores a facility vendor as <see cref="FacilityModel.VendorVersionId"/>.
+    /// A name on <see cref="FacilityModel.Vendor"/> is not mapped onto that id.
+    /// </summary>
+    private static async Task StampVendorAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        FacilityModel model,
+        string? vendorName,
+        bool vendorExplicit,
+        CancellationToken cancellationToken)
+    {
+        var vendor = ResolveVendor(vendorName, vendorExplicit);
+        model.Vendor = vendor;
+        model.VendorVersionId = string.IsNullOrWhiteSpace(vendor?.Name)
+            ? null
+            : await EnsureVendorVersionIdAsync(facilityClient, output, vendor.Name!, cancellationToken);
+    }
+
     private static VendorModel? ResolveVendor(string? vendorName, bool vendorExplicit)
     {
         if (!vendorExplicit)
@@ -178,16 +197,17 @@ public static class FacilitySetupHelper
 
         var dmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
 
-        var createResponse = await facilityClient.CreateAsync(new FacilityModel
+        var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = ResolveVendor(vendorName, vendorExplicit),
             // Empty under DMRP, and not merely unselected: a request that names any report is refused
             // outright. The measures are enrolled below instead.
             ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds)
-        }, cancellationToken);
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var createResponse = await facilityClient.CreateAsync(facility, cancellationToken);
 
         if (!createResponse.IsSuccessStatusCode)
         {
@@ -282,14 +302,15 @@ public static class FacilitySetupHelper
             }
         }
 
-        var updated = await facilityClient.UpdateAsync(facilityId, new FacilityModel
+        var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = ResolveVendor(vendorName, vendorExplicit),
             ScheduledReports = MonthlySchedule([])
-        }, cancellationToken);
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
 
         if (!updated.IsSuccessStatusCode)
         {
@@ -787,14 +808,15 @@ public static class FacilitySetupHelper
             return;
         }
 
-        var created = await facilityClient.CreateAsync(new FacilityModel
+        var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = ResolveVendor(vendorName, vendorExplicit),
             ScheduledReports = MonthlySchedule([])
-        }, cancellationToken);
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var created = await facilityClient.CreateAsync(facility, cancellationToken);
 
         if (!created.IsSuccessStatusCode)
         {
@@ -818,17 +840,15 @@ public static class FacilitySetupHelper
     string? vendorName = null,
     bool vendorExplicit = false)
     {
-        var updated = await facilityClient.UpdateAsync(
-            facilityId,
-            new FacilityModel
-            {
-                FacilityId = facilityId,
-                FacilityName = facilityId,
-                TimeZone = FacilityTimeZone,
-                Vendor = ResolveVendor(vendorName, vendorExplicit),
-                ScheduledReports = MonthlySchedule([])
-            },
-            cancellationToken);
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            ScheduledReports = MonthlySchedule([])
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
 
         if (!updated.IsSuccessStatusCode)
         {

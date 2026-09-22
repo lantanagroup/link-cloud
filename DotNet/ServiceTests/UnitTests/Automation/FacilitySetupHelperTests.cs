@@ -57,6 +57,17 @@ public class FacilitySetupHelperTests
                 _updated.Add(model);
                 return Response(200, model);
             });
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorModel model, CancellationToken _) =>
+                Response(201, new VendorModel { Id = Guid.NewGuid(), Name = model.Name }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorVersionModel model, CancellationToken _) =>
+                Response(201, new VendorVersionModel { Id = Guid.NewGuid(), VendorId = model.VendorId, Version = model.Version }));
     }
 
     [Fact]
@@ -69,6 +80,7 @@ public class FacilitySetupHelperTests
         var created = Assert.Single(_created);
         Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
         Assert.Equal("Epic", created.Vendor?.Name);
+        Assert.NotNull(created.VendorVersionId);
         Assert.Empty(_updated);
     }
 
