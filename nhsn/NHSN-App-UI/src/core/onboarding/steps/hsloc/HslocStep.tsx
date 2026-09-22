@@ -24,7 +24,7 @@ import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {findDuplicateSourceCodeIndexes, isRowBlank, isRowComplete} from './validate';
+import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes, isRowBlank, isRowComplete} from './validate';
 import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
@@ -261,13 +261,21 @@ export function HslocStep({onNext, onBack}: StepProps) {
   }, [codes]);
 
   function validateStep(): boolean {
-    if (completeRows.length === 0) {
-      announceValidationMessage(
-        t(rows.every(isRowBlank) ? 'onboarding:hsloc.messages.empty' : 'onboarding:hsloc.messages.incomplete')
-      );
+    if (rows.every(isRowBlank)) {
+      announceValidationMessage(t('onboarding:hsloc.messages.empty'));
       return false;
     }
-    if (findDuplicateSourceCodeIndexes(completeRows).length > 0) {
+    const incompleteRowIndexes = findIncompleteRowIndexes(rows);
+    if (incompleteRowIndexes.length > 0) {
+      setRows(prev =>
+        prev.map((row, index) =>
+          incompleteRowIndexes.includes(index) ? {...row, dirty: {sourceDisplay: true, sourceCode: true, hslocCode: true}} : row
+        )
+      );
+      announceValidationMessage(t('onboarding:hsloc.messages.incomplete'));
+      return false;
+    }
+    if (findDuplicateSourceCodeIndexes(rows).length > 0) {
       announceValidationMessage(t('onboarding:hsloc.messages.duplicate'));
       return false;
     }
