@@ -23,7 +23,7 @@ public class RunCleanupHelperPurgeHistoryTests
         var run = new AutomationRunSummary { RunId = runId, ReportId = reportId };
 
         var report = new Mock<IReportServiceClient>();
-        report.Setup(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>())).ReturnsAsync(Ok());
+        report.Setup(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>(), true)).ReturnsAsync(Ok());
 
         var snapshots = new Mock<ISnapshotStore>();
         snapshots.Setup(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -42,7 +42,7 @@ public class RunCleanupHelperPurgeHistoryTests
             TimeSpan.FromDays(14),
             CancellationToken.None);
 
-        report.Verify(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>()), Times.Once);
+        report.Verify(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>(), true), Times.Once);
         snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -70,7 +70,7 @@ public class RunCleanupHelperPurgeHistoryTests
             TimeSpan.FromDays(14),
             CancellationToken.None);
 
-        report.Verify(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        report.Verify(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
         snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -82,7 +82,7 @@ public class RunCleanupHelperPurgeHistoryTests
         var run = new AutomationRunSummary { RunId = runId, ReportId = reportId };
 
         var report = new Mock<IReportServiceClient>();
-        report.Setup(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>())).ReturnsAsync(NotFound());
+        report.Setup(c => c.SoftDeleteScheduleAsync(reportId, It.IsAny<CancellationToken>(), true)).ReturnsAsync(NotFound());
 
         var snapshots = new Mock<ISnapshotStore>();
         snapshots.Setup(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
@@ -127,6 +127,96 @@ public class RunCleanupHelperPurgeHistoryTests
             run,
             TimeSpan.FromDays(14),
             CancellationToken.None);
+
+        dataAcq.VerifyNoOtherCalls();
+        snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurgeRunHistoryAsync_skips_soft_delete_for_non_guid_ReportId()
+    {
+        var runId = Guid.NewGuid();
+        var run = new AutomationRunSummary { RunId = runId, ReportId = "seed-report-demo" };
+
+        var report = new Mock<IReportServiceClient>();
+        var snapshots = new Mock<ISnapshotStore>();
+        snapshots.Setup(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await RunCleanupHelper.PurgeRunHistoryAsync(
+            Mock.Of<IFacilityServiceClient>(),
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IDataAcquisitionServiceClient>(),
+            Mock.Of<IQueryDispatchServiceClient>(),
+            Mock.Of<ICensusServiceClient>(),
+            report.Object,
+            null,
+            snapshots.Object,
+            Mock.Of<IAutomationOutput>(),
+            run,
+            TimeSpan.FromDays(14),
+            CancellationToken.None,
+            teardownFacility: false);
+
+        report.Verify(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+        snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurgeRunHistoryAsync_skips_facility_teardown_when_teardownFacility_false()
+    {
+        var runId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        var run = new AutomationRunSummary { RunId = runId, FacilityId = facilityId, ReportId = null };
+
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        var snapshots = new Mock<ISnapshotStore>();
+        snapshots.Setup(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await RunCleanupHelper.PurgeRunHistoryAsync(
+            Mock.Of<IFacilityServiceClient>(),
+            Mock.Of<INormalizationServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<IQueryDispatchServiceClient>(),
+            Mock.Of<ICensusServiceClient>(),
+            Mock.Of<IReportServiceClient>(),
+            null,
+            snapshots.Object,
+            Mock.Of<IAutomationOutput>(),
+            run,
+            TimeSpan.FromDays(14),
+            CancellationToken.None,
+            teardownFacility: false);
+
+        dataAcq.VerifyNoOtherCalls();
+        snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PurgeRunHistoryAsync_skips_facility_teardown_when_already_torn_down()
+    {
+        var runId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+        var run = new AutomationRunSummary { RunId = runId, FacilityId = facilityId, ReportId = null };
+
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        var snapshots = new Mock<ISnapshotStore>();
+        snapshots.Setup(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await RunCleanupHelper.PurgeRunHistoryAsync(
+            Mock.Of<IFacilityServiceClient>(),
+            Mock.Of<INormalizationServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<IQueryDispatchServiceClient>(),
+            Mock.Of<ICensusServiceClient>(),
+            Mock.Of<IReportServiceClient>(),
+            null,
+            snapshots.Object,
+            Mock.Of<IAutomationOutput>(),
+            run,
+            TimeSpan.FromDays(14),
+            CancellationToken.None,
+            teardownFacility: true,
+            alreadyTornDownFacilityIds: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { facilityId });
 
         dataAcq.VerifyNoOtherCalls();
         snapshots.Verify(s => s.DeleteRunAsync(runId, It.IsAny<CancellationToken>()), Times.Once);

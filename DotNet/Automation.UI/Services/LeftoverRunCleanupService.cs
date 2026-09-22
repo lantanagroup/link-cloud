@@ -422,6 +422,9 @@ public sealed class LeftoverRunCleanupService(
                 try
                 {
                     var output = new LoggerAutomationOutput(logger, run.FacilityId ?? run.RunId.ToString());
+                    // Weekly history-purge always wants per-run facility teardown.
+                    // Custom-range honors the independent teardownFacilities checkbox; skip IDs the facility loop already handled.
+                    var teardownInPurge = mode == "history-purge" || teardownFacilities;
                     await RunCleanupHelper.PurgeRunHistoryAsync(
                         facilityClient,
                         normalizationClient,
@@ -434,7 +437,11 @@ public sealed class LeftoverRunCleanupService(
                         output,
                         run,
                         settings.AbortTtl,
-                        cancellationToken);
+                        cancellationToken,
+                        teardownFacility: teardownInPurge,
+                        alreadyTornDownFacilityIds: tornDown.Count > 0
+                            ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
+                            : null);
                     purged.Add(run.RunId);
                 }
                 catch (Exception ex)
