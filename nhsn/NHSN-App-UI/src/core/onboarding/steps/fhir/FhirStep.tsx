@@ -313,8 +313,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxConcurrentRequestsTooltip')}
               required
-              min={1}
-              max={8}
+              min={0}
               step={1}
               value={maxConcurrentRequests}
               error={fieldError('maxConcurrentRequests')}
@@ -334,7 +333,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxRetriesLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxRetriesTooltip')}
               min={0}
-              max={10}
               step={1}
               value={maxRetries}
               error={fieldError('maxRetries')}
@@ -361,7 +359,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               value={minPullTime}
               error={fieldError('minAcquisitionPullTime')}
               onChange={value => {
-                const normalized = digitsOnly(value);
+                const normalized = normalizePullTime(value);
                 setMinPullTime(normalized);
                 resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
@@ -376,7 +374,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               value={maxPullTime}
               error={fieldError('maxAcquisitionPullTime')}
               onChange={value => {
-                const normalized = digitsOnly(value);
+                const normalized = normalizePullTime(value);
                 setMaxPullTime(normalized);
                 resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
@@ -400,7 +398,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
                 required
                 min={0}
-                max={30}
                 step={1}
                 value={lagDays}
                 error={fieldError('lagDays')}
@@ -418,9 +415,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               <NumberField
                 id="lagHours"
                 label={t('onboarding:fhirServerInfo.fields.lagHoursLabel')}
-                required
                 min={0}
-                max={23}
                 step={1}
                 value={lagHours}
                 error={fieldError('lagHours')}
@@ -438,9 +433,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
               <NumberField
                 id="lagMinutes"
                 label={t('onboarding:fhirServerInfo.fields.lagMinutesLabel')}
-                required
                 min={0}
-                max={59}
                 step={1}
                 value={lagMinutes}
                 error={fieldError('lagMinutes')}
@@ -499,11 +492,6 @@ function scrollNearestContainerToBottom(element: HTMLElement | null): void {
     }
     node = node.parentElement;
   }
-}
-
-/** A letter can never be part of a valid HH:MM time, so it's blocked at every keystroke. */
-function digitsOnly(value: string): string {
-  return value.replace(/[^0-9]/g, '');
 }
 
 function normalizePullTime(value: string): string {

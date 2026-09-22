@@ -41,6 +41,8 @@ export function validateCensus(
   } else if (censusAcquisition === 'Sftp') {
     if (!c.sftpHost?.trim()) {
       errors.sftpHost = 'onboarding:census.errors.hostRequired';
+    } else if (c.sftpHost.trim().length > 128) {
+      errors.sftpHost = 'onboarding:census.errors.hostTooLong';
     } else if (!isValidSftpHost(c.sftpHost.trim())) {
       errors.sftpHost = 'onboarding:census.errors.hostInvalid';
     }
@@ -54,8 +56,10 @@ export function validateCensus(
   if (censusAcquisition) {
     const parsed = parseHoursMinutesDuration(c.acquisitionFrequency);
     const totalMinutes = parsed ? parsed.hours * 60 + parsed.minutes : undefined;
-    if (totalMinutes === undefined || totalMinutes < 15) {
+    if (totalMinutes === undefined || totalMinutes < 5) {
       errors.acquisitionFrequency = 'onboarding:census.errors.frequencyTooShort';
+    } else if (totalMinutes > 1440) {
+      errors.acquisitionFrequency = 'onboarding:census.errors.frequencyTooLong';
     }
   }
 

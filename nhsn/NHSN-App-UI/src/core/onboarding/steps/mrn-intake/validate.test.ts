@@ -71,7 +71,7 @@ describe('validateMrnIntake', () => {
       variesByFacility: false,
       changesOverTime: false
     });
-    expect(validateMrnIntake(draft).otherTermUsed).toBe('onboarding:mrnIntake.errors.fieldRequired');
+    expect(validateMrnIntake(draft).otherTermUsed).toBe('onboarding:mrnIntake.errors.describeOtherTerm');
   });
 
   it('requires at least one rule, then a value on every rule that needs one', () => {
