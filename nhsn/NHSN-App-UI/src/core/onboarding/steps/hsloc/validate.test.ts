@@ -1,5 +1,25 @@
 import {describe, expect, it} from 'vitest';
-import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes} from './validate';
+import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes, isRowBlank, isRowComplete} from './validate';
+
+describe('isRowBlank', () => {
+  it('is true when every field is empty or whitespace', () => {
+    expect(isRowBlank({sourceDisplay: '', sourceCode: '  ', hslocCode: ''})).toBe(true);
+  });
+
+  it('is false once any single field has a value', () => {
+    expect(isRowBlank({sourceDisplay: 'ICU', sourceCode: '', hslocCode: ''})).toBe(false);
+  });
+});
+
+describe('isRowComplete', () => {
+  it('is true only when all three fields have a value', () => {
+    expect(isRowComplete({sourceDisplay: 'ICU', sourceCode: 'ICU-1', hslocCode: '1030'})).toBe(true);
+  });
+
+  it('is false when any field is blank', () => {
+    expect(isRowComplete({sourceDisplay: 'ICU', sourceCode: '', hslocCode: '1030'})).toBe(false);
+  });
+});
 
 describe('findIncompleteRowIndexes', () => {
   it('flags rows missing any field', () => {

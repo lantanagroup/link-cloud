@@ -35,6 +35,9 @@ export function validateCensus(
         errors[`listId.${key}`] = 'onboarding:census.errors.listIdRequired';
       }
     });
+    findDuplicatePatientListIdKeys(c.patientListIds).forEach(key => {
+      errors[`listId.${key}`] = 'onboarding:census.errors.listIdDuplicate';
+    });
   } else if (censusAcquisition === 'Sftp') {
     if (!c.sftpHost?.trim()) {
       errors.sftpHost = 'onboarding:census.errors.hostRequired';
@@ -57,6 +60,29 @@ export function validateCensus(
   }
 
   return errors;
+}
+
+function findDuplicatePatientListIdKeys(
+  patientListIds: Partial<Record<CensusListKey, string>> | undefined
+): Set<CensusListKey> {
+  const firstKeyByValue = new Map<string, CensusListKey>();
+  const duplicates = new Set<CensusListKey>();
+
+  CENSUS_LIST_KEYS.forEach(key => {
+    const value = patientListIds?.[key]?.trim();
+    if (!value) {
+      return;
+    }
+    const firstKey = firstKeyByValue.get(value);
+    if (firstKey === undefined) {
+      firstKeyByValue.set(value, key);
+      return;
+    }
+    duplicates.add(firstKey);
+    duplicates.add(key);
+  });
+
+  return duplicates;
 }
 
 /**

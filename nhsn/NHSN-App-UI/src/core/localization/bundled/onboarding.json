@@ -238,6 +238,7 @@
     },
     "errors": {
       "listIdRequired": "This field is required.",
+      "listIdDuplicate": "Duplicate IDs are not allowed. Please ensure all entered IDs are unique.",
       "hostRequired": "SFTP Host URL is required.",
       "hostInvalid": "Enter a hostname or IP address, not a URL (e.g. sftp.example.com, not http://sftp.example.com).",
       "portRequired": "SFTP Host URL Port is required.",
@@ -369,7 +370,8 @@
       }
     },
     "messages": {
-      "incomplete": "Please complete all fields for each mapping row before continuing.",
+      "empty": "At least one HSLOC Code Mapping is required.",
+      "incomplete": "Please complete all fields for at least one mapping row before continuing.",
       "duplicate": "Two or more rows map the same location code to different HSLOC codes. Each location code must be unique.",
       "loadError": "Unable to load HSLOC reference data.",
       "saveError": "Unable to save HSLOC location mappings."
