@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using System.Reflection;
 
@@ -74,10 +75,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Health is registered in both modes so /health always answers. The database check is not:
-// a disabled deployment deliberately skips migration (below), so probing the DbContext would
-// report Unhealthy and a platform probe would restart the container in a loop -- which is the
-// "looks like an outage" failure the disabled path exists to avoid. A dormant service has no
-// database to be unhealthy about.
+// a disabled deployment may have no database at all (it migrates only when a connection
+// string is configured, below), so probing the DbContext would report Unhealthy and a
+// platform probe would restart the container in a loop -- which is the "looks like an
+// outage" failure the disabled path exists to avoid. A dormant service serves nothing from
+// its database, so there is nothing for it to be unhealthy about.
 var healthChecks = builder.Services.AddHealthChecks();
 
 if (enabled)
@@ -96,20 +98,34 @@ if (enabled)
     // stay dormant rather than crash-loop, and a key that is going to fail should fail
     // before any schema is altered.
     _ = app.Services.GetRequiredService<IAuthTokenService>();
+}
 
+// The schema is kept current whether or not the mock is serving, so an environment can
+// switch the mock on without first waiting for a restart to build its tables. An enabled
+// deployment always migrates, and a missing connection string fails it at startup. A
+// disabled one migrates only when a connection string is configured: a namespace with no
+// database for the mock must stay dormant rather than crash-loop on the missing string.
+var hasConnectionString = !string.IsNullOrWhiteSpace(
+    app.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
+var migrate = enabled || hasConnectionString;
+
+if (migrate)
+{
     app.AutoMigrateEF<ReportingPlanDbContext>();
 }
-else
+
+if (!enabled)
 {
-    // A dormant deployment must not create or alter a schema. Health still answers, so the
-    // container reports healthy rather than looking like an outage.
+    // Health still answers, so the container reports healthy rather than looking like an
+    // outage.
     app.Logger.LogWarning(
         "Mock DMRP API is disabled in the {Environment} environment because {EnabledKey} is "
         + "false or unset -- it defaults to disabled. Every route except {AllowedPaths} will "
-        + "answer 503, and schema migration has been skipped.",
+        + "answer 503. Schema migration {MigrationOutcome}.",
         app.Environment.EnvironmentName,
         DmrpAvailability.EnabledConfigurationKey,
-        string.Join(", ", DmrpAvailability.AlwaysAvailablePaths));
+        string.Join(", ", DmrpAvailability.AlwaysAvailablePaths),
+        migrate ? "ran" : "was skipped because no database connection string is configured");
 }
 
 // Before routing, so nothing added later can be reached while the service is disabled.
