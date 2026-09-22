@@ -65,6 +65,7 @@ steps:
 - task: Bash@3
   inputs:
     targetType: 'inline'
+    workingDirectory: '$(Pipeline.Workspace)/link-cloud'
     script: |
       GIT_COMMIT=$(git rev-parse --short HEAD)
       echo "GIT_COMMIT: ${GIT_COMMIT}"
@@ -74,8 +75,8 @@ steps:
 #   displayName: "Inject Service Info"
 #   inputs:
 #     scriptSource: 'filePath'
-#     scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
-#     workingDirectory: '$(Build.SourcesDirectory)'
+#     scriptPath: $(Pipeline.Workspace)/link-cloud/Scripts/set_service_info.py
+#     workingDirectory: '$(Pipeline.Workspace)/link-cloud'
 #     arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
 
 # Copy into Packages Folder
