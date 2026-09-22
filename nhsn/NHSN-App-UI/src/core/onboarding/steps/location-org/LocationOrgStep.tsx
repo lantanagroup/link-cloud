@@ -27,7 +27,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError, notifySuccess} = useNotifications();
-  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
+  const {draft, patch, mirror, saving, savingDirection, vendorProfile} = useOnboarding();
 
   const locationOrg = draft.locationOrg;
   const methods = vendorProfile?.locationMethods ?? [];
@@ -52,8 +52,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
       hasCustomFhirPath && !hasLocationIdentifiers && methods.includes('custom-fhir-path')
         ? 'custom-fhir-path'
         : methods[0];
-    patch('locationOrg', {method: defaultMethod});
-  }, [activeMethod, methods, locationOrg.customFhirPath, locationOrg.locationIdentifiers, patch]);
+    mirror('locationOrg', {method: defaultMethod});
+  }, [activeMethod, methods, locationOrg.customFhirPath, locationOrg.locationIdentifiers, mirror]);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
