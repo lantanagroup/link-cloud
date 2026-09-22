@@ -38,8 +38,9 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--census-gray-600);
-  margin: 26px 0 10px;
+  margin-bottom: 10px;
   font-weight: 600;
+  color: var(--census-blue-dark);
 }
 
 .census-poi .census-section-heading {
@@ -264,7 +265,7 @@
 .census-poi .census-table-scroll table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.5px;
+  font-size: 12px;
 }
 
 .census-poi .census-table-scroll th {
@@ -272,6 +273,11 @@
   top: 0;
   background: var(--census-gray-50);
   z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--census-blue);
 }
 
 .census-poi .census-table-scroll th,
