@@ -24,7 +24,7 @@ import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes} from './validate';
+import {findDuplicateSourceCodeIndexes, isRowBlank, isRowComplete} from './validate';
 import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
@@ -90,7 +90,13 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const [mappingsLoading, setMappingsLoading] = useState(true);
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const hasSyncedInitialLoad = useRef(false);
+
+  function announceValidationMessage(message: string) {
+    setValidationError(null);
+    window.setTimeout(() => setValidationError(message), 0);
+  }
 
   // A manual-upload row whose HSLOC Reference Code didn't resolve against the reference table comes
   // back from the import with a blank hslocCode, specifically so the facility can still see the
@@ -189,7 +195,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
     return rows.some(row => row.hslocCode === code && row.sourceCode.trim());
   }
 
-  const incompleteRowIndexes = useMemo(() => new Set(findIncompleteRowIndexes(rows)), [rows]);
+  const completeRows = useMemo(() => rows.filter(isRowComplete), [rows]);
   const duplicateRowIndexes = useMemo(() => new Set(findDuplicateSourceCodeIndexes(rows)), [rows]);
   const requiredFieldError = t('onboarding:hsloc.mapping.fields.requiredError');
   const duplicateFieldError = t('onboarding:hsloc.mapping.fields.duplicateError');
@@ -255,14 +261,17 @@ export function HslocStep({onNext, onBack}: StepProps) {
   }, [codes]);
 
   function validateStep(): boolean {
-    if (incompleteRowIndexes.size > 0) {
-      notifyError(t('onboarding:hsloc.messages.incomplete'));
+    if (completeRows.length === 0) {
+      announceValidationMessage(
+        t(rows.every(isRowBlank) ? 'onboarding:hsloc.messages.empty' : 'onboarding:hsloc.messages.incomplete')
+      );
       return false;
     }
-    if (duplicateRowIndexes.size > 0) {
-      notifyError(t('onboarding:hsloc.messages.duplicate'));
+    if (findDuplicateSourceCodeIndexes(completeRows).length > 0) {
+      announceValidationMessage(t('onboarding:hsloc.messages.duplicate'));
       return false;
     }
+    setValidationError(null);
     return true;
   }
 
@@ -273,7 +282,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
     setSubmitting(true);
     try {
-      const mappings = toMappings(rows);
+      const mappings = toMappings(completeRows);
 
       await api.saveHslocMappings(mappings);
       patch('hsloc', {mappings});
@@ -303,13 +312,13 @@ export function HslocStep({onNext, onBack}: StepProps) {
                   <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleNext} disabled={busy || incompleteRowIndexes.size > 0}>
+                  <Button onClick={stableHandleNext} disabled={busy}>
                     {t('common:actions.continue')}
                   </Button>
                 </StepActions>
               )
             },
-      [t, loading, busy, stableOnBack, stableHandleNext, incompleteRowIndexes]
+      [t, loading, busy, stableOnBack, stableHandleNext]
     )
   );
 
@@ -385,7 +394,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                           ? 'nhsn-link__hsloc-code-select nhsn-link__hsloc-code-select--error'
                           : 'nhsn-link__hsloc-code-select'
                       }
-                      aria-label={hslocCodeLabel}
+                      aria-label={acronymLabel(hslocCodeLabel)}
                       aria-invalid={hslocCodeInvalid}
                       aria-required="true"
                       aria-describedby={hslocCodeInvalid ? `hsloc-code-error-${index}` : undefined}
@@ -538,6 +547,12 @@ export function HslocStep({onNext, onBack}: StepProps) {
         </SidePanelLayout>
           )}
         </Tabs>
+      </div>
+
+      <div aria-live="off">
+        <p className="nhsn-link__form-error" role="alert">
+          {validationError && <AcronymText>{validationError}</AcronymText>}
+        </p>
       </div>
     </div>
   );

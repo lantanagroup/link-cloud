@@ -4,6 +4,14 @@ export interface MappingRowValues {
   hslocCode: string;
 }
 
+export function isRowBlank(row: MappingRowValues): boolean {
+  return !row.sourceDisplay.trim() && !row.sourceCode.trim() && !row.hslocCode.trim();
+}
+
+export function isRowComplete(row: MappingRowValues): boolean {
+  return Boolean(row.sourceDisplay.trim() && row.sourceCode.trim() && row.hslocCode.trim());
+}
+
 export function findIncompleteRowIndexes(rows: MappingRowValues[]): number[] {
   const incomplete: number[] = [];
   rows.forEach((row, index) => {

@@ -1741,10 +1741,25 @@
      horizontal form row - redundant here since the row's own `gap` already
      separates fields, and it otherwise reads as dead space before Remove. */
   padding-right: 0;
+  position: relative;
 }
 
 .nhsn-link__repeatable-fields .k-input {
   border-radius: 6px;
+}
+
+.nhsn-link__repeatable-fields .k-form-error,
+.nhsn-link__repeatable-fields .nhsn-link__hsloc-code-error-text {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+}
+
+.nhsn-link__repeatable-row:has(.k-form-error),
+.nhsn-link__repeatable-row:has(.nhsn-link__hsloc-code-error-text) {
+  margin-bottom: 20px;
 }
 
 /* Every row repeats the same labels, and the placeholder already carries them.
