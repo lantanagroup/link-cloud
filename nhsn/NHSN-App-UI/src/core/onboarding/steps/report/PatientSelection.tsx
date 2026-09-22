@@ -136,7 +136,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
     return results.map(result => ({
       key: result.listKey,
       label: t(LIST_LABEL_KEYS[result.listKey]),
-      patientIds: result.patientIds,
+      patientIds: result.patients.map(patient => patient.id),
       simulated: result.simulated
     }));
   }, [acquisition, api, t]);

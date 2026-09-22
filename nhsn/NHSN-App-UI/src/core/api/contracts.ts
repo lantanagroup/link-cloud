@@ -200,10 +200,15 @@ export type CensusListKey =
   | 'discharge-24-to-48'
   | 'discharge-gt-48';
 
+export interface CensusPatient {
+  id: string;
+  name?: string;
+}
+
 export interface CensusListResult {
   listKey: CensusListKey;
   patientCount: number;
-  patientIds: string[];
+  patients: CensusPatient[];
   simulated?: boolean;
 }
 

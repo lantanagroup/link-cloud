@@ -99,17 +99,14 @@ internal sealed class PatientListGateway : IPatientListGateway
     public async Task<CensusListResult> QueryAsync(string facilityId, string listKey, CancellationToken cancellationToken = default)
     {
         var wire = await FetchAsync(facilityId, cancellationToken, includePatients: true);
-        var patientIds = PatientListConfigurationMapper.FindList(wire, listKey)?.Patients?
-            .Select(patient => patient.Id)
-            .OfType<string>()
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .ToArray() ?? [];
+        var patients = PatientListConfigurationMapper.ToCensusPatients(
+            PatientListConfigurationMapper.FindList(wire, listKey));
 
         return new CensusListResult
         {
             ListKey = listKey,
-            PatientCount = patientIds.Length,
-            PatientIds = patientIds
+            PatientCount = patients.Length,
+            Patients = patients
         };
     }
 

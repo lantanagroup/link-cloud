@@ -303,7 +303,7 @@ export class MockApiClient implements ApiClient {
   async queryPatientList(key: C.CensusListKey): Promise<C.CensusListResult> {
     await tick();
     const count = 5 + Math.floor(Math.random() * 46);
-    return {listKey: key, patientCount: count, patientIds: ids(count), simulated: true};
+    return {listKey: key, patientCount: count, patients: patients(count), simulated: true};
   }
 
   async queryPatientLists(): Promise<C.CensusListResult[]> {
@@ -705,6 +705,10 @@ export class MockApiClient implements ApiClient {
 
 function ids(count: number): string[] {
   return Array.from({length: count}, (_, i) => `SIMULATED-PATIENT-${String(i + 1).padStart(4, '0')}`);
+}
+
+function patients(count: number): C.CensusPatient[] {
+  return ids(count).map((id, i) => ({id, name: `Simulated Patient ${i + 1}`}));
 }
 
 function tick(): Promise<void> {

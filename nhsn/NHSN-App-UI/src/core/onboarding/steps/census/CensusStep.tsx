@@ -523,11 +523,12 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     const rows = CENSUS_LIST_KEYS.filter((key) => listState[key]?.result).flatMap(
       (key) => {
         const state = listState[key]!;
-        return state.result!.patientIds.map((patientId) => [
+        return state.result!.patients.map((patient) => [
           t(LIST_LABEL_KEYS[key]),
           census.patientListIds?.[key] ?? "",
           formatDateTime(state.queriedAt),
-          patientId,
+          patient.id,
+          patient.name ?? "",
         ]);
       },
     );
@@ -537,6 +538,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
         t("onboarding:census.epic.summary.listId"),
         t("onboarding:census.epic.summary.queriedAt"),
         t("onboarding:census.epic.columns.patientId"),
+        t("onboarding:census.epic.columns.patientName"),
       ],
       rows,
     );
@@ -591,12 +593,14 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.epic.columns.patientId")}</th>
+              <th scope="col">{t("onboarding:census.epic.columns.patientName")}</th>
             </tr>
           </thead>
           <tbody>
-            {selectedListState.result.patientIds.map((id) => (
-              <tr key={id}>
-                <td>{id}</td>
+            {selectedListState.result.patients.map((patient) => (
+              <tr key={patient.id}>
+                <td>{patient.id}</td>
+                <td>{patient.name ?? ""}</td>
               </tr>
             ))}
           </tbody>
