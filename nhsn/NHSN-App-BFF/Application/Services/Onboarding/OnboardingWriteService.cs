@@ -442,6 +442,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         switch (stepId)
         {
             case "facility-info":
+                var previousVendor = facility.Vendor;
+
                 await _facilityGateway.SaveAsync(new FacilityInfo
                 {
                     FacilityId = facility.FacilityId,
@@ -453,6 +455,15 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 // Mirrored onto the row so /userinfo and an outage-time read can still branch on
                 // vendor. Tenant remains the system of record.
                 await MirrorVendorAsync(facility, draft.FacilityInfo.Vendor, cancellationToken);
+
+                if (previousVendor is not null && draft.FacilityInfo.Vendor is not null && previousVendor != draft.FacilityInfo.Vendor)
+                {
+                    await _patientsOfInterestService.AcknowledgeCensusAsync(new AcknowledgementRequest
+                    {
+                        Accepted = false,
+                        StatementKey = "census-accuracy"
+                    }, cancellationToken);
+                }
                 break;
 
             case "census":
