@@ -1,9 +1,11 @@
-import React, {useId} from 'react';
-import {NewTabAnnouncement} from '../fields';
+import React, {useId, useState} from 'react';
+import {MessageContainer} from '../fields';
 
 export interface InstructionsDownloadProps {
-  /** From `api.getJwksInstructionsUrl(vendor)` or `api.getLocationOrgResolutionUrl()`. */
-  href: string;
+  /** Fetches the instructions document as a blob, e.g. `() => api.getDocument(documentKey)`. */
+  onDownload: () => Promise<Blob>;
+  /** Name the downloaded file is saved as. */
+  fileName: string;
   /** Already translated: the paragraph above the link. */
   description: string;
   /** Already translated: the link text, e.g. "Download PDF Instructions". */
@@ -11,19 +13,43 @@ export interface InstructionsDownloadProps {
   headingId?: string;
 }
 
-/** Bordered instructions box + download link, matching `FhirStep.tsx`'s JWKS pattern. Opens in a new tab. */
-export function InstructionsDownload({href, description, linkText, headingId}: InstructionsDownloadProps) {
+/** Bordered instructions box + download button, matching `FhirStep.tsx`'s JWKS pattern. Downloads the file directly, same as the manual-upload import sheet. */
+export function InstructionsDownload({onDownload, fileName, description, linkText, headingId}: InstructionsDownloadProps) {
   const descriptionId = useId();
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function handleClick() {
+    if (downloading) {
+      return;
+    }
+    setDownloading(true);
+    setError(undefined);
+    try {
+      const blob = await onDownload();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="nhsn-link__instructions">
       <p className="nhsn-link__instructions-text" id={descriptionId}>
         {description}
       </p>
-      <a
+      <button
+        type="button"
         className="nhsn-link__document-link"
-        href={href}
-        target="_blank"
-        rel="noopener"
+        disabled={downloading}
+        onClick={handleClick}
         aria-describedby={headingId ? `${headingId} ${descriptionId}` : descriptionId}>
         <svg
           width="16"
@@ -40,8 +66,12 @@ export function InstructionsDownload({href, description, linkText, headingId}: I
           <path d="M5 21h14" />
         </svg>
         {linkText}
-        <NewTabAnnouncement />
-      </a>
+      </button>
+      {error && (
+        <MessageContainer type="error" showIcon>
+          <span>{error}</span>
+        </MessageContainer>
+      )}
     </div>
   );
 }

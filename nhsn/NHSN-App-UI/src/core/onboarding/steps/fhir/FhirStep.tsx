@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
+import {InstructionsDownload} from '../../../documents';
 import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnnouncement, NumberField, RequiredAsterisk, StepActions, TextField} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
@@ -292,25 +293,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
               <div className="section-title" id="fhir-jwks-section-title">
                 {t('onboarding:fhirServerInfo.authenticationSectionTitle')}
               </div>
-              <div className="instructions-box">
-                <p id="fhir-jwks-instructions-desc">
-                  <AcronymText>{t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}</AcronymText>
-                </p>
-                <a
-                  className="download-link"
-                  href={api.getJwksInstructionsUrl(vendorProfile.vendor)}
-                  target="_blank"
-                  rel="noopener"
-                  aria-describedby="fhir-jwks-section-title fhir-jwks-instructions-desc">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 3v12" />
-                    <path d="M7 10l5 5 5-5" />
-                    <path d="M5 21h14" />
-                  </svg>
-                  {t('onboarding:fhirServerInfo.fields.downloadPdfInstructions')}
-                  <NewTabAnnouncement />
-                </a>
-              </div>
+              <InstructionsDownload
+                onDownload={() => api.getJwksInstructionsPdf(vendorProfile?.vendor ?? '')}
+                fileName={`${vendorProfile?.vendor ?? 'vendor'}_JWKS_Instructions.pdf`}
+                description={t('onboarding:fhirServerInfo.fields.jwksInstructions', {vendor: vendorDisplayName})}
+                linkText={t('onboarding:fhirServerInfo.fields.downloadPdfInstructions')}
+                headingId="fhir-jwks-section-title"
+              />
             </>
           )}
 

@@ -140,7 +140,8 @@ export interface ApiClient {
    */
   getAvailableMeasures(): Promise<AvailableMeasure[]>;
 
-  getJwksInstructionsUrl(vendor: string): string;
-  getLocationOrgResolutionUrl(): string;
-  getCensusInstructionsUrl(vendor: string): string;
+  // vendor instruction PDFs — served from the BFF's anonymous static-asset routes, not `getDocument`
+  getJwksInstructionsPdf(vendor: string): Promise<Blob>;
+  getLocationOrgResolutionPdf(): Promise<Blob>;
+  getCensusInstructionsPdf(vendor: string): Promise<Blob>;
 }
