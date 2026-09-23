@@ -330,6 +330,82 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task LockFacilitySequenceWrites_SecondConnectionWaitsUntilTheFirstCommits()
+    {
+        var connectionString = $"Data Source=file:opseqlock{Guid.NewGuid():N}?mode=memory&cache=shared;Pooling=False;Default Timeout=30";
+        await using var anchor = new SqliteConnection(connectionString);
+        await anchor.OpenAsync();
+        await using (var setup = new NormalizationDbContext(new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlite(anchor).Options))
+        {
+            setup.Database.EnsureCreated();
+            var resource = new LantanaGroup.Link.Normalization.Domain.Entities.ResourceType { Id = Guid.NewGuid(), Name = "Patient" };
+            var operation = new Operation
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = "facility-a",
+                Name = "Copy",
+                Description = "Copy",
+                OperationType = "CopyProperty",
+                OperationJson = CopyJson,
+                CreateDate = DateTime.UtcNow
+            };
+            setup.ResourceTypes.Add(resource);
+            setup.Operations.Add(operation);
+            setup.OperationResourceTypes.Add(new OperationResourceType
+            {
+                Id = Guid.NewGuid(),
+                OperationId = operation.Id,
+                ResourceTypeId = resource.Id
+            });
+            await setup.SaveChangesAsync();
+        }
+
+        await using var firstConnection = new SqliteConnection(connectionString);
+        await using var secondConnection = new SqliteConnection(connectionString);
+        await firstConnection.OpenAsync();
+        await secondConnection.OpenAsync();
+        await using var first = new NormalizationDbContext(new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlite(firstConnection).Options);
+        await using var second = new NormalizationDbContext(new DbContextOptionsBuilder<NormalizationDbContext>().UseSqlite(secondConnection).Options);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var resolver = Mock.Of<IVendorVersionResolver>();
+        var firstQueries = new OperationSequenceQueries(null!, first, cache, resolver);
+        var secondQueries = new OperationSequenceQueries(null!, second, cache, resolver);
+        var operationResourceTypeId = await first.OperationResourceTypes.Select(map => map.Id).SingleAsync();
+
+        await using var firstTransaction = await first.Database.BeginTransactionAsync();
+        await firstQueries.LockFacilitySequenceWritesAsync("facility-a");
+        first.OperationSequences.Add(new OperationSequence
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = "facility-a",
+            OperationResourceTypeId = operationResourceTypeId,
+            Sequence = 1,
+            CreateDate = DateTime.UtcNow
+        });
+        await first.SaveChangesAsync();
+
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondLock = Task.Run(async () =>
+        {
+            started.TrySetResult();
+            await using var secondTransaction = await second.Database.BeginTransactionAsync();
+            await secondQueries.LockFacilitySequenceWritesAsync("facility-a");
+            var sequences = await second.OperationSequences.CountAsync(sequence => sequence.FacilityId == "facility-a");
+            await secondTransaction.CommitAsync();
+            return sequences;
+        });
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(500);
+        Assert.False(secondLock.IsCompleted);
+
+        await firstTransaction.CommitAsync();
+        var seen = await secondLock.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, seen);
+        Assert.Equal(1, await first.OperationSequenceWriteLocks.CountAsync(lockRow => lockRow.FacilityId == "facility-a"));
+    }
+
+    [Fact]
     public async Task RemovingAResourceType_InvalidatesTheListenerCache()
     {
         using var harness = new Harness();
