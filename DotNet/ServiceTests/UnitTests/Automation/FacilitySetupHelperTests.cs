@@ -161,6 +161,76 @@ public class FacilitySetupHelperTests
     }
 
     [Fact]
+    public async Task Refuses_to_create_a_vendor_when_the_vendor_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorModel>>(503, rawBody: "tenant down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureFacilityAsync(
+                _facilityClient.Object, _dmrpClient.Object, _output.Object, FacilityId, [MeasureId]));
+
+        Assert.Contains("Failed to list vendors", exception.Message);
+        Assert.Contains("503", exception.Message);
+        _facilityClient.Verify(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Reuses_the_vendor_when_create_loses_a_race()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+        var lists = 0;
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                lists++;
+                return lists == 1
+                    ? Response(200, new List<VendorModel>())
+                    : Response(200, new List<VendorModel> { new() { Id = vendorId, Name = "Epic" } });
+            });
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<VendorModel>(409, rawBody: "already exists"));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>
+            {
+                new() { Id = versionId, VendorId = vendorId, Version = "default" }
+            }));
+
+        await EnsureFacilityAsync();
+
+        Assert.Equal(versionId, Assert.Single(_created).VendorVersionId);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Refuses_to_create_a_vendor_version_when_the_version_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Epic" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorVersionModel>>(500, rawBody: "versions down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(EnsureFacilityAsync);
+
+        Assert.Contains("Failed to list vendor versions", exception.Message);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
     public async Task Leaves_the_dmrp_module_alone_when_it_is_not_enabled()
     {
         GivenDmrpIsDisabled();
@@ -375,6 +445,6 @@ public class FacilitySetupHelperTests
         return plans;
     }
 
-    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default) =>
-        new() { StatusCode = statusCode, Body = body };
+    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default, string? rawBody = null) =>
+        new() { StatusCode = statusCode, Body = body, RawBody = rawBody };
 }

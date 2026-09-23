@@ -75,29 +75,67 @@ public static class FacilitySetupHelper
         string vendorName,
         CancellationToken cancellationToken)
     {
-        var vendors = await facilityClient.GetVendorsAsync(cancellationToken);
-        var vendor = vendors.IsSuccessStatusCode
-            ? vendors.Body?.FirstOrDefault(v => string.Equals(v.Name, vendorName, StringComparison.OrdinalIgnoreCase))
-            : null;
+        var vendorId = await EnsureVendorIdAsync(facilityClient, output, vendorName, cancellationToken);
+        return await EnsureVendorVersionIdAsync(facilityClient, vendorId, vendorName, cancellationToken);
+    }
 
-        if (vendor?.Id is not Guid vendorId)
+    /// <summary>
+    /// A failed vendor list is not an empty catalog. Creating from that would duplicate vendors
+    /// and hide the Tenant error. A create that loses a race comes back as a conflict, so the
+    /// list is read again before the failure is reported.
+    /// </summary>
+    private static async Task<Guid> EnsureVendorIdAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
+        var listed = await facilityClient.GetVendorsAsync(cancellationToken);
+        if (!listed.IsSuccessStatusCode)
         {
-            var created = await facilityClient.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, cancellationToken);
-            if (!created.IsSuccessStatusCode || created.Body?.Id is not Guid createdId)
-            {
-                throw new InvalidOperationException(
-                    $"Failed to create vendor '{vendorName}'. HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
-            }
-
-            vendorId = createdId;
-            output.WriteLine($"Created vendor '{vendorName}'.");
+            throw new InvalidOperationException(
+                $"Failed to list vendors before creating '{vendorName}'. HTTP {listed.StatusCode}: {listed.RawBody ?? "(no body)"}");
         }
 
+        var existingId = FindVendorId(listed.Body, vendorName);
+        if (existingId is Guid vendorId)
+            return vendorId;
+
+        var created = await facilityClient.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, cancellationToken);
+        if (created.IsSuccessStatusCode && created.Body?.Id is Guid createdId)
+        {
+            output.WriteLine($"Created vendor '{vendorName}'.");
+            return createdId;
+        }
+
+        var reread = await facilityClient.GetVendorsAsync(cancellationToken);
+        if (reread.IsSuccessStatusCode && FindVendorId(reread.Body, vendorName) is Guid racedId)
+        {
+            output.WriteLine($"Vendor '{vendorName}' was created by another run.");
+            return racedId;
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to create vendor '{vendorName}'. HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+    }
+
+    private static Guid? FindVendorId(IEnumerable<VendorModel>? vendors, string vendorName) =>
+        vendors?.FirstOrDefault(v => string.Equals(v.Name, vendorName, StringComparison.OrdinalIgnoreCase))?.Id;
+
+    private static async Task<Guid> EnsureVendorVersionIdAsync(
+        IFacilityServiceClient facilityClient,
+        Guid vendorId,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
         var versions = await facilityClient.GetVendorVersionsAsync(vendorId, cancellationToken);
-        var versionId = versions.IsSuccessStatusCode
-            ? versions.Body?.Select(v => v.Id).FirstOrDefault(id => id.HasValue)
-            : null;
-        if (versionId is Guid existingVersionId)
+        if (!versions.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to list vendor versions for '{vendorName}'. HTTP {versions.StatusCode}: {versions.RawBody ?? "(no body)"}");
+        }
+
+        if (FirstVersionId(versions.Body) is Guid existingVersionId)
             return existingVersionId;
 
         var createdVersion = await facilityClient.CreateVendorVersionAsync(new CreateVendorVersionModel
@@ -105,14 +143,19 @@ public static class FacilitySetupHelper
             VendorId = vendorId,
             Version = "automation"
         }, cancellationToken);
-        if (!createdVersion.IsSuccessStatusCode || createdVersion.Body?.Id is not Guid newVersionId)
-        {
-            throw new InvalidOperationException(
-                $"Failed to create a vendor version for '{vendorName}'. HTTP {createdVersion.StatusCode}: {createdVersion.RawBody ?? "(no body)"}");
-        }
+        if (createdVersion.IsSuccessStatusCode && createdVersion.Body?.Id is Guid newVersionId)
+            return newVersionId;
 
-        return newVersionId;
+        var reread = await facilityClient.GetVendorVersionsAsync(vendorId, cancellationToken);
+        if (reread.IsSuccessStatusCode && FirstVersionId(reread.Body) is Guid racedVersionId)
+            return racedVersionId;
+
+        throw new InvalidOperationException(
+            $"Failed to create a vendor version for '{vendorName}'. HTTP {createdVersion.StatusCode}: {createdVersion.RawBody ?? "(no body)"}");
     }
+
+    private static Guid? FirstVersionId(IEnumerable<VendorVersionModel>? versions) =>
+        versions?.Select(v => v.Id).FirstOrDefault(id => id.HasValue);
 
     /// <summary>
     /// Tenant stores a facility vendor as <see cref="FacilityModel.VendorVersionId"/>.

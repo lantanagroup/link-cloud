@@ -32,8 +32,11 @@ public class FacilityTemplatesController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveInline([FromBody] FacilityTemplate model, CancellationToken ct)
+    public async Task<IActionResult> SaveInline([FromBody] FacilityTemplate? model, CancellationToken ct)
     {
+        if (model is null)
+            return BadRequest("Facility template is required.");
+
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Template name is required.");
 
