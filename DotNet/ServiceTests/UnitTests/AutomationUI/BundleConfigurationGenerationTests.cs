@@ -208,6 +208,126 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_reuses_type_only_map_when_required_code_is_present_among_other_raw_types()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        const string role = "http://terminology.hl7.org/CodeSystem/v3-RoleCode";
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 2,
+            LocationIdentifiers = [new LocationIdentifierHint { System = role, Value = "HU" }],
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                new LocationTypeHint { System = hsloc, Code = "1027-2" },
+                new LocationTypeHint { System = hsloc, Code = "1052-0" },
+                new LocationTypeHint { System = role, Code = "HU" },
+                new LocationTypeHint { System = hsloc, Code = "1039-7" },
+                new LocationTypeHint { System = hsloc, Code = "1060-3" },
+                new LocationTypeHint { System = hsloc, Code = "1026-4" },
+                new LocationTypeHint { System = hsloc, Code = "1198-3" },
+                new LocationTypeHint { System = hsloc, Code = "1205-6" }
+            ]
+        };
+        var typeOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Step down 1099-1",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1')"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [typeOnly]);
+        var reuse = proposal.Reuse.Should().ContainSingle(r => r.Id == typeOnly.Id).Subject;
+        reuse.Recommendation.Should().Be("Reuse");
+        reuse.Score.Should().Be(1);
+        reuse.Reason.Should().Contain("already present");
+        reuse.Reason.Should().NotContain("of 9");
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_type_only_map_when_only_a_different_code_on_that_system_is_uploaded()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = "UNIT-9" }],
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1027-2" }]
+        };
+        var typeOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Step down 1099-1",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1')"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [typeOnly]);
+        proposal.Reuse.Should().NotContain(r => r.Recommendation == "Reuse" && r.Id == typeOnly.Id);
+    }
+
+    [Fact]
+    public void Orm_builder_reuses_type_only_map_only_when_every_code_it_requires_is_on_the_upload()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Two HSLOC codes",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}' and code = '1099-1').exists()"
+                },
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}' and code = '1027-2').exists()"
+                }
+            ]
+        };
+
+        var partial = new BundleConfigFingerprint
+        {
+            LocationCount = 2,
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                new LocationTypeHint { System = hsloc, Code = "1052-0" },
+                new LocationTypeHint { System = "http://terminology.hl7.org/CodeSystem/v3-RoleCode", Code = "HU" }
+            ]
+        };
+        var partialReuse = OrgResourceMapProposalBuilder.Build(partial, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id).Subject;
+        partialReuse.Recommendation.Should().Be("Extend");
+        partialReuse.Score.Should().Be(0.5);
+
+        var complete = new BundleConfigFingerprint
+        {
+            LocationCount = 3,
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                new LocationTypeHint { System = hsloc, Code = "1027-2" },
+                new LocationTypeHint { System = hsloc, Code = "9999-9" }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(complete, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 1);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint
@@ -229,7 +349,36 @@ public class BundleConfigurationGenerationTests
         };
 
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [hospitalOnly]);
-        proposal.Reuse.Should().NotContain(r => r.Recommendation == "Reuse" && r.Id == hospitalOnly.Id);
+        proposal.Reuse.Should().NotContain(r => r.Id == hospitalOnly.Id && (r.Recommendation == "Reuse" || r.Score >= 0.999));
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_editor_value_specific_identifier_for_a_different_value()
+    {
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers =
+            [
+                new LocationIdentifierHint { System = "http://a", Value = "UNIT-9" },
+                new LocationIdentifierHint { System = "http://a", Value = "UNIT-2" }
+            ]
+        };
+        var hospitalOnly = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "DP ORM2",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.exists(system = 'http://a' and value = 'HOSP')"
+                }
+            ]
+        };
+
+        var proposal = OrgResourceMapProposalBuilder.Build(fp, [hospitalOnly]);
+        proposal.Reuse.Should().NotContain(r => r.Id == hospitalOnly.Id);
     }
 
     [Fact]

@@ -133,9 +133,11 @@ public static class OrgResourceMapProposalBuilder
             if (!hasType)
                 continue;
 
-            // Type-only maps are reusable only when those type codes are already on the raw
-            // upload. Cleanup cannot make them true in time for org mapping.
-            if (rawTypeKeys.Count == 0)
+            // Score the codes this map requires against the raw upload. Other type codes
+            // on the upload do not lower the score. Cleanup cannot add the missing codes
+            // before acquisition evaluates org mapping.
+            var mapTypeKeys = covered.Where(IsTypeKey).ToList();
+            if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
             {
                 if (neededIdentifiers.Count == 0)
                     continue;
@@ -148,8 +150,8 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var typeHit = rawTypeKeys.Count(neededKey => IsCovered(neededKey, covered));
-            if (typeHit == 0)
+            var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys));
+            if (satisfied == 0)
             {
                 if (neededIdentifiers.Count == 0)
                     continue;
@@ -162,13 +164,13 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var typeScore = (double)typeHit / rawTypeKeys.Count;
+            var typeScore = (double)satisfied / mapTypeKeys.Count;
             results.Add(ToCandidate(
                 template,
                 typeScore,
                 typeScore >= 0.999
                     ? "This map matches type codes already present on the uploaded Locations, which acquisition can see."
-                    : $"This map matches {typeHit} of {rawTypeKeys.Count} type codes already on the uploaded Locations."));
+                    : $"This map matches {satisfied} of {mapTypeKeys.Count} type codes it requires. The upload does not contain the rest."));
         }
 
         return results
@@ -283,19 +285,41 @@ public static class OrgResourceMapProposalBuilder
         if (covered.Contains(neededKey))
             return true;
 
+        // A system-level condition covers every value or code in that system.
+        // A value-specific or code-specific condition does not.
         if (neededKey.StartsWith("id|", StringComparison.OrdinalIgnoreCase))
         {
-            var parts = neededKey.Split('|');
-            return parts.Length >= 2 && covered.Contains($"idsys|{parts[1]}");
+            var system = KeySystem(neededKey);
+            return system.Length > 0 && covered.Contains($"idsys|{system}");
         }
 
         if (neededKey.StartsWith("type|", StringComparison.OrdinalIgnoreCase))
         {
-            var parts = neededKey.Split('|');
-            return parts.Length >= 2 && covered.Contains($"typesys|{parts[1]}");
+            var system = KeySystem(neededKey);
+            return system.Length > 0 && covered.Contains($"typesys|{system}");
         }
 
         return false;
+    }
+
+    private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)
+    {
+        if (rawTypeKeys.Contains(mapKey))
+            return true;
+
+        if (!mapKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var system = mapKey["typesys|".Length..];
+        return rawTypeKeys.Any(raw =>
+            raw.StartsWith("type|", StringComparison.OrdinalIgnoreCase)
+            && KeySystem(raw).Equals(system, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string KeySystem(string key)
+    {
+        var parts = key.Split('|');
+        return parts.Length >= 2 ? parts[1] : "";
     }
 
     private static bool IsIdentifierKey(string key)
