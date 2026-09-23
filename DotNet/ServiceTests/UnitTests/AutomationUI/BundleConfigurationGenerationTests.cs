@@ -1267,6 +1267,54 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_does_not_reuse_a_type_map_that_requires_an_empty_alias()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var emptyAlias = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Empty alias",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = ''"
+                }
+            ]
+        };
+        var plain = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Code only",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1')"
+                }
+            ]
+        };
+        var upload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["ICU"]
+                }
+            ]
+        };
+
+        OrgResourceMapProposalBuilder.Build(upload, [emptyAlias]).Reuse
+            .Should().NotContain(r => r.Id == emptyAlias.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(upload, [plain]).Reuse
+            .Should().ContainSingle(r => r.Id == plain.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Normalization_builder_emits_one_of_each_supported_type_when_data_allows()
     {
         var fp = new BundleConfigFingerprint

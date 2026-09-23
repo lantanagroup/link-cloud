@@ -299,8 +299,10 @@ public static class OrgResourceMapProposalBuilder
                 // and left most Locations out-of-org. An alias predicate is part of the
                 // same condition, so the type code alone must not satisfy it.
                 // System, code, value, and alias equality use the unescaped literal.
-                var alias = type.Groups[3].Success ? UnescapeFhirPathLiteral(type.Groups[3].Value) : "";
-                var hasAlias = alias.Length > 0;
+                // Group presence keeps an explicit alias = '' predicate. Length would
+                // drop it and score the type code as if no alias were required.
+                var hasAlias = type.Groups[3].Success;
+                var alias = hasAlias ? UnescapeFhirPathLiteral(type.Groups[3].Value) : "";
                 var system = UnescapeFhirPathLiteral(type.Groups[1].Value);
                 var code = type.Groups[2].Success ? UnescapeFhirPathLiteral(type.Groups[2].Value) : "";
                 if (code.Length > 0 && !string.IsNullOrWhiteSpace(code))

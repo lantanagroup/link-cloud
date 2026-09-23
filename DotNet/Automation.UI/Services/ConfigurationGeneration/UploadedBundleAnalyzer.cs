@@ -8,6 +8,7 @@ public static class UploadedBundleAnalyzer
     public static BundleConfigFingerprint Analyze(IEnumerable<Resource> resources)
     {
         var fp = new BundleConfigFingerprint();
+        var seen = new HashSet<RawLocationHint>(RawSignatureComparer.Instance);
         foreach (var resource in resources.Where(r => r != null))
         {
             var type = resource.TypeName;
@@ -17,7 +18,7 @@ public static class UploadedBundleAnalyzer
                 fp.PatientCount++;
 
             if (resource is Location location)
-                AddLocation(fp, location);
+                AddLocation(fp, location, seen);
 
             CollectExtensions(fp, resource, type);
             CollectCodings(fp, resource, type);
@@ -57,8 +58,9 @@ public static class UploadedBundleAnalyzer
                 merged.LocationAliases.Add(alias);
         }
 
+        var seen = new HashSet<RawLocationHint>(merged.RawLocations, RawSignatureComparer.Instance);
         foreach (var location in right.RawLocations)
-            AddRawLocation(merged, location);
+            AddRawLocation(merged, location, seen);
 
         foreach (var ext in right.Extensions)
         {
@@ -96,7 +98,7 @@ public static class UploadedBundleAnalyzer
             LocationsWithoutIdentifier = source.LocationsWithoutIdentifier
         };
 
-    private static void AddLocation(BundleConfigFingerprint fp, Location location)
+    private static void AddLocation(BundleConfigFingerprint fp, Location location, HashSet<RawLocationHint> seen)
     {
         fp.LocationCount++;
         var raw = new RawLocationHint();
@@ -145,14 +147,14 @@ public static class UploadedBundleAnalyzer
             fp.LocationAliases.Add(hint);
         }
 
-        AddRawLocation(fp, raw);
+        AddRawLocation(fp, raw, seen);
     }
 
-    private static void AddRawLocation(BundleConfigFingerprint fp, RawLocationHint raw)
+    private static void AddRawLocation(BundleConfigFingerprint fp, RawLocationHint raw, HashSet<RawLocationHint> seen)
     {
         if (raw.Types.Count == 0 && raw.Aliases.Count == 0)
             return;
-        if (fp.RawLocations.Any(existing => SameSignature(existing, raw)))
+        if (!seen.Add(raw))
             return;
         fp.RawLocations.Add(CloneRawLocation(raw));
     }
@@ -250,6 +252,32 @@ public static class UploadedBundleAnalyzer
         => !string.IsNullOrWhiteSpace(url)
            && url == url.Trim()
            && Uri.TryCreate(url, UriKind.Absolute, out _);
+
+    private sealed class RawSignatureComparer : IEqualityComparer<RawLocationHint>
+    {
+        public static readonly RawSignatureComparer Instance = new();
+
+        public bool Equals(RawLocationHint? x, RawLocationHint? y)
+            => x != null && y != null && SameSignature(x, y);
+
+        public int GetHashCode(RawLocationHint obj)
+        {
+            var hash = new HashCode();
+            hash.Add(obj.Aliases.Count);
+            foreach (var alias in obj.Aliases.OrderBy(alias => alias, StringComparer.Ordinal))
+                hash.Add(alias, StringComparer.Ordinal);
+            hash.Add(obj.Types.Count);
+            foreach (var type in obj.Types
+                         .OrderBy(type => type.System, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(type => type.Code, StringComparer.Ordinal))
+            {
+                hash.Add(type.System?.Trim(), StringComparer.OrdinalIgnoreCase);
+                hash.Add(type.Code?.Trim(), StringComparer.Ordinal);
+            }
+
+            return hash.ToHashCode();
+        }
+    }
 
     private static bool Same(string? left, string? right)
         => string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
