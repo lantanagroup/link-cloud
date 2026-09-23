@@ -24,6 +24,7 @@ public sealed class LeftoverRunCleanupService(
     IOptions<LeftoverRunCleanupOptions> leftoverOptions,
     ILogger<LeftoverRunCleanupService> logger) : BackgroundService, ILeftoverRunCleanup
 {
+    private static readonly TimeSpan TerminalPersistenceBudget = TimeSpan.FromSeconds(5);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DateTimeOffset? _lastQuiesceAt;
     private CancellationToken _stopping;
@@ -433,11 +434,13 @@ public sealed class LeftoverRunCleanupService(
                     // Weekly history-purge always wants per-run facility teardown.
                     // Custom-range honors the independent teardownFacilities checkbox; skip IDs the facility loop already handled.
                     var teardownInPurge = mode == "history-purge" || teardownFacilities;
-                    // Record the teardown before snapshot delete. A later failure must not
-                    // drop a facility that CleanupLeftoverFacilityAsync already removed.
-                    // A teardown failure still falls through to the history purge.
-                    var teardownThisRun = teardownInPurge && IsNewHistoryTeardown(run.FacilityId, tornDown);
-                    if (teardownThisRun)
+                    // FacilityId and the scenario RunId are both Automation-owned facility ids.
+                    // Keep the run snapshot when a required teardown fails so a later pass can retry.
+                    var pendingTeardown = teardownInPurge
+                        ? OwnedAutomationFacilityIds(run).Where(id => IsNewHistoryTeardown(id, tornDown)).ToList()
+                        : [];
+                    var teardownFailed = false;
+                    foreach (var facilityId in pendingTeardown)
                     {
                         try
                         {
@@ -450,36 +453,44 @@ public sealed class LeftoverRunCleanupService(
                                 reportClient,
                                 abortRegistry,
                                 output,
-                                run.FacilityId!,
+                                facilityId,
                                 settings.AbortTtl,
                                 cancellationToken);
-                            tornDown.Add(run.FacilityId!);
+                            tornDown.Add(facilityId);
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", run.FacilityId);
-                            failedFacilities.Add(run.FacilityId!);
+                            logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", facilityId);
+                            failedFacilities.Add(facilityId);
+                            teardownFailed = true;
                         }
                     }
 
-                    await RunCleanupHelper.PurgeRunHistoryAsync(
-                        facilityClient,
-                        normalizationClient,
-                        dataAcqClient,
-                        queryDispatchClient,
-                        censusClient,
-                        reportClient,
-                        abortRegistry,
-                        snapshotStore,
-                        output,
-                        run,
-                        settings.AbortTtl,
-                        cancellationToken,
-                        teardownFacility: teardownInPurge && !teardownThisRun,
-                        alreadyTornDownFacilityIds: tornDown.Count > 0
-                            ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
-                            : null);
-                    purged.Add(run.RunId);
+                    if (teardownFailed)
+                    {
+                        failedRuns.Add(run.RunId);
+                    }
+                    else
+                    {
+                        await RunCleanupHelper.PurgeRunHistoryAsync(
+                            facilityClient,
+                            normalizationClient,
+                            dataAcqClient,
+                            queryDispatchClient,
+                            censusClient,
+                            reportClient,
+                            abortRegistry,
+                            snapshotStore,
+                            output,
+                            run,
+                            settings.AbortTtl,
+                            cancellationToken,
+                            teardownFacility: teardownInPurge && pendingTeardown.Count == 0,
+                            alreadyTornDownFacilityIds: tornDown.Count > 0
+                                ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
+                                : null);
+                        purged.Add(run.RunId);
+                    }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -510,7 +521,7 @@ public sealed class LeftoverRunCleanupService(
             var status = failedFacilities.Count > 0 || failedRuns.Count > 0 ? "failed" : "completed";
             var finishedAt = time.GetUtcNow();
             var message = FormatActivityResult(label, result);
-            var persisted = await TrySaveReportAsync(new CleanupReport
+            var persisted = await SaveReportWithinBudgetAsync(new CleanupReport
             {
                 Id = Guid.NewGuid(),
                 Mode = mode,
@@ -528,14 +539,14 @@ public sealed class LeftoverRunCleanupService(
                 FailedFacilityIds = result.FailedFacilityIds,
                 FailedRunIds = result.FailedRunIds,
                 Message = message
-            }, CancellationToken.None);
+            }, cancellationToken);
             savedTerminal = persisted;
             if (!persisted)
                 message += " The cleanup report could not be saved.";
 
             try
             {
-                await PublishAsync(new CleanupActivity
+                await PublishWithinBudgetAsync(new CleanupActivity
                 {
                     Mode = mode,
                     Label = label,
@@ -549,7 +560,7 @@ public sealed class LeftoverRunCleanupService(
                     Failed = failedFacilities.Count + failedRuns.Count,
                     Message = message,
                     At = finishedAt
-                }, CancellationToken.None);
+                }, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -565,27 +576,27 @@ public sealed class LeftoverRunCleanupService(
 
             var finishedAt = time.GetUtcNow();
             var message = $"{label} cancelled.";
-            await TrySaveReportAsync(PartialReport(
+            await SaveBestEffortWithinBudgetAsync(PartialReport(
                 mode, label, trigger, startedAt, finishedAt, message,
                 quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
-                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
-            await PublishAsync(CurrentActivity with
+                historyCandidateCount, purged, failedFacilities, failedRuns));
+            await PublishBestEffortWithinBudgetAsync(CurrentActivity with
             {
                 Status = "failed",
                 Message = message,
                 At = finishedAt
-            }, CancellationToken.None);
+            });
             throw;
         }
         catch (Exception ex)
         {
             var finishedAt = time.GetUtcNow();
             var message = $"{label} failed: {ex.Message}";
-            await TrySaveReportAsync(PartialReport(
+            await SaveBestEffortWithinBudgetAsync(PartialReport(
                 mode, label, trigger, startedAt, finishedAt, message,
                 quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
-                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
-            await PublishAsync(new CleanupActivity
+                historyCandidateCount, purged, failedFacilities, failedRuns));
+            await PublishBestEffortWithinBudgetAsync(new CleanupActivity
             {
                 Mode = mode,
                 Label = label,
@@ -593,7 +604,7 @@ public sealed class LeftoverRunCleanupService(
                 Trigger = trigger,
                 Message = message,
                 At = finishedAt
-            }, CancellationToken.None);
+            });
             throw;
         }
         finally
@@ -684,11 +695,61 @@ public sealed class LeftoverRunCleanupService(
 
     private static List<string> HistoryTeardownCandidates(IReadOnlyList<AutomationRunSummary> historyRuns)
         => historyRuns
-            .Select(run => run.FacilityId)
-            .Where(id => !string.IsNullOrWhiteSpace(id) && RunCleanupHelper.IsAutomationFacilityId(id))
+            .SelectMany(OwnedAutomationFacilityIds)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(id => id!)
             .ToList();
+
+    private static List<string> OwnedAutomationFacilityIds(AutomationRunSummary run)
+    {
+        var ids = new List<string>();
+        Add(run.FacilityId);
+        Add(run.RunId.ToString());
+        return ids;
+
+        void Add(string? id)
+        {
+            if (string.IsNullOrWhiteSpace(id) || !RunCleanupHelper.IsAutomationFacilityId(id))
+                return;
+            if (ids.Exists(existing => string.Equals(existing, id, StringComparison.OrdinalIgnoreCase)))
+                return;
+            ids.Add(id);
+        }
+    }
+
+    private async Task<bool> SaveReportWithinBudgetAsync(CleanupReport report, CancellationToken cancellationToken)
+    {
+        using var timeout = new CancellationTokenSource(TerminalPersistenceBudget);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        try
+        {
+            return await TrySaveReportAsync(report, linked.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Cleanup report save exceeded {Budget}.", TerminalPersistenceBudget);
+            return false;
+        }
+    }
+
+    private async Task PublishWithinBudgetAsync(CleanupActivity activity, CancellationToken cancellationToken)
+    {
+        using var timeout = new CancellationTokenSource(TerminalPersistenceBudget);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        try
+        {
+            await PublishAsync(activity, linked.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("Cleanup activity publish exceeded {Budget}.", TerminalPersistenceBudget);
+        }
+    }
+
+    private Task SaveBestEffortWithinBudgetAsync(CleanupReport report)
+        => SaveReportWithinBudgetAsync(report, CancellationToken.None);
+
+    private Task PublishBestEffortWithinBudgetAsync(CleanupActivity activity)
+        => PublishWithinBudgetAsync(activity, CancellationToken.None);
 
     private static CleanupReport PartialReport(
         string mode,

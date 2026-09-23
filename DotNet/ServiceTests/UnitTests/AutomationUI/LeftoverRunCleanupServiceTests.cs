@@ -34,12 +34,13 @@ public class LeftoverRunCleanupServiceTests
         var result = await service.RunHistoryPurgeNowAsync();
 
         order.Should().ContainInOrder("save", "publish");
-        result.TornDownFacilityIds.Should().Equal(guidFacility);
-        result.TeardownCandidateCount.Should().Be(1);
+        result.TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, guidRun.RunId.ToString(), namedRun.RunId.ToString()]);
+        result.TornDownFacilityIds.Should().NotContain("CityHospital");
+        result.TeardownCandidateCount.Should().Be(3);
         result.PurgedRunIds.Should().BeEquivalentTo([guidRun.RunId, namedRun.RunId]);
         saved.Should().ContainSingle();
-        saved[0].TornDownFacilityIds.Should().Equal(guidFacility);
-        saved[0].TeardownCandidateCount.Should().Be(1);
+        saved[0].TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, guidRun.RunId.ToString(), namedRun.RunId.ToString()]);
+        saved[0].TeardownCandidateCount.Should().Be(3);
         saved[0].PurgedRunIds.Should().BeEquivalentTo([guidRun.RunId, namedRun.RunId]);
     }
 
@@ -59,9 +60,9 @@ public class LeftoverRunCleanupServiceTests
             teardownFacilities: true,
             purgeHistory: true);
 
-        result.TornDownFacilityIds.Should().Equal(guidFacility);
-        result.TeardownCandidateCount.Should().Be(1);
-        saved.Single().TeardownCandidateCount.Should().Be(1);
+        result.TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, run.RunId.ToString()]);
+        result.TeardownCandidateCount.Should().Be(2);
+        saved.Single().TeardownCandidateCount.Should().Be(2);
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
-    public async Task HistoryPurge_still_purges_the_run_when_facility_teardown_fails()
+    public async Task HistoryPurge_keeps_the_run_when_facility_teardown_fails()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
         var guidFacility = Guid.NewGuid().ToString();
@@ -91,10 +92,35 @@ public class LeftoverRunCleanupServiceTests
         var result = await service.RunHistoryPurgeNowAsync();
 
         result.TornDownFacilityIds.Should().BeEmpty();
-        result.FailedFacilityIds.Should().Equal(guidFacility);
-        result.PurgedRunIds.Should().Equal(run.RunId);
-        saved.Single().PurgedRunIds.Should().Equal(run.RunId);
-        saved.Single().FailedFacilityIds.Should().Equal(guidFacility);
+        result.FailedFacilityIds.Should().BeEquivalentTo([guidFacility, run.RunId.ToString()]);
+        result.FailedRunIds.Should().Equal(run.RunId);
+        result.PurgedRunIds.Should().BeEmpty();
+        saved.Single().PurgedRunIds.Should().BeEmpty();
+        saved.Single().FailedRunIds.Should().Equal(run.RunId);
+    }
+
+    [Fact]
+    public async Task HistoryPurge_tears_down_a_facility_identified_by_the_run_id()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var run = new AutomationRunSummary
+        {
+            RunId = runId,
+            FacilityId = "CityHospital",
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-30)
+        };
+        var saved = new List<CleanupReport>();
+        var service = Create(now, [run], saved);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().Equal(runId.ToString());
+        result.TeardownCandidateCount.Should().Be(1);
+        result.PurgedRunIds.Should().Equal(runId);
+        saved.Single().TornDownFacilityIds.Should().Equal(runId.ToString());
     }
 
     [Fact]
@@ -126,11 +152,11 @@ public class LeftoverRunCleanupServiceTests
 
         var result = await service.RunHistoryPurgeNowAsync();
 
-        result.TornDownFacilityIds.Should().Equal(guidFacility);
+        result.TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, guidRun.RunId.ToString()]);
         result.PurgedRunIds.Should().BeEmpty();
         result.FailedRunIds.Should().Equal(guidRun.RunId);
         saved.Should().ContainSingle();
-        saved[0].TornDownFacilityIds.Should().Equal(guidFacility);
+        saved[0].TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, guidRun.RunId.ToString()]);
         saved[0].FailedRunIds.Should().Equal(guidRun.RunId);
     }
 
@@ -151,7 +177,7 @@ public class LeftoverRunCleanupServiceTests
         await act.Should().ThrowAsync<OperationCanceledException>();
         saved.Should().ContainSingle();
         saved[0].Status.Should().Be("failed");
-        saved[0].TornDownFacilityIds.Should().Equal(firstFacility);
+        saved[0].TornDownFacilityIds.Should().BeEquivalentTo([firstFacility, first.RunId.ToString()]);
         saved[0].PurgedRunIds.Should().Equal(first.RunId);
         saved[0].Message.Should().Contain("cancelled");
     }
