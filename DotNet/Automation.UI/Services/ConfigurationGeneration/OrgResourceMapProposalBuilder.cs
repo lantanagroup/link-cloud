@@ -505,7 +505,53 @@ public static class OrgResourceMapProposalBuilder
            || key.StartsWith("typealias|", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<string> SplitOr(string path)
-        => path.Split([" or ", " OR ", " || "], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    {
+        var parts = new List<string>();
+        var start = 0;
+        var inQuote = false;
+        for (var i = 0; i < path.Length; i++)
+        {
+            if (path[i] == '\'' && (i == 0 || path[i - 1] != '\\'))
+            {
+                inQuote = !inQuote;
+                continue;
+            }
+
+            if (inQuote || !TryMatchOrSeparator(path, i, out var length))
+                continue;
+
+            AddPart(parts, path[start..i]);
+            i += length - 1;
+            start = i + 1;
+        }
+
+        AddPart(parts, path[start..]);
+        return parts;
+    }
+
+    private static bool TryMatchOrSeparator(string path, int index, out int length)
+    {
+        ReadOnlySpan<string> separators = [" or ", " OR ", " || "];
+        foreach (var separator in separators)
+        {
+            if (index + separator.Length <= path.Length
+                && path.AsSpan(index, separator.Length).SequenceEqual(separator))
+            {
+                length = separator.Length;
+                return true;
+            }
+        }
+
+        length = 0;
+        return false;
+    }
+
+    private static void AddPart(List<string> parts, string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length > 0)
+            parts.Add(trimmed);
+    }
 
     private static string Escape(string value)
         => value.Replace("\\", "\\\\").Replace("'", "\\'");

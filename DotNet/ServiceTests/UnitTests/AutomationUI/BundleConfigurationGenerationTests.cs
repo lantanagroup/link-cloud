@@ -503,6 +503,34 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(lowerOnly, [bothCases]).Reuse
             .Should().ContainSingle(r => r.Id == bothCases.Id && r.Recommendation == "Reuse");
+
+        var aliasWithOr = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "ICU or Stepdown",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = 'ICU or Stepdown'"
+                }
+            ]
+        };
+        var stepdown = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["ICU or Stepdown"]
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(stepdown, [aliasWithOr]).Reuse
+            .Should().ContainSingle(r => r.Id == aliasWithOr.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]
