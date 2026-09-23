@@ -9,7 +9,7 @@ import React, {
   useState,
   useTransition
 } from 'react';
-import {useQuery} from '@tanstack/react-query';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
@@ -105,6 +105,7 @@ export function OnboardingProvider({
   const api = useApiClient();
   const {t} = useTranslation('common');
   const {notifyError} = useNotifications();
+  const queryClient = useQueryClient();
   const [draft, dispatch] = useReducer(draftReducer, undefined, createEmptyDraft);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
@@ -247,6 +248,7 @@ export function OnboardingProvider({
       setSaving(true);
 
       const previousVendor = lastSavedDraftRef.current?.facilityInfo.vendor;
+      const previousFhirBaseUrl = lastSavedDraftRef.current?.fhir.fhirServerBaseUrl?.trim();
 
       const outcome = saveChain.current
         .catch(() => undefined)
@@ -256,16 +258,32 @@ export function OnboardingProvider({
             lastSavedDraftRef.current = toSave;
             dirtyRef.current = false;
 
-            if (previousVendor && toSave.facilityInfo.vendor && previousVendor !== toSave.facilityInfo.vendor) {
-              // The BFF just revoked the census step's accuracy acknowledgement server-side as a
-              // side effect of this vendor change - reload so the now-pending census (and every
-              // step gated behind it) shows up instead of the stale in-memory draft. A failed
-              // reload here shouldn't surface as a save failure - the save itself succeeded.
+            const vendorChanged = Boolean(
+              previousVendor && toSave.facilityInfo.vendor && previousVendor !== toSave.facilityInfo.vendor
+            );
+            const fhirBaseUrlChanged = Boolean(
+              previousFhirBaseUrl &&
+                toSave.fhir.fhirServerBaseUrl &&
+                previousFhirBaseUrl !== toSave.fhir.fhirServerBaseUrl.trim()
+            );
+
+            if (vendorChanged || fhirBaseUrlChanged) {
+              // The BFF just revoked the census step's accuracy acknowledgement (and the latest
+              // report's) server-side as a side effect of this vendor or FHIR base URL change -
+              // reload so the now-pending census (and every step gated behind it) shows up instead
+              // of the stale in-memory draft. A failed reload here shouldn't surface as a save
+              // failure - the save itself succeeded.
               try {
                 await reloadDraft();
               } catch {
                 // Next navigation/reload picks up the server's state regardless.
               }
+
+              // Report Results' own acknowledgement isn't part of the draft - it's a separate,
+              // staleTime:Infinity query keyed by report id (see ReportResultsStep) that reloadDraft
+              // never touches. The report id itself didn't change, so without this the checkbox
+              // would keep showing the stale "accepted" value the BFF just revoked.
+              await queryClient.invalidateQueries({queryKey: ['reportAccuracyAcknowledgement']});
             }
 
             return true;
@@ -291,7 +309,7 @@ export function OnboardingProvider({
       saveChain.current = outcome;
       return outcome;
     },
-    [api, notifyError, t, reloadDraft]
+    [api, notifyError, t, reloadDraft, queryClient]
   );
 
   // Persist at transitions. popstate cannot be cancelled, so a dirty-navigation
