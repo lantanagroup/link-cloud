@@ -246,7 +246,9 @@ export function EncounterEvidenceModal({
             </thead>
             <tbody>
               {encounterUnmappedEntries.map((entry) => (
-                <tr key={entry.key}>
+                <tr
+                  key={entry.key}
+                  className="nhsn-link__report-results-row--unmapped">
                   <td>{entry.sourceSystem}</td>
                   <td>{entry.code}</td>
                   <td>
@@ -285,7 +287,7 @@ export function EncounterEvidenceModal({
             </tbody>
           </table>
         </div>
-        <p className="nhsn-link__hint-text">
+        <p className="nhsn-link__report-results-hint-box">
           {t(
             'onboarding:reportResults.detail.mappingEvidence.encounterAddedHint',
           )}

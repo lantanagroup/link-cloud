@@ -175,7 +175,9 @@ export function HslocEvidenceModal({
                 </thead>
                 <tbody>
                   {hslocUnmappedCodes.map((code) => (
-                    <tr key={code}>
+                    <tr
+                      key={code}
+                      className="nhsn-link__report-results-row--unmapped">
                       <td>{code}</td>
                       <td>
                         <Select
@@ -214,7 +216,7 @@ export function HslocEvidenceModal({
               </table>
             </div>
           )}
-          <p className="nhsn-link__hint-text">
+          <p className="nhsn-link__report-results-hint-box">
             {t(
               'onboarding:reportResults.detail.mappingEvidence.hslocAddedHint',
             )}
