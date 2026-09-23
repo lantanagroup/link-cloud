@@ -128,7 +128,7 @@
                             <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                                 <div>
                                     <h6 class="fw-semibold mb-1">Weekly history purge</h6>
-                                    <p class="small text-muted mb-0">Deletes Automation.UI run snapshots, logs, and payloads older than retention. Does not teardown facilities.</p>
+                                    <p class="small text-muted mb-0">Deletes Automation.UI run snapshots, logs, and payloads older than retention, and tears down each purged run's Automation.UI facility. Named production facilities are not touched.</p>
                                 </div>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="WeeklyHistoryPurgeEnabled" name="WeeklyHistoryPurgeEnabled" value="true" @(s.WeeklyHistoryPurgeEnabled ? "checked" : null) />
@@ -162,7 +162,7 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-outline-danger btn-sm cleanup-run-btn" name="runKind" value="history-purge"
-                                    data-confirm="Delete Automation.UI run history older than retention? This cannot be undone.">
+                                    data-confirm="Delete Automation.UI run history older than retention and tear down each purged run's Automation.UI facility? Named production facilities are not touched. This cannot be undone.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run weekly purge
                             </button>
                         </div>
@@ -222,7 +222,7 @@
                                 <input class="form-control" type="date" id="ToDate" name="ToDate" value="@Model.ToDate.ToString("yyyy-MM-dd")" required />
                             </div>
                             <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="TeardownFacilities" name="TeardownFacilities" value="true" checked />
+                                <input class="form-check-input" type="checkbox" id="TeardownFacilities" name="TeardownFacilities" value="true" />
                                 <label class="form-check-label" for="TeardownFacilities">Teardown leftover Automation.UI facilities</label>
                             </div>
                             <div class="form-check mb-3">
