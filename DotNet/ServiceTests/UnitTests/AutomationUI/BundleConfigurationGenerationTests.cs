@@ -768,6 +768,44 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_splits_or_after_an_alias_that_ends_in_a_backslash()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Slash or ward",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.type.coding.exists(system = '" + hsloc
+                        + @"' and code = '1099-1') and Location.alias = 'ICU\\' or Location.type.coding.where(system = '"
+                        + hsloc + "' and code = '1027-2').exists()"
+                }
+            ]
+        };
+        BundleConfigFingerprint Upload(string? alias, string code) => new()
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = code }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = code }],
+                    Aliases = alias == null ? [] : [alias]
+                }
+            ]
+        };
+
+        OrgResourceMapProposalBuilder.Build(Upload(@"ICU\", "1099-1"), [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(Upload(null, "1027-2"), [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint

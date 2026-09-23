@@ -574,7 +574,7 @@ public static class OrgResourceMapProposalBuilder
         var inQuote = false;
         for (var i = 0; i < path.Length; i++)
         {
-            if (path[i] == '\'' && (i == 0 || path[i - 1] != '\\'))
+            if (path[i] == '\'' && !IsEscapedQuote(path, i))
             {
                 inQuote = !inQuote;
                 continue;
@@ -590,6 +590,14 @@ public static class OrgResourceMapProposalBuilder
 
         AddPart(parts, path[start..]);
         return parts;
+    }
+
+    private static bool IsEscapedQuote(string path, int quoteIndex)
+    {
+        var slashes = 0;
+        for (var i = quoteIndex - 1; i >= 0 && path[i] == '\\'; i--)
+            slashes++;
+        return slashes % 2 == 1;
     }
 
     private static bool TryMatchOrSeparator(string path, int index, out int length)
