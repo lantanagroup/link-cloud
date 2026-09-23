@@ -1,14 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AcquisitionLogEntry } from '../../../api/contracts';
-import {
-  Button,
-  MessageContainer,
-  Modal,
-  NHSNLoadingIndicator,
-  Select,
-  TextField,
-} from '../../../fields';
+import { Button, Modal, Select, TextField } from '../../../fields';
+import { AsyncStatus } from './AsyncStatus';
 import { DownloadIcon } from './icons';
 import { EMPTY_ACQUISITION_LOG_FILTERS, type AcquisitionLogFilters } from './patientRows';
 import { buildXlsxBlob, downloadBlob } from './reportExport';
@@ -128,15 +122,7 @@ export function AcquisitionLogModal({
         </Button>
       </>
     }>
-    <p className="nhsn-link__visually-hidden" role="alert">
-      {!loading ? error : null}
-    </p>
-    {loading && <NHSNLoadingIndicator />}
-    {!loading && error && (
-      <MessageContainer type="error" showIcon>
-        <span>{error}</span>
-      </MessageContainer>
-    )}
+    <AsyncStatus loading={loading} error={error} />
     {!loading &&
       !error &&
       (entries.length > 0 ? (

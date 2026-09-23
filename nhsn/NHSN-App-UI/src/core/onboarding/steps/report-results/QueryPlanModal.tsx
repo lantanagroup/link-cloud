@@ -1,13 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { QueryPlan } from '../../../api/contracts';
-import {
-  AcronymText,
-  Button,
-  MessageContainer,
-  Modal,
-  NHSNLoadingIndicator,
-} from '../../../fields';
+import { AcronymText, Button, Modal } from '../../../fields';
+import { AsyncStatus } from './AsyncStatus';
 import { DownloadIcon } from './icons';
 import { parseQueryPlan } from './queryPlan';
 import { buildXlsxBlob, downloadBlob } from './reportExport';
@@ -62,15 +57,7 @@ export function QueryPlanModal({
           </Button>
         </>
       }>
-      <p className="nhsn-link__visually-hidden" role="alert">
-        {!loading ? error : null}
-      </p>
-      {loading && <NHSNLoadingIndicator />}
-      {!loading && error && (
-        <MessageContainer type="error" showIcon>
-          <span>{error}</span>
-        </MessageContainer>
-      )}
+      <AsyncStatus loading={loading} error={error} />
       {!loading && !error && parsedQueryPlan && (
         <>
           <ul className="nhsn-link__summary-list">

@@ -1,4 +1,5 @@
 import type { ReportDetail } from '../../../api/contracts';
+import { hashToColor } from './pieChart';
 
 /**
  * The NHSN measure names Report Results/Details show for a report. Prefers the exact selection
@@ -89,9 +90,5 @@ const MEASURE_COLOR_PALETTE = [
 ];
 
 export function measureColor(measure: string): string {
-  let hash = 0;
-  for (let i = 0; i < measure.length; i++) {
-    hash = (hash * 31 + measure.charCodeAt(i)) >>> 0;
-  }
-  return MEASURE_COLOR_PALETTE[hash % MEASURE_COLOR_PALETTE.length];
+  return hashToColor(measure, MEASURE_COLOR_PALETTE);
 }

@@ -5,14 +5,9 @@ import type {
   HslocMapping,
   PatientMappingEvidence,
 } from '../../../api/contracts';
-import {
-  Button,
-  MessageContainer,
-  Modal,
-  NHSNLoadingIndicator,
-  Select,
-} from '../../../fields';
+import { Button, Modal, NHSNLoadingIndicator, Select } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
+import { AsyncStatus } from './AsyncStatus';
 import { isHslocCodeMap } from './patientRows';
 
 export interface HslocEvidenceModalProps {
@@ -141,16 +136,8 @@ export function HslocEvidenceModal({
       </table>
     </div>
   
-    <p className="nhsn-link__visually-hidden" role="alert">
-      {!loading ? error : null}
-    </p>
-    {loading && <NHSNLoadingIndicator />}
-    {!loading && error && (
-      <MessageContainer type="error" showIcon>
-        <span>{error}</span>
-      </MessageContainer>
-    )}
-  
+    <AsyncStatus loading={loading} error={error} />
+
     {!loading &&
       !error &&
       hslocUnmappedCodes.length > 0 && (

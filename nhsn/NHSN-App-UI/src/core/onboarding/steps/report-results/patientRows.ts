@@ -5,6 +5,7 @@ import type {
   ReportPatientEntry,
 } from '../../../api/contracts';
 import type { LocationOrgDraft } from '../../types';
+import { hashToColor } from './pieChart';
 import { toStatusCategory, type ReportStatusSlice } from './reportStatus';
 
 /**
@@ -165,11 +166,7 @@ const RESOURCE_TYPE_COLOR_PALETTE = [
 ];
 
 function resourceTypeColor(resourceType: string): string {
-  let hash = 0;
-  for (let i = 0; i < resourceType.length; i++) {
-    hash = (hash * 31 + resourceType.charCodeAt(i)) >>> 0;
-  }
-  return RESOURCE_TYPE_COLOR_PALETTE[hash % RESOURCE_TYPE_COLOR_PALETTE.length];
+  return hashToColor(resourceType, RESOURCE_TYPE_COLOR_PALETTE);
 }
 
 export function buildResourceBreakdown(

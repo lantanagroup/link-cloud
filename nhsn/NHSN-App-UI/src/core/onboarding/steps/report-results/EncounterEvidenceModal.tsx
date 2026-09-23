@@ -14,6 +14,7 @@ import {
 } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
 import { buildGroups, encodeTarget } from '../encounter/EncounterStep';
+import { AsyncStatus } from './AsyncStatus';
 import { isHslocCodeMap, type PatientStatusRow } from './patientRows';
 
 export interface EncounterEvidenceModalProps {
@@ -86,16 +87,8 @@ export function EncounterEvidenceModal({
       </div>
     </dl>
   
-    <p className="nhsn-link__visually-hidden" role="alert">
-      {!loading ? error : null}
-    </p>
-    {loading && <NHSNLoadingIndicator />}
-    {!loading && error && (
-      <MessageContainer type="error" showIcon>
-        <span>{error}</span>
-      </MessageContainer>
-    )}
-  
+    <AsyncStatus loading={loading} error={error} />
+
     {!loading &&
       !error &&
       encounterCodeMaps.length > 0 && (
