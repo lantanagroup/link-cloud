@@ -115,6 +115,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     () => _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken),
                     cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 taskResult.IsSuccess = false;
@@ -220,6 +224,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     () => _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken),
                     cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 taskResult.IsSuccess = false;
@@ -260,20 +268,38 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 return;
             }
 
-            if (_database.HasActiveTransaction)
+            var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(vendorVersionIds, cancellationToken);
+            var ownsTransaction = !_database.HasActiveTransaction;
+            var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
+            try
             {
-                await SaveVendorPresetsAsync(operationId, vendorVersionIds, cancellationToken);
-                return;
+                await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+                await SaveVendorPresetsAsync(operationId, vendorVersionIds, resolvedVendorVersions.Keys, cancellationToken);
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
             }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
 
-            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-            await SaveVendorPresetsAsync(operationId, vendorVersionIds, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
         }
 
-        private async Task SaveVendorPresetsAsync(Guid operationId, List<Guid> vendorVersionIds, CancellationToken cancellationToken)
+        private async Task SaveVendorPresetsAsync(Guid operationId, List<Guid> vendorVersionIds, IEnumerable<Guid> resolvedVendorVersionIds, CancellationToken cancellationToken)
         {
-            var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(vendorVersionIds, cancellationToken);
             var orts = (await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId, cancellationToken)).Select(ort => ort.Id);
 
             foreach (var ort in orts)
@@ -286,7 +312,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     _database.VendorVersionOperationPresets.Remove(delete);
                 }
 
-                foreach (var vendorVersionId in resolvedVendorVersions.Keys)
+                foreach (var vendorVersionId in resolvedVendorVersionIds)
                 {
                     if (!await _database.VendorVersionOperationPresets.AnyAsync(vop => vop.VendorVersionId == vendorVersionId && vop.OperationResourceTypeId == ort, cancellationToken))
                     {
@@ -805,7 +831,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 else
                 {
                     var operationIds = await _operationSequenceQueries.OperationsInFacilitySequencesAsync(model.FacilityId, model.ResourceType, cancellationToken);
-                    foreach (var operationId in operationIds)
+                    foreach (var operationId in operationIds.OrderBy(id => id))
                     {
                         await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
                     }
