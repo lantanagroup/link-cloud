@@ -434,6 +434,25 @@ public sealed class LeftoverRunCleanupService(
                     // Weekly history-purge always wants per-run facility teardown.
                     // Custom-range honors the independent teardownFacilities checkbox; skip IDs the facility loop already handled.
                     var teardownInPurge = mode == "history-purge" || teardownFacilities;
+                    // Record the teardown before snapshot delete. A later failure must not
+                    // drop a facility that CleanupLeftoverFacilityAsync already removed.
+                    if (teardownInPurge && IsNewHistoryTeardown(run.FacilityId, tornDown))
+                    {
+                        await RunCleanupHelper.CleanupLeftoverFacilityAsync(
+                            facilityClient,
+                            normalizationClient,
+                            dataAcqClient,
+                            queryDispatchClient,
+                            censusClient,
+                            reportClient,
+                            abortRegistry,
+                            output,
+                            run.FacilityId!,
+                            settings.AbortTtl,
+                            cancellationToken);
+                        tornDown.Add(run.FacilityId!);
+                    }
+
                     await RunCleanupHelper.PurgeRunHistoryAsync(
                         facilityClient,
                         normalizationClient,
@@ -451,8 +470,6 @@ public sealed class LeftoverRunCleanupService(
                         alreadyTornDownFacilityIds: tornDown.Count > 0
                             ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
                             : null);
-                    if (teardownInPurge && IsNewHistoryTeardown(run.FacilityId, tornDown))
-                        tornDown.Add(run.FacilityId!);
                     purged.Add(run.RunId);
                 }
                 catch (Exception ex)

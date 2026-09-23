@@ -44,6 +44,29 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_keeps_torn_down_facility_when_snapshot_delete_fails()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var guidFacility = Guid.NewGuid().ToString();
+        var guidRun = Run(guidFacility, now.AddDays(-30));
+        var saved = new List<CleanupReport>();
+        var service = Create(
+            now,
+            [guidRun],
+            saved,
+            deleteRunError: new InvalidOperationException("snapshot delete failed"));
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().Equal(guidFacility);
+        result.PurgedRunIds.Should().BeEmpty();
+        result.FailedRunIds.Should().Equal(guidRun.RunId);
+        saved.Should().ContainSingle();
+        saved[0].TornDownFacilityIds.Should().Equal(guidFacility);
+        saved[0].FailedRunIds.Should().Equal(guidRun.RunId);
+    }
+
+    [Fact]
     public async Task HistoryPurge_cancel_keeps_facilities_already_torn_down()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -80,7 +103,8 @@ public class LeftoverRunCleanupServiceTests
         IReadOnlyList<AutomationRunSummary> runs,
         List<CleanupReport> saved,
         CancellationTokenSource? cancelAfterFirstDelete = null,
-        List<string>? order = null)
+        List<string>? order = null,
+        Exception? deleteRunError = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -143,7 +167,12 @@ public class LeftoverRunCleanupServiceTests
         snapshots.Setup(s => s.GetAllRunSummariesAsync(It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(runs);
         snapshots.Setup(s => s.DeleteRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Callback(() => cancelAfterFirstDelete?.Cancel())
+            .Callback(() =>
+            {
+                cancelAfterFirstDelete?.Cancel();
+                if (deleteRunError != null)
+                    throw deleteRunError;
+            })
             .Returns(Task.CompletedTask);
 
         var settings = new Mock<ICleanupSettingsStore>();
