@@ -420,7 +420,15 @@ public class BundleConfigurationGenerationTests
         {
             LocationCount = 1,
             LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
-            LocationAliases = ["Ward"]
+            LocationAliases = ["Ward"],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["Ward"]
+                }
+            ]
         };
         OrgResourceMapProposalBuilder.Build(missingAlias, [map]).Reuse
             .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
@@ -429,16 +437,37 @@ public class BundleConfigurationGenerationTests
         {
             LocationCount = 1,
             LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
-            LocationAliases = ["ICU"]
+            LocationAliases = ["ICU"],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["ICU"]
+                }
+            ]
         };
         OrgResourceMapProposalBuilder.Build(withAlias, [map]).Reuse
             .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 1);
 
         var differentCase = new BundleConfigFingerprint
         {
-            LocationCount = 1,
+            LocationCount = 2,
             LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
-            LocationAliases = ["icu"]
+            LocationAliases = ["icu", "ICU"],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["icu"]
+                },
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1027-2" }],
+                    Aliases = ["ICU"]
+                }
+            ]
         };
         OrgResourceMapProposalBuilder.Build(differentCase, [map]).Reuse
             .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
@@ -573,7 +602,7 @@ public class BundleConfigurationGenerationTests
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [existing], existing);
         proposal.Conditions.Should().HaveCount(2);
         proposal.Conditions.Select(c => c.FhirPath).Should().Contain("Location.identifier.where(system = 'http://b').exists()");
-        proposal.Reuse.Should().ContainSingle(r => r.Id == existing.Id && r.Recommendation == "Reuse" && r.Score == 0.5);
+        proposal.Reuse.Should().ContainSingle(r => r.Id == existing.Id && r.Recommendation == "Extend" && r.Score == 0.5);
     }
 
     [Fact]

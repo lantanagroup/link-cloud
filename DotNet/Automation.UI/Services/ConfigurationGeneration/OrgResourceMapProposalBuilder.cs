@@ -95,7 +95,7 @@ public static class OrgResourceMapProposalBuilder
     {
         var neededIdentifiers = NeededIdentifierKeys(fingerprint);
         var rawTypeKeys = NeededRawTypeKeys(fingerprint);
-        var aliases = new HashSet<string>(fingerprint.LocationAliases, StringComparer.Ordinal);
+        var rawLocations = fingerprint.RawLocations;
         var results = new List<ReuseCandidate>();
 
         foreach (var template in existing)
@@ -118,6 +118,7 @@ public static class OrgResourceMapProposalBuilder
                 {
                     var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
                     var score = (double)hit / neededIdentifiers.Count;
+                    var siblingValues = UncoveredIdentifiersAreSiblingValues(neededIdentifiers, covered);
                     results.Add(ToCandidate(
                         template,
                         score,
@@ -126,7 +127,7 @@ public static class OrgResourceMapProposalBuilder
                             : template.IsSystem
                                 ? $"This system map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload. Extending clones a custom copy so the system map stays unchanged."
                                 : $"This map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload.",
-                        reuse: true));
+                        reuse: siblingValues));
                     continue;
                 }
             }
@@ -152,7 +153,7 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys, aliases));
+            var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys, rawLocations));
             if (satisfied == 0)
             {
                 if (neededIdentifiers.Count == 0)
@@ -166,7 +167,7 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, aliases));
+            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, rawLocations));
             var coverage = (double)coveredTypes / rawTypeKeys.Count;
             results.Add(ToCandidate(
                 template,
@@ -353,31 +354,76 @@ public static class OrgResourceMapProposalBuilder
             && KeySystem(needed).Equals(system, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool RawTypeCovered(string rawKey, HashSet<string> covered, HashSet<string> aliases)
+    private static bool UncoveredIdentifiersAreSiblingValues(HashSet<string> needed, HashSet<string> covered)
+    {
+        foreach (var neededKey in needed)
+        {
+            if (IsCovered(neededKey, covered))
+                continue;
+            if (!neededKey.StartsWith("id|", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var system = KeySystem(neededKey);
+            var matchedValueOnSystem = covered.Any(key =>
+                key.StartsWith("id|", StringComparison.OrdinalIgnoreCase)
+                && !key.StartsWith("idsys|", StringComparison.OrdinalIgnoreCase)
+                && KeySystem(key).Equals(system, StringComparison.OrdinalIgnoreCase)
+                && needed.Contains(key));
+            if (!matchedValueOnSystem)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool RawTypeCovered(string rawKey, HashSet<string> covered, IReadOnlyList<RawLocationHint> locations)
     {
         if (IsCovered(rawKey, covered))
             return true;
 
         foreach (var key in covered)
         {
-            if (!TrySplitAliasKey(key, out var typeKey, out var alias) || !aliases.Contains(alias))
+            if (!TrySplitAliasKey(key, out var typeKey, out var alias))
                 continue;
-            if (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
-                && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase))
+            if (locations.Any(location => AliasConditionMatches(location, typeKey, alias))
+                && (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase)
+                    || (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
+                        && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase))))
                 return true;
         }
 
         return false;
     }
 
-    private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys, HashSet<string> aliases)
+    private static bool MapTypeKeySatisfied(
+        string mapKey,
+        HashSet<string> rawTypeKeys,
+        IReadOnlyList<RawLocationHint> locations)
     {
         if (TrySplitAliasKey(mapKey, out var typeKey, out var alias))
-            return aliases.Contains(alias) && TypeKeySatisfied(typeKey, rawTypeKeys);
+            return locations.Any(location => AliasConditionMatches(location, typeKey, alias));
 
         return TypeKeySatisfied(mapKey, rawTypeKeys);
+    }
+
+    private static bool AliasConditionMatches(RawLocationHint location, string typeKey, string alias)
+        => location.Aliases.Contains(alias) && TypeOnLocation(typeKey, location);
+
+    private static bool TypeOnLocation(string typeKey, RawLocationHint location)
+    {
+        if (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase))
+        {
+            var system = typeKey["typesys|".Length..];
+            return location.Types.Any(type =>
+                type.System.Equals(system, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var parts = typeKey.Split('|');
+        if (parts.Length < 3 || !parts[0].Equals("type", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return location.Types.Any(type =>
+            type.System.Equals(parts[1], StringComparison.OrdinalIgnoreCase)
+            && type.Code.Equals(parts[2], StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool TypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)

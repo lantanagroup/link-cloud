@@ -57,6 +57,8 @@ public static class UploadedBundleAnalyzer
                 merged.LocationAliases.Add(alias);
         }
 
+        merged.RawLocations.AddRange(right.RawLocations);
+
         foreach (var ext in right.Extensions)
         {
             if (!merged.Extensions.Any(x => Same(x.Url, ext.Url) && Same(x.ResourceType, ext.ResourceType)))
@@ -85,6 +87,11 @@ public static class UploadedBundleAnalyzer
             LocationIdentifiers = [.. source.LocationIdentifiers],
             LocationTypes = [.. source.LocationTypes],
             LocationAliases = [.. source.LocationAliases],
+            RawLocations = source.RawLocations.Select(location => new RawLocationHint
+            {
+                Types = [.. location.Types],
+                Aliases = [.. location.Aliases]
+            }).ToList(),
             Extensions = [.. source.Extensions],
             Codings = [.. source.Codings],
             LocationCount = source.LocationCount,
@@ -95,6 +102,8 @@ public static class UploadedBundleAnalyzer
     private static void AddLocation(BundleConfigFingerprint fp, Location location)
     {
         fp.LocationCount++;
+        var raw = new RawLocationHint();
+        fp.RawLocations.Add(raw);
         var hasUsableIdentifier = false;
         foreach (var identifier in location.Identifier ?? [])
         {
@@ -118,9 +127,11 @@ public static class UploadedBundleAnalyzer
                 var code = coding.Code?.Trim() ?? "";
                 if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(code))
                     continue;
+                var hint = new LocationTypeHint { System = system, Code = code };
+                raw.Types.Add(hint);
                 if (fp.LocationTypes.Any(x => Same(x.System, system) && Same(x.Code, code)))
                     continue;
-                fp.LocationTypes.Add(new LocationTypeHint { System = system, Code = code });
+                fp.LocationTypes.Add(hint);
             }
         }
 
@@ -129,6 +140,7 @@ public static class UploadedBundleAnalyzer
             var value = alias?.Trim();
             if (string.IsNullOrWhiteSpace(value))
                 continue;
+            raw.Aliases.Add(value);
             if (!fp.LocationAliases.Contains(value))
                 fp.LocationAliases.Add(value);
         }
