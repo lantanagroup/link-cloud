@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
 import type {
@@ -65,6 +65,7 @@ export function ReportDetailView() {
   const { notifySuccess, notifyError } = useNotifications();
   const { draft, mirror, saving, closeView } = useOnboarding();
   const reportResults = draft.reportResults;
+  const queryClient = useQueryClient();
 
   const viewingReportId = draft.currentView?.params?.reportId;
 
@@ -370,6 +371,7 @@ export function ReportDetailView() {
       ];
       await api.saveHslocMappings(nextMappings);
       setHslocMappings(nextMappings);
+      queryClient.setQueryData(['hslocMappings'], nextMappings);
       mirror('hsloc', { mappings: nextMappings });
       notifySuccess(
         t('onboarding:reportResults.detail.mappingEvidence.hslocMappingAdded'),
