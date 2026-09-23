@@ -257,36 +257,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                     foreach (var resourceType in model.ResourceTypes)
                     {
-                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        {
-                            ResourceType = resourceType,
-                            FacilityId = model.FacilityId
-                        }, false);
-
-                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
-
-                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
-
-                        if (results != null && results.Count() > 0)
-                        {
-                            foreach (var result in results)
-                            {
-                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                            }
-                        }
-
-                        createSequences.Add(new CreateOperationSequenceModel()
-                        {
-                            OperationId = operationModel.Id,
-                            Sequence = maxSequence
-                        });
-
-                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                        {
-                            FacilityId = model.FacilityId,
-                            ResourceType = resourceType,
-                            OperationSequences = createSequences,
-                        }, cancellationToken);
+                        await _operationManager.AppendOperationToSequence(model.FacilityId, resourceType, operationModel.Id, cancellationToken);
                     }
                 }
 

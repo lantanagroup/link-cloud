@@ -25,6 +25,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources, CancellationToken cancellationToken = default);
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes, CancellationToken cancellationToken = default);
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model, CancellationToken cancellationToken = default);
+        Task<List<OperationSequenceModel>> AppendOperationToSequence(string facilityId, string resourceType, Guid operationId, CancellationToken cancellationToken = default);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel, CancellationToken cancellationToken = default);
     }
 
@@ -324,7 +325,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 if (resource == null)
                 {
-                    resource = await _resourceManager.CreateResource(res);
+                    resource = await _resourceManager.CreateResource(res, cancellationToken: cancellationToken);
                 }
 
                 resources.Add(resource);
@@ -394,7 +395,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId or vendor");
             }
 
-            using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            var ownsTransaction = !_database.HasActiveTransaction;
+            var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
             if (!string.IsNullOrEmpty(model.FacilityId))
             {
                 await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
@@ -428,8 +430,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                     if (operations != null && operations.Records.Count > 0)
                     {
-                        modifiedRecords += operations.Records.Count;
-
                         returned = operations.Records.Count;
                         count = operations.Metadata.TotalCount;
 
@@ -437,6 +437,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
+                            var current = await _database.Operations.GetAsync(operation.Id, cancellationToken);
+                            if (current == null || !await OperationStillMatchesDeleteAsync(current, model, cancellationToken))
+                            {
+                                continue;
+                            }
+
+                            modifiedRecords++;
                             foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken))
                             {
                                 affectedFacilities.Add(facilityId);
@@ -465,21 +472,123 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     }
 
                 } while (count > returned);
+
+                if (modifiedRecords > 0)
+                {
+                    await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
+                    if (transaction != null)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    return true;
+                }
+
+                return false;
             }
             catch
             {
-                await transaction.RollbackAsync(cancellationToken);
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+
                 throw;
             }
-
-            if (modifiedRecords > 0)
+            finally
             {
-                await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
+        }
+
+        private async Task<bool> OperationStillMatchesDeleteAsync(Operation operation, DeleteOperationModel model, CancellationToken cancellationToken)
+        {
+            if (model.OperationId.HasValue && operation.Id != model.OperationId.Value)
+            {
+                return false;
+            }
+
+            var facilitySpecified = !string.IsNullOrEmpty(model.FacilityId);
+            var vendorSpecified = model.VendorVersionId != null;
+            var facilityMatches = facilitySpecified && operation.FacilityId == model.FacilityId;
+            var vendorMatches = vendorSpecified && await _database.VendorVersionOperationPresets.AnyAsync(
+                preset => preset.VendorVersionId == model.VendorVersionId && preset.OperationResourceType.OperationId == operation.Id,
+                cancellationToken);
+            var scopeMatches = facilitySpecified && vendorSpecified
+                ? facilityMatches || vendorMatches
+                : (!facilitySpecified || facilityMatches) && (!vendorSpecified || vendorMatches);
+            if (!scopeMatches)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(model.ResourceType))
+            {
                 return true;
             }
 
-            return false;
+            return await _database.OperationResourceTypes.AnyAsync(
+                ort => ort.OperationId == operation.Id && ort.ResourceType.Name == model.ResourceType,
+                cancellationToken);
+        }
+
+        public async Task<List<OperationSequenceModel>> AppendOperationToSequence(string facilityId, string resourceType, Guid operationId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                throw new InvalidOperationException("No FacilityId Provided");
+            }
+
+            if (string.IsNullOrEmpty(resourceType))
+            {
+                throw new InvalidOperationException("No Resource Found.");
+            }
+
+            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            await _operationSequenceQueries.LockResourceTypeAsync(resourceType, cancellationToken);
+            await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
+
+            var existingOperationIds = await _operationSequenceQueries.OperationsInFacilitySequencesAsync(facilityId, resourceType, cancellationToken);
+            foreach (var id in existingOperationIds.Append(operationId).Distinct().OrderBy(id => id))
+            {
+                await _operationSequenceQueries.LockOperationAsync(id, cancellationToken);
+            }
+
+            existingOperationIds = await _operationSequenceQueries.OperationsInFacilitySequencesAsync(facilityId, resourceType, cancellationToken);
+            if (!existingOperationIds.Contains(operationId))
+            {
+                var existing = await _database.OperationSequences.FindAsync(
+                    sequence => sequence.FacilityId == facilityId && sequence.OperationResourceType.ResourceType.Name == resourceType,
+                    cancellationToken);
+                var resource = await _database.ResourceTypes.SingleOrDefaultAsync(candidate => candidate.Name == resourceType, cancellationToken);
+                if (resource == null)
+                {
+                    throw new InvalidOperationException("No Resource Found.");
+                }
+
+                var operationResourceType = await _database.OperationResourceTypes.SingleAsync(
+                    candidate => candidate.OperationId == operationId && candidate.ResourceTypeId == resource.Id,
+                    cancellationToken);
+                var nextSequence = existing.Count == 0 ? 1 : existing.Max(sequence => sequence.Sequence ?? 0) + 1;
+                await _database.OperationSequences.AddAsync(new OperationSequence
+                {
+                    FacilityId = facilityId,
+                    OperationResourceTypeId = operationResourceType.Id,
+                    Sequence = nextSequence
+                }, cancellationToken);
+                await _database.SaveChangesAsync(cancellationToken);
+                await _operationSequenceQueries.InvalidateFacilityAsync(facilityId, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return await _operationSequenceQueries.Search(new OperationSequenceSearchModel
+            {
+                FacilityId = facilityId,
+                ResourceType = resourceType
+            }, false, cancellationToken);
         }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model, CancellationToken cancellationToken = default)

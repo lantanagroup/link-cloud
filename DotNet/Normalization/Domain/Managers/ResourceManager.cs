@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     public interface IResourceManager
     {
         Task<List<ResourceModel>> InitializeResources();
-        Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false);
+        Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default);
         Task DeleteResource(string resource, CancellationToken cancellationToken = default);
     }
 
@@ -32,7 +32,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             _logger = logger;
         }
 
-        public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
+        public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(resourceName))
             {
@@ -50,10 +50,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 resourceName = resourceType.ToString();
             }
 
-            await CreateResourceLock.WaitAsync();
+            await CreateResourceLock.WaitAsync(cancellationToken);
             try
             {
-                var existing = await _resourceQueries.Get(resourceName);
+                var existing = await _resourceQueries.Get(resourceName, cancellationToken);
 
                 if (existing != null)
                 {
@@ -61,17 +61,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 var entity = new Entities.ResourceType() { Name = resourceName };
-                await _database.ResourceTypes.AddAsync(entity);
-                await _database.SaveChangesAsync();
+                await _database.ResourceTypes.AddAsync(entity, cancellationToken);
+                await _database.SaveChangesAsync(cancellationToken);
 
-                return await _resourceQueries.Get(resourceName);
+                return await _resourceQueries.Get(resourceName, cancellationToken);
             }
             catch (DbUpdateException ex)
             {
                 var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
                 _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
 
-                var existing = await _resourceQueries.Get(resourceName);
+                var existing = await _resourceQueries.Get(resourceName, cancellationToken);
                 if (existing != null)
                 {
                     return existing;

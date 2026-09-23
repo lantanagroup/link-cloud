@@ -75,8 +75,14 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         }
 
         var operationResourceType = await _database.OperationResourceTypes.GetAsync(preset.OperationResourceTypeId, cancellationToken);
+        await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+        await _operationSequenceQueries.LockOperationAsync(operationResourceType.OperationId, cancellationToken);
         var operationPresets = await _database.VendorVersionOperationPresets.FindAsync(candidate =>
             candidate.OperationResourceTypeId == preset.OperationResourceTypeId, cancellationToken);
+        if (operationPresets.All(candidate => candidate.Id != preset.Id))
+        {
+            return;
+        }
 
         if (operationPresets.Count == 1)
         {
@@ -85,12 +91,11 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
                 OperationId = operationResourceType.OperationId,
                 VendorVersionId = vendorVersionId
             }, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return;
         }
 
         _database.VendorVersionOperationPresets.Remove(preset);
-        await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-        await _operationSequenceQueries.LockOperationAsync(operationResourceType.OperationId, cancellationToken);
         await _database.SaveChangesAsync(cancellationToken);
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
             await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationResourceType.OperationId, cancellationToken),

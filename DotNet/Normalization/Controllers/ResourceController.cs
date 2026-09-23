@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Post(string resource)
+        public async Task<ActionResult<ResourceModel>> Post(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -98,7 +98,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var createdResource = await _resourceManager.CreateResource(resource);
+                var createdResource = await _resourceManager.CreateResource(resource, cancellationToken: cancellationToken);
 
                 if (createdResource == null)
                 {
@@ -117,7 +117,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource)
+        public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -126,7 +126,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var foundResource = await _resourceManager.CreateResource(resource, true);
+                var foundResource = await _resourceManager.CreateResource(resource, true, cancellationToken);
 
                 if (foundResource == null)
                 {
