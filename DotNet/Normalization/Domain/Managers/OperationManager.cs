@@ -143,10 +143,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor Version IDs, but not both.");
                 }
 
+                var resourceNames = model.ResourceTypes == null
+                    ? null
+                    : await _operationSequenceQueries.CanonicalResourceNamesAsync(model.ResourceTypes, cancellationToken);
+
                 await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-                if (model.ResourceTypes != null)
+                if (resourceNames != null)
                 {
-                    foreach (var resourceName in model.ResourceTypes.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
+                    foreach (var resourceName in resourceNames)
                     {
                         await _operationSequenceQueries.LockResourceTypeAsync(resourceName, cancellationToken);
                     }
@@ -214,7 +218,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await _database.SaveChangesAsync(cancellationToken);
-                await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes, cancellationToken);
+                await UpdateOperationResourceTypesForOperation(model.Id, resourceNames ?? model.ResourceTypes, cancellationToken);
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorVersionIds, cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -463,6 +467,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId or vendor");
             }
 
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                var canonicalResourceType = await _operationSequenceQueries.CanonicalResourceNamesAsync(new[] { model.ResourceType }, cancellationToken);
+                if (canonicalResourceType.Count == 1)
+                {
+                    model.ResourceType = canonicalResourceType[0];
+                }
+            }
+
             var ownsTransaction = !_database.HasActiveTransaction;
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
             var modifiedRecords = 0;
@@ -564,7 +577,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         {
             var names = string.IsNullOrEmpty(resourceType)
                 ? await _operationSequenceQueries.ResourceTypeNamesForFacilityAsync(facilityId, cancellationToken)
-                : new List<string> { resourceType };
+                : await _operationSequenceQueries.CanonicalResourceNamesAsync(new[] { resourceType }, cancellationToken);
 
             foreach (var name in names.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
             {
@@ -613,6 +626,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if (string.IsNullOrEmpty(resourceType))
             {
                 throw new InvalidOperationException("No Resource Found.");
+            }
+
+            var canonicalResourceType = await _operationSequenceQueries.CanonicalResourceNamesAsync(new[] { resourceType }, cancellationToken);
+            if (canonicalResourceType.Count == 1)
+            {
+                resourceType = canonicalResourceType[0];
             }
 
             return await ExecuteWithDeadlockRetryAsync(async () =>
@@ -687,6 +706,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if (model.OperationSequences.Select(s => s.OperationId).GroupBy(o => o).Any(g => g.Count() > 1))
             {
                 throw new InvalidOperationException("Each Operation ID can only occur once in a given sequence");
+            }
+
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                var canonicalResourceType = await _operationSequenceQueries.CanonicalResourceNamesAsync(new[] { model.ResourceType }, cancellationToken);
+                if (canonicalResourceType.Count == 1)
+                {
+                    model.ResourceType = canonicalResourceType[0];
+                }
             }
 
             return await ExecuteWithDeadlockRetryAsync(async () =>
@@ -791,6 +819,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             if (string.IsNullOrEmpty(model.FacilityId))
             {
                 throw new InvalidOperationException("No FacilityId Provided");
+            }
+
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                var canonicalResourceType = await _operationSequenceQueries.CanonicalResourceNamesAsync(new[] { model.ResourceType }, cancellationToken);
+                if (canonicalResourceType.Count == 1)
+                {
+                    model.ResourceType = canonicalResourceType[0];
+                }
             }
 
             var resourceType = model.ResourceType ?? string.Empty;

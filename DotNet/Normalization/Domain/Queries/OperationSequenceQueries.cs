@@ -20,6 +20,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
         Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default);
         Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<string>> CanonicalResourceNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default);
         Task<List<string>> ResourceTypeNamesForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
         Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
@@ -219,6 +220,44 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 new object[] { facilityId },
                 cancellationToken);
             return updated > 0;
+        }
+
+        public async Task<List<string>> CanonicalResourceNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default)
+        {
+            var requested = names
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (requested.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            var persisted = await _dbContext.ResourceTypes.AsNoTracking()
+                .Select(resource => resource.Name)
+                .ToListAsync(cancellationToken);
+            var canonical = new List<string>();
+            foreach (var name in requested)
+            {
+                var stored = persisted.FirstOrDefault(existing => string.Equals(existing, name, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(stored))
+                {
+                    canonical.Add(stored);
+                    continue;
+                }
+
+                if (Enum.TryParse<Hl7.Fhir.Model.ResourceType>(name, ignoreCase: true, out var parsed))
+                {
+                    canonical.Add(parsed.ToString());
+                }
+                else
+                {
+                    canonical.Add(name);
+                }
+            }
+
+            return canonical.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
         }
 
         public async Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)

@@ -330,6 +330,17 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task CanonicalResourceNames_UsesPersistedCasingAndOrdinalOrder()
+    {
+        using var harness = new Harness();
+        await harness.Resources.CreateResource("patient");
+
+        var names = await harness.WriterQueries.CanonicalResourceNamesAsync(new[] { "encounter", "pAtIeNt" });
+
+        Assert.Equal(new[] { "Encounter", "Patient" }, names);
+    }
+
+    [Fact]
     public async Task LockFacilitySequenceWrites_SecondConnectionWaitsUntilTheFirstCommits()
     {
         var connectionString = $"Data Source=file:opseqlock{Guid.NewGuid():N}?mode=memory&cache=shared;Pooling=False;Default Timeout=30";
