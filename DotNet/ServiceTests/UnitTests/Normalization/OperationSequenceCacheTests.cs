@@ -184,6 +184,30 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task CreateOperationSequences_LocksExistingAndReplacementIdsInAscendingOrder()
+    {
+        using var harness = new Harness();
+        var facilityId = "facility-a";
+        var kept = await harness.SeedOperationAsync(facilityId, "Kept", CopyJson);
+        var replaced = await harness.SeedOperationAsync(facilityId, "Replaced", CopyJson);
+        await harness.WriterManager.CreateOperationSequences(Sequence(facilityId, kept, replaced));
+        var incoming = await harness.SeedOperationAsync(facilityId, "Incoming", CopyJson);
+        var expected = new[] { kept, replaced, incoming }.OrderBy(id => id).ToList();
+
+        harness.WriterCounter.OperationLockIds.Clear();
+        await harness.WriterManager.CreateOperationSequences(Sequence(facilityId, incoming));
+
+        var locked = harness.WriterCounter.OperationLockIds;
+        Assert.Equal(expected, locked.Distinct().ToList());
+        for (var i = 1; i < locked.Count; i++)
+        {
+            Assert.True(expected.IndexOf(locked[i - 1]) <= expected.IndexOf(locked[i]));
+        }
+
+        AssertOperationIds(await harness.WriterQueries.Search(Typed(facilityId)), incoming);
+    }
+
+    [Fact]
     public async Task FacilityOperationCreate_AppendsToTheSequence_AndTheNextReadsSeeIt()
     {
         using var harness = new Harness();

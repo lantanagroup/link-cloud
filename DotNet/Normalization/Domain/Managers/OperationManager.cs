@@ -644,7 +644,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
             await _operationSequenceQueries.LockResourceTypeAsync(model.ResourceType, cancellationToken);
             await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
-            foreach (var operationId in model.OperationSequences.Select(sequence => sequence.OperationId).Distinct().OrderBy(id => id))
+            var existingOperationIds = await _operationSequenceQueries.OperationsInFacilitySequencesAsync(model.FacilityId, model.ResourceType, cancellationToken);
+            foreach (var operationId in existingOperationIds.Concat(model.OperationSequences.Select(sequence => sequence.OperationId)).Distinct().OrderBy(id => id))
             {
                 await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
             }
