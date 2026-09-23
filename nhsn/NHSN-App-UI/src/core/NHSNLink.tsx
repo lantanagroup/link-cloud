@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from './api/ApiClientContext';
@@ -48,6 +48,16 @@ export function NHSNLink({ baseUrl = '/', locale }: NHSNLinkProps) {
     queryFn: () => api.getUserInfo(),
     staleTime: Infinity,
   });
+
+  const previousApiRef = useRef(api);
+  useEffect(() => {
+    if (previousApiRef.current === api) {
+      return;
+    }
+    previousApiRef.current = api;
+    void queryClient.invalidateQueries({ queryKey: ['userInfo'] });
+  }, [api, queryClient]);
+
   const error = userInfoError
     ? userInfoError instanceof Error
       ? userInfoError.message
