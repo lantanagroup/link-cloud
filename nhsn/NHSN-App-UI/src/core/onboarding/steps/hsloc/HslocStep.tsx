@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {useQuery} from '@tanstack/react-query';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/contracts';
@@ -96,14 +96,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const api = useApiClient();
   const {notifyError} = useNotifications();
   const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const queryClient = useQueryClient();
 
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<HslocTab>('mapping');
-  const [mappingsLoading, setMappingsLoading] = useState(true);
   const [rows, setRows] = useState<MappingRow[]>(() => [blankMappingRow()]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const hasSyncedInitialLoad = useRef(false);
+  const hasHydratedMappings = useRef(false);
 
   function announceValidationMessage(message: string) {
     setValidationError(null);
@@ -133,6 +133,16 @@ export function HslocStep({onNext, onBack}: StepProps) {
     staleTime: Infinity
   });
 
+  const {
+    data: persistedMappings,
+    isLoading: mappingsLoading,
+    error: mappingsError
+  } = useQuery({
+    queryKey: ['hslocMappings'],
+    queryFn: () => api.getHslocMappings(),
+    staleTime: Infinity
+  });
+
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -148,50 +158,30 @@ export function HslocStep({onNext, onBack}: StepProps) {
   }, [readyToAdvance, onNext]);
 
   useEffect(() => {
-    let mounted = true;
-    setMappingsLoading(true);
+    if (mappingsError) {
+      notifyError(mappingsError instanceof Error ? mappingsError.message : t('onboarding:hsloc.messages.loadError'));
+    }
+  }, [mappingsError]);
 
-    api
-      .getHslocMappings()
-      .then(mappings => {
-        if (!mounted) {
-          return;
-        }
-        const persisted = mappings.map(toMappingRow);
-        const persistedSourceCodes = new Set(persisted.map(row => row.sourceCode.trim().toLowerCase()));
-        const pending = pendingImportRowsRef.current.filter(
-          row => !persistedSourceCodes.has(row.sourceCode.trim().toLowerCase())
-        );
-        const loaded = [...persisted, ...pending];
-        // Always at least one row to type into - the list's minItems keeps it from being removed.
-        setRows(loaded.length > 0 ? loaded : [blankMappingRow()]);
-      })
-      .catch(cause => {
-        notifyError(cause instanceof Error ? cause.message : t('onboarding:hsloc.messages.loadError'));
-      })
-      .finally(() => {
-        if (mounted) {
-          setMappingsLoading(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [api]);
-
-  // Marks the draft dirty as soon as the user edits a row. Skips the render where the
-  // async load above first settles `rows` -- that's the mappings arriving, not an edit.
   useEffect(() => {
-    if (mappingsLoading) {
+    if (mappingsLoading || hasHydratedMappings.current) {
       return;
     }
-    if (!hasSyncedInitialLoad.current) {
-      hasSyncedInitialLoad.current = true;
-      return;
-    }
-    patch('hsloc', {mappings: toMappings(rows)});
-  }, [rows, mappingsLoading, patch]);
+    hasHydratedMappings.current = true;
+    const persisted = (persistedMappings ?? []).map(toMappingRow);
+    const persistedSourceCodes = new Set(persisted.map(row => row.sourceCode.trim().toLowerCase()));
+    const pending = pendingImportRowsRef.current.filter(
+      row => !persistedSourceCodes.has(row.sourceCode.trim().toLowerCase())
+    );
+    const loaded = [...persisted, ...pending];
+    // Always at least one row to type into - the list's minItems keeps it from being removed.
+    setRows(loaded.length > 0 ? loaded : [blankMappingRow()]);
+  }, [persistedMappings, mappingsLoading]);
+
+  function handleRowsChange(nextRows: MappingRow[]) {
+    setRows(nextRows);
+    patch('hsloc', {mappings: toMappings(nextRows)});
+  }
 
   useEffect(() => {
     if (codesError) {
@@ -339,6 +329,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
       const mappings = toMappings(completeRows);
 
       await api.saveHslocMappings(mappings);
+      queryClient.setQueryData(['hslocMappings'], mappings);
       patch('hsloc', {mappings});
       setReadyToAdvance(true);
     } catch (cause) {
@@ -407,7 +398,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
         <div className="nhsn-link__field-group nhsn-link__hsloc-mapping">
           <RepeatableList<MappingRow>
             items={rows}
-            onChange={setRows}
+            onChange={handleRowsChange}
             newItem={blankMappingRow}
             minItems={1}
             addLabel={t('onboarding:hsloc.mapping.addButton')}

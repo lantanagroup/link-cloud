@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../../api/contracts';
+import type {EncounterCode, EncounterMapping} from '../../../api/contracts';
 import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, TableCaption, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
@@ -145,31 +145,12 @@ export function EncounterStep({onNext, onBack}: StepProps) {
 
   const selectedReferenceRow = filteredReferenceRows.find(row => row.key === selectedKey) ?? null;
 
-  const [codeDetail, setCodeDetail] = useState<EncounterCodeDetail | null>(null);
-
-  useEffect(() => {
-    if (!selectedReferenceRow) {
-      setCodeDetail(null);
-      return;
-    }
-    let mounted = true;
-    setCodeDetail(null);
-    api
-      .lookupEncounterCode(selectedReferenceRow.system, selectedReferenceRow.code)
-      .then(detail => {
-        if (mounted) {
-          setCodeDetail(detail);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setCodeDetail(null);
-        }
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [api, selectedReferenceRow?.system, selectedReferenceRow?.code]);
+  const {data: codeDetail} = useQuery({
+    queryKey: ['encounterCodeLookup', selectedReferenceRow?.system, selectedReferenceRow?.code],
+    queryFn: () => api.lookupEncounterCode(selectedReferenceRow!.system, selectedReferenceRow!.code),
+    enabled: Boolean(selectedReferenceRow),
+    staleTime: Infinity
+  });
 
   const matchedLocalMappings = useMemo(() => {
     if (!selectedReferenceRow) {
