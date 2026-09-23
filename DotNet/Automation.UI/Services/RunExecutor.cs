@@ -451,6 +451,10 @@ internal sealed class RunExecutor
             }
 
             state.FacilityId = facilityId;
+            using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
+                facilityId,
+                message => output.WriteLine(message),
+                cancellationToken);
 
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)
