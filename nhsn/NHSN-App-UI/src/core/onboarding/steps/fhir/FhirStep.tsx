@@ -130,20 +130,14 @@ export function FhirStep({onNext, onBack}: StepProps) {
   }
 
   async function handleTestConnection() {
+    // Reachability only depends on the URL -- the throttle/pull-time/lag fields play no
+    // part in it, so touching only fhirServerBaseUrl is what keeps their errors (if any)
+    // from surfacing on a click this action never looks at.
     const nextErrors = validateFhir(currentFieldValues());
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
-      setTouched({
-        fhirServerBaseUrl: true,
-        maxConcurrentRequests: true,
-        maxRetries: true,
-        minAcquisitionPullTime: true,
-        maxAcquisitionPullTime: true,
-        lagDays: true,
-        lagHours: true,
-        lagMinutes: true
-      });
-      announceValidationMessage(t('onboarding:fhirServerInfo.messages.incomplete'));
+    if (nextErrors.fhirServerBaseUrl) {
+      setTouched(previous => ({...previous, fhirServerBaseUrl: true}));
+      setValidationError(null);
       return;
     }
     setValidationError(null);
