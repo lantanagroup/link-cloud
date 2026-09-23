@@ -379,7 +379,18 @@ export function OnboardingProvider({
     }
     const stepId = pendingStepId;
     setPendingStepId(null);
-    const restored = lastSavedDraftRef.current;
+    const savedContent = lastSavedDraftRef.current;
+    // Only the section fields the user just edited are "dirty" -- which steps are
+    // unlocked never goes through patch(), so it never gets saved on a transition that
+    // has nothing else to save (e.g. leaving a step with no editable fields). Reverting
+    // to lastSavedDraftRef's unlockedStepIds wholesale would then relock every step
+    // reached that way, sending Discard Changes back further than the one step the user
+    // asked for. The current draft's navigation state is what actually reflects where
+    // the user has legitimately been, so it rides along unchanged.
+    const restored: FacilityDraft | undefined = savedContent && {
+      ...savedContent,
+      unlockedStepIds: draft.unlockedStepIds
+    };
     if (restored) {
       dispatch({type: 'draft/loaded', draft: restored});
     }
@@ -396,7 +407,7 @@ export function OnboardingProvider({
       notifyError(t('unsavedChanges.messages.discardRelocked'));
     }
     completeGoTo(target);
-  }, [pendingStepId, completeGoTo, user, notifyError, t, vendorProfiles]);
+  }, [pendingStepId, draft.unlockedStepIds, completeGoTo, user, notifyError, t, vendorProfiles]);
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
