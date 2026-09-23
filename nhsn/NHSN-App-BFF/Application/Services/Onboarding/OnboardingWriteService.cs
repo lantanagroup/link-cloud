@@ -48,6 +48,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IEncounterMappingService _encounterMappingService;
     private readonly IHslocMappingService _hslocMappingService;
     private readonly IPatientsOfInterestService _patientsOfInterestService;
+    private readonly IReportingService _reportingService;
+    private readonly IFhirConfigurationGateway _fhirGateway;
     private readonly IFacilityWriteLock _writeLock;
     private readonly ILogger<OnboardingWriteService> _logger;
 
@@ -65,6 +67,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IEncounterMappingService encounterMappingService,
         IHslocMappingService hslocMappingService,
         IPatientsOfInterestService patientsOfInterestService,
+        IReportingService reportingService,
+        IFhirConfigurationGateway fhirGateway,
         IFacilityWriteLock writeLock,
         ILogger<OnboardingWriteService> logger)
     {
@@ -81,6 +85,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _encounterMappingService = encounterMappingService;
         _hslocMappingService = hslocMappingService;
         _patientsOfInterestService = patientsOfInterestService;
+        _reportingService = reportingService;
+        _fhirGateway = fhirGateway;
         _writeLock = writeLock;
         _logger = logger;
     }
@@ -458,11 +464,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
                 if (previousVendor is not null && draft.FacilityInfo.Vendor is not null && previousVendor != draft.FacilityInfo.Vendor)
                 {
-                    await _patientsOfInterestService.AcknowledgeCensusAsync(new AcknowledgementRequest
-                    {
-                        Accepted = false,
-                        StatementKey = "census-accuracy"
-                    }, cancellationToken);
+                    await RevokeAccuracyAcknowledgementsAsync(cancellationToken);
                 }
                 break;
 
@@ -497,7 +499,18 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 break;
 
             case "fhir":
-                await WriteFhirSectionAsync(facility.FacilityId, draft.Fhir, cancellationToken);
+                var previousFhirBaseUrl = (await _fhirGateway.GetAsync(facility.FacilityId, cancellationToken))?.FhirServerBaseUrl?.Trim();
+
+                var fhirWritten = await WriteFhirSectionAsync(facility.FacilityId, draft.Fhir, cancellationToken);
+
+                var newFhirBaseUrl = draft.Fhir.FhirServerBaseUrl?.Trim();
+                if (fhirWritten
+                    && !string.IsNullOrWhiteSpace(previousFhirBaseUrl)
+                    && !string.IsNullOrWhiteSpace(newFhirBaseUrl)
+                    && !string.Equals(previousFhirBaseUrl, newFhirBaseUrl, StringComparison.Ordinal))
+                {
+                    await RevokeAccuracyAcknowledgementsAsync(cancellationToken);
+                }
                 break;
 
             case "location-org":
@@ -583,7 +596,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         }, cancellationToken);
     }
 
-    private async Task WriteFhirSectionAsync(string facilityId, FhirSection fhir, CancellationToken cancellationToken)
+    // Returns whether the configuration was actually written, not just attempted.
+    private async Task<bool> WriteFhirSectionAsync(string facilityId, FhirSection fhir, CancellationToken cancellationToken)
     {
         // FhirServerBaseUrl, MaxConcurrentRequests and BOTH pull times are hard requirements of
         // FacilityAdministrationService.UpdateFhirServerInfoAsync itself - MinAcquisitionPullTime/
@@ -597,7 +611,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
             string.IsNullOrWhiteSpace(fhir.MinAcquisitionPullTime) ||
             string.IsNullOrWhiteSpace(fhir.MaxAcquisitionPullTime))
         {
-            return;
+            return false;
         }
 
         var (lagDays, lagHours, lagMinutes) = FacilityAdministrationService.ParseLagDuration(fhir.LagDuration);
@@ -617,6 +631,27 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         if (result is null)
         {
             _logger.LogWarning("Step fhir for facility {FacilityId}: Tenant has no facility record; FHIR configuration not written.", facilityId);
+            return false;
+        }
+
+        return true;
+    }
+
+    // Shared by facility-info's vendor change and fhir's base URL change.
+    private async Task RevokeAccuracyAcknowledgementsAsync(CancellationToken cancellationToken)
+    {
+        await _patientsOfInterestService.AcknowledgeCensusAsync(new AcknowledgementRequest
+        {
+            Accepted = false,
+            StatementKey = "census-accuracy"
+        }, cancellationToken);
+
+        var latestReports = await _reportingService.ListReportsAsync(1, 1, cancellationToken);
+        var latestReportId = latestReports.Items.FirstOrDefault()?.ReportId;
+        if (latestReportId is not null)
+        {
+            await _reportingService.RecordReportAccuracyAcknowledgementAsync(
+                latestReportId, false, "report-accuracy", cancellationToken);
         }
     }
 
