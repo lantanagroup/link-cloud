@@ -9,7 +9,7 @@ import type { StepChrome } from './StepChrome';
 
 export function OnboardingStepsNav() {
   const { t } = useTranslation(['onboarding', 'common']);
-  const { draft, user, target, goTo, saving } = useOnboarding();
+  const { draft, user, target, goTo, saving, vendorProfile } = useOnboarding();
   const steps = visibleSteps(draft, user);
 
   return (
@@ -20,9 +20,9 @@ export function OnboardingStepsNav() {
 
       <ol className="nhsn-link__steps">
         {steps.map((entry, index) => {
-          const unlocked = isUnlocked(entry.id, draft, user);
+          const unlocked = isUnlocked(entry.id, draft, user, vendorProfile);
           const complete =
-            entry.isComplete(draft) && unlocked && entry.id !== target.stepId;
+            entry.isComplete(draft, user, vendorProfile) && unlocked && entry.id !== target.stepId;
           return (
             <li
               key={entry.id}

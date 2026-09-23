@@ -207,6 +207,12 @@ export function OnboardingProvider({
     return () => window.removeEventListener('popstate', onPopState);
   }, [baseUrl]);
 
+  // Resolved once here so gating and the context value read the same thing.
+  const vendorProfile = useMemo(
+    () => vendorProfiles.find(profile => profile.vendor === draft.facilityInfo.vendor),
+    [vendorProfiles, draft.facilityInfo.vendor]
+  );
+
   // Every source of truth passes through one gate.
   const target = useMemo<StepTarget>(() => {
     if (loadState !== 'ready') {
@@ -214,8 +220,8 @@ export function OnboardingProvider({
     }
     const preferred: StepTarget =
       urlTarget ?? {stepId: draft.currentStepId, view: draft.currentView};
-    return resolveStep(preferred, draft, user);
-  }, [loadState, urlTarget, draft, user]);
+    return resolveStep(preferred, draft, user, vendorProfile);
+  }, [loadState, urlTarget, draft, user, vendorProfile]);
 
   // Mirror the resolved target into the URL and the draft. Doing it after
   // resolution rather than at the call site means a rejected deep link
@@ -378,12 +384,19 @@ export function OnboardingProvider({
       dispatch({type: 'draft/loaded', draft: restored});
     }
     dirtyRef.current = false;
-    const target = restored && !isUnlocked(stepId, restored, user) ? furthestLegalStep(restored, user) : stepId;
+    // Against restored's own vendor - a discard can revert an in-flight vendor change.
+    const restoredVendorProfile = restored
+      ? vendorProfiles.find(profile => profile.vendor === restored.facilityInfo.vendor)
+      : undefined;
+    const target =
+      restored && !isUnlocked(stepId, restored, user, restoredVendorProfile)
+        ? furthestLegalStep(restored, user, restoredVendorProfile)
+        : stepId;
     if (target !== stepId) {
       notifyError(t('unsavedChanges.messages.discardRelocked'));
     }
     completeGoTo(target);
-  }, [pendingStepId, completeGoTo, user, notifyError, t]);
+  }, [pendingStepId, completeGoTo, user, notifyError, t, vendorProfiles]);
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
@@ -441,11 +454,6 @@ export function OnboardingProvider({
   }, []);
 
   const save = useCallback(() => persistDraft(draft), [persistDraft, draft]);
-
-  const vendorProfile = useMemo(
-    () => vendorProfiles.find(profile => profile.vendor === draft.facilityInfo.vendor),
-    [vendorProfiles, draft.facilityInfo.vendor]
-  );
 
   const value = useMemo<OnboardingContextValue>(
     () => ({

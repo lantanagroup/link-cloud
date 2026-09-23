@@ -1,5 +1,5 @@
 import React from 'react';
-import type {UserInfoResponse} from '../api/contracts';
+import type {UserInfoResponse, VendorProfile} from '../api/contracts';
 import {parseHoursMinutesDuration} from '../shared/duration';
 import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
@@ -22,8 +22,8 @@ export interface Step {
   /** i18n key, never a literal. */
   labelKey: string;
   Component: React.ComponentType<StepProps>;
-  /** Drives unlock of the following step. `user` is optional; only census reads it. */
-  isComplete: (draft: FacilityDraft, user?: UserInfoResponse) => boolean;
+  /** Drives unlock of the following step. `user` and `vendorProfile` are optional; only census reads them. */
+  isComplete: (draft: FacilityDraft, user?: UserInfoResponse, vendorProfile?: VendorProfile) => boolean;
   /**
    * Reserved. No step uses it — all thirteen are always in the flow, and
    * vendor branching is field-level and driven by the VendorProfile the BFF
@@ -76,20 +76,26 @@ export const STEPS: Step[] = [
     id: 'census',
     labelKey: 'onboarding:steps.census',
     Component: lazyStep(() => import('./steps/census/CensusStep')),
-    isComplete: (draft, user) => {
+    isComplete: (draft, user, vendorProfile) => {
       const c = draft.census;
-      // No vendor name here - which branch is required is inferred from which
-      // config the draft actually carries, since isComplete has no vendorProfile.
-      const epicConfigured = CENSUS_LIST_KEYS.every(key => Boolean(c.patientListIds?.[key]?.trim()));
-      const cernerConfigured = Boolean(c.sftpHost?.trim()) && c.sftpPort !== undefined;
-      if (!epicConfigured && !cernerConfigured) {
-        return false;
-      }
-      if (cernerConfigured && !c.sftpConnectionTested) {
+      // Authoritative from the vendor - a switched-vendor draft can still carry the old vendor's fields.
+      const censusAcquisition = vendorProfile?.censusAcquisition;
+      if (censusAcquisition === 'PatientList') {
+        if (!CENSUS_LIST_KEYS.every(key => Boolean(c.patientListIds?.[key]?.trim()))) {
+          return false;
+        }
+      } else if (censusAcquisition === 'Sftp') {
+        if (!c.sftpHost?.trim() || c.sftpPort === undefined) {
+          return false;
+        }
+        if (!c.sftpConnectionTested) {
+          return false;
+        }
+      } else {
         return false;
       }
       // Only require acknowledgement when the fetch is actually live - mirrors CensusStep.tsx's `validationLive`.
-      const validationLive = epicConfigured
+      const validationLive = censusAcquisition === 'PatientList'
         ? Boolean(user?.capabilities?.patientListWithNames)
         : Boolean(user?.capabilities?.sftpFileListing);
       if (validationLive && !c.accuracyAcknowledged) {
