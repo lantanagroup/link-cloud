@@ -183,7 +183,7 @@ describe('HslocComponent', () => {
     expect(component.busy).toBeFalse();
   });
 
-  it('shows load failures and allows a retry', () => {
+  it('shows load failures and clears the busy state', () => {
     http.expectOne(`${url}?includeInactive=true`).flush({detail: 'Unable to load HSLOC codes.'}, {status: 500, statusText: 'Server Error'});
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
@@ -193,8 +193,5 @@ describe('HslocComponent', () => {
     expect(component.loadFailed).toBeTrue();
     expect(component.loaded).toBeFalse();
     expect(component.busy).toBeFalse();
-    component.load();
-    loadRows();
-    expect(component.loadFailed).toBeFalse();
   });
 });

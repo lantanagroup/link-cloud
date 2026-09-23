@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 var oldRows = await _dbContext.HSLOCS
                     .Where(row => row.Version == oldVersion)
                     .ToListAsync(cancellationToken);
-                if (oldRows.Count == 0)
+                if (oldRows.Count == 0 && await _dbContext.HSLOCS.AnyAsync(cancellationToken))
                 {
                     throw new ArgumentException("The specified old HSLOC version does not exist.", nameof(oldVersion));
                 }
