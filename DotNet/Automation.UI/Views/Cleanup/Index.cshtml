@@ -498,6 +498,7 @@
         postForm(e.currentTarget, { runKind: runKind }, saveUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
+            if (runKind && result.ok) sawRunning = true;
             if (payload.activity) applyActivity(payload.activity);
             if (runKind && result.ok) refreshProgress();
             if (!result.ok) setRunning(false);
@@ -518,6 +519,7 @@
         postForm(e.currentTarget, null, rangeUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
+            if (result.ok) sawRunning = true;
             if (payload.activity) applyActivity(payload.activity);
             if (result.ok) refreshProgress();
             else setRunning(false);

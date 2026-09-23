@@ -313,6 +313,7 @@ public sealed class LeftoverRunCleanupService(
         var quiesceCandidateCount = 0;
         var teardownCandidateCount = 0;
         var historyCandidateCount = 0;
+        var savedTerminal = false;
         try
         {
             var settings = await settingsStore.GetEffectiveAsync(cancellationToken);
@@ -361,9 +362,7 @@ public sealed class LeftoverRunCleanupService(
             var total = facilityWork.Count + historyWork.Count;
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
-            teardownCandidateCount = mode == "history-purge"
-                ? HistoryTeardownCandidates(historyRuns).Count
-                : teardownFacilities ? facilityIds.Count : 0;
+            teardownCandidateCount = TeardownCandidateCount(mode, teardownFacilities, purgeHistory, facilityIds, historyRuns);
             historyCandidateCount = historyRuns.Count;
 
             await PublishProgressAsync(
@@ -520,27 +519,38 @@ public sealed class LeftoverRunCleanupService(
                 FailedRunIds = result.FailedRunIds,
                 Message = message
             }, cancellationToken);
+            savedTerminal = true;
 
-            await PublishAsync(new CleanupActivity
+            try
             {
-                Mode = mode,
-                Label = label,
-                Status = status,
-                Trigger = trigger,
-                Total = total,
-                Processed = processed,
-                Quiesced = quiesced.Count,
-                TornDown = tornDown.Count,
-                Purged = purged.Count,
-                Failed = failedFacilities.Count + failedRuns.Count,
-                Message = message,
-                At = finishedAt
-            }, cancellationToken);
+                await PublishAsync(new CleanupActivity
+                {
+                    Mode = mode,
+                    Label = label,
+                    Status = status,
+                    Trigger = trigger,
+                    Total = total,
+                    Processed = processed,
+                    Quiesced = quiesced.Count,
+                    TornDown = tornDown.Count,
+                    Purged = purged.Count,
+                    Failed = failedFacilities.Count + failedRuns.Count,
+                    Message = message,
+                    At = finishedAt
+                }, CancellationToken.None);
+            }
+            catch (OperationCanceledException)
+            {
+                // The report is already stored. A cancelled notification must not write a second failed report.
+            }
 
             return result;
         }
         catch (OperationCanceledException)
         {
+            if (savedTerminal)
+                throw;
+
             var finishedAt = time.GetUtcNow();
             var message = $"{label} cancelled.";
             await TrySaveReportAsync(PartialReport(
@@ -634,6 +644,26 @@ public sealed class LeftoverRunCleanupService(
             Message = message,
             At = time.GetUtcNow()
         }, cancellationToken);
+
+    private static int TeardownCandidateCount(
+        string mode,
+        bool teardownFacilities,
+        bool purgeHistory,
+        IReadOnlyList<string> facilityIds,
+        IReadOnlyList<AutomationRunSummary> historyRuns)
+    {
+        if (mode == "history-purge")
+            return HistoryTeardownCandidates(historyRuns).Count;
+
+        if (!teardownFacilities)
+            return 0;
+
+        var ids = facilityIds.AsEnumerable();
+        if (purgeHistory)
+            ids = ids.Concat(HistoryTeardownCandidates(historyRuns));
+
+        return ids.Distinct(StringComparer.OrdinalIgnoreCase).Count();
+    }
 
     private static bool IsNewHistoryTeardown(string? facilityId, List<string> tornDown)
         => !string.IsNullOrWhiteSpace(facilityId)

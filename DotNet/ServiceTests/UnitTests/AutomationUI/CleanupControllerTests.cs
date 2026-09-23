@@ -16,6 +16,20 @@ namespace UnitTests.AutomationUI;
 public class CleanupControllerTests
 {
     [Fact]
+    public async Task Report_MalformedId_Returns400()
+    {
+        var reports = new Mock<ICleanupReportStore>();
+        var sut = Create(MockCleanup(), MockStore(), reports);
+        sut.ModelState.AddModelError("id", "The value 'not-a-guid' is not valid.");
+
+        var result = await sut.Report(Guid.Empty, CancellationToken.None);
+
+        var badRequest = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequest.Value.Should().Be("Invalid Id format");
+        reports.Verify(s => s.GetAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task SaveSettings_WithoutRunKind_SavesAndDoesNotStartAPass()
     {
         var cleanup = MockCleanup();

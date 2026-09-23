@@ -42,6 +42,9 @@ public class CleanupController(
     [HttpGet]
     public async Task<IActionResult> Report(Guid id, CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+            return BadRequest("Invalid Id format");
+
         var report = await reportStore.GetAsync(id, cancellationToken);
         if (report == null)
             return NotFound();

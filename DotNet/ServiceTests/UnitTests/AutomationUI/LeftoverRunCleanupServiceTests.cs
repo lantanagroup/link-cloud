@@ -44,6 +44,42 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_counts_history_teardown_when_facility_is_already_gone()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var guidFacility = Guid.NewGuid().ToString();
+        var finished = now.AddDays(-2);
+        var run = Run(guidFacility, finished);
+        var saved = new List<CleanupReport>();
+        var service = Create(now, [run], saved, facilities: new Dictionary<string, string>());
+
+        var result = await service.RunCustomRangeAsync(
+            finished.AddHours(-1),
+            finished.AddHours(1),
+            teardownFacilities: true,
+            purgeHistory: true);
+
+        result.TornDownFacilityIds.Should().Equal(guidFacility);
+        result.TeardownCandidateCount.Should().Be(1);
+        saved.Single().TeardownCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CompletedReport_is_not_duplicated_when_terminal_publish_is_cancelled()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var run = Run(Guid.NewGuid().ToString(), now.AddDays(-30));
+        var saved = new List<CleanupReport>();
+        var service = Create(now, [run], saved, throwOnTerminalPublish: true);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        saved.Should().ContainSingle();
+        saved[0].Status.Should().Be("completed");
+    }
+
+    [Fact]
     public async Task HistoryPurge_keeps_torn_down_facility_when_snapshot_delete_fails()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -104,14 +140,17 @@ public class LeftoverRunCleanupServiceTests
         List<CleanupReport> saved,
         CancellationTokenSource? cancelAfterFirstDelete = null,
         List<string>? order = null,
-        Exception? deleteRunError = null)
+        Exception? deleteRunError = null,
+        IReadOnlyDictionary<string, string>? facilities = null,
+        bool throwOnTerminalPublish = false)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<Dictionary<string, string>>
             {
                 StatusCode = 200,
-                Body = runs.ToDictionary(run => run.FacilityId!, run => run.FacilityId!)
+                Body = facilities?.ToDictionary(pair => pair.Key, pair => pair.Value)
+                    ?? runs.ToDictionary(run => run.FacilityId!, run => run.FacilityId!)
             });
         facility.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<FacilityModel> { StatusCode = 404 });
@@ -201,7 +240,11 @@ public class LeftoverRunCleanupServiceTests
             .Callback<string, object?[], CancellationToken>((_, args, _) =>
             {
                 if (args.Length > 0 && args[0] is CleanupActivity activity && activity.Status is "completed" or "failed")
+                {
                     order?.Add("publish");
+                    if (throwOnTerminalPublish)
+                        throw new OperationCanceledException();
+                }
             })
             .Returns(Task.CompletedTask);
         var clients = new Mock<IHubClients>();
