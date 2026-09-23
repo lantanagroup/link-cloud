@@ -103,6 +103,7 @@ public static class OrgResourceMapProposalBuilder
         foreach (var template in existing)
         {
             var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var codeKeys = new HashSet<string>(TypeCodeKeyComparer.Instance);
             var aliasKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var condition in template.Conditions)
             {
@@ -110,13 +111,15 @@ public static class OrgResourceMapProposalBuilder
                 {
                     if (IsAliasKey(key))
                         aliasKeys.Add(key);
+                    else if (key.StartsWith("type|", StringComparison.OrdinalIgnoreCase))
+                        codeKeys.Add(key);
                     else
                         covered.Add(key);
                 }
             }
 
             var hasIdentifier = covered.Any(IsIdentifierKey);
-            var hasType = covered.Any(IsTypeKey) || aliasKeys.Count > 0;
+            var hasType = covered.Any(IsTypeKey) || codeKeys.Count > 0 || aliasKeys.Count > 0;
 
             ReuseCandidate? identifierCandidate = null;
             if (hasIdentifier && neededIdentifiers.Count > 0)
@@ -164,7 +167,7 @@ public static class OrgResourceMapProposalBuilder
             // One required code on the raw upload is enough to reuse the map. Other type
             // codes on the upload do not lower that. Cleanup cannot add a missing code
             // before acquisition evaluates org mapping.
-            var mapTypeKeys = ScoreableTypeKeys(covered);
+            var mapTypeKeys = ScoreableTypeKeys(covered, codeKeys);
             mapTypeKeys.AddRange(aliasKeys);
             if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
             {
@@ -193,7 +196,7 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, aliasKeys, rawLocations));
+            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, codeKeys, aliasKeys, rawLocations));
             var coverage = (double)coveredTypes / rawTypeKeys.Count;
             AddBest(ToCandidate(
                 template,
@@ -245,7 +248,7 @@ public static class OrgResourceMapProposalBuilder
 
     private static HashSet<string> NeededRawTypeKeys(BundleConfigFingerprint fingerprint)
     {
-        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var keys = new HashSet<string>(TypeCodeKeyComparer.Instance);
         foreach (var type in fingerprint.LocationTypes.Where(t => !string.IsNullOrWhiteSpace(t.System)))
         {
             keys.Add(string.IsNullOrWhiteSpace(type.Code)
@@ -368,7 +371,7 @@ public static class OrgResourceMapProposalBuilder
         if (keys.Contains($"typesys|{system}", StringComparer.OrdinalIgnoreCase))
             return true;
         return !string.IsNullOrWhiteSpace(code)
-               && keys.Contains($"type|{system}|{code}", StringComparer.OrdinalIgnoreCase);
+               && keys.Any(key => TypeCodeKeyComparer.Instance.Equals(key, $"type|{system}|{code}"));
     }
 
     private static bool IsCovered(string neededKey, HashSet<string> covered)
@@ -393,9 +396,9 @@ public static class OrgResourceMapProposalBuilder
         return false;
     }
 
-    private static List<string> ScoreableTypeKeys(HashSet<string> covered)
+    private static List<string> ScoreableTypeKeys(HashSet<string> covered, HashSet<string> codeKeys)
     {
-        var keys = covered.Where(IsTypeKey).ToList();
+        var keys = covered.Where(IsTypeKey).Concat(codeKeys).ToList();
         var systemWide = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
         {
@@ -459,10 +462,11 @@ public static class OrgResourceMapProposalBuilder
     private static bool RawTypeCovered(
         string rawKey,
         HashSet<string> covered,
+        HashSet<string> codeKeys,
         HashSet<string> aliasKeys,
         IReadOnlyList<RawLocationHint> locations)
     {
-        if (IsCovered(rawKey, covered))
+        if (IsCovered(rawKey, covered) || codeKeys.Contains(rawKey))
             return true;
 
         foreach (var key in aliasKeys)
@@ -470,7 +474,7 @@ public static class OrgResourceMapProposalBuilder
             if (!TrySplitAliasKey(key, out var typeKey, out var alias))
                 continue;
 
-            if (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase))
+            if (TypeCodeKeyComparer.Instance.Equals(typeKey, rawKey))
             {
                 if (locations.Any(location => AliasConditionMatches(location, typeKey, alias)))
                     return true;
@@ -517,7 +521,7 @@ public static class OrgResourceMapProposalBuilder
             return false;
         return location.Types.Any(type =>
             type.System.Equals(parts[1], StringComparison.OrdinalIgnoreCase)
-            && type.Code.Equals(parts[2], StringComparison.OrdinalIgnoreCase));
+            && type.Code.Equals(parts[2], StringComparison.Ordinal));
     }
 
     private static bool TypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)
@@ -642,4 +646,45 @@ public static class OrgResourceMapProposalBuilder
 
     private static string Escape(string value)
         => value.Replace("\\", "\\\\").Replace("'", "\\'");
+
+    // FHIRPath code equality is case-sensitive. The system portion stays
+    // ignore-case so a system-level condition still matches the upload.
+    private sealed class TypeCodeKeyComparer : IEqualityComparer<string>
+    {
+        public static readonly TypeCodeKeyComparer Instance = new();
+
+        public bool Equals(string? x, string? y)
+        {
+            if (ReferenceEquals(x, y))
+                return true;
+            if (x == null || y == null)
+                return false;
+
+            var left = Split(x);
+            var right = Split(y);
+            return left.Kind.Equals(right.Kind, StringComparison.OrdinalIgnoreCase)
+                && left.System.Equals(right.System, StringComparison.OrdinalIgnoreCase)
+                && left.Code.Equals(right.Code, StringComparison.Ordinal);
+        }
+
+        public int GetHashCode(string obj)
+        {
+            var parts = Split(obj);
+            return HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(parts.Kind),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(parts.System),
+                StringComparer.Ordinal.GetHashCode(parts.Code));
+        }
+
+        private static (string Kind, string System, string Code) Split(string key)
+        {
+            var first = key.IndexOf('|');
+            if (first < 0)
+                return (key, "", "");
+            var second = key.IndexOf('|', first + 1);
+            if (second < 0)
+                return (key[..first], key[(first + 1)..], "");
+            return (key[..first], key[(first + 1)..second], key[(second + 1)..]);
+        }
+    }
 }

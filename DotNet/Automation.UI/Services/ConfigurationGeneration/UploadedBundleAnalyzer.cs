@@ -124,9 +124,9 @@ public static class UploadedBundleAnalyzer
                 if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(code))
                     continue;
                 var hint = new LocationTypeHint { System = system, Code = code };
-                if (!raw.Types.Any(existing => Same(existing.System, system) && Same(existing.Code, code)))
+                if (!raw.Types.Any(existing => Same(existing.System, system) && SameCode(existing.Code, code)))
                     raw.Types.Add(hint);
-                if (fp.LocationTypes.Any(x => Same(x.System, system) && Same(x.Code, code)))
+                if (fp.LocationTypes.Any(x => Same(x.System, system) && SameCode(x.Code, code)))
                     continue;
                 fp.LocationTypes.Add(hint);
             }
@@ -168,7 +168,7 @@ public static class UploadedBundleAnalyzer
         => left.Aliases.Count == right.Aliases.Count
            && right.Aliases.All(alias => left.Aliases.Contains(alias))
            && left.Types.Count == right.Types.Count
-           && right.Types.All(type => left.Types.Any(existing => Same(existing.System, type.System) && Same(existing.Code, type.Code)));
+           && right.Types.All(type => left.Types.Any(existing => Same(existing.System, type.System) && SameCode(existing.Code, type.Code)));
 
     private static void CollectExtensions(BundleConfigFingerprint fp, Resource resource, string resourceType)
     {
@@ -253,4 +253,7 @@ public static class UploadedBundleAnalyzer
 
     private static bool Same(string? left, string? right)
         => string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameCode(string? left, string? right)
+        => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
 }

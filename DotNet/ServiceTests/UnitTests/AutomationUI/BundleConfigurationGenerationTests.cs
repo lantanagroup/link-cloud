@@ -83,6 +83,25 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_keeps_type_codes_that_differ_only_by_case()
+    {
+        var location = new Location
+        {
+            Type =
+            [
+                new CodeableConcept("http://t", "ABC", "ABC"),
+                new CodeableConcept("http://t", "abc", "abc")
+            ]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([location]);
+
+        fp.LocationTypes.Select(type => type.Code).Should().BeEquivalentTo("ABC", "abc");
+        fp.RawLocations.Should().ContainSingle();
+        fp.RawLocations[0].Types.Select(type => type.Code).Should().BeEquivalentTo("ABC", "abc");
+    }
+
+    [Fact]
     public void Analyzer_keeps_exact_location_alias_on_the_raw_location()
     {
         var location = new Location
@@ -982,6 +1001,41 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(missedType, [map]).Reuse
             .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Extend" && r.Score == 0.5);
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_a_type_code_that_differs_only_by_case()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var exact = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Code ABC",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = 'ABC')"
+                }
+            ]
+        };
+        BundleConfigFingerprint Upload(string code) => new()
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = code }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = code }]
+                }
+            ]
+        };
+
+        OrgResourceMapProposalBuilder.Build(Upload("abc"), [exact]).Reuse
+            .Should().NotContain(r => r.Id == exact.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(Upload("ABC"), [exact]).Reuse
+            .Should().ContainSingle(r => r.Id == exact.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]
