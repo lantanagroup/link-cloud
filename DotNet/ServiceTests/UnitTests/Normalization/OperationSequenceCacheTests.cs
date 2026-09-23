@@ -296,10 +296,25 @@ public class OperationSequenceCacheTests
         await harness.WriterManager.CreateOperationSequences(Sequence("facility-a", operationId));
         await harness.WarmAsync("facility-a");
 
+        harness.WriterCounter.OperationLockIds.Clear();
         await harness.Resources.DeleteResource("Patient");
 
+        Assert.Contains(operationId, harness.WriterCounter.OperationLockIds);
         Assert.Empty(harness.WriterContext.VendorVersionOperationPresets);
         Assert.Empty(await harness.ReaderQueries.Search(All("facility-a")));
+    }
+
+    [Fact]
+    public async Task RemovingAResourceType_InvalidatesTheListenerCache()
+    {
+        using var harness = new Harness();
+        var operationId = await harness.SeedAndSequenceAsync("facility-a", "Copy");
+        await harness.WarmAsync("facility-a");
+
+        await harness.WriterManager.UpdateOperationResourceTypesForOperation(operationId, new List<string> { "Encounter" });
+
+        Assert.Empty(await harness.ReaderQueries.Search(Typed("facility-a")));
+        Assert.Empty(await harness.WriterContext.OperationSequences.Where(sequence => sequence.FacilityId == "facility-a").ToListAsync());
     }
 
     [Fact]

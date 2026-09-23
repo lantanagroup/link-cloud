@@ -38,6 +38,11 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
     public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model, CancellationToken cancellationToken = default)
     {
         var operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId, cancellationToken);
+        if (operationResourceType == null)
+        {
+            throw new InvalidOperationException("The operation resource type no longer exists.");
+        }
+
         var operation = await _database.Operations.GetAsync(operationResourceType.OperationId, cancellationToken);
         if (operation.OperationType == OperationType.HSLOCMap.ToString())
         {
@@ -46,15 +51,20 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
         await _vendorVersionResolver.ResolveAsync([model.VendorVersionId], cancellationToken);
 
+        await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+        await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
+        operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId, cancellationToken);
+        if (operationResourceType == null)
+        {
+            throw new InvalidOperationException("The operation resource type no longer exists.");
+        }
+
         var preset = await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset
         {
             VendorVersionId = model.VendorVersionId,
             OperationResourceTypeId = model.OperationResourceTypeId,
             CreateDate = DateTime.UtcNow
         }, cancellationToken);
-
-        await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-        await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
         await _database.SaveChangesAsync(cancellationToken);
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
             await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken),

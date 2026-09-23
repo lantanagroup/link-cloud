@@ -336,8 +336,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources, CancellationToken cancellationToken = default)
         {
+            var ownsTransaction = !_database.HasActiveTransaction;
+            var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
+            try
+            {
             var operation = await _database.Operations.GetAsync(operationId, cancellationToken);
             operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId, cancellationToken);
+            var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);
 
             //Delete any OperationResourceTypes that exist in the DB but not on the incoming model
             foreach (var ort in operation.OperationResourceTypes)
@@ -346,6 +351,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 if (!resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId))
                 {
                     var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == ort.Id, cancellationToken);
+                    foreach (var sequence in sequences)
+                    {
+                        if (!string.IsNullOrEmpty(sequence.FacilityId))
+                        {
+                            affectedFacilities.Add(sequence.FacilityId);
+                        }
+                    }
+
                     sequences.ForEach(_database.OperationSequences.Remove);
 
                     var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == ort.Id, cancellationToken);
@@ -373,6 +386,32 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             await _database.SaveChangesAsync(cancellationToken);
+            if (affectedFacilities.Count > 0)
+            {
+                await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
+            }
+
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            }
+            catch
+            {
+                if (transaction != null)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
         }
 
         private async Task InvalidateCachedSequencesAsync(Guid operationId, CancellationToken cancellationToken, params string?[] additionalFacilityIds)

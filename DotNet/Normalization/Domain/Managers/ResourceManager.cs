@@ -102,6 +102,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
             }
 
+            var operationIds = (await _database.OperationResourceTypes.FindAsync(
+                map => map.ResourceType.Name == resource,
+                cancellationToken)).Select(map => map.OperationId).Distinct().OrderBy(id => id);
+            foreach (var operationId in operationIds)
+            {
+                await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+            }
+
             var presets = await _database.VendorVersionOperationPresets.FindAsync(
                 preset => preset.OperationResourceType.ResourceType.Name == resource,
                 cancellationToken);
