@@ -817,9 +817,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 sequences.ForEach(_database.OperationSequences.Remove);
                 await _database.SaveChangesAsync(cancellationToken);
-                await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
+                // DeleteOperation joins this transaction and still has later operation locks to take.
+                // Bumping the facility revision here would lock that row first and deadlock with
+                // UpdateOperation, which locks the operation and then the revision. A joined caller
+                // invalidates the facility after those operation locks. A caller that owns this
+                // transaction has no later locks, so it bumps the revision before commit.
                 if (transaction != null)
                 {
+                    await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
                 }
 
