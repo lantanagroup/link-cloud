@@ -10,7 +10,7 @@ public static class OrgResourceMapProposalBuilder
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex TypeExists = new(
-        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+code\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'[^']*')?$",
+        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+code\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'([^']*)')?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static GeneratedOrmProposal Build(
@@ -95,6 +95,7 @@ public static class OrgResourceMapProposalBuilder
     {
         var neededIdentifiers = NeededIdentifierKeys(fingerprint);
         var rawTypeKeys = NeededRawTypeKeys(fingerprint);
+        var aliases = new HashSet<string>(fingerprint.LocationAliases, StringComparer.OrdinalIgnoreCase);
         var results = new List<ReuseCandidate>();
 
         foreach (var template in existing)
@@ -151,7 +152,7 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys));
+            var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys, aliases));
             if (satisfied == 0)
             {
                 if (neededIdentifiers.Count == 0)
@@ -256,11 +257,22 @@ public static class OrgResourceMapProposalBuilder
                 // A code-specific condition must not count as covering every Location
                 // that merely shares the type codesystem. Mega-patient uploads have
                 // many HSLOC codes; treating the first as system-wide skipped the rest
-                // and left most Locations out-of-org.
+                // and left most Locations out-of-org. An alias predicate is part of the
+                // same condition, so the type code alone must not satisfy it.
+                var alias = type.Groups[3].Success ? type.Groups[3].Value.Trim() : "";
+                var hasAlias = !string.IsNullOrWhiteSpace(alias);
                 if (type.Groups[2].Success && !string.IsNullOrWhiteSpace(type.Groups[2].Value))
-                    yield return $"type|{type.Groups[1].Value}|{type.Groups[2].Value}";
+                {
+                    yield return hasAlias
+                        ? $"typealias|{type.Groups[1].Value}|{type.Groups[2].Value}|{alias}"
+                        : $"type|{type.Groups[1].Value}|{type.Groups[2].Value}";
+                }
                 else
-                    yield return $"typesys|{type.Groups[1].Value}";
+                {
+                    yield return hasAlias
+                        ? $"typesysalias|{type.Groups[1].Value}|{alias}"
+                        : $"typesys|{type.Groups[1].Value}";
+                }
             }
         }
     }
@@ -323,7 +335,15 @@ public static class OrgResourceMapProposalBuilder
             .ToList();
     }
 
-    private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)
+    private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys, HashSet<string> aliases)
+    {
+        if (TrySplitAliasKey(mapKey, out var typeKey, out var alias))
+            return aliases.Contains(alias) && TypeKeySatisfied(typeKey, rawTypeKeys);
+
+        return TypeKeySatisfied(mapKey, rawTypeKeys);
+    }
+
+    private static bool TypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)
     {
         if (rawTypeKeys.Contains(mapKey))
             return true;
@@ -335,6 +355,39 @@ public static class OrgResourceMapProposalBuilder
         return rawTypeKeys.Any(raw =>
             raw.StartsWith("type|", StringComparison.OrdinalIgnoreCase)
             && KeySystem(raw).Equals(system, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TrySplitAliasKey(string mapKey, out string typeKey, out string alias)
+    {
+        const string codePrefix = "typealias|";
+        const string systemPrefix = "typesysalias|";
+        if (mapKey.StartsWith(codePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = mapKey[codePrefix.Length..];
+            var split = rest.Split('|', 3);
+            if (split.Length == 3)
+            {
+                typeKey = $"type|{split[0]}|{split[1]}";
+                alias = split[2];
+                return true;
+            }
+        }
+
+        if (mapKey.StartsWith(systemPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = mapKey[systemPrefix.Length..];
+            var pipe = rest.IndexOf('|');
+            if (pipe > 0 && pipe < rest.Length - 1)
+            {
+                typeKey = $"typesys|{rest[..pipe]}";
+                alias = rest[(pipe + 1)..];
+                return true;
+            }
+        }
+
+        typeKey = "";
+        alias = "";
+        return false;
     }
 
     private static string KeySystem(string key)
@@ -349,7 +402,9 @@ public static class OrgResourceMapProposalBuilder
 
     private static bool IsTypeKey(string key)
         => key.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
-           || key.StartsWith("type|", StringComparison.OrdinalIgnoreCase);
+           || key.StartsWith("type|", StringComparison.OrdinalIgnoreCase)
+           || key.StartsWith("typesysalias|", StringComparison.OrdinalIgnoreCase)
+           || key.StartsWith("typealias|", StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<string> SplitOr(string path)
         => path.Split([" or ", " OR ", " || "], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

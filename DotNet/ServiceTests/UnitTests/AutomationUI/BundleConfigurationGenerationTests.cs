@@ -369,6 +369,41 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_does_not_reuse_type_map_when_required_alias_is_missing()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "ICU step down",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = 'ICU'"
+                }
+            ]
+        };
+        var missingAlias = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            LocationAliases = ["Ward"]
+        };
+        OrgResourceMapProposalBuilder.Build(missingAlias, [map]).Reuse
+            .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
+
+        var withAlias = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            LocationAliases = ["ICU"]
+        };
+        OrgResourceMapProposalBuilder.Build(withAlias, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 1);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint
