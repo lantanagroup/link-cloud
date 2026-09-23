@@ -47,7 +47,7 @@ public static class UploadedBundleAnalyzer
 
         foreach (var t in right.LocationTypes)
         {
-            if (!merged.LocationTypes.Any(x => Same(x.System, t.System) && Same(x.Code, t.Code)))
+            if (!merged.LocationTypes.Any(x => Same(x.System, t.System) && SameCode(x.Code, t.Code)))
                 merged.LocationTypes.Add(t);
         }
 

@@ -142,6 +142,39 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_merge_keeps_type_codes_that_differ_only_by_case()
+    {
+        const string system = "http://t";
+        var upper = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = system, Code = "ABC" }]
+        };
+        var lower = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = system, Code = "abc" }]
+        };
+        var merged = UploadedBundleAnalyzer.Merge(upper, lower);
+        merged.LocationTypes.Select(type => type.Code).Should().BeEquivalentTo("ABC", "abc");
+
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Lower abc",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{system}' and code = 'abc')"
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(merged, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Analyzer_counts_locations_without_identifiers()
     {
         var fp = UploadedBundleAnalyzer.Analyze([
@@ -1036,6 +1069,55 @@ public class BundleConfigurationGenerationTests
             .Should().NotContain(r => r.Id == exact.Id && r.Recommendation == "Reuse");
         OrgResourceMapProposalBuilder.Build(Upload("ABC"), [exact]).Reuse
             .Should().ContainSingle(r => r.Id == exact.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
+    public void Orm_builder_matches_a_type_code_that_contains_a_pipe()
+    {
+        const string system = "http://t";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Piped code",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{system}' and code = 'A|B') and Location.alias = 'ICU'"
+                }
+            ]
+        };
+        var hit = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = system, Code = "A|B" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = system, Code = "A|B" }],
+                    Aliases = ["ICU"]
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(hit, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse");
+
+        var swapped = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = system, Code = "A" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = system, Code = "A" }],
+                    Aliases = ["B|ICU"]
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(swapped, [map]).Reuse
+            .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]

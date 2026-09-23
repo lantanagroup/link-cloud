@@ -239,8 +239,8 @@ public static class OrgResourceMapProposalBuilder
             if (string.IsNullOrWhiteSpace(system))
                 continue;
             keys.Add(string.IsNullOrWhiteSpace(value)
-                ? $"idsys|{system}"
-                : $"id|{system}|{value}");
+                ? IdSysKey(system)
+                : IdKey(system, value));
         }
 
         return keys;
@@ -252,8 +252,8 @@ public static class OrgResourceMapProposalBuilder
         foreach (var type in fingerprint.LocationTypes.Where(t => !string.IsNullOrWhiteSpace(t.System)))
         {
             keys.Add(string.IsNullOrWhiteSpace(type.Code)
-                ? $"typesys|{type.System}"
-                : $"type|{type.System}|{type.Code}");
+                ? TypeSysKey(type.System)
+                : TypeKey(type.System, type.Code));
         }
 
         return keys;
@@ -279,9 +279,9 @@ public static class OrgResourceMapProposalBuilder
                 // A value-specific condition must not count as covering every Location
                 // that merely shares the identifier system.
                 if (id.Groups[2].Success && !string.IsNullOrWhiteSpace(id.Groups[2].Value))
-                    yield return $"id|{id.Groups[1].Value}|{id.Groups[2].Value}";
+                    yield return IdKey(id.Groups[1].Value, id.Groups[2].Value);
                 else
-                    yield return $"idsys|{id.Groups[1].Value}";
+                    yield return IdSysKey(id.Groups[1].Value);
                 continue;
             }
 
@@ -296,17 +296,19 @@ public static class OrgResourceMapProposalBuilder
                 // Alias equality is the unescaped literal, including surrounding spaces.
                 var alias = type.Groups[3].Success ? UnescapeFhirPathLiteral(type.Groups[3].Value) : "";
                 var hasAlias = alias.Length > 0;
-                if (type.Groups[2].Success && !string.IsNullOrWhiteSpace(type.Groups[2].Value))
+                var system = type.Groups[1].Value;
+                var code = type.Groups[2].Success ? type.Groups[2].Value : "";
+                if (code.Length > 0 && !string.IsNullOrWhiteSpace(code))
                 {
                     yield return hasAlias
-                        ? $"typealias|{type.Groups[1].Value}|{type.Groups[2].Value}|{alias}"
-                        : $"type|{type.Groups[1].Value}|{type.Groups[2].Value}";
+                        ? TypeAliasKey(system, code, alias)
+                        : TypeKey(system, code);
                 }
                 else
                 {
                     yield return hasAlias
-                        ? $"typesysalias|{type.Groups[1].Value}|{alias}"
-                        : $"typesys|{type.Groups[1].Value}";
+                        ? TypeSysAliasKey(system, alias)
+                        : TypeSysKey(system);
                 }
             }
         }
@@ -363,15 +365,15 @@ public static class OrgResourceMapProposalBuilder
 
     private static bool CoversIdentifierSystem(string path, string system)
         => ParseKeys(path).Any(k =>
-            k.Equals($"idsys|{system}", StringComparison.OrdinalIgnoreCase));
+            k.Equals(IdSysKey(system), StringComparison.OrdinalIgnoreCase));
 
     private static bool CoversType(string path, string system, string? code)
     {
         var keys = ParseKeys(path).ToList();
-        if (keys.Contains($"typesys|{system}", StringComparer.OrdinalIgnoreCase))
+        if (keys.Contains(TypeSysKey(system), StringComparer.OrdinalIgnoreCase))
             return true;
         return !string.IsNullOrWhiteSpace(code)
-               && keys.Any(key => TypeCodeKeyComparer.Instance.Equals(key, $"type|{system}|{code}"));
+               && keys.Any(key => TypeCodeKeyComparer.Instance.Equals(key, TypeKey(system, code)));
     }
 
     private static bool IsCovered(string neededKey, HashSet<string> covered)
@@ -384,13 +386,13 @@ public static class OrgResourceMapProposalBuilder
         if (neededKey.StartsWith("id|", StringComparison.OrdinalIgnoreCase))
         {
             var system = KeySystem(neededKey);
-            return system.Length > 0 && covered.Contains($"idsys|{system}");
+            return system.Length > 0 && covered.Contains(IdSysKey(system));
         }
 
         if (neededKey.StartsWith("type|", StringComparison.OrdinalIgnoreCase))
         {
             var system = KeySystem(neededKey);
-            return system.Length > 0 && covered.Contains($"typesys|{system}");
+            return system.Length > 0 && covered.Contains(TypeSysKey(system));
         }
 
         return false;
@@ -427,7 +429,7 @@ public static class OrgResourceMapProposalBuilder
         if (!mapKey.StartsWith("idsys|", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var system = mapKey["idsys|".Length..];
+        var system = KeySystem(mapKey);
         return neededIdentifiers.Any(needed =>
             needed.StartsWith("id|", StringComparison.OrdinalIgnoreCase)
             && KeySystem(needed).Equals(system, StringComparison.OrdinalIgnoreCase));
@@ -483,7 +485,7 @@ public static class OrgResourceMapProposalBuilder
 
             // A system-level alias covers a code only on a Location that also has that alias.
             if (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
-                && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase)
+                && KeySystem(rawKey).Equals(KeySystem(typeKey), StringComparison.OrdinalIgnoreCase)
                 && locations.Any(location =>
                     AliasConditionMatches(location, typeKey, alias)
                     && TypeOnLocation(rawKey, location)))
@@ -516,8 +518,8 @@ public static class OrgResourceMapProposalBuilder
                 type.System.Equals(system, StringComparison.OrdinalIgnoreCase));
         }
 
-        var parts = typeKey.Split('|');
-        if (parts.Length < 3 || !parts[0].Equals("type", StringComparison.OrdinalIgnoreCase))
+        var parts = SplitKey(typeKey);
+        if (parts.Count < 3 || !parts[0].Equals("type", StringComparison.OrdinalIgnoreCase))
             return false;
         return location.Types.Any(type =>
             type.System.Equals(parts[1], StringComparison.OrdinalIgnoreCase)
@@ -532,7 +534,7 @@ public static class OrgResourceMapProposalBuilder
         if (!mapKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var system = mapKey["typesys|".Length..];
+        var system = KeySystem(mapKey);
         return rawTypeKeys.Any(raw =>
             raw.StartsWith("type|", StringComparison.OrdinalIgnoreCase)
             && KeySystem(raw).Equals(system, StringComparison.OrdinalIgnoreCase));
@@ -542,28 +544,19 @@ public static class OrgResourceMapProposalBuilder
     {
         const string codePrefix = "typealias|";
         const string systemPrefix = "typesysalias|";
-        if (mapKey.StartsWith(codePrefix, StringComparison.OrdinalIgnoreCase))
+        var parts = SplitKey(mapKey);
+        if (parts.Count == 4 && parts[0].Equals(codePrefix.TrimEnd('|'), StringComparison.OrdinalIgnoreCase))
         {
-            var rest = mapKey[codePrefix.Length..];
-            var split = rest.Split('|', 3);
-            if (split.Length == 3)
-            {
-                typeKey = $"type|{split[0]}|{split[1]}";
-                alias = split[2];
-                return true;
-            }
+            typeKey = TypeKey(parts[1], parts[2]);
+            alias = parts[3];
+            return true;
         }
 
-        if (mapKey.StartsWith(systemPrefix, StringComparison.OrdinalIgnoreCase))
+        if (parts.Count == 3 && parts[0].Equals(systemPrefix.TrimEnd('|'), StringComparison.OrdinalIgnoreCase))
         {
-            var rest = mapKey[systemPrefix.Length..];
-            var pipe = rest.IndexOf('|');
-            if (pipe > 0 && pipe < rest.Length - 1)
-            {
-                typeKey = $"typesys|{rest[..pipe]}";
-                alias = rest[(pipe + 1)..];
-                return true;
-            }
+            typeKey = TypeSysKey(parts[1]);
+            alias = parts[2];
+            return true;
         }
 
         typeKey = "";
@@ -573,8 +566,62 @@ public static class OrgResourceMapProposalBuilder
 
     private static string KeySystem(string key)
     {
-        var parts = key.Split('|');
-        return parts.Length >= 2 ? parts[1] : "";
+        var parts = SplitKey(key);
+        return parts.Count >= 2 ? parts[1] : "";
+    }
+
+    private static string IdKey(string system, string value)
+        => JoinKey("id", system, value);
+
+    private static string IdSysKey(string system)
+        => JoinKey("idsys", system);
+
+    private static string TypeKey(string system, string code)
+        => JoinKey("type", system, code);
+
+    private static string TypeSysKey(string system)
+        => JoinKey("typesys", system);
+
+    private static string TypeAliasKey(string system, string code, string alias)
+        => JoinKey("typealias", system, code, alias);
+
+    private static string TypeSysAliasKey(string system, string alias)
+        => JoinKey("typesysalias", system, alias);
+
+    private static string JoinKey(string kind, params string[] parts)
+        => kind + "|" + string.Join("|", parts.Select(EncodeKeyPart));
+
+    private static string EncodeKeyPart(string value)
+    {
+        if (value.IndexOf('\\') < 0 && value.IndexOf('|') < 0)
+            return value;
+        return value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("|", "\\|", StringComparison.Ordinal);
+    }
+
+    private static List<string> SplitKey(string key)
+    {
+        var parts = new List<string>();
+        var current = new StringBuilder();
+        for (var i = 0; i < key.Length; i++)
+        {
+            if (key[i] == '\\' && i + 1 < key.Length)
+            {
+                current.Append(key[++i]);
+                continue;
+            }
+
+            if (key[i] == '|')
+            {
+                parts.Add(current.ToString());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(key[i]);
+        }
+
+        parts.Add(current.ToString());
+        return parts;
     }
 
     private static bool IsIdentifierKey(string key)
@@ -678,13 +725,11 @@ public static class OrgResourceMapProposalBuilder
 
         private static (string Kind, string System, string Code) Split(string key)
         {
-            var first = key.IndexOf('|');
-            if (first < 0)
-                return (key, "", "");
-            var second = key.IndexOf('|', first + 1);
-            if (second < 0)
-                return (key[..first], key[(first + 1)..], "");
-            return (key[..first], key[(first + 1)..second], key[(second + 1)..]);
+            var parts = SplitKey(key);
+            return (
+                parts.Count > 0 ? parts[0] : "",
+                parts.Count > 1 ? parts[1] : "",
+                parts.Count > 2 ? parts[2] : "");
         }
     }
 }
