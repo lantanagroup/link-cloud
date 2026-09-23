@@ -95,6 +95,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Ok(result);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -146,6 +150,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Ok(result);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -186,6 +194,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -263,6 +275,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Created("", taskResult.ObjectResult);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -333,6 +349,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Accepted("", taskResult.ObjectResult);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -389,6 +409,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -440,6 +464,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -477,6 +505,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -508,6 +540,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

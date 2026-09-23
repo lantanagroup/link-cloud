@@ -59,6 +59,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Ok(results);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -109,6 +113,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Created("", sequences);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -146,6 +154,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return NoContent();
 
                 return Problem(detail: $"No sequence found to delete for facility id {facilityId.SanitizeAndRemove()}{(resourceType == null ? "" : $" and resource type {resourceType}")}", statusCode: StatusCodes.Status404NotFound);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

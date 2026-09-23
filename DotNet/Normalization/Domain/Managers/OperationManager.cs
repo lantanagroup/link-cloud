@@ -454,6 +454,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 }
 
+                var operationIds = new List<Guid>();
                 var pageNumber = 1;
                 while (true)
                 {
@@ -475,59 +476,55 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         break;
                     }
 
-                    var deletedThisPage = 0;
-                    foreach (var operation in operations.Records.OrderBy(candidate => candidate.Id))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
-                        var current = await _database.Operations.GetAsync(operation.Id, cancellationToken);
-                        if (current == null || !await OperationStillMatchesDeleteAsync(current, model, cancellationToken))
-                        {
-                            continue;
-                        }
-
-                        deletedThisPage++;
-                        modifiedRecords++;
-                        foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken))
-                        {
-                            affectedFacilities.Add(facilityId);
-                        }
-
-                        if (!string.IsNullOrEmpty(model.FacilityId))
-                        {
-                            await DeleteOperationSequence(new DeleteOperationSequencesModel()
-                            {
-                                FacilityId = model.FacilityId,
-                                OperationId = operation.Id,
-                            }, cancellationToken);
-                        }
-
-                        var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id, cancellationToken);
-                        orts.ForEach(_database.OperationResourceTypes.Remove);
-
-                        var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id, cancellationToken);
-                        vops.ForEach(_database.VendorVersionOperationPresets.Remove);
-
-                        var op = await _database.Operations.GetAsync(operation.Id, cancellationToken);
-                        _database.Operations.Remove(op);
-                    }
-
-                    if (deletedThisPage > 0)
-                    {
-                        await _database.SaveChangesAsync(cancellationToken);
-                        pageNumber = 1;
-                        continue;
-                    }
-
-                    pageNumber++;
-                    if (pageNumber > operations.Metadata.TotalPages)
+                    operationIds.AddRange(operations.Records.Select(record => record.Id));
+                    if (pageNumber >= operations.Metadata.TotalPages)
                     {
                         break;
                     }
+
+                    pageNumber++;
+                }
+
+                // SQL Server uniqueidentifier order is not .NET Guid order. Sequence writes sort
+                // every id with GuidComparer, so the delete must lock in that same order.
+                foreach (var operationId in operationIds.Distinct().OrderBy(id => id))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+                    var current = await _database.Operations.GetAsync(operationId, cancellationToken);
+                    if (current == null || !await OperationStillMatchesDeleteAsync(current, model, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    modifiedRecords++;
+                    foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationId, cancellationToken))
+                    {
+                        affectedFacilities.Add(facilityId);
+                    }
+
+                    if (!string.IsNullOrEmpty(model.FacilityId))
+                    {
+                        await DeleteOperationSequence(new DeleteOperationSequencesModel()
+                        {
+                            FacilityId = model.FacilityId,
+                            OperationId = operationId,
+                        }, cancellationToken);
+                    }
+
+                    var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operationId, cancellationToken);
+                    orts.ForEach(_database.OperationResourceTypes.Remove);
+
+                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operationId, cancellationToken);
+                    vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
+                    var op = await _database.Operations.GetAsync(operationId, cancellationToken);
+                    _database.Operations.Remove(op);
                 }
 
                 if (modifiedRecords > 0)
                 {
+                    await _database.SaveChangesAsync(cancellationToken);
                     await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
                     if (transaction != null)
                     {

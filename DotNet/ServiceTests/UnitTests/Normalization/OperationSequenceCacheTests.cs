@@ -168,7 +168,7 @@ public class OperationSequenceCacheTests
             SortOrder = SortOrder.Ascending,
             PageSize = 50,
             PageNumber = 1
-        }, CancellationToken.None, hydrateVendors: false)).Records.Select(record => record.Id).ToList();
+        }, CancellationToken.None, hydrateVendors: false)).Records.Select(record => record.Id).OrderBy(id => id).ToList();
 
         harness.WriterCounter.OperationLockIds.Clear();
         Assert.True(await harness.WriterManager.DeleteOperation(new DeleteOperationModel { FacilityId = facilityId }));

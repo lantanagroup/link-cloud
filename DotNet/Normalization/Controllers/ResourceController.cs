@@ -44,6 +44,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Ok(foundResource);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -62,6 +66,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Ok(foundResources);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -79,6 +87,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 var resourceModels = await _resourceManager.InitializeResources(cancellationToken);
 
                 return Ok(resourceModels);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -110,6 +122,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Created("", createdResource);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -139,6 +155,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Created("", foundResource);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -162,6 +182,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 await _resourceManager.DeleteResource(resource, cancellationToken);
 
                 return Accepted();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

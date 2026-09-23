@@ -40,6 +40,10 @@ public class VendorVersionOperationPresetsController : ControllerBase
                 Resource = resource
             }, cancellationToken));
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             return Problem(detail: exception.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -56,6 +60,10 @@ public class VendorVersionOperationPresetsController : ControllerBase
         {
             var preset = await _presetQueries.Get(presetId, cancellationToken);
             return preset == null ? NotFound() : Ok(preset);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
@@ -94,6 +102,10 @@ public class VendorVersionOperationPresetsController : ControllerBase
         {
             return BadRequest(exception.Message);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             return Problem(detail: exception.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -109,6 +121,10 @@ public class VendorVersionOperationPresetsController : ControllerBase
         {
             await _presetManager.Delete(vendorVersionId, presetId, cancellationToken);
             return NoContent();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
