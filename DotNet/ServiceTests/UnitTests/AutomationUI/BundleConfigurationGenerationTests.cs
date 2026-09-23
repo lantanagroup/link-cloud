@@ -471,6 +471,38 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(differentCase, [map]).Reuse
             .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
+
+        var bothCases = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Both alias cases",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = 'ICU'"
+                },
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = 'icu'"
+                }
+            ]
+        };
+        var lowerOnly = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["icu"]
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(lowerOnly, [bothCases]).Reuse
+            .Should().ContainSingle(r => r.Id == bothCases.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]

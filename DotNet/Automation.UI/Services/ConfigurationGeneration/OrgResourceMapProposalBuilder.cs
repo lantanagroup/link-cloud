@@ -101,14 +101,20 @@ public static class OrgResourceMapProposalBuilder
         foreach (var template in existing)
         {
             var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var aliasKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var condition in template.Conditions)
             {
                 foreach (var key in ParseKeys(condition.FhirPath))
-                    covered.Add(key);
+                {
+                    if (IsAliasKey(key))
+                        aliasKeys.Add(key);
+                    else
+                        covered.Add(key);
+                }
             }
 
             var hasIdentifier = covered.Any(IsIdentifierKey);
-            var hasType = covered.Any(IsTypeKey);
+            var hasType = covered.Any(IsTypeKey) || aliasKeys.Count > 0;
 
             if (hasIdentifier && neededIdentifiers.Count > 0)
             {
@@ -140,6 +146,7 @@ public static class OrgResourceMapProposalBuilder
             // codes on the upload do not lower that. Cleanup cannot add a missing code
             // before acquisition evaluates org mapping.
             var mapTypeKeys = ScoreableTypeKeys(covered);
+            mapTypeKeys.AddRange(aliasKeys);
             if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
             {
                 if (neededIdentifiers.Count == 0)
@@ -167,7 +174,7 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, rawLocations));
+            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, aliasKeys, rawLocations));
             var coverage = (double)coveredTypes / rawTypeKeys.Count;
             results.Add(ToCandidate(
                 template,
@@ -376,12 +383,20 @@ public static class OrgResourceMapProposalBuilder
         return true;
     }
 
-    private static bool RawTypeCovered(string rawKey, HashSet<string> covered, IReadOnlyList<RawLocationHint> locations)
+    private static bool IsAliasKey(string key)
+        => key.StartsWith("typealias|", StringComparison.Ordinal)
+           || key.StartsWith("typesysalias|", StringComparison.Ordinal);
+
+    private static bool RawTypeCovered(
+        string rawKey,
+        HashSet<string> covered,
+        HashSet<string> aliasKeys,
+        IReadOnlyList<RawLocationHint> locations)
     {
         if (IsCovered(rawKey, covered))
             return true;
 
-        foreach (var key in covered)
+        foreach (var key in aliasKeys)
         {
             if (!TrySplitAliasKey(key, out var typeKey, out var alias))
                 continue;
