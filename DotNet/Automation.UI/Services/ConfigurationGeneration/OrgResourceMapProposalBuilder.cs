@@ -104,6 +104,7 @@ public static class OrgResourceMapProposalBuilder
         {
             var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var codeKeys = new HashSet<string>(TypeCodeKeyComparer.Instance);
+            var valueKeys = new HashSet<string>(TypeCodeKeyComparer.Instance);
             var aliasKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var condition in template.Conditions)
             {
@@ -113,24 +114,26 @@ public static class OrgResourceMapProposalBuilder
                         aliasKeys.Add(key);
                     else if (key.StartsWith("type|", StringComparison.OrdinalIgnoreCase))
                         codeKeys.Add(key);
+                    else if (key.StartsWith("id|", StringComparison.OrdinalIgnoreCase))
+                        valueKeys.Add(key);
                     else
                         covered.Add(key);
                 }
             }
 
-            var hasIdentifier = covered.Any(IsIdentifierKey);
+            var hasIdentifier = valueKeys.Count > 0 || covered.Any(IsIdentifierKey);
             var hasType = covered.Any(IsTypeKey) || codeKeys.Count > 0 || aliasKeys.Count > 0;
 
             ReuseCandidate? identifierCandidate = null;
             if (hasIdentifier && neededIdentifiers.Count > 0)
             {
-                var mapIdentifierKeys = covered.Where(IsIdentifierKey).ToList();
+                var mapIdentifierKeys = covered.Where(IsIdentifierKey).Concat(valueKeys).ToList();
                 var identifierSatisfied = mapIdentifierKeys.Count(key => IdentifierKeySatisfied(key, neededIdentifiers));
                 if (identifierSatisfied > 0)
                 {
-                    var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
+                    var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered, valueKeys));
                     var score = (double)hit / neededIdentifiers.Count;
-                    var siblingValues = UncoveredIdentifiersAreSiblingValues(neededIdentifiers, covered);
+                    var siblingValues = UncoveredIdentifiersAreSiblingValues(neededIdentifiers, covered, valueKeys);
                     identifierCandidate = ToCandidate(
                         template,
                         score,
@@ -231,7 +234,7 @@ public static class OrgResourceMapProposalBuilder
 
     private static HashSet<string> NeededIdentifierKeys(BundleConfigFingerprint fingerprint)
     {
-        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var keys = new HashSet<string>(TypeCodeKeyComparer.Instance);
         foreach (var identifier in fingerprint.LocationIdentifiers)
         {
             var system = identifier.System?.Trim() ?? "";
@@ -378,9 +381,9 @@ public static class OrgResourceMapProposalBuilder
                && keys.Any(key => TypeCodeKeyComparer.Instance.Equals(key, TypeKey(system, code)));
     }
 
-    private static bool IsCovered(string neededKey, HashSet<string> covered)
+    private static bool IsCovered(string neededKey, HashSet<string> covered, HashSet<string>? valueKeys = null)
     {
-        if (covered.Contains(neededKey))
+        if (covered.Contains(neededKey) || (valueKeys != null && valueKeys.Contains(neededKey)))
             return true;
 
         // A system-level condition covers every value or code in that system.
@@ -437,20 +440,21 @@ public static class OrgResourceMapProposalBuilder
             && KeySystem(needed).Equals(system, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool UncoveredIdentifiersAreSiblingValues(HashSet<string> needed, HashSet<string> covered)
+    private static bool UncoveredIdentifiersAreSiblingValues(
+        HashSet<string> needed,
+        HashSet<string> covered,
+        HashSet<string> valueKeys)
     {
         foreach (var neededKey in needed)
         {
-            if (IsCovered(neededKey, covered))
+            if (IsCovered(neededKey, covered, valueKeys))
                 continue;
             if (!neededKey.StartsWith("id|", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var system = KeySystem(neededKey);
-            var matchedValueOnSystem = covered.Any(key =>
-                key.StartsWith("id|", StringComparison.OrdinalIgnoreCase)
-                && !key.StartsWith("idsys|", StringComparison.OrdinalIgnoreCase)
-                && KeySystem(key).Equals(system, StringComparison.OrdinalIgnoreCase)
+            var matchedValueOnSystem = valueKeys.Any(key =>
+                KeySystem(key).Equals(system, StringComparison.OrdinalIgnoreCase)
                 && needed.Contains(key));
             if (!matchedValueOnSystem)
                 return false;

@@ -102,6 +102,19 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_keeps_identifier_values_that_differ_only_by_case()
+    {
+        var location = new Location
+        {
+            Identifier = [new Identifier("http://a", "HOSP"), new Identifier("http://a", "hosp")]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([location]);
+
+        fp.LocationIdentifiers.Select(identifier => identifier.Value).Should().BeEquivalentTo("HOSP", "hosp");
+    }
+
+    [Fact]
     public void Analyzer_keeps_exact_location_alias_on_the_raw_location()
     {
         var location = new Location
@@ -1171,6 +1184,47 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(typeUpload, [typeMap]).Reuse
             .Should().ContainSingle(r => r.Id == typeMap.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_an_identifier_value_that_differs_only_by_case()
+    {
+        var exact = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hospital",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = 'http://a' and value = 'HOSP').exists()"
+                }
+            ]
+        };
+        var anyValue = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Any http://a",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = 'http://a').exists()"
+                }
+            ]
+        };
+        BundleConfigFingerprint Upload(string value) => new()
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = value }]
+        };
+
+        OrgResourceMapProposalBuilder.Build(Upload("hosp"), [exact]).Reuse
+            .Should().NotContain(r => r.Id == exact.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(Upload("HOSP"), [exact]).Reuse
+            .Should().ContainSingle(r => r.Id == exact.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(Upload("hosp"), [anyValue]).Reuse
+            .Should().ContainSingle(r => r.Id == anyValue.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]

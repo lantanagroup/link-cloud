@@ -41,7 +41,7 @@ public static class UploadedBundleAnalyzer
 
         foreach (var id in right.LocationIdentifiers)
         {
-            if (!merged.LocationIdentifiers.Any(x => Same(x.System, id.System) && Same(x.Value, id.Value)))
+            if (!merged.LocationIdentifiers.Any(x => Same(x.System, id.System) && SameValue(x.Value, id.Value)))
                 merged.LocationIdentifiers.Add(id);
         }
 
@@ -108,7 +108,7 @@ public static class UploadedBundleAnalyzer
             if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(value))
                 continue;
             hasUsableIdentifier = true;
-            if (fp.LocationIdentifiers.Any(x => Same(x.System, system) && Same(x.Value, value)))
+            if (fp.LocationIdentifiers.Any(x => Same(x.System, system) && SameValue(x.Value, value)))
                 continue;
             fp.LocationIdentifiers.Add(new LocationIdentifierHint { System = system, Value = value });
         }
@@ -255,5 +255,8 @@ public static class UploadedBundleAnalyzer
         => string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private static bool SameCode(string? left, string? right)
+        => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
+
+    private static bool SameValue(string? left, string? right)
         => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
 }
