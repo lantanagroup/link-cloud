@@ -330,6 +330,30 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task CreatePreset_RejectsAnOperationDeletedBeforeTheLock()
+    {
+        using var harness = new Harness();
+        var operationId = await harness.SeedOperationAsync("facility-a", "Copy", CopyJson);
+        var operationResourceTypeId = await harness.WriterContext.OperationResourceTypes
+            .Where(map => map.OperationId == operationId)
+            .Select(map => map.Id)
+            .SingleAsync();
+        harness.WriterContext.ChangeTracker.Clear();
+
+        var operation = await harness.ReaderContext.Operations.SingleAsync(candidate => candidate.Id == operationId);
+        harness.ReaderContext.Operations.Remove(operation);
+        await harness.ReaderContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Presets.Create(new CreateVendorVersionOperationPresetModel
+        {
+            VendorVersionId = Guid.NewGuid(),
+            OperationResourceTypeId = operationResourceTypeId
+        }));
+
+        Assert.Contains("no longer exists", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CanonicalResourceNames_UsesPersistedCasingAndOrdinalOrder()
     {
         using var harness = new Harness();

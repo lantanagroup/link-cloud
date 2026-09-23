@@ -44,6 +44,11 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         }
 
         var operation = await _database.Operations.GetAsync(operationResourceType.OperationId, cancellationToken);
+        if (operation == null)
+        {
+            throw new InvalidOperationException("The operation no longer exists.");
+        }
+
         if (operation.OperationType == OperationType.HSLOCMap.ToString())
         {
             throw new InvalidOperationException("HSLOC Map operations cannot be assigned to vendors.");
@@ -87,6 +92,11 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         }
 
         var operationResourceType = await _database.OperationResourceTypes.GetAsync(preset.OperationResourceTypeId, cancellationToken);
+        if (operationResourceType == null)
+        {
+            return;
+        }
+
         await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
         await _operationSequenceQueries.LockOperationAsync(operationResourceType.OperationId, cancellationToken);
         var operationPresets = await _database.VendorVersionOperationPresets.FindAsync(candidate =>
