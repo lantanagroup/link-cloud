@@ -136,7 +136,7 @@ public static class OrgResourceMapProposalBuilder
             // Score the codes this map requires against the raw upload. Other type codes
             // on the upload do not lower the score. Cleanup cannot add the missing codes
             // before acquisition evaluates org mapping.
-            var mapTypeKeys = covered.Where(IsTypeKey).ToList();
+            var mapTypeKeys = ScoreableTypeKeys(covered);
             if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
             {
                 if (neededIdentifiers.Count == 0)
@@ -300,6 +300,29 @@ public static class OrgResourceMapProposalBuilder
         }
 
         return false;
+    }
+
+    private static List<string> ScoreableTypeKeys(HashSet<string> covered)
+    {
+        var keys = covered.Where(IsTypeKey).ToList();
+        var systemWide = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in keys)
+        {
+            if (key.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase))
+                systemWide.Add(key["typesys|".Length..]);
+        }
+
+        // A system-level condition already matches every code in that system, so a
+        // code-specific row for the same system is not a second requirement.
+        return keys
+            .Where(key =>
+            {
+                if (!key.StartsWith("type|", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                var system = KeySystem(key);
+                return system.Length == 0 || !systemWide.Contains(system);
+            })
+            .ToList();
     }
 
     private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys)

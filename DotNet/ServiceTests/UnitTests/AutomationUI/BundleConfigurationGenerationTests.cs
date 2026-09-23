@@ -328,6 +328,38 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_does_not_let_a_subsumed_code_lower_a_system_level_type_map()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Any HSLOC plus one code",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}').exists()"
+                },
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}' and code = '1099-1').exists()"
+                }
+            ]
+        };
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1027-2" }]
+        };
+
+        var reuse = OrgResourceMapProposalBuilder.Build(fp, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id).Subject;
+        reuse.Recommendation.Should().Be("Reuse");
+        reuse.Score.Should().Be(1);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint
