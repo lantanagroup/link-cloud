@@ -57,7 +57,8 @@ public static class UploadedBundleAnalyzer
                 merged.LocationAliases.Add(alias);
         }
 
-        merged.RawLocations.AddRange(right.RawLocations);
+        foreach (var location in right.RawLocations)
+            AddRawLocation(merged, location);
 
         foreach (var ext in right.Extensions)
         {
@@ -87,11 +88,7 @@ public static class UploadedBundleAnalyzer
             LocationIdentifiers = [.. source.LocationIdentifiers],
             LocationTypes = [.. source.LocationTypes],
             LocationAliases = [.. source.LocationAliases],
-            RawLocations = source.RawLocations.Select(location => new RawLocationHint
-            {
-                Types = [.. location.Types],
-                Aliases = [.. location.Aliases]
-            }).ToList(),
+            RawLocations = source.RawLocations.Select(CloneRawLocation).ToList(),
             Extensions = [.. source.Extensions],
             Codings = [.. source.Codings],
             LocationCount = source.LocationCount,
@@ -103,7 +100,6 @@ public static class UploadedBundleAnalyzer
     {
         fp.LocationCount++;
         var raw = new RawLocationHint();
-        fp.RawLocations.Add(raw);
         var hasUsableIdentifier = false;
         foreach (var identifier in location.Identifier ?? [])
         {
@@ -128,7 +124,8 @@ public static class UploadedBundleAnalyzer
                 if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(code))
                     continue;
                 var hint = new LocationTypeHint { System = system, Code = code };
-                raw.Types.Add(hint);
+                if (!raw.Types.Any(existing => Same(existing.System, system) && Same(existing.Code, code)))
+                    raw.Types.Add(hint);
                 if (fp.LocationTypes.Any(x => Same(x.System, system) && Same(x.Code, code)))
                     continue;
                 fp.LocationTypes.Add(hint);
@@ -140,11 +137,36 @@ public static class UploadedBundleAnalyzer
             var value = alias?.Trim();
             if (string.IsNullOrWhiteSpace(value))
                 continue;
-            raw.Aliases.Add(value);
+            if (!raw.Aliases.Contains(value))
+                raw.Aliases.Add(value);
             if (!fp.LocationAliases.Contains(value))
                 fp.LocationAliases.Add(value);
         }
+
+        AddRawLocation(fp, raw);
     }
+
+    private static void AddRawLocation(BundleConfigFingerprint fp, RawLocationHint raw)
+    {
+        if (raw.Types.Count == 0 && raw.Aliases.Count == 0)
+            return;
+        if (fp.RawLocations.Any(existing => SameSignature(existing, raw)))
+            return;
+        fp.RawLocations.Add(CloneRawLocation(raw));
+    }
+
+    private static RawLocationHint CloneRawLocation(RawLocationHint raw)
+        => new()
+        {
+            Types = raw.Types.Select(type => new LocationTypeHint { System = type.System, Code = type.Code }).ToList(),
+            Aliases = [.. raw.Aliases]
+        };
+
+    private static bool SameSignature(RawLocationHint left, RawLocationHint right)
+        => left.Aliases.Count == right.Aliases.Count
+           && right.Aliases.All(alias => left.Aliases.Contains(alias))
+           && left.Types.Count == right.Types.Count
+           && right.Types.All(type => left.Types.Any(existing => Same(existing.System, type.System) && Same(existing.Code, type.Code)));
 
     private static void CollectExtensions(BundleConfigFingerprint fp, Resource resource, string resourceType)
     {

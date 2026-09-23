@@ -56,6 +56,30 @@ public class BundleConfigurationGenerationTests
         fp.LocationAliases.Should().Contain("Main Hospital, Campus A");
         fp.Extensions.Should().Contain(e => e.Url.Contains("epic-id") && e.ResourceType == "Location");
         fp.Extensions.Should().Contain(e => e.Url.Contains("patient-merge") && e.ResourceType == "Patient");
+        fp.RawLocations.Should().ContainSingle();
+        fp.RawLocations[0].Aliases.Should().ContainSingle("Main Hospital, Campus A");
+    }
+
+    [Fact]
+    public void Analyzer_keeps_one_signature_per_distinct_type_and_alias_pair()
+    {
+        Location Make(string code, string alias) => new()
+        {
+            Type = [new CodeableConcept("http://t", code, code)],
+            Alias = [alias]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([
+            Make("1099-1", "ICU"),
+            Make("1099-1", "ICU"),
+            Make("1099-1", "Ward")
+        ]);
+
+        fp.LocationCount.Should().Be(3);
+        fp.RawLocations.Should().HaveCount(2);
+        fp.RawLocations.Should().Contain(location =>
+            location.Aliases.Contains("ICU") && location.Types.Any(type => type.Code == "1099-1"));
+        fp.RawLocations.Should().Contain(location => location.Aliases.Contains("Ward"));
     }
 
     [Fact]
