@@ -4,6 +4,9 @@ import {parseHoursMinutesDuration} from '../shared/duration';
 import type {FacilityDraft, StepId} from './types';
 import {STEP_IDS} from './types';
 import {CENSUS_LIST_KEYS} from './steps/census/validate';
+import {isFacilityInfoComplete} from './steps/facility-info/validate';
+import {isFhirComplete} from './steps/fhir/validate';
+import {isHslocComplete} from './steps/hsloc/validate';
 import {isMrnIntakeComplete} from './steps/mrn-intake/validate';
 import {isReportComplete} from './steps/report/validate';
 import {WelcomeStep} from './steps/welcome/WelcomeStep';
@@ -29,21 +32,6 @@ export interface Step {
   isVisible?: (draft: FacilityDraft, user: UserInfoResponse) => boolean;
 }
 
-/**
- * Steps whose internals are separate stories. Their completion predicate is a
- * placeholder so the machine is traversable before they are built; each story
- * replaces its own. Grep this symbol to find what is still outstanding.
- */
-const COMPLETION_PENDING_STORY = () => true;
-
-/**
- * TEMPORARY: forces every step to unlock the next one regardless of draft
- * state, so the flow can be clicked through end-to-end while the `complete`
- * step is being built. Grep this symbol and restore each step's real
- * `isComplete` predicate once the enrollment-complete page is in place.
- */
-const TEMP_ALWAYS_COMPLETE = () => true;
-
 const lazyStep = (loader: () => Promise<{default: React.ComponentType<StepProps>}>) =>
   React.lazy(loader);
 
@@ -68,19 +56,21 @@ export const STEPS: Step[] = [
     id: 'facility-info',
     labelKey: 'onboarding:steps.facilityInfo',
     Component: lazyStep(() => import('./steps/facility-info/FacilityInfoStep')),
-    isComplete: TEMP_ALWAYS_COMPLETE
+    isComplete: isFacilityInfoComplete
   },
   {
     id: 'manual-upload',
     labelKey: 'onboarding:steps.manualUpload',
     Component: lazyStep(() => import('./steps/manual-upload/ManualUploadStep')),
-    isComplete: TEMP_ALWAYS_COMPLETE
+    // Optional by design - the step's own copy invites uploading a partially completed
+    // form and finishing later, and ManualUploadStep has no useStepValidator gating Continue.
+    isComplete: () => true
   },
   {
     id: 'fhir',
     labelKey: 'onboarding:steps.fhir',
     Component: lazyStep(() => import('./steps/fhir/FhirStep')),
-    isComplete: TEMP_ALWAYS_COMPLETE
+    isComplete: isFhirComplete
   },
   {
     id: 'census',
@@ -124,7 +114,7 @@ export const STEPS: Step[] = [
     id: 'hsloc',
     labelKey: 'onboarding:steps.hsloc',
     Component: lazyStep(() => import('./steps/hsloc/HslocStep')),
-    isComplete: COMPLETION_PENDING_STORY
+    isComplete: isHslocComplete
   },
   {
     id: 'encounter',

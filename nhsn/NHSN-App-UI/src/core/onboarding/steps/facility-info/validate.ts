@@ -17,3 +17,7 @@ export function validateFacilityInfo(draft: FacilityDraft): FieldErrors {
 
   return errors;
 }
+
+export function isFacilityInfoComplete(draft: FacilityDraft): boolean {
+  return Object.keys(validateFacilityInfo(draft)).length === 0;
+}

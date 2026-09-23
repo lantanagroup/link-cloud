@@ -1,3 +1,6 @@
+import type {HslocMapping} from '../../../api/contracts';
+import type {FacilityDraft} from '../../types';
+
 export interface MappingRowValues {
   sourceDisplay: string;
   sourceCode: string;
@@ -51,4 +54,22 @@ export function findDuplicateSourceCodeIndexes(rows: MappingRowValues[]): number
   });
 
   return Array.from(duplicates).sort((a, b) => a - b);
+}
+
+function toRowValues(mapping: HslocMapping): MappingRowValues {
+  return {sourceDisplay: mapping.sourceDisplay ?? '', sourceCode: mapping.sourceCode, hslocCode: mapping.hslocCode};
+}
+
+/**
+ * Mirrors HslocStep.validateStep: at least one mapping, none left incomplete (a manual-upload
+ * import can land a row with an unresolved hslocCode - see ManualUploadStep), and no source code
+ * mapped twice.
+ */
+export function isHslocComplete(draft: FacilityDraft): boolean {
+  const mappings = draft.hsloc.mappings ?? [];
+  if (mappings.length === 0) {
+    return false;
+  }
+  const rows = mappings.map(toRowValues);
+  return rows.every(isRowComplete) && findDuplicateSourceCodeIndexes(rows).length === 0;
 }
