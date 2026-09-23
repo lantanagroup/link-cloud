@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 };
 
                 await _database.Operations.AddAsync(operation);
-                await _database.SaveChangesAsync();
+                await _database.SaveChangesAsync(cancellationToken);
 
                 await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
                 await UpdateVendorPresetsForOperation(operation.Id, model.VendorVersionIds, cancellationToken);
@@ -194,8 +194,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 operation.IsDisabled = model.IsDisabled;
                 operation.ModifyDate = DateTime.UtcNow;
 
-                await using var transaction = await _database.BeginTransactionAsync();
-                await _database.SaveChangesAsync();
+                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                await _database.SaveChangesAsync(cancellationToken);
                 await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorVersionIds, cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
@@ -250,7 +250,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 return;
             }
 
-            await using var transaction = await _database.BeginTransactionAsync();
+            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
             await SaveVendorPresetsAsync(operationId, vendorVersionIds, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -283,7 +283,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
             }
 
-            await _database.SaveChangesAsync();
+            await _database.SaveChangesAsync(cancellationToken);
             await InvalidateCachedSequencesAsync(operationId, cancellationToken);
         }
 
@@ -370,7 +370,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Request must include a valid facilityId or vendor");
             }
 
-            using var transaction = await _database.BeginTransactionAsync();
+            using var transaction = await _database.BeginTransactionAsync(cancellationToken);
 
             var modifiedRecords = 0;
             var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);
@@ -432,14 +432,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                             _database.Operations.Remove(op);
                         }
 
-                        await _database.SaveChangesAsync();
+                        await _database.SaveChangesAsync(cancellationToken);
                     }
 
                 } while (count > returned);
             }
             catch
             {
-                await transaction.RollbackAsync();
+                await transaction.RollbackAsync(cancellationToken);
                 throw;
             }
 
@@ -480,7 +480,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Each Operation ID can only occur once in a given sequence");
             }
 
-            await using var transaction = await _database.BeginTransactionAsync();
+            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
             var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);
 
             existing.ForEach(_database.OperationSequences.Remove);
@@ -506,7 +506,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 });
             }
 
-            await _database.SaveChangesAsync();
+            await _database.SaveChangesAsync(cancellationToken);
             await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -535,13 +535,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 sequences.ForEach(_database.OperationSequences.Remove);
                 if (_database.HasActiveTransaction)
                 {
-                    await _database.SaveChangesAsync();
+                    await _database.SaveChangesAsync(cancellationToken);
                     await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
                     return true;
                 }
 
-                await using var transaction = await _database.BeginTransactionAsync();
-                await _database.SaveChangesAsync();
+                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                await _database.SaveChangesAsync(cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return true;

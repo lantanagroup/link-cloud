@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.Normalization.Domain
     public interface IDatabase
     {
         Task SaveChangesAsync();
+        Task SaveChangesAsync(CancellationToken cancellationToken);
         IEntityRepository<Operation> Operations { get; set; }
         IEntityRepository<OperationSequence> OperationSequences { get; set; }
         IEntityRepository<ResourceType> ResourceTypes { get; set; }
@@ -15,6 +16,7 @@ namespace LantanaGroup.Link.Normalization.Domain
 
         bool HasActiveTransaction { get; }
         Task<IDbContextTransaction> BeginTransactionAsync();
+        Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
         Task RollbackTransactionAsync();
         Task CommitTransactionAsync();
     }
@@ -45,9 +47,14 @@ namespace LantanaGroup.Link.Normalization.Domain
 
         public bool HasActiveTransaction => _dbContext.Database.CurrentTransaction != null;
 
-        public async Task<IDbContextTransaction> BeginTransactionAsync()
+        public Task<IDbContextTransaction> BeginTransactionAsync()
         {
-            return await _dbContext.Database.BeginTransactionAsync();
+            return BeginTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+        {
+            return await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         }
 
         public async Task RollbackTransactionAsync()
@@ -60,9 +67,14 @@ namespace LantanaGroup.Link.Normalization.Domain
             await _dbContext.Database.CommitTransactionAsync();
         }
 
-        public async Task SaveChangesAsync()
+        public Task SaveChangesAsync()
         {
-            await _dbContext.SaveChangesAsync();
+            return SaveChangesAsync(CancellationToken.None);
+        }
+
+        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }
