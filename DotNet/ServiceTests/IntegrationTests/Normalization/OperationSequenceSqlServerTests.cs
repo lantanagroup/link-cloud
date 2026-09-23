@@ -72,11 +72,17 @@ public class OperationSequenceSqlServerTests
         {
             await Task.WhenAll(delete, replace).WaitAsync(TimeSpan.FromSeconds(40));
         }
+        catch (TimeoutException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             failure = ex;
         }
 
+        Assert.True(delete.IsCompleted);
+        Assert.True(replace.IsCompleted);
         Assert.False(ContainsDeadlock(failure), failure?.ToString());
         await using var check = _fixture.Open();
         var remaining = await check.Context.Operations.CountAsync(operation => operation.FacilityId == facilityId);
