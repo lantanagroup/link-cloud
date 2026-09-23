@@ -165,13 +165,14 @@ public static class OrgResourceMapProposalBuilder
             var satisfied = mapTypeKeys.Count(mapKey => MapTypeKeySatisfied(mapKey, rawTypeKeys, rawLocations));
             if (satisfied == 0)
             {
-                if (neededIdentifiers.Count == 0)
-                    continue;
-
+                // The upload has type codes this map does not match. Extending adds those
+                // codes. An upload with no identifiers and no type codes is omitted above.
                 results.Add(ToCandidate(
                     template,
                     score: 0,
-                    "This map matches Location.type codes that are not on the uploaded Locations. Acquisition will not see codes cleanup adds later. Extending adds identifier conditions from the raw Locations.",
+                    neededIdentifiers.Count == 0
+                        ? "This map matches Location.type codes that are not on the uploaded Locations. Extending adds the type codes already present on the upload."
+                        : "This map matches Location.type codes that are not on the uploaded Locations. Acquisition will not see codes cleanup adds later. Extending adds identifier conditions from the raw Locations.",
                     forceExtend: true));
                 continue;
             }

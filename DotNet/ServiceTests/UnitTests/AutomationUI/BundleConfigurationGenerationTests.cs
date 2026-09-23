@@ -409,6 +409,37 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_offers_extend_when_a_type_only_map_matches_no_uploaded_code()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Step down 1099-1",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1')"
+                }
+            ]
+        };
+        var upload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1027-2" }]
+        };
+        var extend = OrgResourceMapProposalBuilder.Build(upload, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id).Subject;
+        extend.Recommendation.Should().Be("Extend");
+        extend.Score.Should().Be(0);
+
+        var noShape = new BundleConfigFingerprint { LocationCount = 1 };
+        OrgResourceMapProposalBuilder.Build(noShape, [map]).Reuse
+            .Should().NotContain(r => r.Id == map.Id);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_let_a_subsumed_code_lower_a_system_level_type_map()
     {
         const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
