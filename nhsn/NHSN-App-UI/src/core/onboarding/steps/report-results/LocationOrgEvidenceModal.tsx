@@ -1,9 +1,10 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PatientMappingEvidence } from '../../../api/contracts';
-import { Button, Modal, MessageContainer, NHSNLoadingIndicator } from '../../../fields';
+import { Button, Modal, MessageContainer } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
 import { METHOD_LABEL_KEYS } from '../location-org/LocationOrgStep';
+import { AsyncStatus } from './AsyncStatus';
 import { locationOrgConfigInfo, type PatientStatusRow } from './patientRows';
 
 export interface LocationOrgEvidenceModalProps {
@@ -119,15 +120,7 @@ export function LocationOrgEvidenceModal({
         'onboarding:reportResults.detail.mappingEvidence.locationEvidenceHeading',
       )}
     </h3>
-    <p className="nhsn-link__visually-hidden" role="alert">
-      {!loading ? error : null}
-    </p>
-    {loading && <NHSNLoadingIndicator />}
-    {!loading && error && (
-      <MessageContainer type="error" showIcon>
-        <span>{error}</span>
-      </MessageContainer>
-    )}
+    <AsyncStatus loading={loading} error={error} />
     {!loading &&
       !error &&
       evidence &&

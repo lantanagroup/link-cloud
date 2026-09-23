@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '../../../fields';
 import { DownloadIcon } from './icons';
-import { describePieSlice } from './pieChart';
+import { buildPieSlices } from './pieChart';
 import { buildResourceBreakdown, type PatientStatusRow } from './patientRows';
 import { STATUS_PILL_CLASS_BY_KEY } from './reportStatus';
 
@@ -34,19 +34,7 @@ export function PatientDetailModal({
   const resourceBreakdown = patientRow
     ? buildResourceBreakdown(patientRow.resourceCountsByType)
     : [];
-  let resourceSliceStart = 0;
-  const resourcePieSlices = resourceBreakdown.map((slice) => {
-    const sweep = (slice.percent / 100) * 360;
-    const path = describePieSlice(
-      60,
-      60,
-      60,
-      resourceSliceStart,
-      resourceSliceStart + sweep,
-    );
-    resourceSliceStart += sweep;
-    return { ...slice, path };
-  });
+  const resourcePieSlices = buildPieSlices(resourceBreakdown, 60);
 
   return (
   <Modal

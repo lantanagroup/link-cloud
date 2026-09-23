@@ -37,7 +37,7 @@ import { useStableCallback, useStepChrome } from '../../StepChrome';
 import { decodeTarget } from '../encounter/EncounterStep';
 import { formatDate, formatDateTime } from './format';
 import { ChartIcon, DownloadIcon, RefreshIcon } from './icons';
-import { describePieSlice } from './pieChart';
+import { buildPieSlices } from './pieChart';
 import { patientsForDqm, toPatientRows, type PatientStatusRow } from './patientRows';
 import { parseQueryPlan } from './queryPlan';
 import { buildXlsxBlob, downloadBlob, type XlsxSheet } from './reportExport';
@@ -501,13 +501,7 @@ export function ReportDetailView() {
   const mappingEvidencePatientRow =
     patientRows.find((row) => row.patientId === mappingEvidencePatientId) ??
     null;
-  let sliceStart = 0;
-  const pieSlices = statusBreakdown.map((slice) => {
-    const sweep = (slice.percent / 100) * 360;
-    const path = describePieSlice(60, 60, 60, sliceStart, sliceStart + sweep);
-    sliceStart += sweep;
-    return { ...slice, path };
-  });
+  const pieSlices = buildPieSlices(statusBreakdown, 60);
 
   return (
     <>
