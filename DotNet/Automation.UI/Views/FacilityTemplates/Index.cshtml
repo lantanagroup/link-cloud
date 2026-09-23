@@ -240,6 +240,11 @@
     document.getElementById('facilityBackdrop').addEventListener('click', hide);
     document.getElementById('facilitySave').addEventListener('click', async function () {
         errors.style.display = 'none';
+        if (!document.getElementById('facilityQueryPlan').value) {
+            errors.textContent = 'A facility template needs a query plan.';
+            errors.style.display = '';
+            return;
+        }
         if (document.getElementById('facilityOrgMapping').checked && !document.getElementById('facilityOrm').value) {
             errors.textContent = 'Organization location mapping is on, so an organization resource map is required.';
             errors.style.display = '';

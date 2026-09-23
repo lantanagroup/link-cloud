@@ -2011,11 +2011,11 @@ internal sealed class RunExecutor
         if (conditions.Count == 0)
             throw new InvalidOperationException($"Organization resource map template '{template.Name}' has no valid conditions.");
 
-        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
-        if (existing.IsSuccessStatusCode && existing.Body != null)
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count > 0)
         {
             var normalizedTemplate = string.Join("\n", conditions.Select(c => $"{c.Priority}:{c.FhirPath}"));
-            var hasMatchingActive = existing.Body.Any(cfg =>
+            var hasMatchingActive = existing.Any(cfg =>
                 cfg.IsActive
                 && string.Join("\n", cfg.Conditions.OrderBy(c => c.Priority).Select(c => $"{c.Priority}:{c.FhirPath}")) == normalizedTemplate);
 
@@ -2051,8 +2051,8 @@ internal sealed class RunExecutor
         string facilityId,
         CancellationToken cancellationToken)
     {
-        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
-        if (!existing.IsSuccessStatusCode || existing.Body is not { Count: > 0 })
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count == 0)
         {
             output.WriteLine($"No organization location configuration to clear for facility '{facilityId}'.");
             return;
@@ -2065,7 +2065,26 @@ internal sealed class RunExecutor
                 $"Failed to clear organization location configuration for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
         }
 
-        output.WriteLine($"Cleared {existing.Body.Count} organization location configuration(s) for facility '{facilityId}'.");
+        output.WriteLine($"Cleared {existing.Count} organization location configuration(s) for facility '{facilityId}'.");
+    }
+
+    /// <summary>
+    /// A failed read is not an empty configuration. Treating it as empty leaves the previous
+    /// mapping in place while the run applies a different template.
+    /// </summary>
+    private static async Task<List<OrganizationLocationConfigurationApiModel>> ReadOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!existing.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read organization location configuration for facility '{facilityId}'. HTTP {existing.StatusCode}: {existing.RawBody ?? "(no body)"}");
+        }
+
+        return existing.Body ?? [];
     }
 
     private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
@@ -2394,25 +2413,26 @@ internal sealed class RunExecutor
             if (existingOperations.Count > 0)
             {
                 var deletedOps = await normalizationClient.DeleteFacilityOperationsAsync(facilityId, cancellationToken);
-                if (!deletedOps.IsSuccessStatusCode)
+                if (!IsSuccessOrMissing(deletedOps))
                 {
                     throw new InvalidOperationException(
                         $"Failed to clear normalization operations for facility '{facilityId}'. HTTP {deletedOps.StatusCode}: {deletedOps.RawBody ?? "(no body)"}");
                 }
-
-                var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
-                if (!deletedSequences.IsSuccessStatusCode)
-                {
-                    throw new InvalidOperationException(
-                        $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
-                }
-
-                output.WriteLine($"Cleared {existingOperations.Count} normalization operation(s) for facility '{facilityId}' because the suite has none.");
             }
-            else
+
+            // Deleting the operations already removes their sequences, so this delete is often a 404.
+            // A facility can also have sequences and no operations. Either way, nothing left is success.
+            var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
+            if (!IsSuccessOrMissing(deletedSequences))
             {
-                output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+                throw new InvalidOperationException(
+                    $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
             }
+
+            if (existingOperations.Count == 0 && deletedSequences.StatusCode == 404)
+                output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            else
+                output.WriteLine($"Cleared normalization configuration for facility '{facilityId}' because the suite has none.");
 
             return new NormalizationFacilitySetup(resolution, runtimeSequences);
         }
@@ -2516,6 +2536,18 @@ internal sealed class RunExecutor
 
         }
 
+        foreach (var leftover in existingPoolByKey.SelectMany(pair => pair.Value))
+        {
+            var deleted = await normalizationClient.DeleteFacilityOperationAsync(facilityId, leftover.Id, cancellationToken);
+            if (!IsSuccessOrMissing(deleted))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to remove normalization operation '{leftover.Name}' ({leftover.OperationType}) for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+            }
+
+            output.WriteLine($"  Removed operation that is not in suite '{resolution.SuiteName}': {leftover.Name} ({leftover.OperationType})");
+        }
+
         // Create sequences per resource type.
         // We need to get operations back from the API since the create response may not give IDs directly.
         // Instead, re-search to find newly created ops and build sequences.
@@ -2590,4 +2622,10 @@ internal sealed class RunExecutor
 
         return new NormalizationFacilitySetup(resolution, runtimeSequences);
     }
+
+    /// <summary>
+    /// Normalization returns 404 when the facility already has nothing to delete.
+    /// </summary>
+    private static bool IsSuccessOrMissing(LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse response) =>
+        response.IsSuccessStatusCode || response.StatusCode == 404;
 }

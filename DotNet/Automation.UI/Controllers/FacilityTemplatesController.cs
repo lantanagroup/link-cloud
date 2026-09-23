@@ -48,6 +48,9 @@ public class FacilityTemplatesController(
             .Distinct()
             .ToList();
 
+        if (!model.QueryPlanTemplateId.HasValue)
+            return BadRequest("A facility template needs a query plan.");
+
         if (model.EnableOrganizationLocationMapping && !model.OrganizationResourceMapTemplateId.HasValue)
             return BadRequest("Organization location mapping is on, so an organization resource map is required.");
 
