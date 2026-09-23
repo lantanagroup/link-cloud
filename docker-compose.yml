@@ -722,7 +722,7 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
       Redis__Password: ${REDIS_PASS}
-      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
+      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-false}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
