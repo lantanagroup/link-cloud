@@ -809,18 +809,23 @@ public static class FacilitySetupHelper
             SupplementalQueries = jBody["SupplementalQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>()
         };
 
+        // Plans are keyed by facility and type. A reused NHSN facility would otherwise keep
+        // the plan from the previous run, including its EHR description.
+        var deleted = await dataAcqClient.DeleteQueryPlanAsync(facilityId, type);
+        if (!deleted.IsSuccessStatusCode && deleted.StatusCode != (int)HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException(
+                $"Failed to replace {type} query plan for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+        }
+
         var createdPlan = await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
         if (!createdPlan.IsSuccessStatusCode)
         {
-            if (createdPlan.StatusCode == (int)HttpStatusCode.Conflict)
-            {
-                output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
-                return;
-            }
-
             throw new InvalidOperationException(
                 $"Failed to create {type} query plan for facility '{facilityId}'. HTTP {createdPlan.StatusCode}: {createdPlan.RawBody ?? "(no body)"}");
         }
+
+        output.WriteLine($"Replaced {type} query plan for facility '{facilityId}'.");
     }
 
     public static async Task EnsureEmptyDmrpFacilityAsync(

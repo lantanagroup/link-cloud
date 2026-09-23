@@ -3,6 +3,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -391,6 +392,46 @@ public class FacilitySetupHelperTests
         Assert.Empty(_created);
         Assert.Empty(_updated);
         _dmrpClient.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Replaces_an_existing_query_plan_instead_of_keeping_it()
+    {
+        var createdTypes = new List<string>();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 204 });
+        dataAcq.Setup(d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, CreateQueryPlanRequestApiModel plan, CancellationToken _) =>
+            {
+                createdTypes.Add(plan.Type ?? "");
+                return new LinkApiResponse { StatusCode = 201 };
+            });
+
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner");
+
+        Assert.Equal(["Discharge", "Daily", "Monthly"], createdTypes);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Discharge", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Daily", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Monthly", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Does_not_create_a_query_plan_when_the_old_plan_cannot_be_deleted()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 500, RawBody = "down" });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureQueryPlansAsync(
+                dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner"));
+
+        Assert.Contains("Failed to replace", exception.Message);
+        dataAcq.Verify(
+            d => d.CreateQueryPlanAsync(It.IsAny<string>(), It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     private Task EnsureFacilityAsync() =>

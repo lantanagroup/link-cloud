@@ -36,6 +36,7 @@ public class FacilitySetupGateTests
         releaseFirst.SetResult();
         await Task.WhenAll(first, second);
         Assert.Equal(2, Volatile.Read(ref entered));
+        Assert.False(FacilitySetupGate.IsTracking(facilityId));
     }
 
     [Fact]

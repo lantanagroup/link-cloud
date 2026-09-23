@@ -2362,6 +2362,11 @@
                 valid = false;
             }
 
+            if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
+                markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
+                valid = false;
+            }
+
             if (model.enableDmrp && !(model.nhsnOrganizationId || '').trim()) {
                 markFieldError(
                     'NhsnOrganizationId',

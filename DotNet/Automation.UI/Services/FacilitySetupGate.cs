@@ -9,31 +9,82 @@ namespace Automation.UI.Services;
 /// </summary>
 internal static class FacilitySetupGate
 {
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Entry> Gates = new(StringComparer.OrdinalIgnoreCase);
+
+    internal static bool IsTracking(string facilityId) => Gates.ContainsKey(facilityId);
 
     public static async Task<IDisposable> AcquireAsync(
         string facilityId,
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        var gate = Gates.GetOrAdd(facilityId, static _ => new SemaphoreSlim(1, 1));
-        if (!await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        while (true)
         {
-            log($"Facility '{facilityId}' setup is already running. Waiting for that run to finish.");
-            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
+            var entry = Gates.GetOrAdd(facilityId, static _ => new Entry());
+            var counted = false;
+            lock (entry)
+            {
+                if (Gates.TryGetValue(facilityId, out var current) && ReferenceEquals(current, entry))
+                {
+                    entry.Refs++;
+                    counted = true;
+                }
+            }
 
-        return new Release(gate);
+            if (!counted)
+                continue;
+
+            var acquired = false;
+            try
+            {
+                if (!await entry.Gate.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+                {
+                    log($"Facility '{facilityId}' setup is already running. Waiting for that run to finish.");
+                    await entry.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                acquired = true;
+                return new Release(facilityId, entry);
+            }
+            catch
+            {
+                if (!acquired)
+                    ReleaseRef(facilityId, entry);
+                throw;
+            }
+        }
     }
 
-    private sealed class Release(SemaphoreSlim gate) : IDisposable
+    private static void ReleaseRef(string facilityId, Entry entry)
+    {
+        lock (entry)
+        {
+            entry.Refs--;
+            if (entry.Refs != 0)
+                return;
+
+            if (Gates.TryRemove(new KeyValuePair<string, Entry>(facilityId, entry)))
+                entry.Gate.Dispose();
+        }
+    }
+
+    private sealed class Entry
+    {
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public int Refs;
+    }
+
+    private sealed class Release(string facilityId, Entry entry) : IDisposable
     {
         private int _released;
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _released, 1) == 0)
-                gate.Release();
+            if (Interlocked.Exchange(ref _released, 1) != 0)
+                return;
+
+            entry.Gate.Release();
+            ReleaseRef(facilityId, entry);
         }
     }
 }

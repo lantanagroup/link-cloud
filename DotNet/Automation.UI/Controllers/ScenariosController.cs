@@ -92,6 +92,8 @@ public class ScenariosController(
         {
             model.FacilityTemplateId = null;
             model.VendorName = string.IsNullOrWhiteSpace(model.VendorName) ? null : model.VendorName.Trim();
+            if (!model.QueryPlanTemplateId.HasValue)
+                return BadRequest("Ala carte needs a query plan.");
         }
 
         foreach (var cohort in model.PatientCohorts)
