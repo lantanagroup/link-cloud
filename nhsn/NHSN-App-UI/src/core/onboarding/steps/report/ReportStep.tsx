@@ -84,8 +84,27 @@ export function ReportStep({onNext, onBack}: StepProps) {
     setErrors(validateReport(draftForValidation()));
   }
 
+  // True when the sole problem is a duplicate patient id and every other field is
+  // complete. Distinguishes "you left something blank" from "everything's filled in,
+  // but two rows match" so the two cases never announce contradictory messages at once.
+  function isOnlyPatientIdsDuplicate(errs: FieldErrors): boolean {
+    const keys = Object.keys(errs);
+    return keys.length === 1 && errs.patientIds === 'onboarding:report.errors.patientIdsDuplicate';
+  }
+
   function fieldError(field: string): string | undefined {
-    return touched[field] && errors[field] ? t(errors[field]) : undefined;
+    if (!touched[field] || !errors[field]) {
+      return undefined;
+    }
+    // The duplicate-id message is rendered once, inside PatientSelection. Outside the
+    // duplicate-only case, either patientIds is missing entirely (the step banner's
+    // "complete all fields" already says so) or another field is also incomplete (which
+    // takes priority) -- either way, showing it here too would stack a second message
+    // about the same row.
+    if (field === 'patientIds' && !isOnlyPatientIdsDuplicate(errors)) {
+      return undefined;
+    }
+    return t(errors[field]);
   }
 
   function announceValidationMessage(message: string) {
@@ -97,12 +116,19 @@ export function ReportStep({onNext, onBack}: StepProps) {
     setTouched({measures: true, startDate: true, endDate: true, patientIds: true});
     const nextErrors = validateReport(draftForValidation());
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) {
-      announceValidationMessage(t('onboarding:report.messages.incomplete'));
-      return false;
+    if (Object.keys(nextErrors).length === 0) {
+      setValidationError(null);
+      return true;
     }
-    setValidationError(null);
-    return true;
+    // A duplicate id with everything else complete gets its own message from
+    // PatientSelection -- the generic banner would be both redundant and wrong (nothing
+    // is actually incomplete).
+    if (isOnlyPatientIdsDuplicate(nextErrors)) {
+      setValidationError(null);
+    } else {
+      announceValidationMessage(t('onboarding:report.messages.incomplete'));
+    }
+    return false;
   }
 
   async function handleGenerate() {
@@ -257,6 +283,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
             patientIds={report.patientIds ?? []}
             disabled={requesting}
             error={fieldError('patientIds')}
+            showEmptyRowErrors={touched.patientIds}
             onChange={next => {
               patch('report', {patientIds: next});
               clearFieldError('patientIds');

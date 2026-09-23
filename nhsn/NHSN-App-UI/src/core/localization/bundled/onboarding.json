@@ -416,7 +416,8 @@
       "targetCodeLabel": "CPT or SNOMED code",
       "targetCodePlaceholder": "Search CPT or SNOMED code…",
       "targetCodeNoMatches": "No matching codes.",
-      "incompleteRowHint": "This mapping is missing a local code or a CPT/SNOMED code."
+      "incompleteRowHint": "This mapping is missing a local code or a CPT/SNOMED code.",
+      "duplicateCodeSystemHint": "This code system is already used by another group above (or both are blank) — their mappings will not save separately."
     },
     "reference": {
       "searchLabel": "Search reference codes",
@@ -440,7 +441,9 @@
     },
     "messages": {
       "loadError": "Unable to load encounter mapping data.",
-      "saveError": "Unable to save encounter mappings."
+      "saveError": "Unable to save encounter mappings.",
+      "incomplete": "Please complete all fields before continuing.",
+      "missingCodeSystemHint": "An Encounter.type Code System is required for this group's mappings."
     }
   },
   "report": {
@@ -477,7 +480,9 @@
       "startDateRequired": "A report start date is required.",
       "endDateRequired": "A report end date is required.",
       "endBeforeStart": "The report end date cannot precede the start date.",
-      "patientIdsRequired": "Add at least one FHIR Patient ID."
+      "patientIdsRequired": "Add at least one FHIR Patient ID.",
+      "patientIdsIncomplete": "Complete or remove blank FHIR Patient ID fields before continuing.",
+      "patientIdsDuplicate": "Remove duplicate FHIR Patient IDs before continuing."
     },
     "patients": {
       "label": "FHIR Patient ID(s)",
@@ -493,7 +498,9 @@
         "inputLabel": "FHIR Patient Id",
         "placeholder": "FHIR Patient ID",
         "add": "+ Add Patient ID",
-        "empty": "None added yet."
+        "empty": "None added yet.",
+        "requiredError": "This field cannot be empty.",
+        "duplicateError": "This FHIR Patient ID has already been added."
       },
       "csv": {
         "hint": "Upload a CSV file of FHIR Patient IDs to add to the list. Download the template below for the expected format.",

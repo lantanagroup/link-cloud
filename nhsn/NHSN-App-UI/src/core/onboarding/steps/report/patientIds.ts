@@ -49,3 +49,30 @@ export function addPatientIds(current: readonly string[], incoming: readonly str
 export function isAtPatientIdLimit(ids: readonly string[] | undefined): boolean {
   return (ids?.length ?? 0) >= PATIENT_ID_LIMIT;
 }
+
+/**
+ * Indexes of rows whose trimmed id repeats an earlier row's - the repeat only, not the row it
+ * repeats, since that first occurrence is the one the user presumably meant to keep. Blank rows
+ * (a row mid-edit) never collide with each other.
+ *
+ * `addPatientIds` already keeps the three non-manual tabs duplicate-free on the way in; this
+ * covers Manual Entry, where a row is typed directly rather than added through that path.
+ */
+export function findDuplicatePatientIdIndexes(ids: readonly string[]): number[] {
+  const seenIds = new Set<string>();
+  const duplicates: number[] = [];
+
+  ids.forEach((raw, index) => {
+    const id = raw.trim();
+    if (!id) {
+      return;
+    }
+    if (seenIds.has(id)) {
+      duplicates.push(index);
+      return;
+    }
+    seenIds.add(id);
+  });
+
+  return duplicates;
+}
