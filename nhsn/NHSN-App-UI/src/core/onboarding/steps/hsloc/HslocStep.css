@@ -248,3 +248,9 @@
     }
   }
 }
+
+/* The mapping tab opens straight on the list's column headings - nothing else sits between them
+   and the tab row - so this keeps the two from butting up against each other. */
+.nhsn-link__hsloc-mapping {
+  margin-top: 16px;
+}

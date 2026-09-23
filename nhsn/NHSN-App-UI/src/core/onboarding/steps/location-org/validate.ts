@@ -22,3 +22,36 @@ export function findIncompleteLocationIdentifierIndexes(rows: LocationIdentifier
   });
   return incomplete;
 }
+
+/** Indexes of every row whose values repeat an earlier row's (case-insensitive, trimmed). The
+ *  first occurrence is left unflagged - it's the repeats that need removing. A row with any blank
+ *  value is skipped; that's a required-field problem, not a duplicate. */
+function findDuplicateIndexes<T>(rows: T[], values: (row: T) => string[]): number[] {
+  const seen = new Set<string>();
+  const duplicates: number[] = [];
+  rows.forEach((row, index) => {
+    const parts = values(row).map(value => value.trim().toLowerCase());
+    if (parts.some(part => !part)) {
+      return;
+    }
+    const key = JSON.stringify(parts);
+    if (seen.has(key)) {
+      duplicates.push(index);
+    } else {
+      seen.add(key);
+    }
+  });
+  return duplicates;
+}
+
+export function findDuplicateManagingOrgIndexes(ids: string[]): number[] {
+  return findDuplicateIndexes(ids, id => [id]);
+}
+
+export function findDuplicateLocationTypeIndexes(rows: LocationTypeEntry[]): number[] {
+  return findDuplicateIndexes(rows, row => [row.code, row.alias]);
+}
+
+export function findDuplicateLocationIdentifierIndexes(rows: LocationIdentifierEntry[]): number[] {
+  return findDuplicateIndexes(rows, row => [row.system, row.code]);
+}

@@ -862,7 +862,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                   onBlur={() => refreshFieldError("sftpPort")}
                 />
 
-                <div className="census-triplet">
+                <div className="census-triplet census-triplet--full">
                   <TextField
                     id="census-sftp-username"
                     label={t("onboarding:census.cerner.fields.usernameLabel")}

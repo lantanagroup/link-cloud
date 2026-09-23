@@ -282,6 +282,8 @@
       "searchTitle": "{{vendor}} Site Locations",
       "searching": "Searching for Site locations…",
       "noCandidates": "No Site locations were returned.",
+      "allCandidatesAdded": "All Site locations have already been added.",
+      "selectAll": "Select all Site locations",
       "addSelected": "Add",
       "listLabel": "Location Type Code / Location Alias",
       "codeLabel": "Location Type Code",
@@ -300,7 +302,9 @@
       "downloadPdf": "Download PDF Instructions",
       "listLabel": "Location Identifier System / Location Identifier Code",
       "systemLabel": "Location Identifier System",
+      "systemPlaceholder": "location.identifier.system",
       "codeLabel": "Location Identifier Code",
+      "codePlaceholder": "location.identifier.code",
       "add": "+ Add Location Identifier",
       "tooltip": "Add the identifier system and code that uniquely identify your facility's Location resource in the FHIR data."
     },
@@ -316,7 +320,13 @@
     },
     "errors": {
       "rowIncomplete": "This field is required.",
-      "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing."
+      "fieldRequiredError": "{{field}} is required.",
+      "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
+      "listEmpty": "At least one entry is required before continuing.",
+      "duplicateManagingOrg": "This Managing Organization has already been added.",
+      "duplicateLocationType": "This Location Type has already been added.",
+      "duplicateLocationIdentifier": "This Location Identifier has already been added.",
+      "duplicateRows": "Each entry must be unique - remove or change any repeated entries before continuing."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },
@@ -334,11 +344,14 @@
       "emptyState": "None added yet.",
       "addButton": "+ Add Mapping",
       "fields": {
-        "yourCodePlaceholder": "Your Code",
-        "yourCodeAriaLabel": "Your Code",
+        "yourCodePlaceholder": "Your (local) code",
+        "yourCodeAriaLabel": "Your (local) code",
         "locationValueFallback": "Location value",
         "hslocCodePlaceholder": "Select an HSLOC code…",
+        "hslocCodeHeading": "HSLOC Code",
         "requiredError": "This field is required.",
+        "fieldRequiredError": "{{field}} is required.",
+        "hslocCodeRequiredError": "Please select an HSLOC code for this location.",
         "duplicateError": "This location code is already mapped in another row."
       }
     },

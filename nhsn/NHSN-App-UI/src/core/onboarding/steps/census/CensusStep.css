@@ -226,6 +226,10 @@
   flex: 1;
 }
 
+.census-poi .census-triplet--full {
+  max-width: none;
+}
+
 .census-poi .census-field-label {
   display: block;
   font-size: 13.5px;
