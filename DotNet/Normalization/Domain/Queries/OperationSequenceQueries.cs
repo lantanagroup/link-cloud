@@ -17,6 +17,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task ClearCache(OperationSequenceSearchModel model, CancellationToken cancellationToken = default);
         Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
         Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
+        Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     }
 
@@ -138,10 +139,25 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
         public async Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default)
         {
-            foreach (var facilityId in facilityIds.Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal))
+            foreach (var facilityId in facilityIds.Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal))
             {
                 await InvalidateFacilityAsync(facilityId, cancellationToken);
             }
+        }
+
+        public async Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default)
+        {
+            // InMemory has no row locks. On SQL Server and SQLite this update keeps an exclusive lock
+            // on the operation until the caller's transaction commits, so a sequence write cannot land
+            // between the facility snapshot and the revision bump.
+            if (!_dbContext.Database.IsRelational())
+            {
+                return;
+            }
+
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Operation SET ModifyDate = ModifyDate WHERE Id = {operationId}",
+                cancellationToken);
         }
 
         public Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default)

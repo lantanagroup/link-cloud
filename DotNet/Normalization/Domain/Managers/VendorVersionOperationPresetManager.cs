@@ -54,6 +54,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
         });
 
         await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+        await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
         await _database.SaveChangesAsync(cancellationToken);
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
             await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken),
@@ -89,6 +90,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
         _database.VendorVersionOperationPresets.Remove(preset);
         await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+        await _operationSequenceQueries.LockOperationAsync(operationResourceType.OperationId, cancellationToken);
         await _database.SaveChangesAsync(cancellationToken);
         await _operationSequenceQueries.InvalidateFacilitiesAsync(
             await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operationResourceType.OperationId, cancellationToken),
