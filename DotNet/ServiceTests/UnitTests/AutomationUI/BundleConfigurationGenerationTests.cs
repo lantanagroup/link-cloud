@@ -1121,6 +1121,59 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_unescapes_identifier_and_type_literals()
+    {
+        const string system = "http://t";
+        var identifierMap = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Slashed identifier",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = '" + system + @"' and value = 'A\\B').exists()"
+                }
+            ]
+        };
+        var identifierUpload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = system, Value = @"A\B" }]
+        };
+        OrgResourceMapProposalBuilder.Build(identifierUpload, [identifierMap]).Reuse
+            .Should().ContainSingle(r => r.Id == identifierMap.Id && r.Recommendation == "Reuse");
+
+        var doubled = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = system, Value = @"A\\B" }]
+        };
+        OrgResourceMapProposalBuilder.Build(doubled, [identifierMap]).Reuse
+            .Should().NotContain(r => r.Id == identifierMap.Id && r.Recommendation == "Reuse");
+
+        var typeMap = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Slashed code",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.type.coding.exists(system = '" + system + @"' and code = 'A\\B')"
+                }
+            ]
+        };
+        var typeUpload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = system, Code = @"A\B" }]
+        };
+        OrgResourceMapProposalBuilder.Build(typeUpload, [typeMap]).Reuse
+            .Should().ContainSingle(r => r.Id == typeMap.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Normalization_builder_emits_one_of_each_supported_type_when_data_allows()
     {
         var fp = new BundleConfigFingerprint

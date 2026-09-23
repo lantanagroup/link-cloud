@@ -278,10 +278,12 @@ public static class OrgResourceMapProposalBuilder
             {
                 // A value-specific condition must not count as covering every Location
                 // that merely shares the identifier system.
-                if (id.Groups[2].Success && !string.IsNullOrWhiteSpace(id.Groups[2].Value))
-                    yield return IdKey(id.Groups[1].Value, id.Groups[2].Value);
+                var idSystem = UnescapeFhirPathLiteral(id.Groups[1].Value);
+                var idValue = id.Groups[2].Success ? UnescapeFhirPathLiteral(id.Groups[2].Value) : "";
+                if (idValue.Length > 0 && !string.IsNullOrWhiteSpace(idValue))
+                    yield return IdKey(idSystem, idValue);
                 else
-                    yield return IdSysKey(id.Groups[1].Value);
+                    yield return IdSysKey(idSystem);
                 continue;
             }
 
@@ -293,11 +295,11 @@ public static class OrgResourceMapProposalBuilder
                 // many HSLOC codes; treating the first as system-wide skipped the rest
                 // and left most Locations out-of-org. An alias predicate is part of the
                 // same condition, so the type code alone must not satisfy it.
-                // Alias equality is the unescaped literal, including surrounding spaces.
+                // System, code, value, and alias equality use the unescaped literal.
                 var alias = type.Groups[3].Success ? UnescapeFhirPathLiteral(type.Groups[3].Value) : "";
                 var hasAlias = alias.Length > 0;
-                var system = type.Groups[1].Value;
-                var code = type.Groups[2].Success ? type.Groups[2].Value : "";
+                var system = UnescapeFhirPathLiteral(type.Groups[1].Value);
+                var code = type.Groups[2].Success ? UnescapeFhirPathLiteral(type.Groups[2].Value) : "";
                 if (code.Length > 0 && !string.IsNullOrWhiteSpace(code))
                 {
                     yield return hasAlias
