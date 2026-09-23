@@ -14,6 +14,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<OperationModel> Get(Guid id, string? facilityId = null, CancellationToken cancellationToken = default);
         Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default, bool hydrateVendors = true);
+        Task<List<Guid>> MatchingIds(OperationSearchModel model, CancellationToken cancellationToken = default);
     }
 
     public class OperationQueries : IOperationQueries
@@ -161,6 +162,47 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 Records = records,
                 Metadata = new PaginationMetadata(pageSize, pageNumber, count)
             };
+        }
+
+        public Task<List<Guid>> MatchingIds(OperationSearchModel model, CancellationToken cancellationToken = default)
+        {
+            var query = _dbContext.Operations.AsQueryable();
+            if (!string.IsNullOrEmpty(model.FacilityId) && model.VendorVersionId != null)
+            {
+                query = query.Where(operation => operation.FacilityId == model.FacilityId
+                    || operation.OperationResourceTypes.Any(map => map.VendorVersionOperationPresets.Any(preset => preset.VendorVersionId == model.VendorVersionId)));
+            }
+            else if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                query = query.Where(operation => operation.FacilityId == model.FacilityId);
+            }
+            else if (model.VendorVersionId.HasValue)
+            {
+                query = query.Where(operation => operation.OperationResourceTypes.Any(map => map.VendorVersionOperationPresets.Any(preset => preset.VendorVersionId == model.VendorVersionId)));
+            }
+
+            if (model.OperationId.HasValue)
+            {
+                query = query.Where(operation => operation.Id == model.OperationId);
+            }
+
+            if (!string.IsNullOrEmpty(model.ResourceType))
+            {
+                query = query.Where(operation => operation.OperationResourceTypes.Any(map => map.ResourceType.Name == model.ResourceType));
+            }
+
+            if (!model.IncludeDisabled)
+            {
+                query = query.Where(operation => !operation.IsDisabled);
+            }
+
+            if (model.OperationType.HasValue)
+            {
+                var operationType = model.OperationType.ToString();
+                query = query.Where(operation => operation.OperationType == operationType);
+            }
+
+            return query.Select(operation => operation.Id).ToListAsync(cancellationToken);
         }
 
         private async Task HydrateVendorVersionsAsync(IEnumerable<OperationModel> operations, CancellationToken cancellationToken)

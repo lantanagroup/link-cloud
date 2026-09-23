@@ -480,21 +480,16 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 }
 
-                // One query, not offset pages. A concurrent vendor delete can commit between
-                // page 1 and page 2 and shift the remaining rows, so a later page would skip them.
-                var operations = await _operationQueries.Search(new OperationSearchModel()
+                // One id query, not offset pages and not full operation graphs. A concurrent
+                // vendor delete can commit between pages and shift the remaining rows.
+                var operationIds = await _operationQueries.MatchingIds(new OperationSearchModel()
                 {
                     FacilityId = model.FacilityId,
                     VendorVersionId = model.VendorVersionId,
                     OperationId = model.OperationId,
                     ResourceType = model.ResourceType,
-                    IncludeDisabled = true,
-                    SortBy = "Id",
-                    SortOrder = SortOrder.Ascending,
-                    PageNumber = 1,
-                    PageSize = int.MaxValue
-                }, cancellationToken, hydrateVendors: false);
-                var operationIds = operations?.Records.Select(record => record.Id) ?? Enumerable.Empty<Guid>();
+                    IncludeDisabled = true
+                }, cancellationToken);
 
                 // SQL Server uniqueidentifier order is not .NET Guid order. Sequence writes sort
                 // every id with GuidComparer, so the delete must lock in that same order.
