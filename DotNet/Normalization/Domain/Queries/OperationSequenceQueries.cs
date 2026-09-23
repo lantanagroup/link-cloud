@@ -18,6 +18,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
         Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
         Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
+        Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     }
 
@@ -158,6 +159,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             await _dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"UPDATE Operation SET ModifyDate = ModifyDate WHERE Id = {operationId}",
                 cancellationToken);
+        }
+
+        public async Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default)
+        {
+            var query = _dbContext.OperationSequences.AsNoTracking().Where(sequence => sequence.FacilityId == facilityId);
+            if (!string.IsNullOrEmpty(resourceType))
+            {
+                query = query.Where(sequence => sequence.OperationResourceType.ResourceType.Name == resourceType);
+            }
+
+            return await query.Select(sequence => sequence.OperationResourceType.OperationId).Distinct().OrderBy(id => id).ToListAsync(cancellationToken);
         }
 
         public Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default)

@@ -129,6 +129,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     throw new Exception("An operation must either be configured with a FacilityID or one or more Vendor Version IDs, but not both.");
                 }
 
+                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                await _operationSequenceQueries.LockOperationAsync(model.Id, cancellationToken);
+
                 #region Lookup the Detailed Operation Model to check for Facility/Vendor operation conversions (which are not allowed)
                 var operationModel = (await _operationQueries.Search(new OperationSearchModel()
                 {
@@ -183,8 +186,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 operation.IsDisabled = model.IsDisabled;
                 operation.ModifyDate = DateTime.UtcNow;
 
-                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-                await _operationSequenceQueries.LockOperationAsync(model.Id, cancellationToken);
                 var affectedFacilities = await _operationSequenceQueries.FacilitiesReferencingOperationAsync(model.Id, cancellationToken);
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
@@ -533,29 +534,49 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             var resourceType = model.ResourceType ?? string.Empty;
-
-            var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId
-                                        && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
-                                        && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
-
-            if (sequences.Any())
+            var ownsTransaction = !_database.HasActiveTransaction;
+            var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
+            try
             {
-                sequences.ForEach(_database.OperationSequences.Remove);
-                if (_database.HasActiveTransaction)
+                if (model.OperationId.HasValue)
                 {
-                    await _database.SaveChangesAsync(cancellationToken);
-                    await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
-                    return true;
+                    await _operationSequenceQueries.LockOperationAsync(model.OperationId.Value, cancellationToken);
+                }
+                else
+                {
+                    var operationIds = await _operationSequenceQueries.OperationsInFacilitySequencesAsync(model.FacilityId, model.ResourceType, cancellationToken);
+                    foreach (var operationId in operationIds)
+                    {
+                        await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+                    }
                 }
 
-                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId
+                                            && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
+                                            && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
+
+                if (!sequences.Any())
+                {
+                    return false;
+                }
+
+                sequences.ForEach(_database.OperationSequences.Remove);
                 await _database.SaveChangesAsync(cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilityAsync(model.FacilityId, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
                 return true;
             }
-
-            return false;
+            finally
+            {
+                if (transaction != null)
+                {
+                    await transaction.DisposeAsync();
+                }
+            }
         }
     }
 }
