@@ -698,6 +698,45 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_unescapes_fhirpath_alias_literals()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        OrganizationResourceMapTemplate Map(string name, string path) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Conditions = [new OrganizationResourceMapCondition { FhirPath = path }]
+        };
+        BundleConfigFingerprint Upload(string alias) => new()
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = [alias]
+                }
+            ]
+        };
+
+        var slashMap = Map(
+            "Slash",
+            "Location.type.coding.exists(system = '" + hsloc + @"' and code = '1099-1') and Location.alias = 'ICU\\Ward'");
+        OrgResourceMapProposalBuilder.Build(Upload(@"ICU\Ward"), [slashMap]).Reuse
+            .Should().ContainSingle(r => r.Id == slashMap.Id && r.Recommendation == "Reuse" && r.Score == 1);
+        OrgResourceMapProposalBuilder.Build(Upload(@"ICU\\Ward"), [slashMap]).Reuse
+            .Should().NotContain(r => r.Id == slashMap.Id && r.Recommendation == "Reuse");
+
+        var apostropheMap = Map(
+            "Apostrophe",
+            "Location.type.coding.exists(system = '" + hsloc + @"' and code = '1099-1') and Location.alias = 'O\'Brien'");
+        OrgResourceMapProposalBuilder.Build(Upload("O'Brien"), [apostropheMap]).Reuse
+            .Should().ContainSingle(r => r.Id == apostropheMap.Id && r.Recommendation == "Reuse" && r.Score == 1);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint

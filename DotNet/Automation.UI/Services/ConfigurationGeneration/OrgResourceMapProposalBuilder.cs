@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using Automation.UI.Models;
 
@@ -10,7 +12,7 @@ public static class OrgResourceMapProposalBuilder
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex TypeExists = new(
-        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+code\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'([^']*)')?$",
+        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+code\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'((?:\\.|[^'\\])*)')?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static GeneratedOrmProposal Build(
@@ -271,8 +273,8 @@ public static class OrgResourceMapProposalBuilder
                 // many HSLOC codes; treating the first as system-wide skipped the rest
                 // and left most Locations out-of-org. An alias predicate is part of the
                 // same condition, so the type code alone must not satisfy it.
-                // Alias equality is the captured literal, including surrounding spaces.
-                var alias = type.Groups[3].Success ? type.Groups[3].Value : "";
+                // Alias equality is the unescaped literal, including surrounding spaces.
+                var alias = type.Groups[3].Success ? UnescapeFhirPathLiteral(type.Groups[3].Value) : "";
                 var hasAlias = alias.Length > 0;
                 if (type.Groups[2].Success && !string.IsNullOrWhiteSpace(type.Groups[2].Value))
                 {
@@ -288,6 +290,55 @@ public static class OrgResourceMapProposalBuilder
                 }
             }
         }
+    }
+
+    private static string UnescapeFhirPathLiteral(string literal)
+    {
+        if (literal.IndexOf('\\') < 0)
+            return literal;
+
+        var decoded = new StringBuilder(literal.Length);
+        for (var i = 0; i < literal.Length; i++)
+        {
+            if (literal[i] != '\\' || i + 1 >= literal.Length)
+            {
+                decoded.Append(literal[i]);
+                continue;
+            }
+
+            var next = literal[++i];
+            switch (next)
+            {
+                case '\'':
+                case '\\':
+                case '/':
+                    decoded.Append(next);
+                    break;
+                case 'f':
+                    decoded.Append('\f');
+                    break;
+                case 'n':
+                    decoded.Append('\n');
+                    break;
+                case 'r':
+                    decoded.Append('\r');
+                    break;
+                case 't':
+                    decoded.Append('\t');
+                    break;
+                case 'u' when i + 4 < literal.Length
+                    && ushort.TryParse(literal.AsSpan(i + 1, 4), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code):
+                    decoded.Append((char)code);
+                    i += 4;
+                    break;
+                default:
+                    decoded.Append('\\');
+                    decoded.Append(next);
+                    break;
+            }
+        }
+
+        return decoded.ToString();
     }
 
     private static bool CoversIdentifierSystem(string path, string system)
