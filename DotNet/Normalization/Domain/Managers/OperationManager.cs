@@ -374,6 +374,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            if (!string.IsNullOrEmpty(model.FacilityId))
+            {
+                await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
+            }
 
             var modifiedRecords = 0;
             var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);
@@ -485,6 +489,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
             foreach (var operationId in model.OperationSequences.Select(sequence => sequence.OperationId).Distinct().OrderBy(id => id))
             {
                 await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
@@ -538,6 +543,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
             try
             {
+                await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 if (model.OperationId.HasValue)
                 {
                     await _operationSequenceQueries.LockOperationAsync(model.OperationId.Value, cancellationToken);

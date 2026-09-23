@@ -145,7 +145,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string resource)
+        public async Task<IActionResult> Delete(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -154,7 +154,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                await _resourceManager.DeleteResource(resource);
+                await _resourceManager.DeleteResource(resource, cancellationToken);
 
                 return Accepted();
             }

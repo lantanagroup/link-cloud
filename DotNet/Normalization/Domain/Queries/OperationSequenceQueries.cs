@@ -18,6 +18,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
         Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
         Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
+        Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
         Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     }
@@ -144,6 +146,91 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             {
                 await InvalidateFacilityAsync(facilityId, cancellationToken);
             }
+        }
+
+        public async Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            // Not a facility revision. Sequence create and delete lock this row before operation rows,
+            // so a delete-all waits out a concurrent create that uses a different operation id.
+            if (!_dbContext.Database.IsRelational() || string.IsNullOrEmpty(facilityId))
+            {
+                return;
+            }
+
+            var key = SequenceWriteLockKey(facilityId);
+            if (await HoldSequenceWriteLockAsync(key, cancellationToken))
+            {
+                return;
+            }
+
+            var transaction = _dbContext.Database.CurrentTransaction;
+            var savepoint = "s" + Guid.NewGuid().ToString("N")[..31];
+            if (transaction != null)
+            {
+                await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+            }
+
+            try
+            {
+                _dbContext.OperationSequenceCacheRevisions.Add(new OperationSequenceCacheRevision
+                {
+                    FacilityId = key,
+                    Revision = 0
+                });
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // The other writer inserted the lock row. Roll back to the savepoint so this
+                // transaction can still commit, then wait on that row.
+                if (transaction != null)
+                {
+                    await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+                }
+
+                foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceCacheRevision>().ToList())
+                {
+                    if (entry.Entity.FacilityId == key && entry.State == EntityState.Added)
+                    {
+                        entry.State = EntityState.Detached;
+                    }
+                }
+            }
+
+            if (!await HoldSequenceWriteLockAsync(key, cancellationToken))
+            {
+                throw new InvalidOperationException("Could not acquire the operation sequence write lock.");
+            }
+        }
+
+        private async Task<bool> HoldSequenceWriteLockAsync(string key, CancellationToken cancellationToken)
+        {
+            var updated = await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE OperationSequenceCacheRevisions SET Revision = Revision WHERE FacilityId = {key}",
+                cancellationToken);
+            return updated > 0;
+        }
+
+        public Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationSequences.AsNoTracking()
+                .Where(sequence => sequence.OperationResourceType.ResourceType.Name == resourceName)
+                .Select(sequence => sequence.FacilityId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        private static string SequenceWriteLockKey(string facilityId)
+        {
+            const string prefix = "seq-lock:";
+            var key = prefix + facilityId;
+            if (key.Length <= 255)
+            {
+                return key;
+            }
+
+            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(facilityId)));
+            return prefix + hash;
         }
 
         public async Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default)

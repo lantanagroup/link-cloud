@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         Task<List<ResourceModel>> InitializeResources();
         Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false);
-        Task DeleteResource(string resource);
+        Task DeleteResource(string resource, CancellationToken cancellationToken = default);
     }
 
     public class ResourceManager : IResourceManager
@@ -22,11 +22,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
+        private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly ILogger<ResourceManager> _logger;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, ILogger<ResourceManager> logger)
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, IOperationSequenceQueries operationSequenceQueries, ILogger<ResourceManager> logger)
         {
             _database = database;
             _resourceQueries = resourceQueries;
+            _operationSequenceQueries = operationSequenceQueries;
             _logger = logger;
         }
 
@@ -83,7 +85,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteResource(string resource)
+        public async Task DeleteResource(string resource, CancellationToken cancellationToken = default)
         {
             var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
 
@@ -92,9 +94,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("An Error has occurred while deleting the Resource.");
             }
 
-            _database.ResourceTypes.Remove(resourceEntity.Single());
+            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            var affectedFacilities = await _operationSequenceQueries.FacilitiesUsingResourceTypeAsync(resource, cancellationToken);
+            foreach (var facilityId in affectedFacilities.OrderBy(id => id, StringComparer.Ordinal))
+            {
+                await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
+            }
 
-            await _database.SaveChangesAsync();
+            _database.ResourceTypes.Remove(resourceEntity.Single());
+            await _database.SaveChangesAsync(cancellationToken);
+            await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
         public async Task<List<ResourceModel>> InitializeResources()

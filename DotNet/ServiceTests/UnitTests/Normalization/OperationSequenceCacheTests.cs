@@ -211,6 +211,26 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task DeleteResource_DropsTheListenerCache_AndLeavesAnUnrelatedFacilityCached()
+    {
+        using var harness = new Harness();
+        await harness.SeedAndSequenceAsync("facility-a", "Copy");
+        var encounterOperationId = await harness.SeedOperationAsync("facility-b", "EncounterCopy", CopyJson, resourceName: "Encounter");
+        await harness.WriterManager.CreateOperationSequences(Sequence("facility-b", "Encounter", encounterOperationId));
+        await harness.WarmAsync("facility-a");
+        await harness.WarmAsync("facility-b");
+
+        await harness.Resources.DeleteResource("Patient");
+
+        Assert.Empty(await harness.ReaderQueries.Search(Typed("facility-a")));
+        Assert.Empty(await harness.ReaderQueries.Search(All("facility-a")));
+        var otherBefore = harness.ReaderCounter.SequenceCommands;
+        var kept = Assert.Single(await harness.ReaderQueries.Search(All("facility-b")));
+        Assert.Equal(otherBefore, harness.ReaderCounter.SequenceCommands);
+        Assert.Equal(encounterOperationId, kept.OperationResourceType.OperationId);
+    }
+
+    [Fact]
     public async Task RemovingAResourceType_DeletesOnlyThatOperationResourceTypeSequences()
     {
         using var harness = new Harness();
@@ -371,12 +391,13 @@ public class OperationSequenceCacheTests
             OperationQueries = new OperationQueries(writerDatabase, WriterContext, Resolver.Object);
             WriterQueries = new OperationSequenceQueries(writerDatabase, WriterContext, _writerCache, Resolver.Object);
             ReaderQueries = new OperationSequenceQueries(DatabaseFor(ReaderContext), ReaderContext, _readerCache, Resolver.Object);
+            Resources = new ResourceManager(writerDatabase, resourceQueries, WriterQueries, NullLogger<ResourceManager>.Instance);
             WriterManager = new OperationManager(
                 writerDatabase,
                 OperationQueries,
                 WriterQueries,
                 resourceQueries,
-                new ResourceManager(writerDatabase, resourceQueries, NullLogger<ResourceManager>.Instance),
+                Resources,
                 Resolver.Object,
                 Mock.Of<IHSLOCQueries>());
             WriterController = ControllerFor(WriterManager, WriterQueries);
@@ -392,16 +413,17 @@ public class OperationSequenceCacheTests
         public OperationQueries OperationQueries { get; }
         public OperationSequenceQueries WriterQueries { get; }
         public OperationSequenceQueries ReaderQueries { get; }
+        public ResourceManager Resources { get; }
         public OperationManager WriterManager { get; }
         public OperationSequenceController WriterController { get; }
         public OperationSequenceController ReaderController { get; }
 
-        public async Task<Guid> SeedOperationAsync(string facilityId, string name, string json, Guid? vendorVersionId = null)
+        public async Task<Guid> SeedOperationAsync(string facilityId, string name, string json, Guid? vendorVersionId = null, string resourceName = "Patient")
         {
-            var resource = await WriterContext.ResourceTypes.SingleOrDefaultAsync(candidate => candidate.Name == "Patient");
+            var resource = await WriterContext.ResourceTypes.SingleOrDefaultAsync(candidate => candidate.Name == resourceName);
             if (resource == null)
             {
-                resource = new LantanaGroup.Link.Normalization.Domain.Entities.ResourceType { Id = Guid.NewGuid(), Name = "Patient" };
+                resource = new LantanaGroup.Link.Normalization.Domain.Entities.ResourceType { Id = Guid.NewGuid(), Name = resourceName };
                 WriterContext.ResourceTypes.Add(resource);
             }
 
