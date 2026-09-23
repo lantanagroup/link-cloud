@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -37,7 +38,7 @@ public sealed class CleanupReport
 /// One document per leftover-cleanup pass so operators can reopen completed work.
 /// Kept small: each pass is capped by MaxFacilitiesPerPass.
 /// </summary>
-public sealed class MongoCleanupReportStore(IMongoDatabase database) : ICleanupReportStore
+public sealed class MongoCleanupReportStore(IMongoDatabase database, ILogger<MongoCleanupReportStore> logger) : ICleanupReportStore
 {
     public const string CollectionName = "automation_cleanup_reports";
     public const int MaxStoredReports = 50;
@@ -48,7 +49,18 @@ public sealed class MongoCleanupReportStore(IMongoDatabase database) : ICleanupR
     public async Task SaveAsync(CleanupReport report, CancellationToken cancellationToken = default)
     {
         await _collection.InsertOneAsync(ToDocument(report), cancellationToken: cancellationToken);
-        await TrimAsync(cancellationToken);
+        try
+        {
+            await TrimAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogWarning("Cleanup report trim was cancelled after saving {ReportId}.", report.Id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not trim leftover cleanup reports after saving {ReportId}.", report.Id);
+        }
     }
 
     public async Task<IReadOnlyList<CleanupReport>> ListRecentAsync(int limit = 25, CancellationToken cancellationToken = default)
