@@ -8,11 +8,11 @@ namespace Automation.UI.Services.ConfigurationGeneration;
 public static class OrgResourceMapProposalBuilder
 {
     private static readonly Regex IdentifierExists = new(
-        @"^(?:Location\.)?identifier\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+value\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?$",
+        @"^(?:Location\.)?identifier\.(?:exists|where)\(\s*system\s*=\s*'((?:\\.|[^'\\])+)'(?:\s+and\s+value\s*=\s*'((?:\\.|[^'\\])+)')?\s*\)(?:\.exists\(\s*\))?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex TypeExists = new(
-        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'(?:\s+and\s+code\s*=\s*'([^']+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'((?:\\.|[^'\\])*)')?$",
+        @"^(?:Location\.)?type\.coding\.(?:exists|where)\(\s*system\s*=\s*'((?:\\.|[^'\\])+)'(?:\s+and\s+code\s*=\s*'((?:\\.|[^'\\])+)')?\s*\)(?:\.exists\(\s*\))?(?:\s+and\s+Location\.alias\s*=\s*'((?:\\.|[^'\\])*)')?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static GeneratedOrmProposal Build(

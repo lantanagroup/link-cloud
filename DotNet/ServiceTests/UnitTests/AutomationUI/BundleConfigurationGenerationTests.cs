@@ -1228,6 +1228,45 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_parses_a_generated_type_code_that_contains_an_apostrophe()
+    {
+        var fp = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = "http://t", Code = "O'Brien" }]
+        };
+        var generated = OrgResourceMapProposalBuilder.Build(fp, []);
+        generated.Conditions.Should().ContainSingle();
+        generated.Conditions[0].FhirPath.Should().Contain("\\'");
+
+        var saved = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Apostrophe code",
+            Conditions = generated.Conditions
+        };
+        OrgResourceMapProposalBuilder.Build(fp, [saved]).Reuse
+            .Should().ContainSingle(r => r.Id == saved.Id && r.Recommendation == "Reuse");
+
+        var identifiers = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://o'brien", Value = "HOSP" }]
+        };
+        var generatedIdentifier = OrgResourceMapProposalBuilder.Build(identifiers, []);
+        generatedIdentifier.Conditions.Should().ContainSingle();
+        generatedIdentifier.Conditions[0].FhirPath.Should().Contain("\\'");
+        var savedIdentifier = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Apostrophe system",
+            Conditions = generatedIdentifier.Conditions
+        };
+        OrgResourceMapProposalBuilder.Build(identifiers, [savedIdentifier]).Reuse
+            .Should().ContainSingle(r => r.Id == savedIdentifier.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Normalization_builder_emits_one_of_each_supported_type_when_data_allows()
     {
         var fp = new BundleConfigFingerprint
