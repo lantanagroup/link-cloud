@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Filters;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -70,6 +71,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("initialize")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<ActionResult<List<ResourceModel>>> Initialize()
         {
             try
@@ -89,6 +91,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<ActionResult<ResourceModel>> Post(string resource, CancellationToken cancellationToken = default)
         {
             try
@@ -117,6 +120,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource, CancellationToken cancellationToken = default)
         {
             try
@@ -145,6 +149,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ValidateAntiForgeryOrBearerToken]
         public async Task<IActionResult> Delete(string resource, CancellationToken cancellationToken = default)
         {
             try
