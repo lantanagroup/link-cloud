@@ -95,7 +95,7 @@ public static class OrgResourceMapProposalBuilder
     {
         var neededIdentifiers = NeededIdentifierKeys(fingerprint);
         var rawTypeKeys = NeededRawTypeKeys(fingerprint);
-        var aliases = new HashSet<string>(fingerprint.LocationAliases, StringComparer.OrdinalIgnoreCase);
+        var aliases = new HashSet<string>(fingerprint.LocationAliases, StringComparer.Ordinal);
         var results = new List<ReuseCandidate>();
 
         foreach (var template in existing)
@@ -110,25 +110,25 @@ public static class OrgResourceMapProposalBuilder
             var hasIdentifier = covered.Any(IsIdentifierKey);
             var hasType = covered.Any(IsTypeKey);
 
-            if (hasIdentifier)
+            if (hasIdentifier && neededIdentifiers.Count > 0)
             {
-                if (neededIdentifiers.Count == 0)
+                var mapIdentifierKeys = covered.Where(IsIdentifierKey).ToList();
+                var identifierSatisfied = mapIdentifierKeys.Count(key => IdentifierKeySatisfied(key, neededIdentifiers));
+                if (identifierSatisfied > 0)
+                {
+                    var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
+                    var score = (double)hit / neededIdentifiers.Count;
+                    results.Add(ToCandidate(
+                        template,
+                        score,
+                        score >= 0.999
+                            ? "This map already matches the Location identifiers acquisition will see."
+                            : template.IsSystem
+                                ? $"This system map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload. Extending clones a custom copy so the system map stays unchanged."
+                                : $"This map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload.",
+                        reuse: true));
                     continue;
-
-                var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
-                if (hit == 0)
-                    continue;
-
-                var score = (double)hit / neededIdentifiers.Count;
-                results.Add(ToCandidate(
-                    template,
-                    score,
-                    score >= 0.999
-                        ? "This map already matches the Location identifiers acquisition will see."
-                        : template.IsSystem
-                            ? $"This system map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload. Extending clones a custom copy so the system map stays unchanged."
-                            : $"This map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload."));
-                continue;
+                }
             }
 
             if (!hasType)
@@ -166,10 +166,13 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
+            var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, aliases));
+            var coverage = (double)coveredTypes / rawTypeKeys.Count;
             results.Add(ToCandidate(
                 template,
-                score: 1,
-                "This map matches type codes already present on the uploaded Locations, which acquisition can see."));
+                coverage,
+                "This map matches type codes already present on the uploaded Locations, which acquisition can see.",
+                reuse: true));
         }
 
         return results
@@ -184,14 +187,15 @@ public static class OrgResourceMapProposalBuilder
         OrganizationResourceMapTemplate template,
         double score,
         string reason,
-        bool forceExtend = false)
+        bool forceExtend = false,
+        bool reuse = false)
         => new()
         {
             Id = template.Id,
             Name = template.Name,
             Kind = template.IsSystem ? "System ORM" : "Custom ORM",
             Score = Math.Round(score, 2),
-            Recommendation = !forceExtend && score >= 0.999 ? "Reuse" : "Extend",
+            Recommendation = !forceExtend && (reuse || score >= 0.999) ? "Reuse" : "Extend",
             Reason = reason
         };
 
@@ -333,6 +337,39 @@ public static class OrgResourceMapProposalBuilder
                 return system.Length == 0 || !systemWide.Contains(system);
             })
             .ToList();
+    }
+
+    private static bool IdentifierKeySatisfied(string mapKey, HashSet<string> neededIdentifiers)
+    {
+        if (neededIdentifiers.Contains(mapKey))
+            return true;
+
+        if (!mapKey.StartsWith("idsys|", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var system = mapKey["idsys|".Length..];
+        return neededIdentifiers.Any(needed =>
+            needed.StartsWith("id|", StringComparison.OrdinalIgnoreCase)
+            && KeySystem(needed).Equals(system, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool RawTypeCovered(string rawKey, HashSet<string> covered, HashSet<string> aliases)
+    {
+        if (IsCovered(rawKey, covered))
+            return true;
+
+        foreach (var key in covered)
+        {
+            if (!TrySplitAliasKey(key, out var typeKey, out var alias) || !aliases.Contains(alias))
+                continue;
+            if (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
+                && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool MapTypeKeySatisfied(string mapKey, HashSet<string> rawTypeKeys, HashSet<string> aliases)

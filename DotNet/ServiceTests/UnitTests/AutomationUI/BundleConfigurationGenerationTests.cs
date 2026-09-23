@@ -149,6 +149,21 @@ public class BundleConfigurationGenerationTests
 
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [systemDefault]);
         proposal.Reuse.Should().ContainSingle(r => r.Recommendation == "Reuse" && r.Id == systemDefault.Id);
+
+        var typeOnlyUpload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes =
+            [
+                new LocationTypeHint
+                {
+                    System = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    Code = "1099-1"
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(typeOnlyUpload, [systemDefault]).Reuse
+            .Should().ContainSingle(r => r.Recommendation == "Reuse" && r.Id == systemDefault.Id);
         proposal.Notes.Should().Contain(n => n.Contains("before cleanup", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -245,9 +260,26 @@ public class BundleConfigurationGenerationTests
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [typeOnly]);
         var reuse = proposal.Reuse.Should().ContainSingle(r => r.Id == typeOnly.Id).Subject;
         reuse.Recommendation.Should().Be("Reuse");
-        reuse.Score.Should().Be(1);
+        reuse.Score.Should().Be(0.11);
         reuse.Reason.Should().Contain("already present");
-        reuse.Reason.Should().NotContain("of 9");
+
+        var wider = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Any HSLOC",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}').exists()"
+                }
+            ]
+        };
+        var ranked = OrgResourceMapProposalBuilder.Build(fp, [typeOnly, wider]).Reuse;
+        ranked[0].Id.Should().Be(wider.Id);
+        ranked[0].Recommendation.Should().Be("Reuse");
+        ranked[0].Score.Should().Be(0.89);
+        ranked.Should().Contain(r => r.Id == typeOnly.Id && r.Recommendation == "Reuse" && r.Score == 0.11);
     }
 
     [Fact]
@@ -311,7 +343,7 @@ public class BundleConfigurationGenerationTests
         var partialReuse = OrgResourceMapProposalBuilder.Build(partial, [map]).Reuse
             .Should().ContainSingle(r => r.Id == map.Id).Subject;
         partialReuse.Recommendation.Should().Be("Reuse");
-        partialReuse.Score.Should().Be(1);
+        partialReuse.Score.Should().Be(0.33);
 
         var neither = new BundleConfigFingerprint
         {
@@ -333,7 +365,7 @@ public class BundleConfigurationGenerationTests
             ]
         };
         OrgResourceMapProposalBuilder.Build(complete, [map]).Reuse
-            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 1);
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 0.67);
     }
 
     [Fact]
@@ -401,6 +433,15 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(withAlias, [map]).Reuse
             .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse" && r.Score == 1);
+
+        var differentCase = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            LocationAliases = ["icu"]
+        };
+        OrgResourceMapProposalBuilder.Build(differentCase, [map]).Reuse
+            .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]
@@ -455,6 +496,12 @@ public class BundleConfigurationGenerationTests
 
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [hospitalOnly]);
         proposal.Reuse.Should().NotContain(r => r.Id == hospitalOnly.Id);
+
+        fp.LocationIdentifiers.Add(new LocationIdentifierHint { System = "http://a", Value = "HOSP" });
+        var matched = OrgResourceMapProposalBuilder.Build(fp, [hospitalOnly]).Reuse
+            .Should().ContainSingle(r => r.Id == hospitalOnly.Id).Subject;
+        matched.Recommendation.Should().Be("Reuse");
+        matched.Score.Should().Be(0.33);
     }
 
     [Fact]
@@ -526,7 +573,7 @@ public class BundleConfigurationGenerationTests
         var proposal = OrgResourceMapProposalBuilder.Build(fp, [existing], existing);
         proposal.Conditions.Should().HaveCount(2);
         proposal.Conditions.Select(c => c.FhirPath).Should().Contain("Location.identifier.where(system = 'http://b').exists()");
-        proposal.Reuse.Should().ContainSingle(r => r.Recommendation == "Extend");
+        proposal.Reuse.Should().ContainSingle(r => r.Id == existing.Id && r.Recommendation == "Reuse" && r.Score == 0.5);
     }
 
     [Fact]

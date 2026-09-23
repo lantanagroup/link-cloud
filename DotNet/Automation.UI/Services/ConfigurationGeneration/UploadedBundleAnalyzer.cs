@@ -53,7 +53,7 @@ public static class UploadedBundleAnalyzer
 
         foreach (var alias in right.LocationAliases)
         {
-            if (!merged.LocationAliases.Contains(alias, StringComparer.OrdinalIgnoreCase))
+            if (!merged.LocationAliases.Contains(alias))
                 merged.LocationAliases.Add(alias);
         }
 
@@ -129,7 +129,7 @@ public static class UploadedBundleAnalyzer
             var value = alias?.Trim();
             if (string.IsNullOrWhiteSpace(value))
                 continue;
-            if (!fp.LocationAliases.Contains(value, StringComparer.OrdinalIgnoreCase))
+            if (!fp.LocationAliases.Contains(value))
                 fp.LocationAliases.Add(value);
         }
     }
