@@ -66,6 +66,32 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_clears_a_facility_failure_when_the_history_retry_succeeds()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var guidFacility = Guid.NewGuid().ToString();
+        var finished = now.AddDays(-2);
+        var run = Run(guidFacility, finished);
+        var saved = new List<CleanupReport>();
+        var service = Create(now, [run], saved, failFirstFacilityDeletes: 1);
+
+        var result = await service.RunCustomRangeAsync(
+            finished.AddHours(-1),
+            finished.AddHours(1),
+            teardownFacilities: true,
+            purgeHistory: true);
+
+        result.TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, run.RunId.ToString()]);
+        result.FailedFacilityIds.Should().BeEmpty();
+        result.FailedRunIds.Should().BeEmpty();
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        saved.Should().ContainSingle();
+        saved[0].Status.Should().Be("completed");
+        saved[0].FailedFacilityIds.Should().BeEmpty();
+        saved[0].TornDownFacilityIds.Should().BeEquivalentTo([guidFacility, run.RunId.ToString()]);
+    }
+
+    [Fact]
     public async Task CompletedReport_is_not_duplicated_when_terminal_publish_is_cancelled()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -202,6 +228,7 @@ public class LeftoverRunCleanupServiceTests
         IReadOnlyDictionary<string, string>? facilities = null,
         bool throwOnTerminalPublish = false,
         bool failFacilityDelete = false,
+        int failFirstFacilityDeletes = 0,
         bool failReportSave = false,
         List<string>? terminalMessages = null)
     {
@@ -215,10 +242,17 @@ public class LeftoverRunCleanupServiceTests
             });
         facility.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<FacilityModel> { StatusCode = 404 });
+        var remainingDeleteFailures = failFacilityDelete ? int.MaxValue : failFirstFacilityDeletes;
         facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(() => failFacilityDelete
-                ? throw new InvalidOperationException("facility delete failed")
-                : Task.FromResult(Ok()));
+            .Returns(() =>
+            {
+                if (remainingDeleteFailures <= 0)
+                    return Task.FromResult(Ok());
+
+                if (remainingDeleteFailures < int.MaxValue)
+                    remainingDeleteFailures--;
+                throw new InvalidOperationException("facility delete failed");
+            });
 
         var normalization = new Mock<INormalizationServiceClient>();
         normalization.Setup(c => c.DeleteFacilityOperationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

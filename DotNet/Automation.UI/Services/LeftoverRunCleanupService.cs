@@ -457,11 +457,14 @@ public sealed class LeftoverRunCleanupService(
                                 settings.AbortTtl,
                                 cancellationToken);
                             tornDown.Add(facilityId);
+                            // A custom-range facility pass may already have recorded this id. A successful retry clears it.
+                            failedFacilities.RemoveAll(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
                             logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", facilityId);
-                            failedFacilities.Add(facilityId);
+                            if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                                failedFacilities.Add(facilityId);
                             teardownFailed = true;
                         }
                     }
