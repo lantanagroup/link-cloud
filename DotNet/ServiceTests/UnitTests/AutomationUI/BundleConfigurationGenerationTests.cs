@@ -278,7 +278,7 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
-    public void Orm_builder_reuses_type_only_map_only_when_every_code_it_requires_is_on_the_upload()
+    public void Orm_builder_reuses_type_only_map_when_any_of_its_codes_is_on_the_upload()
     {
         const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
         var map = new OrganizationResourceMapTemplate
@@ -310,8 +310,17 @@ public class BundleConfigurationGenerationTests
         };
         var partialReuse = OrgResourceMapProposalBuilder.Build(partial, [map]).Reuse
             .Should().ContainSingle(r => r.Id == map.Id).Subject;
-        partialReuse.Recommendation.Should().Be("Extend");
-        partialReuse.Score.Should().Be(0.5);
+        partialReuse.Recommendation.Should().Be("Reuse");
+        partialReuse.Score.Should().Be(1);
+
+        var neither = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = "UNIT-9" }],
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1052-0" }]
+        };
+        OrgResourceMapProposalBuilder.Build(neither, [map]).Reuse
+            .Should().NotContain(r => r.Id == map.Id && r.Recommendation == "Reuse");
 
         var complete = new BundleConfigFingerprint
         {

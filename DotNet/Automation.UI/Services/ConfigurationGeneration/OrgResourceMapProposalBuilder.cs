@@ -133,8 +133,9 @@ public static class OrgResourceMapProposalBuilder
             if (!hasType)
                 continue;
 
-            // Score the codes this map requires against the raw upload. Other type codes
-            // on the upload do not lower the score. Cleanup cannot add the missing codes
+            // Conditions are alternatives: any matching type condition lets a Location pass.
+            // One required code on the raw upload is enough to reuse the map. Other type
+            // codes on the upload do not lower that. Cleanup cannot add a missing code
             // before acquisition evaluates org mapping.
             var mapTypeKeys = ScoreableTypeKeys(covered);
             if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
@@ -164,13 +165,10 @@ public static class OrgResourceMapProposalBuilder
                 continue;
             }
 
-            var typeScore = (double)satisfied / mapTypeKeys.Count;
             results.Add(ToCandidate(
                 template,
-                typeScore,
-                typeScore >= 0.999
-                    ? "This map matches type codes already present on the uploaded Locations, which acquisition can see."
-                    : $"This map matches {satisfied} of {mapTypeKeys.Count} type codes it requires. The upload does not contain the rest."));
+                score: 1,
+                "This map matches type codes already present on the uploaded Locations, which acquisition can see."));
         }
 
         return results
