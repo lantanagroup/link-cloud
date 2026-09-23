@@ -75,6 +75,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return taskResult;
                 }
 
+                if (model.ResourceTypes != null)
+                {
+                    model.ResourceTypes = await _operationSequenceQueries.CanonicalResourceNamesAsync(model.ResourceTypes, cancellationToken);
+                }
+
                 var result = await ValidateOperation(model.OperationType, model.OperationJson, model.ResourceTypes, cancellationToken);
 
                 if (!result.IsValid)
@@ -187,7 +192,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id, cancellationToken);
 
-                var result = await ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes, cancellationToken);
+                var result = await ValidateOperation(operation.OperationType.ToString(), model.OperationJson, resourceNames ?? model.ResourceTypes, cancellationToken);
 
                 if (!result.IsValid)
                 {
