@@ -311,6 +311,9 @@
     var runButtons = document.querySelectorAll('.cleanup-run-btn');
     var pollTimer = null;
     var sawRunning = false;
+    var latestAt = 0;
+    var passArmed = false;
+    var armedAfter = 0;
 
     function token(form) {
         var input = form.querySelector('input[name="__RequestVerificationToken"]');
@@ -355,15 +358,28 @@
         return activity[name] !== undefined ? activity[name] : activity[name.charAt(0).toUpperCase() + name.slice(1)];
     }
 
+    function activityTime(activity) {
+        var at = field(activity, 'at');
+        var parsed = at ? Date.parse(at) : NaN;
+        return isNaN(parsed) ? 0 : parsed;
+    }
+
     function applyActivity(activity) {
         if (!activity) return;
         var status = field(activity, 'status') || 'idle';
-        if (sawRunning && (status === 'completed' || status === 'failed')) {
+        var at = activityTime(activity);
+        if (at > latestAt) latestAt = at;
+        if (status === 'running') sawRunning = true;
+        var terminal = status === 'completed' || status === 'failed';
+        // A start response can still echo the previous pass. Reload only for a newer terminal update.
+        var staleArmedTerminal = passArmed && terminal && at > 0 && at <= armedAfter;
+        var newerArmedTerminal = passArmed && terminal && at > armedAfter;
+        if (terminal && !staleArmedTerminal && (sawRunning || newerArmedTerminal)) {
             sawRunning = false;
+            passArmed = false;
             window.location.reload();
             return;
         }
-        if (status === 'running') sawRunning = true;
         var running = status === 'running';
         setRunning(running);
 
@@ -494,15 +510,22 @@
             return;
         }
         e.preventDefault();
-        if (runKind) setRunning(true);
+        if (runKind) {
+            passArmed = true;
+            armedAfter = latestAt;
+            setRunning(true);
+        }
         postForm(e.currentTarget, { runKind: runKind }, saveUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
-            if (runKind && result.ok) sawRunning = true;
             if (payload.activity) applyActivity(payload.activity);
             if (runKind && result.ok) refreshProgress();
-            if (!result.ok) setRunning(false);
+            if (!result.ok) {
+                passArmed = false;
+                setRunning(false);
+            }
         }).catch(function (err) {
+            passArmed = false;
             setRunning(false);
             setFlash('Could not talk to the cleanup endpoint: ' + err, true);
         });
@@ -515,15 +538,20 @@
             return;
         }
         e.preventDefault();
+        passArmed = true;
+        armedAfter = latestAt;
         setRunning(true);
         postForm(e.currentTarget, null, rangeUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
-            if (result.ok) sawRunning = true;
             if (payload.activity) applyActivity(payload.activity);
             if (result.ok) refreshProgress();
-            else setRunning(false);
+            else {
+                passArmed = false;
+                setRunning(false);
+            }
         }).catch(function (err) {
+            passArmed = false;
             setRunning(false);
             setFlash('Could not start custom-range cleanup: ' + err, true);
         });

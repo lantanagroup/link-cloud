@@ -317,6 +317,18 @@ public sealed class LeftoverRunCleanupService(
         var savedTerminal = false;
         try
         {
+            // The start request reads CurrentActivity as soon as this task hits its first I/O.
+            // Publish running first so that response is not the previous pass's terminal activity.
+            await PublishAsync(new CleanupActivity
+            {
+                Mode = mode,
+                Label = label,
+                Status = "running",
+                Trigger = trigger,
+                Message = "Starting leftover cleanup…",
+                At = startedAt
+            }, cancellationToken);
+
             var settings = await settingsStore.GetEffectiveAsync(cancellationToken);
             using var scope = scopeFactory.CreateScope();
             var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();

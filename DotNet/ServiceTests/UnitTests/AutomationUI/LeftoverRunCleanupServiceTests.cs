@@ -21,6 +21,19 @@ namespace UnitTests.AutomationUI;
 public class LeftoverRunCleanupServiceTests
 {
     [Fact]
+    public async Task HistoryPurge_is_running_before_settings_are_read()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var run = Run(Guid.NewGuid().ToString(), now.AddDays(-30));
+        var statuses = new List<string>();
+        var service = Create(now, [run], [], statusesWhenSettingsLoad: statuses);
+
+        await service.RunHistoryPurgeNowAsync();
+
+        statuses.Should().Contain("running");
+    }
+
+    [Fact]
     public async Task HistoryPurge_records_guid_facility_teardown_and_skips_named_facilities()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -230,7 +243,8 @@ public class LeftoverRunCleanupServiceTests
         bool failFacilityDelete = false,
         int failFirstFacilityDeletes = 0,
         bool failReportSave = false,
-        List<string>? terminalMessages = null)
+        List<string>? terminalMessages = null,
+        List<string>? statusesWhenSettingsLoad = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -311,12 +325,18 @@ public class LeftoverRunCleanupServiceTests
             })
             .Returns(Task.CompletedTask);
 
+        LeftoverRunCleanupService? built = null;
         var settings = new Mock<ICleanupSettingsStore>();
         settings.Setup(s => s.GetEffectiveAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LeftoverRunCleanupSettings
+            .Returns(() =>
             {
-                TeardownRetention = TimeSpan.FromDays(14),
-                MaxFacilitiesPerPass = 25
+                if (built != null && statusesWhenSettingsLoad != null)
+                    statusesWhenSettingsLoad.Add(built.CurrentActivity.Status);
+                return Task.FromResult(new LeftoverRunCleanupSettings
+                {
+                    TeardownRetention = TimeSpan.FromDays(14),
+                    MaxFacilitiesPerPass = 25
+                });
             });
 
         var reports = new Mock<ICleanupReportStore>();
@@ -352,7 +372,7 @@ public class LeftoverRunCleanupServiceTests
         var hub = new Mock<IHubContext<CleanupHub>>();
         hub.SetupGet(h => h.Clients).Returns(clients.Object);
 
-        return new LeftoverRunCleanupService(
+        built = new LeftoverRunCleanupService(
             scopeFactory.Object,
             snapshots.Object,
             new FakeTimeProvider(now),
@@ -362,6 +382,7 @@ public class LeftoverRunCleanupServiceTests
             hub.Object,
             Options.Create(new LeftoverRunCleanupOptions()),
             NullLogger<LeftoverRunCleanupService>.Instance);
+        return built;
     }
 
     private static LinkApiResponse Ok() => new() { StatusCode = 200 };
