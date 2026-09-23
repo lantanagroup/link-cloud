@@ -696,6 +696,14 @@
   box-shadow: none;
 }
 
+/* The package's invalid-and-focused selector outranks the rule above and brings back a red glow -
+   a field being typed into gets the same blue ring as any other; its error text still shows below. */
+.nhsn-link .k-input.k-invalid:focus,
+.nhsn-link .k-input.k-invalid:focus-within,
+.nhsn-link .k-input.k-invalid.k-focus {
+  box-shadow: none;
+}
+
 .nhsn-link__form-error {
   color: var(--kendo-color-error, #cc1b22);
   font-weight: 600;
@@ -1725,6 +1733,13 @@
   color: var(--kendo-color-app-text-subtle, #5a5f69);
 }
 
+/* Organization Identification's Managing Organization and Custom FHIRPath tabs open straight on a
+   field label, with no intro paragraph between it and the method tabs the way Location Type has -
+   this keeps the two from butting up against each other. */
+.nhsn-link__location-org-tab-top {
+  margin-top: 16px;
+}
+
 /* ---- repeatable list (core/fields/RepeatableList.tsx) */
 
 .nhsn-link__repeatable {
@@ -1761,15 +1776,57 @@
   margin: 0;
 }
 
+/* Column headings above the scrollable row list - stay in place while the rows below scroll,
+   same as the add button does. Purely visual: each field's own label already carries this text
+   for assistive tech (hidden visually, see the .k-label rule above), so the row is aria-hidden.
+   Bottom-aligned (not the row default of flex-start) so a heading that wraps to two lines and one
+   that fits on one line both end flush with the fields below instead of drifting out of line with
+   each other. */
+.nhsn-link__repeatable-heading-row {
+  /* `.nhsn-link__repeatable` is a column flexbox with `align-items: flex-start`, so without an
+     explicit width every child shrink-wraps to its own content instead of spanning the card - the
+     row list works around this the same way, via `.nhsn-link__repeatable-scroll`'s `width: 100%`. */
+  width: 100%;
+  box-sizing: border-box;
+  align-items: flex-end;
+  margin: 0 0 6px 0;
+}
+
+.nhsn-link__repeatable-heading-row .nhsn-link__repeatable-fields {
+  align-items: flex-end;
+}
+
+.nhsn-link__repeatable-heading {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+/* Reserves the Remove button's column width so the headings above line up with the fields below. */
+.nhsn-link__repeatable-heading-spacer {
+  flex: 0 0 auto;
+  width: 74px;
+}
+
+/* Grid, not flex, for the columns themselves: with flex, a child whose content resists shrinking
+   (the native HSLOC <select>, sized to fit its longest option) pulls extra space from its equal
+   share, so this row's columns and the (separately rendered) heading row's above it silently drift
+   out of alignment. `minmax(0, 1fr)` makes every column exactly equal regardless of what's inside
+   it - content that doesn't fit is clipped by the column's own `overflow`/`min-width: 0`, never
+   grown around. */
 .nhsn-link__repeatable-fields {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   flex: 1 1 auto;
   gap: 4px;
   min-width: 0;
 }
 
 .nhsn-link__repeatable-fields > * {
-  flex: 1 1 0;
   min-width: 0;
   margin-bottom: 0;
   /* The package's .k-form-field reserves 1rem for the next field in a
@@ -2005,6 +2062,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: 16px;
 }
 
 .nhsn-link__modal-title {

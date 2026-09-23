@@ -390,7 +390,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               <NumberField
                 id="lagDays"
                 label={t('onboarding:fhirServerInfo.fields.lagDaysLabel')}
-                required
                 min={0}
                 step={1}
                 value={lagDays}

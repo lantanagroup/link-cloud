@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {LocationCandidate, LocationMethod} from '../../../api/contracts';
@@ -17,10 +17,16 @@ import {
 } from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import type {LocationIdentifierEntry, LocationTypeEntry} from '../../types';
-import {findIncompleteLocationIdentifierIndexes, findIncompleteLocationTypeIndexes} from './validate';
+import {
+  findDuplicateLocationIdentifierIndexes,
+  findDuplicateLocationTypeIndexes,
+  findDuplicateManagingOrgIndexes,
+  findIncompleteLocationIdentifierIndexes,
+  findIncompleteLocationTypeIndexes
+} from './validate';
 
 /** Organization Identification. Methods and instructions PDF both come from `vendorProfile` - no vendor name here. */
 export function LocationOrgStep({onNext, onBack}: StepProps) {
@@ -60,26 +66,98 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const [candidates, setCandidates] = useState<LocationCandidate[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
 
-  const managingOrganizations = locationOrg.managingOrganizationIds ?? [];
-  const locationTypes = locationOrg.locationTypes ?? [];
-  const locationIdentifiers = locationOrg.locationIdentifiers ?? [];
+  // Each list always shows at least one row to type into (its minItems keeps that row from being
+  // removed). An empty list in the draft displays one blank row that is only written back once the
+  // facility edits it, so just opening the step doesn't dirty the draft.
+  const managingOrganizations = withAtLeastOneRow(locationOrg.managingOrganizationIds, '');
+  const locationTypes = withAtLeastOneRow(locationOrg.locationTypes, {code: '', alias: ''});
+  const locationIdentifiers = withAtLeastOneRow(locationOrg.locationIdentifiers, {system: '', code: ''});
 
   // Only the active method's rows can block Continue - a different method's rows just sit hidden
   // in the draft, unrelated to what's being configured right now (same reasoning as `activeMethod`
   // itself only ever showing one method's fields at a time).
-  const incompleteLocationTypeIndexes = useMemo(
-    () => new Set(findIncompleteLocationTypeIndexes(locationTypes)),
-    [locationTypes]
+  const incompleteRowIndexes =
+    activeMethod === 'location-type'
+      ? findIncompleteLocationTypeIndexes(locationTypes)
+      : activeMethod === 'location-identifier'
+        ? findIncompleteLocationIdentifierIndexes(locationIdentifiers)
+        : activeMethod === 'managing-org'
+          ? managingOrganizations.flatMap((id, index) => (id.trim() ? [] : [index]))
+          : [];
+  const activeRowCount =
+    activeMethod === 'location-type'
+      ? locationTypes.length
+      : activeMethod === 'location-identifier'
+        ? locationIdentifiers.length
+        : activeMethod === 'managing-org'
+          ? managingOrganizations.length
+          : 0;
+
+  // A method backed by a repeatable list needs at least one filled-in entry to mean anything -
+  // custom-fhir-path has no list at all, so it's exempt.
+  const hasEmptyRequiredList =
+    activeMethod === 'location-type'
+      ? locationTypes.every(row => !row.code.trim() && !row.alias.trim())
+      : activeMethod === 'location-identifier'
+        ? locationIdentifiers.every(row => !row.system.trim() && !row.code.trim())
+        : activeMethod === 'managing-org'
+          ? managingOrganizations.every(id => !id.trim())
+          : false;
+  const hasIncompleteRows = !hasEmptyRequiredList && incompleteRowIndexes.length > 0;
+
+  // Shown on the repeat as soon as it's typed - unlike a blank field, an exact repeat is already
+  // wrong, not just unfinished. Only the active method's list is checked.
+  const duplicateRowIndexes = new Set(
+    activeMethod === 'managing-org'
+      ? findDuplicateManagingOrgIndexes(managingOrganizations)
+      : activeMethod === 'location-type'
+        ? findDuplicateLocationTypeIndexes(locationTypes)
+        : activeMethod === 'location-identifier'
+          ? findDuplicateLocationIdentifierIndexes(locationIdentifiers)
+          : []
   );
-  const incompleteLocationIdentifierIndexes = useMemo(
-    () => new Set(findIncompleteLocationIdentifierIndexes(locationIdentifiers)),
-    [locationIdentifiers]
-  );
-  const hasIncompleteRows =
-    (activeMethod === 'location-type' && incompleteLocationTypeIndexes.size > 0) ||
-    (activeMethod === 'location-identifier' && incompleteLocationIdentifierIndexes.size > 0);
+  const hasDuplicateRows = duplicateRowIndexes.size > 0;
+
+  // No error is worth showing before the facility has actually tried to move on - an untouched,
+  // still-blank list isn't wrong yet, just not started. Once shown, though, it tracks the live state
+  // below, so fixing (or re-breaking) it updates the errors without another click.
+  const [continueAttempted, setContinueAttempted] = useState(false);
+  // Rows that existed at the last Continue attempt - only these get "required" errors on their
+  // blank fields. A row added afterwards stays quiet until the next
+  // attempt, instead of showing up already in error.
+  const [flaggedRowCount, setFlaggedRowCount] = useState(0);
+  const isRowFlagged = (index: number) => index < flaggedRowCount;
+  const hasFlaggedIncompleteRows = hasIncompleteRows && incompleteRowIndexes.some(isRowFlagged);
+
+  function validateStep(): boolean {
+    setContinueAttempted(true);
+    setFlaggedRowCount(activeRowCount);
+    return !hasIncompleteRows && !hasEmptyRequiredList && !hasDuplicateRows;
+  }
+
+  /** Keeps `flaggedRowCount` pointing at the same rows when one of them is removed. */
+  function trackRemoval<T>(previous: T[], next: T[]) {
+    if (next.length < previous.length) {
+      const removedIndex = previous.findIndex((row, index) => row !== next[index]);
+      setFlaggedRowCount(count => (removedIndex < count ? count - 1 : count));
+    }
+  }
+
+  function handleContinue() {
+    if (validateStep()) {
+      onNext();
+    }
+  }
+
+  useStepValidator(validateStep);
+
+  function requiredError(field: string): string {
+    return t('onboarding:locationOrg.errors.fieldRequiredError', {field});
+  }
 
   function handleMethodChange(method: LocationMethod) {
+    setContinueAttempted(false);
+    setFlaggedRowCount(0);
     patch('locationOrg', {method});
   }
 
@@ -100,25 +178,33 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
     }
   }
 
+  // A search result already in the Location Type list (same code and alias) isn't offered again -
+  // removing that row from the list brings it back on the next search.
+  const addedLocationTypeKeys = new Set(locationTypes.map(row => locationTypeKey(row.code, row.alias)));
+  const availableCandidates = candidates.filter(
+    candidate => !addedLocationTypeKeys.has(locationTypeKey(candidateTypeCode(candidate), candidate.display))
+  );
+
   function handleAddSelected() {
-    const chosen = candidates.filter(candidate => selectedCandidates[candidate.id]);
+    const chosen = availableCandidates.filter(candidate => selectedCandidates[candidate.id]);
     if (chosen.length === 0) {
       return;
     }
     patch('locationOrg', {
       locationTypes: [
-        ...locationTypes,
-        ...chosen.map(candidate => ({code: candidate.typeCodings?.[0]?.code ?? '', alias: candidate.display}))
+        // Drops the untouched placeholder row (or any other left fully blank) the search replaces.
+        ...locationTypes.filter(row => row.code.trim() || row.alias.trim()),
+        ...chosen.map(candidate => ({code: candidateTypeCode(candidate), alias: candidate.display}))
       ]
     });
     setSearchOpen(false);
     notifySuccess(t('onboarding:locationOrg.messages.candidatesAdded', {count: chosen.length}));
   }
 
-  const anySelected = candidates.some(candidate => selectedCandidates[candidate.id]);
+  const anySelected = availableCandidates.some(candidate => selectedCandidates[candidate.id]);
 
   const stableOnBack = useStableCallback(onBack);
-  const stableOnNext = useStableCallback(onNext);
+  const stableHandleContinue = useStableCallback(handleContinue);
 
   useStepChrome(
     useMemo(
@@ -129,13 +215,13 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving || hasIncompleteRows} loading={savingDirection === 'next'}>
+            <Button onClick={stableHandleContinue} disabled={saving} loading={savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, savingDirection, stableOnBack, stableOnNext, hasIncompleteRows]
+      [t, saving, savingDirection, stableOnBack, stableHandleContinue]
     )
   );
 
@@ -176,35 +262,48 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           </div>
 
           <div className="nhsn-link__field-group">
-            <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.locationType.tooltip')}>{t('onboarding:locationOrg.locationType.listLabel')}</FieldLabel>
             <RepeatableList<LocationTypeEntry>
               items={locationTypes}
-              onChange={rows => patch('locationOrg', {locationTypes: rows})}
+              onChange={rows => {
+                trackRemoval(locationTypes, rows);
+                patch('locationOrg', {locationTypes: rows});
+              }}
               newItem={() => ({code: '', alias: ''})}
+              minItems={1}
               addLabel={t('onboarding:locationOrg.locationType.add')}
               removeLabel={t('common:actions.remove')}
-              emptyLabel={t('onboarding:locationOrg.noneAdded')}
+              columnHeadings={[
+                t('onboarding:locationOrg.locationIdentifier.systemPlaceholder'),
+                t('onboarding:locationOrg.locationIdentifier.codePlaceholder')
+              ]}
               renderItem={(row, index, onRowChange) => {
-                // Only flag a half-filled row (one side typed, the other still blank) - a freshly
-                // added, entirely untouched row isn't wrong yet, just unfinished, so it stays quiet
-                // until the facility actually starts it.
-                const partial = Boolean(row.code.trim()) !== Boolean(row.alias.trim());
+                // Blank fields are only flagged once Continue has been tried with this row present - not
+                // while the facility is still filling it in.
+                const flagBlank = isRowFlagged(index);
                 return (
                   <>
                     <TextField
                       id={`location-type-code-${index}`}
                       label={t('onboarding:locationOrg.locationType.codeLabel')}
-                      placeholder={t('onboarding:locationOrg.locationType.codeLabel')}
                       value={row.code}
-                      error={partial && !row.code.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      error={
+                        flagBlank && !row.code.trim()
+                          ? requiredError(t('onboarding:locationOrg.locationType.codeLabel'))
+                          : undefined
+                      }
                       onChange={code => onRowChange({...row, code})}
                     />
                     <TextField
                       id={`location-type-alias-${index}`}
                       label={t('onboarding:locationOrg.locationType.aliasLabel')}
-                      placeholder={t('onboarding:locationOrg.locationType.aliasLabel')}
                       value={row.alias}
-                      error={partial && !row.alias.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      error={
+                        flagBlank && !row.alias.trim()
+                          ? requiredError(t('onboarding:locationOrg.locationType.aliasLabel'))
+                          : duplicateRowIndexes.has(index)
+                            ? t('onboarding:locationOrg.errors.duplicateLocationType')
+                            : undefined
+                      }
                       onChange={alias => onRowChange({...row, alias})}
                     />
                   </>
@@ -216,21 +315,30 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
       )}
 
       {activeMethod === 'managing-org' && (
-        <div className="nhsn-link__field-group">
+        <div className="nhsn-link__field-group nhsn-link__location-org-tab-top">
           <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.managingOrg.tooltip')}>{t('onboarding:locationOrg.managingOrg.listLabel')}</FieldLabel>
           <RepeatableList<string>
             items={managingOrganizations}
-            onChange={rows => patch('locationOrg', {managingOrganizationIds: rows})}
+            onChange={rows => {
+              trackRemoval(managingOrganizations, rows);
+              patch('locationOrg', {managingOrganizationIds: rows});
+            }}
             newItem={() => ''}
+            minItems={1}
             addLabel={t('onboarding:locationOrg.managingOrg.add')}
             removeLabel={t('common:actions.remove')}
-            emptyLabel={t('onboarding:locationOrg.noneAdded')}
             renderItem={(row, index, onRowChange) => (
               <TextField
                 id={`managing-org-${index}`}
                 label={t('onboarding:locationOrg.managingOrg.listLabel')}
-                placeholder={t('onboarding:locationOrg.managingOrg.placeholder')}
                 value={row}
+                error={
+                  isRowFlagged(index) && !row.trim()
+                    ? requiredError(t('onboarding:locationOrg.managingOrg.placeholder'))
+                    : duplicateRowIndexes.has(index)
+                      ? t('onboarding:locationOrg.errors.duplicateManagingOrg')
+                      : undefined
+                }
                 onChange={onRowChange}
               />
             )}
@@ -250,32 +358,46 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           )}
 
           <div className="nhsn-link__field-group">
-            <FieldLabel checked={false} tooltip={t('onboarding:locationOrg.locationIdentifier.tooltip')}>{t('onboarding:locationOrg.locationIdentifier.listLabel')}</FieldLabel>
             <RepeatableList<LocationIdentifierEntry>
               items={locationIdentifiers}
-              onChange={rows => patch('locationOrg', {locationIdentifiers: rows})}
+              onChange={rows => {
+                trackRemoval(locationIdentifiers, rows);
+                patch('locationOrg', {locationIdentifiers: rows});
+              }}
               newItem={() => ({system: '', code: ''})}
+              minItems={1}
               addLabel={t('onboarding:locationOrg.locationIdentifier.add')}
               removeLabel={t('common:actions.remove')}
-              emptyLabel={t('onboarding:locationOrg.noneAdded')}
+              columnHeadings={[
+                t('onboarding:locationOrg.locationIdentifier.systemPlaceholder'),
+                t('onboarding:locationOrg.locationIdentifier.codePlaceholder')
+              ]}
               renderItem={(row, index, onRowChange) => {
-                const partial = Boolean(row.system.trim()) !== Boolean(row.code.trim());
+                const flagBlank = isRowFlagged(index);
                 return (
                   <>
                     <TextField
                       id={`location-identifier-system-${index}`}
                       label={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
-                      placeholder={t('onboarding:locationOrg.locationIdentifier.systemLabel')}
                       value={row.system}
-                      error={partial && !row.system.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      error={
+                        flagBlank && !row.system.trim()
+                          ? requiredError(t('onboarding:locationOrg.locationIdentifier.systemLabel'))
+                          : undefined
+                      }
                       onChange={system => onRowChange({...row, system})}
                     />
                     <TextField
                       id={`location-identifier-code-${index}`}
                       label={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
-                      placeholder={t('onboarding:locationOrg.locationIdentifier.codeLabel')}
                       value={row.code}
-                      error={partial && !row.code.trim() ? t('onboarding:locationOrg.errors.rowIncomplete') : undefined}
+                      error={
+                        flagBlank && !row.code.trim()
+                          ? requiredError(t('onboarding:locationOrg.locationIdentifier.codeLabel'))
+                          : duplicateRowIndexes.has(index)
+                            ? t('onboarding:locationOrg.errors.duplicateLocationIdentifier')
+                            : undefined
+                      }
                       onChange={code => onRowChange({...row, code})}
                     />
                   </>
@@ -286,7 +408,9 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         </>
       )}
 
-            {activeMethod === 'custom-fhir-path' && customFhirPathContent}
+            {activeMethod === 'custom-fhir-path' && (
+              <div className="nhsn-link__location-org-tab-top">{customFhirPathContent}</div>
+            )}
           </Tabs>
         </div>
       )}
@@ -313,24 +437,48 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         ) : (
           <CandidateTable
             caption={t('onboarding:locationOrg.locationType.searchTitle', {vendor: vendorName})}
-            candidates={candidates}
+            candidates={availableCandidates}
             selected={selectedCandidates}
             onToggle={(id, checked) => setSelectedCandidates(current => ({...current, [id]: checked}))}
+            onToggleAll={checked =>
+              setSelectedCandidates(Object.fromEntries(availableCandidates.map(candidate => [candidate.id, checked])))
+            }
+            selectAllLabel={t('onboarding:locationOrg.locationType.selectAll')}
             columnLabels={{
               id: t('onboarding:locationOrg.locationType.columns.id'),
               alias: t('onboarding:locationOrg.locationType.columns.alias'),
               type: t('onboarding:locationOrg.locationType.columns.type'),
               codings: t('onboarding:locationOrg.locationType.columns.codings')
             }}
-            emptyLabel={t('onboarding:locationOrg.locationType.noCandidates')}
+            emptyLabel={
+              candidates.length > 0
+                ? t('onboarding:locationOrg.locationType.allCandidatesAdded')
+                : t('onboarding:locationOrg.locationType.noCandidates')
+            }
           />
         )}
       </Modal>
 
-      {hasIncompleteRows && (
+      {continueAttempted && hasFlaggedIncompleteRows && (
         <div aria-live="off">
           <p className="nhsn-link__form-error" role="alert">
             {t('onboarding:locationOrg.errors.incompleteRows')}
+          </p>
+        </div>
+      )}
+
+      {continueAttempted && !hasIncompleteRows && hasEmptyRequiredList && (
+        <div aria-live="off">
+          <p className="nhsn-link__form-error" role="alert">
+            {t('onboarding:locationOrg.errors.listEmpty')}
+          </p>
+        </div>
+      )}
+
+      {continueAttempted && !hasFlaggedIncompleteRows && !hasEmptyRequiredList && hasDuplicateRows && (
+        <div aria-live="off">
+          <p className="nhsn-link__form-error" role="alert">
+            {t('onboarding:locationOrg.errors.duplicateRows')}
           </p>
         </div>
       )}
@@ -339,6 +487,18 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 }
 
 export default LocationOrgStep;
+
+function candidateTypeCode(candidate: LocationCandidate): string {
+  return candidate.typeCodings?.[0]?.code ?? '';
+}
+
+function locationTypeKey(code: string, alias: string): string {
+  return `${code.trim().toLowerCase()}|${alias.trim().toLowerCase()}`;
+}
+
+function withAtLeastOneRow<T>(rows: T[] | undefined, blank: T): T[] {
+  return rows && rows.length > 0 ? rows : [blank];
+}
 
 /**
  * i18n key per method, so no kebab-case identifier is built by string concatenation. Exported for
@@ -355,13 +515,36 @@ interface CandidateTableProps {
   candidates: LocationCandidate[];
   selected: Record<string, boolean>;
   onToggle: (id: string, checked: boolean) => void;
+  onToggleAll: (checked: boolean) => void;
+  selectAllLabel: string;
   columnLabels: {id: string; alias: string; type: string; codings: string};
   emptyLabel: string;
   caption: string;
 }
 
 /** Multi-select over search results. Columns match the POC's Cerner site-location table. */
-function CandidateTable({candidates, selected, onToggle, columnLabels, emptyLabel, caption}: CandidateTableProps) {
+function CandidateTable({
+  candidates,
+  selected,
+  onToggle,
+  onToggleAll,
+  selectAllLabel,
+  columnLabels,
+  emptyLabel,
+  caption
+}: CandidateTableProps) {
+  const selectedCount = candidates.filter(candidate => selected[candidate.id]).length;
+  const allSelected = candidates.length > 0 && selectedCount === candidates.length;
+  const someSelected = selectedCount > 0 && !allSelected;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  // `indeterminate` has no HTML attribute - it can only be set on the element itself.
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
   if (candidates.length === 0) {
     return <p className="nhsn-link__hint-text">{emptyLabel}</p>;
   }
@@ -372,7 +555,15 @@ function CandidateTable({candidates, selected, onToggle, columnLabels, emptyLabe
         <caption className="nhsn-link__visually-hidden">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col" className="nhsn-link__table-select-column" />
+            <th scope="col" className="nhsn-link__table-select-column">
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allSelected}
+                aria-label={selectAllLabel}
+                onChange={event => onToggleAll(event.target.checked)}
+              />
+            </th>
             <th scope="col">{columnLabels.id}</th>
             <th scope="col">{columnLabels.alias}</th>
             <th scope="col">{columnLabels.type}</th>

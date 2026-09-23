@@ -224,7 +224,7 @@ export class MockApiClient implements ApiClient {
           jwksInstructions: 'epic-jwks-instructions',
           locationOrgResolution: 'location-org-resolution'
         },
-        hslocSourceLabel: 'Epic Location Code'
+        hslocSourceLabel: 'location.identifier.value'
       },
       {
         vendor: 'Cerner',
@@ -237,7 +237,7 @@ export class MockApiClient implements ApiClient {
           jwksInstructions: 'cerner-jwks-instructions',
           locationOrgResolution: 'location-org-resolution'
         },
-        hslocSourceLabel: 'Cerner Location Code'
+        hslocSourceLabel: 'location.identifier.alias'
       }
     ];
   }

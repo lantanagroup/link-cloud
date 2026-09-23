@@ -29,6 +29,9 @@ import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
 
+/** Which fields show their "required" error. Set only by a Continue attempt, and cleared again the
+ *  moment that field is edited - so emptying a field while editing never flags it until the facility
+ *  next tries to move on. */
 interface RowDirtyState {
   sourceDisplay: boolean;
   sourceCode: boolean;
@@ -36,6 +39,7 @@ interface RowDirtyState {
 }
 
 const CLEAN_ROW: RowDirtyState = {sourceDisplay: false, sourceCode: false, hslocCode: false};
+const ALL_DIRTY: RowDirtyState = {sourceDisplay: true, sourceCode: true, hslocCode: true};
 
 interface MappingRow {
   sourceDisplay: string;
@@ -51,6 +55,14 @@ function toMappingRow(mapping: HslocMapping): MappingRow {
     hslocCode: mapping.hslocCode,
     dirty: CLEAN_ROW
   };
+}
+
+function hasFlaggedField(row: MappingRow): boolean {
+  return row.dirty.sourceDisplay || row.dirty.sourceCode || row.dirty.hslocCode;
+}
+
+function blankMappingRow(): MappingRow {
+  return {sourceDisplay: '', sourceCode: '', hslocCode: '', dirty: CLEAN_ROW};
 }
 
 function toMappings(rows: MappingRow[]): HslocMapping[] {
@@ -88,7 +100,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<HslocTab>('mapping');
   const [mappingsLoading, setMappingsLoading] = useState(true);
-  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [rows, setRows] = useState<MappingRow[]>(() => [blankMappingRow()]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const hasSyncedInitialLoad = useRef(false);
@@ -150,7 +162,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
         const pending = pendingImportRowsRef.current.filter(
           row => !persistedSourceCodes.has(row.sourceCode.trim().toLowerCase())
         );
-        setRows([...persisted, ...pending]);
+        const loaded = [...persisted, ...pending];
+        // Always at least one row to type into - the list's minItems keeps it from being removed.
+        setRows(loaded.length > 0 ? loaded : [blankMappingRow()]);
       })
       .catch(cause => {
         notifyError(cause instanceof Error ? cause.message : t('onboarding:hsloc.messages.loadError'));
@@ -190,6 +204,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const locationValueLabel = vendorProfile?.hslocSourceLabel ?? t('onboarding:hsloc.mapping.fields.locationValueFallback');
   const yourCodeLabel = t('onboarding:hsloc.mapping.fields.yourCodePlaceholder');
   const hslocCodeLabel = t('onboarding:hsloc.mapping.fields.hslocCodePlaceholder');
+  const hslocCodeHeading = t('onboarding:hsloc.mapping.fields.hslocCodeHeading');
+  const mappingColumnHeadings = [yourCodeLabel, locationValueLabel, hslocCodeHeading];
 
   function isCodeMapped(code: string): boolean {
     return rows.some(row => row.hslocCode === code && row.sourceCode.trim());
@@ -197,7 +213,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
   const completeRows = useMemo(() => rows.filter(isRowComplete), [rows]);
   const duplicateRowIndexes = useMemo(() => new Set(findDuplicateSourceCodeIndexes(rows)), [rows]);
-  const requiredFieldError = t('onboarding:hsloc.mapping.fields.requiredError');
+  const yourCodeRequiredError = t('onboarding:hsloc.mapping.fields.fieldRequiredError', {field: yourCodeLabel});
+  const locationValueRequiredError = t('onboarding:hsloc.mapping.fields.fieldRequiredError', {field: locationValueLabel});
+  const hslocCodeRequiredError = t('onboarding:hsloc.mapping.fields.hslocCodeRequiredError');
   const duplicateFieldError = t('onboarding:hsloc.mapping.fields.duplicateError');
 
   const categories = useMemo(
@@ -260,27 +278,55 @@ export function HslocStep({onNext, onBack}: StepProps) {
     return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [codes]);
 
-  function validateStep(): boolean {
-    if (rows.every(isRowBlank)) {
-      announceValidationMessage(t('onboarding:hsloc.messages.empty'));
-      return false;
+  /** The step-level message `rows` currently deserves, or null when they're fine to save. */
+  function validationMessageFor(current: MappingRow[]): string | null {
+    if (current.every(isRowBlank)) {
+      return t('onboarding:hsloc.messages.empty');
     }
-    const incompleteRowIndexes = findIncompleteRowIndexes(rows);
+    if (findIncompleteRowIndexes(current).length > 0) {
+      return t('onboarding:hsloc.messages.incomplete');
+    }
+    if (findDuplicateSourceCodeIndexes(current).length > 0) {
+      return t('onboarding:hsloc.messages.duplicate');
+    }
+    return null;
+  }
+
+  // Once shown, the message follows the rows live - fixing the problem clears it (or swaps it for
+  // the next one) without another click on Continue. A row added since that Continue isn't flagged
+  // yet (its fields show no errors), so it doesn't hold the message up either until the next attempt.
+  useEffect(() => {
+    if (validationError === null) {
+      return;
+    }
+    const tracked = rows.filter(row => hasFlaggedField(row) || isRowComplete(row));
+    const message =
+      tracked.length > 0
+        ? validationMessageFor(tracked)
+        : rows.every(isRowBlank)
+          ? t('onboarding:hsloc.messages.empty')
+          : null;
+    if (message !== validationError) {
+      setValidationError(message);
+    }
+  }, [rows]);
+
+  function validateStep(): boolean {
+    const message = validationMessageFor(rows);
+    if (message === null) {
+      setValidationError(null);
+      return true;
+    }
+    const incompleteRowIndexes = rows.every(isRowBlank)
+      ? rows.map((_row, index) => index)
+      : findIncompleteRowIndexes(rows);
     if (incompleteRowIndexes.length > 0) {
       setRows(prev =>
-        prev.map((row, index) =>
-          incompleteRowIndexes.includes(index) ? {...row, dirty: {sourceDisplay: true, sourceCode: true, hslocCode: true}} : row
-        )
+        prev.map((row, index) => (incompleteRowIndexes.includes(index) ? {...row, dirty: ALL_DIRTY} : row))
       );
-      announceValidationMessage(t('onboarding:hsloc.messages.incomplete'));
-      return false;
     }
-    if (findDuplicateSourceCodeIndexes(rows).length > 0) {
-      announceValidationMessage(t('onboarding:hsloc.messages.duplicate'));
-      return false;
-    }
-    setValidationError(null);
-    return true;
+    announceValidationMessage(message);
+    return false;
   }
 
   async function handleNext() {
@@ -358,41 +404,42 @@ export function HslocStep({onNext, onBack}: StepProps) {
           activeTab={tab}
           onTabChange={setTab}>
           {tab === 'mapping' && (
-        <div className="nhsn-link__field-group">
-          <FieldLabel checked={false}><AcronymText>{t('onboarding:hsloc.mapping.listLabel')}</AcronymText></FieldLabel>
+        <div className="nhsn-link__field-group nhsn-link__hsloc-mapping">
           <RepeatableList<MappingRow>
             items={rows}
             onChange={setRows}
-            newItem={() => ({sourceDisplay: '', sourceCode: '', hslocCode: '', dirty: CLEAN_ROW})}
+            newItem={blankMappingRow}
+            minItems={1}
             addLabel={t('onboarding:hsloc.mapping.addButton')}
             removeLabel={t('common:actions.remove')}
-            emptyLabel={t('onboarding:hsloc.mapping.emptyState')}
+            columnHeadings={mappingColumnHeadings}
             renderItem={(row, index, onRowChange) => {
               const sourceDisplayInvalid = row.dirty.sourceDisplay && !row.sourceDisplay.trim();
               const sourceCodeInvalid = row.dirty.sourceCode && !row.sourceCode.trim();
-              const sourceCodeDuplicate = row.dirty.sourceCode && !sourceCodeInvalid && duplicateRowIndexes.has(index);
+              // A repeat is wrong the moment it's typed, so unlike a blank field it doesn't wait for Continue.
+              const sourceCodeDuplicate = !sourceCodeInvalid && duplicateRowIndexes.has(index);
               const hslocCodeInvalid = row.dirty.hslocCode && !row.hslocCode.trim();
               return (
                 <>
                   <TextField
                     id={`hsloc-your-code-${index}`}
                     label={yourCodeLabel}
-                    placeholder={yourCodeLabel}
                     required
                     value={row.sourceDisplay}
-                    error={sourceDisplayInvalid ? requiredFieldError : undefined}
+                    error={sourceDisplayInvalid ? yourCodeRequiredError : undefined}
                     onChange={sourceDisplay =>
-                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: true}})
+                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: false}})
                     }
                   />
                   <TextField
                     id={`hsloc-location-value-${index}`}
                     label={locationValueLabel}
-                    placeholder={locationValueLabel}
                     required
                     value={row.sourceCode}
-                    error={sourceCodeInvalid ? requiredFieldError : sourceCodeDuplicate ? duplicateFieldError : undefined}
-                    onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}})}
+                    error={
+                      sourceCodeInvalid ? locationValueRequiredError : sourceCodeDuplicate ? duplicateFieldError : undefined
+                    }
+                    onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: false}})}
                   />
                   <div>
                     <select
@@ -409,7 +456,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                       required
                       value={row.hslocCode}
                       onChange={event =>
-                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: true}})
+                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: false}})
                       }>
                       <option value="">{hslocCodeLabel}</option>
                       {groupedCodeOptions.map(([category, categoryCodes]) => (
@@ -424,7 +471,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     </select>
                     {hslocCodeInvalid && (
                       <p id={`hsloc-code-error-${index}`} className="nhsn-link__hsloc-code-error-text" role="alert">
-                        {requiredFieldError}
+                        {hslocCodeRequiredError}
                       </p>
                     )}
                   </div>
