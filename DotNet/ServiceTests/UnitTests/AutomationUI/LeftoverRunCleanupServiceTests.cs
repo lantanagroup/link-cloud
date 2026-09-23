@@ -80,6 +80,38 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_still_purges_the_run_when_facility_teardown_fails()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var guidFacility = Guid.NewGuid().ToString();
+        var run = Run(guidFacility, now.AddDays(-30));
+        var saved = new List<CleanupReport>();
+        var service = Create(now, [run], saved, failFacilityDelete: true);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().BeEmpty();
+        result.FailedFacilityIds.Should().Equal(guidFacility);
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        saved.Single().PurgedRunIds.Should().Equal(run.RunId);
+        saved.Single().FailedFacilityIds.Should().Equal(guidFacility);
+    }
+
+    [Fact]
+    public async Task HistoryPurge_says_so_when_the_report_cannot_be_saved()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var run = Run(Guid.NewGuid().ToString(), now.AddDays(-30));
+        var messages = new List<string>();
+        var service = Create(now, [run], [], failReportSave: true, terminalMessages: messages);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        messages.Should().Contain(message => message.Contains("could not be saved"));
+    }
+
+    [Fact]
     public async Task HistoryPurge_keeps_torn_down_facility_when_snapshot_delete_fails()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -142,7 +174,10 @@ public class LeftoverRunCleanupServiceTests
         List<string>? order = null,
         Exception? deleteRunError = null,
         IReadOnlyDictionary<string, string>? facilities = null,
-        bool throwOnTerminalPublish = false)
+        bool throwOnTerminalPublish = false,
+        bool failFacilityDelete = false,
+        bool failReportSave = false,
+        List<string>? terminalMessages = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -155,7 +190,9 @@ public class LeftoverRunCleanupServiceTests
         facility.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<FacilityModel> { StatusCode = 404 });
         facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Ok());
+            .Returns(() => failFacilityDelete
+                ? throw new InvalidOperationException("facility delete failed")
+                : Task.FromResult(Ok()));
 
         var normalization = new Mock<INormalizationServiceClient>();
         normalization.Setup(c => c.DeleteFacilityOperationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -226,6 +263,8 @@ public class LeftoverRunCleanupServiceTests
         reports.Setup(s => s.SaveAsync(It.IsAny<CleanupReport>(), It.IsAny<CancellationToken>()))
             .Callback<CleanupReport, CancellationToken>((report, _) =>
             {
+                if (failReportSave)
+                    throw new InvalidOperationException("report store unavailable");
                 order?.Add("save");
                 saved.Add(report);
             })
@@ -244,6 +283,7 @@ public class LeftoverRunCleanupServiceTests
                     order?.Add("publish");
                     if (throwOnTerminalPublish)
                         throw new OperationCanceledException();
+                    terminalMessages?.Add(activity.Message);
                 }
             })
             .Returns(Task.CompletedTask);

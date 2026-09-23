@@ -411,7 +411,7 @@ public sealed class LeftoverRunCleanupService(
                         quiesced.Add(facilityId);
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogWarning(ex, "Leftover facility {Mode} failed for {FacilityId}.", mode, facilityId);
                     failedFacilities.Add(facilityId);
@@ -435,21 +435,31 @@ public sealed class LeftoverRunCleanupService(
                     var teardownInPurge = mode == "history-purge" || teardownFacilities;
                     // Record the teardown before snapshot delete. A later failure must not
                     // drop a facility that CleanupLeftoverFacilityAsync already removed.
-                    if (teardownInPurge && IsNewHistoryTeardown(run.FacilityId, tornDown))
+                    // A teardown failure still falls through to the history purge.
+                    var teardownThisRun = teardownInPurge && IsNewHistoryTeardown(run.FacilityId, tornDown);
+                    if (teardownThisRun)
                     {
-                        await RunCleanupHelper.CleanupLeftoverFacilityAsync(
-                            facilityClient,
-                            normalizationClient,
-                            dataAcqClient,
-                            queryDispatchClient,
-                            censusClient,
-                            reportClient,
-                            abortRegistry,
-                            output,
-                            run.FacilityId!,
-                            settings.AbortTtl,
-                            cancellationToken);
-                        tornDown.Add(run.FacilityId!);
+                        try
+                        {
+                            await RunCleanupHelper.CleanupLeftoverFacilityAsync(
+                                facilityClient,
+                                normalizationClient,
+                                dataAcqClient,
+                                queryDispatchClient,
+                                censusClient,
+                                reportClient,
+                                abortRegistry,
+                                output,
+                                run.FacilityId!,
+                                settings.AbortTtl,
+                                cancellationToken);
+                            tornDown.Add(run.FacilityId!);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", run.FacilityId);
+                            failedFacilities.Add(run.FacilityId!);
+                        }
                     }
 
                     await RunCleanupHelper.PurgeRunHistoryAsync(
@@ -465,13 +475,13 @@ public sealed class LeftoverRunCleanupService(
                         run,
                         settings.AbortTtl,
                         cancellationToken,
-                        teardownFacility: teardownInPurge,
+                        teardownFacility: teardownInPurge && !teardownThisRun,
                         alreadyTornDownFacilityIds: tornDown.Count > 0
                             ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
                             : null);
                     purged.Add(run.RunId);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogWarning(ex, "History purge failed for run {RunId}.", run.RunId);
                     failedRuns.Add(run.RunId);
@@ -500,7 +510,7 @@ public sealed class LeftoverRunCleanupService(
             var status = failedFacilities.Count > 0 || failedRuns.Count > 0 ? "failed" : "completed";
             var finishedAt = time.GetUtcNow();
             var message = FormatActivityResult(label, result);
-            await TrySaveReportAsync(new CleanupReport
+            var persisted = await TrySaveReportAsync(new CleanupReport
             {
                 Id = Guid.NewGuid(),
                 Mode = mode,
@@ -518,8 +528,10 @@ public sealed class LeftoverRunCleanupService(
                 FailedFacilityIds = result.FailedFacilityIds,
                 FailedRunIds = result.FailedRunIds,
                 Message = message
-            }, cancellationToken);
-            savedTerminal = true;
+            }, CancellationToken.None);
+            savedTerminal = persisted;
+            if (!persisted)
+                message += " The cleanup report could not be saved.";
 
             try
             {
@@ -713,15 +725,17 @@ public sealed class LeftoverRunCleanupService(
             Message = message
         };
 
-    private async Task TrySaveReportAsync(CleanupReport report, CancellationToken cancellationToken)
+    private async Task<bool> TrySaveReportAsync(CleanupReport report, CancellationToken cancellationToken)
     {
         try
         {
             await reportStore.SaveAsync(report, cancellationToken);
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Could not persist leftover cleanup report for {Mode}.", report.Mode);
+            return false;
         }
     }
 
