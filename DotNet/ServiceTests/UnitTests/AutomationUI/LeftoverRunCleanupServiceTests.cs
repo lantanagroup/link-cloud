@@ -28,10 +28,12 @@ public class LeftoverRunCleanupServiceTests
         var guidRun = Run(guidFacility, now.AddDays(-30));
         var namedRun = Run("CityHospital", now.AddDays(-30));
         var saved = new List<CleanupReport>();
-        var service = Create(now, [guidRun, namedRun], saved);
+        var order = new List<string>();
+        var service = Create(now, [guidRun, namedRun], saved, order: order);
 
         var result = await service.RunHistoryPurgeNowAsync();
 
+        order.Should().ContainInOrder("save", "publish");
         result.TornDownFacilityIds.Should().Equal(guidFacility);
         result.TeardownCandidateCount.Should().Be(1);
         result.PurgedRunIds.Should().BeEquivalentTo([guidRun.RunId, namedRun.RunId]);
@@ -77,7 +79,8 @@ public class LeftoverRunCleanupServiceTests
         DateTimeOffset now,
         IReadOnlyList<AutomationRunSummary> runs,
         List<CleanupReport> saved,
-        CancellationTokenSource? cancelAfterFirstDelete = null)
+        CancellationTokenSource? cancelAfterFirstDelete = null,
+        List<string>? order = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -153,7 +156,11 @@ public class LeftoverRunCleanupServiceTests
 
         var reports = new Mock<ICleanupReportStore>();
         reports.Setup(s => s.SaveAsync(It.IsAny<CleanupReport>(), It.IsAny<CancellationToken>()))
-            .Callback<CleanupReport, CancellationToken>((report, _) => saved.Add(report))
+            .Callback<CleanupReport, CancellationToken>((report, _) =>
+            {
+                order?.Add("save");
+                saved.Add(report);
+            })
             .Returns(Task.CompletedTask);
 
         var abort = new Mock<IPipelineAbortRegistry>();
@@ -162,6 +169,11 @@ public class LeftoverRunCleanupServiceTests
 
         var proxy = new Mock<IClientProxy>();
         proxy.Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object?[]>(), It.IsAny<CancellationToken>()))
+            .Callback<string, object?[], CancellationToken>((_, args, _) =>
+            {
+                if (args.Length > 0 && args[0] is CleanupActivity activity && activity.Status is "completed" or "failed")
+                    order?.Add("publish");
+            })
             .Returns(Task.CompletedTask);
         var clients = new Mock<IHubClients>();
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(proxy.Object);

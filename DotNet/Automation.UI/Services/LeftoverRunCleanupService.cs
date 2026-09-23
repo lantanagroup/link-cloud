@@ -484,22 +484,6 @@ public sealed class LeftoverRunCleanupService(
             var status = failedFacilities.Count > 0 || failedRuns.Count > 0 ? "failed" : "completed";
             var finishedAt = time.GetUtcNow();
             var message = FormatActivityResult(label, result);
-            await PublishAsync(new CleanupActivity
-            {
-                Mode = mode,
-                Label = label,
-                Status = status,
-                Trigger = trigger,
-                Total = total,
-                Processed = processed,
-                Quiesced = quiesced.Count,
-                TornDown = tornDown.Count,
-                Purged = purged.Count,
-                Failed = failedFacilities.Count + failedRuns.Count,
-                Message = message,
-                At = finishedAt
-            }, cancellationToken);
-
             await TrySaveReportAsync(new CleanupReport
             {
                 Id = Guid.NewGuid(),
@@ -520,28 +504,48 @@ public sealed class LeftoverRunCleanupService(
                 Message = message
             }, cancellationToken);
 
+            await PublishAsync(new CleanupActivity
+            {
+                Mode = mode,
+                Label = label,
+                Status = status,
+                Trigger = trigger,
+                Total = total,
+                Processed = processed,
+                Quiesced = quiesced.Count,
+                TornDown = tornDown.Count,
+                Purged = purged.Count,
+                Failed = failedFacilities.Count + failedRuns.Count,
+                Message = message,
+                At = finishedAt
+            }, cancellationToken);
+
             return result;
         }
         catch (OperationCanceledException)
         {
             var finishedAt = time.GetUtcNow();
             var message = $"{label} cancelled.";
+            await TrySaveReportAsync(PartialReport(
+                mode, label, trigger, startedAt, finishedAt, message,
+                quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
+                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
             await PublishAsync(CurrentActivity with
             {
                 Status = "failed",
                 Message = message,
                 At = finishedAt
             }, CancellationToken.None);
-            await TrySaveReportAsync(PartialReport(
-                mode, label, trigger, startedAt, finishedAt, message,
-                quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
-                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
             throw;
         }
         catch (Exception ex)
         {
             var finishedAt = time.GetUtcNow();
             var message = $"{label} failed: {ex.Message}";
+            await TrySaveReportAsync(PartialReport(
+                mode, label, trigger, startedAt, finishedAt, message,
+                quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
+                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
             await PublishAsync(new CleanupActivity
             {
                 Mode = mode,
@@ -551,10 +555,6 @@ public sealed class LeftoverRunCleanupService(
                 Message = message,
                 At = finishedAt
             }, CancellationToken.None);
-            await TrySaveReportAsync(PartialReport(
-                mode, label, trigger, startedAt, finishedAt, message,
-                quiesceCandidateCount, quiesced, teardownCandidateCount, tornDown,
-                historyCandidateCount, purged, failedFacilities, failedRuns), CancellationToken.None);
             throw;
         }
         finally

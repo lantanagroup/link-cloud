@@ -476,7 +476,8 @@
             var id = btn.getAttribute('data-report-id');
             fetch(reportUrl + '/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } })
                 .then(function (r) {
-                    if (!r.ok) throw new Error('Report not found');
+                    if (r.status === 404) throw new Error('Report not found');
+                    if (!r.ok) throw new Error('Could not load cleanup report');
                     return r.json();
                 })
                 .then(showReport)
