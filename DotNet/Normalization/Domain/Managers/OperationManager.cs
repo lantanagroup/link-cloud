@@ -340,6 +340,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
             try
             {
+            if (ownsTransaction)
+            {
+                // CreateOperationSequences locks this operation before it inserts a sequence.
+                // Hold that lock before snapshotting sequences so a concurrent create cannot
+                // insert one and bump a facility that this delete then cascades away.
+                await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+            }
+
             var operation = await _database.Operations.GetAsync(operationId, cancellationToken);
             operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId, cancellationToken);
             var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);

@@ -412,7 +412,10 @@ public class OperationSequenceCacheTests
         var operationId = await harness.SeedAndSequenceAsync("facility-a", "Copy");
         await harness.WarmAsync("facility-a");
 
+        harness.WriterCounter.OperationLockIds.Clear();
         await harness.WriterManager.UpdateOperationResourceTypesForOperation(operationId, new List<string> { "Encounter" });
+
+        Assert.Contains(operationId, harness.WriterCounter.OperationLockIds);
 
         Assert.Empty(await harness.ReaderQueries.Search(Typed("facility-a")));
         Assert.Empty(await harness.WriterContext.OperationSequences.Where(sequence => sequence.FacilityId == "facility-a").ToListAsync());
