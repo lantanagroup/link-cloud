@@ -480,36 +480,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 }
 
-                var operationIds = new List<Guid>();
-                var pageNumber = 1;
-                while (true)
+                // One query, not offset pages. A concurrent vendor delete can commit between
+                // page 1 and page 2 and shift the remaining rows, so a later page would skip them.
+                var operations = await _operationQueries.Search(new OperationSearchModel()
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var operations = await _operationQueries.Search(new OperationSearchModel()
-                    {
-                        FacilityId = model.FacilityId,
-                        VendorVersionId = model.VendorVersionId,
-                        OperationId = model.OperationId,
-                        ResourceType = model.ResourceType,
-                        IncludeDisabled = true,
-                        SortBy = "Id",
-                        SortOrder = SortOrder.Ascending,
-                        PageNumber = pageNumber
-                    }, cancellationToken, hydrateVendors: false);
-
-                    if (operations == null || operations.Records.Count == 0)
-                    {
-                        break;
-                    }
-
-                    operationIds.AddRange(operations.Records.Select(record => record.Id));
-                    if (pageNumber >= operations.Metadata.TotalPages)
-                    {
-                        break;
-                    }
-
-                    pageNumber++;
-                }
+                    FacilityId = model.FacilityId,
+                    VendorVersionId = model.VendorVersionId,
+                    OperationId = model.OperationId,
+                    ResourceType = model.ResourceType,
+                    IncludeDisabled = true,
+                    SortBy = "Id",
+                    SortOrder = SortOrder.Ascending,
+                    PageNumber = 1,
+                    PageSize = int.MaxValue
+                }, cancellationToken, hydrateVendors: false);
+                var operationIds = operations?.Records.Select(record => record.Id) ?? Enumerable.Empty<Guid>();
 
                 // SQL Server uniqueidentifier order is not .NET Guid order. Sequence writes sort
                 // every id with GuidComparer, so the delete must lock in that same order.
