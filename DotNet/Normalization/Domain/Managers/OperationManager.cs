@@ -397,11 +397,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var ownsTransaction = !_database.HasActiveTransaction;
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
-            if (!string.IsNullOrEmpty(model.FacilityId))
-            {
-                await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
-            }
-
             var modifiedRecords = 0;
             var affectedFacilities = new HashSet<string>(StringComparer.Ordinal);
             if (!string.IsNullOrEmpty(model.FacilityId))
@@ -411,6 +406,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             try
             {
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
+                }
+
                 int returned;
                 long count;
 

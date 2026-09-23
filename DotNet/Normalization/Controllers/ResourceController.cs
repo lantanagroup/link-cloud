@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Get(string resource)
+        public async Task<ActionResult<ResourceModel>> Get(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -35,7 +35,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var foundResource = await _resourceQueries.Get(resource);
+                var foundResource = await _resourceQueries.Get(resource, cancellationToken);
 
                 if (foundResource == null)
                 {
@@ -54,11 +54,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ResourceModel>>> Get()
+        public async Task<ActionResult<List<ResourceModel>>> Get(CancellationToken cancellationToken = default)
         {
             try
             {
-                var foundResources = await _resourceQueries.GetAll();
+                var foundResources = await _resourceQueries.GetAll(cancellationToken);
 
                 return Ok(foundResources);
             }

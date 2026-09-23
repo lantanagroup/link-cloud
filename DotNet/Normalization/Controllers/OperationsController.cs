@@ -58,13 +58,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorVersionId = null,
-            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
                         return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
@@ -91,7 +91,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
             }
@@ -107,7 +107,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorVersionId = null,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -116,7 +116,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(detail: $"A faciityId must be provided", statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                 {
                     return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                 }
@@ -142,7 +142,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
             }
@@ -158,7 +158,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorVersionOperations(Guid vendorVersionId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -183,7 +183,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
             }
@@ -405,7 +405,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                var dbEntity = await _operationQueries.Get(id, facilityId);
+                var dbEntity = await _operationQueries.Get(id, facilityId, cancellationToken);
 
                 if (dbEntity == null)
                 {

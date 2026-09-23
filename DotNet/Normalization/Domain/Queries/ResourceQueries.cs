@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IResourceQueries
     {
-        Task<List<ResourceModel>> GetAll();
+        Task<List<ResourceModel>> GetAll(CancellationToken cancellationToken = default);
         Task<ResourceModel?> Get(Guid resourceId);
         Task<ResourceModel?> Get(string resourceName, CancellationToken cancellationToken = default);
         Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default);
@@ -36,9 +36,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             }, cancellationToken)).FirstOrDefault();
         }
 
-        public async Task<List<ResourceModel>> GetAll()
+        public async Task<List<ResourceModel>> GetAll(CancellationToken cancellationToken = default)
         {
-            return await Search(new ResourceSearchModel());
+            return await Search(new ResourceSearchModel(), cancellationToken);
         }
 
         public async Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default)
