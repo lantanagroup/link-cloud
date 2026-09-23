@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Services;
 using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
@@ -417,6 +418,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         OperationId = model.OperationId,
                         ResourceType = model.ResourceType,
                         IncludeDisabled = true,
+                        SortBy = "Id",
+                        SortOrder = SortOrder.Ascending,
                         PageNumber = pageNumber
                     }, cancellationToken, hydrateVendors: false);
 

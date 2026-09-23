@@ -11,6 +11,7 @@ using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
 using LantanaGroup.Link.Normalization.Domain.Services;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services;
 using Microsoft.AspNetCore.Http;
@@ -147,6 +148,39 @@ public class OperationSequenceCacheTests
         Assert.Empty(await harness.WriterQueries.Search(Typed(facilityId)));
         Assert.Empty(await harness.ReaderQueries.Search(All(facilityId)));
         Assert.Empty(await harness.GetAsync(harness.ReaderController, facilityId, "Patient"));
+    }
+
+    [Fact]
+    public async Task DeleteOperation_LocksPagedOperationsInAscendingIdOrder()
+    {
+        using var harness = new Harness();
+        var facilityId = "facility-a";
+        for (var i = 0; i < 11; i++)
+        {
+            await harness.SeedAndSequenceAsync(facilityId, $"Op{i}");
+        }
+
+        var expected = (await harness.OperationQueries.Search(new OperationSearchModel
+        {
+            FacilityId = facilityId,
+            IncludeDisabled = true,
+            SortBy = "Id",
+            SortOrder = SortOrder.Ascending,
+            PageSize = 50,
+            PageNumber = 1
+        }, CancellationToken.None, hydrateVendors: false)).Records.Select(record => record.Id).ToList();
+
+        harness.WriterCounter.OperationLockIds.Clear();
+        Assert.True(await harness.WriterManager.DeleteOperation(new DeleteOperationModel { FacilityId = facilityId }));
+
+        var locked = harness.WriterCounter.OperationLockIds;
+        Assert.Equal(expected, locked.Distinct().ToList());
+        for (var i = 1; i < locked.Count; i++)
+        {
+            Assert.True(expected.IndexOf(locked[i - 1]) <= expected.IndexOf(locked[i]));
+        }
+
+        Assert.Empty(await harness.WriterContext.Operations.Where(operation => operation.FacilityId == facilityId).ToListAsync());
     }
 
     [Fact]
@@ -556,6 +590,7 @@ public class OperationSequenceCacheTests
     {
         public int SequenceCommands { get; private set; }
         public int RevisionCommands { get; private set; }
+        public List<Guid> OperationLockIds { get; } = new();
 
         public override InterceptionResult<DbDataReader> ReaderExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
         {
@@ -567,6 +602,42 @@ public class OperationSequenceCacheTests
         {
             Count(command.CommandText);
             return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+        {
+            CaptureOperationLock(command);
+            return base.NonQueryExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            CaptureOperationLock(command);
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        private void CaptureOperationLock(DbCommand command)
+        {
+            if (!command.CommandText.Contains("UPDATE Operation", StringComparison.OrdinalIgnoreCase)
+                || !command.CommandText.Contains("ModifyDate", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            foreach (DbParameter parameter in command.Parameters)
+            {
+                if (parameter.Value is Guid id)
+                {
+                    OperationLockIds.Add(id);
+                    return;
+                }
+
+                if (parameter.Value is string text && Guid.TryParse(text, out var parsed))
+                {
+                    OperationLockIds.Add(parsed);
+                    return;
+                }
+            }
         }
 
         private void Count(string commandText)
