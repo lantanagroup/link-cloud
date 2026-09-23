@@ -61,7 +61,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return (await _presetQueries.Get(preset.Id))!;
+        return (await _presetQueries.Get(preset.Id, cancellationToken))!;
     }
 
     public async Task Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default)

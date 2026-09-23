@@ -30,7 +30,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<VendorVersionOperationPresetModel>))]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetAll(Guid? vendorVersionId = null, string? resource = null)
+    public async Task<ActionResult<List<VendorVersionOperationPresetModel>>> GetAll(Guid? vendorVersionId = null, string? resource = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -38,7 +38,7 @@ public class VendorVersionOperationPresetsController : ControllerBase
             {
                 VendorVersionId = vendorVersionId,
                 Resource = resource
-            }));
+            }, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -50,11 +50,11 @@ public class VendorVersionOperationPresetsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorVersionOperationPresetModel))]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<VendorVersionOperationPresetModel>> Get(Guid presetId)
+    public async Task<ActionResult<VendorVersionOperationPresetModel>> Get(Guid presetId, CancellationToken cancellationToken = default)
     {
         try
         {
-            var preset = await _presetQueries.Get(presetId);
+            var preset = await _presetQueries.Get(presetId, cancellationToken);
             return preset == null ? NotFound() : Ok(preset);
         }
         catch (Exception exception)

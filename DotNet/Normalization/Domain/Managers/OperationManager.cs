@@ -110,7 +110,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }, cancellationToken);
 
                 taskResult.IsSuccess = true;
-                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken);
+                taskResult.ObjectResult = await ExecuteWithDeadlockRetryAsync(
+                    () => _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken),
+                    cancellationToken);
             }
             catch (Exception ex)
             {
@@ -213,7 +215,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await transaction.CommitAsync(cancellationToken);
 
                 taskResult.IsSuccess = true;
-                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken);
+                taskResult.ObjectResult = await ExecuteWithDeadlockRetryAsync(
+                    () => _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken),
+                    cancellationToken);
             }
             catch (Exception ex)
             {
@@ -668,7 +672,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         private async Task<T> ExecuteWithDeadlockRetryAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
         {
-            const int maxAttempts = 3;
+            const int maxAttempts = 8;
             for (var attempt = 1; ; attempt++)
             {
                 try
@@ -690,7 +694,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     }
 
                     _database.ClearChanges();
-                    cancellationToken.ThrowIfCancellationRequested();
+                    await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(25, 80) * attempt), cancellationToken);
                 }
             }
         }
@@ -702,6 +706,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 if (current.GetType().Name == "SqlException"
                     && current.GetType().GetProperty("Number")?.GetValue(current) is int number
                     && number == 1205)
+                {
+                    return true;
+                }
+
+                if (current.Message.Contains("was deadlocked", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }
