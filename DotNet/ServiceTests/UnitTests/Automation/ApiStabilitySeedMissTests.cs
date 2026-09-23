@@ -20,6 +20,8 @@ public class ApiStabilitySeedMissTests
     [InlineData("API health run failed. status=Failed, failedEndpoints=2, error=GET /facilities returned 500")]
     [InlineData("REPORT INTERNAL ABS MANIFEST VALIDATION: ABS patient=Patient-1, type=Condition: expected=1, actual=0.")]
     [InlineData("ABS artifacts missing expected resource: ServiceRequest/Patient-1-SvcReq-001")]
+    [InlineData("REPORT INTERNAL ABS MANIFEST VALIDATION: ABS patient=Patient-1, type=ServiceRequest: expected=1, actual=2.")]
+    [InlineData("REPORT INTERNAL ABS MANIFEST VALIDATION: Resource ServiceRequest/Patient-1-SvcReq-001 has a duplicate id.")]
     public void OtherFailures_AreNotRetried(string? error)
     {
         ApiStabilitySeedMiss.IsRetryable(error).Should().BeFalse();

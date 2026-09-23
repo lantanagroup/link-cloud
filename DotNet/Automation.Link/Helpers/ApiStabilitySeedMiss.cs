@@ -17,9 +17,10 @@ public static class ApiStabilitySeedMiss
         if (!error.Contains("REPORT INTERNAL ABS MANIFEST VALIDATION", StringComparison.Ordinal))
             return false;
 
-        return error.Contains("type=ServiceRequest:", StringComparison.Ordinal)
-            || error.Contains("type=Observation:", StringComparison.Ordinal)
-            || error.Contains("ServiceRequest/", StringComparison.Ordinal)
-            || error.Contains("Observation/", StringComparison.Ordinal);
+        // Only a missing ServiceRequest or Observation key. A type= surplus
+        // (actual greater than expected) and a "Resource ServiceRequest/... has ..."
+        // reference error are deterministic and must fail the test immediately.
+        return error.Contains("ABS artifacts missing expected resource: ServiceRequest/", StringComparison.Ordinal)
+            || error.Contains("ABS artifacts missing expected resource: Observation/", StringComparison.Ordinal);
     }
 }
