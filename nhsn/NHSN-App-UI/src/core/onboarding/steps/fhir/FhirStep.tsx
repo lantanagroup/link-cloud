@@ -6,7 +6,7 @@ import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnno
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
+import {parseIso8601Duration, validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
 import './FhirStep.css';
 
 /**
@@ -511,22 +511,4 @@ function buildIso8601Duration(days?: number, hours?: number, minutes?: number): 
   const normalizedHours = Math.floor((totalMinutes % (24 * 60)) / 60);
   const normalizedMinutes = totalMinutes % 60;
   return `P${normalizedDays}DT${normalizedHours}H${normalizedMinutes}M`;
-}
-
-// Inverse of buildIso8601Duration, but tolerant of any minimal ISO-8601 duration shape, not just
-// the one buildIso8601Duration itself emits: a value round-tripped through Query Dispatch comes
-// back as .NET's XmlConvert.ToString(TimeSpan), which drops any component that's zero entirely -
-// 50 days with no hours/minutes serializes as "P50D", not "P50DT0H0M" - so every one of D/T/H/M/S
-// here is optional, and a missing piece just means zero, not "unparseable".
-function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
-  if (!duration) {
-    return [undefined, undefined, undefined];
-  }
-
-  const match = duration.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?)?$/);
-  if (!match) {
-    return [undefined, undefined, undefined];
-  }
-
-  return [Number(match[1] ?? 0), Number(match[2] ?? 0), Number(match[3] ?? 0)];
 }

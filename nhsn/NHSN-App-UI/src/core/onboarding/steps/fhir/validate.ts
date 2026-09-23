@@ -1,3 +1,5 @@
+import type {FacilityDraft} from '../../types';
+
 export interface FieldErrors {
   [field: string]: string; // i18n keys, not sentences
 }
@@ -123,4 +125,42 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
   }
 
   return errors;
+}
+
+// Inverse of FhirStep's buildIso8601Duration, but tolerant of any minimal ISO-8601 duration shape,
+// not just the one that emits: a value round-tripped through Query Dispatch comes back as .NET's
+// XmlConvert.ToString(TimeSpan), which drops any component that's zero entirely - 50 days with no
+// hours/minutes serializes as "P50D", not "P50DT0H0M" - so every one of D/T/H/M/S here is optional,
+// and a missing piece just means zero, not "unparseable".
+export function parseIso8601Duration(duration?: string): [number | undefined, number | undefined, number | undefined] {
+  if (!duration) {
+    return [undefined, undefined, undefined];
+  }
+
+  const match = duration.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?)?$/);
+  if (!match) {
+    return [undefined, undefined, undefined];
+  }
+
+  return [Number(match[1] ?? 0), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+}
+
+/** Mirrors FhirStep.validateStep: every field valid, and the current base URL actually tested. */
+export function isFhirComplete(draft: FacilityDraft): boolean {
+  const f = draft.fhir;
+  if (!f.connectionTested) {
+    return false;
+  }
+  const [lagDays, lagHours, lagMinutes] = parseIso8601Duration(f.lagDuration);
+  const errors = validateFhir({
+    fhirServerBaseUrl: f.fhirServerBaseUrl ?? '',
+    maxConcurrentRequests: f.maxConcurrentRequests,
+    maxRetries: f.maxRetries,
+    minAcquisitionPullTime: f.minAcquisitionPullTime ?? '',
+    maxAcquisitionPullTime: f.maxAcquisitionPullTime ?? '',
+    lagDays,
+    lagHours,
+    lagMinutes
+  });
+  return Object.keys(errors).length === 0;
 }

@@ -60,7 +60,12 @@ describe('resolveStep', () => {
       {
         facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
         manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
-        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        fhir: {
+          fhirServerBaseUrl: 'https://example.invalid/fhir',
+          maxConcurrentRequests: 4,
+          lagDuration: 'P0DT1H0M',
+          connectionTested: true
+        },
         census: {
           patientListIds: {
             'admit-lt-24': 'list-1',
@@ -72,7 +77,9 @@ describe('resolveStep', () => {
           },
           acquisitionFrequency: 'PT0H15M',
           accuracyAcknowledged: true
-        }
+        },
+        hsloc: {mappings: [{sourceCode: 'ICU', sourceDisplay: 'ICU', hslocCode: '1024-9'}]},
+        report: {lastRequestedReportId: 'R1'}
       }
     );
     const target = {
@@ -97,10 +104,7 @@ describe('resolveStep', () => {
 });
 
 describe('isUnlocked', () => {
-  // TEMP: skipped alongside TEMP_ALWAYS_COMPLETE in flow.ts — facility-info's
-  // real isComplete is bypassed for now, so this no longer holds. Re-enable
-  // once that temporary override is removed.
-  it.skip('requires every preceding step to be complete, not just an unlock record', () => {
+  it('requires every preceding step to be complete, not just an unlock record', () => {
     // facility-info is unlocked but incomplete, so fhir behind it is not reachable
     // even though a stale draft lists it.
     const draft = draftAt(['welcome', 'reporting-plan', 'facility-info', 'fhir']);
