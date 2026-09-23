@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
     public interface IResourceManager
     {
-        Task<List<ResourceModel>> InitializeResources();
+        Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default);
         Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default);
         Task DeleteResource(string resource, CancellationToken cancellationToken = default);
     }
@@ -102,20 +102,25 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
             }
 
+            var presets = await _database.VendorVersionOperationPresets.FindAsync(
+                preset => preset.OperationResourceType.ResourceType.Name == resource,
+                cancellationToken);
+            presets.ForEach(_database.VendorVersionOperationPresets.Remove);
             _database.ResourceTypes.Remove(resourceEntity.Single());
             await _database.SaveChangesAsync(cancellationToken);
             await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
 
-        public async Task<List<ResourceModel>> InitializeResources()
+        public async Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default)
         {
             List<string> resources = new List<string>(Enum.GetNames(typeof(ResourceType)));
 
             List<ResourceModel> resourceModels = new();
             foreach (var resource in resources)
             {
-                var created = await CreateResource(resource);
+                cancellationToken.ThrowIfCancellationRequested();
+                var created = await CreateResource(resource, cancellationToken: cancellationToken);
                 if (created != null)
                 {
                     resourceModels.Add(created);

@@ -98,14 +98,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 };
 
                 await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-                if (model.ResourceTypes != null)
-                {
-                    foreach (var resourceName in model.ResourceTypes.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
-                    {
-                        await _operationSequenceQueries.LockResourceTypeAsync(resourceName, cancellationToken);
-                    }
-                }
-
                 await _database.Operations.AddAsync(operation, cancellationToken);
                 await _database.SaveChangesAsync(cancellationToken);
 
@@ -411,67 +403,75 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 }
 
-                int returned;
-                long count;
-
-                do
+                var pageNumber = 1;
+                while (true)
                 {
-                    returned = 0;
-                    count = 0;
-
+                    cancellationToken.ThrowIfCancellationRequested();
                     var operations = await _operationQueries.Search(new OperationSearchModel()
                     {
                         FacilityId = model.FacilityId,
                         VendorVersionId = model.VendorVersionId,
                         OperationId = model.OperationId,
                         ResourceType = model.ResourceType,
-                        IncludeDisabled = true
+                        IncludeDisabled = true,
+                        PageNumber = pageNumber
                     }, cancellationToken);
 
-                    if (operations != null && operations.Records.Count > 0)
+                    if (operations == null || operations.Records.Count == 0)
                     {
-                        returned = operations.Records.Count;
-                        count = operations.Metadata.TotalCount;
-
-                        foreach (var operation in operations.Records.OrderBy(candidate => candidate.Id))
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
-                            var current = await _database.Operations.GetAsync(operation.Id, cancellationToken);
-                            if (current == null || !await OperationStillMatchesDeleteAsync(current, model, cancellationToken))
-                            {
-                                continue;
-                            }
-
-                            modifiedRecords++;
-                            foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken))
-                            {
-                                affectedFacilities.Add(facilityId);
-                            }
-
-                            if (!string.IsNullOrEmpty(model.FacilityId))
-                            {
-                                await DeleteOperationSequence(new DeleteOperationSequencesModel()
-                                {
-                                    FacilityId = model.FacilityId,
-                                    OperationId = operation.Id,
-                                }, cancellationToken);
-                            }
-
-                            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id, cancellationToken);
-                            orts.ForEach(_database.OperationResourceTypes.Remove);
-
-                            var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id, cancellationToken);
-                            vops.ForEach(_database.VendorVersionOperationPresets.Remove);
-
-                            var op = await _database.Operations.GetAsync(operation.Id, cancellationToken);
-                            _database.Operations.Remove(op);
-                        }
-
-                        await _database.SaveChangesAsync(cancellationToken);
+                        break;
                     }
 
-                } while (count > returned);
+                    var deletedThisPage = 0;
+                    foreach (var operation in operations.Records.OrderBy(candidate => candidate.Id))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
+                        var current = await _database.Operations.GetAsync(operation.Id, cancellationToken);
+                        if (current == null || !await OperationStillMatchesDeleteAsync(current, model, cancellationToken))
+                        {
+                            continue;
+                        }
+
+                        deletedThisPage++;
+                        modifiedRecords++;
+                        foreach (var facilityId in await _operationSequenceQueries.FacilitiesReferencingOperationAsync(operation.Id, cancellationToken))
+                        {
+                            affectedFacilities.Add(facilityId);
+                        }
+
+                        if (!string.IsNullOrEmpty(model.FacilityId))
+                        {
+                            await DeleteOperationSequence(new DeleteOperationSequencesModel()
+                            {
+                                FacilityId = model.FacilityId,
+                                OperationId = operation.Id,
+                            }, cancellationToken);
+                        }
+
+                        var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id, cancellationToken);
+                        orts.ForEach(_database.OperationResourceTypes.Remove);
+
+                        var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id, cancellationToken);
+                        vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+
+                        var op = await _database.Operations.GetAsync(operation.Id, cancellationToken);
+                        _database.Operations.Remove(op);
+                    }
+
+                    if (deletedThisPage > 0)
+                    {
+                        await _database.SaveChangesAsync(cancellationToken);
+                        pageNumber = 1;
+                        continue;
+                    }
+
+                    pageNumber++;
+                    if (pageNumber > operations.Metadata.TotalPages)
+                    {
+                        break;
+                    }
+                }
 
                 if (modifiedRecords > 0)
                 {
@@ -547,6 +547,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("No Resource Found.");
             }
 
+            return await ExecuteWithDeadlockRetryAsync(async () =>
+            {
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
             await _operationSequenceQueries.LockResourceTypeAsync(resourceType, cancellationToken);
             await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
@@ -589,6 +591,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 FacilityId = facilityId,
                 ResourceType = resourceType
             }, false, cancellationToken);
+            }, cancellationToken);
         }
 
         public async Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model, CancellationToken cancellationToken = default)
@@ -618,6 +621,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Each Operation ID can only occur once in a given sequence");
             }
 
+            return await ExecuteWithDeadlockRetryAsync(async () =>
+            {
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
             await _operationSequenceQueries.LockResourceTypeAsync(model.ResourceType, cancellationToken);
             await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
@@ -660,6 +665,51 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 FacilityId = model.FacilityId,
                 ResourceType = model.ResourceType
             }, false, cancellationToken);
+            }, cancellationToken);
+        }
+
+        private async Task<T> ExecuteWithDeadlockRetryAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+        {
+            const int maxAttempts = 3;
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    return await action();
+                }
+                catch (Exception ex) when (attempt < maxAttempts && IsSqlDeadlock(ex))
+                {
+                    if (_database.HasActiveTransaction)
+                    {
+                        try
+                        {
+                            await _database.RollbackTransactionAsync();
+                        }
+                        catch (Exception)
+                        {
+                            // SQL Server already aborted the deadlock victim.
+                        }
+                    }
+
+                    _database.ClearChanges();
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+        }
+
+        private static bool IsSqlDeadlock(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current.GetType().Name == "SqlException"
+                    && current.GetType().GetProperty("Number")?.GetValue(current) is int number
+                    && number == 1205)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model, CancellationToken cancellationToken = default)

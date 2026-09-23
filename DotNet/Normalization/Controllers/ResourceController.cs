@@ -72,11 +72,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<ActionResult<List<ResourceModel>>> Initialize()
+        public async Task<ActionResult<List<ResourceModel>>> Initialize(CancellationToken cancellationToken = default)
         {
             try
             {
-                var resourceModels = await _resourceManager.InitializeResources();
+                var resourceModels = await _resourceManager.InitializeResources(cancellationToken);
 
                 return Ok(resourceModels);
             }

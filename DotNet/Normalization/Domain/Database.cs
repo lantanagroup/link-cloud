@@ -15,6 +15,7 @@ namespace LantanaGroup.Link.Normalization.Domain
         IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
         bool HasActiveTransaction { get; }
+        void ClearChanges();
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
         Task RollbackTransactionAsync();
@@ -46,6 +47,11 @@ namespace LantanaGroup.Link.Normalization.Domain
         }
 
         public bool HasActiveTransaction => _dbContext.Database.CurrentTransaction != null;
+
+        public void ClearChanges()
+        {
+            _dbContext.ChangeTracker.Clear();
+        }
 
         public Task<IDbContextTransaction> BeginTransactionAsync()
         {

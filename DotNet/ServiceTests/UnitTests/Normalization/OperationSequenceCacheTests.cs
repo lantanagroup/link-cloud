@@ -231,6 +231,20 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task DeleteResource_RemovesVendorPresets_AndDropsTheListenerCache()
+    {
+        using var harness = new Harness();
+        var operationId = await harness.SeedOperationAsync("facility-a", "Copy", CopyJson, Guid.NewGuid());
+        await harness.WriterManager.CreateOperationSequences(Sequence("facility-a", operationId));
+        await harness.WarmAsync("facility-a");
+
+        await harness.Resources.DeleteResource("Patient");
+
+        Assert.Empty(harness.WriterContext.VendorVersionOperationPresets);
+        Assert.Empty(await harness.ReaderQueries.Search(All("facility-a")));
+    }
+
+    [Fact]
     public async Task RemovingAResourceType_DeletesOnlyThatOperationResourceTypeSequences()
     {
         using var harness = new Harness();
