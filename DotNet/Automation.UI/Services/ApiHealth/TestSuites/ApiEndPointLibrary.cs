@@ -6,6 +6,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 
 public static class ApiEndPointLibrary
 {
+    public const string ServiceInfoGet200 = "Service Info GET → 200";
     private static readonly ConcurrentDictionary<string, IReadOnlyList<ApiEndpointDefinition>> _orderedByService = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, ApiEndpointDefinition>> _endpointByNameByService = new(StringComparer.OrdinalIgnoreCase);
 
@@ -338,7 +339,7 @@ public static class ApiEndPointLibrary
 
     public static class AdminBffSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string HealthGet200 = "Health GET → 200";
         public const string FacilityDelete200 = "Facility DELETE → 200";
         public const string FacilityDelete404 = "Facility DELETE → 404";
@@ -355,7 +356,7 @@ public static class ApiEndPointLibrary
 
     public static class AccountSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
@@ -374,13 +375,13 @@ public static class ApiEndPointLibrary
 
     public static class AuditSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
     public static class CensusSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ConfigPost201 = "Config POST → 201";
         public const string ConfigPost400EmptyScheduledTrigger = "Config POST → 400 (empty ScheduledTrigger)";
@@ -419,7 +420,7 @@ public static class ApiEndPointLibrary
 
     public static class DataAcquisitionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string FhirConfigPost201 = "FhirConfig POST → 201";
         public const string FhirConfigPost409 = "FhirConfig POST → 409";
@@ -483,7 +484,7 @@ public static class ApiEndPointLibrary
 
     public static class NormalizationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post201 = "POST → 201";
         public const string Post400InvalidOperationType = "POST → 400 (invalid operation type)";
@@ -529,7 +530,7 @@ public static class ApiEndPointLibrary
 
     public static class QueryDispatchSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Post400NullModel = "POST → 400 (empty model)";
         public const string Post400EmptyFacilityId = "POST → 400 (empty facilityId)";
@@ -549,7 +550,7 @@ public static class ApiEndPointLibrary
 
     public static class ReportSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetSchedule200HasData = "Get Schedule → 200 (has data)";
         public const string GetSchedule404 = "Get Schedule → 404";
@@ -612,7 +613,7 @@ public static class ApiEndPointLibrary
 
     public static class TenantSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Create201 = "Create → 201";
         public const string Create400Duplicate = "Create → 400 (duplicate)";
@@ -654,7 +655,7 @@ public static class ApiEndPointLibrary
 
     public static class TerminologySteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
     }
 
@@ -696,7 +697,7 @@ public static class ApiEndPointLibrary
 
     public static class MeasureEvalSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string GetAll200 = "GET ALL → 200";
         public const string Get200 = "GET → 200";
@@ -707,7 +708,7 @@ public static class ApiEndPointLibrary
 
     public static class SubmissionSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string Get200 = "GET → 200";
         public const string Get400BadReportId = "GET → 400 (bad reportId)";
@@ -718,7 +719,7 @@ public static class ApiEndPointLibrary
 
     public static class ValidationSteps
     {
-        public const string InfoGet200 = "Service Info GET → 200";
+        public const string InfoGet200 = ServiceInfoGet200;
         public const string RootHealthGet200 = "Root Health GET → 200";
         public const string ArtifactsGet200 = "Artifacts GET → 200";
         public const string CategoriesGet200 = "Categories GET → 200";

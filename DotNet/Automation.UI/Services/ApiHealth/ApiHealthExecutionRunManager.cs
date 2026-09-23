@@ -16,7 +16,6 @@ public sealed class ApiHealthExecutionRunManager(
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
-    private const string ServiceInfoEndpointName = "Service Info GET → 200";
     private static readonly TimeSpan CompletedRunRetention = TimeSpan.FromHours(6);
     private const int MaxCompletedRunsToRetain = 200;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -371,20 +370,16 @@ public sealed class ApiHealthExecutionRunManager(
             .Select(d => d.Key)
             .ToHashSet();
 
-        var serviceInfo = GetServiceInformation(results);
+        var serviceInfo = GetServiceInformation(results, suite.ServiceName);
+        var commit = GetCommit(serviceInfo);
 
         foreach (var result in results)
         {
             result.RunId = run.RunId;
-            result.Commit = string.IsNullOrWhiteSpace(serviceInfo?.Commit)
-                ? null
-                : serviceInfo.Commit;
-            result.Build = string.IsNullOrWhiteSpace(serviceInfo?.Build)
-                ? null
-                : serviceInfo.Build;
-            result.Version = string.IsNullOrWhiteSpace(serviceInfo?.Version)
-                ? null
-                : serviceInfo.Version;
+            result.Commit = commit;
+            result.Build = NullIfWhiteSpace(serviceInfo?.Build);
+            result.Version = NullIfWhiteSpace(serviceInfo?.Version);
+            result.ProductVersion = NullIfWhiteSpace(serviceInfo?.ProductVersion);
         }
 
         await store.SaveRunResultsAsync(
@@ -400,18 +395,26 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private static ServiceInformation? GetServiceInformation(IReadOnlyList<ApiTestRunResult> results)
+    private ServiceInformation? GetServiceInformation(IReadOnlyList<ApiTestRunResult> results, string serviceName)
     {
         var serviceInfoResult = results.FirstOrDefault(result =>
             string.Equals(
                 result.EndpointName,
-                ServiceInfoEndpointName,
+                ApiEndPointLibrary.ServiceInfoGet200,
                 StringComparison.Ordinal)
-            && result.Passed
-            && !string.IsNullOrWhiteSpace(result.ResponseBody));
+            && result.Passed);
 
         if (serviceInfoResult == null)
             return null;
+
+        if (string.IsNullOrWhiteSpace(serviceInfoResult.ResponseBody))
+        {
+            logger.LogWarning(
+                "Service Info step passed for {ServiceName}, but the response body was empty.",
+                serviceName);
+
+            return null;
+        }
 
         try
         {
@@ -422,10 +425,35 @@ public sealed class ApiHealthExecutionRunManager(
                     PropertyNameCaseInsensitive = true
                 });
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            logger.LogWarning(
+                ex,
+                "Service Info step passed for {ServiceName}, but the response body could not be parsed.",
+                serviceName);
+
             return null;
         }
+    }
+
+    private static string? NullIfWhiteSpace(string? value) =>
+    string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string? GetCommit(ServiceInformation? serviceInfo)
+    {
+        var commit = NullIfWhiteSpace(serviceInfo?.Commit);
+        if (commit != null)
+            return commit;
+
+        var version = NullIfWhiteSpace(serviceInfo?.Version);
+        if (version == null)
+            return null;
+
+        var separatorIndex = version.IndexOf('+');
+        if (separatorIndex < 0 || separatorIndex == version.Length - 1)
+            return null;
+
+        return NullIfWhiteSpace(version[(separatorIndex + 1)..]);
     }
 
     private Task AddPhaseAsync(RunState run, string phase, string message, bool isError = false, Guid? seedRunId = null, string? seedRunName = null)
