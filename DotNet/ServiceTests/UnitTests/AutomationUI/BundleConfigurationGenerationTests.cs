@@ -83,6 +83,22 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_keeps_exact_location_alias_on_the_raw_location()
+    {
+        var location = new Location
+        {
+            Type = [new CodeableConcept("http://t", "1099-1", "1099-1")],
+            Alias = [" ICU "]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([location]);
+
+        fp.RawLocations.Should().ContainSingle();
+        fp.RawLocations[0].Aliases.Should().ContainSingle(" ICU ");
+        fp.LocationAliases.Should().ContainSingle("ICU");
+    }
+
+    [Fact]
     public void Analyzer_merge_unions_fingerprints_from_multiple_patients()
     {
         var first = UploadedBundleAnalyzer.Analyze([
@@ -635,6 +651,50 @@ public class BundleConfigurationGenerationTests
         };
         OrgResourceMapProposalBuilder.Build(sameLocation, [aliasMap]).Reuse
             .Should().ContainSingle(r => r.Id == aliasMap.Id && r.Recommendation == "Reuse" && r.Score == 1);
+    }
+
+    [Fact]
+    public void Orm_builder_matches_alias_literals_without_trimming()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        OrganizationResourceMapTemplate Map(string name, string alias) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1') and Location.alias = '{alias}'"
+                }
+            ]
+        };
+        BundleConfigFingerprint Upload(string alias) => new()
+        {
+            LocationCount = 1,
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+            LocationAliases = [alias.Trim()],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = [alias]
+                }
+            ]
+        };
+
+        var plain = Map("Plain ICU", "ICU");
+        var padded = Map("Padded ICU", " ICU ");
+        var paddedUpload = Upload(" ICU ");
+        var plainUpload = Upload("ICU");
+
+        OrgResourceMapProposalBuilder.Build(paddedUpload, [plain]).Reuse
+            .Should().NotContain(r => r.Id == plain.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(paddedUpload, [padded]).Reuse
+            .Should().ContainSingle(r => r.Id == padded.Id && r.Recommendation == "Reuse" && r.Score == 1);
+        OrgResourceMapProposalBuilder.Build(plainUpload, [padded]).Reuse
+            .Should().NotContain(r => r.Id == padded.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]

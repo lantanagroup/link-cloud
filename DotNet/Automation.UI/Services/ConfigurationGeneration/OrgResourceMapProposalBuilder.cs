@@ -271,8 +271,9 @@ public static class OrgResourceMapProposalBuilder
                 // many HSLOC codes; treating the first as system-wide skipped the rest
                 // and left most Locations out-of-org. An alias predicate is part of the
                 // same condition, so the type code alone must not satisfy it.
-                var alias = type.Groups[3].Success ? type.Groups[3].Value.Trim() : "";
-                var hasAlias = !string.IsNullOrWhiteSpace(alias);
+                // Alias equality is the captured literal, including surrounding spaces.
+                var alias = type.Groups[3].Success ? type.Groups[3].Value : "";
+                var hasAlias = alias.Length > 0;
                 if (type.Groups[2].Success && !string.IsNullOrWhiteSpace(type.Groups[2].Value))
                 {
                     yield return hasAlias

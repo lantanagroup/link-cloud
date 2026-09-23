@@ -134,13 +134,15 @@ public static class UploadedBundleAnalyzer
 
         foreach (var alias in location.Alias ?? [])
         {
-            var value = alias?.Trim();
-            if (string.IsNullOrWhiteSpace(value))
+            if (string.IsNullOrEmpty(alias))
                 continue;
-            if (!raw.Aliases.Contains(value))
-                raw.Aliases.Add(value);
-            if (!fp.LocationAliases.Contains(value))
-                fp.LocationAliases.Add(value);
+            // Reuse matching uses the original alias. FHIRPath equality does not trim.
+            if (!raw.Aliases.Contains(alias))
+                raw.Aliases.Add(alias);
+            var hint = alias.Trim();
+            if (hint.Length == 0 || fp.LocationAliases.Contains(hint))
+                continue;
+            fp.LocationAliases.Add(hint);
         }
 
         AddRawLocation(fp, raw);
