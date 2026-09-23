@@ -400,10 +400,20 @@ public static class OrgResourceMapProposalBuilder
         {
             if (!TrySplitAliasKey(key, out var typeKey, out var alias))
                 continue;
-            if (locations.Any(location => AliasConditionMatches(location, typeKey, alias))
-                && (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase)
-                    || (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
-                        && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase))))
+
+            if (typeKey.Equals(rawKey, StringComparison.OrdinalIgnoreCase))
+            {
+                if (locations.Any(location => AliasConditionMatches(location, typeKey, alias)))
+                    return true;
+                continue;
+            }
+
+            // A system-level alias covers a code only on a Location that also has that alias.
+            if (typeKey.StartsWith("typesys|", StringComparison.OrdinalIgnoreCase)
+                && KeySystem(rawKey).Equals(typeKey["typesys|".Length..], StringComparison.OrdinalIgnoreCase)
+                && locations.Any(location =>
+                    AliasConditionMatches(location, typeKey, alias)
+                    && TypeOnLocation(rawKey, location)))
                 return true;
         }
 

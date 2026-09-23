@@ -558,6 +558,86 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_scores_system_alias_only_for_codes_on_the_matching_location()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var aliasMap = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "HSLOC on ICU",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}').exists() and Location.alias = 'ICU'"
+                }
+            ]
+        };
+        var anyHsloc = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Any HSLOC",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.where(system = '{hsloc}').exists()"
+                }
+            ]
+        };
+        var split = new BundleConfigFingerprint
+        {
+            LocationCount = 2,
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                new LocationTypeHint { System = hsloc, Code = "1027-2" }
+            ],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1099-1" }],
+                    Aliases = ["ICU"]
+                },
+                new RawLocationHint
+                {
+                    Types = [new LocationTypeHint { System = hsloc, Code = "1027-2" }],
+                    Aliases = ["Ward"]
+                }
+            ]
+        };
+        var ranked = OrgResourceMapProposalBuilder.Build(split, [aliasMap, anyHsloc]).Reuse;
+        ranked[0].Id.Should().Be(anyHsloc.Id);
+        ranked[0].Score.Should().Be(1);
+        ranked.Should().Contain(r => r.Id == aliasMap.Id && r.Recommendation == "Reuse" && r.Score == 0.5);
+
+        var sameLocation = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationTypes =
+            [
+                new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                new LocationTypeHint { System = hsloc, Code = "1027-2" }
+            ],
+            RawLocations =
+            [
+                new RawLocationHint
+                {
+                    Types =
+                    [
+                        new LocationTypeHint { System = hsloc, Code = "1099-1" },
+                        new LocationTypeHint { System = hsloc, Code = "1027-2" }
+                    ],
+                    Aliases = ["ICU"]
+                }
+            ]
+        };
+        OrgResourceMapProposalBuilder.Build(sameLocation, [aliasMap]).Reuse
+            .Should().ContainSingle(r => r.Id == aliasMap.Id && r.Recommendation == "Reuse" && r.Score == 1);
+    }
+
+    [Fact]
     public void Orm_builder_does_not_treat_value_specific_condition_as_covering_the_whole_system()
     {
         var fp = new BundleConfigFingerprint
