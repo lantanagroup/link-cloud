@@ -305,6 +305,31 @@ public class OperationSequenceCacheTests
     }
 
     [Fact]
+    public async Task CreatePreset_RejectsAMappingDeletedWhileTheOperationLockWasHeld()
+    {
+        using var harness = new Harness();
+        var operationId = await harness.SeedOperationAsync("facility-a", "Copy", CopyJson);
+        var operationResourceTypeId = await harness.WriterContext.OperationResourceTypes
+            .Where(map => map.OperationId == operationId)
+            .Select(map => map.Id)
+            .SingleAsync();
+        await harness.WriterContext.OperationResourceTypes.FindAsync(operationResourceTypeId);
+
+        var deleted = await harness.ReaderContext.OperationResourceTypes.SingleAsync(map => map.Id == operationResourceTypeId);
+        harness.ReaderContext.OperationResourceTypes.Remove(deleted);
+        await harness.ReaderContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => harness.Presets.Create(new CreateVendorVersionOperationPresetModel
+        {
+            VendorVersionId = Guid.NewGuid(),
+            OperationResourceTypeId = operationResourceTypeId
+        }));
+
+        Assert.Contains("no longer exists", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(harness.WriterContext.VendorVersionOperationPresets.Local);
+    }
+
+    [Fact]
     public async Task RemovingAResourceType_InvalidatesTheListenerCache()
     {
         using var harness = new Harness();
@@ -487,6 +512,12 @@ public class OperationSequenceCacheTests
                 Resources,
                 Resolver.Object,
                 Mock.Of<IHSLOCQueries>());
+            Presets = new VendorVersionOperationPresetManager(
+                writerDatabase,
+                WriterManager,
+                new VendorVersionOperationPresetQueries(WriterContext, Resolver.Object),
+                Resolver.Object,
+                WriterQueries);
             WriterController = ControllerFor(WriterManager, WriterQueries);
             ReaderController = ControllerFor(WriterManager, ReaderQueries);
         }
@@ -502,6 +533,7 @@ public class OperationSequenceCacheTests
         public OperationSequenceQueries ReaderQueries { get; }
         public ResourceManager Resources { get; }
         public OperationManager WriterManager { get; }
+        public VendorVersionOperationPresetManager Presets { get; }
         public OperationSequenceController WriterController { get; }
         public OperationSequenceController ReaderController { get; }
 

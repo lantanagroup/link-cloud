@@ -53,8 +53,10 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
         await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
         await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
-        operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId, cancellationToken);
-        if (operationResourceType == null)
+        var mappingStillExists = await _database.OperationResourceTypes.AnyAsync(
+            map => map.Id == model.OperationResourceTypeId,
+            cancellationToken);
+        if (!mappingStillExists)
         {
             throw new InvalidOperationException("The operation resource type no longer exists.");
         }
