@@ -41,7 +41,7 @@ export function PatientDetailModal({
     open={open}
     title={t('onboarding:reportResults.detail.patientDetail.title')}
     onClose={onClose}
-    size="small"
+    size="large"
     footer={
       <Button
         variant="secondary"
