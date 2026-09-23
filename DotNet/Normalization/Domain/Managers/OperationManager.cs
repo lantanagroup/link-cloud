@@ -402,6 +402,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 if (!string.IsNullOrEmpty(model.FacilityId))
                 {
+                    await LockResourceTypesBeforeFacilityAsync(model.FacilityId, model.ResourceType, cancellationToken);
                     await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 }
 
@@ -503,6 +504,18 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 {
                     await transaction.DisposeAsync();
                 }
+            }
+        }
+
+        private async Task LockResourceTypesBeforeFacilityAsync(string facilityId, string? resourceType, CancellationToken cancellationToken)
+        {
+            var names = string.IsNullOrEmpty(resourceType)
+                ? await _operationSequenceQueries.ResourceTypeNamesForFacilityAsync(facilityId, cancellationToken)
+                : new List<string> { resourceType };
+
+            foreach (var name in names.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
+            {
+                await _operationSequenceQueries.LockResourceTypeAsync(name, cancellationToken);
             }
         }
 
@@ -685,7 +698,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     {
                         try
                         {
-                            await _database.RollbackTransactionAsync();
+                            await _database.RollbackTransactionAsync(cancellationToken);
                         }
                         catch (Exception)
                         {
@@ -731,6 +744,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             var transaction = ownsTransaction ? await _database.BeginTransactionAsync(cancellationToken) : null;
             try
             {
+                if (ownsTransaction)
+                {
+                    await LockResourceTypesBeforeFacilityAsync(model.FacilityId, model.ResourceType, cancellationToken);
+                }
+
                 await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
                 if (model.OperationId.HasValue)
                 {

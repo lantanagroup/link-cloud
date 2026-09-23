@@ -20,6 +20,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
         Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default);
         Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<string>> ResourceTypeNamesForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
         Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
@@ -242,6 +243,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 $"UPDATE {target} SET Name = Name WHERE Name = {{0}}",
                 new object[] { resourceName },
                 cancellationToken);
+        }
+
+        public Task<List<string>> ResourceTypeNamesForFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationResourceTypes.AsNoTracking()
+                .Where(map => map.Operation.FacilityId == facilityId)
+                .Select(map => map.ResourceType.Name)
+                .Distinct()
+                .ToListAsync(cancellationToken);
         }
 
         public Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)

@@ -19,6 +19,7 @@ namespace LantanaGroup.Link.Normalization.Domain
         Task<IDbContextTransaction> BeginTransactionAsync();
         Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
         Task RollbackTransactionAsync();
+        Task RollbackTransactionAsync(CancellationToken cancellationToken);
         Task CommitTransactionAsync();
     }
 
@@ -63,9 +64,14 @@ namespace LantanaGroup.Link.Normalization.Domain
             return await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         }
 
-        public async Task RollbackTransactionAsync()
+        public Task RollbackTransactionAsync()
         {
-            await _dbContext.Database.RollbackTransactionAsync();
+            return RollbackTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
         }
 
         public async Task CommitTransactionAsync()
