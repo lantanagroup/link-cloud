@@ -156,6 +156,40 @@ public class HSLOCManagerTests : IDisposable
         Assert.True(Assert.Single(stored, row => row.HSLOCCode == "C3").IsActive);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Update_MissingOldVersion_ThrowsArgumentExceptionWithoutWritingChanges(bool hasOtherVersion)
+    {
+        using var context = CreateContext();
+        if (hasOtherVersion)
+        {
+            context.HSLOCS.Add(CreateHSLOC("A1", "2024"));
+            await context.SaveChangesAsync();
+        }
+
+        await using var csv = CreateCsv("new-cdc,new short,A1,new long");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            CreateManager(context).Update("2025", "2026", csv));
+
+        Assert.Equal("oldVersion", exception.ParamName);
+        Assert.Contains("does not exist", exception.Message);
+        Assert.False(context.ChangeTracker.HasChanges());
+        var stored = await context.HSLOCS.AsNoTracking().ToListAsync();
+        if (hasOtherVersion)
+        {
+            var unchanged = Assert.Single(stored);
+            Assert.Equal("2024", unchanged.Version);
+            Assert.Equal("cdc-A1", unchanged.CDCCode);
+            Assert.True(unchanged.IsActive);
+        }
+        else
+        {
+            Assert.Empty(stored);
+        }
+    }
+
     [Fact]
     public async Task Update_DuplicateImportedCode_ThrowsArgumentExceptionWithoutWritingChanges()
     {

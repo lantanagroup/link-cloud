@@ -60,6 +60,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 var oldRows = await _dbContext.HSLOCS
                     .Where(row => row.Version == oldVersion)
                     .ToListAsync(cancellationToken);
+                if (oldRows.Count == 0)
+                {
+                    throw new ArgumentException("The specified old HSLOC version does not exist.", nameof(oldVersion));
+                }
+
                 var oldRowsByCode = oldRows.ToDictionary(row => row.HSLOCCode, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var importedRow in importedRows)
