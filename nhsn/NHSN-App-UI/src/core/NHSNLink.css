@@ -2266,7 +2266,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 14px;
+  padding: 7px 10px;
   background: var(--kendo-color-surface, #f7f9fc);
   border-bottom: 1px solid var(--kendo-color-border, #d0d7de);
   text-align: left;
@@ -2279,7 +2279,7 @@
 }
 
 .nhsn-link__report-results-table td {
-  padding: 12px 14px;
+  padding: 9px 10px;
   border-bottom: 2px solid var(--kendo-color-border, #d0d7de);
   vertical-align: middle;
 }
@@ -2436,6 +2436,36 @@
    - a plain 1px light border matches the reference instead. */
 .nhsn-link__report-results-table--light-border td {
   border-bottom: 1px solid #dde1e6;
+}
+
+.nhsn-link__report-results-row--unmapped td {
+  background: #fbdada;
+}
+
+.nhsn-link__report-results-row--unmapped .k-label {
+  display: none;
+}
+
+.nhsn-link__report-results-row--unmapped .k-dropdownlist {
+  width: 260px;
+  background: var(--kendo-color-app-surface, #ffffff);
+}
+
+.nhsn-link__report-results-row--unmapped .k-input-inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nhsn-link__report-results-hint-box {
+  margin: 10px 0 16px;
+  padding: 10px 12px;
+  background: var(--kendo-color-surface, #f7f9fc);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .nhsn-link__report-results-empty {
