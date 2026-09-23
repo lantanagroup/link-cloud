@@ -75,7 +75,13 @@ export class HslocComponent implements OnInit, AfterViewInit {
         if (!this.versions.includes(this.version)) this.version = '';
         this.applyFilter();
       },
-      error: () => this.loadFailed = true
+      error: () => {
+        this.loaded = false;
+        this.dataSource.data = [];
+        this.versions = [];
+        this.success = '';
+        this.loadFailed = true;
+      }
     });
   }
 
