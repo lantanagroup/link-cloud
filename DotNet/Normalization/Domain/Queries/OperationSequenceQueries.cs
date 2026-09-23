@@ -19,6 +19,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
         Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
         Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
         Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
         Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
@@ -209,6 +210,30 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 $"UPDATE OperationSequenceCacheRevisions SET Revision = Revision WHERE FacilityId = {key}",
                 cancellationToken);
             return updated > 0;
+        }
+
+        public async Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)
+        {
+            // Sequence creates take this row before they insert, and resource deletes take it before
+            // they look up facilities, so a delete cannot miss a facility a concurrent create adds.
+            if (!_dbContext.Database.IsRelational() || string.IsNullOrEmpty(resourceName))
+            {
+                return;
+            }
+
+            var entityType = _dbContext.Model.FindEntityType(typeof(ResourceType));
+            var table = entityType?.GetTableName();
+            if (string.IsNullOrEmpty(table))
+            {
+                return;
+            }
+
+            var schema = entityType!.GetSchema();
+            var target = string.IsNullOrEmpty(schema) ? table : schema + "." + table;
+            await _dbContext.Database.ExecuteSqlRawAsync(
+                $"UPDATE {target} SET Name = Name WHERE Name = {{0}}",
+                new object[] { resourceName },
+                cancellationToken);
         }
 
         public Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)

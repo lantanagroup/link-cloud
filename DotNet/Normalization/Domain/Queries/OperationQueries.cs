@@ -12,8 +12,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IOperationQueries
     {
-        Task<OperationModel> Get(Guid id, string? facilityId = null);
-        Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model);
+        Task<OperationModel> Get(Guid id, string? facilityId = null, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default);
     }
 
     public class OperationQueries : IOperationQueries
@@ -29,17 +29,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _vendorVersionResolver = vendorVersionResolver;
         }
 
-        public async Task<OperationModel> Get(Guid id, string? facilityId = null)
+        public async Task<OperationModel> Get(Guid id, string? facilityId = null, CancellationToken cancellationToken = default)
         {
             return (await Search(new OperationSearchModel()
             {
                 OperationId = id,
                 FacilityId = facilityId,
                 IncludeDisabled = true
-            })).Records.FirstOrDefault();
+            }, cancellationToken)).Records.FirstOrDefault();
         }
 
-        public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)
+        public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default)
         {
             var query = from o in _dbContext.Operations
                         select new OperationModel()
@@ -144,14 +144,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             var pageNumber = model.PageNumber ?? 1;
             var pageSize = model.PageSize ?? 10;
 
-            var count = await query.CountAsync();
+            var count = await query.CountAsync(cancellationToken);
 
             var records = await query
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
-            await HydrateVendorVersionsAsync(records);
+            await HydrateVendorVersionsAsync(records, cancellationToken);
 
             return new PagedConfigModel<OperationModel>()
             {
@@ -160,7 +160,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             };
         }
 
-        private async Task HydrateVendorVersionsAsync(IEnumerable<OperationModel> operations)
+        private async Task HydrateVendorVersionsAsync(IEnumerable<OperationModel> operations, CancellationToken cancellationToken)
         {
             var presets = operations.SelectMany(operation => operation.VendorPresets).ToList();
             if (presets.Count == 0)
@@ -168,7 +168,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 return;
             }
 
-            var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(presets.Select(preset => preset.VendorVersionId));
+            var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(presets.Select(preset => preset.VendorVersionId), cancellationToken);
             foreach (var preset in presets)
             {
                 preset.VendorVersion = resolvedVendorVersions[preset.VendorVersionId];

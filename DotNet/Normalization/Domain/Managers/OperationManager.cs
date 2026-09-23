@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 if (model.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
-                    await _database.Operations.AnyAsync(operation => operation.FacilityId == model.FacilityId && operation.OperationType == "HSLOCMap"))
+                    await _database.Operations.AnyAsync(operation => operation.FacilityId == model.FacilityId && operation.OperationType == "HSLOCMap", cancellationToken))
                 {
                     taskResult.IsSuccess = false;
                     taskResult.ObjectResult = null;
@@ -96,14 +96,24 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     ModifyDate = null
                 };
 
+                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                if (model.ResourceTypes != null)
+                {
+                    foreach (var resourceName in model.ResourceTypes.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
+                    {
+                        await _operationSequenceQueries.LockResourceTypeAsync(resourceName, cancellationToken);
+                    }
+                }
+
                 await _database.Operations.AddAsync(operation, cancellationToken);
                 await _database.SaveChangesAsync(cancellationToken);
 
                 await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes, cancellationToken);
                 await UpdateVendorPresetsForOperation(operation.Id, model.VendorVersionIds, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
 
                 taskResult.IsSuccess = true;
-                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -130,6 +140,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                if (model.ResourceTypes != null)
+                {
+                    foreach (var resourceName in model.ResourceTypes.Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal))
+                    {
+                        await _operationSequenceQueries.LockResourceTypeAsync(resourceName, cancellationToken);
+                    }
+                }
+
                 await _operationSequenceQueries.LockOperationAsync(model.Id, cancellationToken);
 
                 #region Lookup the Detailed Operation Model to check for Facility/Vendor operation conversions (which are not allowed)
@@ -137,7 +155,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 {
                     OperationId = model.Id,
                     IncludeDisabled = true
-                })).Records.SingleOrDefault();
+                }, cancellationToken)).Records.SingleOrDefault();
 
                 if (operationModel == null)
                 {
@@ -155,9 +173,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
                 #endregion
 
-                var operation = await _database.Operations.GetAsync(model.Id);
+                var operation = await _database.Operations.GetAsync(model.Id, cancellationToken);
                 if (operation.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
-                    await _database.Operations.AnyAsync(existing => existing.FacilityId == model.FacilityId && existing.OperationType == "HSLOCMap" && existing.Id != model.Id))
+                    await _database.Operations.AnyAsync(existing => existing.FacilityId == model.FacilityId && existing.OperationType == "HSLOCMap" && existing.Id != model.Id, cancellationToken))
                 {
                     taskResult.IsSuccess = false;
                     taskResult.ObjectResult = null;
@@ -165,7 +183,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return taskResult;
                 }
 
-                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id);
+                operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == model.Id, cancellationToken);
 
                 var result = await ValidateOperation(operation.OperationType.ToString(), model.OperationJson, model.ResourceTypes, cancellationToken);
 
@@ -204,7 +222,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await transaction.CommitAsync(cancellationToken);
 
                 taskResult.IsSuccess = true;
-                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -406,7 +424,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         OperationId = model.OperationId,
                         ResourceType = model.ResourceType,
                         IncludeDisabled = true
-                    });
+                    }, cancellationToken);
 
                     if (operations != null && operations.Records.Count > 0)
                     {
@@ -433,13 +451,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                                 }, cancellationToken);
                             }
 
-                            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id);
+                            var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.OperationId == operation.Id, cancellationToken);
                             orts.ForEach(_database.OperationResourceTypes.Remove);
 
-                            var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id);
+                            var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceType.OperationId == operation.Id, cancellationToken);
                             vops.ForEach(_database.VendorVersionOperationPresets.Remove);
 
-                            var op = await _database.Operations.GetAsync(operation.Id);
+                            var op = await _database.Operations.GetAsync(operation.Id, cancellationToken);
                             _database.Operations.Remove(op);
                         }
 
@@ -492,19 +510,20 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            await _operationSequenceQueries.LockResourceTypeAsync(model.ResourceType, cancellationToken);
             await _operationSequenceQueries.LockFacilitySequenceWritesAsync(model.FacilityId, cancellationToken);
             foreach (var operationId in model.OperationSequences.Select(sequence => sequence.OperationId).Distinct().OrderBy(id => id))
             {
                 await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
             }
 
-            var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType);
+            var existing = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId && s.OperationResourceType.ResourceType.Name == model.ResourceType, cancellationToken);
 
             existing.ForEach(_database.OperationSequences.Remove);
 
             var sequences = model.OperationSequences.OrderBy(s => s.Sequence).ToList();
 
-            var resource = await _database.ResourceTypes.SingleOrDefaultAsync(r => r.Name == model.ResourceType);
+            var resource = await _database.ResourceTypes.SingleOrDefaultAsync(r => r.Name == model.ResourceType, cancellationToken);
 
             if (resource == null)
             {
@@ -513,14 +532,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             foreach (var sequence in sequences)
             {   
-                var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
-                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
+                var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId, cancellationToken);
+                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id, cancellationToken);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
                     FacilityId = model.FacilityId,
                     OperationResourceTypeId = operationResourceTypeMap.Id,
                     Sequence = sequence.Sequence,
-                });
+                }, cancellationToken);
             }
 
             await _database.SaveChangesAsync(cancellationToken);
@@ -562,7 +581,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 var sequences = await _database.OperationSequences.FindAsync(s => s.FacilityId == model.FacilityId
                                             && (resourceType == string.Empty || s.OperationResourceType.ResourceType.Name.Equals(model.ResourceType))
-                                            && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId));
+                                            && (model.OperationId == null || s.OperationResourceType.OperationId == model.OperationId), cancellationToken);
 
                 if (!sequences.Any())
                 {

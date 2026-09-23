@@ -95,6 +95,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            await _operationSequenceQueries.LockResourceTypeAsync(resource, cancellationToken);
             var affectedFacilities = await _operationSequenceQueries.FacilitiesUsingResourceTypeAsync(resource, cancellationToken);
             foreach (var facilityId in affectedFacilities.OrderBy(id => id, StringComparer.Ordinal))
             {
