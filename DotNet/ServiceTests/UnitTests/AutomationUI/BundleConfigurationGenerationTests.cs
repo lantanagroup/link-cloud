@@ -938,6 +938,53 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_reuses_mixed_map_when_a_type_condition_matches_despite_a_partial_identifier()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var map = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Hospital or stepdown",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = 'http://a' and value = 'HOSP').exists()"
+                },
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.type.coding.exists(system = '{hsloc}' and code = '1099-1')"
+                }
+            ]
+        };
+        var matchedType = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers =
+            [
+                new LocationIdentifierHint { System = "http://a", Value = "HOSP" },
+                new LocationIdentifierHint { System = "http://b", Value = "UNIT-9" }
+            ],
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1099-1" }]
+        };
+        OrgResourceMapProposalBuilder.Build(matchedType, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Reuse");
+
+        var missedType = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers =
+            [
+                new LocationIdentifierHint { System = "http://a", Value = "HOSP" },
+                new LocationIdentifierHint { System = "http://b", Value = "UNIT-9" }
+            ],
+            LocationTypes = [new LocationTypeHint { System = hsloc, Code = "1027-2" }]
+        };
+        OrgResourceMapProposalBuilder.Build(missedType, [map]).Reuse
+            .Should().ContainSingle(r => r.Id == map.Id && r.Recommendation == "Extend" && r.Score == 0.5);
+    }
+
+    [Fact]
     public void Normalization_builder_emits_one_of_each_supported_type_when_data_allows()
     {
         var fp = new BundleConfigFingerprint

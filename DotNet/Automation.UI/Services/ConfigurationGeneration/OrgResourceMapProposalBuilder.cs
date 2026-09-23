@@ -118,6 +118,7 @@ public static class OrgResourceMapProposalBuilder
             var hasIdentifier = covered.Any(IsIdentifierKey);
             var hasType = covered.Any(IsTypeKey) || aliasKeys.Count > 0;
 
+            ReuseCandidate? identifierCandidate = null;
             if (hasIdentifier && neededIdentifiers.Count > 0)
             {
                 var mapIdentifierKeys = covered.Where(IsIdentifierKey).ToList();
@@ -127,7 +128,7 @@ public static class OrgResourceMapProposalBuilder
                     var hit = neededIdentifiers.Count(neededKey => IsCovered(neededKey, covered));
                     var score = (double)hit / neededIdentifiers.Count;
                     var siblingValues = UncoveredIdentifiersAreSiblingValues(neededIdentifiers, covered);
-                    results.Add(ToCandidate(
+                    identifierCandidate = ToCandidate(
                         template,
                         score,
                         score >= 0.999
@@ -135,13 +136,29 @@ public static class OrgResourceMapProposalBuilder
                             : template.IsSystem
                                 ? $"This system map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload. Extending clones a custom copy so the system map stays unchanged."
                                 : $"This map matches {hit} of {neededIdentifiers.Count} Location identifiers from the upload.",
-                        reuse: siblingValues));
-                    continue;
+                        reuse: siblingValues);
+                    // Conditions are alternatives. A partial identifier match can still be
+                    // Ready to use when a type condition on the same map matches.
+                    if (identifierCandidate.Recommendation == "Reuse" || !hasType)
+                    {
+                        results.Add(identifierCandidate);
+                        continue;
+                    }
                 }
             }
 
             if (!hasType)
                 continue;
+
+            void AddBest(ReuseCandidate? typeCandidate)
+            {
+                if (typeCandidate?.Recommendation == "Reuse")
+                    results.Add(typeCandidate);
+                else if (identifierCandidate != null)
+                    results.Add(identifierCandidate);
+                else if (typeCandidate != null)
+                    results.Add(typeCandidate);
+            }
 
             // Conditions are alternatives: any matching type condition lets a Location pass.
             // One required code on the raw upload is enough to reuse the map. Other type
@@ -151,14 +168,13 @@ public static class OrgResourceMapProposalBuilder
             mapTypeKeys.AddRange(aliasKeys);
             if (rawTypeKeys.Count == 0 || mapTypeKeys.Count == 0)
             {
-                if (neededIdentifiers.Count == 0)
-                    continue;
-
-                results.Add(ToCandidate(
-                    template,
-                    score: 0,
-                    "This map matches Location.type. Acquisition decides org membership before cleanup copies identifiers onto type, so this upload would not match as-is. Extending adds identifier conditions from the raw Locations.",
-                    forceExtend: true));
+                AddBest(neededIdentifiers.Count == 0
+                    ? null
+                    : ToCandidate(
+                        template,
+                        score: 0,
+                        "This map matches Location.type. Acquisition decides org membership before cleanup copies identifiers onto type, so this upload would not match as-is. Extending adds identifier conditions from the raw Locations.",
+                        forceExtend: true));
                 continue;
             }
 
@@ -167,7 +183,7 @@ public static class OrgResourceMapProposalBuilder
             {
                 // The upload has type codes this map does not match. Extending adds those
                 // codes. An upload with no identifiers and no type codes is omitted above.
-                results.Add(ToCandidate(
+                AddBest(ToCandidate(
                     template,
                     score: 0,
                     neededIdentifiers.Count == 0
@@ -179,7 +195,7 @@ public static class OrgResourceMapProposalBuilder
 
             var coveredTypes = rawTypeKeys.Count(raw => RawTypeCovered(raw, covered, aliasKeys, rawLocations));
             var coverage = (double)coveredTypes / rawTypeKeys.Count;
-            results.Add(ToCandidate(
+            AddBest(ToCandidate(
                 template,
                 coverage,
                 "This map matches type codes already present on the uploaded Locations, which acquisition can see.",
