@@ -310,6 +310,7 @@
     var initialActivity = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activity, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     var runButtons = document.querySelectorAll('.cleanup-run-btn');
     var pollTimer = null;
+    var sawRunning = false;
 
     function token(form) {
         var input = form.querySelector('input[name="__RequestVerificationToken"]');
@@ -357,6 +358,12 @@
     function applyActivity(activity) {
         if (!activity) return;
         var status = field(activity, 'status') || 'idle';
+        if (sawRunning && (status === 'completed' || status === 'failed')) {
+            sawRunning = false;
+            window.location.reload();
+            return;
+        }
+        if (status === 'running') sawRunning = true;
         var running = status === 'running';
         setRunning(running);
 

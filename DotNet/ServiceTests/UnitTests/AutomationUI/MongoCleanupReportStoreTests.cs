@@ -1,0 +1,52 @@
+using System.Reflection;
+using Automation.UI.Services.Persistence;
+using FluentAssertions;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
+namespace UnitTests.AutomationUI;
+
+[Trait("Category", "UnitTests")]
+public class MongoCleanupReportStoreTests
+{
+    [Fact]
+    public void Trim_drops_nothing_matched_before_passes_that_did_work()
+    {
+        var oldTeardown = Report(DateTimeOffset.Parse("2026-09-01T00:00:00Z"), tornDown: ["facility"]);
+        var newerEmpty = Report(DateTimeOffset.Parse("2026-09-20T00:00:00Z"));
+        var newestEmpty = Report(DateTimeOffset.Parse("2026-09-22T00:00:00Z"));
+        var failedEmpty = Report(DateTimeOffset.Parse("2026-09-21T00:00:00Z"), status: "failed");
+
+        var drop = MongoCleanupReportStore.SelectIdsToTrim(
+            [oldTeardown, newerEmpty, newestEmpty, failedEmpty],
+            maxStored: 2);
+
+        drop.Should().Equal(newerEmpty.Id, newestEmpty.Id);
+    }
+
+    [Fact]
+    public void Document_stores_guids_as_strings_and_timestamps_as_bson_dates()
+    {
+        var document = typeof(MongoCleanupReportStore).GetNestedType("CleanupReportDocument", BindingFlags.NonPublic);
+        document.Should().NotBeNull();
+        Representation(document!, "Id").Should().Be(BsonType.String);
+        Representation(document!, "PurgedRunIds").Should().Be(BsonType.String);
+        Representation(document!, "FailedRunIds").Should().Be(BsonType.String);
+        Representation(document!, "StartedAt").Should().Be(BsonType.DateTime);
+        Representation(document!, "FinishedAt").Should().Be(BsonType.DateTime);
+    }
+
+    private static BsonType Representation(Type document, string property)
+        => document.GetProperty(property)!
+            .GetCustomAttribute<BsonRepresentationAttribute>()!
+            .Representation;
+
+    private static CleanupReport Report(DateTimeOffset finishedAt, string status = "completed", IReadOnlyList<string>? tornDown = null)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            Status = status,
+            FinishedAt = finishedAt,
+            TornDownFacilityIds = tornDown ?? []
+        };
+}

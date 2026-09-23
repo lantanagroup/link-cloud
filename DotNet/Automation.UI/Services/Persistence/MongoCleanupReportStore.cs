@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
@@ -69,17 +70,38 @@ public sealed class MongoCleanupReportStore(IMongoDatabase database) : ICleanupR
 
     private async Task TrimAsync(CancellationToken cancellationToken)
     {
-        var extra = await _collection
-            .Find(_ => true)
-            .SortByDescending(d => d.FinishedAt)
-            .Skip(MaxStoredReports)
-            .Project(d => d.Id)
-            .ToListAsync(cancellationToken);
-        if (extra.Count == 0)
+        var docs = await _collection.Find(_ => true).ToListAsync(cancellationToken);
+        var drop = SelectIdsToTrim(docs.Select(FromDocument).ToList(), MaxStoredReports);
+        if (drop.Count == 0)
             return;
 
-        await _collection.DeleteManyAsync(d => extra.Contains(d.Id), cancellationToken);
+        await _collection.DeleteManyAsync(d => drop.Contains(d.Id), cancellationToken);
     }
+
+    /// <summary>
+    /// Drops nothing-matched passes before any pass that quiesced, tore down, purged, or failed.
+    /// Within each group, older finishes go first.
+    /// </summary>
+    public static IReadOnlyList<Guid> SelectIdsToTrim(IReadOnlyList<CleanupReport> reports, int maxStored)
+    {
+        if (reports.Count <= maxStored)
+            return [];
+
+        return reports
+            .OrderBy(report => DidWork(report) ? 1 : 0)
+            .ThenBy(report => report.FinishedAt)
+            .Take(reports.Count - maxStored)
+            .Select(report => report.Id)
+            .ToList();
+    }
+
+    private static bool DidWork(CleanupReport report)
+        => report.Status == "failed"
+           || report.QuiescedFacilityIds.Count > 0
+           || report.TornDownFacilityIds.Count > 0
+           || report.PurgedRunIds.Count > 0
+           || report.FailedFacilityIds.Count > 0
+           || report.FailedRunIds.Count > 0;
 
     private static CleanupReportDocument ToDocument(CleanupReport report) => new()
     {
@@ -125,20 +147,25 @@ public sealed class MongoCleanupReportStore(IMongoDatabase database) : ICleanupR
     private sealed class CleanupReportDocument
     {
         [BsonId]
+        [BsonRepresentation(BsonType.String)]
         public Guid Id { get; set; }
         public string Mode { get; set; } = "";
         public string Label { get; set; } = "";
         public string Trigger { get; set; } = "";
         public string Status { get; set; } = "";
+        [BsonRepresentation(BsonType.DateTime)]
         public DateTimeOffset StartedAt { get; set; }
+        [BsonRepresentation(BsonType.DateTime)]
         public DateTimeOffset FinishedAt { get; set; }
         public int QuiesceCandidateCount { get; set; }
         public List<string> QuiescedFacilityIds { get; set; } = [];
         public int TeardownCandidateCount { get; set; }
         public List<string> TornDownFacilityIds { get; set; } = [];
         public int HistoryPurgeCandidateCount { get; set; }
+        [BsonRepresentation(BsonType.String)]
         public List<Guid> PurgedRunIds { get; set; } = [];
         public List<string> FailedFacilityIds { get; set; } = [];
+        [BsonRepresentation(BsonType.String)]
         public List<Guid> FailedRunIds { get; set; } = [];
         public string Message { get; set; } = "";
     }
