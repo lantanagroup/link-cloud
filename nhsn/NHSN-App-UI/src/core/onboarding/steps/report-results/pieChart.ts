@@ -11,13 +11,14 @@ export function polarToCartesian(cx: number, cy: number, r: number, angleDeg: nu
   return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
 }
 
-export function buildPieSlices<T extends { percent: number }>(
+export function buildPieSlices<T extends { count: number }>(
   breakdown: T[],
   radius: number,
 ): (T & { path: string })[] {
+  const total = breakdown.reduce((sum, slice) => sum + slice.count, 0);
   let sliceStart = 0;
   return breakdown.map((slice) => {
-    const sweep = (slice.percent / 100) * 360;
+    const sweep = total > 0 ? (slice.count / total) * 360 : 0;
     const path = describePieSlice(radius, radius, radius, sliceStart, sliceStart + sweep);
     sliceStart += sweep;
     return { ...slice, path };

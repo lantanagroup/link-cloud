@@ -2563,7 +2563,8 @@
   display: flex;
   align-items: center;
   gap: 28px;
-  margin-bottom: 8px;
+  margin-bottom: 20px;
+  justify-content: center;
 }
 
 .nhsn-link__report-results-legend {

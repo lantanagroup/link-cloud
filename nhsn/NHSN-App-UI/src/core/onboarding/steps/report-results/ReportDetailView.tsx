@@ -43,6 +43,7 @@ import { parseQueryPlan } from './queryPlan';
 import { buildXlsxBlob, downloadBlob, type XlsxSheet } from './reportExport';
 import { DQM_SPEC_URL_BY_ID, dqmIdForMeasureName, dqmLabel, friendlyMeasuresFor } from './reportMeasures';
 import { buildReportStatusBreakdown, STATUS_PILL_CLASS, STATUS_PILL_CLASS_BY_KEY } from './reportStatus';
+import { useMappingEvidence } from './useMappingEvidence';
 import {
   buildAcquisitionLogSheet,
   buildPatientReportingStatusSheet,
@@ -120,19 +121,32 @@ export function ReportDetailView() {
   // persisted (e.g. right after this modal's own "+ Add Mapping" adds one). Organization
   // Identification has no equivalent -- its 4 configuration methods make inline editing a much
   // bigger UI lift, so that modal stays read-only and links to the real step instead.
-  const [hslocCodes, setHslocCodes] = useState<HslocCode[]>([]);
-  const [hslocMappings, setHslocMappings] = useState<HslocMapping[]>([]);
-  const [hslocDataLoading, setHslocDataLoading] = useState(false);
-  const [hslocSelections, setHslocSelections] = useState<
-    Record<string, string>
-  >({});
-  const [addingHslocCode, setAddingHslocCode] = useState<string | null>(null);
+  const hslocEvidence = useMappingEvidence<HslocCode, HslocMapping>({
+    loadCodes: () => api.getHslocCodes(),
+    loadMappings: () => api.getHslocMappings(),
+    saveMappings: (mappings) => api.saveHslocMappings(mappings),
+    // HslocStep reads mappings via useQuery(['hslocMappings']), not off the draft, so a mapping
+    // added here has to land in that cache directly or HslocStep would show it as stale until a
+    // refetch. Encounter has no such cache to write -- see the hook below.
+    onSaved: (nextMappings) => {
+      queryClient.setQueryData(['hslocMappings'], nextMappings);
+      mirror('hsloc', { mappings: nextMappings });
+    },
+    successMessageKey:
+      'onboarding:reportResults.detail.mappingEvidence.hslocMappingAdded',
+  });
 
-  const [encounterCodes, setEncounterCodes] = useState<EncounterCode[]>([]);
-  const [encounterMappings, setEncounterMappings] = useState<EncounterMapping[]>([]);
-  const [encounterDataLoading, setEncounterDataLoading] = useState(false);
-  const [encounterSelections, setEncounterSelections] = useState<Record<string, string>>({});
-  const [addingEncounterKey, setAddingEncounterKey] = useState<string | null>(null);
+  // Same shape as hslocEvidence above, for the Encounter mapping editor. EncounterStep sources its
+  // mappings from draft.encounter.mappings rather than a query, so mirroring the draft is the only
+  // sync a save needs here.
+  const encounterEvidence = useMappingEvidence<EncounterCode, EncounterMapping>({
+    loadCodes: () => api.getEncounterCodes(),
+    loadMappings: () => api.getEncounterMappings(),
+    saveMappings: (mappings) => api.saveEncounterMappings(mappings),
+    onSaved: (nextMappings) => mirror('encounter', { mappings: nextMappings }),
+    successMessageKey:
+      'onboarding:reportResults.detail.mappingEvidence.encounterMappingAdded',
+  });
 
   const [queryPlanOpen, setQueryPlanOpen] = useState(false);
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null);
@@ -301,8 +315,8 @@ export function ReportDetailView() {
     setMappingEvidence(null);
     setMappingEvidenceError(null);
     setMappingEvidenceLoading(true);
-    setHslocSelections({});
-    setEncounterSelections({});
+    hslocEvidence.resetSelections();
+    encounterEvidence.resetSelections();
     try {
       const evidence = await api.getPatientMappingEvidence(
         detail.reportId,
@@ -319,104 +333,37 @@ export function ReportDetailView() {
       setMappingEvidenceLoading(false);
     }
     if (column === 'hsloc') {
-      setHslocDataLoading(true);
-      try {
-        // Mappings are always refetched (unlike the reference code list, cached once loaded) --
-        // they can change between openings, including from this same modal's own "+ Add Mapping".
-        const [codes, mappings] = await Promise.all([
-          hslocCodes.length === 0
-            ? api.getHslocCodes()
-            : Promise.resolve(hslocCodes),
-          api.getHslocMappings(),
-        ]);
-        setHslocCodes(codes);
-        setHslocMappings(mappings);
-      } catch (cause) {
-        notifyError(
-          cause instanceof Error
-            ? cause.message
-            : t('onboarding:reportResults.messages.loadError'),
-        );
-      } finally {
-        setHslocDataLoading(false);
-      }
+      await hslocEvidence.load();
     }
     if (column === 'encounter') {
-      setEncounterDataLoading(true);
-      try {
-        const [codes, mappings] = await Promise.all([
-          encounterCodes.length === 0 ? api.getEncounterCodes() : Promise.resolve(encounterCodes),
-          api.getEncounterMappings()
-        ]);
-        setEncounterCodes(codes);
-        setEncounterMappings(mappings);
-      } catch (cause) {
-        notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
-      } finally {
-        setEncounterDataLoading(false);
-      }
+      await encounterEvidence.load();
     }
   }
 
   async function handleAddHslocMapping(unmappedCode: string) {
-    const hslocCode = hslocSelections[unmappedCode];
+    const hslocCode = hslocEvidence.selections[unmappedCode];
     if (!hslocCode) {
       return;
     }
-    setAddingHslocCode(unmappedCode);
-    try {
-      const nextMappings = [
-        ...hslocMappings,
-        { sourceCode: unmappedCode, hslocCode },
-      ];
-      await api.saveHslocMappings(nextMappings);
-      setHslocMappings(nextMappings);
-      queryClient.setQueryData(['hslocMappings'], nextMappings);
-      mirror('hsloc', { mappings: nextMappings });
-      notifySuccess(
-        t('onboarding:reportResults.detail.mappingEvidence.hslocMappingAdded'),
-      );
-      setHslocSelections((prev) => {
-        const next = { ...prev };
-        delete next[unmappedCode];
-        return next;
-      });
-    } catch (cause) {
-      notifyError(
-        cause instanceof Error
-          ? cause.message
-          : t('onboarding:reportResults.messages.loadError'),
-      );
-    } finally {
-      setAddingHslocCode(null);
-    }
+    await hslocEvidence.add(unmappedCode, { sourceCode: unmappedCode, hslocCode });
   }
 
   async function handleAddEncounterMapping(sourceSystem: string, unmappedCode: string) {
     const key = `${sourceSystem}|${unmappedCode}`;
-    const target = encounterSelections[key];
+    const target = encounterEvidence.selections[key];
     if (!target) {
       return;
     }
     const [targetSystem, targetCode] = decodeTarget(target);
-    const targetDisplay = encounterCodes.find(code => code.system === targetSystem && code.code === targetCode)?.display;
-    setAddingEncounterKey(key);
-    try {
-      const nextMappings = [...encounterMappings, {system: sourceSystem, code: unmappedCode, display: targetDisplay, encounterType: target}];
-      await api.saveEncounterMappings(nextMappings);
-      setEncounterMappings(nextMappings);
-      mirror('encounter', {mappings: nextMappings});
-      notifySuccess(t('onboarding:reportResults.detail.mappingEvidence.encounterMappingAdded'));
-      setEncounterSelections(prev => {
-        const next = {...prev};
-        delete next[key];
-        return next;
-      });
-    } catch (cause) {
-      notifyError(cause instanceof Error ? cause.message : t('onboarding:reportResults.messages.loadError'));
-    } finally {
-      setAddingEncounterKey(null);
-    }
+    const targetDisplay = encounterEvidence.codes.find(
+      (code) => code.system === targetSystem && code.code === targetCode,
+    )?.display;
+    await encounterEvidence.add(key, {
+      system: sourceSystem,
+      code: unmappedCode,
+      display: targetDisplay,
+      encounterType: target,
+    });
   }
 
   async function handleRefreshDetail() {
@@ -946,14 +893,12 @@ export function ReportDetailView() {
         evidence={mappingEvidence}
         loading={mappingEvidenceLoading}
         error={mappingEvidenceError}
-        codes={hslocCodes}
-        mappings={hslocMappings}
-        dataLoading={hslocDataLoading}
-        selections={hslocSelections}
-        onSelectionChange={(code, value) =>
-          setHslocSelections((prev) => ({ ...prev, [code]: value }))
-        }
-        addingCode={addingHslocCode}
+        codes={hslocEvidence.codes}
+        mappings={hslocEvidence.mappings}
+        dataLoading={hslocEvidence.dataLoading}
+        selections={hslocEvidence.selections}
+        onSelectionChange={hslocEvidence.setSelection}
+        addingCode={hslocEvidence.addingKey}
         onAddMapping={handleAddHslocMapping}
       />
 
@@ -965,14 +910,12 @@ export function ReportDetailView() {
         evidence={mappingEvidence}
         loading={mappingEvidenceLoading}
         error={mappingEvidenceError}
-        codes={encounterCodes}
-        mappings={encounterMappings}
-        dataLoading={encounterDataLoading}
-        selections={encounterSelections}
-        onSelectionChange={(key, value) =>
-          setEncounterSelections((prev) => ({ ...prev, [key]: value }))
-        }
-        addingKey={addingEncounterKey}
+        codes={encounterEvidence.codes}
+        mappings={encounterEvidence.mappings}
+        dataLoading={encounterEvidence.dataLoading}
+        selections={encounterEvidence.selections}
+        onSelectionChange={encounterEvidence.setSelection}
+        addingKey={encounterEvidence.addingKey}
         onAddMapping={handleAddEncounterMapping}
       />
     </>
