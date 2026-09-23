@@ -37,8 +37,8 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
 
     public async Task<VendorVersionOperationPresetModel> Create(CreateVendorVersionOperationPresetModel model, CancellationToken cancellationToken = default)
     {
-        var operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId);
-        var operation = await _database.Operations.GetAsync(operationResourceType.OperationId);
+        var operationResourceType = await _database.OperationResourceTypes.GetAsync(model.OperationResourceTypeId, cancellationToken);
+        var operation = await _database.Operations.GetAsync(operationResourceType.OperationId, cancellationToken);
         if (operation.OperationType == OperationType.HSLOCMap.ToString())
         {
             throw new InvalidOperationException("HSLOC Map operations cannot be assigned to vendors.");
@@ -51,7 +51,7 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
             VendorVersionId = model.VendorVersionId,
             OperationResourceTypeId = model.OperationResourceTypeId,
             CreateDate = DateTime.UtcNow
-        });
+        }, cancellationToken);
 
         await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
         await _operationSequenceQueries.LockOperationAsync(operation.Id, cancellationToken);
@@ -67,16 +67,16 @@ public class VendorVersionOperationPresetManager : IVendorVersionOperationPreset
     public async Task Delete(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default)
     {
         var preset = await _database.VendorVersionOperationPresets.SingleOrDefaultAsync(candidate =>
-            candidate.Id == presetId && candidate.VendorVersionId == vendorVersionId);
+            candidate.Id == presetId && candidate.VendorVersionId == vendorVersionId, cancellationToken);
 
         if (preset == null)
         {
             return;
         }
 
-        var operationResourceType = await _database.OperationResourceTypes.GetAsync(preset.OperationResourceTypeId);
+        var operationResourceType = await _database.OperationResourceTypes.GetAsync(preset.OperationResourceTypeId, cancellationToken);
         var operationPresets = await _database.VendorVersionOperationPresets.FindAsync(candidate =>
-            candidate.OperationResourceTypeId == preset.OperationResourceTypeId);
+            candidate.OperationResourceTypeId == preset.OperationResourceTypeId, cancellationToken);
 
         if (operationPresets.Count == 1)
         {

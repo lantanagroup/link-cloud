@@ -8,8 +8,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<List<ResourceModel>> GetAll();
         Task<ResourceModel?> Get(Guid resourceId);
-        Task<ResourceModel?> Get(string resourceName);
-        Task<List<ResourceModel>> Search(ResourceSearchModel model);
+        Task<ResourceModel?> Get(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default);
     }
 
     public class ResourceQueries : IResourceQueries
@@ -28,12 +28,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).SingleOrDefault();
         }
 
-        public async Task<ResourceModel?> Get(string resourceName)
+        public async Task<ResourceModel?> Get(string resourceName, CancellationToken cancellationToken = default)
         {
             return (await Search(new ResourceSearchModel()
             {
                 Name = resourceName
-            })).FirstOrDefault();
+            }, cancellationToken)).FirstOrDefault();
         }
 
         public async Task<List<ResourceModel>> GetAll()
@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             return await Search(new ResourceSearchModel());
         }
 
-        public async Task<List<ResourceModel>> Search(ResourceSearchModel model)
+        public async Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default)
         {
             var query = from r in _context.ResourceTypes
                         select new ResourceModel()
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.ResourceTypeId == model.ResourceId);
             }
 
-            return await query.OrderBy(q => q.ResourceName).ToListAsync();
+            return await query.OrderBy(q => q.ResourceName).ToListAsync(cancellationToken);
         }
     }
 }

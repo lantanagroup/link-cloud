@@ -70,9 +70,9 @@ public class OperationsControllerTests
         var database = new Mock<IDatabase> { DefaultValue = DefaultValue.Mock };
         var resourceTypeId = Guid.NewGuid();
         var operationId = Guid.NewGuid();
-        database.Setup(candidate => candidate.OperationResourceTypes.GetAsync(resourceTypeId))
+        database.Setup(candidate => candidate.OperationResourceTypes.GetAsync(resourceTypeId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OperationResourceType { OperationId = operationId });
-        database.Setup(candidate => candidate.Operations.GetAsync(operationId))
+        database.Setup(candidate => candidate.Operations.GetAsync(operationId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Operation { OperationType = OperationType.HSLOCMap.ToString() });
         var manager = new VendorVersionOperationPresetManager(database.Object, null!, null!, null!, null!);
         var controller = new VendorVersionOperationPresetsController(manager, null!);

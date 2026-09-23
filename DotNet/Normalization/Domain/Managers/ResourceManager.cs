@@ -87,7 +87,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task DeleteResource(string resource, CancellationToken cancellationToken = default)
         {
-            var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
+            var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource, cancellationToken);
 
             if (resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
             {

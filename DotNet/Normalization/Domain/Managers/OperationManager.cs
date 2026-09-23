@@ -22,8 +22,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task<TaskResult> UpdateOperation(UpdateOperationModel model, CancellationToken cancellationToken = default);
         Task<bool> DeleteOperation(DeleteOperationModel deleteOperationModel, CancellationToken cancellationToken = default);
         Task UpdateVendorPresetsForOperation(Guid operationId, List<Guid>? vendorVersionIds, CancellationToken cancellationToken = default);
-        Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources);
-        Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes);
+        Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources, CancellationToken cancellationToken = default);
+        Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes, CancellationToken cancellationToken = default);
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model, CancellationToken cancellationToken = default);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel, CancellationToken cancellationToken = default);
     }
@@ -96,10 +96,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     ModifyDate = null
                 };
 
-                await _database.Operations.AddAsync(operation);
+                await _database.Operations.AddAsync(operation, cancellationToken);
                 await _database.SaveChangesAsync(cancellationToken);
 
-                await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes);
+                await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes, cancellationToken);
                 await UpdateVendorPresetsForOperation(operation.Id, model.VendorVersionIds, cancellationToken);
 
                 taskResult.IsSuccess = true;
@@ -198,7 +198,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 await _database.SaveChangesAsync(cancellationToken);
-                await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes);
+                await UpdateOperationResourceTypesForOperation(model.Id, model.ResourceTypes, cancellationToken);
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorVersionIds, cancellationToken);
                 await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -260,12 +260,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         private async Task SaveVendorPresetsAsync(Guid operationId, List<Guid> vendorVersionIds, CancellationToken cancellationToken)
         {
             var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(vendorVersionIds, cancellationToken);
-            var orts = (await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId)).Select(ort => ort.Id);
+            var orts = (await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId, cancellationToken)).Select(ort => ort.Id);
 
             foreach (var ort in orts)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var toDelete = await _database.VendorVersionOperationPresets.FindAsync(vp => vp.OperationResourceTypeId == ort && !vendorVersionIds.Contains(vp.VendorVersionId));
+                var toDelete = await _database.VendorVersionOperationPresets.FindAsync(vp => vp.OperationResourceTypeId == ort && !vendorVersionIds.Contains(vp.VendorVersionId), cancellationToken);
 
                 foreach (var delete in toDelete)
                 {
@@ -274,13 +274,13 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 foreach (var vendorVersionId in resolvedVendorVersions.Keys)
                 {
-                    if (!await _database.VendorVersionOperationPresets.AnyAsync(vop => vop.VendorVersionId == vendorVersionId && vop.OperationResourceTypeId == ort))
+                    if (!await _database.VendorVersionOperationPresets.AnyAsync(vop => vop.VendorVersionId == vendorVersionId && vop.OperationResourceTypeId == ort, cancellationToken))
                     {
                         await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset()
                         {
                             OperationResourceTypeId = ort,
                             VendorVersionId = vendorVersionId
-                        });
+                        }, cancellationToken);
                     }
                 }
             }
@@ -289,7 +289,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             await InvalidateCachedSequencesAsync(operationId, cancellationToken);
         }
 
-        public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes)
+        public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes, CancellationToken cancellationToken = default)
         {
             if (resourceTypes == null || resourceTypes.Count == 0)
             {
@@ -299,9 +299,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             List<ResourceModel> resources = new List<ResourceModel>();
             foreach (var res in resourceTypes)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.IsNullOrEmpty(res)) continue;
 
-                var resource = await _resourceQueries.Get(res);
+                var resource = await _resourceQueries.Get(res, cancellationToken);
 
                 if (resource == null)
                 {
@@ -316,23 +317,24 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 throw new InvalidOperationException("Not all provided Resource Types were found.");
             }
 
-            await UpdateOperationResourceTypesForOperation(operationId, resources);
+            await UpdateOperationResourceTypesForOperation(operationId, resources, cancellationToken);
         }
 
-        public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources)
+        public async Task UpdateOperationResourceTypesForOperation(Guid operationId, List<ResourceModel> resources, CancellationToken cancellationToken = default)
         {
-            var operation = await _database.Operations.GetAsync(operationId);
-            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId);
+            var operation = await _database.Operations.GetAsync(operationId, cancellationToken);
+            operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId, cancellationToken);
 
             //Delete any OperationResourceTypes that exist in the DB but not on the incoming model
             foreach (var ort in operation.OperationResourceTypes)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId))
                 {
-                    var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == ort.Id);
+                    var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == ort.Id, cancellationToken);
                     sequences.ForEach(_database.OperationSequences.Remove);
 
-                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == ort.Id);
+                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == ort.Id, cancellationToken);
                     vops.ForEach(_database.VendorVersionOperationPresets.Remove);
 
                     _database.OperationResourceTypes.Remove(ort);
@@ -342,6 +344,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             //Create any OperationResourceTypes that exist on the incoming model but not in the DB
             foreach (var resource in resources)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!operation.OperationResourceTypes.Any(ort => ort.ResourceTypeId == resource.ResourceTypeId && ort.Operation.Id == operation.Id))
                 {
                     var ort = new OperationResourceType()
@@ -351,11 +354,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     };
 
                     operation.OperationResourceTypes.Add(ort);
-                    await _database.OperationResourceTypes.AddAsync(ort);
+                    await _database.OperationResourceTypes.AddAsync(ort, cancellationToken);
                 }
             }
 
-            await _database.SaveChangesAsync();
+            await _database.SaveChangesAsync(cancellationToken);
         }
 
         private async Task InvalidateCachedSequencesAsync(Guid operationId, CancellationToken cancellationToken, params string?[] additionalFacilityIds)
