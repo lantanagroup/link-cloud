@@ -1,4 +1,4 @@
-import type {UserInfoResponse} from '../api/contracts';
+import type {UserInfoResponse, VendorProfile} from '../api/contracts';
 import {STEP_VIEWS, stepIndex, visibleSteps} from './flow';
 import type {FacilityDraft, StepTarget} from './types';
 import {isStepId} from './types';
@@ -15,10 +15,11 @@ import {isStepId} from './types';
 export function resolveStep(
   target: StepTarget | undefined,
   draft: FacilityDraft,
-  user: UserInfoResponse
+  user: UserInfoResponse,
+  vendorProfile?: VendorProfile
 ): StepTarget {
   const steps = visibleSteps(draft, user);
-  const furthest = furthestLegalStep(draft, user);
+  const furthest = furthestLegalStep(draft, user, vendorProfile);
 
   if (!target || !isStepId(target.stepId)) {
     return {stepId: furthest};
@@ -30,7 +31,7 @@ export function resolveStep(
     return {stepId: furthest};
   }
 
-  if (!isUnlocked(target.stepId, draft, user)) {
+  if (!isUnlocked(target.stepId, draft, user, vendorProfile)) {
     return {stepId: furthest};
   }
 
@@ -56,7 +57,8 @@ export function resolveStep(
 export function isUnlocked(
   stepId: FacilityDraft['currentStepId'],
   draft: FacilityDraft,
-  user: UserInfoResponse
+  user: UserInfoResponse,
+  vendorProfile?: VendorProfile
 ): boolean {
   // A facility that already completed onboarding, on a build where the OnboardingRevisit
   // capability is on, can browse every step freely -- there is no "next required step" left to
@@ -72,18 +74,19 @@ export function isUnlocked(
   if (index <= 0) {
     return index === 0;
   }
-  return steps.slice(0, index).every(step => step.isComplete(draft, user));
+  return steps.slice(0, index).every(step => step.isComplete(draft, user, vendorProfile));
 }
 
 /** The furthest step the draft legitimately reaches — the fallback for a rejected target. */
 export function furthestLegalStep(
   draft: FacilityDraft,
-  user: UserInfoResponse
+  user: UserInfoResponse,
+  vendorProfile?: VendorProfile
 ): FacilityDraft['currentStepId'] {
   const steps = visibleSteps(draft, user);
   let furthest = steps[0]?.id ?? 'welcome';
   for (const step of steps) {
-    if (isUnlocked(step.id, draft, user)) {
+    if (isUnlocked(step.id, draft, user, vendorProfile)) {
       furthest = step.id;
     } else {
       break;

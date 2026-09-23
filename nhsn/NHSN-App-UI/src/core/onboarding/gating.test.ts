@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import type {UserInfoResponse} from '../api/contracts';
+import type {UserInfoResponse, VendorProfile} from '../api/contracts';
 import {furthestLegalStep, isUnlocked, nextStepId, resolveStep} from './gating';
 import {createEmptyDraft, type FacilityDraft, type StepId} from './types';
 
@@ -27,6 +27,33 @@ function draftAt(unlocked: StepId[], overrides: Partial<FacilityDraft> = {}): Fa
     ...overrides
   };
 }
+
+const epicProfile: VendorProfile = {
+  vendor: 'Epic',
+  displayName: 'Epic',
+  censusAcquisition: 'PatientList',
+  patientListKeys: [
+    'admit-lt-24',
+    'admit-24-to-48',
+    'admit-gt-48',
+    'discharge-lt-24',
+    'discharge-24-to-48',
+    'discharge-gt-48'
+  ],
+  locationMethods: [],
+  documentKeys: {},
+  hslocSourceLabel: 'Epic Location'
+};
+
+const cernerProfile: VendorProfile = {
+  vendor: 'Cerner',
+  displayName: 'Cerner',
+  censusAcquisition: 'Sftp',
+  patientListKeys: [],
+  locationMethods: [],
+  documentKeys: {},
+  hslocSourceLabel: 'Cerner Location'
+};
 
 describe('resolveStep', () => {
   it('falls back to the furthest legal step when the target was never unlocked', () => {
@@ -86,7 +113,7 @@ describe('resolveStep', () => {
       stepId: 'report-results' as StepId,
       view: {stepId: 'report-results' as StepId, view: 'detail', params: {id: 'R1'}}
     };
-    expect(resolveStep(target, draft, user)).toEqual(target);
+    expect(resolveStep(target, draft, user, epicProfile)).toEqual(target);
   });
 
   it('degrades an undeclared sub-view to its step rather than erroring', () => {
@@ -154,6 +181,53 @@ describe('isUnlocked', () => {
       }
     };
     expect(isUnlocked('report-results', createEmptyDraft(), flaggedUser)).toBe(false);
+  });
+
+  it('does not let a previous vendor\'s leftover census fields block the current vendor\'s step', () => {
+    const draft = draftAt(
+      ['welcome', 'reporting-plan', 'facility-info', 'manual-upload', 'fhir', 'census', 'location-org'],
+      {
+        facilityInfo: {timeZone: 'America/Chicago', vendor: 'Epic'},
+        manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
+        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        census: {
+          patientListIds: {
+            'admit-lt-24': 'list-1',
+            'admit-24-to-48': 'list-2',
+            'admit-gt-48': 'list-3',
+            'discharge-lt-24': 'list-4',
+            'discharge-24-to-48': 'list-5',
+            'discharge-gt-48': 'list-6'
+          },
+          acquisitionFrequency: 'PT0H15M',
+          accuracyAcknowledged: true,
+          // Leftover from the earlier Cerner configuration - never cleared client-side.
+          sftpHost: 'old-cerner-host.example.invalid',
+          sftpPort: 22,
+          sftpConnectionTested: false
+        }
+      }
+    );
+    expect(isUnlocked('location-org', draft, user, epicProfile)).toBe(true);
+  });
+
+  it('still requires a tested connection for a facility actually on Cerner', () => {
+    const draft = draftAt(
+      ['welcome', 'reporting-plan', 'facility-info', 'manual-upload', 'fhir', 'census', 'location-org'],
+      {
+        facilityInfo: {timeZone: 'America/Chicago', vendor: 'Cerner'},
+        manualUpload: {uploadedFileName: 'facility-data.csv', uploadedOn: '2026-01-01T00:00:00.000Z'},
+        fhir: {fhirServerBaseUrl: 'https://example.invalid/fhir', connectionTested: true},
+        census: {
+          sftpHost: 'sftp.example.invalid',
+          sftpPort: 22,
+          sftpConnectionTested: false,
+          acquisitionFrequency: 'PT0H15M',
+          accuracyAcknowledged: true
+        }
+      }
+    );
+    expect(isUnlocked('location-org', draft, user, cernerProfile)).toBe(false);
   });
 });
 
