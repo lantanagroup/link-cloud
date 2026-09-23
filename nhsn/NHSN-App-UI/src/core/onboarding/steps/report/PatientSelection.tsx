@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {CensusListKey} from '../../../api/contracts';
@@ -19,7 +19,7 @@ import {
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import {useOnboarding} from '../../OnboardingProvider';
 import {CENSUS_LIST_KEYS} from '../census/validate';
-import {PATIENT_ID_LIMIT, addPatientIds, isAtPatientIdLimit} from './patientIds';
+import {PATIENT_ID_LIMIT, addPatientIds, findDuplicatePatientIdIndexes, isAtPatientIdLimit} from './patientIds';
 
 type PatientTab = 'manual' | 'csv' | 'previous' | 'new-pull';
 
@@ -53,6 +53,12 @@ export interface PatientSelectionProps {
   /** Already translated. */
   error?: string;
   disabled?: boolean;
+  /**
+   * True once Generate Report has been clicked at least once. A blank row is the normal
+   * state while one is being typed, so blank rows are only flagged as errors from that
+   * point on -- not the instant "+ Add Patient ID" opens a new one.
+   */
+  showEmptyRowErrors?: boolean;
 }
 
 /**
@@ -66,7 +72,13 @@ export interface PatientSelectionProps {
  * patients is the non-blank one - `validateReport` and the report request both
  * read it that way.
  */
-export function PatientSelection({patientIds, onChange, error, disabled}: PatientSelectionProps) {
+export function PatientSelection({
+  patientIds,
+  onChange,
+  error,
+  disabled,
+  showEmptyRowErrors
+}: PatientSelectionProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError, notifyInfo, notifySuccess} = useNotifications();
@@ -93,6 +105,11 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const atLimit = isAtPatientIdLimit(patientIds);
+  const duplicatePatientIdIndexes = useMemo(() => new Set(findDuplicatePatientIdIndexes(patientIds)), [patientIds]);
+  const emptyPatientIdIndexes = useMemo(
+    () => new Set(patientIds.flatMap((id, index) => (id.trim() ? [] : [index]))),
+    [patientIds]
+  );
 
   const add = useCallback(
     (incoming: string[]): number => {
@@ -400,6 +417,13 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
                   placeholder={t('onboarding:report.patients.manual.placeholder')}
                   value={item}
                   disabled={disabled}
+                  error={
+                    duplicatePatientIdIndexes.has(index)
+                      ? t('onboarding:report.patients.manual.duplicateError')
+                      : showEmptyRowErrors && emptyPatientIdIndexes.has(index)
+                        ? t('onboarding:report.patients.manual.requiredError')
+                        : undefined
+                  }
                   onChange={onItemChange} />
               )} />
           </div>
@@ -453,7 +477,7 @@ export function PatientSelection({patientIds, onChange, error, disabled}: Patien
       </Tabs>
 
       {atLimit && <p className="form-hint">{t('onboarding:report.patients.messages.limitReached')}</p>}
-      <p className="k-form-error" role="alert">
+      <p className="nhsn-link__form-error" role="alert">
         {error}
       </p>
     </div>

@@ -6,9 +6,9 @@ import type {EncounterCode, EncounterCodeDetail, EncounterMapping} from '../../.
 import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, TableCaption, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {findIncompleteRowKeys} from './validate';
+import {findDuplicateCodeSystemIndexes, findIncompleteRowKeys, findMissingCodeSystemGroupKeys, pruneEmptyGroups} from './validate';
 import './EncounterStep.css';
 
 /**
@@ -59,6 +59,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [validationRequested, setValidationRequested] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   // Captured once, at mount -- not a "have we run yet" flag, because StrictMode invokes
   // effects twice on mount against the same committed state, and a boolean flag would be
   // flipped by the first invocation and wrongly let the second one patch.
@@ -183,6 +184,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   }, [allMappingRows, selectedReferenceRow]);
 
   const incompleteRowKeys = useMemo(() => new Set(findIncompleteRowKeys(groups)), [groups]);
+  const duplicateCodeSystemGroupKeys = useMemo(() => new Set(findDuplicateCodeSystemIndexes(groups)), [groups]);
 
   function addCodeSystem() {
     setGroups(current => [...current, {groupKey: makeKey(), codeSystem: '', mappings: []}]);
@@ -226,12 +228,41 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     );
   }
 
-  function handleNext() {
+  function announceValidationMessage(message: string) {
+    setValidationError(null);
+    window.setTimeout(() => setValidationError(message), 0);
+  }
+
+  /**
+   * Diverges from the POC (which sets encounterMappingAcknowledged unconditionally): a code
+   * system left blank while it still has mappings, or a mapping row with only one side filled
+   * in, blocks Continue - see findMissingCodeSystemGroupKeys/findIncompleteRowKeys. Unused
+   * scaffolding (a blank row nobody typed into, an empty group with nothing in it) is pruned
+   * first rather than counted against the user - see pruneEmptyGroups.
+   */
+  function validateStep(): boolean {
     setValidationRequested(true);
-    const {codeSystems, mappings} = flattenGroups(groups);
+    const pruned = pruneEmptyGroups(groups);
+    if (findMissingCodeSystemGroupKeys(pruned).length > 0 || findIncompleteRowKeys(pruned).length > 0) {
+      announceValidationMessage(t('onboarding:encounter.messages.incomplete'));
+      return false;
+    }
+    setValidationError(null);
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateStep()) {
+      return;
+    }
+    const pruned = pruneEmptyGroups(groups);
+    setGroups(pruned);
+    const {codeSystems, mappings} = flattenGroups(pruned);
     patch('encounter', {codeSystems, mappings});
     setReadyToAdvance(true);
   }
+
+  useStepValidator(validateStep);
 
   const stableOnBack = useStableCallback(onBack);
   const stableHandleNext = useStableCallback(handleNext);
@@ -328,6 +359,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   group={group}
                   referenceCodes={referenceCodes}
                   incompleteRowKeys={incompleteRowKeys}
+                  duplicate={duplicateCodeSystemGroupKeys.has(group.groupKey)}
                   showValidation={validationRequested}
                   onCodeSystemChange={value => updateCodeSystem(group.groupKey, value)}
                   onRemoveGroup={() => removeCodeSystem(group.groupKey)}
@@ -339,6 +371,10 @@ export function EncounterStep({onNext, onBack}: StepProps) {
               <Button variant="secondary" size="sm" onClick={addCodeSystem} disabled={saving}>
                 {t('onboarding:encounter.fields.addCodeSystem')}
               </Button>
+
+              <p className="nhsn-link__form-error" role="alert">
+                {validationError}
+              </p>
             </div>
           )}
 
@@ -479,6 +515,7 @@ interface CodeSystemBlockProps {
   group: CodeSystemGroupState;
   referenceCodes: EncounterCode[];
   incompleteRowKeys: Set<string>;
+  duplicate: boolean;
   showValidation: boolean;
   onCodeSystemChange: (value: string) => void;
   onRemoveGroup: () => void;
@@ -491,6 +528,7 @@ function CodeSystemBlock({
   group,
   referenceCodes,
   incompleteRowKeys,
+  duplicate,
   showValidation,
   onCodeSystemChange,
   onRemoveGroup,
@@ -500,6 +538,7 @@ function CodeSystemBlock({
 }: CodeSystemBlockProps) {
   const {t} = useTranslation('onboarding');
   const codeSystemInputId = `encounter-codesystem-${group.groupKey}`;
+  const duplicateHintId = `encounter-codesystem-hint-${group.groupKey}`;
 
   return (
     <div className="codesystem-block">
@@ -510,6 +549,8 @@ function CodeSystemBlock({
             id={codeSystemInputId}
             type="text"
             placeholder={t('encounter.fields.codeSystemPlaceholder') ?? ''}
+            aria-invalid={duplicate}
+            aria-describedby={duplicate ? duplicateHintId : undefined}
             value={group.codeSystem}
             onChange={event => onCodeSystemChange(event.target.value)} />
           <Button
@@ -524,6 +565,11 @@ function CodeSystemBlock({
             {t('encounter.fields.removeCodeSystem')}
           </Button>
         </div>
+        {duplicate && (
+          <span id={duplicateHintId} className="encounter-row-hint" role="alert">
+            {t('encounter.fields.duplicateCodeSystemHint')}
+          </span>
+        )}
       </div>
 
       <div className="form-group">
@@ -792,11 +838,21 @@ export function buildGroups(codeSystems: string[], mappings: EncounterMapping[])
     }
   });
 
-  return order.map(codeSystem => ({
-    groupKey: makeKey(),
-    codeSystem,
-    mappings: bySystem.get(codeSystem) ?? []
-  }));
+  // Each system's rows go to only the FIRST group slot with that value. A Map key can't tell two
+  // same-valued slots apart (most commonly two groups both still blank), so handing the same rows
+  // to every slot sharing a value is what let a Continue-then-Back round trip double every mapping
+  // row it saw, over and over. See findDuplicateCodeSystemIndexes for the validation that keeps a
+  // user from creating that colliding state in the first place.
+  const claimed = new Set<string>();
+  return order.map(codeSystem => {
+    const mappingsForGroup = claimed.has(codeSystem) ? [] : bySystem.get(codeSystem) ?? [];
+    claimed.add(codeSystem);
+    return {
+      groupKey: makeKey(),
+      codeSystem,
+      mappings: mappingsForGroup
+    };
+  });
 }
 
 function flattenGroups(groups: CodeSystemGroupState[]): {codeSystems: string[]; mappings: EncounterMapping[]} {

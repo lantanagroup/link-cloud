@@ -1,4 +1,5 @@
 import type {FacilityDraft} from '../../types';
+import {findDuplicatePatientIdIndexes} from './patientIds';
 
 export interface FieldErrors {
   [field: string]: string; // i18n keys, not sentences
@@ -30,8 +31,16 @@ export function validateReport(draft: FacilityDraft): FieldErrors {
     errors.endDate = 'onboarding:report.errors.endDateRequired';
   }
 
-  if (enteredPatientIds(draft).length === 0) {
+  const rawPatientIds = report.patientIds ?? [];
+  const patientIds = enteredPatientIds(draft);
+  if (patientIds.length === 0) {
     errors.patientIds = 'onboarding:report.errors.patientIdsRequired';
+  } else if (rawPatientIds.some(id => !id.trim())) {
+    // A row was added (via "+ Add Patient ID" or Upload/Census) but never filled in --
+    // distinct from patientIds.length === 0, where nothing has been entered at all.
+    errors.patientIds = 'onboarding:report.errors.patientIdsIncomplete';
+  } else if (findDuplicatePatientIdIndexes(patientIds).length > 0) {
+    errors.patientIds = 'onboarding:report.errors.patientIdsDuplicate';
   }
 
   // Both are ISO date-only strings, so a lexical comparison is a date
