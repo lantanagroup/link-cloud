@@ -85,25 +85,29 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     return taskResult;
                 }
 
-                var operation = new Operation()
+                var operation = await ExecuteWithDeadlockRetryAsync(async () =>
                 {
-                    OperationType = model.OperationType,
-                    OperationJson = model.OperationJson,
-                    FacilityId = model.FacilityId,
-                    Name = model.Name,
-                    Description = model.Description,
-                    IsDisabled = model.IsDisabled,
-                    CreateDate = DateTime.UtcNow,
-                    ModifyDate = null
-                };
+                    var created = new Operation()
+                    {
+                        OperationType = model.OperationType,
+                        OperationJson = model.OperationJson,
+                        FacilityId = model.FacilityId,
+                        Name = model.Name,
+                        Description = model.Description,
+                        IsDisabled = model.IsDisabled,
+                        CreateDate = DateTime.UtcNow,
+                        ModifyDate = null
+                    };
 
-                await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
-                await _database.Operations.AddAsync(operation, cancellationToken);
-                await _database.SaveChangesAsync(cancellationToken);
+                    await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+                    await _database.Operations.AddAsync(created, cancellationToken);
+                    await _database.SaveChangesAsync(cancellationToken);
 
-                await UpdateOperationResourceTypesForOperation(operation.Id, model.ResourceTypes, cancellationToken);
-                await UpdateVendorPresetsForOperation(operation.Id, model.VendorVersionIds, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
+                    await UpdateOperationResourceTypesForOperation(created.Id, model.ResourceTypes, cancellationToken);
+                    await UpdateVendorPresetsForOperation(created.Id, model.VendorVersionIds, cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return created;
+                }, cancellationToken);
 
                 taskResult.IsSuccess = true;
                 taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId, cancellationToken);
@@ -143,30 +147,24 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 await _operationSequenceQueries.LockOperationAsync(model.Id, cancellationToken);
 
-                #region Lookup the Detailed Operation Model to check for Facility/Vendor operation conversions (which are not allowed)
-                var operationModel = (await _operationQueries.Search(new OperationSearchModel()
-                {
-                    OperationId = model.Id,
-                    IncludeDisabled = true
-                }, cancellationToken)).Records.SingleOrDefault();
-
-                if (operationModel == null)
+                var operation = await _database.Operations.GetAsync(model.Id, cancellationToken);
+                if (operation == null)
                 {
                     throw new InvalidOperationException($"No Operation Found for Id {model.Id}");
                 }
 
-                if (!string.IsNullOrEmpty(operationModel.FacilityId) && (model.VendorVersionIds?.Any() ?? false))
+                var hasVendorPresets = await _database.VendorVersionOperationPresets.AnyAsync(
+                    preset => preset.OperationResourceType.OperationId == model.Id,
+                    cancellationToken);
+                if (!string.IsNullOrEmpty(operation.FacilityId) && (model.VendorVersionIds?.Any() ?? false))
                 {
                     throw new InvalidOperationException("The operation for the provided Id is a facility operation, but the update model has provided vendor version IDs. A facility operation cannot also be a vendor operation or vice versa. Create a new Operation for the facility or vendor version(s).");
                 }
 
-                if (operationModel.VendorPresets.Any() && !string.IsNullOrEmpty(model.FacilityId))
+                if (hasVendorPresets && !string.IsNullOrEmpty(model.FacilityId))
                 {
                     throw new InvalidOperationException("The operation for the provided Id is a vendor operation, but the update model has provided a FacilityId. A facility operation cannot also be a vendor operation or vice versa. Create a new Operation for the facility or vendor(s).");
                 }
-                #endregion
-
-                var operation = await _database.Operations.GetAsync(model.Id, cancellationToken);
                 if (operation.OperationType == "HSLOCMap" && !string.IsNullOrEmpty(model.FacilityId) &&
                     await _database.Operations.AnyAsync(existing => existing.FacilityId == model.FacilityId && existing.OperationType == "HSLOCMap" && existing.Id != model.Id, cancellationToken))
                 {
@@ -415,7 +413,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                         ResourceType = model.ResourceType,
                         IncludeDisabled = true,
                         PageNumber = pageNumber
-                    }, cancellationToken);
+                    }, cancellationToken, hydrateVendors: false);
 
                     if (operations == null || operations.Records.Count == 0)
                     {

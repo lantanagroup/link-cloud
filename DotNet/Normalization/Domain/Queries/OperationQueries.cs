@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public interface IOperationQueries
     {
         Task<OperationModel> Get(Guid id, string? facilityId = null, CancellationToken cancellationToken = default);
-        Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default);
+        Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default, bool hydrateVendors = true);
     }
 
     public class OperationQueries : IOperationQueries
@@ -39,7 +39,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             }, cancellationToken)).Records.FirstOrDefault();
         }
 
-        public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model, CancellationToken cancellationToken = default, bool hydrateVendors = true)
         {
             var query = from o in _dbContext.Operations
                         select new OperationModel()
@@ -151,7 +151,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-            await HydrateVendorVersionsAsync(records, cancellationToken);
+            if (hydrateVendors)
+            {
+                await HydrateVendorVersionsAsync(records, cancellationToken);
+            }
 
             return new PagedConfigModel<OperationModel>()
             {

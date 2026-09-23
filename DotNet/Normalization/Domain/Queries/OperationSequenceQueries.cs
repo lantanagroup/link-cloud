@@ -158,8 +158,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 return;
             }
 
-            var key = SequenceWriteLockKey(facilityId);
-            if (await HoldSequenceWriteLockAsync(key, cancellationToken))
+            if (await HoldSequenceWriteLockAsync(facilityId, cancellationToken))
             {
                 return;
             }
@@ -173,10 +172,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
             try
             {
-                _dbContext.OperationSequenceCacheRevisions.Add(new OperationSequenceCacheRevision
+                _dbContext.OperationSequenceWriteLocks.Add(new OperationSequenceWriteLock
                 {
-                    FacilityId = key,
-                    Revision = 0
+                    FacilityId = facilityId
                 });
                 await _dbContext.SaveChangesAsync(cancellationToken);
             }
@@ -189,25 +187,35 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                     await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
                 }
 
-                foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceCacheRevision>().ToList())
+                foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceWriteLock>().ToList())
                 {
-                    if (entry.Entity.FacilityId == key && entry.State == EntityState.Added)
+                    if (entry.Entity.FacilityId == facilityId && entry.State == EntityState.Added)
                     {
                         entry.State = EntityState.Detached;
                     }
                 }
             }
 
-            if (!await HoldSequenceWriteLockAsync(key, cancellationToken))
+            if (!await HoldSequenceWriteLockAsync(facilityId, cancellationToken))
             {
                 throw new InvalidOperationException("Could not acquire the operation sequence write lock.");
             }
         }
 
-        private async Task<bool> HoldSequenceWriteLockAsync(string key, CancellationToken cancellationToken)
+        private async Task<bool> HoldSequenceWriteLockAsync(string facilityId, CancellationToken cancellationToken)
         {
-            var updated = await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE OperationSequenceCacheRevisions SET Revision = Revision WHERE FacilityId = {key}",
+            var entityType = _dbContext.Model.FindEntityType(typeof(OperationSequenceWriteLock));
+            var table = entityType?.GetTableName();
+            if (string.IsNullOrEmpty(table))
+            {
+                return false;
+            }
+
+            var schema = entityType!.GetSchema();
+            var target = string.IsNullOrEmpty(schema) ? table : schema + "." + table;
+            var updated = await _dbContext.Database.ExecuteSqlRawAsync(
+                $"UPDATE {target} SET FacilityId = FacilityId WHERE FacilityId = {{0}}",
+                new object[] { facilityId },
                 cancellationToken);
             return updated > 0;
         }
@@ -243,19 +251,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 .Select(sequence => sequence.FacilityId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
-        }
-
-        private static string SequenceWriteLockKey(string facilityId)
-        {
-            const string prefix = "seq-lock:";
-            var key = prefix + facilityId;
-            if (key.Length <= 255)
-            {
-                return key;
-            }
-
-            var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(facilityId)));
-            return prefix + hash;
         }
 
         public async Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default)
