@@ -750,7 +750,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                 {CENSUS_LIST_KEYS.map((key) => {
                   const state = listState[key];
                   const fieldError = errors[`listId.${key}`]
-                    ? t(errors[`listId.${key}`])
+                    ? t(errors[`listId.${key}`], { list: t(LIST_LABEL_KEYS[key]) })
                     : state?.error;
                   return (
                     <div
@@ -762,13 +762,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           label={t(LIST_LABEL_KEYS[key])}
                           required
                           value={census.patientListIds?.[key] ?? ""}
-                          error={
-                            errors[`listId.${key}`]
-                              ? t(errors[`listId.${key}`], {
-                                  list: t(LIST_LABEL_KEYS[key]),
-                                })
-                              : undefined
-                          }
+                          error={fieldError}
                           onChange={(value) => updateListId(key, value)}
                           onBlur={() => refreshFieldError(`listId.${key}`)}
                         />
