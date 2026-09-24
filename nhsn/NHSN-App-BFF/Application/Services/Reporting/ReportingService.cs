@@ -124,8 +124,37 @@ public sealed class ReportingService : IReportingService
     public Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default) =>
         _dataAcquisitionGateway.GetReportSummaryAsync(reportId, cancellationToken);
 
-    public Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default) =>
-        _reportGateway.GetPatientMeasureReportExportAsync(reportId, patientId, reportType, cancellationToken);
+    public async Task<MeasureReportResource?> GetPatientMeasureReportResourceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
+    {
+        var export = await _reportGateway.GetPatientMeasureReportExportAsync(reportId, patientId, reportType, cancellationToken);
+        if (export is null)
+        {
+            return null;
+        }
+
+        return new MeasureReportResource
+        {
+            Id = export.MeasureReportId ?? $"{reportId}-{patientId}-{reportType}",
+            Measure = export.ReportType,
+            Date = DateTime.UtcNow.ToString("O"),
+            Reporter = _userContext.FacilityName is null ? null : new MeasureReportReporter {Display = _userContext.FacilityName},
+            Period = export.PeriodStart is null || export.PeriodEnd is null
+                ? null
+                : new MeasureReportPeriod
+                {
+                    Start = export.PeriodStart.Value.ToString("yyyy-MM-dd"),
+                    End = export.PeriodEnd.Value.ToString("yyyy-MM-dd")
+                },
+            Subject = new MeasureReportReference {Reference = $"Patient/{patientId}"},
+            EvaluatedResource = export.EvaluatedResources
+                .Select(resource => new MeasureReportReference {Reference = $"{resource.ResourceType}/{resource.ResourceId}"})
+                .ToArray(),
+            Extension =
+            [
+                new MeasureReportExtension {Url = "urn:nhsn-link:reportingStatus", ValueString = export.ReportingStatus}
+            ]
+        };
+    }
 
     public Task<bool?> GetReportAccuracyAcknowledgementAsync(string reportId, CancellationToken cancellationToken = default)
     {

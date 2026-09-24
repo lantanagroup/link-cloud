@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -26,7 +27,7 @@ public class EncounterEndpoints : IApi
             });
 
         group.MapGet("/encounter-codes/lookup", async (string system, string code, IReferenceDataService referenceData, CancellationToken cancellationToken) =>
-                Results.Ok(await referenceData.LookupEncounterCodeAsync(system, code, cancellationToken)))
+                Results.Ok(await referenceData.LookupEncounterCodeAsync(system.Sanitize(), code.Sanitize(), cancellationToken)))
             .WithName("LookupEncounterCode")
             .Produces<EncounterCodeDetail?>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)

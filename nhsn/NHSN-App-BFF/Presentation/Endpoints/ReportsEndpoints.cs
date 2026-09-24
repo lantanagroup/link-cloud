@@ -3,6 +3,7 @@ using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -12,6 +13,7 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 public class ReportsEndpoints : IApi
 {
     private const int MaxPatientIds = 10;
+    private const int MaxPageSize = 100;
 
     public void RegisterEndpoints(WebApplication app)
     {
@@ -56,7 +58,7 @@ public class ReportsEndpoints : IApi
                 CancellationToken cancellationToken,
                 int page = 1,
                 int pageSize = 10) =>
-                Results.Ok(await service.ListReportsAsync(page < 1 ? 1 : page, pageSize < 1 ? 10 : pageSize, cancellationToken)))
+                Results.Ok(await service.ListReportsAsync(page < 1 ? 1 : page, Math.Clamp(pageSize, 1, MaxPageSize), cancellationToken)))
             .WithName("ListReports")
             .Produces<Paged<ReportSummary>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -177,48 +179,20 @@ public class ReportsEndpoints : IApi
                 string patientId,
                 string measure,
                 IReportingService service,
-                INhsnUserContext userContext,
                 CancellationToken cancellationToken) =>
             {
-                var export = await service.GetPatientMeasureReportExportAsync(reportId, patientId, measure, cancellationToken);
-                if (export is null)
+                var sanitizedMeasure = measure.Sanitize();
+                var resource = await service.GetPatientMeasureReportResourceAsync(reportId, patientId, sanitizedMeasure, cancellationToken);
+                if (resource is null)
                 {
                     return Results.NotFound();
                 }
 
-                var measureReportResource = new
-                {
-                    resourceType = "MeasureReport",
-                    id = export.MeasureReportId ?? $"{reportId}-{patientId}-{measure}",
-                    status = "complete",
-                    type = "individual",
-                    measure = export.ReportType,
-                    date = DateTime.UtcNow.ToString("O"),
-                    reporter = userContext.FacilityName is null
-                        ? null
-                        : new {display = userContext.FacilityName},
-                    period = export.PeriodStart is null || export.PeriodEnd is null
-                        ? null
-                        : new
-                        {
-                            start = export.PeriodStart.Value.ToString("yyyy-MM-dd"),
-                            end = export.PeriodEnd.Value.ToString("yyyy-MM-dd")
-                        },
-                    subject = new {reference = $"Patient/{patientId}"},
-                    evaluatedResource = export.EvaluatedResources
-                        .Select(resource => new {reference = $"{resource.ResourceType}/{resource.ResourceId}"})
-                        .ToArray(),
-                    extension = new[]
-                    {
-                        new {url = "urn:nhsn-link:reportingStatus", valueString = export.ReportingStatus}
-                    }
-                };
-
-                var ndjson = JsonSerializer.Serialize(measureReportResource);
+                var ndjson = JsonSerializer.Serialize(resource);
                 return Results.File(
                     System.Text.Encoding.UTF8.GetBytes(ndjson),
                     "application/x-ndjson",
-                    $"{patientId}_{measure}_report.ndjson");
+                    $"{patientId}_{sanitizedMeasure}_report.ndjson");
             })
             .WithName("ExportPatientReport")
             .Produces(StatusCodes.Status200OK)
@@ -260,10 +234,10 @@ public class ReportsEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 await service.RecordReportAccuracyAcknowledgementAsync(reportId, request.Accepted, request.StatementKey, cancellationToken);
-                return Results.NoContent();
+                return Results.Accepted();
             })
             .WithName("AcknowledgeReportAccuracy")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {

@@ -32,10 +32,10 @@ public class MrnIntakeEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 await service.SaveAsync(intake, cancellationToken);
-                return Results.NoContent();
+                return Results.Accepted();
             })
             .WithName("SaveMrnIntake")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {

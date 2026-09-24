@@ -32,10 +32,10 @@ public class HslocMappingsEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 await service.SaveAsync(mappings, cancellationToken);
-                return Results.NoContent();
+                return Results.Accepted();
             })
             .WithName("SaveHslocMappings")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {

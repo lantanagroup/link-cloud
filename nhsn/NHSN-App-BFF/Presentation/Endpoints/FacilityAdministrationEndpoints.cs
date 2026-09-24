@@ -21,7 +21,7 @@ public class FacilityAdministrationEndpoints : IApi
                 try
                 {
                     var updated = await facilityAdministrationService.UpdateFacilityOnboardingAsync(facilityId, request, cancellationToken);
-                    return updated is null ? Results.NotFound() : Results.Ok(updated);
+                    return updated is null ? Results.NotFound() : Results.Accepted(value: updated);
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -29,7 +29,7 @@ public class FacilityAdministrationEndpoints : IApi
                 }
             })
             .WithName("UpdateFacilityOnboarding")
-            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
     }

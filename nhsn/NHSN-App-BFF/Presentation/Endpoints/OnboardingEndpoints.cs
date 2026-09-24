@@ -39,10 +39,10 @@ public class OnboardingEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 var envelope = await writeService.SaveAsync(draft, cancellationToken);
-                return Results.Ok(envelope);
+                return Results.Accepted(value: envelope);
             })
             .WithName("SaveOnboardingDraft")
-            .Produces<DraftEnvelopeResponse>(StatusCodes.Status200OK)
+            .Produces<DraftEnvelopeResponse>(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status502BadGateway)
