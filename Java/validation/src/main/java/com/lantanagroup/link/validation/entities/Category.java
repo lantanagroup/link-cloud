@@ -56,7 +56,7 @@ public class Category {
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50,
-            columnDefinition = "varchar(50) default 'LABEL' not null")
+            columnDefinition = "varchar(50) default 'LABEL'")
     private CategoryStrategy strategy = CategoryStrategy.LABEL;
 
     /**
