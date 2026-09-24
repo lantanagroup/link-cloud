@@ -838,7 +838,8 @@ public static class FacilitySetupHelper
     string facilityId,
     CancellationToken cancellationToken = default,
     string? vendorName = null,
-    bool vendorExplicit = false)
+    bool vendorExplicit = false,
+    Func<Task>? onCreated = null)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
 
@@ -876,6 +877,9 @@ public static class FacilitySetupHelper
                 $"Failed to create DMRP facility '{facilityId}'. " +
                 $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
         }
+
+        if (onCreated != null)
+            await onCreated();
 
         await WaitForFacilityReadConsistencyAsync(
             facilityClient,

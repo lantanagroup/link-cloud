@@ -540,8 +540,14 @@ internal sealed class RunExecutor
                     facilityId,
                     cancellationToken,
                     state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces);
-                await callbacks.PersistOwnership();
+                    state.Options.HonorExplicitFacilityPieces,
+                    onCreated: async () =>
+                    {
+                        state.AutomationCreatedFacility = true;
+                        await callbacks.PersistOwnership();
+                    });
+                if (!state.AutomationCreatedFacility)
+                    await callbacks.PersistOwnership();
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)

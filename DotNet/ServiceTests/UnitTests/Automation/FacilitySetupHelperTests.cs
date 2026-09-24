@@ -472,6 +472,40 @@ public class FacilitySetupHelperTests
     }
 
     [Fact]
+    public async Task Empty_dmrp_setup_reports_creation_before_the_read_back_can_cancel()
+    {
+        using var cts = new CancellationTokenSource();
+        var reported = false;
+        var gets = 0;
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .Returns((string _, CancellationToken token) =>
+            {
+                gets++;
+                if (gets == 1)
+                    return Task.FromResult(Response<FacilityModel>(404));
+
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(Response(200, new FacilityModel { FacilityId = FacilityId }));
+            });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                _facilityClient.Object,
+                _output.Object,
+                FacilityId,
+                cts.Token,
+                onCreated: () =>
+                {
+                    reported = true;
+                    cts.Cancel();
+                    return Task.CompletedTask;
+                }));
+
+        Assert.True(reported);
+        Assert.Single(_created);
+    }
+
+    [Fact]
     public async Task Empty_dmrp_setup_returns_true_only_after_it_creates_the_facility()
     {
         var created = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(

@@ -268,15 +268,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
-        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
+        // Drop child history first and the run summary last. A failure after the
+        // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
 
-        // Only remove externalized payload blobs after Mongo cleanup succeeds so
-        // a DB failure cannot orphan pointer records that still reference payload data.
+        // Payload blobs follow the Mongo child rows so a DB failure cannot orphan
+        // pointer records that still reference payload data. The summary stays until
+        // those deletes succeed.
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
+        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
