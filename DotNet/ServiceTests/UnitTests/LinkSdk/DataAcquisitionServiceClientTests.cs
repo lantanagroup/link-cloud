@@ -400,6 +400,21 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task UpdateSftpCredentialsAsync_DoesNotCaptureTheRequestBody()
+    {
+        using var server = new OneShotServer(string.Empty, 204);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.UpdateSftpCredentialsAsync("org-1", new { username = "facility-user", password = SftpTestPassword });
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        // The password did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(SftpTestPassword, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
     {
         using var server = new OneShotServer("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");

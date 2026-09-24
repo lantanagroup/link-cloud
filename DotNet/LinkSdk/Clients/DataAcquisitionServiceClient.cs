@@ -404,8 +404,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string organizationId,
         object credentials,
         CancellationToken cancellationToken = default) =>
+        // The body carries the SFTP password, so it must not be copied into LinkApiResponse.RequestBody
         SendAsync(() => Request($"data/{organizationId}/sftp-configurations/credentials")
-            .PutJsonAsync(credentials, cancellationToken: cancellationToken));
+            .PutJsonAsync(credentials, cancellationToken: cancellationToken),
+            captureRequestBody: false);
 
     public Task<LinkApiResponse> DeleteSftpCredentialsAsync(
         string organizationId,

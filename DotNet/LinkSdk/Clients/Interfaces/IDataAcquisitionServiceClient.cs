@@ -122,6 +122,7 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> CreateSftpConfigurationAsync(string organizationId, object request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateSftpConfigurationAsync(string organizationId, string configurationId, object request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteSftpConfigurationAsync(string organizationId, string configurationId, CancellationToken cancellationToken = default);
+    /// <summary>Saves the write-only sFTP credentials. The request body is not captured in the response, because it carries the password.</summary>
     Task<LinkApiResponse> UpdateSftpCredentialsAsync(string organizationId, object credentials, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteSftpCredentialsAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
