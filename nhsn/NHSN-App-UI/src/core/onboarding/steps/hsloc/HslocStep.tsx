@@ -16,7 +16,6 @@ import {
   SidePanel,
   SidePanelLayout,
   StepActions,
-  TableCaption,
   Tabs,
   TextField
 } from '../../../fields';
@@ -516,7 +515,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
             <div className="nhsn-link__table-scroll nhsn-link__hsloc-table-scroll" tabIndex={-1}>
               <table className="nhsn-link__table nhsn-link__hsloc-table">
-                <TableCaption><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></TableCaption>
+                <caption className="nhsn-link__visually-hidden"><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></caption>
                 <thead>
                   <tr>
                     <th scope="col">{t('onboarding:hsloc.reference.columns.category')}</th>
