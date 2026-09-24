@@ -38,7 +38,7 @@
         <div class="card-body">
             <p id="cleanup-activity-label" class="fw-semibold mb-1">No cleanup pass running</p>
             <p id="cleanup-activity-message" class="small text-muted mb-2">Scheduled daytime quiesce, daily teardown, weekly purge, and custom-range runs show up here while they work. Completed passes are saved under Cleanup reports.</p>
-            <div class="progress mb-2" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <div id="cleanup-activity-progress" class="progress mb-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div id="cleanup-activity-bar" class="progress-bar" style="width: 0%"></div>
             </div>
             <dl class="row mb-0 small">
@@ -403,11 +403,14 @@
             var trigger = field(activity, 'trigger') ? ' (' + field(activity, 'trigger') + ')' : '';
             message.textContent = (field(activity, 'message') || '') + trigger;
         }
+        var percent = Number(field(activity, 'percent') || 0);
         if (bar) {
-            bar.style.width = (field(activity, 'percent') || 0) + '%';
+            bar.style.width = percent + '%';
             bar.classList.toggle('progress-bar-animated', running);
             bar.classList.toggle('progress-bar-striped', running);
         }
+        var progress = document.getElementById('cleanup-activity-progress');
+        if (progress) progress.setAttribute('aria-valuenow', String(percent));
         if (counts) {
             counts.textContent = (field(activity, 'processed') || 0) + ' / ' + (field(activity, 'total') || 0) +
                 '  ·  quiesced ' + (field(activity, 'quiesced') || 0) +

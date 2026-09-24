@@ -163,6 +163,39 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_does_not_delete_a_named_facility_after_the_run_id_is_torn_down()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var finished = now.AddDays(-2);
+        var run = new AutomationRunSummary
+        {
+            RunId = runId,
+            FacilityId = "CityHospital",
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = finished
+        };
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string>
+        {
+            ["CityHospital"] = "City Hospital",
+            [runId.ToString()] = "scenario"
+        };
+        var service = Create(now, [run], [], facilities: facilities, deletedFacilityIds: deleted);
+
+        var result = await service.RunCustomRangeAsync(
+            finished.AddHours(-1),
+            finished.AddHours(1),
+            teardownFacilities: true,
+            purgeHistory: true);
+
+        deleted.Should().Equal(runId.ToString());
+        result.TornDownFacilityIds.Should().Equal(runId.ToString());
+        result.PurgedRunIds.Should().Equal(runId);
+    }
+
+    [Fact]
     public async Task HistoryPurge_says_so_when_the_report_cannot_be_saved()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -244,7 +277,8 @@ public class LeftoverRunCleanupServiceTests
         int failFirstFacilityDeletes = 0,
         bool failReportSave = false,
         List<string>? terminalMessages = null,
-        List<string>? statusesWhenSettingsLoad = null)
+        List<string>? statusesWhenSettingsLoad = null,
+        List<string>? deletedFacilityIds = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -267,6 +301,15 @@ public class LeftoverRunCleanupServiceTests
                     remainingDeleteFailures--;
                 throw new InvalidOperationException("facility delete failed");
             });
+        if (deletedFacilityIds != null)
+        {
+            facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((string facilityId, CancellationToken _) =>
+                {
+                    deletedFacilityIds.Add(facilityId);
+                    return Task.FromResult(Ok());
+                });
+        }
 
         var normalization = new Mock<INormalizationServiceClient>();
         normalization.Setup(c => c.DeleteFacilityOperationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

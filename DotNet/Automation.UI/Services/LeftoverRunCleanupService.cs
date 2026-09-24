@@ -487,6 +487,7 @@ public sealed class LeftoverRunCleanupService(
                     }
                     else
                     {
+                        // Owned ids were already torn down above. Do not let the helper fall back to run.FacilityId.
                         await RunCleanupHelper.PurgeRunHistoryAsync(
                             facilityClient,
                             normalizationClient,
@@ -500,10 +501,7 @@ public sealed class LeftoverRunCleanupService(
                             run,
                             settings.AbortTtl,
                             cancellationToken,
-                            teardownFacility: teardownInPurge && pendingTeardown.Count == 0,
-                            alreadyTornDownFacilityIds: tornDown.Count > 0
-                                ? new HashSet<string>(tornDown, StringComparer.OrdinalIgnoreCase)
-                                : null);
+                            teardownFacility: false);
                         purged.Add(run.RunId);
                     }
                 }
