@@ -10,6 +10,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(Guid vendorVersionId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationAsync(CreateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteFacilityOperationAsync(string facilityId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationSequencesAsync(string facilityId, string resourceType, List<CreateNormalizationOperationSequenceApiModel> sequences, CancellationToken cancellationToken = default);

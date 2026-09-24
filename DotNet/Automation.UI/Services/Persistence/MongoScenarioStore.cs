@@ -397,6 +397,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             Name = model.Name,
             Description = model.Description,
             IsSystemScenario = model.IsSystemScenario,
+            FacilityConfigurationMode = model.FacilityConfigurationMode.ToString(),
+            FacilityTemplateId = model.FacilityTemplateId,
+            VendorName = model.VendorName,
             ReportMethod = model.ReportMethod.ToString(),
             SelectedMeasures = model.SelectedMeasures.Select(m => m.ToString()).ToList(),
             SelectedMeasureIds = model.SelectedMeasureIds.Select(id => id.ToString()).ToList(),
@@ -435,6 +438,11 @@ public sealed class MongoScenarioStore : IScenarioStore
             Name = doc.Name,
             Description = doc.Description,
             IsSystemScenario = doc.IsSystemScenario,
+            FacilityConfigurationMode = Enum.TryParse<FacilityConfigurationMode>(doc.FacilityConfigurationMode, true, out var facilityMode)
+                ? facilityMode
+                : FacilityConfigurationMode.Unspecified,
+            FacilityTemplateId = doc.FacilityTemplateId,
+            VendorName = doc.VendorName,
             ReportMethod = Enum.TryParse<ReportMethod>(doc.ReportMethod, true, out var rm) ? rm : ReportMethod.Adhoc,
             SelectedMeasures = doc.SelectedMeasures
                 .Select(s => Enum.TryParse<ProfiledMeasureType>(s, true, out var m) ? m : (ProfiledMeasureType?)null)

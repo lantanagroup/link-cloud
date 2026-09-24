@@ -61,6 +61,14 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> DeleteFacilityOperationAsync(
+        string facilityId,
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
+            .SetQueryParam("operationId", operationId)
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(
         Guid vendorVersionId,
         CancellationToken cancellationToken = default) =>

@@ -21,6 +21,13 @@ public sealed class TestScenarioDocument
     public string? Description { get; set; }
     public bool IsSystemScenario { get; set; }
 
+    public string FacilityConfigurationMode { get; set; } = "Unspecified";
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid? FacilityTemplateId { get; set; }
+
+    public string? VendorName { get; set; }
+
     public string ReportMethod { get; set; } = "Adhoc";
     public List<string> SelectedMeasures { get; set; } = [];
 

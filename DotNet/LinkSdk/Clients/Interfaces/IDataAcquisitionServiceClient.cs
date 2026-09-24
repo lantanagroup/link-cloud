@@ -51,6 +51,10 @@ public interface IDataAcquisitionServiceClient
         CreateOrganizationLocationConfigurationApiModel request,
         CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default);

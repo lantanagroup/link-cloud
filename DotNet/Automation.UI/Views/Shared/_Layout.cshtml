@@ -13,7 +13,8 @@
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
     bool NavActive(string name) => string.Equals(currentController, name, StringComparison.OrdinalIgnoreCase);
     var configActive = NavActive("Measures") || NavActive("QueryPlans") || NavActive("Normalizations")
-        || NavActive("OrganizationResourceMaps") || NavActive("PatientConfigurations");
+        || NavActive("OrganizationResourceMaps") || NavActive("PatientConfigurations")
+        || NavActive("FacilityTemplates");
 }
     <header>
         <nav class="navbar navbar-expand-sm au-navbar mb-3">
@@ -44,6 +45,7 @@
                                 <i class="bi bi-sliders me-1"></i>Configurations
                             </a>
                             <ul class="dropdown-menu au-nav-dropdown-menu" aria-labelledby="configurationsDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="FacilityTemplates" asp-action="Index"><i class="bi bi-hospital me-1"></i>Facility Templates</a></li>
                                 <li><a class="dropdown-item" asp-area="" asp-controller="Measures" asp-action="Index"><i class="bi bi-clipboard2-pulse me-1"></i>Measures</a></li>
                                 <li><a class="dropdown-item" asp-area="" asp-controller="QueryPlans" asp-action="Index"><i class="bi bi-diagram-3 me-1"></i>Query Plans</a></li>
                                 <li><a class="dropdown-item" asp-area="" asp-controller="Normalizations" asp-action="Index"><i class="bi bi-funnel me-1"></i>Normalizations</a></li>

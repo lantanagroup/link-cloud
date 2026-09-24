@@ -21,6 +21,7 @@ public class ScenariosController(
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IPatientConfigurationStore patientConfigurationStore,
     IMeasureTemplateStore measureTemplateStore,
+    IFacilityTemplateStore facilityTemplateStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
@@ -40,6 +41,7 @@ public class ScenariosController(
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
         ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(ct);
+        ViewBag.FacilityTemplates = await facilityTemplateStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -66,6 +68,33 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
+
+        if (model.FacilityConfigurationMode == FacilityConfigurationMode.Facility)
+        {
+            if (!model.FacilityTemplateId.HasValue)
+                return BadRequest("Select a facility template, or switch to ala carte.");
+
+            var facilityTemplate = await facilityTemplateStore.GetByIdAsync(model.FacilityTemplateId.Value, ct);
+            if (facilityTemplate == null)
+                return BadRequest("Facility template was not found.");
+
+            var patientConfigError = FacilityConfigurationPolicy.ValidatePatientConfigurations(
+                facilityTemplate, model.PatientCohorts);
+            if (patientConfigError != null)
+                return BadRequest(patientConfigError);
+
+            model.QueryPlanTemplateId = null;
+            model.NormalizationSuiteId = null;
+            model.OrganizationResourceMapTemplateId = null;
+            model.VendorName = null;
+        }
+        else if (model.FacilityConfigurationMode == FacilityConfigurationMode.AlaCarte)
+        {
+            model.FacilityTemplateId = null;
+            model.VendorName = string.IsNullOrWhiteSpace(model.VendorName) ? null : model.VendorName.Trim();
+            if (!model.QueryPlanTemplateId.HasValue)
+                return BadRequest("Ala carte needs a query plan.");
+        }
 
         foreach (var cohort in model.PatientCohorts)
         {
@@ -633,6 +662,9 @@ public class ScenariosController(
                     Intent = PatientGenerationIntent.Clone(c.Intent)
                 })
                 .ToList(),
+            FacilityConfigurationMode = source.FacilityConfigurationMode,
+            FacilityTemplateId = source.FacilityTemplateId,
+            VendorName = source.VendorName,
             QueryPlanTemplateId = source.QueryPlanTemplateId,
             NormalizationSuiteId = source.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,

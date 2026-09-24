@@ -12,7 +12,10 @@ public sealed class OrganizationResourceMapTemplateResolver
         _store = store;
     }
 
-    public async Task<OrganizationResourceMapTemplate?> ResolveAsync(Guid? templateId, CancellationToken ct = default)
+    public async Task<OrganizationResourceMapTemplate?> ResolveAsync(
+        Guid? templateId,
+        CancellationToken ct = default,
+        bool honorExplicitSelection = false)
     {
         if (templateId.HasValue)
         {
@@ -21,6 +24,9 @@ public sealed class OrganizationResourceMapTemplateResolver
                 throw new InvalidOperationException($"Organization resource map template '{templateId.Value}' was not found.");
             return selected;
         }
+
+        if (honorExplicitSelection)
+            return null;
 
         return await _store.GetDefaultAsync(ct);
     }
