@@ -131,6 +131,25 @@ public class FacilityLocationApiModel
     public DateTime? ModifyDate { get; set; }
 }
 
+public class FacilityLocationTreeApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string LocationId { get; set; } = string.Empty;
+    public string? PartOfId { get; set; }
+    public string? LocationName { get; set; }
+    public string? LocationAlias { get; set; }
+    public List<FacilityLocationTreeMappingApiModel> Mappings { get; set; } = [];
+}
+
+public class FacilityLocationTreeMappingApiModel
+{
+    public string Id { get; set; } = string.Empty;
+    public string LocalCodeSystem { get; set; } = string.Empty;
+    public string LocalCode { get; set; } = string.Empty;
+    public Guid? HSLOCId { get; set; }
+    public string? HSLOCCode { get; set; }
+}
+
 public class CreateFacilityLocationRequestApiModel
 {
     public string LocationId { get; set; } = string.Empty;

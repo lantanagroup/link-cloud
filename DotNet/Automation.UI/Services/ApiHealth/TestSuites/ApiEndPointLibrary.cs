@@ -230,6 +230,7 @@ public static class ApiEndPointLibrary
         [NormalizationSteps.LocationPost201] = new EndpointMeta("Creates a facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationPost400EmptyLocationId] = new EndpointMeta("Rejects a facility location with an empty location id.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationPost409Duplicate] = new EndpointMeta("Rejects a duplicate facility location.", "POST /api/normalization/facility-locations/facilities/{facilityId}/locations"),
+        [NormalizationSteps.LocationsGet200] = new EndpointMeta("Lists a facility's locations.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations"),
         [NormalizationSteps.LocationGet200] = new EndpointMeta("Returns a facility location including LocationName and LocationAlias.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
         [NormalizationSteps.LocationGet400EmptyLocationId] = new EndpointMeta("Rejects a facility-location get with an empty location id.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
         [NormalizationSteps.LocationGet404] = new EndpointMeta("Returns 404 for a facility location that does not exist.", "GET /api/normalization/facility-locations/facilities/{facilityId}/locations/{locationId}"),
@@ -504,6 +505,7 @@ public static class ApiEndPointLibrary
         public const string LocationPost201 = "LOCATION POST → 201";
         public const string LocationPost400EmptyLocationId = "LOCATION POST → 400 (empty locationId)";
         public const string LocationPost409Duplicate = "LOCATION POST → 409 (duplicate)";
+        public const string LocationsGet200 = "LOCATIONS GET → 200";
         public const string LocationGet200 = "LOCATION GET → 200";
         public const string LocationGet400EmptyLocationId = "LOCATION GET → 400 (empty locationId)";
         public const string LocationGet404 = "LOCATION GET → 404";

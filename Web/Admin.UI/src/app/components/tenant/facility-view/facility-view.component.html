@@ -321,7 +321,12 @@
     </div>
     }
     </mat-tab>
-    <mat-tab label="Locations">
+    <mat-tab label="HSLOC Locations">
+      <ng-template matTabContent>
+        <app-hsloc-locations-list [facilityId]="facilityId"></app-hsloc-locations-list>
+      </ng-template>
+    </mat-tab>
+    <mat-tab label="Org Locations">
       <ng-template matTabContent>
         <app-locations-list [facilityId]="facilityId"></app-locations-list>
       </ng-template>

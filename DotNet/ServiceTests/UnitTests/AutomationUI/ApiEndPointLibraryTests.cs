@@ -42,6 +42,7 @@ public class ApiEndPointLibraryTests
             ApiEndPointLibrary.NormalizationSteps.LocationPost201,
             ApiEndPointLibrary.NormalizationSteps.LocationPost400EmptyLocationId,
             ApiEndPointLibrary.NormalizationSteps.LocationPost409Duplicate,
+            ApiEndPointLibrary.NormalizationSteps.LocationsGet200,
             ApiEndPointLibrary.NormalizationSteps.LocationGet200,
             ApiEndPointLibrary.NormalizationSteps.LocationGet400EmptyLocationId,
             ApiEndPointLibrary.NormalizationSteps.LocationGet404,
