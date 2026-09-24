@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterMapping} from '../../../api/contracts';
-import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, TableCaption, Tabs, TextField} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
@@ -410,7 +410,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
 
                 <div className="encounter-table-scroll" tabIndex={-1}>
                   <table className="encounter-table">
-                    <TableCaption>{t('onboarding:encounter.tabs.reference')}</TableCaption>
+                    <caption className="nhsn-link__visually-hidden">{t('onboarding:encounter.tabs.reference')}</caption>
                     <thead>
                       <tr>
                         <th scope="col">{t('onboarding:encounter.reference.columns.system')}</th>

@@ -23,7 +23,6 @@ import {
   SidePanel,
   SidePanelLayout,
   StepActions,
-  TableCaption,
   TextField,
 } from "../../../fields";
 import { useNotifications } from "../../../notifications/NotificationProvider";
@@ -631,7 +630,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       </ul>
       <div className="census-table-scroll" tabIndex={-1}>
         <table>
-          <TableCaption>{t("onboarding:census.epic.resultsTitle")}</TableCaption>
+          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.epic.resultsTitle")}</caption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.epic.columns.patientId")}</th>
@@ -672,7 +671,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
       </ul>
       <div className="census-table-scroll" tabIndex={-1}>
         <table>
-          <TableCaption>{t("onboarding:census.cerner.resultsTitle")}</TableCaption>
+          <caption className="nhsn-link__visually-hidden">{t("onboarding:census.cerner.resultsTitle")}</caption>
           <thead>
             <tr>
               <th scope="col">{t("onboarding:census.cerner.columns.patientId")}</th>

@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
-import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions, TableCaption} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -109,7 +109,7 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
       {hasSchedule ? (
         <div className="nhsn-link__reporting-plan-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__reporting-plan-table">
-            <TableCaption>{t('onboarding:reportingPlan.title')}</TableCaption>
+            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportingPlan.title')}</caption>
             <thead>
               <tr>
                 <th scope="col">{t('onboarding:reportingPlan.columns.month')}</th>

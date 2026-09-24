@@ -29,7 +29,6 @@ import {
   NHSNLoadingIndicator,
   StepActions,
   Tabs,
-  TableCaption,
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import { useOnboarding } from '../../OnboardingProvider';
@@ -589,7 +588,7 @@ export function ReportDetailView() {
           </h3>
           <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
             <table className="nhsn-link__report-results-table">
-              <TableCaption>{t('onboarding:reportResults.detail.selectedMeasures')}</TableCaption>
+              <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.selectedMeasures')}</caption>
               <thead>
                 <tr>
                   <th scope="col">
@@ -697,11 +696,11 @@ export function ReportDetailView() {
               </h3>
               <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
                 <table className="nhsn-link__report-results-table nhsn-link__report-results-table--light-border nhsn-link__report-results-table--fixed">
-                  <TableCaption>
+                  <caption className="nhsn-link__visually-hidden">
                     {t('onboarding:reportResults.detail.patientReportingStatus', {
                       count: dqmScopedPatients.length,
                     })}
-                  </TableCaption>
+                  </caption>
                   <colgroup>
                     <col style={{ width: '9%' }} />
                     <col style={{ width: '12%' }} />

@@ -11,7 +11,6 @@ import {
   MessageContainer,
   NHSNLoadingIndicator,
   StepActions,
-  TableCaption,
 } from '../../../fields';
 import { useNotifications } from '../../../notifications/NotificationProvider';
 import { useOnboarding } from '../../OnboardingProvider';
@@ -182,7 +181,7 @@ export function ReportListView({
       {!loading && reports.length > 0 && (
         <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
-            <TableCaption>{t('onboarding:reportResults.title')}</TableCaption>
+            <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.title')}</caption>
             <colgroup>
               <col style={{ width: '11%' }} />
               <col style={{ width: '26%' }} />

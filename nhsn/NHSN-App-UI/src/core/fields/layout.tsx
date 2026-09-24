@@ -182,21 +182,6 @@ export function HeadingPause({children}: {children: React.ReactNode}) {
   );
 }
 
-/**
- * A table's visually-hidden `<caption>`, always ending in "Table" - NVDA's
- * continuous/Say-All reading speaks a caption's own text but doesn't reliably
- * also announce the "table" role the way landing on it via Tab/object
- * navigation does, so the word has to be part of the caption text itself.
- */
-export function TableCaption({children}: {children: React.ReactNode}) {
-  const {t} = useTranslation('common');
-  return (
-    <caption className="nhsn-link__visually-hidden">
-      {children} {t('a11y.table')}
-    </caption>
-  );
-}
-
 export interface SidePanelLayoutProps {
   children: React.ReactNode;
 }
