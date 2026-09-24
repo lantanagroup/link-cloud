@@ -269,12 +269,32 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return docs.Select(ToSummary).ToList();
     }
 
-    public async Task MarkAutomationCreatedFacilityAsync(Guid runId, string facilityId, CancellationToken ct = default)
+    public async Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default)
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.AutomationCreatedFacility, true)
-            .Set(r => r.FacilityId, facilityId ?? string.Empty);
-        await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
+            .Set(r => r.FacilityId, facilityId ?? string.Empty)
+            .SetOnInsert(r => r.RunId, summary.RunId)
+            .SetOnInsert(r => r.RunName, summary.RunName)
+            .SetOnInsert(r => r.Scenario, summary.Scenario.ToString())
+            .SetOnInsert(r => r.SelectedMeasure, summary.SelectedMeasure)
+            .SetOnInsert(r => r.PatientCount, summary.PatientCount)
+            .SetOnInsert(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
+            .SetOnInsert(r => r.Seed, summary.Seed)
+            .SetOnInsert(r => r.IsMetricsRun, summary.IsMetricsRun)
+            .SetOnInsert(r => r.Status, summary.Status.ToString())
+            .SetOnInsert(r => r.CreatedAt, summary.CreatedAt)
+            .SetOnInsert(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
+            .SetOnInsert(r => r.FinishedAt, summary.FinishedAt)
+            .SetOnInsert(r => r.Error, summary.Error)
+            .SetOnInsert(r => r.ReportId, summary.ReportId ?? string.Empty)
+            .SetOnInsert(r => r.IsActive, true);
+
+        await _runs.UpdateOneAsync(
+            r => r.RunId == summary.RunId,
+            update,
+            new UpdateOptions { IsUpsert = true },
+            ct);
     }
 
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)

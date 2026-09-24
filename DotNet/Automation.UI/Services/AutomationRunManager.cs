@@ -683,15 +683,12 @@ public class AutomationRunManager : IAutomationRunManager
         {
             try
             {
-                string facilityId;
-                lock (state.Sync)
-                {
-                    if (!state.AutomationCreatedFacility)
-                        return;
-                    facilityId = state.FacilityId ?? string.Empty;
-                }
+                var summary = ToSummary(state);
+                if (!summary.AutomationCreatedFacility)
+                    return;
 
-                await _snapshotStore.MarkAutomationCreatedFacilityAsync(state.RunId, facilityId, budget.Token);
+                await _snapshotStore.MarkAutomationCreatedFacilityAsync(
+                    summary, summary.FacilityId ?? string.Empty, budget.Token);
                 return;
             }
             catch (OperationCanceledException) when (budget.IsCancellationRequested)
