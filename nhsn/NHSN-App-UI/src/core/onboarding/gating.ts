@@ -60,13 +60,9 @@ export function isUnlocked(
   user: UserInfoResponse,
   vendorProfile?: VendorProfile
 ): boolean {
-  // A facility that already completed onboarding, on a build where the OnboardingRevisit
-  // capability is on, can browse every step freely -- there is no "next required step" left to
-  // protect, and the whole point of revisiting is to jump around out of the original order.
-  if (user.isOnboarded && user.capabilities?.onboardingRevisit) {
-    return true;
-  }
-  if (!draft.unlockedStepIds.includes(stepId)) {
+  // Revisit mode waives the unlockedStepIds record, not the completeness cascade below.
+  const revisiting = user.isOnboarded && user.capabilities?.onboardingRevisit;
+  if (!revisiting && !draft.unlockedStepIds.includes(stepId)) {
     return false;
   }
   const steps = visibleSteps(draft, user);
