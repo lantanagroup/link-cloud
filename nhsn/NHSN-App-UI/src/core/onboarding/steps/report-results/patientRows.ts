@@ -1,6 +1,9 @@
 import type {
   CodeMapEvidence,
+  EncounterMapping,
+  HslocMapping,
   LocationMethod,
+  PatientMappingEvidence,
   ReportingStatus,
   ReportPatientEntry,
 } from '../../../api/contracts';
@@ -17,6 +20,41 @@ import { toStatusCategory, type ReportStatusSlice } from './reportStatus';
  */
 export function isHslocCodeMap(codeMap: CodeMapEvidence): boolean {
   return codeMap.targetSystem.trim().toUpperCase() === 'HSLOC';
+}
+
+/**
+ * Whether a patient's encounter mapping evidence is fully covered by the facility's live
+ * mappings, even if the evidence itself (a snapshot taken when the report ran) still lists
+ * those codes as unmapped -- lets a mapping added after report generation flip the "Found"
+ * pill without waiting on the backend to re-evaluate the report.
+ */
+export function isEncounterMappingResolved(
+  evidence: PatientMappingEvidence,
+  mappings: EncounterMapping[],
+): boolean {
+  const mappedKeys = new Set(
+    mappings.map((mapping) => `${mapping.system}|${mapping.code}`),
+  );
+  return evidence.codeMaps
+    .filter((codeMap) => !isHslocCodeMap(codeMap))
+    .every((codeMap) =>
+      codeMap.unmappedCodes.every((code) =>
+        mappedKeys.has(`${codeMap.sourceSystem}|${code}`),
+      ),
+    );
+}
+
+/** Same idea as isEncounterMappingResolved, for HSLOC -- HslocMapping has no system field, so unmapped codes are cross-referenced by sourceCode alone. */
+export function isHslocMappingResolved(
+  evidence: PatientMappingEvidence,
+  mappings: HslocMapping[],
+): boolean {
+  const mappedCodes = new Set(mappings.map((mapping) => mapping.sourceCode));
+  return evidence.codeMaps
+    .filter(isHslocCodeMap)
+    .every((codeMap) =>
+      codeMap.unmappedCodes.every((code) => mappedCodes.has(code)),
+    );
 }
 
 /** A field's `t` narrowed to the plain-string-key shape the sheet builders below need. */

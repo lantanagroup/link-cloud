@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useApiClient } from '../../../api/ApiClientContext';
@@ -38,7 +38,13 @@ import { decodeTarget } from '../encounter/EncounterStep';
 import { formatDate, formatDateTime } from './format';
 import { ChartIcon, DownloadIcon, RefreshIcon } from './icons';
 import { buildPieSlices } from './pieChart';
-import { patientsForDqm, toPatientRows, type PatientStatusRow } from './patientRows';
+import {
+  isEncounterMappingResolved,
+  isHslocMappingResolved,
+  patientsForDqm,
+  toPatientRows,
+  type PatientStatusRow,
+} from './patientRows';
 import { parseQueryPlan } from './queryPlan';
 import { buildXlsxBlob, downloadBlob, type XlsxSheet } from './reportExport';
 import { DQM_SPEC_URL_BY_ID, dqmIdForMeasureName, dqmLabel, friendlyMeasuresFor } from './reportMeasures';
@@ -88,6 +94,29 @@ export function ReportDetailView() {
   });
   const detail = detailData?.found ?? null;
   const patients = detailData?.foundPatients ?? [];
+  const patientIds = useMemo(
+    () => patients.map((patient) => patient.patientId),
+    [patients],
+  );
+  const { data: patientMappingEvidenceByPatientId } = useQuery({
+    queryKey: ['patientMappingEvidence', viewingReportId, patientIds],
+    queryFn: async () => {
+      const entries = await Promise.all(
+        patientIds.map(
+          async (patientId) =>
+            [
+              patientId,
+              await api.getPatientMappingEvidence(viewingReportId!, patientId),
+            ] as const,
+        ),
+      );
+      return Object.fromEntries(entries) as Record<
+        string,
+        PatientMappingEvidence
+      >;
+    },
+    enabled: Boolean(viewingReportId) && patientIds.length > 0,
+  });
   const detailError = detailQueryError
     ? detailQueryError instanceof Error
       ? detailQueryError.message
@@ -147,6 +176,15 @@ export function ReportDetailView() {
     successMessageKey:
       'onboarding:reportResults.detail.mappingEvidence.encounterMappingAdded',
   });
+
+  const stableLoadHslocEvidence = useStableCallback(hslocEvidence.load);
+  const stableLoadEncounterEvidence = useStableCallback(encounterEvidence.load);
+  useEffect(() => {
+    if (viewingReportId) {
+      stableLoadHslocEvidence();
+      stableLoadEncounterEvidence();
+    }
+  }, [viewingReportId, stableLoadHslocEvidence, stableLoadEncounterEvidence]);
 
   const [queryPlanOpen, setQueryPlanOpen] = useState(false);
   const [queryPlan, setQueryPlan] = useState<QueryPlan | null>(null);
@@ -302,7 +340,9 @@ export function ReportDetailView() {
   }
 
   // Real evidence behind the Location Org / HSLOC / Encounter Mapping indicators, from Report's
-  // per-patient detail operation. Fetched on demand rather than for every row up front.
+  // per-patient detail operation. Served from the bulk patientMappingEvidenceByPatientId prefetch
+  // when it already covers this patient, falling back to a direct fetch otherwise (prefetch still
+  // loading, failed, or this component mounted after it settled).
   async function openMappingEvidence(
     column: 'locationOrg' | 'hsloc' | 'encounter',
     patientId: string,
@@ -312,25 +352,31 @@ export function ReportDetailView() {
     }
     setMappingEvidenceColumn(column);
     setMappingEvidencePatientId(patientId);
-    setMappingEvidence(null);
     setMappingEvidenceError(null);
-    setMappingEvidenceLoading(true);
     hslocEvidence.resetSelections();
     encounterEvidence.resetSelections();
-    try {
-      const evidence = await api.getPatientMappingEvidence(
-        detail.reportId,
-        patientId,
-      );
-      setMappingEvidence(evidence);
-    } catch (cause) {
-      setMappingEvidenceError(
-        cause instanceof Error
-          ? cause.message
-          : t('onboarding:reportResults.messages.loadError'),
-      );
-    } finally {
+    const cachedEvidence = patientMappingEvidenceByPatientId?.[patientId];
+    if (cachedEvidence) {
+      setMappingEvidence(cachedEvidence);
       setMappingEvidenceLoading(false);
+    } else {
+      setMappingEvidence(null);
+      setMappingEvidenceLoading(true);
+      try {
+        const evidence = await api.getPatientMappingEvidence(
+          detail.reportId,
+          patientId,
+        );
+        setMappingEvidence(evidence);
+      } catch (cause) {
+        setMappingEvidenceError(
+          cause instanceof Error
+            ? cause.message
+            : t('onboarding:reportResults.messages.loadError'),
+        );
+      } finally {
+        setMappingEvidenceLoading(false);
+      }
     }
     if (column === 'hsloc') {
       await hslocEvidence.load();
@@ -446,7 +492,34 @@ export function ReportDetailView() {
   // per-dQM validation outcome to split it by.
   const dqmScopedPatients = patientsForDqm(patients, currentDqm);
   const statusBreakdown = buildReportStatusBreakdown(dqmScopedPatients);
-  const patientRows = toPatientRows(dqmScopedPatients, currentDqm);
+  const resolvedEncounterFound = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const [patientId, evidence] of Object.entries(
+      patientMappingEvidenceByPatientId ?? {},
+    )) {
+      if (isEncounterMappingResolved(evidence, encounterEvidence.mappings)) {
+        map[patientId] = true;
+      }
+    }
+    return map;
+  }, [patientMappingEvidenceByPatientId, encounterEvidence.mappings]);
+  const resolvedHslocFound = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    for (const [patientId, evidence] of Object.entries(
+      patientMappingEvidenceByPatientId ?? {},
+    )) {
+      if (isHslocMappingResolved(evidence, hslocEvidence.mappings)) {
+        map[patientId] = true;
+      }
+    }
+    return map;
+  }, [patientMappingEvidenceByPatientId, hslocEvidence.mappings]);
+  const patientRows = toPatientRows(dqmScopedPatients, currentDqm).map((row) => ({
+    ...row,
+    encounterFound:
+      row.encounterFound || Boolean(resolvedEncounterFound[row.patientId]),
+    hslocFound: row.hslocFound || Boolean(resolvedHslocFound[row.patientId]),
+  }));
   const mappingEvidencePatientRow =
     patientRows.find((row) => row.patientId === mappingEvidencePatientId) ??
     null;
