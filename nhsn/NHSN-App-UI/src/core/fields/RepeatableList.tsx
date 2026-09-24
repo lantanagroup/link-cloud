@@ -95,7 +95,7 @@ export function RepeatableList<T>({
 
   return (
     <div className="nhsn-link__repeatable">
-      {columnHeadings && (
+      {columnHeadings && items.length > 0 && (
         <div className="nhsn-link__repeatable-row nhsn-link__repeatable-heading-row" aria-hidden="true">
           <div className="nhsn-link__repeatable-fields">
             {columnHeadings.map((heading, index) => (

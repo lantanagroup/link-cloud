@@ -157,26 +157,34 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             if (fields.Census is { } census)
             {
-                var (_, censusDetail) = await TrySectionAsync(facilityId, "census", () => WriteCensusSectionAsync(facilityId, new CensusSection
+                var (_, censusDetail) = await TrySectionAsync(facilityId, "census", async () =>
                 {
-                    PatientListIds = census.PatientListIds ?? new Dictionary<string, string>(),
-                    SftpHost = census.SftpHost,
-                    SftpPort = census.SftpPort,
-                    SftpRemoteDirectory = census.SftpRemoteDirectory,
-                    SftpRemoveAfterProcessing = census.SftpRemoveAfterProcessing,
-                    AcquisitionFrequency = census.AcquisitionFrequency
-                }, cancellationToken));
+                    await WriteCensusSectionAsync(facilityId, new CensusSection
+                    {
+                        PatientListIds = census.PatientListIds ?? new Dictionary<string, string>(),
+                        SftpHost = census.SftpHost,
+                        SftpPort = census.SftpPort,
+                        SftpRemoteDirectory = census.SftpRemoteDirectory,
+                        SftpRemoveAfterProcessing = census.SftpRemoveAfterProcessing,
+                        AcquisitionFrequency = census.AcquisitionFrequency
+                    }, cancellationToken);
+                    return true;
+                });
                 RecordFailure("census", censusDetail);
 
                 // Secrets: saved straight to Data Acquisition and never round-tripped anywhere else
                 // (not persisted to the draft, not included in the response this method returns).
                 if (!string.IsNullOrWhiteSpace(census.SftpUsername) && !string.IsNullOrWhiteSpace(census.SftpPassword))
                 {
-                    var (credsSaved, credsDetail) = await TrySectionAsync(facilityId, "census.sftpCredentials", () => _patientsOfInterestService.SaveSftpCredentialsAsync(new SftpCredentialsRequest
+                    var (credsSaved, credsDetail) = await TrySectionAsync(facilityId, "census.sftpCredentials", async () =>
                     {
-                        Username = census.SftpUsername,
-                        Password = census.SftpPassword
-                    }, cancellationToken));
+                        await _patientsOfInterestService.SaveSftpCredentialsAsync(new SftpCredentialsRequest
+                        {
+                            Username = census.SftpUsername,
+                            Password = census.SftpPassword
+                        }, cancellationToken);
+                        return true;
+                    });
                     sftpCredentialsSaved = credsSaved;
                     RecordFailure("census", credsDetail);
                 }
@@ -184,44 +192,97 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             if (fields.LocationOrg is { } locationOrg)
             {
-                var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", () => WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", async () =>
                 {
-                    Method = locationOrg.Method,
-                    ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
-                    LocationTypes = locationOrg.LocationTypes?
-                        .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
-                        .ToList() ?? [],
-                    LocationIdentifiers = locationOrg.LocationIdentifiers?
-                        .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
-                        .ToList() ?? [],
-                    CustomFhirPath = locationOrg.CustomFhirPath
-                }, cancellationToken));
+                    await WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                    {
+                        Method = locationOrg.Method,
+                        ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
+                        LocationTypes = locationOrg.LocationTypes?
+                            .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
+                            .ToList() ?? [],
+                        LocationIdentifiers = locationOrg.LocationIdentifiers?
+                            .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
+                            .ToList() ?? [],
+                        CustomFhirPath = locationOrg.CustomFhirPath
+                    }, cancellationToken);
+                    return true;
+                });
                 RecordFailure("location-org", locationOrgDetail);
             }
 
             if (fields.Hsloc?.Mappings is { Count: > 0 } hslocMappings)
             {
-                var (_, hslocDetail) = await TrySectionAsync(facilityId, "hsloc", () => _hslocMappingService.SaveAsync(
-                    hslocMappings.Select(m => new HslocMapping
-                    {
-                        SourceCode = m.SourceCode,
-                        SourceDisplay = m.SourceDisplay,
-                        HslocCode = m.HslocCode
-                    }).ToList(),
-                    cancellationToken));
+                // HslocMappingService.SaveAsync replaces the facility's whole HSLOC mapping set in
+                // one call - anything sent with a blank HslocCode (ManualUploadTemplateService.
+                // BuildHslocAsync leaves a mismatch/unresolved row that way on purpose, so the
+                // facility sees "you still need to pick one") would otherwise delete an existing,
+                // previously-resolved mapping for that same local code instead of just leaving it
+                // unselected. Only fetched when actually needed - a sheet with every row resolved
+                // never pays for this read.
+                var hslocMappingsToSave = hslocMappings;
+                if (hslocMappings.Any(m => string.IsNullOrWhiteSpace(m.HslocCode)))
+                {
+                    var existingHslocByCode = (await _hslocMappingService.GetAsync(cancellationToken))
+                        .GroupBy(m => m.SourceCode, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                    hslocMappingsToSave = hslocMappings
+                        .Select(m => string.IsNullOrWhiteSpace(m.HslocCode) && existingHslocByCode.TryGetValue(m.SourceCode, out var existing)
+                            ? m with {HslocCode = existing.HslocCode}
+                            : m)
+                        .ToList();
+                }
+
+                var (_, hslocDetail) = await TrySectionAsync(facilityId, "hsloc", async () =>
+                {
+                    await _hslocMappingService.SaveAsync(
+                        hslocMappingsToSave.Select(m => new HslocMapping
+                        {
+                            SourceCode = m.SourceCode,
+                            SourceDisplay = m.SourceDisplay,
+                            HslocCode = m.HslocCode
+                        }).ToList(),
+                        cancellationToken);
+                    return true;
+                });
                 RecordFailure("hsloc", hslocDetail);
             }
 
             if (fields.Encounter?.Mappings is { Count: > 0 } encounterMappings)
             {
-                var (_, encounterDetail) = await TrySectionAsync(facilityId, "encounter", () => _encounterMappingService.SaveAsync(
-                    encounterMappings.Select(m => new EncounterMapping
-                    {
-                        System = m.System,
-                        Code = m.Code,
-                        EncounterType = m.EncounterType
-                    }).ToList(),
-                    cancellationToken));
+                // EncounterMappingService.SaveAsync replaces the facility's whole Code Map operation
+                // in one call - a row sent with a blank EncounterType (ManualUploadTemplateService.
+                // BuildEncounterAsync leaves a mismatch/unresolved row that way on purpose, so the
+                // facility sees "you still need to pick a target") would otherwise drop that local
+                // system/code out of the replacement set entirely, deleting an existing,
+                // previously-resolved mapping instead of just leaving it unselected. Only fetched
+                // when actually needed - a sheet with every row resolved never pays for this read.
+                var encounterMappingsToSave = encounterMappings;
+                if (encounterMappings.Any(m => string.IsNullOrWhiteSpace(m.EncounterType)))
+                {
+                    var existingEncounterByKey = (await _encounterMappingService.GetAsync(cancellationToken))
+                        .GroupBy(m => (System: m.System.ToUpperInvariant(), Code: m.Code.ToUpperInvariant()))
+                        .ToDictionary(g => g.Key, g => g.First());
+                    encounterMappingsToSave = encounterMappings
+                        .Select(m => string.IsNullOrWhiteSpace(m.EncounterType) &&
+                                     existingEncounterByKey.TryGetValue((m.System.ToUpperInvariant(), m.Code.ToUpperInvariant()), out var existing)
+                            ? m with {EncounterType = existing.EncounterType}
+                            : m)
+                        .ToList();
+                }
+
+                var (_, encounterDetail) = await TrySectionAsync(facilityId, "encounter", async () =>
+                {
+                    await _encounterMappingService.SaveAsync(
+                        encounterMappingsToSave.Select(m => new EncounterMapping
+                        {
+                            System = m.System,
+                            Code = m.Code,
+                            EncounterType = m.EncounterType
+                        }).ToList(),
+                        cancellationToken);
+                    return true;
+                });
                 RecordFailure("encounter", encounterDetail);
 
                 // CodeSystems is a BFF-only cache (see SaveWorkflowStateAsync's "encounter" case)
@@ -295,12 +356,22 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     // Census's HasCredentials - don't have to re-derive it from what was merely parsed) plus a
     // human-readable reason on failure, so the facility sees why a value they entered didn't save
     // instead of just finding it blank later.
-    private async Task<(bool Success, string? Detail)> TrySectionAsync(string facilityId, string section, Func<Task> write)
+    //
+    // One method, one shape: `write` always reports its own real outcome as the bool it returns -
+    // WriteFhirSectionAsync already does (false when Tenant's own required fields aren't all
+    // present, without throwing), and every other writer here is a void-returning Task, so its call
+    // site wraps it as `async () => { await X(...); return true; }` - "didn't throw" becomes an
+    // explicit true instead of an implicit one. That wrapping is one line at each of five call
+    // sites; the alternative (a second overload matched by delegate type) let a Task<bool>-returning
+    // lambda silently bind to a Func<Task> parameter via return-type covariance, which is exactly
+    // the bug that shipped here before: the bool got discarded by `await write()` and Success was
+    // permanently true unless an exception was thrown.
+    private async Task<(bool Success, string? Detail)> TrySectionAsync(string facilityId, string section, Func<Task<bool>> write)
     {
         try
         {
-            await write();
-            return (true, null);
+            var success = await write();
+            return (success, null);
         }
         catch (InvalidOperationException ex)
         {

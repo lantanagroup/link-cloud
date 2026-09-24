@@ -66,12 +66,11 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const [candidates, setCandidates] = useState<LocationCandidate[]>([]);
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, boolean>>({});
 
-  // Each list always shows at least one row to type into (its minItems keeps that row from being
-  // removed). An empty list in the draft displays one blank row that is only written back once the
-  // facility edits it, so just opening the step doesn't dirty the draft.
-  const managingOrganizations = withAtLeastOneRow(locationOrg.managingOrganizationIds, '');
-  const locationTypes = withAtLeastOneRow(locationOrg.locationTypes, {code: '', alias: ''});
-  const locationIdentifiers = withAtLeastOneRow(locationOrg.locationIdentifiers, {system: '', code: ''});
+  // No forced starting row - an empty list stays empty until the facility clicks "+ Add", same as
+  // every RepeatableList's own minItems={0} below lets it go back to zero after that.
+  const managingOrganizations = locationOrg.managingOrganizationIds ?? [];
+  const locationTypes = locationOrg.locationTypes ?? [];
+  const locationIdentifiers = locationOrg.locationIdentifiers ?? [];
 
   // Only the active method's rows can block Continue - a different method's rows just sit hidden
   // in the draft, unrelated to what's being configured right now (same reasoning as `activeMethod`
@@ -93,17 +92,13 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           ? managingOrganizations.length
           : 0;
 
-  // A method backed by a repeatable list needs at least one filled-in entry to mean anything -
-  // custom-fhir-path has no list at all, so it's exempt.
-  const hasEmptyRequiredList =
-    activeMethod === 'location-type'
-      ? locationTypes.every(row => !row.code.trim() && !row.alias.trim())
-      : activeMethod === 'location-identifier'
-        ? locationIdentifiers.every(row => !row.system.trim() && !row.code.trim())
-        : activeMethod === 'managing-org'
-          ? managingOrganizations.every(id => !id.trim())
-          : false;
-  const hasIncompleteRows = !hasEmptyRequiredList && incompleteRowIndexes.length > 0;
+  // Zero rows is fine - a method can be selected with nothing added yet, same as the manual-upload
+  // import path. But once a row EXISTS (the facility clicked "+ Add", even if they haven't typed
+  // anything into it yet), it has to be either filled in or removed before Continue - a row just
+  // sitting there empty is exactly as ambiguous as a half-filled one: incompleteRowIndexes already
+  // flags a fully-blank row the same way it flags a half-filled one, and with zero rows it's
+  // naturally empty, so no separate "is everything blank" check is needed here.
+  const hasIncompleteRows = incompleteRowIndexes.length > 0;
 
   // Shown on the repeat as soon as it's typed - unlike a blank field, an exact repeat is already
   // wrong, not just unfinished. Only the active method's list is checked.
@@ -132,7 +127,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   function validateStep(): boolean {
     setContinueAttempted(true);
     setFlaggedRowCount(activeRowCount);
-    return !hasIncompleteRows && !hasEmptyRequiredList && !hasDuplicateRows;
+    return !hasIncompleteRows && !hasDuplicateRows;
   }
 
   /** Keeps `flaggedRowCount` pointing at the same rows when one of them is removed. */
@@ -269,7 +264,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 patch('locationOrg', {locationTypes: rows});
               }}
               newItem={() => ({code: '', alias: ''})}
-              minItems={1}
+              minItems={0}
               addLabel={t('onboarding:locationOrg.locationType.add')}
               removeLabel={t('common:actions.remove')}
               columnHeadings={[
@@ -324,7 +319,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               patch('locationOrg', {managingOrganizationIds: rows});
             }}
             newItem={() => ''}
-            minItems={1}
+            minItems={0}
             addLabel={t('onboarding:locationOrg.managingOrg.add')}
             removeLabel={t('common:actions.remove')}
             renderItem={(row, index, onRowChange) => (
@@ -365,7 +360,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 patch('locationOrg', {locationIdentifiers: rows});
               }}
               newItem={() => ({system: '', code: ''})}
-              minItems={1}
+              minItems={0}
               addLabel={t('onboarding:locationOrg.locationIdentifier.add')}
               removeLabel={t('common:actions.remove')}
               columnHeadings={[
@@ -467,15 +462,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         </div>
       )}
 
-      {continueAttempted && !hasIncompleteRows && hasEmptyRequiredList && (
-        <div aria-live="off">
-          <p className="nhsn-link__form-error" role="alert">
-            {t('onboarding:locationOrg.errors.listEmpty')}
-          </p>
-        </div>
-      )}
-
-      {continueAttempted && !hasFlaggedIncompleteRows && !hasEmptyRequiredList && hasDuplicateRows && (
+      {continueAttempted && !hasFlaggedIncompleteRows && hasDuplicateRows && (
         <div aria-live="off">
           <p className="nhsn-link__form-error" role="alert">
             {t('onboarding:locationOrg.errors.duplicateRows')}
@@ -494,10 +481,6 @@ function candidateTypeCode(candidate: LocationCandidate): string {
 
 function locationTypeKey(code: string, alias: string): string {
   return `${code.trim().toLowerCase()}|${alias.trim().toLowerCase()}`;
-}
-
-function withAtLeastOneRow<T>(rows: T[] | undefined, blank: T): T[] {
-  return rows && rows.length > 0 ? rows : [blank];
 }
 
 /**
