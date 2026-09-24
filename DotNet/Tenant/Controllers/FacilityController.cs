@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.DMRP.Api;
 using LantanaGroup.Link.DMRP.Business;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -10,6 +11,8 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -220,6 +223,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         /// <returns></returns>
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(FacilityModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpPost]
         public async Task<IActionResult> StoreFacility(FacilityModel newFacility, CancellationToken cancellationToken)
@@ -246,6 +250,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             catch (ScheduledReportsNotAcceptedException ex)
             {
                 return BadRequestProblem(ex.Message);
+            }
+            catch (DmrpApiException ex)
+            {
+                return Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "DMRP could not be reached");
             }
             catch (ApplicationException ex)
             {
@@ -545,7 +553,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
-                    Headers = new Headers(),
+                    Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue
                     {
                         AdhocReportId = reportId,
@@ -632,7 +640,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var message = new Message<string, GenerateReportValue>
                 {
                     Key = facilityId,
-                    Headers = new Headers(),
+                    Headers = CreateGenerateReportHeaders(request.MetricsMode),
                     Value = new GenerateReportValue()
                     {
                         ReportId = request.ReportId == null ? null : Guid.Parse(request.ReportId),
@@ -652,6 +660,17 @@ namespace LantanaGroup.Link.Tenant.Controllers
             }
 
             return Ok(new GenerateAdhocReportResponse(reportId));
+        }
+
+        private static Headers CreateGenerateReportHeaders(string? metricsMode)
+        {
+            var headers = new Headers();
+            if (string.Equals(metricsMode, "performance", StringComparison.OrdinalIgnoreCase))
+            {
+                KafkaHeaderHelper.SetMetricsMode(headers, "performance");
+            }
+
+            return headers;
         }
     }
 }

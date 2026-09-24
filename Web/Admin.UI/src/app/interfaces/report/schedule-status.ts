@@ -55,3 +55,15 @@ export function scheduleStatusLabel(status: string): string {
 export function scheduleStatusBadgeClass(status: string): string {
   return SCHEDULE_STATUS_DISPLAY[status as ScheduleStatus]?.class ?? '';
 }
+
+/** New and EndOfPeriod are actively running; those rows get Abort, not cleanup. */
+export function isInProgressScheduleStatus(status: string): boolean {
+  return status === ScheduleStatus.New || status === ScheduleStatus.EndOfPeriod;
+}
+
+/** Finished or waiting schedules can be cleaned up with soft-delete. */
+export function canCleanUpScheduleStatus(status: string): boolean {
+  return status === ScheduleStatus.Submitted
+    || status === ScheduleStatus.CompletedNotSubmitted
+    || status === ScheduleStatus.Scheduled;
+}

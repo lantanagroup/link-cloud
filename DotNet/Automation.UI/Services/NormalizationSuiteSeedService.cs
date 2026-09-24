@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Validation;
 
 namespace Automation.UI.Services;
 
@@ -13,6 +14,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
     private static readonly Guid OpCopyLocationId = new("00000000-0000-0000-2000-000000000001");
     private static readonly Guid OpRemoveExtensionsId = new("00000000-0000-0000-2000-000000000002");
     private static readonly Guid OpCopyIdentifierToTypeId = new("00000000-0000-0000-2000-000000000003");
+    private static readonly Guid OpHslocMapId = new("00000000-0000-0000-2000-000000000008");
     private static readonly Guid OpRemoveEncounterEpicExtensionsId = new("00000000-0000-0000-2000-000000000004");
     private static readonly Guid OpRemoveMeasureReportExtensionsId = new("00000000-0000-0000-2000-000000000005");
     private static readonly Guid OpRemoveObservationDatetimeExtensionId = new("00000000-0000-0000-2000-000000000006");
@@ -60,6 +62,9 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        // Kept as a reusable operation for custom suites. Not on System Default:
+        // MeasureReports are written by MeasureEval after Normalization, so this
+        // op never runs on the acquired-resource path the default suite exercises.
         var removeMeasureReportExtensions = new NormalizationOperationDefinition
         {
             Id = OpRemoveMeasureReportExtensionsId,
@@ -135,9 +140,23 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        var hslocMap = new NormalizationOperationDefinition
+        {
+            Id = OpHslocMapId,
+            Name = HslocMappingDefaults.OperationName,
+            Description = "Maps local Location codes to NHSN HSLOC. Copies identifier and alias onto type, including Location.partOf.",
+            OperationType = HslocMappingDefaults.OperationType,
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = HslocMappingDefaults.FhirPath,
+            CodeSystemMaps = HslocAutomationMaps.BuildCodeSystemMaps(),
+            IsSystem = true,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
         await _store.UpsertOperationAsync(copyLocation, cancellationToken);
         await _store.UpsertOperationAsync(removeExtensions, cancellationToken);
         await _store.UpsertOperationAsync(copyIdentifierToType, cancellationToken);
+        await _store.UpsertOperationAsync(hslocMap, cancellationToken);
         await _store.UpsertOperationAsync(removeEncounterEpicExtensions, cancellationToken);
         await _store.UpsertOperationAsync(removeMeasureReportExtensions, cancellationToken);
         await _store.UpsertOperationAsync(removeObservationDatetimeExtension, cancellationToken);
@@ -150,11 +169,11 @@ public sealed class NormalizationSuiteSeedService : IHostedService
         {
             Id = SeqDefaultLocationId,
             Name = "Default Location Normalization",
-            Description = "Applies CopyLocation and CopyProperty operations to Location resources.",
+            Description = "Applies CopyLocation and HSLOCMap operations to Location resources. HSLOCMap copies identifiers and aliases onto type before mapping, so the old CopyProperty overwrite is not in this sequence.",
             Entries =
             [
                 new NormalizationSequenceEntry { OperationId = OpCopyLocationId, Sequence = 1 },
-                new NormalizationSequenceEntry { OperationId = OpCopyIdentifierToTypeId, Sequence = 2 }
+                new NormalizationSequenceEntry { OperationId = OpHslocMapId, Sequence = 2 }
             ],
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -170,8 +189,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
                 new NormalizationSequenceEntry { OperationId = OpRemoveExtensionsId, Sequence = 1 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveEncounterEpicExtensionsId, Sequence = 2 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveObservationDatetimeExtensionId, Sequence = 3 },
-                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 },
-                new NormalizationSequenceEntry { OperationId = OpRemoveMeasureReportExtensionsId, Sequence = 5 }
+                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 }
             ],
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -188,7 +206,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             Id = SuiteSystemDefaultId,
             Name = "System Default",
             Description = "Built-in normalization suite that applies location normalization and extension cleanup.",
-            OperationIds = [OpRemoveMeasureReportExtensionsId],
+            OperationIds = [],
             SequenceIds = [SeqDefaultLocationId, SeqDefaultCleanupId],
             IsSystem = true,
             IsDefault = true,

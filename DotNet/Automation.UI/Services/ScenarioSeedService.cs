@@ -24,6 +24,7 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
     private static readonly Guid AdhocReportDailyAchTestId = new("00000000-0000-0000-0000-000000000009");
+    private static readonly Guid DmrpScheduledReportTestId = new("00000000-0000-0000-0000-000000000010");
 
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
@@ -40,21 +41,19 @@ public sealed class ScenarioSeedService : IHostedService
     private const string RegenerateReportTestNhsnOrganizationId = "10762";
     private const string MultiMeasureTestNhsnOrganizationId = "10763";
     private const string AdhocReportDailyAchTestNhsnOrganizationId = "10764";
+    private const string DmrpScheduledReportTestNhsnOrganizationId = "10765";
 
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
 
-    private static readonly List<string> DefaultNonQualifyingScenarioIds =
-        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.NonQualifying)];
-
-    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultQualifyingEligibilities =
-        DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
-
-    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultNonQualifyingEligibilities =
-        DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying);
+    private static readonly List<string> AmbulatoryPneumoniaScenarioIds =
+        [ClinicalScenarioIds.Pneumonia.ToString()];
 
     private static readonly List<string> DailyAchEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DailyAchMeasures, MeasureEligibility.Qualifying)];
+
+    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultQualifyingEligibilities =
+        DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
 
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DailyAchQualifyingEligibilities =
         DailyAchMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
@@ -71,6 +70,7 @@ public sealed class ScenarioSeedService : IHostedService
 
         foreach (var scenario in systemScenarios)
         {
+            scenario.NormalizeMeasureSelection();
             var existing = await _store.GetByIdAsync(scenario.Id, cancellationToken);
             if (existing == null)
             {
@@ -89,14 +89,47 @@ public sealed class ScenarioSeedService : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static List<TestScenarioDefinition> BuildSystemScenarios() =>
+    private static List<TestScenarioDefinition> BuildSystemScenarios()
+    {
+        var scenarios = BuildSystemScenarioList();
+        foreach (var scenario in scenarios)
+        {
+            foreach (var cohort in scenario.PatientCohorts)
+            {
+                if (cohort.PatientConfigurationId.HasValue)
+                    continue;
+                cohort.PatientConfigurationId = ResolveSystemPatientConfigurationId(cohort);
+            }
+        }
+
+        return scenarios;
+    }
+
+    private static Guid ResolveSystemPatientConfigurationId(PatientCohortDefinition cohort)
+    {
+        if (string.Equals(cohort.Intent?.EncounterClass, "AMB", StringComparison.OrdinalIgnoreCase))
+            return SystemPatientConfigurationIds.PneumoniaAmbulatory;
+
+        if (cohort.Intent?.IncludeHypoglycemicInsulin == true)
+            return SystemPatientConfigurationIds.DiabeticHypoglycemia;
+
+        if (cohort.EligibleClinicalScenarioIds.Count == 1
+            && cohort.EligibleClinicalScenarioIds[0] == ClinicalScenarioIds.DiabeticHypoglycemia.ToString())
+        {
+            return SystemPatientConfigurationIds.DiabeticHypoglycemia;
+        }
+
+        return SystemPatientConfigurationIds.PneumoniaInpatient;
+    }
+
+    private static List<TestScenarioDefinition> BuildSystemScenarioList() =>
     [
-        // --- Adhoc Report Test (ad-hoc, 1 patient, 1000 resources) ---
+        // --- Adhoc Report Test (ad-hoc, ACH Monthly, 1 patient, 1000 resources) ---
         new TestScenarioDefinition
         {
             Id = AdhocReportTestId,
             Name = "Adhoc Report Test",
-            Description = "Single patient ad-hoc report. Mirrors the AdhocReportTest backend E2E test.",
+            Description = "Single patient ad-hoc report against ACH Monthly. Mirrors the AdhocReportTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
@@ -135,6 +168,8 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
             ResourcesPerPatientMax = 1000,
+            // Daily ACH is a one-day measure. A year-long ad-hoc window (the Monthly default)
+            // is not the protocol period and has produced empty Initial Population results.
             ReportPeriodStart = new DateTimeOffset(2023, 1, 15, 0, 0, 0, TimeSpan.Zero),
             ReportPeriodEnd = new DateTimeOffset(2023, 1, 15, 23, 59, 59, TimeSpan.Zero),
             PatientCohorts =
@@ -337,22 +372,20 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    CohortQualification = MeasureEligibility.NonQualifying,
-                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
-                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    EligibleClinicalScenarioIds = [..AmbulatoryPneumoniaScenarioIds],
                     ResourcesPerPatientMin = 50,
                     ResourcesPerPatientMax = 100,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }
                 },
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    CohortQualification = MeasureEligibility.NonQualifying,
-                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
-                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    EligibleClinicalScenarioIds = [..AmbulatoryPneumoniaScenarioIds],
                     ResourcesPerPatientMin = 50,
                     ResourcesPerPatientMax = 100,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }
                 }
             ],
             CleanupServiceData = false,
@@ -409,40 +442,57 @@ public sealed class ScenarioSeedService : IHostedService
             ResourcesPerPatientMax = 250,
             PatientCohorts =
             [
-                // Cohort 1: qualifies for both ACH and Hypo (inpatient + diabetic med)
+                // Cohort 1: ACH + Hypo — inpatient diabetic hypoglycemia with insulin
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
-                    {
-                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
-                        [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.Qualifying
-                    },
-                    EligibleClinicalScenarioIds =
-                    [
-                        ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
-                        [
-                            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-                            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-                        ], MeasureEligibility.Qualifying)
-                    ],
+                    EligibleClinicalScenarioIds = [ClinicalScenarioIds.DiabeticHypoglycemia.ToString()],
                     ResourcesPerPatientMin = 250,
                     ResourcesPerPatientMax = 250,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = true }
                 },
-                // Cohort 2: qualifies for ACH only (inpatient, no Hypo med)
+                // Cohort 2: ACH only — inpatient pneumonia, no hypoglycemic insulin
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
-                    MeasureEligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>
-                    {
-                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
-                        [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
-                    },
-                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    EligibleClinicalScenarioIds = [ClinicalScenarioIds.Pneumonia.ToString()],
                     ResourcesPerPatientMin = 250,
                     ResourcesPerPatientMax = 250,
-                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod,
+                    Intent = new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false }
+                }
+            ],
+            CleanupServiceData = false,
+            CleanupFhirData = true,
+        },
+
+        // --- DMRP Scheduled Report Test (scheduled, ACH Monthly, 1 patient) ---
+        new TestScenarioDefinition
+        {
+            Id = DmrpScheduledReportTestId,
+            Name = "DMRP Scheduled Report Test",
+            Description = "Single-patient ACH Monthly scheduled report using Mock DMRP enrollment and Tenant-derived reporting plans.",
+            IsSystemScenario = true,
+            ReportMethod = ReportMethod.ScheduledReport,
+            SelectedMeasures = [..DefaultMeasures],
+            NhsnOrganizationId = DmrpScheduledReportTestNhsnOrganizationId,
+            EnableDmrp = true,
+            Seed = 20260909,
+            PatientCount = 1,
+            ResourcesPerPatientMin = 50,
+            ResourcesPerPatientMax = 100,
+            PatientCohorts =
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern =
+                        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,

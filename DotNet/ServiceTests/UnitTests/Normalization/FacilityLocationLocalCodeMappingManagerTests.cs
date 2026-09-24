@@ -35,6 +35,38 @@ public class FacilityLocationLocalCodeMappingManagerTests : IDisposable
         _connection.Dispose();
     }
 
+    [Fact]
+    public async Task GetForFacility_IncludesAllLocationsAndMappingsButExcludesOtherFacilities()
+    {
+        var hsloc = await SeedHSLOC();
+        var parent = new FacilityLocation { FacilityId = FacilityId, LocationId = "hospital" };
+        var child = new FacilityLocation
+        {
+            FacilityId = FacilityId, LocationId = "ward", PartOfId = "hospital",
+            LocationName = "Ward", LocationAlias = "Alias",
+            FacilityLocationLocalCodeMappings = [
+                new FacilityLocationLocalCodeMapping { LocalCodeSystem = "local", LocalCode = "mapped", HSLOCId = hsloc.Id },
+                new FacilityLocationLocalCodeMapping { LocalCodeSystem = "local", LocalCode = "unmapped" }
+            ]
+        };
+        _context.FacilityLocations.AddRange(parent, child,
+            new FacilityLocation { FacilityId = "other-facility", LocationId = "other" });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var records = await new FacilityLocationManager(_context).GetForFacility(FacilityId);
+
+        Assert.Equal(2, records.Count);
+        Assert.Empty(Assert.Single(records, row => row.LocationId == "hospital").Mappings);
+        var ward = Assert.Single(records, row => row.LocationId == "ward");
+        Assert.Equal("hospital", ward.PartOfId);
+        Assert.Equal("Alias", ward.LocationAlias);
+        Assert.Equal(2, ward.Mappings.Count);
+        var mapped = Assert.Single(ward.Mappings, mapping => mapping.HSLOCId != null);
+        Assert.Equal(hsloc.HSLOCCode, mapped.HSLOCCode);
+        Assert.Single(ward.Mappings, mapping => mapping.HSLOCId == null);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

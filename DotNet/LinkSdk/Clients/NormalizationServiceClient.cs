@@ -1,5 +1,8 @@
 ﻿﻿using Flurl.Http;
+using Flurl.Http.Configuration;
+using Flurl.Http.Content;
 using LantanaGroup.Link.Sdk.ApiClient;
+using System.Net.Http;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -116,6 +119,12 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<FacilityLocationTreeApiModel>>> GetFacilityLocationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityLocationTreeApiModel>>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations")
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(
         string facilityId,
         string locationId,
@@ -180,4 +189,27 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/hsloc-mappings/facilities/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(
+        bool includeInactive = false,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<HslocCodeApiModel>>(() => Request("normalization/HSLOC")
+            .SetQueryParam("includeInactive", includeInactive)
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateHslocCodesAsync(
+        string oldVersion,
+        string newVersion,
+        Stream csvFile,
+        string fileName = "hsloc.csv",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(csvFile);
+        var request = Request("normalization/HSLOC");
+        var content = new CapturedMultipartContent(new FlurlHttpSettings());
+        content.AddString("OldVersion", oldVersion ?? string.Empty);
+        content.AddString("NewVersion", newVersion ?? string.Empty);
+        content.AddFile("CsvFile", csvFile, string.IsNullOrWhiteSpace(fileName) ? "hsloc.csv" : fileName, "text/csv");
+        return SendAsync(() => request.SendAsync(HttpMethod.Put, content, cancellationToken: cancellationToken));
+    }
 }

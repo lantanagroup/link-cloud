@@ -65,7 +65,12 @@ public abstract class LinkApiClientBase : IDisposable
     /// Executes a request and returns the full response (status code + deserialized body).
     /// Does NOT swallow any status codes — the caller decides how to handle each response.
     /// </summary>
-    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action)
+    /// <param name="action">The request to send.</param>
+    /// <param name="captureRequestBody">
+    /// When false, the request body is not copied into the response's RequestBody. Pass false for any
+    /// request whose body carries a credential, since callers display and log RequestBody.
+    /// </param>
+    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action, bool captureRequestBody = true)
     {
         try
         {
@@ -73,7 +78,7 @@ public abstract class LinkApiClientBase : IDisposable
             var statusCode = response.StatusCode;
             var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
             var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
-            var requestBody = await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage);
+            var requestBody = captureRequestBody ? await ExtractRequestBodyAsync(response.ResponseMessage.RequestMessage) : null;
             var traceId = ExtractTraceId(response);
 
             if (statusCode is >= 200 and < 300)
@@ -107,7 +112,7 @@ public abstract class LinkApiClientBase : IDisposable
             var raw = await ex.GetResponseStringAsync();
             var requestUrl = ex.Call?.Request?.Url?.ToString();
             var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
-            var requestBody = await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage);
+            var requestBody = captureRequestBody ? await ExtractRequestBodyAsync(ex.Call?.HttpRequestMessage) : null;
             var traceId = ExtractTraceId(ex.Call?.Response);
             return new LinkApiResponse<T> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, RequestBody = requestBody, TraceId = traceId };
         }

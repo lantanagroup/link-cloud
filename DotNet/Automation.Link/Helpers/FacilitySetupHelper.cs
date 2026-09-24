@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -161,7 +162,7 @@ public static class FacilitySetupHelper
         {
             var mappingId = await EnsureMeasureMappingAsync(dmrpClient, output, measureId, cancellationToken);
 
-            foreach (var (month, year) in ReportingPeriods())
+            foreach (var (month, year) in GetDmrpReportingPeriods())
             {
                 await EnsureReportingPlanAsync(dmrpClient, output, facilityId, mappingId, month, year,
                     cancellationToken);
@@ -199,7 +200,7 @@ public static class FacilitySetupHelper
     /// the two saves would otherwise derive an empty schedule from a period nothing was enrolled for,
     /// then fail much later with an error about scheduled reports rather than about the clock.
     /// </remarks>
-    private static IReadOnlyList<(int Month, int Year)> ReportingPeriods()
+    public static IReadOnlyList<(int Month, int Year)> GetDmrpReportingPeriods()
     {
         var now = FacilityLocalNow();
         var next = now.AddMonths(1);
@@ -406,11 +407,15 @@ public static class FacilitySetupHelper
         IDataAcquisitionServiceClient dataAcqClient,
         AutomationConfig config,
         IAutomationOutput output,
-        string facilityId)
+        string facilityId,
+        int? concurrencyOverride = null)
     {
-        // Keep concurrency high enough to avoid single-request bottlenecks,
-        // but cap it to reduce downstream service saturation in large volume runs.
-        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 1, 8);
+        // v1 concurrency is 1–8. Scenario Concurrency maps to DA MaxConcurrentRequests here.
+        // Worker AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions is a separate cap
+        // (also 8 in appsettings). Setting 16 silently becomes 8; lifting this requires changing
+        // both clamps. Do not treat this as a soak or saturation test.
+        var requested = concurrencyOverride ?? config.FhirQuery.MaxConcurrentRequests;
+        var effectiveMaxConcurrentRequests = Math.Clamp(requested, 1, 8);
 
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
@@ -583,6 +588,9 @@ public static class FacilitySetupHelper
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Daily");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
+        var fhirList = await dataAcqClient.DeleteFhirListConfigurationAsync(facilityId);
+        if (!fhirList.IsSuccessStatusCode && fhirList.StatusCode != 404)
+            throw new InvalidOperationException($"FHIR list config delete failed for '{facilityId}' (HTTP {fhirList.StatusCode}).");
         await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
         await facilityClient.DeleteAsync(facilityId);
         output.WriteLine("Facility cleanup complete.");
@@ -639,5 +647,151 @@ public static class FacilitySetupHelper
             throw new InvalidOperationException(
                 $"Failed to create {type} query plan for facility '{facilityId}'. HTTP {createdPlan.StatusCode}: {createdPlan.RawBody ?? "(no body)"}");
         }
+    }
+
+    public static async Task EnsureEmptyDmrpFacilityAsync(
+    IFacilityServiceClient facilityClient,
+    IAutomationOutput output,
+    string facilityId,
+    CancellationToken cancellationToken = default)
+    {
+        var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
+
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            output.WriteLine($"Facility '{facilityId}' already exists.");
+            await WaitForFacilityReadConsistencyAsync(
+                facilityClient,
+                output,
+                facilityId,
+                cancellationToken);
+
+            return;
+        }
+
+        var created = await facilityClient.CreateAsync(new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            Vendor = new VendorModel
+            {
+                Name = "Epic"
+            },
+            ScheduledReports = MonthlySchedule([])
+        }, cancellationToken);
+
+        if (!created.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create DMRP facility '{facilityId}'. " +
+                $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+        }
+
+        await WaitForFacilityReadConsistencyAsync(
+            facilityClient,
+            output,
+            facilityId,
+            cancellationToken);
+    }
+
+    public static async Task RefreshDmrpDerivedScheduleAsync(
+    IFacilityServiceClient facilityClient,
+    IAutomationOutput output,
+    string facilityId,
+    CancellationToken cancellationToken = default)
+    {
+        var updated = await facilityClient.UpdateAsync(
+            facilityId,
+            new FacilityModel
+            {
+                FacilityId = facilityId,
+                FacilityName = facilityId,
+                TimeZone = FacilityTimeZone,
+                Vendor = new VendorModel
+                {
+                    Name = "Epic"
+                },
+                ScheduledReports = MonthlySchedule([])
+            },
+            cancellationToken);
+
+        if (!updated.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to derive the DMRP schedule for facility '{facilityId}'. " +
+                $"HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(
+            $"Refreshed DMRP-derived schedule for facility '{facilityId}'.");
+    }
+
+    public static async Task<string> EnsureDmrpMeasureMappingAsync(
+    IDmrpServiceClient dmrpClient,
+    IAutomationOutput output,
+    string nhsnMeasure,
+    string dqm,
+    Frequency frequency,
+    CancellationToken cancellationToken = default)
+    {
+        var search = await dmrpClient.SearchMeasureMappingsAsync(
+            measure: nhsnMeasure,
+            dqm: dqm,
+            frequency: frequency,
+            pageSize: 1,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+
+        var existingId = search.Body?.Records?.FirstOrDefault()?.Id;
+
+        if (!string.IsNullOrWhiteSpace(existingId))
+        {
+            output.WriteLine($"DMRP measure mapping '{nhsnMeasure}' -> '{dqm}' already exists. Reusing it.");
+
+            return existingId;
+        }
+
+        var created = await dmrpClient.CreateMeasureMappingAsync(
+            new MeasureMappingModel
+            {
+                Measure = nhsnMeasure,
+                DQM = dqm,
+                Frequency = frequency
+            },
+            cancellationToken);
+
+        if (created.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(created.Body?.Id))
+        {
+            output.WriteLine($"Created DMRP measure mapping '{nhsnMeasure}' -> '{dqm}'.");
+
+            return created.Body!.Id!;
+        }
+
+        if (created.StatusCode == (int)HttpStatusCode.BadRequest)
+        {
+            var concurrentSearch = await dmrpClient.SearchMeasureMappingsAsync(
+                measure: nhsnMeasure,
+                dqm: dqm,
+                frequency: frequency,
+                pageSize: 1,
+                pageNumber: 1,
+                cancellationToken: cancellationToken);
+
+            var concurrentId = concurrentSearch.Body?.Records?.FirstOrDefault()?.Id;
+
+            if (!string.IsNullOrWhiteSpace(concurrentId))
+            {
+                output.WriteLine(
+                    $"DMRP measure mapping '{nhsnMeasure}' -> '{dqm}' " +
+                    $"was created concurrently. Reusing it.");
+
+                return concurrentId;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to create DMRP measure mapping '{nhsnMeasure}' -> '{dqm}'. " +
+            $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
     }
 }

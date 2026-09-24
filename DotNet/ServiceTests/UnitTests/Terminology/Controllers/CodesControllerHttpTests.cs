@@ -76,6 +76,8 @@ public class CodesControllerHttpTests
             {
                 services.AddLogging();
                 services.AddSingleton(cache.Object);
+                services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
+                services.AddSingleton(TerminologyTestConfig.Options());
                 services.AddSingleton<FhirService>();
                 services.AddSingleton<ICodeSearchService, CodeSearchService>();
                 services.AddControllers(options =>
