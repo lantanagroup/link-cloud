@@ -539,11 +539,11 @@
     "intro2": "NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided on this page ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This page should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.",
     "sections": {
       "multipleMrn": "Multiple MRN Candidates",
-      "userFacingMrn": "User-Facing MRN in the EHR",
-      "correspondingIdentifier": "Corresponding FHIR Identifier",
-      "ruleToIdentify": "Rule to Identify the Usable MRN",
-      "variability": "Variability Across Facilities or Settings",
-      "changesOverTime": "MRN Changes Over Time"
+      "userFacingMrn": "USER-FACING MRN IN THE EHR",
+      "correspondingIdentifier": "CORRESPONDING FHIR IDENTIFIER",
+      "ruleToIdentify": "RULE TO IDENTIFY THE USABLE MRN",
+      "variability": "VARIABILITY ACROSS FACILITIES OR SETTINGS",
+      "changesOverTime": "MRN CHANGES OVER TIME"
     },
     "multipleMrn": {
       "question": "In your facility's EHR, are there multiple MRN-like patient identifiers?",
