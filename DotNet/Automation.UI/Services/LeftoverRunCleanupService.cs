@@ -473,7 +473,6 @@ public sealed class LeftoverRunCleanupService(
                         ? OwnedAutomationFacilityIds(run).Where(id => IsNewHistoryTeardown(id, tornDown)).ToList()
                         : [];
                     var teardownFailed = false;
-                    var deferredForActiveRun = false;
                     foreach (var facilityId in pendingTeardown)
                     {
                         if (heldByOtherRun.Contains(facilityId))
@@ -481,7 +480,6 @@ public sealed class LeftoverRunCleanupService(
                             logger.LogInformation(
                                 "History purge left facility {FacilityId} in place because another run still references it.",
                                 facilityId);
-                            deferredForActiveRun = true;
                             continue;
                         }
 
@@ -515,11 +513,6 @@ public sealed class LeftoverRunCleanupService(
                     if (teardownFailed)
                     {
                         failedRuns.Add(run.RunId);
-                    }
-                    else if (deferredForActiveRun)
-                    {
-                        // Keep the creator snapshot so AutomationCreatedFacility can be retried
-                        // after the active run finishes.
                     }
                     else
                     {

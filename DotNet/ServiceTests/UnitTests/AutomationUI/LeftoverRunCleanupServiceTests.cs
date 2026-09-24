@@ -248,7 +248,7 @@ public class LeftoverRunCleanupServiceTests
 
         deleted.Should().Equal(creator.RunId.ToString());
         result.TornDownFacilityIds.Should().Equal(creator.RunId.ToString());
-        result.PurgedRunIds.Should().BeEmpty();
+        result.PurgedRunIds.Should().Equal(creator.RunId);
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public class LeftoverRunCleanupServiceTests
 
         deleted.Should().Equal(creator.RunId.ToString());
         result.TornDownFacilityIds.Should().Equal(creator.RunId.ToString());
-        result.PurgedRunIds.Should().BeEmpty();
+        result.PurgedRunIds.Should().Equal(creator.RunId);
     }
 
     [Fact]

@@ -427,8 +427,9 @@ public static class RunCleanupHelper
         var protectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var run in runs)
         {
-            var isStale = !run.Status.IsTerminal() && now - RunTimestamp(run) >= retention;
-            if (isStale)
+            // A run already old enough for teardown must not shield the facility.
+            // Only a run still inside retention protects it.
+            if (now - RunTimestamp(run) >= retention)
                 continue;
             Protect(protectedIds, run);
         }
