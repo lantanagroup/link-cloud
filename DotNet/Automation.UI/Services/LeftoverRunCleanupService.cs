@@ -679,6 +679,36 @@ public sealed class LeftoverRunCleanupService(
                 processed++;
             }
 
+            if (mode == "history-purge")
+            {
+                var remainingRuns = runs.Where(run => !purged.Contains(run.RunId)).ToList();
+                var nowUnshielded = await SelectRetainedFacilitiesAsync(
+                    facilities, remainingRuns, now, settings.TeardownRetention, mode, cancellationToken);
+                var pendingRetained = nowUnshielded
+                    .Where(id => !tornDown.Exists(done => string.Equals(done, id, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                var room = Math.Max(0, limit - (tornDown.Count + failedFacilities.Count));
+                teardownCandidateCount += pendingRetained.Count;
+                foreach (var facilityId in pendingRetained.Take(room))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await TearDownOneFacilityAsync(
+                            facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
+                            censusClient, reportClient, abortRegistry, settings, facilityId, cancellationToken);
+                        tornDown.Add(facilityId);
+                        await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", facilityId);
+                        if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                            failedFacilities.Add(facilityId);
+                    }
+                }
+            }
+
             var result = new LeftoverCleanupResult(
                 quiesceCandidateCount,
                 quiesced,

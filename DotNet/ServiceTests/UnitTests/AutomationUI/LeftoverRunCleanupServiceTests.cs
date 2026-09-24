@@ -395,6 +395,41 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_tears_down_a_retained_facility_once_its_last_run_is_purged()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var shared = Guid.NewGuid().ToString();
+        var newer = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = shared,
+            AutomationCreatedFacility = false,
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-30)
+        };
+        var deleted = new List<string>();
+        var released = new List<string>();
+        var facilities = new Dictionary<string, string> { [shared] = "shared" };
+        var service = Create(
+            now,
+            [newer],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [shared],
+            retainedEligibleAt: now.AddDays(-40),
+            releasedFacilityIds: released);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.PurgedRunIds.Should().Equal(newer.RunId);
+        deleted.Should().Contain(shared);
+        released.Should().Contain(shared);
+        result.ProcessedAllCandidates.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task CustomRange_history_only_does_not_partially_tear_down_when_the_cap_is_one()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
