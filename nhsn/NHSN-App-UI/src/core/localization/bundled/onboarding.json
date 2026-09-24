@@ -741,12 +741,12 @@
     "intro1": "When multiple patient identifiers are present in FHIR, the facility reporting digital quality measures (dQMs) to NHSN should identify the one that is operationally used by end users in the source EHR. This allows NHSN to provide back to the facility the medical record number (MRN) end user can use to recognize and retrieve the patients based on their NHSN analysis reports. In FHIR implementations, Patient.identifier is a repeating element, and more than one identifier may be represented as MRN or may appear to be the MRN. Fields such as type, use, system, assigner, and period can help distinguish identifiers. If more than one identifier is coded as the MRN, NHSN needs to differentiate the usable MRN using FHIR fields such as identifier.system, identifier.use, identifier.assigner, and identifier.period.",
     "intro2": "NHSN uses defined business rules to identify the usable MRN in specific scenarios. The information provided on this page ensures MRN data are identified correctly. If your facility's data do not align with one of these scenarios, NHSN will be unable to isolate the MRN until either (1) the data are updated to conform to these rules or (2) NHSN updates its data pipeline. This may affect MRN-dependent processes, including data processing and the availability of MRN data in your facility's analytic reports to enable identification of patients. This page should be completed by <b>Information Systems</b> personnel who are familiar with patient identifier data, including (1) MRN management and (2) FHIR mapping throughout the health system.",
     "sections": {
-      "multipleMrn": "Multiple MRN Candidates",
-      "userFacingMrn": "User-Facing MRN in the EHR",
-      "correspondingIdentifier": "Corresponding FHIR Identifier",
-      "ruleToIdentify": "Rule to Identify the Usable MRN",
-      "variability": "Variability Across Facilities or Settings",
-      "changesOverTime": "MRN Changes Over Time"
+      "multipleMrn": "MULTIPLE MRN CANDIDATES",
+      "userFacingMrn": "USER-FACING MRN IN THE EHR",
+      "correspondingIdentifier": "CORRESPONDING FHIR IDENTIFIER",
+      "ruleToIdentify": "RULE TO IDENTIFY THE USABLE MRN",
+      "variability": "VARIABILITY ACROSS FACILITIES OR SETTINGS",
+      "changesOverTime": "MRN CHANGES OVER TIME"
     },
     "multipleMrn": {
       "question": "In your facility's EHR, are there multiple MRN-like patient identifiers?",
@@ -769,6 +769,8 @@
     },
     "identifierTable": {
       "hint": "Below are the patients queried from your facility's reports along with each patient's Patient.identifier entries. Click a patient id to review their identifiers and add rules for the elements that identify the usable MRN. Not every patient needs to be reviewed to identify all of the required identifier elements needed to identify the usable MRN.",
+      "modalTitle": "Patient {{patientId}} — Identifiers",
+      "modalDescription": "Scroll through this patient's identifiers below. Click \"+ Add rule\" on any element to add it to the usable MRN ruleset.",
       "columns": {
         "patientId": "Patient Id",
         "identifiers": "Identifiers",

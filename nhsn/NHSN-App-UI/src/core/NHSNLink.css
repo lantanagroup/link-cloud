@@ -1259,12 +1259,10 @@
    same small-caps divider FhirStep/CensusStep/EncounterStep each redefine under their own
    step-specific root class, given a shared name instead of a fourth copy. */
 .nhsn-link__section-title {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  font-size: 13.5px;
+  color: var(--kendo-color-app-text, #1f2328);
   font-weight: 600;
-  margin: 20px 0 10px;
+  margin: 15px 0 5px;
 }
 
 .nhsn-link__section-title:first-child {
@@ -1354,11 +1352,7 @@
   fill: #cfeee0;
 }
 
-/* core/fields/layout.tsx RequiredAsterisk - the one required-field marker
-   every hand-rolled label in the app uses, positioned inline right beside
-   the label text it follows. `align-self` covers containers that lay the
-   label out as a flex row (where `vertical-align` has no effect); both are
-   kept so the icon lands at the top of the label in every context. */
+/* core/fields/layout.tsx RequiredAsterisk */
 .nhsn-link__required-asterisk {
   display: inline-block;
   width: 8px;
