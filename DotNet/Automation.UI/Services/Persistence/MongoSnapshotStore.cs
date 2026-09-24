@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
 using System.Text.Json;
@@ -32,6 +33,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
+    private readonly IMongoCollection<OwnedFacilityTombstoneDocument> _ownedFacilityTombstones;
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
@@ -43,6 +45,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+        _ownedFacilityTombstones = database.GetCollection<OwnedFacilityTombstoneDocument>("automation_owned_facility_tombstones");
         _snapshotPayloadStore = snapshotPayloadStore ?? new InlineSnapshotPayloadStore();
         _logger = logger;
     }
@@ -297,8 +300,42 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             ct);
     }
 
+    public async Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default)
+    {
+        foreach (var facilityId in new[] { summary.FacilityId, summary.RunId.ToString() })
+        {
+            if (!RunCleanupHelper.IsOwnedAutomationFacilityId(summary, facilityId) || facilityId is null)
+                continue;
+
+            await _ownedFacilityTombstones.ReplaceOneAsync(
+                t => t.FacilityId == facilityId,
+                new OwnedFacilityTombstoneDocument
+                {
+                    FacilityId = facilityId,
+                    RunId = summary.RunId.ToString(),
+                    CreatedAt = DateTimeOffset.UtcNow
+                },
+                new ReplaceOptions { IsUpsert = true },
+                ct);
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetRetainedFacilityIdsAsync(CancellationToken ct = default)
+    {
+        var docs = await _ownedFacilityTombstones.Find(FilterDefinition<OwnedFacilityTombstoneDocument>.Empty)
+            .ToListAsync(ct);
+        return docs.Select(doc => doc.FacilityId).ToList();
+    }
+
+    public async Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default)
+        => await _ownedFacilityTombstones.DeleteOneAsync(t => t.FacilityId == facilityId, ct);
+
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
+        var summary = await GetRunSummaryAsync(runId, ct);
+        if (summary != null)
+            await RetainOwnedFacilitiesAsync(summary, ct);
+
         // Drop child history first and the run summary last. A failure after the
         // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);

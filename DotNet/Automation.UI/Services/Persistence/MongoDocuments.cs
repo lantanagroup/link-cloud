@@ -52,6 +52,18 @@ public sealed class AutomationRunDocument
     public string? GeneratedTemplateSetHash { get; set; }
 }
 
+/// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
+public sealed class OwnedFacilityTombstoneDocument
+{
+    [BsonId]
+    public string FacilityId { get; set; } = string.Empty;
+
+    public string RunId { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>
 public sealed class AutomationRunInputDocument
 {

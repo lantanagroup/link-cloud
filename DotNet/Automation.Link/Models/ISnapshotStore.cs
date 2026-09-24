@@ -41,6 +41,9 @@ public interface ISnapshotStore
     /// When the run row is missing, inserts a complete summary so the marker is durable.
     /// </summary>
     Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default);
+    Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetRetainedFacilityIdsAsync(CancellationToken ct = default);
+    Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);

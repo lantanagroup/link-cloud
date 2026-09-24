@@ -539,6 +539,11 @@ public sealed class LeftoverRunCleanupService(
                 processed++;
             }
 
+            if (teardownFacilities || mode == "history-purge")
+                await TearDownRetainedFacilitiesAsync(
+                    facilities, runs, facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
+                    censusClient, reportClient, abortRegistry, settings, tornDown, failedFacilities, cancellationToken);
+
             var result = new LeftoverCleanupResult(
                 quiesceCandidateCount,
                 quiesced,
@@ -600,9 +605,9 @@ public sealed class LeftoverRunCleanupService(
                     At = finishedAt
                 }, cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                // The report is already stored. A cancelled notification must not write a second failed report.
+                // The report is already stored. A notification-budget timeout must not write a second failed report.
             }
 
             return result;
@@ -736,6 +741,73 @@ public sealed class LeftoverRunCleanupService(
             .SelectMany(OwnedAutomationFacilityIds)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private async Task TearDownRetainedFacilitiesAsync(
+        IReadOnlyDictionary<string, string> facilities,
+        IReadOnlyList<AutomationRunSummary> runs,
+        IFacilityServiceClient facilityClient,
+        INormalizationServiceClient normalizationClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IQueryDispatchServiceClient queryDispatchClient,
+        ICensusServiceClient censusClient,
+        IReportServiceClient reportClient,
+        IPipelineAbortRegistry abortRegistry,
+        LeftoverRunCleanupSettings settings,
+        List<string> tornDown,
+        List<string> failedFacilities,
+        CancellationToken cancellationToken)
+    {
+        var retained = await snapshotStore.GetRetainedFacilityIdsAsync(cancellationToken) ?? [];
+        foreach (var facilityId in retained)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(facilityId))
+                continue;
+
+            var stillReferenced = runs.Any(run =>
+                string.Equals(run.FacilityId, facilityId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(run.RunId.ToString(), facilityId, StringComparison.OrdinalIgnoreCase));
+            if (stillReferenced)
+                continue;
+
+            if (!facilities.ContainsKey(facilityId))
+            {
+                await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
+                continue;
+            }
+
+            if (tornDown.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+            {
+                await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
+                continue;
+            }
+
+            try
+            {
+                var output = new LoggerAutomationOutput(logger, facilityId);
+                await RunCleanupHelper.CleanupLeftoverFacilityAsync(
+                    facilityClient,
+                    normalizationClient,
+                    dataAcqClient,
+                    queryDispatchClient,
+                    censusClient,
+                    reportClient,
+                    abortRegistry,
+                    output,
+                    facilityId,
+                    settings.AbortTtl,
+                    cancellationToken);
+                tornDown.Add(facilityId);
+                await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", facilityId);
+                if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                    failedFacilities.Add(facilityId);
+            }
+        }
+    }
 
     private static List<string> OwnedAutomationFacilityIds(AutomationRunSummary run)
     {

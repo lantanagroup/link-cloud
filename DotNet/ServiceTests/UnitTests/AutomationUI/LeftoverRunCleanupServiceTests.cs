@@ -285,6 +285,30 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_tears_down_a_facility_retained_after_its_run_was_deleted()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var retained = Guid.NewGuid().ToString();
+        var released = new List<string>();
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string> { [retained] = "retained" };
+        var service = Create(
+            now,
+            [],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [retained],
+            releasedFacilityIds: released);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        deleted.Should().Equal(retained);
+        result.TornDownFacilityIds.Should().Equal(retained);
+        released.Should().Equal(retained);
+    }
+
+    [Fact]
     public async Task HistoryPurge_says_so_when_the_report_cannot_be_saved()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -368,7 +392,9 @@ public class LeftoverRunCleanupServiceTests
         bool failReportSave = false,
         List<string>? terminalMessages = null,
         List<string>? statusesWhenSettingsLoad = null,
-        List<string>? deletedFacilityIds = null)
+        List<string>? deletedFacilityIds = null,
+        IReadOnlyList<string>? retainedFacilityIds = null,
+        List<string>? releasedFacilityIds = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -449,6 +475,11 @@ public class LeftoverRunCleanupServiceTests
         var snapshots = new Mock<ISnapshotStore>();
         snapshots.Setup(s => s.GetAllRunSummariesAsync(It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(runs);
+        snapshots.Setup(s => s.GetRetainedFacilityIdsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(retainedFacilityIds ?? []);
+        snapshots.Setup(s => s.ReleaseRetainedFacilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, CancellationToken>((id, _) => releasedFacilityIds?.Add(id))
+            .Returns(Task.CompletedTask);
         snapshots.Setup(s => s.DeleteRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Callback(() =>
             {
