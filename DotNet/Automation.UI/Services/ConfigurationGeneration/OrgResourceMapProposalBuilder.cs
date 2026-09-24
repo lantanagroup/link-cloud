@@ -282,11 +282,14 @@ public static class OrgResourceMapProposalBuilder
                 // A value-specific condition must not count as covering every Location
                 // that merely shares the identifier system.
                 var idSystem = UnescapeFhirPathLiteral(id.Groups[1].Value);
-                var idValue = id.Groups[2].Success ? UnescapeFhirPathLiteral(id.Groups[2].Value) : "";
-                if (idValue.Length > 0 && !string.IsNullOrWhiteSpace(idValue))
-                    yield return IdKey(idSystem, idValue);
-                else
+                if (!id.Groups[2].Success)
+                {
                     yield return IdSysKey(idSystem);
+                    continue;
+                }
+
+                // A present value group is value-specific, including spaces.
+                yield return IdKey(idSystem, UnescapeFhirPathLiteral(id.Groups[2].Value));
                 continue;
             }
 

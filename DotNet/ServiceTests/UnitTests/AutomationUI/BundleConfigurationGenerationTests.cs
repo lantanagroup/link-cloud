@@ -1294,6 +1294,38 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Orm_builder_does_not_treat_a_whitespace_identifier_value_as_system_wide()
+    {
+        var spaces = new OrganizationResourceMapTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Spaces only",
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = "Location.identifier.where(system = 'http://a' and value = '   ').exists()"
+                }
+            ]
+        };
+        var unit = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = "UNIT-9" }]
+        };
+        OrgResourceMapProposalBuilder.Build(unit, [spaces]).Reuse
+            .Should().NotContain(r => r.Id == spaces.Id && r.Recommendation == "Reuse");
+
+        var blankValue = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = "http://a", Value = "   " }]
+        };
+        OrgResourceMapProposalBuilder.Build(blankValue, [spaces]).Reuse
+            .Should().ContainSingle(r => r.Id == spaces.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
     public void Orm_builder_parses_a_generated_type_code_that_contains_an_apostrophe()
     {
         var fp = new BundleConfigFingerprint
