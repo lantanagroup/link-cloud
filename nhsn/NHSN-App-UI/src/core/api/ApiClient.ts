@@ -128,7 +128,6 @@ export interface ApiClient {
   getAcquisitionLogs(reportId: string): Promise<AcquisitionLogEntry[]>;
   exportReportSummary(reportId: string): Promise<Blob>;
   exportPatientReport(reportId: string, patientId: string, reportType: string): Promise<Blob>;
-  regenerateReport(reportId: string): Promise<Operation<ReportSummary>>;
   /** The most recently recorded ReportAccuracy acknowledgement for this report, or null if none yet. */
   getReportAcknowledgement(reportId: string): Promise<boolean | null>;
   acknowledgeReport(reportId: string, acknowledgement: Acknowledgement): Promise<void>;

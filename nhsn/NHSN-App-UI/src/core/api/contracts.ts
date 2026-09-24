@@ -353,7 +353,6 @@ export interface ReportSummary {
   endDate: string;
   createDate: string;
   status: ReportStatus;
-  regeneratedFrom?: string;
 }
 
 export interface ReportDetail extends ReportSummary {
