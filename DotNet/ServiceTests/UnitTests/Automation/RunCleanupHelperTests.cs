@@ -140,6 +140,26 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
+    public void Stale_creator_does_not_select_a_facility_a_newer_run_still_uses()
+    {
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var shared = Guid.NewGuid().ToString();
+        var stale = Run(Guid.NewGuid(), shared, AutomationRunStatus.Running, finishedAt: null);
+        stale.AutomationCreatedFacility = true;
+        stale.CreatedAt = now.AddDays(-15);
+        stale.StartedAt = now.AddDays(-15);
+        var newer = Run(Guid.NewGuid(), shared, AutomationRunStatus.Running, finishedAt: null);
+        newer.CreatedAt = now.AddHours(-1);
+        newer.StartedAt = now.AddHours(-1);
+
+        RunCleanupHelper.SelectStaleActiveAutomationFacilities(
+            Facilities(shared),
+            [stale, newer],
+            now,
+            TeardownRetention).Should().BeEmpty();
+    }
+
+    [Fact]
     public void History_purge_selects_terminal_runs_past_retention()
     {
         var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");

@@ -252,6 +252,39 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_leaves_a_created_facility_a_newer_terminal_run_still_uses()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var shared = Guid.NewGuid().ToString();
+        var creator = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = shared,
+            AutomationCreatedFacility = true,
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-30)
+        };
+        var newer = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = shared,
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-1)
+        };
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string> { [shared] = "shared" };
+        var service = Create(now, [creator, newer], [], facilities: facilities, deletedFacilityIds: deleted);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        deleted.Should().Equal(creator.RunId.ToString());
+        result.TornDownFacilityIds.Should().Equal(creator.RunId.ToString());
+        result.PurgedRunIds.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task HistoryPurge_says_so_when_the_report_cannot_be_saved()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

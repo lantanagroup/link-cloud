@@ -424,8 +424,17 @@ public static class RunCleanupHelper
                 stale.Add(runId);
         }
 
+        var protectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var run in runs)
+        {
+            var isStale = !run.Status.IsTerminal() && now - RunTimestamp(run) >= retention;
+            if (isStale)
+                continue;
+            Protect(protectedIds, run);
+        }
+
         return facilities.Keys
-            .Where(stale.Contains)
+            .Where(id => stale.Contains(id) && !protectedIds.Contains(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -451,11 +460,24 @@ public static class RunCleanupHelper
 
     public static IReadOnlyList<string> SelectAutomationFacilitiesForRuns(
         IReadOnlyDictionary<string, string> facilities,
-        IReadOnlyList<AutomationRunSummary> runs)
+        IReadOnlyList<AutomationRunSummary> runs,
+        IReadOnlyList<AutomationRunSummary>? allRuns = null)
     {
         var owned = OwnedAutomationFacilityIds(runs);
+        var protectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (allRuns != null)
+        {
+            var selected = runs.Select(run => run.RunId).ToHashSet();
+            foreach (var run in allRuns)
+            {
+                if (selected.Contains(run.RunId))
+                    continue;
+                Protect(protectedIds, run);
+            }
+        }
+
         return facilities.Keys
-            .Where(owned.Contains)
+            .Where(id => owned.Contains(id) && !protectedIds.Contains(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

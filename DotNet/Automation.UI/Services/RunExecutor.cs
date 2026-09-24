@@ -149,7 +149,8 @@ internal sealed class RunExecutor
     public sealed record ExecutorCallbacks(
         IAutomationOutput Output,
         Func<Task> BroadcastStatus,
-        Func<Task> PersistRunSummary);
+        Func<Task> PersistRunSummary,
+        Func<Task> PersistOwnership);
 
     public async Task ExecuteAsync(
         MutableRunState state,
@@ -540,7 +541,7 @@ internal sealed class RunExecutor
                     cancellationToken,
                     state.Options.VendorName,
                     state.Options.HonorExplicitFacilityPieces);
-                await callbacks.PersistRunSummary();
+                await callbacks.PersistOwnership();
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)
@@ -660,7 +661,7 @@ internal sealed class RunExecutor
                     cancellationToken,
                     state.Options.VendorName,
                     state.Options.HonorExplicitFacilityPieces);
-                await callbacks.PersistRunSummary();
+                await callbacks.PersistOwnership();
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(

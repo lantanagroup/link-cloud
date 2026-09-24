@@ -108,7 +108,8 @@ public class AutomationRunManager : IAutomationRunManager
                 var callbacks = new RunExecutor.ExecutorCallbacks(
                     Output: output,
                     BroadcastStatus: () => BroadcastStatus(state),
-                    PersistRunSummary: () => PersistRunSummaryAsync(state));
+                    PersistRunSummary: () => PersistRunSummaryAsync(state),
+                    PersistOwnership: () => PersistOwnershipAsync(state));
 
                 await _runExecutor.ExecuteAsync(state, callbacks, state.RunCancellation.Token);
             }
@@ -672,23 +673,34 @@ public class AutomationRunManager : IAutomationRunManager
         await PersistRunSummaryAsync(state);
     }
 
+    private async Task PersistOwnershipAsync(MutableRunState state)
+    {
+        const int attempts = 3;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                await WriteRunSummaryAsync(state, state.RunCancellation.Token);
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (attempt < attempts)
+            {
+                _logger.LogWarning(ex,
+                    "Ownership summary persist failed for {RunId}; retrying.", state.RunId);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), state.RunCancellation.Token);
+            }
+        }
+    }
+
     private async Task PersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
-            AutomationRunSummary summary;
-            string? facilityId;
-            string? reportId;
-
-            lock (state.Sync)
-            {
-                summary = ToSummary(state);
-                facilityId = state.FacilityId;
-                reportId = state.ReportId;
-            }
-
-            summary.RunConfigurationJson = null;
-            await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
+            await WriteRunSummaryAsync(state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -702,6 +714,23 @@ public class AutomationRunManager : IAutomationRunManager
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
         }
+    }
+
+    private async Task WriteRunSummaryAsync(MutableRunState state, CancellationToken cancellationToken)
+    {
+        AutomationRunSummary summary;
+        string? facilityId;
+        string? reportId;
+
+        lock (state.Sync)
+        {
+            summary = ToSummary(state);
+            facilityId = state.FacilityId;
+            reportId = state.ReportId;
+        }
+
+        summary.RunConfigurationJson = null;
+        await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
     }
 
     /// <summary>

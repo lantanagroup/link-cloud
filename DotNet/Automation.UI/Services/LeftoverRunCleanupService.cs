@@ -104,7 +104,7 @@ public sealed class LeftoverRunCleanupService(
             {
                 var ranged = RunCleanupHelper.SelectRunsFinishedInRange(runs, fromInclusiveUtc, toExclusiveUtc);
                 var facilityIds = teardownFacilities
-                    ? RunCleanupHelper.SelectAutomationFacilitiesForRuns(facilities, ranged)
+                    ? RunCleanupHelper.SelectAutomationFacilitiesForRuns(facilities, ranged, runs)
                     : [];
                 var history = purgeHistory ? ranged : [];
                 return (facilityIds, history);
@@ -372,14 +372,15 @@ public sealed class LeftoverRunCleanupService(
             var historyWork = purgeHistory
                 ? historyRuns.Take(Math.Max(limit, 200)).ToList()
                 : [];
-            var heldByActiveRun = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var active in runs)
+            var purgingRunIds = historyWork.Select(run => run.RunId).ToHashSet();
+            var heldByOtherRun = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var other in runs)
             {
-                if (active.Status.IsTerminal())
+                if (purgingRunIds.Contains(other.RunId))
                     continue;
-                if (!string.IsNullOrWhiteSpace(active.FacilityId))
-                    heldByActiveRun.Add(active.FacilityId);
-                heldByActiveRun.Add(active.RunId.ToString());
+                if (!string.IsNullOrWhiteSpace(other.FacilityId))
+                    heldByOtherRun.Add(other.FacilityId);
+                heldByOtherRun.Add(other.RunId.ToString());
             }
             var total = facilityWork.Count + historyWork.Count;
             var processed = 0;
@@ -464,10 +465,10 @@ public sealed class LeftoverRunCleanupService(
                     var deferredForActiveRun = false;
                     foreach (var facilityId in pendingTeardown)
                     {
-                        if (heldByActiveRun.Contains(facilityId))
+                        if (heldByOtherRun.Contains(facilityId))
                         {
                             logger.LogInformation(
-                                "History purge left facility {FacilityId} in place because an active run still uses it.",
+                                "History purge left facility {FacilityId} in place because another run still references it.",
                                 facilityId);
                             deferredForActiveRun = true;
                             continue;
