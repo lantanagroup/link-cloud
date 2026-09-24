@@ -18,6 +18,7 @@ public class RunsController(
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IPatientConfigurationStore patientConfigurationStore,
     IMeasureTemplateStore measureTemplateStore,
+    IFacilityTemplateStore facilityTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     GeneratedTemplateCacheVersionStore templateCacheVersionStore,
@@ -49,6 +50,7 @@ public class RunsController(
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
         ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(cancellationToken);
         ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.FacilityTemplates = await facilityTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {
@@ -139,9 +141,16 @@ public class RunsController(
 
             // Build the run request from the complete persisted scenario rather than
             // relying on the default hidden values submitted by the Quick Launch form.
-            var runId = await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
-
-            return RedirectToAction(nameof(Details), new { id = runId });
+            try
+            {
+                var runId = await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+                return RedirectToAction(nameof(Details), new { id = runId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["RunStartError"] = $"Unable to start test: {ex.Message}";
+                return RedirectToAction(nameof(Index));
+            }
         }
 
         if (!ModelState.IsValid)
@@ -158,8 +167,16 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        var startedRunId = await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id = startedRunId });
+        try
+        {
+            var startedRunId = await runManager.StartAsync(request, cancellationToken);
+            return RedirectToAction(nameof(Details), new { id = startedRunId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["RunStartError"] = $"Unable to start test: {ex.Message}";
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     [HttpPost]

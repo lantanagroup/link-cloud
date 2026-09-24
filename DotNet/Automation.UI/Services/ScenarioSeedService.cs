@@ -94,6 +94,13 @@ public sealed class ScenarioSeedService : IHostedService
         var scenarios = BuildSystemScenarioList();
         foreach (var scenario in scenarios)
         {
+            scenario.FacilityConfigurationMode = FacilityConfigurationMode.Facility;
+            scenario.FacilityTemplateId = FacilityTemplateCatalog.SystemDefaultId;
+            scenario.QueryPlanTemplateId = null;
+            scenario.NormalizationSuiteId = null;
+            scenario.OrganizationResourceMapTemplateId = null;
+            scenario.VendorName = null;
+
             foreach (var cohort in scenario.PatientCohorts)
             {
                 if (cohort.PatientConfigurationId.HasValue)
