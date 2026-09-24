@@ -81,8 +81,9 @@ public sealed record FhirSection
 }
 
 // Data Acquisition for the lists and sFTP settings, Census for the frequency, BFF tables for the
-// acknowledgement. hasCredentials is read from Data Acquisition's credentials/status endpoint, not
-// tracked by the BFF, and the credentials themselves never enter this shape.
+// acknowledgement, except SftpConnectionTested which is a UI flag from DraftJson (mirrors
+// FhirSection.ConnectionTested). hasCredentials is read from Data Acquisition's credentials/status
+// endpoint, not tracked by the BFF, and the credentials themselves never enter this shape.
 public sealed record CensusSection
 {
     public IReadOnlyDictionary<string, string> PatientListIds { get; init; } = new Dictionary<string, string>();
@@ -91,6 +92,7 @@ public sealed record CensusSection
     public string? SftpRemoteDirectory { get; init; }
     public bool? SftpRemoveAfterProcessing { get; init; }
     public bool? HasCredentials { get; init; }
+    public bool? SftpConnectionTested { get; init; }
     public string? AcquisitionFrequency { get; init; }
     public bool? AccuracyAcknowledged { get; init; }
 }

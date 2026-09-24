@@ -395,6 +395,7 @@ export function OnboardingProvider({
       dispatch({type: 'draft/loaded', draft: restored});
     }
     dirtyRef.current = false;
+    queryClient.invalidateQueries({queryKey: ['reportAccuracyAcknowledgement']});
     // Against restored's own vendor - a discard can revert an in-flight vendor change.
     const restoredVendorProfile = restored
       ? vendorProfiles.find(profile => profile.vendor === restored.facilityInfo.vendor)
@@ -407,7 +408,7 @@ export function OnboardingProvider({
       notifyError(t('unsavedChanges.messages.discardRelocked'));
     }
     completeGoTo(target);
-  }, [pendingStepId, draft.unlockedStepIds, completeGoTo, user, notifyError, t, vendorProfiles]);
+  }, [pendingStepId, draft.unlockedStepIds, completeGoTo, user, notifyError, t, vendorProfiles, queryClient]);
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {

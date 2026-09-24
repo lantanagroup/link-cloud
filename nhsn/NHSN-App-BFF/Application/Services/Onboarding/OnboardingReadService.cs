@@ -237,6 +237,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
                 SftpRemoteDirectory = sftpConfig?.RemoteDirectory,
                 SftpRemoveAfterProcessing = sftpConfig?.RemoveAfterProcessing,
                 HasCredentials = hasCredentials,
+                SftpConnectionTested = stored.State.Census.SftpConnectionTested,
                 AcquisitionFrequency = acquisitionFrequency,
                 AccuracyAcknowledged = censusAccuracyAcknowledged
             },

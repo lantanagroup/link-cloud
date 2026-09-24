@@ -84,13 +84,15 @@ export function ReportListView({
   // Real, report-scoped acknowledgement (AcknowledgementKind.ReportAccuracy, contextId the report
   // id) -- the same append-only attestation mechanism the Census step already uses, just keyed by
   // report instead of facility. Deferred to Continue, matching the Census pattern: toggling the
-  // checkbox only updates the local query cache, and ReportResultsStep's handleNext is what
-  // actually PUTs it.
+  // checkbox updates the local query cache (what ReportResultsStep's validator and handleNext
+  // read) and patches the draft (what marks the step dirty for the unsaved-changes prompt);
+  // ReportResultsStep's handleNext is what actually PUTs the real acknowledgement.
   function handleAckChange(checked: boolean) {
     if (!latestReportId) {
       return;
     }
     queryClient.setQueryData(reportAcknowledgementQueryKey, checked);
+    patch('reportResults', { accuracyAcknowledged: checked });
     clearValidationMessage();
   }
 

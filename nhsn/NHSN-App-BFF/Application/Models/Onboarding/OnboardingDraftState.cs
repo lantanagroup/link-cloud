@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
 // The split runs per field, not per section, which is what makes this easy to get wrong. The UI's
 // fhir slice carries fhirServerBaseUrl (Data Acquisition's) next to connectionTested (ours); its
 // census slice carries sFTP settings (Data Acquisition's) next to accuracyAcknowledged (a BFF
-// acknowledgement row). Only the second of each pair appears below.
+// acknowledgement row) and sftpConnectionTested (ours). Only the "ours" fields appear below.
 //
 // Also absent, each owned elsewhere: currentStepId (the Facilities column), schemaVersion (its own
 // column, read before this can be parsed), unlockedStepIds (its own column).
@@ -21,6 +21,8 @@ public sealed record OnboardingDraftState
     public StepView? CurrentView { get; init; }
 
     public FhirWorkflowState Fhir { get; init; } = new();
+
+    public CensusWorkflowState Census { get; init; } = new();
 
     public EncounterWorkflowState Encounter { get; init; } = new();
 
@@ -45,6 +47,13 @@ public sealed record StepView
 public sealed record FhirWorkflowState
 {
     public bool? ConnectionTested { get; init; }
+}
+
+// Whether the Cerner sFTP connection probe has been run. The sFTP settings themselves are Data
+// Acquisition's.
+public sealed record CensusWorkflowState
+{
+    public bool? SftpConnectionTested { get; init; }
 }
 
 
