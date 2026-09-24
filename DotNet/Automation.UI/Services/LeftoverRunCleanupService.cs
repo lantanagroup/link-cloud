@@ -377,9 +377,32 @@ public sealed class LeftoverRunCleanupService(
                 .Where(id => !facilityWork.Exists(existing => string.Equals(existing, id, StringComparison.OrdinalIgnoreCase)))
                 .Take(Math.Max(0, limit - facilityWork.Count))
                 .ToList();
-            var historyWork = purgeHistory
-                ? historyRuns.Take(Math.Max(limit, 200)).ToList()
-                : [];
+            var historyWork = new List<AutomationRunSummary>();
+            if (purgeHistory)
+            {
+                var spent = facilityWork.Count + retainedWork.Count;
+                var scheduledTeardown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (teardownFacilities)
+                {
+                    foreach (var id in facilityWork)
+                        scheduledTeardown.Add(id);
+                }
+                foreach (var id in retainedWork)
+                    scheduledTeardown.Add(id);
+
+                foreach (var run in historyRuns)
+                {
+                    var owned = OwnedAutomationFacilityIds(run);
+                    var extra = owned.Count(id => !scheduledTeardown.Contains(id));
+                    if (historyWork.Count > 0 && spent + extra > limit)
+                        break;
+
+                    historyWork.Add(run);
+                    foreach (var id in owned)
+                        scheduledTeardown.Add(id);
+                    spent += extra;
+                }
+            }
             var purgingRunIds = historyWork.Select(run => run.RunId).ToHashSet();
             var heldByOtherRun = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var other in runs)
@@ -393,8 +416,8 @@ public sealed class LeftoverRunCleanupService(
             var total = facilityWork.Count + retainedWork.Count + historyWork.Count;
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
-            teardownCandidateCount = TeardownCandidateCount(mode, teardownFacilities, purgeHistory, facilityIds, historyRuns)
-                + retainedEligible.Count(id => !facilityIds.Any(existing => string.Equals(existing, id, StringComparison.OrdinalIgnoreCase)));
+            teardownCandidateCount = CountTeardownAttempts(
+                teardownFacilities, facilityWork, retainedWork, historyWork, heldByOtherRun);
             historyCandidateCount = historyRuns.Count;
 
             await PublishProgressAsync(
@@ -734,6 +757,35 @@ public sealed class LeftoverRunCleanupService(
             Message = message,
             At = time.GetUtcNow()
         }, cancellationToken);
+
+    private static int CountTeardownAttempts(
+        bool teardownFacilities,
+        IReadOnlyList<string> facilityWork,
+        IReadOnlyList<string> retainedWork,
+        IReadOnlyList<AutomationRunSummary> historyWork,
+        HashSet<string> heldByOtherRun)
+    {
+        var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (teardownFacilities)
+        {
+            foreach (var id in facilityWork)
+                attempted.Add(id);
+        }
+
+        foreach (var id in retainedWork)
+            attempted.Add(id);
+
+        foreach (var run in historyWork)
+        {
+            foreach (var id in OwnedAutomationFacilityIds(run))
+            {
+                if (!heldByOtherRun.Contains(id))
+                    attempted.Add(id);
+            }
+        }
+
+        return attempted.Count;
+    }
 
     private static int TeardownCandidateCount(
         string mode,

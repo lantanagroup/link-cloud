@@ -547,7 +547,7 @@ internal sealed class RunExecutor
                         await callbacks.PersistOwnership();
                     });
                 if (!state.AutomationCreatedFacility)
-                    await callbacks.PersistOwnership();
+                    await callbacks.PersistRunSummary();
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)
