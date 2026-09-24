@@ -23,6 +23,21 @@ public class TestScenarioDefinition
     /// </summary>
     public bool IsSystemScenario { get; set; }
 
+    /// <summary>
+    /// Facility mode uses <see cref="FacilityTemplateId"/>. Ala carte uses the
+    /// query plan, normalization, and organization resource map on this scenario.
+    /// Unspecified keeps the legacy fallback to system defaults.
+    /// </summary>
+    public FacilityConfigurationMode FacilityConfigurationMode { get; set; }
+
+    public Guid? FacilityTemplateId { get; set; }
+
+    /// <summary>
+    /// Vendor posted with the facility when the scenario is in ala carte mode.
+    /// Empty means the run does not send a vendor. Ignored in facility mode.
+    /// </summary>
+    public string? VendorName { get; set; }
+
     // ----- Report -----
 
     /// <summary>How the report is triggered.</summary>

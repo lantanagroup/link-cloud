@@ -40,6 +40,7 @@ public sealed class MongoIndexManager
         EnsureMeasureTemplateIndexes();
         EnsureNormalizationIndexes();
         EnsureOrganizationResourceMapTemplateIndexes();
+        EnsureFacilityTemplateIndexes();
         EnsurePatientConfigurationIndexes();
         EnsureGenerationCatalogIndexes();
         EnsureApiHealthRunIndexes();
@@ -69,6 +70,13 @@ public sealed class MongoIndexManager
             new BsonDocument { { "IsDefault", 1 } },
             unique: false,
             "idx_isDefault");
+    }
+
+    private void EnsureFacilityTemplateIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>(MongoFacilityTemplateStore.CollectionName);
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
     }
 
     // --- automation_runs ---

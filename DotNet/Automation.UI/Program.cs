@@ -248,6 +248,7 @@ builder.Services.AddSingleton<IMeasureTemplateStore, MongoMeasureTemplateStore>(
 builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
 builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
 builder.Services.AddSingleton<IPatientConfigurationStore, MongoPatientConfigurationStore>();
+builder.Services.AddSingleton<IFacilityTemplateStore, MongoFacilityTemplateStore>();
 builder.Services.AddSingleton<IGenerationCatalogStore, MongoGenerationCatalogStore>();
 builder.Services.AddHttpClient("TerminologyLookup");
 builder.Services.AddSingleton<ITerminologyCodeLookup, TerminologyCodeLookup>();
@@ -307,6 +308,7 @@ builder.Services.AddHostedService<MeasureTemplateSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
+builder.Services.AddHostedService<FacilityTemplateSeedService>();
 builder.Services.AddHostedService<GenerationCatalogSeedService>();
 
 // Allow large imported-patient bundle uploads in the Automation UI.
