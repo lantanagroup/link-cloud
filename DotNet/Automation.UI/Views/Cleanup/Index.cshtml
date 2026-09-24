@@ -373,8 +373,10 @@
         var terminal = status === 'completed' || status === 'failed';
         // A start response can still echo the previous pass. Reload only for a newer terminal update.
         var staleArmedTerminal = passArmed && terminal && at > 0 && at <= armedAfter;
+        if (staleArmedTerminal)
+            return;
         var newerArmedTerminal = passArmed && terminal && at > armedAfter;
-        if (terminal && !staleArmedTerminal && (sawRunning || newerArmedTerminal)) {
+        if (terminal && (sawRunning || newerArmedTerminal)) {
             sawRunning = false;
             passArmed = false;
             window.location.reload();

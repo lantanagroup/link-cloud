@@ -109,11 +109,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
-            Builders<AutomationRunDocument>.Update.Set(r => r.AutomationCreatedFacility, summary.AutomationCreatedFacility),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
             Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
         };
+
+        // A later summary written before the flag is set must not clear a true marker.
+        if (summary.AutomationCreatedFacility)
+            updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.AutomationCreatedFacility, true));
 
         if (summary.GeneratedTemplateCacheVersionId.HasValue)
             updates.Add(Builders<AutomationRunDocument>.Update.Set(r => r.GeneratedTemplateCacheVersionId, summary.GeneratedTemplateCacheVersionId));

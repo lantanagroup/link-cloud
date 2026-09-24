@@ -675,23 +675,27 @@ public class AutomationRunManager : IAutomationRunManager
 
     private async Task PersistOwnershipAsync(MutableRunState state)
     {
+        // Independent of run cancellation. CancelRunAsync persists a summary before it
+        // cancels the run token, and that write must not abort this marker.
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         const int attempts = 3;
         for (var attempt = 1; attempt <= attempts; attempt++)
         {
             try
             {
-                await WriteRunSummaryAsync(state, state.RunCancellation.Token);
+                await WriteRunSummaryAsync(state, budget.Token);
                 return;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (budget.IsCancellationRequested)
             {
-                throw;
+                throw new InvalidOperationException(
+                    $"Ownership summary persist timed out for {state.RunId}.");
             }
-            catch (Exception ex) when (attempt < attempts)
+            catch (Exception ex) when (ex is not OperationCanceledException && attempt < attempts)
             {
                 _logger.LogWarning(ex,
                     "Ownership summary persist failed for {RunId}; retrying.", state.RunId);
-                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), state.RunCancellation.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), budget.Token);
             }
         }
     }
