@@ -673,7 +673,7 @@ internal sealed class RunExecutor
                         await callbacks.PersistOwnership();
                     });
                 if (!state.AutomationCreatedFacility)
-                    await callbacks.PersistOwnership();
+                    await callbacks.PersistRunSummary();
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
