@@ -22,12 +22,6 @@ export function isHslocCodeMap(codeMap: CodeMapEvidence): boolean {
   return codeMap.targetSystem.trim().toUpperCase() === 'HSLOC';
 }
 
-/**
- * Whether a patient's encounter mapping evidence is fully covered by the facility's live
- * mappings, even if the evidence itself (a snapshot taken when the report ran) still lists
- * those codes as unmapped -- lets a mapping added after report generation flip the "Found"
- * pill without waiting on the backend to re-evaluate the report.
- */
 export function isEncounterMappingResolved(
   evidence: PatientMappingEvidence,
   mappings: EncounterMapping[],
@@ -44,7 +38,6 @@ export function isEncounterMappingResolved(
     );
 }
 
-/** Same idea as isEncounterMappingResolved, for HSLOC -- HslocMapping has no system field, so unmapped codes are cross-referenced by sourceCode alone. */
 export function isHslocMappingResolved(
   evidence: PatientMappingEvidence,
   mappings: HslocMapping[],

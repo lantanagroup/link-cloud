@@ -340,9 +340,7 @@ export function ReportDetailView() {
   }
 
   // Real evidence behind the Location Org / HSLOC / Encounter Mapping indicators, from Report's
-  // per-patient detail operation. Served from the bulk patientMappingEvidenceByPatientId prefetch
-  // when it already covers this patient, falling back to a direct fetch otherwise (prefetch still
-  // loading, failed, or this component mounted after it settled).
+  // per-patient detail operation.
   async function openMappingEvidence(
     column: 'locationOrg' | 'hsloc' | 'encounter',
     patientId: string,

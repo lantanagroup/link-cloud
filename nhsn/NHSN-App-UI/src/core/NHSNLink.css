@@ -570,7 +570,7 @@
   animation: nhsn-link__spin 0.7s linear infinite;
 }
 
-.nhsn-link__step-actions .k-button.k-button-base .nhsn-link__button-spinner {
+.k-button.k-button-base .nhsn-link__button-spinner {
   border-color: var(--kendo-color-border, #d0d7de);
   border-top-color: var(--kendo-color-primary, #0057b7);
 }

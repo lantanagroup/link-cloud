@@ -38,7 +38,7 @@ internal sealed class ReportGateway : IReportGateway
         };
     }
 
-    public async Task<Paged<ReportSummary>> ListReportsAsync(string facilityId, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<Paged<ReportDetail>> ListReportsAsync(string facilityId, int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var schedulesResponse = await _reportClient.GetSchedulesByFacilityAsync(facilityId, cancellationToken: cancellationToken);
         var schedules = LinkResponseHandler.Optional(schedulesResponse, ServiceName, nameof(ListReportsAsync)) ?? [];
@@ -50,7 +50,7 @@ internal sealed class ReportGateway : IReportGateway
         // once here rather than once per row.
         var availableMeasures = await _reportingPlanGateway.GetAvailableMeasuresAsync(facilityId, cancellationToken);
 
-        var items = new List<ReportSummary>(pageItems.Count);
+        var items = new List<ReportDetail>(pageItems.Count);
         foreach (var schedule in pageItems)
         {
             var summaryResponse = await _reportClient.GetReportSummaryAsync(schedule.Id.ToString(), cancellationToken);
@@ -58,7 +58,7 @@ internal sealed class ReportGateway : IReportGateway
             items.Add(ToDetail(schedule, summary, availableMeasures));
         }
 
-        return new Paged<ReportSummary>
+        return new Paged<ReportDetail>
         {
             Items = items,
             Page = page,

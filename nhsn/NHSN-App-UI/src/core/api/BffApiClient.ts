@@ -262,8 +262,8 @@ export class BffApiClient implements ApiClient {
     return pollOperation(this.http, initial, {isDone: isReportSettled});
   }
 
-  async listReports(page: PageRequest): Promise<Paged<ReportSummary>> {
-    const {data} = await this.http.get<Paged<ReportSummary>>(
+  async listReports(page: PageRequest): Promise<Paged<ReportDetail>> {
+    const {data} = await this.http.get<Paged<ReportDetail>>(
       `/reports?page=${page.page}&pageSize=${page.pageSize}`
     );
     return data;

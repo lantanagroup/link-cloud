@@ -241,7 +241,7 @@ export function ReportListView({
                         {friendlyMeasuresFor(
                           report.measures,
                           report.reportId,
-                          undefined,
+                          report.measureMapping,
                           reportResults.requestedMeasuresByReportId,
                         ).map((measure) => (
                           <span

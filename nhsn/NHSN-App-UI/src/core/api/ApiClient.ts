@@ -118,7 +118,9 @@ export interface ApiClient {
 
   // reporting
   requestReport(request: ReportRequest): Promise<Operation<ReportSummary>>;
-  listReports(page: PageRequest): Promise<Paged<ReportSummary>>;
+  // Each item carries its measure mapping too (ReportDetail, not just ReportSummary), so the
+  // list can resolve friendly measure names the same way the detail view does.
+  listReports(page: PageRequest): Promise<Paged<ReportDetail>>;
   getReport(reportId: string): Promise<ReportDetail>;
   getReportPatients(reportId: string): Promise<ReportPatientEntry[]>;
   getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence>;
