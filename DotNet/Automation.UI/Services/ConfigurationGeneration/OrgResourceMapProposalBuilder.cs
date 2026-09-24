@@ -238,10 +238,10 @@ public static class OrgResourceMapProposalBuilder
         foreach (var identifier in fingerprint.LocationIdentifiers)
         {
             var system = identifier.System?.Trim() ?? "";
-            var value = identifier.Value?.Trim() ?? "";
+            var value = identifier.Value ?? "";
             if (string.IsNullOrWhiteSpace(system))
                 continue;
-            keys.Add(string.IsNullOrWhiteSpace(value)
+            keys.Add(value.Length == 0
                 ? IdSysKey(system)
                 : IdKey(system, value));
         }

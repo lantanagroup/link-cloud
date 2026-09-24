@@ -106,8 +106,9 @@ public static class UploadedBundleAnalyzer
         foreach (var identifier in location.Identifier ?? [])
         {
             var system = identifier.System?.Trim() ?? "";
-            var value = identifier.Value?.Trim() ?? "";
-            if (string.IsNullOrWhiteSpace(system) && string.IsNullOrWhiteSpace(value))
+            // FHIRPath value equality does not trim. System-only suggestions still use the trimmed system.
+            var value = identifier.Value ?? "";
+            if (string.IsNullOrWhiteSpace(system) && value.Length == 0)
                 continue;
             hasUsableIdentifier = true;
             if (fp.LocationIdentifiers.Any(x => Same(x.System, system) && SameValue(x.Value, value)))
@@ -286,5 +287,5 @@ public static class UploadedBundleAnalyzer
         => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
 
     private static bool SameValue(string? left, string? right)
-        => string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
+        => string.Equals(left ?? "", right ?? "", StringComparison.Ordinal);
 }

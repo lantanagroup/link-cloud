@@ -115,6 +115,20 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_keeps_exact_identifier_value_whitespace()
+    {
+        var location = new Location
+        {
+            Identifier = [new Identifier("http://a", " HOSP ")]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([location]);
+
+        fp.LocationIdentifiers.Should().ContainSingle();
+        fp.LocationIdentifiers[0].Value.Should().Be(" HOSP ");
+    }
+
+    [Fact]
     public void Analyzer_keeps_exact_location_alias_on_the_raw_location()
     {
         var location = new Location
@@ -1225,6 +1239,36 @@ public class BundleConfigurationGenerationTests
             .Should().ContainSingle(r => r.Id == exact.Id && r.Recommendation == "Reuse");
         OrgResourceMapProposalBuilder.Build(Upload("hosp"), [anyValue]).Reuse
             .Should().ContainSingle(r => r.Id == anyValue.Id && r.Recommendation == "Reuse");
+    }
+
+    [Fact]
+    public void Orm_builder_does_not_reuse_an_identifier_value_that_differs_only_by_whitespace()
+    {
+        const string system = "http://a";
+        OrganizationResourceMapTemplate Map(string value) => new()
+        {
+            Id = Guid.NewGuid(),
+            Name = "Value " + value,
+            Conditions =
+            [
+                new OrganizationResourceMapCondition
+                {
+                    FhirPath = $"Location.identifier.where(system = '{system}' and value = '{value}').exists()"
+                }
+            ]
+        };
+        var upload = new BundleConfigFingerprint
+        {
+            LocationCount = 1,
+            LocationIdentifiers = [new LocationIdentifierHint { System = system, Value = " HOSP " }]
+        };
+        var plain = Map("HOSP");
+        var padded = Map(" HOSP ");
+
+        OrgResourceMapProposalBuilder.Build(upload, [plain]).Reuse
+            .Should().NotContain(r => r.Id == plain.Id && r.Recommendation == "Reuse");
+        OrgResourceMapProposalBuilder.Build(upload, [padded]).Reuse
+            .Should().ContainSingle(r => r.Id == padded.Id && r.Recommendation == "Reuse");
     }
 
     [Fact]
