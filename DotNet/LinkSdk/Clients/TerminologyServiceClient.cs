@@ -49,6 +49,8 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
         string? id = null,
         string? url = null,
         string? date = null,
+        int? count = null,
+        int? offset = null,
         CancellationToken cancellationToken = default)
     {
         var request = string.IsNullOrWhiteSpace(id)
@@ -56,6 +58,8 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
             : Request($"terminology/fhir/ValueSet/{id}/$expand");
         if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
         if (!string.IsNullOrWhiteSpace(date)) request = request.SetQueryParam("date", date);
+        if (count.HasValue) request = request.SetQueryParam("count", count.Value);
+        if (offset.HasValue) request = request.SetQueryParam("offset", offset.Value);
         return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
 

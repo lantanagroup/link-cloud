@@ -209,6 +209,22 @@ public class TerminologyServiceClientTests
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/terminology/fhir/ValueSet/vs-1/$expand", request.Path);
+        Assert.DoesNotContain("count=", request.Query);
+        Assert.DoesNotContain("offset=", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_SendsPagingParameters()
+    {
+        using var server = new OneShotServer("{}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ExpandValueSetAsync(id: "vs-1", count: 50, offset: 100);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("count=50", request.Query);
+        Assert.Contains("offset=100", request.Query);
     }
 
     [Fact]

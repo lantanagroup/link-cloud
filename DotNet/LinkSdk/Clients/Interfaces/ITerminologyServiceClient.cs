@@ -57,9 +57,11 @@ public interface ITerminologyServiceClient
     /// <summary>
     /// Expands a ValueSet by id or canonical url: <c>GET /api/terminology/fhir/ValueSet/$expand</c>
     /// (or <c>/ValueSet/{id}/$expand</c> when <paramref name="id"/> is supplied). Used for
-    /// encounter-code autocomplete.
+    /// encounter-code autocomplete. The expansion is always bounded: <paramref name="count"/> and
+    /// <paramref name="offset"/> are the FHIR <c>$expand</c> paging parameters, and <c>expansion.total</c>
+    /// reports the full size.
     /// </summary>
-    Task<LinkApiResponse<string>> ExpandValueSetAsync(string? id = null, string? url = null, string? date = null, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<string>> ExpandValueSetAsync(string? id = null, string? url = null, string? date = null, int? count = null, int? offset = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves ValueSet resources, optionally filtered by canonical url:
