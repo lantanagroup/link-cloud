@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -508,7 +509,7 @@ public sealed class LeftoverRunCleanupService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    logger.LogWarning(ex, "Leftover facility {Mode} failed for {FacilityId}.", mode, facilityId);
+                    logger.LogWarning(ex, "Leftover facility {Mode} failed for {FacilityId}.", mode, ForLog(facilityId));
                     failedFacilities.Add(facilityId);
                 }
 
@@ -545,7 +546,7 @@ public sealed class LeftoverRunCleanupService(
                         {
                             logger.LogInformation(
                                 "History purge left facility {FacilityId} in place because another run still references it.",
-                                facilityId);
+                                ForLog(facilityId));
                             continue;
                         }
 
@@ -570,7 +571,7 @@ public sealed class LeftoverRunCleanupService(
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", facilityId);
+                            logger.LogWarning(ex, "History purge facility teardown failed for {FacilityId}.", ForLog(facilityId));
                             if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
                                 failedFacilities.Add(facilityId);
                             teardownFailed = true;
@@ -640,7 +641,7 @@ public sealed class LeftoverRunCleanupService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", facilityId);
+                    logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", ForLog(facilityId));
                     if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
                         failedFacilities.Add(facilityId);
                 }
@@ -671,7 +672,7 @@ public sealed class LeftoverRunCleanupService(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    logger.LogWarning(ex, "History facility teardown failed for {FacilityId}.", facilityId);
+                    logger.LogWarning(ex, "History facility teardown failed for {FacilityId}.", ForLog(facilityId));
                     if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
                         failedFacilities.Add(facilityId);
                 }
@@ -687,8 +688,25 @@ public sealed class LeftoverRunCleanupService(
                 var pendingRetained = nowUnshielded
                     .Where(id => !tornDown.Exists(done => string.Equals(done, id, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
+                var alreadyCounted = new HashSet<string>(retainedEligible, StringComparer.OrdinalIgnoreCase);
+                if (teardownFacilities)
+                {
+                    foreach (var id in selectedFacilities)
+                        alreadyCounted.Add(id);
+                }
+                foreach (var historyRun in historyRuns)
+                {
+                    foreach (var id in OwnedAutomationFacilityIds(historyRun))
+                    {
+                        if (!heldOutsideThisPurge.Contains(id))
+                            alreadyCounted.Add(id);
+                    }
+                }
+                var newlyUnshielded = pendingRetained
+                    .Where(id => !alreadyCounted.Contains(id))
+                    .ToList();
                 var room = Math.Max(0, limit - (tornDown.Count + failedFacilities.Count));
-                teardownCandidateCount += pendingRetained.Count;
+                teardownCandidateCount += newlyUnshielded.Count;
                 foreach (var facilityId in pendingRetained.Take(room))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -702,7 +720,7 @@ public sealed class LeftoverRunCleanupService(
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", facilityId);
+                        logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", ForLog(facilityId));
                         if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
                             failedFacilities.Add(facilityId);
                     }
@@ -1178,13 +1196,15 @@ public sealed class LeftoverRunCleanupService(
             first.FailedFacilityIds.Concat(second.FailedFacilityIds).ToList(),
             first.FailedRunIds.Concat(second.FailedRunIds).ToList());
 
+    private static string ForLog(string? value) => (value ?? string.Empty).SanitizeAndRemove();
+
     private static string FormatResult(string label, LeftoverCleanupResult result)
         => $"{label}: quiesced {result.QuiescedFacilityIds.Count}/{result.QuiesceCandidateCount}, torn down {result.TornDownFacilityIds.Count}/{result.TeardownCandidateCount}, purged {result.PurgedRunIds.Count}/{result.HistoryPurgeCandidateCount}, failed facilities {result.FailedFacilityIds.Count}, failed runs {result.FailedRunIds.Count}.";
 
     private sealed class LoggerAutomationOutput(ILogger logger, string facilityId) : IAutomationOutput
     {
         public void WriteLine(string message) =>
-            logger.LogInformation("Leftover cleanup {FacilityId}: {Message}", facilityId, message);
+            logger.LogInformation("Leftover cleanup {FacilityId}: {Message}", ForLog(facilityId), message.SanitizeAndRemove());
 
         public void WriteLine(string format, params object[] args) =>
             WriteLine(string.Format(format, args));

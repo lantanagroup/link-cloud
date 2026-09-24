@@ -430,6 +430,28 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_does_not_double_count_a_retained_facility_waiting_for_the_next_pass()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var first = Guid.NewGuid().ToString();
+        var second = Guid.NewGuid().ToString();
+        var service = Create(
+            now,
+            [],
+            [],
+            facilities: new Dictionary<string, string> { [first] = "first", [second] = "second" },
+            retainedFacilityIds: [first, second],
+            retainedEligibleAt: now.AddDays(-40),
+            maxFacilitiesPerPass: 1);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().ContainSingle();
+        result.TeardownCandidateCount.Should().Be(2);
+        result.ProcessedAllCandidates.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task CustomRange_history_only_does_not_partially_tear_down_when_the_cap_is_one()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
