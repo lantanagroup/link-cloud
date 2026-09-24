@@ -109,6 +109,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Builders<AutomationRunDocument>.Update.Set(r => r.FinishedAt, summary.FinishedAt),
             Builders<AutomationRunDocument>.Update.Set(r => r.Error, summary.Error),
             Builders<AutomationRunDocument>.Update.Set(r => r.FacilityId, facilityId ?? string.Empty),
+            Builders<AutomationRunDocument>.Update.Set(r => r.AutomationCreatedFacility, summary.AutomationCreatedFacility),
             Builders<AutomationRunDocument>.Update.Set(r => r.ReportId, reportId ?? string.Empty),
             Builders<AutomationRunDocument>.Update.Set(r => r.IsActive, hasIdentifiers && summary.Status.IsInProgress() && summary.Status != AutomationRunStatus.CollectingMetrics),
             Builders<AutomationRunDocument>.Update.SetOnInsert(r => r.RunId, summary.RunId)
@@ -374,6 +375,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             Error = doc.Error,
             Duration = doc.Duration,
             FacilityId = doc.FacilityId,
+            AutomationCreatedFacility = doc.AutomationCreatedFacility,
             ReportId = doc.ReportId,
             GeneratedTemplateCacheVersionId = doc.GeneratedTemplateCacheVersionId,
             GeneratedTemplateCacheVersionNumber = doc.GeneratedTemplateCacheVersionNumber,

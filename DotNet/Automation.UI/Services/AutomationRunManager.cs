@@ -757,6 +757,7 @@ public class AutomationRunManager : IAutomationRunManager
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
                 FacilityId = state.FacilityId,
+                AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,
                 GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,

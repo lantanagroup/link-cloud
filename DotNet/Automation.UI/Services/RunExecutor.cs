@@ -533,7 +533,7 @@ internal sealed class RunExecutor
 
                 // Tenant refuses refresh for a facility it does not know, so create the
                 // facility first with an empty DMRP-derived schedule.
-                await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
                     facilityClient,
                     output,
                     facilityId,
@@ -650,7 +650,7 @@ internal sealed class RunExecutor
             }
             else
             {
-                await FacilitySetupHelper.EnsureFacilityAsync(
+                state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureFacilityAsync(
                     facilityClient,
                     dmrpClient,
                     output,

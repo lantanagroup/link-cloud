@@ -721,7 +721,7 @@ public sealed class LeftoverRunCleanupService(
 
         void Add(string? id)
         {
-            if (string.IsNullOrWhiteSpace(id) || !RunCleanupHelper.IsAutomationFacilityId(id))
+            if (!RunCleanupHelper.IsOwnedAutomationFacilityId(run, id) || id is null)
                 return;
             if (ids.Exists(existing => string.Equals(existing, id, StringComparison.OrdinalIgnoreCase)))
                 return;

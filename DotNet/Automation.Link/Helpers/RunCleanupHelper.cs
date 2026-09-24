@@ -354,6 +354,23 @@ public static class RunCleanupHelper
         Guid.TryParse(facilityId, out _);
 
     /// <summary>
+    /// The run id is the facility Automation creates for a normal scenario.
+    /// A different <see cref="AutomationRunSummary.FacilityId"/> is torn down only when
+    /// this run created it. DMRP can point that id at a tenant that already existed.
+    /// </summary>
+    public static bool IsOwnedAutomationFacilityId(AutomationRunSummary run, string? facilityId)
+    {
+        if (!IsAutomationFacilityId(facilityId))
+            return false;
+
+        if (string.Equals(facilityId, run.RunId.ToString(), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return run.AutomationCreatedFacility
+            && string.Equals(facilityId, run.FacilityId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Automation.UI GUID facilities whose matching run is terminal past <paramref name="grace"/>.
     /// GUID tenants with no Automation run record are not selected.
     /// </summary>
@@ -480,10 +497,10 @@ public static class RunCleanupHelper
         var owned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var run in runs)
         {
-            if (IsAutomationFacilityId(run.FacilityId))
+            if (IsOwnedAutomationFacilityId(run, run.FacilityId))
                 owned.Add(run.FacilityId!);
             var runId = run.RunId.ToString();
-            if (IsAutomationFacilityId(runId))
+            if (IsOwnedAutomationFacilityId(run, runId))
                 owned.Add(runId);
         }
 

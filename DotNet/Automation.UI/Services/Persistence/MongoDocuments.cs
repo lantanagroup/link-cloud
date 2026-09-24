@@ -12,6 +12,8 @@ public sealed class AutomationRunDocument
     public Guid RunId { get; set; }
 
     public string FacilityId { get; set; } = string.Empty;
+    /// <summary>True when this run created <see cref="FacilityId"/> rather than reusing a tenant.</summary>
+    public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
 
     public string RunName { get; set; } = string.Empty;
