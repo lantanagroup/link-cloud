@@ -184,12 +184,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task ExpandValueSetAsync_ByUrl_CallsExpandRoute()
     {
-        using var server = new OneShotServer("{\"resourceType\":\"ValueSet\"}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"ValueSet\"}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.ExpandValueSetAsync(url: "http://example.org/vs/encounter-type");
-        var request = await server.WaitForRequestAsync();
-        var result = await callTask;
+        var result = await client.ExpandValueSetAsync(url: "http://example.org/vs/encounter-type");
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/terminology/fhir/ValueSet/$expand", request.Path);
@@ -200,12 +199,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task ExpandValueSetAsync_ById_CallsIdScopedExpandRoute()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.ExpandValueSetAsync(id: "vs-1");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.ExpandValueSetAsync(id: "vs-1");
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/terminology/fhir/ValueSet/vs-1/$expand", request.Path);
@@ -216,12 +214,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task ExpandValueSetAsync_SendsPagingParameters()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.ExpandValueSetAsync(id: "vs-1", count: 50, offset: 100);
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.ExpandValueSetAsync(id: "vs-1", count: 50, offset: 100);
+        var request = http.SingleRequest();
 
         Assert.Contains("count=50", request.Query);
         Assert.Contains("offset=100", request.Query);
@@ -230,12 +227,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task GetValueSetsAsync_CallsValueSetRoute()
     {
-        using var server = new OneShotServer("{\"resourceType\":\"Bundle\"}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Bundle\"}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.GetValueSetsAsync(url: "http://example.org/vs/encounter-type");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.GetValueSetsAsync(url: "http://example.org/vs/encounter-type");
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/terminology/fhir/ValueSet", request.Path);
@@ -245,12 +241,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task LookupCodeInCodeSystemAsync_CallsLookupRouteWithQuery()
     {
-        using var server = new OneShotServer("{\"resourceType\":\"Parameters\"}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.LookupCodeInCodeSystemAsync(system: "http://loinc.org", code: "1234-5");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.LookupCodeInCodeSystemAsync(system: "http://loinc.org", code: "1234-5");
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
@@ -262,12 +257,11 @@ public class TerminologyServiceClientTests
     public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_PostsParametersBody()
     {
         const string parameters = "{\"resourceType\":\"Parameters\",\"parameter\":[{\"name\":\"code\",\"valueCode\":\"1234-5\"}]}";
-        using var server = new OneShotServer("{\"resourceType\":\"Parameters\"}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.LookupCodeInCodeSystemWithParametersAsync(parameters, system: "http://loinc.org");
-        var request = await server.WaitForRequestAsync();
-        var result = await callTask;
+        var result = await client.LookupCodeInCodeSystemWithParametersAsync(parameters, system: "http://loinc.org");
+        var request = http.SingleRequest();
 
         Assert.Equal("POST", request.Method);
         Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
@@ -279,12 +273,11 @@ public class TerminologyServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_ById_PostsToIdScopedRoute()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.LookupCodeInCodeSystemWithParametersAsync("{\"resourceType\":\"Parameters\"}", id: "loinc");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.LookupCodeInCodeSystemWithParametersAsync("{\"resourceType\":\"Parameters\"}", id: "loinc");
+        var request = http.SingleRequest();
 
         Assert.Equal("POST", request.Method);
         Assert.Equal("/api/terminology/fhir/CodeSystem/loinc/$lookup", request.Path);

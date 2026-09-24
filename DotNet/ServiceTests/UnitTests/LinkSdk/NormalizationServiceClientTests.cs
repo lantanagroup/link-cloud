@@ -209,12 +209,11 @@ public class NormalizationServiceClientTests
     [Fact]
     public async Task DeleteAllHslocCodesAsync_DeletesCodeSetEndpoint()
     {
-        using var server = new OneShotServer(string.Empty, 204);
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.DeleteAllHslocCodesAsync();
-        var request = await server.WaitForRequestAsync();
-        var result = await callTask;
+        var result = await client.DeleteAllHslocCodesAsync();
+        var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
         Assert.Equal("/api/normalization/HSLOC", request.Path);

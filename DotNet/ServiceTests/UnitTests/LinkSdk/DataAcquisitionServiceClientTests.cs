@@ -270,12 +270,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateFhirQueryConfigurationAsync_PutsToConfigurationEndpoint()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateFhirQueryConfigurationAsync(new { facilityId = "f1", fhirServerBaseUrl = "https://ehr/fhir" });
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.UpdateFhirQueryConfigurationAsync(new { facilityId = "f1", fhirServerBaseUrl = "https://ehr/fhir" });
+        var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
         Assert.Equal("/api/data/fhirQueryConfiguration", request.Path);
@@ -285,12 +284,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task ValidateFacilityConnectionAsync_GetsFacilityScopedValidateRoute()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.ValidateFacilityConnectionAsync("f1", patientId: "p1", measureId: "m1");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.ValidateFacilityConnectionAsync("f1", patientId: "p1", measureId: "m1");
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/data/connectionValidation/f1/$validate", request.Path);
@@ -301,12 +299,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateFhirListConfigurationAsync_PutsToListEndpoint()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateFhirListConfigurationAsync(new { facilityId = "f1" });
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.UpdateFhirListConfigurationAsync(new { facilityId = "f1" });
+        var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
         Assert.Equal("/api/data/fhirQueryList", request.Path);
@@ -315,12 +312,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateQueryPlanAsync_PutsToQueryPlanEndpoint()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateQueryPlanAsync("f1", new { planName = "p" });
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.UpdateQueryPlanAsync("f1", new { planName = "p" });
+        var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
         Assert.Equal("/api/data/f1/QueryPlan", request.Path);
@@ -330,12 +326,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateOrganizationLocationConfigurationAsync_PutsToConfigRoute()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateOrganizationLocationConfigurationAsync("f1", new { description = "d" });
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.UpdateOrganizationLocationConfigurationAsync("f1", new { description = "d" });
+        var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
         Assert.Equal("/api/data/location-config/facility/f1", request.Path);
@@ -344,12 +339,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateOrganizationLocationMappingAsync_PutsToMappingRoute()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateOrganizationLocationMappingAsync(7, new { locationName = "ICU" });
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.UpdateOrganizationLocationMappingAsync(7, new { locationName = "ICU" });
+        var request = http.SingleRequest();
 
         Assert.Equal("PUT", request.Method);
         Assert.Equal("/api/data/location-mappings/7", request.Path);
@@ -362,12 +356,11 @@ public class DataAcquisitionServiceClientTests
         string expectedPath,
         Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task> invoke)
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = invoke(client);
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await invoke(client);
+        var request = http.SingleRequest();
 
         Assert.Equal(expectedMethod, request.Method);
         Assert.Equal(expectedPath, request.Path);
@@ -402,12 +395,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task UpdateSftpCredentialsAsync_DoesNotCaptureTheRequestBody()
     {
-        using var server = new OneShotServer(string.Empty, 204);
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.UpdateSftpCredentialsAsync("org-1", new { username = "facility-user", password = SftpTestPassword });
-        var request = await server.WaitForRequestAsync();
-        var result = await callTask;
+        var result = await client.UpdateSftpCredentialsAsync("org-1", new { username = "facility-user", password = SftpTestPassword });
+        var request = http.SingleRequest();
 
         // The password did go to the service, but it must not be kept on the response, which callers display
         Assert.Contains(SftpTestPassword, request.Body);
@@ -417,12 +409,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
     {
-        using var server = new OneShotServer("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.GetOrganizationLocationMappingAsync(7);
-        var request = await server.WaitForRequestAsync();
-        var result = await callTask;
+        var result = await client.GetOrganizationLocationMappingAsync(7);
+        var request = http.SingleRequest();
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/data/location-mappings/7", request.Path);
@@ -434,12 +425,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task DeleteOrganizationLocationMappingAsync_DeletesMappingById()
     {
-        using var server = new OneShotServer(string.Empty, 202);
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary(string.Empty, 202);
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.DeleteOrganizationLocationMappingAsync(7);
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.DeleteOrganizationLocationMappingAsync(7);
+        var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
         Assert.Equal("/api/data/location-mappings/7", request.Path);
