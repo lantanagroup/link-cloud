@@ -24,7 +24,9 @@ export const CENSUS_LIST_KEYS: readonly CensusListKey[] = [
  */
 export function validateCensus(
   draft: FacilityDraft,
-  censusAcquisition: CensusAcquisition | undefined
+  censusAcquisition: CensusAcquisition | undefined,
+  /** The list id field the user is actively editing, if any -- see findDuplicatePatientListIdKeys. */
+  editedListKey?: CensusListKey
 ): FieldErrors {
   const errors: FieldErrors = {};
   const c = draft.census;
@@ -35,7 +37,7 @@ export function validateCensus(
         errors[`listId.${key}`] = 'onboarding:census.errors.listIdRequired';
       }
     });
-    findDuplicatePatientListIdKeys(c.patientListIds).forEach(key => {
+    findDuplicatePatientListIdKeys(c.patientListIds, editedListKey).forEach(key => {
       errors[`listId.${key}`] = 'onboarding:census.errors.listIdDuplicate';
     });
   } else if (censusAcquisition === 'Sftp') {
@@ -66,24 +68,43 @@ export function validateCensus(
   return errors;
 }
 
-function findDuplicatePatientListIdKeys(
-  patientListIds: Partial<Record<CensusListKey, string>> | undefined
+/**
+ * Flags every member of a duplicate-value group except one "kept" row. The row the user is
+ * actively editing is the one that should carry the error -- not just whichever sits later in
+ * the list -- so it's kept out of contention for the clean slot whenever it's part of the group.
+ * With no active edit (initial load, a CSV/census import), the first occurrence in list order
+ * stays clean, same as before.
+ */
+export function findDuplicatePatientListIdKeys(
+  patientListIds: Partial<Record<CensusListKey, string>> | undefined,
+  editedKey?: CensusListKey
 ): Set<CensusListKey> {
-  const firstKeyByValue = new Map<string, CensusListKey>();
-  const duplicates = new Set<CensusListKey>();
+  const keysByValue = new Map<string, CensusListKey[]>();
 
   CENSUS_LIST_KEYS.forEach(key => {
     const value = patientListIds?.[key]?.trim();
     if (!value) {
       return;
     }
-    const firstKey = firstKeyByValue.get(value);
-    if (firstKey === undefined) {
-      firstKeyByValue.set(value, key);
+    const keys = keysByValue.get(value);
+    if (keys) {
+      keys.push(key);
+    } else {
+      keysByValue.set(value, [key]);
+    }
+  });
+
+  const duplicates = new Set<CensusListKey>();
+  keysByValue.forEach(keys => {
+    if (keys.length < 2) {
       return;
     }
-    duplicates.add(firstKey);
-    duplicates.add(key);
+    const kept = keys.find(key => key !== editedKey) ?? keys[0];
+    keys.forEach(key => {
+      if (key !== kept) {
+        duplicates.add(key);
+      }
+    });
   });
 
   return duplicates;

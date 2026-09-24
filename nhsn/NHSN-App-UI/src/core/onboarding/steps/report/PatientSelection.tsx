@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {CensusListKey} from '../../../api/contracts';
@@ -105,7 +105,24 @@ export function PatientSelection({
   const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const atLimit = isAtPatientIdLimit(patientIds);
-  const duplicatePatientIdIndexes = useMemo(() => new Set(findDuplicatePatientIdIndexes(patientIds)), [patientIds]);
+
+  // The row the user is actively typing into, so a duplicate points at that row rather than
+  // whichever one happens to sit later in the list. Only meaningful while the list's shape is
+  // unchanged -- adding or removing a row shifts every index after it, so a stale reference
+  // would flag the wrong row; resetting on length change falls back to the default ordering.
+  const [editedPatientIdIndex, setEditedPatientIdIndex] = useState<number | null>(null);
+  const previousPatientIdCount = useRef(patientIds.length);
+  useEffect(() => {
+    if (previousPatientIdCount.current !== patientIds.length) {
+      previousPatientIdCount.current = patientIds.length;
+      setEditedPatientIdIndex(null);
+    }
+  }, [patientIds.length]);
+
+  const duplicatePatientIdIndexes = useMemo(
+    () => new Set(findDuplicatePatientIdIndexes(patientIds, editedPatientIdIndex ?? undefined)),
+    [patientIds, editedPatientIdIndex]
+  );
   const emptyPatientIdIndexes = useMemo(
     () => new Set(patientIds.flatMap((id, index) => (id.trim() ? [] : [index]))),
     [patientIds]
@@ -424,7 +441,10 @@ export function PatientSelection({
                         ? t('onboarding:report.patients.manual.requiredError')
                         : undefined
                   }
-                  onChange={onItemChange} />
+                  onChange={value => {
+                    setEditedPatientIdIndex(index);
+                    onItemChange(value);
+                  }} />
               )} />
           </div>
         )}

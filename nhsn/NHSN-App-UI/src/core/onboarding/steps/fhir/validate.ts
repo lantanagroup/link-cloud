@@ -53,7 +53,26 @@ function toMinutesSinceMidnight(pullTime: string): number {
   return hours * 60 + minutes;
 }
 
-export function validateFhir(values: FhirFieldValues): FieldErrors {
+/**
+ * True once both pull times are complete, well-formed HH:MM values and min doesn't precede max.
+ * Gated on both sides already matching PULL_TIME_PATTERN so a mid-typing value (no colon yet,
+ * one digit short) never reads as a range conflict -- only a genuinely finished pair can.
+ */
+export function isPullTimeRangeInvalid(minAcquisitionPullTime: string, maxAcquisitionPullTime: string): boolean {
+  return Boolean(
+    minAcquisitionPullTime &&
+    maxAcquisitionPullTime &&
+    PULL_TIME_PATTERN.test(minAcquisitionPullTime) &&
+    PULL_TIME_PATTERN.test(maxAcquisitionPullTime) &&
+    toMinutesSinceMidnight(minAcquisitionPullTime) >= toMinutesSinceMidnight(maxAcquisitionPullTime)
+  );
+}
+
+export function validateFhir(
+  values: FhirFieldValues,
+  /** The pull-time field the user is actively editing, if any -- see the range check below. */
+  editedPullTimeField?: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime'
+): FieldErrors {
   const errors: FieldErrors = {};
 
   const trimmedBaseUrl = values.fhirServerBaseUrl.trim();
@@ -99,12 +118,13 @@ export function validateFhir(values: FhirFieldValues): FieldErrors {
   if (
     !errors.minAcquisitionPullTime &&
     !errors.maxAcquisitionPullTime &&
-    values.minAcquisitionPullTime &&
-    values.maxAcquisitionPullTime &&
-    toMinutesSinceMidnight(values.minAcquisitionPullTime) >= toMinutesSinceMidnight(values.maxAcquisitionPullTime)
+    isPullTimeRangeInvalid(values.minAcquisitionPullTime, values.maxAcquisitionPullTime)
   ) {
-    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
-    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+    // Wrong the moment the second time is entered, so - like a duplicate FHIR Patient ID or
+    // census list id - only the field just edited carries the error, not both sides of the
+    // pair. With no active edit (initial load, a blur on neither field), max defaults to the
+    // flagged side.
+    errors[editedPullTimeField ?? 'maxAcquisitionPullTime'] = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
   }
 
   if (values.lagDays != null && (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > LAG_DAYS_CAP)) {

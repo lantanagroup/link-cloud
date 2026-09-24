@@ -134,10 +134,21 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: flex-start;
 }
 
-.encounter-mapping .repeat-row--incomplete .encounter-code-picker input,
-.encounter-mapping .repeat-row--incomplete > input {
+/* Each field owns its own column and, when invalid, its own hint directly beneath it --
+   rather than one hint spanning the whole row with no indication of which side it's about. */
+.encounter-mapping .encounter-mapping-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.encounter-mapping .encounter-mapping-field input[type='text'] {
+  width: 100%;
+}
+
+.encounter-mapping input[type='text'].is-invalid {
   border-color: var(--encounter-red);
 }
 
@@ -168,10 +179,6 @@
 .encounter-mapping input[type='text']:focus-visible {
   outline: 2px solid var(--encounter-blue);
   outline-offset: 1px;
-}
-
-.encounter-mapping .repeat-row > input[type='text'] {
-  flex: 1;
 }
 
 .encounter-mapping .encounter-code-picker {
