@@ -303,8 +303,7 @@ public static class RunCleanupHelper
         ArgumentNullException.ThrowIfNull(output);
 
         if (teardownFacility
-            && !string.IsNullOrWhiteSpace(run.FacilityId)
-            && IsAutomationFacilityId(run.FacilityId)
+            && IsOwnedAutomationFacilityId(run, run.FacilityId)
             && (alreadyTornDownFacilityIds is null
                 || !alreadyTornDownFacilityIds.Contains(run.FacilityId)))
         {
@@ -418,10 +417,10 @@ public static class RunCleanupHelper
             if (now - RunTimestamp(run) < retention)
                 continue;
 
-            if (IsAutomationFacilityId(run.FacilityId))
+            if (IsOwnedAutomationFacilityId(run, run.FacilityId))
                 stale.Add(run.FacilityId!);
             var runId = run.RunId.ToString();
-            if (IsAutomationFacilityId(runId))
+            if (IsOwnedAutomationFacilityId(run, runId))
                 stale.Add(runId);
         }
 

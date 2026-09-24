@@ -540,6 +540,7 @@ internal sealed class RunExecutor
                     cancellationToken,
                     state.Options.VendorName,
                     state.Options.HonorExplicitFacilityPieces);
+                await callbacks.PersistRunSummary();
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)
@@ -659,6 +660,7 @@ internal sealed class RunExecutor
                     cancellationToken,
                     state.Options.VendorName,
                     state.Options.HonorExplicitFacilityPieces);
+                await callbacks.PersistRunSummary();
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(

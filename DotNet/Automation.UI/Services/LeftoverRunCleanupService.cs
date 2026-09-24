@@ -372,6 +372,15 @@ public sealed class LeftoverRunCleanupService(
             var historyWork = purgeHistory
                 ? historyRuns.Take(Math.Max(limit, 200)).ToList()
                 : [];
+            var heldByActiveRun = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var active in runs)
+            {
+                if (active.Status.IsTerminal())
+                    continue;
+                if (!string.IsNullOrWhiteSpace(active.FacilityId))
+                    heldByActiveRun.Add(active.FacilityId);
+                heldByActiveRun.Add(active.RunId.ToString());
+            }
             var total = facilityWork.Count + historyWork.Count;
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
@@ -452,8 +461,18 @@ public sealed class LeftoverRunCleanupService(
                         ? OwnedAutomationFacilityIds(run).Where(id => IsNewHistoryTeardown(id, tornDown)).ToList()
                         : [];
                     var teardownFailed = false;
+                    var deferredForActiveRun = false;
                     foreach (var facilityId in pendingTeardown)
                     {
+                        if (heldByActiveRun.Contains(facilityId))
+                        {
+                            logger.LogInformation(
+                                "History purge left facility {FacilityId} in place because an active run still uses it.",
+                                facilityId);
+                            deferredForActiveRun = true;
+                            continue;
+                        }
+
                         try
                         {
                             await RunCleanupHelper.CleanupLeftoverFacilityAsync(
@@ -484,6 +503,11 @@ public sealed class LeftoverRunCleanupService(
                     if (teardownFailed)
                     {
                         failedRuns.Add(run.RunId);
+                    }
+                    else if (deferredForActiveRun)
+                    {
+                        // Keep the creator snapshot so AutomationCreatedFacility can be retried
+                        // after the active run finishes.
                     }
                     else
                     {

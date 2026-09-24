@@ -110,6 +110,7 @@ public class RunCleanupHelperTests
         var facilityId = Guid.NewGuid().ToString();
         var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
         var stale = Run(runId, facilityId, AutomationRunStatus.Running, finishedAt: null);
+        stale.AutomationCreatedFacility = true;
         stale.CreatedAt = now.AddDays(-15);
         stale.StartedAt = now.AddDays(-15);
         var runs = new[] { stale };
@@ -119,6 +120,23 @@ public class RunCleanupHelperTests
             runs,
             now,
             TeardownRetention).Should().Equal(facilityId);
+    }
+
+    [Fact]
+    public void Stale_active_reused_guid_tenant_is_not_selected()
+    {
+        var runId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid().ToString();
+        var now = DateTimeOffset.Parse("2026-08-28T20:00:00Z");
+        var stale = Run(runId, tenantId, AutomationRunStatus.Running, finishedAt: null);
+        stale.CreatedAt = now.AddDays(-15);
+        stale.StartedAt = now.AddDays(-15);
+
+        RunCleanupHelper.SelectStaleActiveAutomationFacilities(
+            Facilities(tenantId),
+            [stale],
+            now,
+            TeardownRetention).Should().BeEmpty();
     }
 
     [Fact]
