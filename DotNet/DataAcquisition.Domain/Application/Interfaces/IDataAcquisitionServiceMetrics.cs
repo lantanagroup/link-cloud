@@ -6,5 +6,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces
     {
         void IncrementResourceAcquiredCounter(List<KeyValuePair<string, object?>> tags);
         TrackedRequestDuration MeasureDataRequestDuration(List<KeyValuePair<string, object?>> tags);
+        void RecordSemaphoreWaitDuration(string facilityId, double durationMilliseconds);
     }
 }

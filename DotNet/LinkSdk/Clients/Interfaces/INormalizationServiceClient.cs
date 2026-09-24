@@ -17,6 +17,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<NormalizationVendorVersionOperationPresetApiModel>> CreateVendorVersionOperationPresetAsync(CreateNormalizationVendorVersionOperationPresetRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>> GetVendorVersionOperationPresetsAsync(Guid? vendorVersionId = null, string? resource = null, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationPresetAsync(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<PagedConfigModel<FacilityLocationTreeApiModel>>> GetFacilityLocationsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(string facilityId, string locationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityLocationApiModel>> CreateFacilityLocationAsync(string facilityId, CreateFacilityLocationRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>> SearchFacilityLocationLocalCodeMappingsAsync(SearchFacilityLocationLocalCodeMappingsRequestApiModel request, CancellationToken cancellationToken = default);
@@ -25,4 +26,6 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(string mappingId, UpdateFacilityLocationLocalCodeMappingRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(string mappingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
 }

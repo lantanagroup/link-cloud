@@ -23,4 +23,20 @@ public class FhirGenerationPipelineLiveAppendTests
             .Should().Be(3);
         FhirGenerationPipeline.NextGeneratedPatientIndex([], "abcd1234").Should().Be(0);
     }
+
+    [Fact]
+    public void MaterializeTemplateCollection_replaces_placeholder_run_tag()
+    {
+        var template = new GeneratedPatientTemplate(
+            "template-run",
+            [
+                """{"resourceType":"Bundle","type":"transaction","entry":[{"resource":{"resourceType":"Patient","id":"Patient-template-run-001"}}]}"""
+            ]);
+
+        var json = FhirGenerationPipeline.MaterializeTemplateCollection(template, "abcd1234");
+
+        json.Should().Contain("\"type\": \"collection\"");
+        json.Should().Contain("Patient-abcd1234-001");
+        json.Should().NotContain("template-run");
+    }
 }

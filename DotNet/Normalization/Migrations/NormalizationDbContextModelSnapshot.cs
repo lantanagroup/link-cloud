@@ -789,6 +789,34 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.ToTable("OperationSequence");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.OperationSequenceCacheRevision", b =>
+                {
+                    b.Property<string>("FacilityId")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FacilityId");
+
+                    b.ToTable("OperationSequenceCacheRevisions");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.OperationSequenceWriteLock", b =>
+                {
+                    b.Property<string>("FacilityId")
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("FacilityId");
+
+                    b.ToTable("OperationSequenceWriteLocks");
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.ResourceType", b =>
                 {
                     b.Property<Guid>("Id")

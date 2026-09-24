@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Net;
@@ -184,6 +185,87 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("DELETE", request.Method);
         Assert.Equal("/api/data/acquisition-logs/report/rpt-2", request.Path);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ValidateFhirServerConnectionAsync_CallsExpectedEndpoint()
+    {
+        using var server = new OneShotServer("{\"isConnected\":true}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.ValidateFhirServerConnectionAsync("http://fhir.test/r4");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/connectionValidation/$validate", request.Path);
+        Assert.Contains("fhirServerUrl=", request.Query);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.IsConnected);
+        Assert.Null(result.Body.ErrorMessage);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_PostsDetailsAndParsesResult()
+    {
+        const string response = """{"success":true,"message":"Connected.","files":[{"fileName":"census.dat","patients":[{"patientId":"12345","patientName":"Doe, John","admissionDate":"2023-07-07T13:06:43Z"}]}]}""";
+        using var server = new OneShotServer(response);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest(), includeFileContent: true);
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/data/sftp-configurations/test-connection", request.Path);
+        Assert.Contains("includeFileContent=true", request.Query);
+        Assert.Contains("\"hostName\":\"sftp.example.com\"", request.Body);
+        Assert.Contains("\"hostUrlPort\":2222", request.Body);
+        Assert.NotNull(result.Body);
+        Assert.True(result.Body.Success);
+        var file = Assert.Single(result.Body.Files!);
+        var patient = Assert.Single(file.Patients);
+        Assert.Equal("12345", patient.PatientId);
+        Assert.Equal("Doe, John", patient.PatientName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_IncludeFileContentDefaultsToFalse()
+    {
+        using var server = new OneShotServer("""{"success":true,"message":"Connected."}""");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest());
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("includeFileContent=false", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TestSftpConnectionAsync_DoesNotCaptureTheRequestBody()
+    {
+        using var server = new OneShotServer("""{"success":false,"message":"Authentication failed. Verify the username and password."}""");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.TestSftpConnectionAsync(SftpTestRequest());
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        // The password did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(SftpTestPassword, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    private const string SftpTestPassword = "Pa55-must-not-leak";
+
+    private static SftpTestConnectionRequestApiModel SftpTestRequest() => new()
+    {
+        HostName = "sftp.example.com",
+        HostUrlPort = 2222,
+        Username = "facility-user",
+        Password = SftpTestPassword,
+        ReportDirectory = "/data"
+    };
 
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)
     {

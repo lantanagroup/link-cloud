@@ -161,6 +161,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+
     // Add Secret Manager
     var secretManagerProvider = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
     Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", secretManagerProvider);

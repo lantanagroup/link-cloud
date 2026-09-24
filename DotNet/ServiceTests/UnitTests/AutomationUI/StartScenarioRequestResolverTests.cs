@@ -42,6 +42,18 @@ public class StartScenarioRequestResolverTests
 
         options.PatientCount.Should().Be(FhirBundleGenerator.DefaultPatientCount);
         options.ResourcesPerPatient.Should().Be(FhirBundleGenerator.DefaultResourcesPerPatient);
+        options.MaxPollingDurationMinutes.Should().Be(0);
+    }
+
+    [Fact]
+    public void Custom_scenario_waits_six_hours_for_submission()
+    {
+        StartScenarioRequestResolver.CustomMaxPollingDurationMinutes.Should().Be(6 * 60);
+
+        var options = StartScenarioRequestResolver.Resolve(
+            new StartScenarioRequest { Scenario = AutomationScenarioKind.Custom });
+
+        options.MaxPollingDurationMinutes.Should().Be(6 * 60);
     }
 
     [Fact]
@@ -77,7 +89,7 @@ public class StartScenarioRequestResolverTests
         options.PatientCount.Should().Be(7);
         options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
-        options.MaxPollingDurationMinutes.Should().Be(30);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
@@ -196,16 +208,21 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
-    public void Cohort_qualification_is_extracted_and_propagated_to_profiles()
+    public void Derived_qualification_comes_from_clinical_shape_not_saved_flags()
     {
         var json = """
             {
                 "patientCohorts": [
                     {
                         "patientCount": 1,
-                        "cohortQualification": "NonQualifying",
+                        "cohortQualification": "Qualifying",
                         "measureEligibilities": {
                             "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        },
+                        "eligibleClinicalScenarioIds": ["f640c3ef-a8f4-4f85-87f1-1f1df74c8a01"],
+                        "intent": {
+                            "encounterClass": "AMB",
+                            "includeHypoglycemicInsulin": false
                         }
                     }
                 ]
@@ -218,10 +235,11 @@ public class StartScenarioRequestResolverTests
             RunConfigurationJson = json,
         });
 
-        options.PatientCohorts.Should().ContainSingle();
-        options.PatientCohorts[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
         options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            .Should().BeFalse();
         options.PatientProfiles[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
+        options.PatientProfiles[0].Intent!.EncounterClass.Should().Be("AMB");
     }
 
     // ---------- Custom scenario: JSON fallback when typed properties are missing ----------
@@ -508,12 +526,81 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
-    public void Live_simulation_forces_scheduled_report_and_extends_polling()
+    public void Non_custom_scenarios_expand_all_qualifying_profiles()
+    {
+        var options = StartScenarioRequestResolver.Resolve(
+            new StartScenarioRequest { Scenario = AutomationScenarioKind.AdhocReportTest });
+
+        options.PatientProfiles.Should().HaveCount(1);
+        options.PatientProfiles.Should().OnlyContain(p =>
+            p.QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation));
+        options.PatientCohorts.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void Custom_json_cohorts_preserve_patient_configuration_id_and_intent()
+    {
+        var configId = Guid.Parse("00000000-0000-0000-3000-000000000001");
+        var json = $$"""
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 50,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        },
+                        "patientConfigurationId": "{{configId}}",
+                        "intent": {
+                            "gender": "female",
+                            "minAge": 70,
+                            "conditionPaletteMode": "Replace"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        var cohort = options.PatientCohorts.Should().ContainSingle().Subject;
+        cohort.PatientConfigurationId.Should().Be(configId);
+        cohort.Intent.Should().NotBeNull();
+        cohort.Intent!.Gender.Should().Be("female");
+        cohort.Intent.MinAge.Should().Be(70);
+        cohort.Intent.ConditionPaletteMode.Should().Be(PaletteMode.Replace);
+        options.PatientProfiles.Should().ContainSingle()
+            .Which.Intent!.Gender.Should().Be("female");
+    }
+
+    [Theory]
+    [InlineData(ReportMethod.Adhoc)]
+    [InlineData(ReportMethod.RegenerateReport)]
+    public void Live_simulation_is_only_valid_for_scheduled_reports(ReportMethod method)
+    {
+        var act = () => StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = method,
+            IsLiveSimulation = true
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Live simulation is only valid for Scheduled reports*");
+    }
+
+    [Fact]
+    public void Live_simulation_on_scheduled_extends_polling()
     {
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = AutomationScenarioKind.Custom,
-            ReportMethod = ReportMethod.Adhoc,
+            ReportMethod = ReportMethod.ScheduledReport,
             IsLiveSimulation = true,
             ReportingWindowMinutes = 15
         });
@@ -521,7 +608,7 @@ public class StartScenarioRequestResolverTests
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(15);
-        options.MaxPollingDurationMinutes.Should().Be(45);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
     }
 
     [Fact]
@@ -530,13 +617,14 @@ public class StartScenarioRequestResolverTests
         var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
         {
             Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.ScheduledReport,
             RunConfigurationJson = """{ "isLiveSimulation": true, "reportingWindowMinutes": 7 }"""
         });
 
         options.IsLiveSimulation.Should().BeTrue();
         options.ReportMethod.Should().Be(ReportMethod.ScheduledReport);
         options.ReportingWindowMinutes.Should().Be(10);
-        options.MaxPollingDurationMinutes.Should().Be(40);
+        options.MaxPollingDurationMinutes.Should().Be(StartScenarioRequestResolver.CustomMaxPollingDurationMinutes);
     }
 
     [Theory]
@@ -549,5 +637,92 @@ public class StartScenarioRequestResolverTests
     public void Reporting_window_minutes_are_normalized(int? input, int expected)
     {
         StartScenarioRequestResolver.NormalizeReportingWindowMinutes(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Metrics_run_flag_reads_from_typed_request()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            IsMetricsRun = true,
+            BenchmarkKey = "adhoc-10p",
+            TargetDurationSeconds = 120,
+            Concurrency = 4,
+            FailRunOnBenchmark = true
+        });
+
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("adhoc-10p");
+        options.TargetDurationSeconds.Should().Be(120);
+        options.Concurrency.Should().Be(4);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Metrics_run_flag_reads_from_run_configuration_json()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = """
+                { "isMetricsRun": true, "benchmarkKey": " json-key ", "targetDurationSeconds": 90, "concurrency": 3, "failRunOnBenchmark": true }
+                """
+        });
+
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("json-key");
+        options.TargetDurationSeconds.Should().Be(90);
+        options.Concurrency.Should().Be(3);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Fact]
+    public void FromScenario_copies_metrics_run_fields()
+    {
+        var scenario = new TestScenarioDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "perf",
+            IsMetricsRun = true,
+            BenchmarkKey = "saved-key",
+            TargetDurationSeconds = 45,
+            Concurrency = 2,
+            FailRunOnBenchmark = true
+        };
+
+        var request = StartScenarioRequest.FromScenario(scenario);
+        var options = StartScenarioRequestResolver.Resolve(request);
+
+        request.ScenarioId.Should().Be(scenario.Id);
+        options.IsMetricsRun.Should().BeTrue();
+        options.BenchmarkKey.Should().Be("saved-key");
+        options.TargetDurationSeconds.Should().Be(45);
+        options.Concurrency.Should().Be(2);
+        options.FailRunOnBenchmark.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(8, 8)]
+    [InlineData(99, 8)]
+    public void Concurrency_is_clamped_to_1_through_8(int? input, int? expected)
+    {
+        StartScenarioRequestResolver.NormalizeConcurrency(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Built_in_scenario_kinds_stay_lightweight()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.AdhocReportTest,
+            IsMetricsRun = true
+        });
+
+        options.IsMetricsRun.Should().BeFalse();
+        options.Concurrency.Should().BeNull();
     }
 }

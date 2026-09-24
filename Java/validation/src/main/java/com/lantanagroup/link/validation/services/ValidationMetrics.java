@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.services;
 
+import com.lantanagroup.link.shared.utils.HistogramBuckets;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
@@ -19,20 +20,32 @@ public class ValidationMetrics {
     private static final AttributeKey<String> ATTR_OUTCOME = AttributeKey.stringKey("outcome");
 
     private final LongCounter validationCounter;
+    private final LongCounter validationIssuesCounter;
     private final DoubleHistogram validationDuration;
     private final DoubleHistogram categorizationDuration;
     private final LongCounter ruleOutcomeCounter;
+    private final DoubleHistogram reportFetchDuration;
 
     public ValidationMetrics(OpenTelemetry openTelemetry) {
         Meter meter = openTelemetry.getMeter(ValidationMetrics.class.getName());
         validationCounter = meter.counterBuilder("link.validation.counter").build();
+        validationIssuesCounter = meter.counterBuilder("link.validation.issues")
+                .setDescription("Validation issue count by severity")
+                .build();
         validationDuration = meter.histogramBuilder("link.validation.validate.duration")
                 .setDescription("The duration of the validation process, excluding persisting validation results")
                 .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
                 .build();
         categorizationDuration = meter.histogramBuilder("link.validation.categorization.duration")
                 .setDescription("The duration of the categorization process, excluding persisting categorized results")
                 .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
+                .build();
+        reportFetchDuration = meter.histogramBuilder("link.validation.report_fetch_duration")
+                .setDescription("Duration of fetching the patient report bundle (blob or Report HTTP)")
+                .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
                 .build();
         ruleOutcomeCounter = meter.counterBuilder("link.validation.rule.outcome")
                 .setDescription("Counts each time a categorization rule fires, tagged by rule_id and outcome " +
@@ -44,6 +57,16 @@ public class ValidationMetrics {
 
     public void addToValidationCounter(Attributes attributes) {
         validationCounter.add(1L, attributes);
+    }
+
+    public void addIssues(String severity, long count, Attributes baseAttributes) {
+        if (count <= 0) {
+            return;
+        }
+        Attributes attributes = baseAttributes.toBuilder()
+                .put("severity", severity)
+                .build();
+        validationIssuesCounter.add(count, attributes);
     }
 
     public void recordValidationDuration(double millis, Attributes attributes) {
@@ -63,5 +86,9 @@ public class ValidationMetrics {
         ruleOutcomeCounter.add(1L, Attributes.of(
                 ATTR_RULE_ID, ruleId,
                 ATTR_OUTCOME, outcome));
+    }
+
+    public void recordReportFetchDuration(double millis, Attributes attributes) {
+        reportFetchDuration.record(millis, attributes);
     }
 }
