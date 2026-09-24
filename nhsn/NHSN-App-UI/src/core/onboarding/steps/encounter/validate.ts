@@ -35,20 +35,21 @@ export function findIncompleteRowKeys(groups: CodeSystemGroupValues[]): string[]
 }
 
 /**
- * groupKeys of groups with a blank Encounter.type Code System despite having mapping rows to
- * save under it - there's no code system for those rows to attach to. Call after
- * `pruneEmptyGroups` so a still-blank group with no mappings (unused scaffolding, not a mistake)
- * isn't flagged.
+ * groupKeys of groups with a blank Encounter.type Code System - whether or not they have mapping
+ * rows under them yet. Unlike a blank mapping row, a blank Code System block stays on screen with
+ * its own visible "Remove System" control, so leaving it blank is a choice to hold Continue on,
+ * not scaffolding to silently discard - check this against the raw, unpruned groups, same as
+ * findDuplicateCodeSystemIndexes.
  */
 export function findMissingCodeSystemGroupKeys(groups: CodeSystemGroupValues[]): string[] {
-  return groups.filter(group => !group.codeSystem.trim() && group.mappings.length > 0).map(group => group.groupKey);
+  return groups.filter(group => !group.codeSystem.trim()).map(group => group.groupKey);
 }
 
 /**
  * Drops mapping rows nobody has typed anything into, then drops any group left with a blank
- * code system and no mappings - unused scaffolding from "+ Add Code System" / "+ Add Mapping"
- * that a user never filled in or decided against, not data worth blocking Continue over.
- * Call this before findMissingCodeSystemGroupKeys/findIncompleteRowKeys decide whether to block.
+ * code system and no mappings - unused scaffolding from "+ Add Mapping" that a user never filled
+ * in, not data worth blocking Continue over. Call this before findIncompleteRowKeys decides
+ * whether to block (findMissingCodeSystemGroupKeys runs on the raw groups instead - see above).
  */
 export function pruneEmptyGroups<T extends CodeSystemGroupValues>(groups: T[]): T[] {
   return groups
