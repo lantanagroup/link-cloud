@@ -428,7 +428,12 @@ public sealed class LeftoverRunCleanupService(
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
             teardownCandidateCount = CountTeardownAttempts(
-                teardownFacilities, selectedFacilities, retainedEligible, historyRuns, heldOutsideThisPurge);
+                teardownFacilities,
+                mode == "history-purge" || teardownFacilities,
+                selectedFacilities,
+                retainedEligible,
+                historyRuns,
+                heldOutsideThisPurge);
             historyCandidateCount = historyRuns.Count;
 
             await PublishProgressAsync(
@@ -771,6 +776,7 @@ public sealed class LeftoverRunCleanupService(
 
     private static int CountTeardownAttempts(
         bool teardownFacilities,
+        bool countHistoryTeardown,
         IReadOnlyList<string> selectedFacilities,
         IReadOnlyList<string> retainedEligible,
         IReadOnlyList<AutomationRunSummary> historyRuns,
@@ -785,6 +791,9 @@ public sealed class LeftoverRunCleanupService(
 
         foreach (var id in retainedEligible)
             attempted.Add(id);
+
+        if (!countHistoryTeardown)
+            return attempted.Count;
 
         foreach (var run in historyRuns)
         {

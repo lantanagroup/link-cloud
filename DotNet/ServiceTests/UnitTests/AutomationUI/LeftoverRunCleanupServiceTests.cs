@@ -338,6 +338,25 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_history_only_does_not_count_facility_teardown()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var run = Run(Guid.NewGuid().ToString(), now.AddDays(-2));
+        var service = Create(now, [run], []);
+
+        var result = await service.RunCustomRangeAsync(
+            now.AddDays(-3),
+            now.AddDays(-1),
+            teardownFacilities: false,
+            purgeHistory: true);
+
+        result.TornDownFacilityIds.Should().BeEmpty();
+        result.TeardownCandidateCount.Should().Be(0);
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        result.ProcessedAllCandidates.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Teardown_skips_a_retained_facility_younger_than_retention()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
