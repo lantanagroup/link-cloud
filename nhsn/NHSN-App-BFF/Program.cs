@@ -43,7 +43,7 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
-SetupMiddleware(app);
+await SetupMiddleware(app);
 
 app.Run();
 
@@ -265,13 +265,13 @@ static void RegisterServices(WebApplicationBuilder builder)
         .CreateLogger();
 }
 
-static void SetupMiddleware(WebApplication app)
+static async Task SetupMiddleware(WebApplication app)
 {
     app.AutoMigrateEF<NhsnAppDbContext>();
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<NhsnAppDbContext>();
-        NhsnAppSeedData.SeedAsync(dbContext).GetAwaiter().GetResult();
+        await NhsnAppSeedData.SeedAsync(dbContext);
     }
 
     app.UseExceptionHandler();

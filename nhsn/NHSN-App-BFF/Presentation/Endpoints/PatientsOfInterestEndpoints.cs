@@ -100,10 +100,10 @@ public class PatientsOfInterestEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 await service.SaveSftpCredentialsAsync(request, cancellationToken);
-                return Results.NoContent();
+                return Results.Accepted();
             })
             .WithName("SaveSftpCredentials")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {
@@ -120,10 +120,10 @@ public class PatientsOfInterestEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 await service.AcknowledgeCensusAsync(request, cancellationToken);
-                return Results.NoContent();
+                return Results.Accepted();
             })
             .WithName("AcknowledgeCensus")
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {
