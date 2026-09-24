@@ -73,6 +73,9 @@ public class FhirControllerHttpTests
             .ConfigureServices(services =>
             {
                 services.AddLogging();
+                // CodeSystem $lookup (POST) carries an antiforgery filter, which resolves IAntiforgery for
+                // any request that is not bearer-authenticated.
+                services.AddAntiforgery();
                 services.AddSingleton(cache.Object);
                 services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
                 services.AddSingleton(TerminologyTestConfig.Options());
@@ -328,5 +331,32 @@ public class FhirControllerHttpTests
 
         var response = await client.SendAsync(request);
         return (response.StatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// Service-to-service callers such as LinkSdk authenticate with a bearer token and never hold an
+    /// antiforgery token, so a bearer-authenticated POST $lookup must reach the action.
+    /// </summary>
+    [Fact]
+    public async Task LookupCodeInCodeSystem_Post_WithBearerToken_IsNotRejectedByAntiforgery()
+    {
+        var (status, payload) = await PostLookupAsync("service-token");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var document = JsonDocument.Parse(payload);
+        Assert.Equal("Parameters", document.RootElement.GetProperty("resourceType").GetString());
+        Assert.Contains("Postal", payload);
+    }
+
+    /// <summary>
+    /// Without a bearer token the request could be a cookie-authenticated browser call, so the CSRF
+    /// protection must still apply.
+    /// </summary>
+    [Fact]
+    public async Task LookupCodeInCodeSystem_Post_WithoutBearerOrAntiforgeryToken_Returns400()
+    {
+        var (status, _) = await PostLookupAsync(bearerToken: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
     }
 }
