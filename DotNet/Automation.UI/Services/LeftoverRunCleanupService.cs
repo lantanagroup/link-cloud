@@ -414,11 +414,21 @@ public sealed class LeftoverRunCleanupService(
                     heldByOtherRun.Add(other.FacilityId);
                 heldByOtherRun.Add(other.RunId.ToString());
             }
+            var historyCandidateIds = historyRuns.Select(run => run.RunId).ToHashSet();
+            var heldOutsideThisPurge = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var other in runs)
+            {
+                if (historyCandidateIds.Contains(other.RunId))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(other.FacilityId))
+                    heldOutsideThisPurge.Add(other.FacilityId);
+                heldOutsideThisPurge.Add(other.RunId.ToString());
+            }
             var total = facilityWork.Count + retainedWork.Count + historyWork.Count;
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
             teardownCandidateCount = CountTeardownAttempts(
-                teardownFacilities, facilityWork, retainedWork, historyWork, heldByOtherRun);
+                teardownFacilities, selectedFacilities, retainedEligible, historyRuns, heldOutsideThisPurge);
             historyCandidateCount = historyRuns.Count;
 
             await PublishProgressAsync(
@@ -761,26 +771,26 @@ public sealed class LeftoverRunCleanupService(
 
     private static int CountTeardownAttempts(
         bool teardownFacilities,
-        IReadOnlyList<string> facilityWork,
-        IReadOnlyList<string> retainedWork,
-        IReadOnlyList<AutomationRunSummary> historyWork,
-        HashSet<string> heldByOtherRun)
+        IReadOnlyList<string> selectedFacilities,
+        IReadOnlyList<string> retainedEligible,
+        IReadOnlyList<AutomationRunSummary> historyRuns,
+        HashSet<string> heldOutsideThisPurge)
     {
         var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (teardownFacilities)
         {
-            foreach (var id in facilityWork)
+            foreach (var id in selectedFacilities)
                 attempted.Add(id);
         }
 
-        foreach (var id in retainedWork)
+        foreach (var id in retainedEligible)
             attempted.Add(id);
 
-        foreach (var run in historyWork)
+        foreach (var run in historyRuns)
         {
             foreach (var id in OwnedAutomationFacilityIds(run))
             {
-                if (!heldByOtherRun.Contains(id))
+                if (!heldOutsideThisPurge.Contains(id))
                     attempted.Add(id);
             }
         }

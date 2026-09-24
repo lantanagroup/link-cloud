@@ -22,6 +22,9 @@ public sealed record RunSnapshotMeta
     public bool IsMetricsRun { get; init; }
 }
 
+/// <summary>An Automation-owned facility whose run summary was deleted before teardown.</summary>
+public sealed record RetainedFacility(string FacilityId, DateTimeOffset EligibleAt);
+
 /// <summary>
 /// Abstraction for persisting and reading automation run data.
 /// Implementations can target MongoDB, SQL Server, or any other store.
@@ -31,9 +34,6 @@ public sealed record RunSnapshotMeta
 ///   - Domain snapshots: per-run, per-domain polling data (schedule, entries, etc.)
 ///   - Logs: full log output per run (potentially large)
 /// </summary>
-/// <summary>An Automation-owned facility whose run summary was deleted before teardown.</summary>
-public sealed record RetainedFacility(string FacilityId, DateTimeOffset EligibleAt);
-
 public interface ISnapshotStore
 {
     // --- Run metadata ---
