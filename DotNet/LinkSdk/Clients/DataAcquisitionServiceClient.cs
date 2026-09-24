@@ -42,8 +42,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     public Task<LinkApiResponse> GetFhirListConfigurationAsync(
         string facilityId,
+        bool includePatients = false,
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
+            .SetQueryParam("includePatients", includePatients ? "true" : null)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> CreateFhirListConfigurationAsync(
@@ -228,6 +230,12 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data/location-config/facility/{facilityId}")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
@@ -239,4 +247,21 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
+        string fhirServerUrl,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FhirServerConnectionResult>(() => Request("data/connectionValidation/$validate")
+            .SetQueryParam("fhirServerUrl", fhirServerUrl)
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
+        SftpTestConnectionRequestApiModel request,
+        bool includeFileContent = false,
+        CancellationToken cancellationToken = default) =>
+        // The body carries the SFTP password, so it must not be copied into LinkApiResponse.RequestBody
+        SendAsync<SftpTestConnectionResultApiModel>(() => Request("data/sftp-configurations/test-connection")
+            .SetQueryParam("includeFileContent", includeFileContent ? "true" : "false")
+            .PostJsonAsync(request, cancellationToken: cancellationToken),
+            captureRequestBody: false);
 }

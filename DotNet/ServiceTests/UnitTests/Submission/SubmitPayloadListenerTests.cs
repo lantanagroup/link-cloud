@@ -166,4 +166,32 @@ public class SubmitPayloadListenerTests
                 It.IsAny<Action<DeliveryReport<PayloadSubmittedKey, PayloadSubmittedValue>>>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task ConsumeAsync_UploadSuccess_IncrementsUploadCountSuccess()
+    {
+        var listener = CreateListener(suppressManifest: false);
+        var result = BuildConsumeResult("facility-1", PayloadType.MeasureReportSubmissionEntry);
+
+        await InvokeConsumeAsync(listener, result);
+
+        _metricsMock.Verify(m => m.IncrementUploadCount(It.IsAny<List<KeyValuePair<string, object?>>>(), "success"), Times.Once);
+        _metricsMock.Verify(m => m.IncrementUploadCount(It.IsAny<List<KeyValuePair<string, object?>>>(), "failure"), Times.Never);
+    }
+
+    [Fact]
+    public async Task ConsumeAsync_UploadFailure_IncrementsUploadCountFailure()
+    {
+        _storageServiceMock
+            .Setup(s => s.UploadToExternalAsync(It.IsAny<SubmitPayloadKey>(), It.IsAny<SubmitPayloadValue>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("upload failed"));
+
+        var listener = CreateListener(suppressManifest: false);
+        var result = BuildConsumeResult("facility-1", PayloadType.MeasureReportSubmissionEntry);
+
+        await InvokeConsumeAsync(listener, result);
+
+        _metricsMock.Verify(m => m.IncrementUploadCount(It.IsAny<List<KeyValuePair<string, object?>>>(), "failure"), Times.Once);
+        _metricsMock.Verify(m => m.IncrementUploadCount(It.IsAny<List<KeyValuePair<string, object?>>>(), "success"), Times.Never);
+    }
 }

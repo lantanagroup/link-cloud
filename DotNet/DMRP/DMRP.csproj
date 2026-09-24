@@ -35,6 +35,7 @@
 		     Report's managers already do, so a filter the caller did not supply contributes no SQL
 		     rather than a null test the database has to evaluate. -->
 		<PackageReference Include="LinqKit.Core" />
+		<PackageReference Include="Quartz" />
 	</ItemGroup>
 
 	<ItemGroup>

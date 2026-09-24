@@ -1,4 +1,5 @@
 using Hl7.Fhir.Model;
+using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -11,10 +12,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
     {
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ILogger<HSLOCMapOperationService> _logger;
-
-        public static string LocationAliasCodeSystem = "https://nhsnlink.org/location-alias";
-        public const int MAX_ITERATIONS = 20; //prevent infinite loops in case of circular references in the partOf hierarchy
-
         public HSLOCMapOperationService(ILogger<HSLOCMapOperationService> logger,
                                         CodeMapOperationService codeMapOperationService,
                                         TimeSpan? operationTimeout = null)
@@ -34,18 +31,46 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return copyResult;
             }
 
+            //Location.type is now normalized, so we can proceed with the code mapping operation.
+
+            // Identify codings that are not covered by any configured code map and create CodeMappingOutcome for them
+            // This allows us to report all location.type codings even if they are not covered by any configured code map.
+            var configuredSourceSystems = operation.CodeSystemMaps.Select(map => map.SourceSystem).ToHashSet();
+            var unconfiguredOutcomes = resource.Select(operation.FhirPath)
+                .SelectMany(source => source switch
+                {
+                    Coding coding => new[] { coding },
+                    CodeableConcept concept => concept.Coding.AsEnumerable(),
+                    _ => Enumerable.Empty<Coding>()
+                })
+                .Where(coding => !string.IsNullOrWhiteSpace(coding.Code) && !configuredSourceSystems.Contains(coding.System))
+                .GroupBy(coding => coding.System ?? string.Empty)
+                .Select(group => new CodeMappingOutcome(
+                    group.Key, string.Empty, 0, group.Count(),
+                    group.Select(coding => coding.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList()))
+                .ToList();
+
+            //perform the code mapping operation using the normalized Location.type values
             var codeMapOperationResult = await _codeMapOperationService.ProcessOperationAsync(
                 operation,
                 resource,
                 supportingResources,
                 cancellationToken);
 
-            if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
+            if (codeMapOperationResult.SuccessCode == OperationStatus.Failure)
             {
-                return OperationResult.Success(resource, codeMapOperationResult.CodeMapping);
+                return codeMapOperationResult;
             }
 
-            return codeMapOperationResult;
+            // Combine the code mapping outcomes from the code mapping operation with the unconfigured outcomes
+            var codeMapping = (codeMapOperationResult.CodeMapping ?? []).Concat(unconfiguredOutcomes).ToList();
+            
+            if (copyResult.SuccessCode == OperationStatus.Success && codeMapOperationResult.SuccessCode == OperationStatus.NoAction)
+            {
+                return OperationResult.Success(resource, codeMapping);
+            }
+
+            return new OperationResult(codeMapOperationResult.SuccessCode, codeMapOperationResult.ErrorMessage, resource, codeMapping);
         }
 
         /// <summary>
@@ -67,11 +92,17 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 location.Type = new List<CodeableConcept>();
             }
 
-            int iterationCount = 0;
+            var visitedLocations = new HashSet<Location>(ReferenceEqualityComparer.Instance);
             int changes = 0;
             do
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (!visitedLocations.Add(location))
+                {
+                    _logger.LogWarning("Circular location hierarchy detected while processing HSLOCMapOperation for Location {ResourceId}.", resource.Id.SanitizeForLog());
+                    break;
+                }
 
                 //1. copy alias to type
                 foreach(var alias in location.Alias)
@@ -123,12 +154,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     }
                     location = null;
                 }
-                iterationCount++;
-                if(iterationCount >= MAX_ITERATIONS && location != null)
-                {
-                    _logger.LogWarning("Maximum iteration count of {MaxIterations} reached while processing HSLOCMapOperation for Location {ResourceId}.", MAX_ITERATIONS, resource.Id.SanitizeForLog());
-                }
-            } while(location != null && iterationCount < MAX_ITERATIONS);
+            } while(location != null);
 
             if(changes > 0)
             {
@@ -147,13 +173,13 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             // de-dupe on (system, code)
             var exists = location.Type.Any(cc =>
                 cc.Coding.Any(cd =>
-                    string.Equals(cd.System, LocationAliasCodeSystem, StringComparison.Ordinal) &&
+                    string.Equals(cd.System, MappingTargetSystems.LocationAliasCodeSystem, StringComparison.Ordinal) &&
                     string.Equals(cd.Code, trimmedAlias, StringComparison.Ordinal)));
 
             if (exists)
                 return 0;
 
-            CodeableConcept codeableConcept = new(LocationAliasCodeSystem, trimmedAlias);
+            CodeableConcept codeableConcept = new(MappingTargetSystems.LocationAliasCodeSystem, trimmedAlias);
             location.Type.Add(codeableConcept);
             return 1;
         }

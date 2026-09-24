@@ -131,6 +131,13 @@ public sealed class GenerationManifest
         = new Dictionary<string, HashSet<string>>();
 
     /// <summary>
+    /// Per-patient ABS template-cache key used to replay this patient's generated
+    /// FHIR without storing a per-run copy of the bundle.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> TemplateCacheKeyByPatient { get; set; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
     /// Per-patient resource type -> count map, derived from the generated bundles.
     /// Key = patient ID, Value = { ResourceType -> count }.
     /// Shared infrastructure resources are stored under the empty-string key.
@@ -437,7 +444,8 @@ public sealed class GenerationManifest
         IReadOnlyDictionary<string, int>? resourceCountsByType = null,
         IReadOnlyCollection<string>? simulatedAcquiredKeys = null,
         IReadOnlyCollection<string>? cqlFilteredKeys = null,
-        bool preExisting = false)
+        bool preExisting = false,
+        string? templateCacheKey = null)
     {
         if (string.IsNullOrWhiteSpace(patientId))
             return false;
@@ -494,6 +502,13 @@ public sealed class GenerationManifest
             PreExistingPatientIds = preExistingIds;
         }
 
+        if (!string.IsNullOrWhiteSpace(templateCacheKey))
+        {
+            var templateKeys = EnsureMutableDictionary(TemplateCacheKeyByPatient);
+            templateKeys[id] = templateCacheKey;
+            TemplateCacheKeyByPatient = templateKeys;
+        }
+
         return true;
     }
 
@@ -529,9 +544,10 @@ public sealed class GenerationManifest
             other.ResourceCountsByPatientType.TryGetValue(id, out var counts);
             other.SimulatedAcquiredResourceKeysByPatient.TryGetValue(id, out var simulated);
             other.CqlFilteredResourceKeysByPatient.TryGetValue(id, out var cqlFiltered);
+            other.TemplateCacheKeyByPatient.TryGetValue(id, out var templateCacheKey);
             var preExisting = other.PreExistingPatientIds.Contains(id);
 
-            if (TryAppendPatient(id, profile, keys, counts, simulated, cqlFiltered, preExisting))
+            if (TryAppendPatient(id, profile, keys, counts, simulated, cqlFiltered, preExisting, templateCacheKey))
                 added++;
         }
 
@@ -639,6 +655,7 @@ public sealed class GenerationManifest
             PatientCount = PatientIds.Count,
             TotalResourceCount = TotalResourceCount,
             PatientIds = PatientIds,
+            ExpectedSubmittedPatientIds = ExpectedSubmittedPatientIds(),
             SelectedMeasures = SelectedMeasures.Select(m => m.ToString()).ToList(),
             MeasureIds = MeasureIds,
             AcquiredResourceTypes = AcquiredResourceTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),
@@ -655,7 +672,10 @@ public sealed class GenerationManifest
             PatientEligibility = eligibility,
             PatientInpatientPatterns = inpatientPatterns,
             ExpectedAbsCountsByPatient = expectedAbsByPatient,
-            ExpectedAbsTotalCountsByType = expectedAbsTotals
+            ExpectedAbsTotalCountsByType = expectedAbsTotals,
+            TemplateCacheKeyByPatient = TemplateCacheKeyByPatient
+                .Where(kv => !string.IsNullOrWhiteSpace(kv.Key) && !string.IsNullOrWhiteSpace(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal)
         };
     }
 
@@ -676,6 +696,7 @@ public sealed class GenerationManifest
         private readonly Dictionary<string, int> _totalsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _simulatedAcquiredKeys = new(StringComparer.Ordinal);
         private readonly HashSet<string> _preExistingPatientIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _templateCacheKeys = new(StringComparer.Ordinal);
         private int _totalCount;
 
         /// <summary>
@@ -785,6 +806,21 @@ public sealed class GenerationManifest
         }
 
         /// <summary>
+        /// Records the ABS template-cache key used to generate this patient's FHIR
+        /// so later downloads can replay the same template without a per-run copy.
+        /// </summary>
+        public void SetTemplateCacheKey(string patientId, string templateCacheKey)
+        {
+            if (string.IsNullOrWhiteSpace(patientId) || string.IsNullOrWhiteSpace(templateCacheKey))
+                return;
+
+            lock (_lock)
+            {
+                _templateCacheKeys[patientId] = templateCacheKey;
+            }
+        }
+
+        /// <summary>
         /// Builds the final <see cref="GenerationManifest"/> from all accumulated data.
         /// Call once after all patients have been processed.
         /// </summary>
@@ -803,7 +839,8 @@ public sealed class GenerationManifest
                     TotalResourceCount = _totalCount,
                     SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal),
                     CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal),
-                    PreExistingPatientIds = new HashSet<string>(_preExistingPatientIds, StringComparer.Ordinal)
+                    PreExistingPatientIds = new HashSet<string>(_preExistingPatientIds, StringComparer.Ordinal),
+                    TemplateCacheKeyByPatient = new Dictionary<string, string>(_templateCacheKeys, StringComparer.Ordinal)
                 };
             }
         }

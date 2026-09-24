@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Runtime.CompilerServices;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -25,7 +26,8 @@ public class CernerCclExtractParser(ILogger<CernerCclExtractParser> logger) : IF
     // Indices 2-5 (facility, unit, room, bed) parsed but not included in CernerEncounters model
     private const int FinIndex = 6;
     private const int MrnIndex = 7;
-    // Index 8 (pat_nam) parsed but not included in CernerEncounters model
+    // Index 8 (pat_nam) is not included in CernerEncounters model; only the connection-test preview reads it
+    private const int PatNamIndex = 8;
     private const int EncStatusIndex = 9;
     private const int EncTypeIndex = 10;
     private const int AdmitDtIndex = 11;
@@ -45,6 +47,60 @@ public class CernerCclExtractParser(ILogger<CernerCclExtractParser> logger) : IF
         FileParsingConfiguration? config,  // Ignored - uses hardcoded Cerner format
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        await foreach (var (fields, lineNumber) in ReadRowsAsync(fileStream, cancellationToken))
+        {
+            var encounter = ParseRow(fields, lineNumber);
+            if (encounter != null)
+            {
+                yield return encounter;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads the patients in a Cerner census extract for an SFTP connection-test preview.
+    /// Extract rows are per encounter, so a patient with several encounters is returned once,
+    /// from the first row it appears on. Rows that <see cref="ParseAsync"/> would skip are skipped here too,
+    /// so the preview shows what acquisition would actually read.
+    /// </summary>
+    /// <param name="fileStream">The extract file contents.</param>
+    /// <param name="config">Ignored - uses hardcoded Cerner format.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    public async IAsyncEnumerable<SftpTestFilePatientModel> Preview(
+        Stream fileStream,
+        FileParsingConfiguration? config,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var seenPatientIds = new HashSet<string>(StringComparer.Ordinal);
+
+        await foreach (var (fields, lineNumber) in ReadRowsAsync(fileStream, cancellationToken))
+        {
+            if (!TryGetIds(fields, lineNumber, out var patientId, out _))
+            {
+                continue;
+            }
+
+            if (!seenPatientIds.Add(patientId))
+            {
+                continue;
+            }
+
+            yield return new SftpTestFilePatientModel
+            {
+                PatientId = patientId,
+                PatientName = GetField(fields, PatNamIndex) ?? string.Empty,
+                AdmissionDate = ParseCernerDate(GetField(fields, AdmitDtIndex))
+            };
+        }
+    }
+
+    /// <summary>
+    /// Yields the fields of each data row, skipping blank lines, the header row and rows with too few columns.
+    /// </summary>
+    private async IAsyncEnumerable<(string[] Fields, int LineNumber)> ReadRowsAsync(
+        Stream fileStream,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
         using var reader = new StreamReader(fileStream);
         var lineNumber = 0;
         var isFirstLine = true;
@@ -55,38 +111,51 @@ public class CernerCclExtractParser(ILogger<CernerCclExtractParser> logger) : IF
             lineNumber++;
 
             var line = await reader.ReadLineAsync(cancellationToken);
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
 
             // Skip header row
             if (isFirstLine)
             {
                 isFirstLine = false;
                 if (line.StartsWith("person_id", StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
             }
 
-            var encounter = ParseLine(line, lineNumber);
-            if (encounter != null)
-                yield return encounter;
+            var fields = line.Split('|');
+            if (fields.Length < MinColumnCount)
+            {
+                logger.LogWarning("Line {LineNumber} has insufficient columns ({Count}/{Expected}), skipping",
+                    lineNumber, fields.Length, MinColumnCount);
+                continue;
+            }
+
+            yield return (fields, lineNumber);
         }
     }
 
-    private CernerEncounters? ParseLine(string line, int lineNumber)
+    private bool TryGetIds(string[] fields, int lineNumber, out string patientId, out string encounterId)
     {
-        var fields = line.Split('|');
-        if (fields.Length < MinColumnCount)
-        {
-            logger.LogWarning("Line {LineNumber} has insufficient columns ({Count}/{Expected}), skipping",
-                lineNumber, fields.Length, MinColumnCount);
-            return null;
-        }
-
-        var patientId = CleanId(fields[PersonIdIndex]);
-        var encounterId = CleanId(fields[EncntrIdIndex]);
+        patientId = CleanId(fields[PersonIdIndex]);
+        encounterId = CleanId(fields[EncntrIdIndex]);
 
         if (string.IsNullOrWhiteSpace(patientId) || string.IsNullOrWhiteSpace(encounterId))
         {
             logger.LogWarning("Line {LineNumber} has empty PatientId or EncounterId, skipping", lineNumber);
+            return false;
+        }
+
+        return true;
+    }
+
+    private CernerEncounters? ParseRow(string[] fields, int lineNumber)
+    {
+        if (!TryGetIds(fields, lineNumber, out var patientId, out var encounterId))
+        {
             return null;
         }
 

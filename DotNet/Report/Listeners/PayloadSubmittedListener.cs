@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -96,6 +97,7 @@ public class PayloadSubmittedListener(
 
     public async Task ProcessMessageAsync(ConsumeResult<PayloadSubmittedKey, PayloadSubmittedValue> result, CancellationToken cancellationToken)
     {
+        using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
         if (!result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
         {
             throw new DeadLetterException($"{Name}: Received message without correlation ID (ReportId = {result.Message.Key.ReportScheduleId}, FacilityId = {result.Message.Key.FacilityId}).");
@@ -113,6 +115,10 @@ public class PayloadSubmittedListener(
         try
         {
             var reportTrackingId = result.Message.Key.ReportScheduleId;
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, logger, Name, facilityId, reportTrackingId.ToString(), cancellationToken))
+                return;
+
             var reportSchedule = (await reportScheduledManager.FindAsync(x => x.Id == reportTrackingId, cancellationToken)).Single();
 
             logger.LogDebug("Consuming PayloadSubmitted (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, result.Message.Value.PatientId, reportTrackingId);

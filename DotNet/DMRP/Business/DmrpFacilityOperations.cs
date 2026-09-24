@@ -1,6 +1,7 @@
 using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -34,7 +35,9 @@ namespace LantanaGroup.Link.DMRP.Business
         /// </summary>
         private readonly IEntityRepository<FacilityReportingPlan> _reportingPlanRepository;
 
-        private readonly TimeProvider _timeProvider;
+        private readonly IFacilityReportingPeriodResolver _facilityReportingPeriodResolver;
+        private readonly IDmrpReportingPlanSync _sync;
+        private readonly IDmrpNightlyJobReconciler _reconciler;
 
         public DmrpFacilityOperations(ILogger<DmrpFacilityOperations> logger,
             IFacilityOperations hostImplementation,
@@ -42,7 +45,9 @@ namespace LantanaGroup.Link.DMRP.Business
             IReportingPlanScheduleProjector scheduleProjector,
             IFacilityReportingPlanManager reportingPlanManager,
             IEntityRepository<FacilityReportingPlan> reportingPlanRepository,
-            TimeProvider timeProvider)
+            IFacilityReportingPeriodResolver facilityReportingPeriodResolver,
+            IDmrpReportingPlanSync sync,
+            IDmrpNightlyJobReconciler reconciler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _hostImplementation = hostImplementation ?? throw new ArgumentNullException(nameof(hostImplementation));
@@ -50,18 +55,57 @@ namespace LantanaGroup.Link.DMRP.Business
             _scheduleProjector = scheduleProjector ?? throw new ArgumentNullException(nameof(scheduleProjector));
             _reportingPlanManager = reportingPlanManager ?? throw new ArgumentNullException(nameof(reportingPlanManager));
             _reportingPlanRepository = reportingPlanRepository ?? throw new ArgumentNullException(nameof(reportingPlanRepository));
-            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            _facilityReportingPeriodResolver = facilityReportingPeriodResolver ?? throw new ArgumentNullException(nameof(facilityReportingPeriodResolver));
+            _sync = sync ?? throw new ArgumentNullException(nameof(sync));
+            _reconciler = reconciler ?? throw new ArgumentNullException(nameof(reconciler));
         }
 
+        /// <summary>
+        /// Creates the facility and the reporting plans it is created with as one unit.
+        /// </summary>
+        /// <remarks>
+        /// The host owns duplicate-id and format validation and runs it inside its own
+        /// <c>CreateAsync</c> - after the DMRP refresh below has already written rows. One
+        /// transaction over both is what keeps a refused create from leaving them: a duplicate POST
+        /// would otherwise re-sync a live facility's month, and a partial DMRP answer flips the rows
+        /// it omits to <c>IsReporting = false</c>; a malformed POST would leave plan rows for a
+        /// facility that never existed. Same pattern as <see cref="DeleteAsync"/>, for the same
+        /// reason: both write through the host's context, so one transaction covers both.
+        /// </remarks>
         public async Task CreateAsync(FacilityModel facility, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(facility);
 
             RejectCallerSuppliedSchedule(facility);
 
-            facility.ScheduledReports = await BuildScheduleAsync(facility, cancellationToken);
+            await _reportingPlanRepository.StartTransactionAsync(cancellationToken);
 
-            await _hostImplementation.CreateAsync(facility, cancellationToken);
+            try
+            {
+                // A facility onboarded mid-month must not be dark until the next month end: ask DMRP
+                // now. Fail closed - an admin who sees the 502 can retry; a facility silently created
+                // with no plans would report nothing for weeks.
+                if (!string.IsNullOrWhiteSpace(facility.FacilityId))
+                {
+                    var period = _facilityReportingPeriodResolver.Resolve(facility.FacilityId, facility.TimeZone);
+                    await _sync.SyncAsync(facility.FacilityId, period.Month, period.Year, cancellationToken);
+                }
+
+                facility.ScheduledReports = await BuildScheduleAsync(facility, cancellationToken);
+
+                await _hostImplementation.CreateAsync(facility, cancellationToken);
+
+                await _reportingPlanRepository.CommitTransactionAsync(cancellationToken);
+            }
+            catch
+            {
+                await RollbackQuietlyAsync("creation", facility.FacilityId ?? string.Empty, cancellationToken);
+                throw;
+            }
+
+            // After the commit: Quartz keeps its own store and cannot enlist, so there is nothing to
+            // undo if this fails and nothing to gain from doing it while the transaction is open.
+            await EnsureZoneJobAsync(facility, cancellationToken);
         }
 
         public async Task UpdateAsync(FacilityModel existingFacility, FacilityModel updatedFacility,
@@ -77,6 +121,8 @@ namespace LantanaGroup.Link.DMRP.Business
             updatedFacility.ScheduledReports = await BuildScheduleAsync(updatedFacility, cancellationToken);
 
             await _hostImplementation.UpdateAsync(existingFacility, updatedFacility, cancellationToken);
+
+            await EnsureZoneJobAsync(updatedFacility, cancellationToken);
         }
 
         /// <summary>
@@ -112,7 +158,7 @@ namespace LantanaGroup.Link.DMRP.Business
             }
             catch
             {
-                await RollbackQuietlyAsync(facilityId, cancellationToken);
+                await RollbackQuietlyAsync("deletion", facilityId, cancellationToken);
                 throw;
             }
 
@@ -124,7 +170,7 @@ namespace LantanaGroup.Link.DMRP.Business
         /// A rollback that fails must not replace the error that caused it, or the caller is told about
         /// the cleanup instead of the thing that actually went wrong.
         /// </summary>
-        private async Task RollbackQuietlyAsync(string facilityId, CancellationToken cancellationToken)
+        private async Task RollbackQuietlyAsync(string operation, string facilityId, CancellationToken cancellationToken)
         {
             try
             {
@@ -133,8 +179,8 @@ namespace LantanaGroup.Link.DMRP.Business
             catch (Exception rollbackFailure)
             {
                 _logger.LogError(rollbackFailure,
-                    "Rolling back the deletion of facility {FacilityId} failed. Its reporting plans may be left behind; clear them with DELETE api/dmrp/reporting-plans/facilities/{FacilityId}.",
-                    facilityId.SanitizeForLog(), facilityId.SanitizeForLog());
+                    "Rolling back the {Operation} of facility {FacilityId} failed. Its reporting plans may be left behind; clear them with DELETE api/dmrp/reporting-plans/facilities/{FacilityId}.",
+                    operation, facilityId.SanitizeForLog(), facilityId.SanitizeForLog());
             }
         }
 
@@ -145,8 +191,42 @@ namespace LantanaGroup.Link.DMRP.Business
         public Task SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default) =>
             _hostImplementation.SoftDeleteAsync(facilityId, cancellationToken);
 
-        public Task RestoreAsync(FacilityModel facility, CancellationToken cancellationToken = default) =>
-            _hostImplementation.RestoreAsync(facility, cancellationToken);
+        public async Task RestoreAsync(FacilityModel facility, CancellationToken cancellationToken = default)
+        {
+            await _hostImplementation.RestoreAsync(facility, cancellationToken);
+
+            await EnsureZoneJobAsync(facility, cancellationToken);
+        }
+
+        /// <summary>
+        /// The nightly job is per timezone, so a save only has to make sure the zone it names has
+        /// one. Idempotent and cheap; enrollment changes never touch Quartz.
+        /// </summary>
+        /// <remarks>
+        /// Every caller runs this after the facility is committed, so a Quartz failure here would
+        /// turn a successful save into a 5xx for a facility that does exist - and a caller retrying
+        /// cannot fix Quartz. It is logged and swallowed instead: the reconciler's
+        /// <c>ReconcileAllAsync</c> rebuilds every zone's job at the next boot, so the cost is at
+        /// most the nights between now and then, and only for a timezone no other facility uses.
+        /// </remarks>
+        private async Task EnsureZoneJobAsync(FacilityModel facility, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(facility.TimeZone))
+            {
+                return;
+            }
+
+            try
+            {
+                await _reconciler.EnsureZoneJobAsync(facility.TimeZone, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Facility {FacilityId} was saved, but its DMRP nightly job for timezone {TimeZone} could not be scheduled. The next start-up reconcile will create it.",
+                    (facility.FacilityId ?? string.Empty).SanitizeForLog(), facility.TimeZone.SanitizeForLog());
+            }
+        }
 
         /// <summary>
         /// Turns the facility's enrolled measures into the schedule the host stores, grouping the dQMs
@@ -164,15 +244,15 @@ namespace LantanaGroup.Link.DMRP.Business
                 return EmptySchedule();
             }
 
-            var (month, year) = CurrentPeriod(facility);
+            var reportingPeriod = _facilityReportingPeriodResolver.Resolve(facilityId, facility.TimeZone);
 
-            var entries = await _reportingPlans.GetForPeriodAsync(facilityId, month, year, cancellationToken);
+            var entries = await _reportingPlans.GetForPeriodAsync(facilityId, reportingPeriod.Month, reportingPeriod.Year, cancellationToken);
 
             if (entries.Count == 0)
             {
                 _logger.LogInformation(
                     "Facility {FacilityId} has no reporting plans for {Month}/{Year}; it is scheduled for no reports.",
-                    facilityId.SanitizeForLog(), month, year);
+                    facilityId.SanitizeForLog(), reportingPeriod.Month, reportingPeriod.Year);
 
                 return EmptySchedule();
             }
@@ -180,40 +260,7 @@ namespace LantanaGroup.Link.DMRP.Business
             // The same derivation the facility-facing look-ahead runs. Shared rather than repeated:
             // a facility told it will report something Link is not going to run is worse than a
             // facility told nothing.
-            return _scheduleProjector.Project(entries, facilityId, new ReportingPeriod(year, month));
-        }
-
-        /// <summary>
-        /// The reporting period the facility is currently in, read in its own timezone so a facility
-        /// near a month boundary is scheduled against the month it is actually in.
-        /// </summary>
-        private (int Month, int Year) CurrentPeriod(FacilityModel facility)
-        {
-            var utcNow = _timeProvider.GetUtcNow();
-
-            if (string.IsNullOrWhiteSpace(facility.TimeZone))
-            {
-                return (utcNow.Month, utcNow.Year);
-            }
-
-            try
-            {
-                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone);
-                var localNow = TimeZoneInfo.ConvertTime(utcNow, timeZone);
-
-                return (localNow.Month, localNow.Year);
-            }
-            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-            {
-                // The host validates the timezone and answers with a message naming it. Falling back
-                // to UTC here lets the request reach that validation rather than failing first with an
-                // error about reporting periods.
-                _logger.LogWarning(ex,
-                    "Facility {FacilityId} has an unusable timezone; the reporting period was read in UTC instead.",
-                    facility.FacilityId?.SanitizeForLog());
-
-                return (utcNow.Month, utcNow.Year);
-            }
+            return _scheduleProjector.Project(entries, facilityId, reportingPeriod);
         }
 
         /// <summary>
