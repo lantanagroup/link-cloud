@@ -380,6 +380,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // those deletes succeed.
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
+        await ClearFacilityTeardownProgressAsync(runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)

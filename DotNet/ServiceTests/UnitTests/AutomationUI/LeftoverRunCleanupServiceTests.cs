@@ -310,6 +310,30 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_cleans_a_retained_facility_missing_from_tenant()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var retainedId = Guid.NewGuid().ToString();
+        var deleted = new List<string>();
+        var released = new List<string>();
+        var service = Create(
+            now,
+            [],
+            [],
+            facilities: new Dictionary<string, string>(),
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [retainedId],
+            retainedEligibleAt: now.AddDays(-30),
+            releasedFacilityIds: released);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        deleted.Should().Contain(retainedId);
+        result.TornDownFacilityIds.Should().Contain(retainedId);
+        released.Should().Equal(retainedId);
+    }
+
+    [Fact]
     public async Task CustomRange_does_not_tear_down_an_unrelated_retained_facility()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

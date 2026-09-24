@@ -916,12 +916,8 @@ public sealed class LeftoverRunCleanupService(
             if (RetainedFacilityIsShielded(facilityId, runs, now, retention, mode))
                 continue;
 
-            if (!facilities.ContainsKey(facilityId))
-            {
-                await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
-                continue;
-            }
-
+            // A missing Tenant row is not a finished teardown. Other services can still
+            // hold config for this facility, and CleanupLeftoverFacilityAsync handles that.
             eligible.Add(facilityId);
         }
 
