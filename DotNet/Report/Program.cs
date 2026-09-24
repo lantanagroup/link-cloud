@@ -170,6 +170,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IReportResourceManager, ReportResourceManager>();
     builder.Services.AddTransient<IReportEntryMappingOutcomeManager, ReportEntryMappingOutcomeManager>();
 
+    builder.Services.AddPipelineAbortRegistry(builder.Configuration);
+
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     builder.Services.AddLinkBearerServiceAuthentication(options =>
     {

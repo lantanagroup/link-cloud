@@ -6,6 +6,7 @@ import {DmrpGuard} from './services/security/dmrp.guard';
 
 
 const routes: Routes = [
+  { path: 'hsloc', loadComponent: () => import('./components/hsloc/hsloc.component').then(mod => mod.HslocComponent), canActivate: [AuthGuard] },
   { path: 'logout', loadComponent: () => import('./components/logout/logout.component').then(mod => mod.LogOutComponent) },
   { path: 'login', loadComponent: () => import('./components/login/login.component').then(mod => mod.LoginComponent) },
   { path: 'unauthorized', loadComponent: () => import('./components/core/unauthorized/unauthorized.component').then(mod => mod.UnauthorizedComponent) },

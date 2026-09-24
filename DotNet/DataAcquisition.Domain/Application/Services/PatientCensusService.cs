@@ -1,7 +1,7 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -17,9 +17,11 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using System.Diagnostics;
+using System.Net;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using ListType = LantanaGroup.Link.Shared.Application.Models.DataAcq.ListType;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 using TimeFrame = LantanaGroup.Link.Shared.Application.Models.DataAcq.TimeFrame;
@@ -209,6 +211,7 @@ public class PatientCensusService : IPatientCensusService
 
         List<string> notes = new List<string>();
         bool isFailed = false;
+        bool isMissing = false;
 
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
@@ -292,10 +295,18 @@ public class PatientCensusService : IPatientCensusService
                 });
 
             }
-            catch (TimeoutException timeoutEx)
+            catch (TimeoutException)
             {
                 isFailed = true;
                 notes.Add($"Timeout while retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}.");
+            }
+            catch (Exception ex) when (IsMissingCensusList(ex))
+            {
+                isMissing = true;
+                _logger.LogWarning(ex,
+                    "Census FHIR list is missing for facility {FacilityId} with list id {CensusListId}. Treating as ConfigurationMissing so it is not retried.",
+                    query.FacilityId.SanitizeForLog(), query.CensusListId.SanitizeForLog());
+                notes.Add($"[{DateTime.UtcNow}] FHIR List/{query.CensusListId} is not known for facility {query.FacilityId}. Census list data is gone; this is not retryable.");
             }
             catch (Exception ex)
             {
@@ -309,6 +320,11 @@ public class PatientCensusService : IPatientCensusService
         {
             notes.Add($"[{DateTime.UtcNow}] Failed to retrieve patient list for facility {log.FacilityId}. See application logs for details.");
             log.Status = RequestStatus.Failed;
+        }
+        else if (isMissing)
+        {
+            notes.Add($"[{DateTime.UtcNow}] Census FHIR lists are missing for facility {log.FacilityId}. Treating as ConfigurationMissing so Data Acquisition will not retry.");
+            log.Status = RequestStatus.ConfigurationMissing;
         }
         else
         {
@@ -341,6 +357,11 @@ public class PatientCensusService : IPatientCensusService
                 throw new Exception($"Failed to retrieve patient list for facility {log.FacilityId}. " + string.Join(", ", notes));
             }
 
+            if (isMissing)
+            {
+                return results;
+            }
+
             var produceMessage = new Message<string, PatientListMessage>
             {
                 Key = log.FacilityId,
@@ -363,6 +384,20 @@ public class PatientCensusService : IPatientCensusService
         }
 
         return results;
+    }
+
+    private static bool IsMissingCensusList(Exception ex)
+    {
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            if (current is FhirOperationException fhirEx &&
+                fhirEx.Status is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task<(bool isQueryParam, object? authHeader)> BuildeAuthHeader(string facilityId, AuthenticationConfigurationModel auth, CancellationToken cancellationToken)

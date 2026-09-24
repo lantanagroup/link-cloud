@@ -9,7 +9,7 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(CreateFhirQueryConfigurationRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatients = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
@@ -51,11 +51,32 @@ public interface IDataAcquisitionServiceClient
         CreateOrganizationLocationConfigurationApiModel request,
         CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
         string facilityId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Validates connectivity to a FHIR server using only its base URL, without requiring an
+    /// existing facility configuration.
+    /// </summary>
+    Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
+        string fhirServerUrl,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Tests SFTP connection details without a saved configuration, optionally previewing the patients in
+    /// each Cerner extract. The request body is not captured in the response, because it carries the password.
+    /// </summary>
+    Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSftpConnectionAsync(
+        SftpTestConnectionRequestApiModel request,
+        bool includeFileContent = false,
         CancellationToken cancellationToken = default);
 }

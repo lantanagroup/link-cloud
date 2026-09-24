@@ -77,7 +77,8 @@ namespace LantanaGroup.Link.DMRP.Business
         /// </summary>
         private static string[] DqmsFor(IReadOnlyList<ReportingPlanEntry> entries, Frequency frequency) =>
             entries.Where(e => e.Frequency == frequency && !string.IsNullOrWhiteSpace(e.DQM))
-                .Select(e => e.DQM)
+                // Non-null by the filter above: an entry with no dQM is a measure Link cannot schedule.
+                .Select(e => e.DQM!)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 

@@ -509,6 +509,133 @@ public class NormalizationsControllerTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task SaveOperation_AcceptsUserOwnedHslocMap()
+    {
+        var store = new Mock<INormalizationStore>();
+        store.Setup(s => s.GetOperationByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((NormalizationOperationDefinition?)null);
+        store.Setup(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var sut = new NormalizationsController(store.Object);
+        var model = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Facility HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "type",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var result = await sut.SaveOperation(model, CancellationToken.None);
+
+        result.Should().BeOfType<JsonResult>();
+        store.Verify(s => s.UpsertOperationAsync(
+            It.Is<NormalizationOperationDefinition>(o =>
+                o.OperationType == "HSLOCMap"
+                && o.CodeMapFhirPath == "type"
+                && o.CodeSystemMaps.Count == 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveOperation_HslocMap_RejectsNonLocationResourceType()
+    {
+        var store = new Mock<INormalizationStore>();
+        var sut = new NormalizationsController(store.Object);
+        var model = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bad HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Patient"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var result = await sut.SaveOperation(model, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>()
+            .Which.Value.Should().Be("HSLOCMap operations must target only the Location resource type.");
+        store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveOperation_HslocMap_RejectsNonHslocTargetSystem()
+    {
+        var store = new Mock<INormalizationStore>();
+        var sut = new NormalizationsController(store.Object);
+        var model = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bad HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "http://example.org/not-hsloc",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var result = await sut.SaveOperation(model, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>()
+            .Which.Value.Should().Be("Code System Map #1 target system must be https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html.");
+        store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveOperation_HslocMap_RejectsNonTypeFhirPath()
+    {
+        var store = new Mock<INormalizationStore>();
+        var sut = new NormalizationsController(store.Object);
+        var model = new NormalizationOperationDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bad HSLOC Map",
+            OperationType = "HSLOCMap",
+            ResourceTypes = ["Location"],
+            CodeMapFhirPath = "identifier.value",
+            CodeSystemMaps =
+            [
+                new NormalizationCodeSystemMap
+                {
+                    SourceSystem = "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+                    TargetSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html",
+                    CodeMaps = { ["ICU"] = new NormalizationCodeMapEntry { Code = "1025-6", Display = "Trauma Critical Care" } }
+                }
+            ]
+        };
+
+        var result = await sut.SaveOperation(model, CancellationToken.None);
+
+        result.Should().BeOfType<BadRequestObjectResult>()
+            .Which.Value.Should().Be("HSLOCMap FhirPath must be type.");
+        store.Verify(s => s.UpsertOperationAsync(It.IsAny<NormalizationOperationDefinition>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static NormalizationOperationDefinition MakeOperation(string name)
         => new()
         {
