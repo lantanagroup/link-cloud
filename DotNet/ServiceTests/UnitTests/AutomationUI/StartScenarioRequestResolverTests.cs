@@ -94,6 +94,8 @@ public class StartScenarioRequestResolverTests
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
         options.QueryPlanTemplateId.Should().Be(request.QueryPlanTemplateId);
+        options.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Unspecified);
+        options.HonorExplicitFacilityPieces.Should().BeFalse();
         options.NhsnOrganizationId.Should().Be("10756");
         options.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
@@ -113,6 +115,9 @@ public class StartScenarioRequestResolverTests
         });
 
         options.NhsnOrganizationId.Should().Be(expectedNhsnOrganizationId);
+        options.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
+        options.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
+        options.HonorExplicitFacilityPieces.Should().BeTrue();
     }
 
     [Fact]

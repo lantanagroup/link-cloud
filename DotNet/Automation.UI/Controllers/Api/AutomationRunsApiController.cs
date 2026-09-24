@@ -48,6 +48,10 @@ public sealed class AutomationRunsApiController(
         {
             runId = await runManager.StartAsync(startRequest, cancellationToken);
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to start scenario {ScenarioId} via API.", request.ScenarioId);

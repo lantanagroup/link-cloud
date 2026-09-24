@@ -68,6 +68,23 @@ public record ResolvedRunOptions(
     /// <summary>Measure template ids selected for this run (empty = use system templates for SelectedMeasures).</summary>
     public List<Guid> SelectedMeasureIds { get; init; } = [];
 
+    public FacilityConfigurationMode FacilityConfigurationMode { get; init; }
+
+    public Guid? FacilityTemplateId { get; init; }
+
+    /// <summary>
+    /// When true, a missing query plan, normalization suite, or organization resource map
+    /// stays missing. Legacy runs leave this false and still fall back to system defaults.
+    /// </summary>
+    public bool HonorExplicitFacilityPieces { get; init; }
+
+    /// <summary>Vendor posted on facility create. Null with <see cref="HonorExplicitFacilityPieces"/> false keeps Epic.</summary>
+    public string? VendorName { get; init; }
+
+    public bool AllowPatientConfigurationsOutsideSet { get; init; } = true;
+
+    public List<Guid> AllowedPatientConfigurationIds { get; init; } = [];
+
     /// <summary>
     /// FHIR measure-bundle JSON, one per selected template, in load order.
     /// System templates are seeded from <see cref="ProfiledMeasureCatalog.ReadBundleJson"/>.

@@ -34,6 +34,10 @@ At a high level, `Automation.UI` is a control plane and observability surface fo
 pipeline tests. It provides:
 
 1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
+   A scenario is either in facility mode (one facility template) or ala carte (query plan,
+   normalization suite, organization resource map, and vendor chosen separately).
+1a. **Facility template management** -- user-owned facility configs plus seeded System Default,
+   Epic, and Cerner templates. System scenarios share the System Default template.
 2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
 2a. **Measure management** -- create, clone, and delete FHIR measure definitions. System

@@ -256,17 +256,31 @@ internal sealed class RunExecutor
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
-            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
-            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
+            var honorFacilityPieces = state.Options.HonorExplicitFacilityPieces;
+            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(
+                state.Options.NormalizationSuiteId, cancellationToken, honorFacilityPieces);
+            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(
+                state.Options.OrganizationResourceMapTemplateId, cancellationToken, honorFacilityPieces);
             var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
             // Resolve the query plan template early so the acquisition simulator uses the
             // same plan the scenario is configured with (not always the built-in default).
-            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
+            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(
+                state.Options.QueryPlanTemplateId, cancellationToken, honorFacilityPieces);
             var queryPlanInput = queryPlanResolution.Input;
-            var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+            var effectiveQueryPlan = queryPlanInput;
+            if (effectiveQueryPlan == null)
+            {
+                if (honorFacilityPieces)
+                {
+                    throw new InvalidOperationException(
+                        "No query plan is configured for this run. Choose one on the facility template or in ala carte mode.");
+                }
+
+                effectiveQueryPlan = QueryPlanDefaults.GetDefaultAsInput();
+            }
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
 
@@ -437,6 +451,10 @@ internal sealed class RunExecutor
             }
 
             state.FacilityId = facilityId;
+            using var facilitySetupLock = await FacilitySetupGate.AcquireAsync(
+                facilityId,
+                message => output.WriteLine(message),
+                cancellationToken);
 
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)
@@ -519,7 +537,9 @@ internal sealed class RunExecutor
                     facilityClient,
                     output,
                     facilityId,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
 
                 // Force Tenant through the real DMRP client for every period we seeded.
                 foreach (var (month, year) in reportingPeriods)
@@ -572,7 +592,9 @@ internal sealed class RunExecutor
                     facilityClient,
                     output,
                     facilityId,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
 
                 pipelineDataReader.InvalidateCache();
 
@@ -634,7 +656,9 @@ internal sealed class RunExecutor
                     output,
                     facilityId,
                     measureIds,
-                    cancellationToken);
+                    cancellationToken,
+                    state.Options.VendorName,
+                    state.Options.HonorExplicitFacilityPieces);
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(
@@ -642,9 +666,17 @@ internal sealed class RunExecutor
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution, patientIds);
             normalizationResolution = normalizationSetup.Resolution;
             var runtimeNormalizationSequences = normalizationSetup.RuntimeSequences;
+            var ehrDescription = effectiveQueryPlan.EhrDescription;
+            if (string.IsNullOrWhiteSpace(ehrDescription))
+            {
+                ehrDescription = honorFacilityPieces
+                    ? state.Options.VendorName ?? string.Empty
+                    : "Epic";
+            }
+
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureIds, "Epic", queryPlanInput);
+                output, facilityId, measureIds, ehrDescription, queryPlanInput);
             await FacilitySetupHelper.EnsureQueryConfigAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
@@ -1966,7 +1998,7 @@ internal sealed class RunExecutor
     {
         if (template == null)
         {
-            output.WriteLine($"No Organization Resource Map template resolved for facility '{facilityId}'. Skipping org-location configuration create.");
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
             return;
         }
 
@@ -1983,11 +2015,11 @@ internal sealed class RunExecutor
         if (conditions.Count == 0)
             throw new InvalidOperationException($"Organization resource map template '{template.Name}' has no valid conditions.");
 
-        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
-        if (existing.IsSuccessStatusCode && existing.Body != null)
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count > 0)
         {
             var normalizedTemplate = string.Join("\n", conditions.Select(c => $"{c.Priority}:{c.FhirPath}"));
-            var hasMatchingActive = existing.Body.Any(cfg =>
+            var hasMatchingActive = existing.Any(cfg =>
                 cfg.IsActive
                 && string.Join("\n", cfg.Conditions.OrderBy(c => c.Priority).Select(c => $"{c.Priority}:{c.FhirPath}")) == normalizedTemplate);
 
@@ -1996,6 +2028,8 @@ internal sealed class RunExecutor
                 output.WriteLine($"Org-location configuration for facility '{facilityId}' already matches template '{template.Name}'. Skipping create.");
                 return;
             }
+
+            await ClearOrganizationLocationConfigurationsAsync(dataAcqClient, output, facilityId, cancellationToken);
         }
 
         var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
@@ -2013,6 +2047,48 @@ internal sealed class RunExecutor
                 $"Failed to create organization location configuration for facility '{facilityId}' from template '{template.Name}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
 
         output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
+    }
+
+    private static async Task ClearOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await ReadOrganizationLocationConfigurationsAsync(dataAcqClient, facilityId, cancellationToken);
+        if (existing.Count == 0)
+        {
+            output.WriteLine($"No organization location configuration to clear for facility '{facilityId}'.");
+            return;
+        }
+
+        var deleted = await dataAcqClient.DeleteOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clear organization location configuration for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine($"Cleared {existing.Count} organization location configuration(s) for facility '{facilityId}'.");
+    }
+
+    /// <summary>
+    /// A failed read is not an empty configuration. Treating it as empty leaves the previous
+    /// mapping in place while the run applies a different template.
+    /// </summary>
+    private static async Task<List<OrganizationLocationConfigurationApiModel>> ReadOrganizationLocationConfigurationsAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (!existing.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read organization location configuration for facility '{facilityId}'. HTTP {existing.StatusCode}: {existing.RawBody ?? "(no body)"}");
+        }
+
+        return existing.Body ?? [];
     }
 
     private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
@@ -2338,7 +2414,30 @@ internal sealed class RunExecutor
         var runtimeSequences = new List<NormalizationRuntimeSequenceStep>();
         if (resolution.Operations.Count == 0)
         {
-            output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            if (existingOperations.Count > 0)
+            {
+                var deletedOps = await normalizationClient.DeleteFacilityOperationsAsync(facilityId, cancellationToken);
+                if (!IsSuccessOrMissing(deletedOps))
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to clear normalization operations for facility '{facilityId}'. HTTP {deletedOps.StatusCode}: {deletedOps.RawBody ?? "(no body)"}");
+                }
+            }
+
+            // Deleting the operations already removes their sequences, so this delete is often a 404.
+            // A facility can also have sequences and no operations. Either way, nothing left is success.
+            var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
+            if (!IsSuccessOrMissing(deletedSequences))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
+            }
+
+            if (existingOperations.Count == 0 && deletedSequences.StatusCode == 404)
+                output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            else
+                output.WriteLine($"Cleared normalization configuration for facility '{facilityId}' because the suite has none.");
+
             return new NormalizationFacilitySetup(resolution, runtimeSequences);
         }
 
@@ -2441,6 +2540,18 @@ internal sealed class RunExecutor
 
         }
 
+        foreach (var leftover in existingPoolByKey.SelectMany(pair => pair.Value))
+        {
+            var deleted = await normalizationClient.DeleteFacilityOperationAsync(facilityId, leftover.Id, cancellationToken);
+            if (!IsSuccessOrMissing(deleted))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to remove normalization operation '{leftover.Name}' ({leftover.OperationType}) for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+            }
+
+            output.WriteLine($"  Removed operation that is not in suite '{resolution.SuiteName}': {leftover.Name} ({leftover.OperationType})");
+        }
+
         // Create sequences per resource type.
         // We need to get operations back from the API since the create response may not give IDs directly.
         // Instead, re-search to find newly created ops and build sequences.
@@ -2515,4 +2626,10 @@ internal sealed class RunExecutor
 
         return new NormalizationFacilitySetup(resolution, runtimeSequences);
     }
+
+    /// <summary>
+    /// Normalization returns 404 when the facility already has nothing to delete.
+    /// </summary>
+    private static bool IsSuccessOrMissing(LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse response) =>
+        response.IsSuccessStatusCode || response.StatusCode == 404;
 }

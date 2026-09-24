@@ -29,6 +29,8 @@ public class ScenarioSeedServiceTests
         monthly.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
         monthly.NhsnOrganizationId.Should().Be("10756");
+        monthly.FacilityConfigurationMode.Should().Be(FacilityConfigurationMode.Facility);
+        monthly.FacilityTemplateId.Should().Be(FacilityTemplateCatalog.SystemDefaultId);
 
         var daily = await store.GetByIdAsync(AdhocReportDailyAchScenarioId, CancellationToken.None);
         daily.Should().NotBeNull();

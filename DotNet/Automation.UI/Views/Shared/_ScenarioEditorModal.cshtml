@@ -16,6 +16,7 @@
     var organizationResourceMaps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
     var patientConfigurations = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
     var measureTemplates = (List<MeasureTemplate>?)ViewBag.MeasureTemplates ?? [];
+    var facilityTemplates = (List<FacilityTemplate>?)ViewBag.FacilityTemplates ?? [];
     var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
     var scheduledPatternOptions = Enum.GetValues<ScheduledInpatientPattern>()
         .Select(p =>
@@ -125,27 +126,61 @@
                                 </div>
                             }
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-12">
+                            <label class="form-label d-block">Facility configuration</label>
+                            <div class="btn-group" role="group" aria-label="Facility configuration mode">
+                                <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeFacility" value="Facility" autocomplete="off" checked />
+                                <label class="btn btn-outline-primary" for="FacilityModeFacility">Facility template</label>
+                                <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeAlaCarte" value="AlaCarte" autocomplete="off" />
+                                <label class="btn btn-outline-primary" for="FacilityModeAlaCarte">Ala carte</label>
+                            </div>
+                            <div class="form-text">Facility mode uses one template. Ala carte chooses each piece and does not select a facility.</div>
+                        </div>
+                        <div class="col-md-8" id="facilityTemplateGroup">
+                            <label class="form-label" for="FacilityTemplate">Facility template</label>
+                            <select class="form-select" id="FacilityTemplate">
+                                @foreach (var facility in facilityTemplates)
+                                {
+                                    <option value="@facility.Id"
+                                            data-is-default="@facility.IsDefault.ToString().ToLower()"
+                                            data-vendor="@(facility.VendorName ?? "")"
+                                            data-org-mapping="@(facility.EnableOrganizationLocationMapping ? "true" : "false")"
+                                            data-allow-outside="@(facility.AllowPatientConfigurationsOutsideSet ? "true" : "false")"
+                                            data-allowed-patients="@string.Join(",", facility.AllowedPatientConfigurationIds)">
+                                        @FormatTemplateOption(facility.Name, facility.IsDefault, facility.IsSystem)
+                                    </option>
+                                }
+                            </select>
+                            <div id="facilityTemplateSummary" class="form-text"></div>
+                        </div>
+                        <div class="col-md-4 facility-alacarte">
+                            <label class="form-label" for="AlaCarteVendor">Vendor</label>
+                            <input class="form-control" type="text" id="AlaCarteVendor" maxlength="80" placeholder="Leave blank to send no vendor" />
+                        </div>
+                        <div class="col-md-4 facility-alacarte">
                             <label class="form-label" for="QueryPlanTemplate">Query Plan</label>
                             <select class="form-select" id="QueryPlanTemplate">
+                                <option value="">(not configured)</option>
                                 @foreach (var qp in queryPlanTemplates)
                                 {
                                     <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@FormatTemplateOption(qp.Name, qp.IsDefault, qp.IsSystem)</option>
                                 }
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 facility-alacarte">
                             <label class="form-label" for="NormalizationSuite">Normalization Suite</label>
                             <select class="form-select" id="NormalizationSuite">
+                                <option value="">(not configured)</option>
                                 @foreach (var ns in normalizationSuites)
                                 {
                                     <option value="@ns.Id" data-name="@ns.Name" data-is-default="@ns.IsDefault.ToString().ToLower()">@FormatTemplateOption(ns.Name, ns.IsDefault, ns.IsSystem)</option>
                                 }
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 facility-alacarte">
                             <label class="form-label" for="OrganizationResourceMap">Organization Resource Map</label>
                             <select class="form-select" id="OrganizationResourceMap">
+                                <option value="">(not configured)</option>
                                 @foreach (var orm in organizationResourceMaps)
                                 {
                                     <option value="@orm.Id" data-name="@orm.Name" data-is-default="@orm.IsDefault.ToString().ToLower()">@FormatTemplateOption(orm.Name, orm.IsDefault, orm.IsSystem)</option>
@@ -455,6 +490,26 @@
                             }
                         }),
                         new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        var facilityTemplateCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                        facilityTemplates.Select(f => new
+                        {
+                            f.Id,
+                            f.Name,
+                            f.VendorName,
+                            f.QueryPlanTemplateId,
+                            f.NormalizationSuiteId,
+                            f.OrganizationResourceMapTemplateId,
+                            f.EnableOrganizationLocationMapping,
+                            f.AllowPatientConfigurationsOutsideSet,
+                            f.AllowedPatientConfigurationIds
+                        }),
+                        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+        var queryPlanNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                        queryPlanTemplates.ToDictionary(q => q.Id.ToString(), q => q.Name)));
+        var normalizationNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                        normalizationSuites.ToDictionary(q => q.Id.ToString(), q => q.Name)));
+        var organizationMapNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                        organizationResourceMaps.ToDictionary(q => q.Id.ToString(), q => q.Name)));
         var patientConfigSaveUrl = '@Url.Action("SaveInline", "PatientConfigurations")';
         var patientConfigGetUrl = '@Url.Action("GetJson", "PatientConfigurations")';
         var patientConfigCatalogUrl = '@Url.Action("Catalog", "PatientConfigurations")';
@@ -464,6 +519,11 @@
         var SYSTEM_PNEUMONIA_Q = '00000000-0000-0000-3000-000000000001';
         var SYSTEM_PNEUMONIA_NQ = '00000000-0000-0000-3000-000000000004';
         var pcCohortRow = null;
+        // Legacy scenarios have no facility mode. Opening one shows the ala carte
+        // controls, but a save stays Unspecified until the user changes that mode
+        // or the vendor. That keeps the old system-piece fallback and Epic vendor.
+        var legacyFacilityMode = false;
+        var legacyPieceIds = null;
         var modal = document.getElementById('scenarioModal');
         var backdrop = document.getElementById('scenarioModalBackdrop');
         var modalTitle = document.getElementById('modalTitle');
@@ -805,6 +865,78 @@
             if (d) orm.value = d.value;
         }
 
+        function isFacilityMode() {
+            var facility = document.getElementById('FacilityModeFacility');
+            return !facility || facility.checked;
+        }
+
+        function selectedFacilityTemplate() {
+            var select = document.getElementById('FacilityTemplate');
+            if (!select || !select.value) return null;
+            return facilityTemplateCatalog.find(function (t) { return t.id === select.value; }) || null;
+        }
+
+        function lookupName(map, id) {
+            if (!id) return 'not configured';
+            return map[id] || map[String(id).toLowerCase()] || id;
+        }
+
+        function selectDefaultFacilityTemplate() {
+            var select = document.getElementById('FacilityTemplate');
+            if (!select) return;
+            var d = select.querySelector('[data-is-default="true"]');
+            if (d) select.value = d.value;
+        }
+
+        function patientConfigAllowed(configId) {
+            if (!isFacilityMode()) return true;
+            var template = selectedFacilityTemplate();
+            if (!template || template.allowPatientConfigurationsOutsideSet) return true;
+            if (!configId) return true;
+            var allowed = template.allowedPatientConfigurationIds || [];
+            return allowed.some(function (id) { return String(id).toLowerCase() === String(configId).toLowerCase(); });
+        }
+
+        function syncFacilityModeUi() {
+            var facility = isFacilityMode();
+            var group = document.getElementById('facilityTemplateGroup');
+            if (group) group.style.display = facility ? '' : 'none';
+            document.querySelectorAll('.facility-alacarte').forEach(function (el) {
+                el.style.display = facility ? 'none' : '';
+            });
+            var summary = document.getElementById('facilityTemplateSummary');
+            if (summary) {
+                var template = selectedFacilityTemplate();
+                if (!facility || !template) {
+                    summary.textContent = facility ? 'Select a facility template. Facility-level pieces come only from that template.' : '';
+                } else {
+                    var vendor = template.vendorName ? template.vendorName : 'no vendor';
+                    var org = template.enableOrganizationLocationMapping ? 'on' : 'off';
+                    var outside = template.allowPatientConfigurationsOutsideSet ? 'allowed' : 'limited to the template set';
+                    summary.textContent = template.name + ': vendor ' + vendor
+                        + ', query plan ' + lookupName(queryPlanNames, template.queryPlanTemplateId)
+                        + ', normalization ' + lookupName(normalizationNames, template.normalizationSuiteId)
+                        + ', org map ' + (template.enableOrganizationLocationMapping ? lookupName(organizationMapNames, template.organizationResourceMapTemplateId) : 'off')
+                        + ', location org ' + org
+                        + ', other patient configurations ' + outside + '.';
+                }
+            }
+            refreshCohortPatientConfigOptions();
+        }
+
+        function refreshCohortPatientConfigOptions() {
+            document.querySelectorAll('#cohortRows .cohort-patient-config').forEach(function (select) {
+                var current = select.value;
+                var html = '<option value="">Select a configuration…</option>' +
+                    patientConfigurationCatalog.filter(function (c) { return patientConfigAllowed(c.id) || c.id === current; }).map(function (c) {
+                        var note = patientConfigAllowed(c.id) ? '' : ' (not on this facility)';
+                        return '<option value="' + c.id + '">' + esc(c.name) + (c.isSystem ? ' (system)' : '') + note + '</option>';
+                    }).join('');
+                select.innerHTML = html;
+                if (current) select.value = current;
+            });
+        }
+
         // ---- AJAX helper ----
         async function postJson(url, body) {
             var res = await fetch(url, {
@@ -1074,8 +1206,9 @@
         }
         function buildPatientConfigSelect(selectedId) {
             var opts = '<option value="">Select a configuration…</option>' +
-                patientConfigurationCatalog.map(function (c) {
-                    return '<option value="' + c.id + '" ' + (c.id === selectedId ? 'selected' : '') + '>' + esc(c.name) + (c.isSystem ? ' (system)' : '') + '</option>';
+                patientConfigurationCatalog.filter(function (c) { return patientConfigAllowed(c.id) || c.id === selectedId; }).map(function (c) {
+                    var note = patientConfigAllowed(c.id) ? '' : ' (not on this facility)';
+                    return '<option value="' + c.id + '" ' + (c.id === selectedId ? 'selected' : '') + '>' + esc(c.name) + (c.isSystem ? ' (system)' : '') + note + '</option>';
                 }).join('');
             return '<div class="d-flex gap-1 pc-cohort-config-cell">' +
                 '<select class="form-select form-select-sm cohort-patient-config">' + opts + '</select>' +
@@ -1330,6 +1463,27 @@
         document.getElementById('EnableDmrp').addEventListener('change', function () {
             syncDmrpUi();
         });
+        document.getElementById('FacilityModeFacility').addEventListener('change', function () {
+            legacyFacilityMode = false;
+            syncFacilityModeUi();
+        });
+        document.getElementById('FacilityModeAlaCarte').addEventListener('change', function () {
+            if (legacyFacilityMode) {
+                legacyFacilityMode = false;
+                var vendor = document.getElementById('AlaCarteVendor');
+                if (vendor && !(vendor.value || '').trim()) vendor.value = 'Epic';
+            }
+            syncFacilityModeUi();
+        });
+        document.getElementById('AlaCarteVendor').addEventListener('input', function () {
+            legacyFacilityMode = false;
+        });
+        ['QueryPlanTemplate', 'NormalizationSuite', 'OrganizationResourceMap'].forEach(function (id) {
+            document.getElementById(id).addEventListener('change', function () {
+                legacyFacilityMode = false;
+            });
+        });
+        document.getElementById('FacilityTemplate').addEventListener('change', syncFacilityModeUi);
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
             reportingWindowEl.addEventListener('change', function () {
@@ -1971,9 +2125,12 @@
                 enableDmrp: document.getElementById('EnableDmrp').checked,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
-                queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
-                normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
-                organizationResourceMapTemplateId: document.getElementById('OrganizationResourceMap').value || null,
+                facilityConfigurationMode: isFacilityMode() ? 'Facility' : (legacyFacilityMode ? 'Unspecified' : 'AlaCarte'),
+                facilityTemplateId: isFacilityMode() ? (document.getElementById('FacilityTemplate').value || null) : null,
+                vendorName: (!isFacilityMode() && !legacyFacilityMode) ? ((document.getElementById('AlaCarteVendor').value || '').trim() || null) : null,
+                queryPlanTemplateId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.queryPlanTemplateId : (document.getElementById('QueryPlanTemplate').value || null)),
+                normalizationSuiteId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.normalizationSuiteId : (document.getElementById('NormalizationSuite').value || null)),
+                organizationResourceMapTemplateId: isFacilityMode() ? null : (legacyFacilityMode && legacyPieceIds ? legacyPieceIds.organizationResourceMapTemplateId : (document.getElementById('OrganizationResourceMap').value || null)),
                 reportPeriodStart: startVal ? (startVal + 'T00:00:00Z') : null,
                 reportPeriodEnd: endVal ? (endVal + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
@@ -2007,6 +2164,20 @@
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
             document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
             document.getElementById('EnableDmrp').checked = !!data.enableDmrp;
+            var facilityMode = data.facilityConfigurationMode;
+            legacyFacilityMode = !facilityMode || facilityMode === 'Unspecified';
+            legacyPieceIds = legacyFacilityMode ? {
+                queryPlanTemplateId: data.queryPlanTemplateId || null,
+                normalizationSuiteId: data.normalizationSuiteId || null,
+                organizationResourceMapTemplateId: data.organizationResourceMapTemplateId || null
+            } : null;
+            if (legacyFacilityMode) facilityMode = 'AlaCarte';
+            document.getElementById('FacilityModeFacility').checked = facilityMode === 'Facility';
+            document.getElementById('FacilityModeAlaCarte').checked = facilityMode !== 'Facility';
+            var facilitySelect = document.getElementById('FacilityTemplate');
+            if (data.facilityTemplateId) facilitySelect.value = data.facilityTemplateId;
+            else selectDefaultFacilityTemplate();
+            document.getElementById('AlaCarteVendor').value = data.vendorName || (legacyFacilityMode ? 'Epic' : '');
             // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
             function isoToDateValue(s) {
                 if (!s) return '';
@@ -2019,12 +2190,15 @@
             document.getElementById('ReportPeriodEnd').value = isoToDateValue(data.reportPeriodEnd);
             var qp = document.getElementById('QueryPlanTemplate');
             if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
+            else if (legacyFacilityMode) qp.value = '';
             else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
             var ns = document.getElementById('NormalizationSuite');
             if (data.normalizationSuiteId) ns.value = data.normalizationSuiteId;
+            else if (legacyFacilityMode) ns.value = '';
             else selectDefaultNormalizationSuite();
             var orm = document.getElementById('OrganizationResourceMap');
             if (data.organizationResourceMapTemplateId) orm.value = data.organizationResourceMapTemplateId;
+            else if (legacyFacilityMode) orm.value = '';
             else selectDefaultOrganizationResourceMap();
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             var ids = data.selectedMeasureIds || [];
@@ -2096,6 +2270,7 @@
             syncReportPeriodPolicyUi();
             syncLiveSimulationUi();
             syncMetricsRunUi();
+            syncFacilityModeUi();
         }
 
         // ---- Open modal ----
@@ -2142,6 +2317,12 @@
                 document.getElementById('CleanupServiceData').checked = false;
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('EnableDmrp').checked = false;
+                legacyFacilityMode = false;
+                legacyPieceIds = null;
+                document.getElementById('FacilityModeFacility').checked = true;
+                document.getElementById('FacilityModeAlaCarte').checked = false;
+                selectDefaultFacilityTemplate();
+                document.getElementById('AlaCarteVendor').value = '';
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
                 fillDefaultAdhocPeriod();
@@ -2162,6 +2343,7 @@
                 syncReportPeriodPolicyUi();
                 syncLiveSimulationUi();
                 syncMetricsRunUi();
+                syncFacilityModeUi();
                 openModal();
             }
         }
@@ -2177,6 +2359,11 @@
 
             if (!(model.name || '').trim()) {
                 markFieldError('ScenarioName', 'Name is required.');
+                valid = false;
+            }
+
+            if (model.facilityConfigurationMode === 'AlaCarte' && !model.queryPlanTemplateId) {
+                markFieldError('QueryPlanTemplate', 'Ala carte needs a query plan.');
                 valid = false;
             }
 

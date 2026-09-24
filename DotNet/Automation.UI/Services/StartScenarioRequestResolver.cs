@@ -78,7 +78,10 @@ public static class StartScenarioRequestResolver
             {
                 PatientCohorts = kindCohorts,
                 PatientProfiles = PatientCohortDefinition.ExpandProfiles(kindCohorts, defaults.Seed),
-                SelectedMeasureIds = MeasureTemplateCatalog.SystemIdsFor(defaultMeasures)
+                SelectedMeasureIds = MeasureTemplateCatalog.SystemIdsFor(defaultMeasures),
+                FacilityConfigurationMode = FacilityConfigurationMode.Facility,
+                FacilityTemplateId = FacilityTemplateCatalog.SystemDefaultId,
+                HonorExplicitFacilityPieces = true
             };
         }
 
@@ -123,6 +126,12 @@ public static class StartScenarioRequestResolver
         var hasImportedPatients = importedIds.Count > 0 || importedBundles.Count > 0;
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
         var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
+        var facilityMode = request.FacilityConfigurationMode != FacilityConfigurationMode.Unspecified
+            ? request.FacilityConfigurationMode
+            : ExtractFacilityMode(request.RunConfigurationJson);
+        var facilityTemplateId = request.FacilityTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "facilityTemplateId");
+        var honorExplicit = facilityMode is FacilityConfigurationMode.Facility or FacilityConfigurationMode.AlaCarte;
+        var vendorName = FirstNonEmpty(request.VendorName, ExtractStringFromJson(request.RunConfigurationJson, "vendorName"));
         var enableDmrp = request.EnableDmrp
             || ExtractBoolFromJson(request.RunConfigurationJson, "enableDmrp") == true;
         var isLiveSimulation = request.IsLiveSimulation
@@ -166,9 +175,19 @@ public static class StartScenarioRequestResolver
             PatientProfiles = profiles,
             PatientCohorts = cohorts,
             ReportMethod = reportMethod,
-            QueryPlanTemplateId = request.QueryPlanTemplateId,
-            NormalizationSuiteId = request.NormalizationSuiteId,
-            OrganizationResourceMapTemplateId = organizationResourceMapTemplateId,
+            OrganizationResourceMapTemplateId = facilityMode == FacilityConfigurationMode.Facility
+                ? null
+                : organizationResourceMapTemplateId,
+            QueryPlanTemplateId = facilityMode == FacilityConfigurationMode.Facility
+                ? null
+                : request.QueryPlanTemplateId,
+            NormalizationSuiteId = facilityMode == FacilityConfigurationMode.Facility
+                ? null
+                : request.NormalizationSuiteId,
+            FacilityConfigurationMode = facilityMode,
+            FacilityTemplateId = facilityMode == FacilityConfigurationMode.Facility ? facilityTemplateId : null,
+            HonorExplicitFacilityPieces = honorExplicit,
+            VendorName = facilityMode == FacilityConfigurationMode.AlaCarte ? vendorName : null,
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
@@ -259,6 +278,14 @@ public static class StartScenarioRequestResolver
         }
 
         return null;
+    }
+
+    private static FacilityConfigurationMode ExtractFacilityMode(string? runConfigurationJson)
+    {
+        var raw = ExtractStringFromJson(runConfigurationJson, "facilityConfigurationMode");
+        return Enum.TryParse<FacilityConfigurationMode>(raw, true, out var mode)
+            ? mode
+            : FacilityConfigurationMode.Unspecified;
     }
 
     private static bool? ExtractBoolFromJson(string? runConfigurationJson, string propertyName)
