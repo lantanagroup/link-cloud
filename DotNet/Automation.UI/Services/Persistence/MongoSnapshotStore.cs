@@ -269,6 +269,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return docs.Select(ToSummary).ToList();
     }
 
+    public async Task MarkAutomationCreatedFacilityAsync(Guid runId, string facilityId, CancellationToken ct = default)
+    {
+        var update = Builders<AutomationRunDocument>.Update
+            .Set(r => r.AutomationCreatedFacility, true)
+            .Set(r => r.FacilityId, facilityId ?? string.Empty);
+        await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
+    }
+
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
         // Drop child history first and the run summary last. A failure after the

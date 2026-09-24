@@ -42,7 +42,7 @@ public class CleanupController(
     [HttpGet]
     public async Task<IActionResult> Report(Guid id, CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        if (!ModelState.IsValid || id == Guid.Empty)
             return BadRequest("Invalid Id format");
 
         var report = await reportStore.GetAsync(id, cancellationToken);

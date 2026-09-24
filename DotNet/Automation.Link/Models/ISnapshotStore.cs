@@ -36,6 +36,10 @@ public interface ISnapshotStore
     // --- Run metadata ---
     Task RegisterRunAsync(Guid runId, RunSnapshotMeta meta, CancellationToken ct = default);
     Task UpdateRunMetaAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default);
+    /// <summary>
+    /// Sets the created-facility marker without rewriting status, timestamps, or errors.
+    /// </summary>
+    Task MarkAutomationCreatedFacilityAsync(Guid runId, string facilityId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);
