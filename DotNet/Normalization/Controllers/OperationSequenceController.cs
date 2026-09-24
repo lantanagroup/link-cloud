@@ -32,13 +32,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetOperationSequence(string facilityId, string? resourceType = null, Guid? resourceTypeId = null)
+        public async Task<IActionResult> GetOperationSequence(string facilityId, string? resourceType = null, Guid? resourceTypeId = null, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
                         return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
@@ -48,14 +48,20 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("A FacilityId must be provided");
                 }
 
+                // Admin reads stay off the listener cache so a GET cannot return a sequence
+                // another replica has not reloaded yet, and cannot pin a partial key in that cache.
                 var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
                     ResourceType = resourceType,
                     ResourceTypeId = resourceTypeId,
                     FacilityId = facilityId
-                });
+                }, useCache: false, cancellationToken);
 
                 return Ok(results);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -67,13 +73,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(List<OperationSequenceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PostOperationSequences(string facilityId, string resourceType, List<PostOperationSequence> model)
+        public async Task<IActionResult> PostOperationSequences(string facilityId, string resourceType, List<PostOperationSequence> model, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
                         return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
@@ -102,10 +108,14 @@ namespace LantanaGroup.Link.Normalization.Controllers
                         OperationId = a.OperationId!.Value,
                         Sequence = a.Sequence!.Value
                     }).ToList()
-                });
+                }, cancellationToken);
 
 
                 return Created("", sequences);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -118,13 +128,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteOperationSequences(string facilityId, string? resourceType)
+        public async Task<IActionResult> DeleteOperationSequences(string facilityId, string? resourceType, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
                         return BadRequest($"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist");
                     }
@@ -138,12 +148,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     FacilityId = facilityId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (deleted)
                     return NoContent();
 
                 return Problem(detail: $"No sequence found to delete for facility id {facilityId.SanitizeAndRemove()}{(resourceType == null ? "" : $" and resource type {resourceType}")}", statusCode: StatusCodes.Status404NotFound);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

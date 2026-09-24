@@ -29,6 +29,7 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly ILivePatientEventInjector _liveInjector;
     private readonly IPatientConfigurationStore _patientConfigurationStore;
     private readonly IMeasureTemplateStore _measureTemplateStore;
+    private readonly IFacilityTemplateStore _facilityTemplateStore;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -47,7 +48,8 @@ public class AutomationRunManager : IAutomationRunManager
         GeneratedTemplateCacheVersionStore generatedTemplateVersionStore,
         ILivePatientEventInjector liveInjector,
         IPatientConfigurationStore patientConfigurationStore,
-        IMeasureTemplateStore measureTemplateStore)
+        IMeasureTemplateStore measureTemplateStore,
+        IFacilityTemplateStore facilityTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -62,6 +64,7 @@ public class AutomationRunManager : IAutomationRunManager
         _liveInjector = liveInjector;
         _patientConfigurationStore = patientConfigurationStore;
         _measureTemplateStore = measureTemplateStore;
+        _facilityTemplateStore = facilityTemplateStore;
         _runExecutor = new RunExecutor(
             _automationConfig,
             _hostServices,
@@ -82,6 +85,7 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var runId = Guid.NewGuid();
         var resolved = StartScenarioRequestResolver.Resolve(request);
+        resolved = await FacilityTemplateRunBinder.ApplyAsync(resolved, _facilityTemplateStore, cancellationToken);
         resolved = await MeasureTemplateRunBinder.AttachBundlesAsync(resolved, _measureTemplateStore, cancellationToken);
         var options = await PatientConfigurationHydrator.HydrateAsync(
             resolved,
