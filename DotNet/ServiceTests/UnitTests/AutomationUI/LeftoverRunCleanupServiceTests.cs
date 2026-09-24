@@ -357,6 +357,26 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_history_only_does_not_partially_tear_down_when_the_cap_is_one()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var facilityId = Guid.NewGuid().ToString();
+        var run = Run(facilityId, now.AddDays(-2));
+        var deleted = new List<string>();
+        var service = Create(now, [run], [], deletedFacilityIds: deleted, maxFacilitiesPerPass: 1);
+
+        var result = await service.RunCustomRangeAsync(
+            now.AddDays(-3),
+            now.AddDays(-1),
+            teardownFacilities: false,
+            purgeHistory: true);
+
+        deleted.Should().BeEmpty();
+        result.TornDownFacilityIds.Should().BeEmpty();
+        result.PurgedRunIds.Should().Equal(run.RunId);
+    }
+
+    [Fact]
     public async Task HistoryPurge_does_not_exceed_the_facility_cap_on_the_first_run()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

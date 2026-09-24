@@ -380,7 +380,7 @@ public sealed class LeftoverRunCleanupService(
                 .ToList();
             var historyWork = new List<AutomationRunSummary>();
             var partialHistoryTeardown = new List<string>();
-            if (purgeHistory)
+            if (purgeHistory && (mode == "history-purge" || teardownFacilities))
             {
                 var spent = facilityWork.Count + retainedWork.Count;
                 var scheduledTeardown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -415,6 +415,10 @@ public sealed class LeftoverRunCleanupService(
                         scheduledTeardown.Add(id);
                     spent += fresh.Count;
                 }
+            }
+            else if (purgeHistory)
+            {
+                historyWork.AddRange(historyRuns.Take(Math.Max(limit, 200)));
             }
             var purgingRunIds = historyWork.Select(run => run.RunId).ToHashSet();
             var heldByOtherRun = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
