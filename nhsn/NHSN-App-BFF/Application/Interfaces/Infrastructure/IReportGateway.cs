@@ -19,9 +19,11 @@ public interface IReportGateway
 
     /// <summary>
     /// Reads a facility's report schedules, newest first, combining each schedule with its report
-    /// summary (status, patient count) for the Report Results list.
+    /// summary (status, patient count) for the Report Results list. Returns each row's measure
+    /// mapping too (not just ReportSummary's fields), so the list can resolve friendly measure
+    /// names the same way the detail view does.
     /// </summary>
-    Task<Paged<ReportSummary>> ListReportsAsync(string facilityId, int page, int pageSize, CancellationToken cancellationToken = default);
+    Task<Paged<ReportDetail>> ListReportsAsync(string facilityId, int page, int pageSize, CancellationToken cancellationToken = default);
 
     /// <summary>Reads one report's full detail, or null when Report has no schedule for that id.</summary>
     Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default);

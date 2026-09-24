@@ -80,7 +80,7 @@ public sealed class ReportingService : IReportingService
         };
     }
 
-    public Task<Paged<ReportSummary>> ListReportsAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    public Task<Paged<ReportDetail>> ListReportsAsync(int page, int pageSize, CancellationToken cancellationToken = default)
     {
         var facilityId = _userContext.RequireFacilityId();
         return _reportGateway.ListReportsAsync(facilityId, page, pageSize, cancellationToken);

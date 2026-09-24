@@ -20,8 +20,8 @@ public interface IReportingService
     /// </remarks>
     Task<ReportSummary> RequestReportAsync(ReportRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Lists the current facility's reports, newest first.</summary>
-    Task<Paged<ReportSummary>> ListReportsAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    /// <summary>Lists the current facility's reports, newest first, each with its measure mapping.</summary>
+    Task<Paged<ReportDetail>> ListReportsAsync(int page, int pageSize, CancellationToken cancellationToken = default);
 
     /// <summary>Reads one report's full detail, or null when Report has no schedule for that id.</summary>
     Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default);

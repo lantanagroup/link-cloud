@@ -60,7 +60,7 @@ public class ReportsEndpoints : IApi
                 int pageSize = 10) =>
                 Results.Ok(await service.ListReportsAsync(page < 1 ? 1 : page, Math.Clamp(pageSize, 1, MaxPageSize), cancellationToken)))
             .WithName("ListReports")
-            .Produces<Paged<ReportSummary>>(StatusCodes.Status200OK)
+            .Produces<Paged<ReportDetail>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {

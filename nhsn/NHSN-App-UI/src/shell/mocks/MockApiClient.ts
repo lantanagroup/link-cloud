@@ -474,7 +474,7 @@ export class MockApiClient implements ApiClient {
     return immediate({...this.buildReport(request), status: 'Pending'});
   }
 
-  async listReports(page: C.PageRequest): Promise<C.Paged<C.ReportSummary>> {
+  async listReports(page: C.PageRequest): Promise<C.Paged<C.ReportDetail>> {
     await tick();
     return {items: [], page: page.page, pageSize: page.pageSize, totalCount: 0};
   }
