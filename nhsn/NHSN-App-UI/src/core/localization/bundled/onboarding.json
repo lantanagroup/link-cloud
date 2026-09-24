@@ -469,8 +469,8 @@
     "messages": {
       "loadError": "Unable to load encounter mapping data.",
       "saveError": "Unable to save encounter mappings.",
-      "incomplete": "Please complete all fields before continuing.",
-      "missingCodeSystemHint": "An Encounter.type Code System is required for this group's mappings.",
+      "incomplete": "Please complete each mapping row's fields, or remove the row, before continuing.",
+      "missingCodeSystemHint": "Encounter.type Code System is required.",
       "missingCodeSystem": "Fill in each Encounter.type Code System, or remove it, before continuing.",
       "duplicateCodeSystem": "Two or more Encounter.type Code Systems are the same (or both blank). Fix or remove one of them before continuing."
     }
