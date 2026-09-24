@@ -381,6 +381,20 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_releases_tombstones_for_facilities_it_just_cleaned()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var facilityId = Guid.NewGuid().ToString();
+        var run = Run(facilityId, now.AddDays(-30));
+        var released = new List<string>();
+        var service = Create(now, [run], [], releasedFacilityIds: released);
+
+        await service.RunHistoryPurgeNowAsync();
+
+        released.Should().BeEquivalentTo([facilityId, run.RunId.ToString()]);
+    }
+
+    [Fact]
     public async Task CustomRange_history_only_does_not_partially_tear_down_when_the_cap_is_one()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

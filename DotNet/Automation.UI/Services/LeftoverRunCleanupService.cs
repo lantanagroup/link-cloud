@@ -580,7 +580,14 @@ public sealed class LeftoverRunCleanupService(
                     }
                     else
                     {
+                        var alreadyCleaned = new HashSet<string>(
+                            await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
+                            StringComparer.OrdinalIgnoreCase);
+                        foreach (var id in tornDown)
+                            alreadyCleaned.Add(id);
+
                         // Owned ids were already torn down above. Do not let the helper fall back to run.FacilityId.
+                        // DeleteRunAsync writes a tombstone for every owned id. Drop the ones already cleaned.
                         await RunCleanupHelper.PurgeRunHistoryAsync(
                             facilityClient,
                             normalizationClient,
@@ -596,6 +603,12 @@ public sealed class LeftoverRunCleanupService(
                             cancellationToken,
                             teardownFacility: false);
                         purged.Add(run.RunId);
+                        foreach (var id in OwnedAutomationFacilityIds(run))
+                        {
+                            if (heldByOtherRun.Contains(id) || !alreadyCleaned.Contains(id))
+                                continue;
+                            await snapshotStore.ReleaseRetainedFacilityAsync(id, cancellationToken);
+                        }
                         await snapshotStore.ClearFacilityTeardownProgressAsync(run.RunId, cancellationToken);
                     }
                 }
