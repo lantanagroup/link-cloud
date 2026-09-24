@@ -12,7 +12,10 @@ using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
 using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 
@@ -51,6 +54,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IReportingService _reportingService;
     private readonly IFhirConfigurationGateway _fhirGateway;
     private readonly IFacilityWriteLock _writeLock;
+    private readonly IDataAcquisitionGateway _dataAcquisitionGateway;
+    private readonly IQueryPlanTemplateProvider _queryPlanTemplateProvider;
+    private readonly QueryPlanAutoSeedSettings _queryPlanAutoSeedSettings;
     private readonly ILogger<OnboardingWriteService> _logger;
 
     public OnboardingWriteService(
@@ -70,6 +76,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IReportingService reportingService,
         IFhirConfigurationGateway fhirGateway,
         IFacilityWriteLock writeLock,
+        IDataAcquisitionGateway dataAcquisitionGateway,
+        IQueryPlanTemplateProvider queryPlanTemplateProvider,
+        IOptions<QueryPlanAutoSeedSettings> queryPlanAutoSeedSettings,
         ILogger<OnboardingWriteService> logger)
     {
         _dbContext = dbContext;
@@ -88,6 +97,9 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _reportingService = reportingService;
         _fhirGateway = fhirGateway;
         _writeLock = writeLock;
+        _dataAcquisitionGateway = dataAcquisitionGateway;
+        _queryPlanTemplateProvider = queryPlanTemplateProvider;
+        _queryPlanAutoSeedSettings = queryPlanAutoSeedSettings.Value;
         _logger = logger;
     }
 
@@ -539,6 +551,11 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 {
                     await RevokeAccuracyAcknowledgementsAsync(cancellationToken);
                 }
+
+                if (_queryPlanAutoSeedSettings.Enabled && draft.FacilityInfo.Vendor is not null)
+                {
+                    await AutoSeedQueryPlanAsync(facility.FacilityId, previousVendor, draft.FacilityInfo.Vendor.Value, cancellationToken);
+                }
                 break;
 
             case "census":
@@ -737,5 +754,43 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
         facility.Vendor = vendor;
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    // Auto-seeds a facility's DataAcquisition QueryPlan from the vendor's static template --
+    // behind QueryPlanAutoSeedSettings, off by default because a production facility may already
+    // carry a hand-configured plan that must never be overwritten. previousVendor null means this
+    // is the facility's first vendor selection (create); a change means the vendor switched
+    // (replace). Failures are logged and swallowed so a template or DataAcquisition problem never
+    // fails the facility-info save itself.
+    private async Task AutoSeedQueryPlanAsync(string facilityId, EhrVendor? previousVendor, EhrVendor vendor, CancellationToken cancellationToken)
+    {
+        if (previousVendor == vendor)
+        {
+            return;
+        }
+
+        try
+        {
+            var template = await _queryPlanTemplateProvider.GetTemplateAsync(vendor, cancellationToken);
+            if (template is null)
+            {
+                return;
+            }
+
+            template.FacilityId = facilityId;
+
+            if (previousVendor is null)
+            {
+                await _dataAcquisitionGateway.CreateQueryPlanAsync(facilityId, template, cancellationToken);
+            }
+            else
+            {
+                await _dataAcquisitionGateway.UpdateQueryPlanAsync(facilityId, template, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "QueryPlan auto-seed failed for facility {FacilityId}, vendor {Vendor}.", facilityId, vendor);
+        }
     }
 }
