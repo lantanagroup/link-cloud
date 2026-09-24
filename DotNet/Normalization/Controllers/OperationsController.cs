@@ -58,13 +58,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorVersionId = null,
-            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!string.IsNullOrEmpty(facilityId))
                 {
-                    if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                    if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                     {
                         return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                     }
@@ -91,9 +91,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -107,7 +111,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorVersionId = null,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -116,7 +120,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(detail: $"A faciityId must be provided", statusCode: StatusCodes.Status400BadRequest);
                 }
 
-                if (!await _tenantApiService.CheckFacilityExists(facilityId))
+                if (!await _tenantApiService.CheckFacilityExists(facilityId, cancellationToken))
                 {
                     return Problem(detail: $"Provided FacilityID {facilityId.SanitizeAndRemove()} does not exist", statusCode: StatusCodes.Status400BadRequest);
                 }
@@ -142,9 +146,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -158,7 +166,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorVersionOperations(Guid vendorVersionId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
-            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
+            string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -183,9 +191,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     SortOrder = sortOrder,
                     PageSize = pageSize,
                     PageNumber = pageNumber
-                });
+                }, cancellationToken);
 
                 return Ok(result);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -257,40 +269,15 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                     foreach (var resourceType in model.ResourceTypes)
                     {
-                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        {
-                            ResourceType = resourceType,
-                            FacilityId = model.FacilityId
-                        }, false);
-
-                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
-
-                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
-
-                        if (results != null && results.Count() > 0)
-                        {
-                            foreach (var result in results)
-                            {
-                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                            }
-                        }
-
-                        createSequences.Add(new CreateOperationSequenceModel()
-                        {
-                            OperationId = operationModel.Id,
-                            Sequence = maxSequence
-                        });
-
-                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                        {
-                            FacilityId = model.FacilityId,
-                            ResourceType = resourceType,
-                            OperationSequences = createSequences,
-                        });
+                        await _operationManager.AppendOperationToSequence(model.FacilityId, resourceType, operationModel.Id, cancellationToken);
                     }
                 }
 
                 return Created("", taskResult.ObjectResult);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -362,6 +349,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 return Accepted("", taskResult.ObjectResult);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -418,6 +409,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -434,7 +429,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         {
             try
             {
-                var dbEntity = await _operationQueries.Get(id, facilityId);
+                var dbEntity = await _operationQueries.Get(id, facilityId, cancellationToken);
 
                 if (dbEntity == null)
                 {
@@ -469,6 +464,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(result?.ErrorMessage ?? "", statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
@@ -481,7 +480,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
          [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteFacilityOperations(string facilityId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -495,7 +494,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = facilityId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {
@@ -505,6 +504,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -518,7 +521,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ValidateAntiForgeryOrBearerToken]
-        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -527,7 +530,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     VendorVersionId = vendorVersionId,
                     OperationId = operationId,
                     ResourceType = resourceType
-                });
+                }, cancellationToken);
 
                 if (result)
                 {
@@ -537,6 +540,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     return Problem("No records were deleted.", statusCode: StatusCodes.Status404NotFound);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
