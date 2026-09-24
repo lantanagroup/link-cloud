@@ -51,27 +51,43 @@ export function isAtPatientIdLimit(ids: readonly string[] | undefined): boolean 
 }
 
 /**
- * Indexes of rows whose trimmed id repeats an earlier row's - the repeat only, not the row it
- * repeats, since that first occurrence is the one the user presumably meant to keep. Blank rows
- * (a row mid-edit) never collide with each other.
+ * Indexes to flag within each group of rows sharing a trimmed id, keeping exactly one "clean"
+ * row per group. The row the user is actively editing (if it's part of a group) is the one
+ * flagged -- not just whichever happens to come later -- so typing a duplicate into a row
+ * points the error at that row instead of an untouched one elsewhere in the list. With no
+ * active edit (a fresh render, a bulk add via CSV/census), the first occurrence stays clean,
+ * same as before. Blank rows (a row mid-edit) never collide with each other.
  *
  * `addPatientIds` already keeps the three non-manual tabs duplicate-free on the way in; this
  * covers Manual Entry, where a row is typed directly rather than added through that path.
  */
-export function findDuplicatePatientIdIndexes(ids: readonly string[]): number[] {
-  const seenIds = new Set<string>();
-  const duplicates: number[] = [];
+export function findDuplicatePatientIdIndexes(ids: readonly string[], editedIndex?: number): number[] {
+  const indexesById = new Map<string, number[]>();
 
   ids.forEach((raw, index) => {
     const id = raw.trim();
     if (!id) {
       return;
     }
-    if (seenIds.has(id)) {
-      duplicates.push(index);
+    const indexes = indexesById.get(id);
+    if (indexes) {
+      indexes.push(index);
+    } else {
+      indexesById.set(id, [index]);
+    }
+  });
+
+  const duplicates: number[] = [];
+  indexesById.forEach(indexes => {
+    if (indexes.length < 2) {
       return;
     }
-    seenIds.add(id);
+    const kept = indexes.find(index => index !== editedIndex) ?? indexes[0];
+    indexes.forEach(index => {
+      if (index !== kept) {
+        duplicates.push(index);
+      }
+    });
   });
 
   return duplicates;

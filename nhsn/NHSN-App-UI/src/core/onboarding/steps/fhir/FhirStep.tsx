@@ -6,7 +6,7 @@ import {AcronymText, acronymTitle, Button, HeadingPause, InfoTooltip, NewTabAnno
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {parseIso8601Duration, validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
+import {isPullTimeRangeInvalid, parseIso8601Duration, validateFhir, type FhirFieldValues, type FieldErrors} from './validate';
 import './FhirStep.css';
 
 /**
@@ -37,6 +37,18 @@ export function FhirStep({onNext, onBack}: StepProps) {
   const [maxRetries, setMaxRetries] = useState<number | undefined>(fhir.maxRetries);
   const [minPullTime, setMinPullTime] = useState(fhir.minAcquisitionPullTime ?? '');
   const [maxPullTime, setMaxPullTime] = useState(fhir.maxAcquisitionPullTime ?? '');
+
+  // Wrong the moment the second time is entered, so - like a duplicate FHIR Patient ID or
+  // census list id - the range conflict doesn't wait for blur. editedPullTimeField is which of
+  // the pair the user is actively typing into, so the error lands on that field rather than
+  // always defaulting to max.
+  const [editedPullTimeField, setEditedPullTimeField] = useState<
+    'minAcquisitionPullTime' | 'maxAcquisitionPullTime' | null
+  >(null);
+  const pullTimeRangeConflictField = useMemo(
+    () => (isPullTimeRangeInvalid(minPullTime, maxPullTime) ? (editedPullTimeField ?? 'maxAcquisitionPullTime') : null),
+    [minPullTime, maxPullTime, editedPullTimeField]
+  );
   const [lagDays, setLagDays] = useState<number | undefined>(initialLagDays);
   const [lagHours, setLagHours] = useState<number | undefined>(initialLagHours);
   const [lagMinutes, setLagMinutes] = useState<number | undefined>(initialLagMinutes);
@@ -107,13 +119,31 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setTouched(prev => ({...prev, [field]: true}));
   }
 
-  function refreshErrors(overrides: Partial<FhirFieldValues> = {}) {
-    setErrors(validateFhir(currentFieldValues(overrides)));
+  function refreshErrors(
+    overrides: Partial<FhirFieldValues> = {},
+    editedPullTimeField?: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime'
+  ) {
+    setErrors(validateFhir(currentFieldValues(overrides), editedPullTimeField));
   }
 
   /** Gates a field's rendered error on it having been touched, translating the i18n key only once shown. */
   function fieldError(field: string): string | undefined {
     return touched[field] && errors[field] ? t(errors[field]) : undefined;
+  }
+
+  const RANGE_INVALID_KEY = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+
+  /**
+   * Like fieldError, but the range conflict comes from the live pullTimeRangeConflictField
+   * instead of the touched/blur-gated errors state -- errors[field] can still hold a stale
+   * pullTimeRangeInvalid from an earlier blur even after a later edit has cleared it live, so
+   * that one key is deliberately excluded from the blur-gated fallback.
+   */
+  function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime'): string | undefined {
+    if (pullTimeRangeConflictField === field) {
+      return t(RANGE_INVALID_KEY);
+    }
+    return touched[field] && errors[field] && errors[field] !== RANGE_INVALID_KEY ? t(errors[field]) : undefined;
   }
 
   function handleBaseUrlBlur() {
@@ -125,7 +155,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
     const normalized = normalizePullTime(value);
     setter(normalized);
     markTouched(field);
-    refreshErrors({[field]: normalized});
+    refreshErrors({[field]: normalized}, field);
     patch('fhir', {[field]: normalized});
   }
 
@@ -351,10 +381,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
               maxLength={5}
               value={minPullTime}
-              error={fieldError('minAcquisitionPullTime')}
+              error={pullTimeFieldError('minAcquisitionPullTime')}
               onChange={value => {
                 const normalized = normalizePullTime(value);
                 setMinPullTime(normalized);
+                setEditedPullTimeField('minAcquisitionPullTime');
                 resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
               }}
@@ -366,10 +397,11 @@ export function FhirStep({onNext, onBack}: StepProps) {
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
               maxLength={5}
               value={maxPullTime}
-              error={fieldError('maxAcquisitionPullTime')}
+              error={pullTimeFieldError('maxAcquisitionPullTime')}
               onChange={value => {
                 const normalized = normalizePullTime(value);
                 setMaxPullTime(normalized);
+                setEditedPullTimeField('maxAcquisitionPullTime');
                 resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
               }}

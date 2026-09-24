@@ -34,7 +34,12 @@ import {
 import type { StepProps } from "../../flow";
 import { useOnboarding, useStepValidator } from "../../OnboardingProvider";
 import { useStableCallback, useStepChrome } from "../../StepChrome";
-import { CENSUS_LIST_KEYS, validateCensus, type FieldErrors } from "./validate";
+import {
+  CENSUS_LIST_KEYS,
+  findDuplicatePatientListIdKeys,
+  validateCensus,
+  type FieldErrors,
+} from "./validate";
 import "./CensusStep.css";
 
 const LIST_LABEL_KEYS: Record<CensusListKey, string> = {
@@ -102,13 +107,17 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const acquisition = vendorProfile?.censusAcquisition;
 
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [validationMessage, setValidationMessage] = useState<string | null>(
+  const [validationMessage, setValidationMessage] = useState<{ text: string; scroll: boolean } | null>(
     null,
   );
 
-  function announceValidationMessage(message: string) {
+  // scroll defaults to true for an explicit action (Continue, Validate Census Results) where
+  // jumping to the result is the point. A message fired as a side effect of typing (e.g.
+  // revoking a prior acknowledgement) passes scroll: false -- yanking the page to the bottom
+  // mid-keystroke, away from the field the user is actively typing in, is the opposite of helpful.
+  function announceValidationMessage(message: string, scroll = true) {
     setValidationMessage(null);
-    window.setTimeout(() => setValidationMessage(message), 0);
+    window.setTimeout(() => setValidationMessage({ text: message, scroll }), 0);
   }
 
   const initialFrequency = parseHoursMinutesDuration(
@@ -150,7 +159,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
 
   const validationMessageRef = useRef<HTMLParagraphElement | null>(null);
   useEffect(() => {
-    if (validationMessage) {
+    if (validationMessage?.scroll) {
       scrollNearestContainerToBottom(validationMessageRef.current);
     }
   }, [validationMessage]);
@@ -181,6 +190,33 @@ export function CensusStep({ onNext, onBack }: StepProps) {
     CENSUS_LIST_KEYS.every((key) => Boolean(listState[key]?.result));
   const sftpValidated = acquisition === "Sftp" && sftpFiles !== null;
   const resultsReady = allListsQueried || sftpValidated;
+
+  // A repeat is wrong the moment it's typed, so unlike a blank field it doesn't wait for
+  // blur/Continue -- mirrors HslocStep's duplicateRowIndexes. editedListKey is which of the
+  // six fields the user is actively typing into, so the error lands on that row rather than
+  // whichever one happens to sit later in the list.
+  const [editedListKey, setEditedListKey] = useState<CensusListKey | null>(null);
+  const duplicateListKeys = useMemo(
+    () => findDuplicatePatientListIdKeys(census.patientListIds, editedListKey ?? undefined),
+    [census.patientListIds, editedListKey],
+  );
+
+  // Which list id fields are worth checking "required" against -- a field the user has never
+  // touched shouldn't flash red the instant the step loads, but once it has been (typed into,
+  // or flagged by a failed Continue), clearing it back to blank is wrong live, the same as a
+  // duplicate is, with no need to click elsewhere first.
+  const [touchedListKeys, setTouchedListKeys] = useState<Set<CensusListKey>>(new Set());
+  const requiredListKeys = useMemo(
+    () =>
+      new Set(
+        CENSUS_LIST_KEYS.filter((key) => touchedListKeys.has(key) && !census.patientListIds?.[key]?.trim()),
+      ),
+    [census.patientListIds, touchedListKeys],
+  );
+
+  function markListKeyTouched(key: CensusListKey) {
+    setTouchedListKeys((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }
 
   function refreshFieldError(field: string) {
     const nextErrors = validateCensus(draft, acquisition);
@@ -219,12 +255,14 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   }
 
   function updateListId(key: CensusListKey, value: string) {
+    setEditedListKey(key);
+    markListKeyTouched(key);
     patch("census", {
       patientListIds: { ...census.patientListIds, [key]: value },
     });
     if (validationLive && census.accuracyAcknowledged) {
       revokeAcknowledgement();
-      announceValidationMessage(t("onboarding:census.messages.validateBeforeAck"));
+      announceValidationMessage(t("onboarding:census.messages.validateBeforeAck"), false);
     }
     setListState((prev) => {
       if (!prev[key]) {
@@ -244,6 +282,7 @@ export function CensusStep({ onNext, onBack }: StepProps) {
       revokeAcknowledgement();
       announceValidationMessage(
         t("onboarding:census.messages.testConnectionBeforeAck"),
+        false,
       );
     }
   }
@@ -414,6 +453,9 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
   }
 
   function validateStep(): boolean {
+    if (acquisition === "PatientList") {
+      setTouchedListKeys(new Set(CENSUS_LIST_KEYS));
+    }
     const nextErrors = validateCensus(draft, acquisition);
     const hoursError = frequencyHoursError(frequencyHours);
     const minutesError = frequencyMinutesError(
@@ -749,9 +791,16 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
               <>
                 {CENSUS_LIST_KEYS.map((key) => {
                   const state = listState[key];
-                  const fieldError = errors[`listId.${key}`]
-                    ? t(errors[`listId.${key}`], { list: t(LIST_LABEL_KEYS[key]) })
-                    : state?.error;
+                  // Both duplicate and required status come from the live useMemos, not from
+                  // errors[] -- a repeat is wrong the moment it's typed, and a required field
+                  // that's blanked out is wrong the moment it's cleared. Neither waits for blur.
+                  const isDuplicate = duplicateListKeys.has(key);
+                  const isRequired = !isDuplicate && requiredListKeys.has(key);
+                  const fieldError = isDuplicate
+                    ? t("onboarding:census.errors.listIdDuplicate", { list: t(LIST_LABEL_KEYS[key]) })
+                    : isRequired
+                      ? t("onboarding:census.errors.listIdRequired", { list: t(LIST_LABEL_KEYS[key]) })
+                      : state?.error;
                   return (
                     <div
                       className={`form-group census-list-field${state?.querying ? " is-querying" : ""}`}
@@ -764,7 +813,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                           value={census.patientListIds?.[key] ?? ""}
                           error={fieldError}
                           onChange={(value) => updateListId(key, value)}
-                          onBlur={() => refreshFieldError(`listId.${key}`)}
+                          onBlur={() => markListKeyTouched(key)}
                         />
                         {(state?.result || state?.verified) && (
                           <InfoTooltip
@@ -998,7 +1047,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
 
             <div aria-live="off">
               <p ref={validationMessageRef} className="nhsn-link__form-error" role="alert">
-                {validationMessage}
+                {validationMessage?.text}
               </p>
             </div>
         </div>

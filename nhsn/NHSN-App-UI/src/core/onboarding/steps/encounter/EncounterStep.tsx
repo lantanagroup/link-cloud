@@ -600,6 +600,12 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
   const blurTimeout = useRef<number>();
   const listboxId = `encounter-code-listbox-${row.rowKey}`;
   const showIncomplete = incomplete && touched;
+  // Which side is actually missing - the combined `incomplete` flag alone can't tell a caller
+  // which of the two fields to anchor the error under.
+  const missingLocal = showIncomplete && !row.localValue.trim();
+  const missingTarget = showIncomplete && !(row.targetSystem && row.targetCode);
+  const localHintId = `${incompleteHintId}-local`;
+  const targetHintId = `${incompleteHintId}-target`;
 
   useEffect(() => {
     if (showValidation && incomplete) {
@@ -678,20 +684,29 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
   return (
     <div className="repeat-row-group" onBlur={handleRowBlur}>
       <div className={showIncomplete ? 'repeat-row repeat-row--incomplete' : 'repeat-row'}>
-        <input
-          type="text"
-          aria-label={t('encounter.fields.localCodeLabel')}
-          aria-describedby={showIncomplete ? incompleteHintId : undefined}
-          placeholder={t('encounter.fields.localCodePlaceholder') ?? ''}
-          value={row.localValue}
-          onChange={event => onChange({localValue: event.target.value})} />
+        <div className="encounter-mapping-field">
+          <input
+            type="text"
+            className={missingLocal ? 'is-invalid' : undefined}
+            aria-label={t('encounter.fields.localCodeLabel')}
+            aria-describedby={missingLocal ? localHintId : undefined}
+            placeholder={t('encounter.fields.localCodePlaceholder') ?? ''}
+            value={row.localValue}
+            onChange={event => onChange({localValue: event.target.value})} />
+          {missingLocal && (
+            <span id={localHintId} className="encounter-row-hint">
+              {t('encounter.fields.missingLocalCodeHint')}
+            </span>
+          )}
+        </div>
 
         <div className="encounter-code-picker">
           <input
             type="text"
             role="combobox"
+            className={missingTarget ? 'is-invalid' : undefined}
             aria-label={t('encounter.fields.targetCodeLabel')}
-            aria-describedby={showIncomplete ? incompleteHintId : undefined}
+            aria-describedby={missingTarget ? targetHintId : undefined}
             aria-expanded={open}
             aria-controls={listboxId}
             aria-autocomplete="list"
@@ -743,6 +758,11 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
               )}
             </div>
           )}
+          {missingTarget && (
+            <span id={targetHintId} className="encounter-row-hint">
+              {t('encounter.fields.missingTargetCodeHint')}
+            </span>
+          )}
         </div>
 
         <Button
@@ -755,12 +775,6 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
           {t('encounter.fields.removeMapping')}
         </Button>
       </div>
-
-      {showIncomplete && (
-        <span id={incompleteHintId} className="encounter-row-hint">
-          {t('encounter.fields.incompleteRowHint')}
-        </span>
-      )}
     </div>
   );
 }

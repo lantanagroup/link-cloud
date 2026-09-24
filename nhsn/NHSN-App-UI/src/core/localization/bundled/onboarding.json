@@ -429,7 +429,8 @@
       "targetCodeLabel": "CPT or SNOMED code",
       "targetCodePlaceholder": "Search CPT or SNOMED code…",
       "targetCodeNoMatches": "No matching codes.",
-      "incompleteRowHint": "This mapping is missing a local code or a CPT/SNOMED code.",
+      "missingLocalCodeHint": "This mapping is missing a local code.",
+      "missingTargetCodeHint": "This mapping is missing a CPT/SNOMED code.",
       "duplicateCodeSystemHint": "This code system is already used by another group above (or both are blank) — their mappings will not save separately."
     },
     "reference": {
