@@ -29,6 +29,11 @@ export function CompleteStep(_props: StepProps) {
     queryKey: ['completeStepDraft'],
     queryFn: () => api.getDraft()
   });
+
+  const {data: reportsPage} = useQuery({
+    queryKey: ['completeStepReportsCount'],
+    queryFn: () => api.listReports({page: 1, pageSize: 1})
+  });
   const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : undefined;
 
   const draft = useMemo(() => migrateDraft(envelope?.draft ?? null), [envelope]);
@@ -52,13 +57,13 @@ export function CompleteStep(_props: StepProps) {
           : t('onboarding:complete.connectionNotTested')
       },
       {label: t('onboarding:complete.summary.censusMethod'), value: censusMethod},
-      {label: t('onboarding:complete.summary.reportsGenerated'), value: draft.report.measures?.length ?? 0},
+      {label: t('onboarding:complete.summary.reportsGenerated'), value: reportsPage?.totalCount ?? 0},
       {
         label: t('onboarding:complete.summary.completedReportId'),
         value: draft.report.lastRequestedReportId ?? t('onboarding:complete.notAvailable')
       }
     ];
-  }, [draft, user, vendorProfile, commitState, t]);
+  }, [draft, user, vendorProfile, commitState, reportsPage, t]);
 
   const loading = !envelope && !error;
 
