@@ -6,6 +6,7 @@ public sealed class BundleConfigFingerprint
     public List<LocationIdentifierHint> LocationIdentifiers { get; set; } = [];
     public List<LocationTypeHint> LocationTypes { get; set; } = [];
     public List<string> LocationAliases { get; set; } = [];
+    public List<RawLocationHint> RawLocations { get; set; } = [];
     public List<ExtensionHint> Extensions { get; set; } = [];
     public List<CodingHint> Codings { get; set; } = [];
     public int LocationCount { get; set; }
@@ -23,6 +24,12 @@ public sealed class LocationTypeHint
 {
     public string System { get; set; } = "";
     public string Code { get; set; } = "";
+}
+
+public sealed class RawLocationHint
+{
+    public List<LocationTypeHint> Types { get; set; } = [];
+    public List<string> Aliases { get; set; } = [];
 }
 
 public sealed class ExtensionHint
