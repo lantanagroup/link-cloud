@@ -251,9 +251,17 @@ export function AcquisitionLogModal({
               },
             )}
           </p>
-          <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
-            <table className="nhsn-link__report-results-table">
+          <div className="nhsn-link__report-results-table-scroll nhsn-link__report-results-table-scroll--compact" tabIndex={-1}>
+            <table className="nhsn-link__report-results-table nhsn-link__report-results-table--fixed">
               <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.actions.viewAcquisitionLog')}</caption>
+              <colgroup>
+                <col style={{ width: '26%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '14%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th scope="col">
@@ -292,16 +300,32 @@ export function AcquisitionLogModal({
                 {filteredEntries.map((entry, index) => (
                   <tr
                     key={`${entry.patientId}-${entry.resource}-${index}`}>
-                    <td>{entry.patientId}</td>
-                    <td>{entry.resource}</td>
-                    <td>{entry.queryPhase}</td>
-                    <td>{entry.queryType ?? '—'}</td>
-                    <td>
+                    <td className="nhsn-link__report-results-ellipsis" title={entry.patientId}>
+                      {entry.patientId}
+                    </td>
+                    <td className="nhsn-link__report-results-ellipsis" title={entry.resource}>
+                      {entry.resource}
+                    </td>
+                    <td className="nhsn-link__report-results-ellipsis" title={entry.queryPhase}>
+                      {entry.queryPhase}
+                    </td>
+                    <td className="nhsn-link__report-results-ellipsis" title={entry.queryType ?? '—'}>
+                      {entry.queryType ?? '—'}
+                    </td>
+                    <td
+                      className="nhsn-link__report-results-ellipsis"
+                      title={
+                        entry.parameters.length > 0
+                          ? entry.parameters.join(', ')
+                          : '—'
+                      }>
                       {entry.parameters.length > 0
                         ? entry.parameters.join(', ')
                         : '—'}
                     </td>
-                    <td>{entry.status}</td>
+                    <td className="nhsn-link__report-results-ellipsis" title={entry.status}>
+                      {entry.status}
+                    </td>
                   </tr>
                 ))}
               </tbody>

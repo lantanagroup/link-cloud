@@ -72,7 +72,7 @@ export function QueryPlanModal({
           <h3 className="nhsn-link__report-results-detail-section-title">
             {t('onboarding:reportResults.detail.queryPlan.planDetails')}
           </h3>
-          <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
+          <div className="nhsn-link__report-results-table-scroll nhsn-link__report-results-table-scroll--compact" tabIndex={-1}>
             <table className="nhsn-link__report-results-table">
               <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.queryPlan.planDetails')}</caption>
               <tbody>
@@ -99,7 +99,7 @@ export function QueryPlanModal({
           <h3 className="nhsn-link__report-results-detail-section-title">
             {t('onboarding:reportResults.detail.queryPlan.queries')}
           </h3>
-          <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
+          <div className="nhsn-link__report-results-table-scroll nhsn-link__report-results-table-scroll--compact" tabIndex={-1}>
             <table className="nhsn-link__report-results-table">
               <caption className="nhsn-link__visually-hidden">{t('onboarding:reportResults.detail.queryPlan.queries')}</caption>
               <thead>
