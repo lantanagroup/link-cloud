@@ -19,6 +19,7 @@ import {MatCheckbox} from '@angular/material/checkbox';
 import {MatTooltipModule} from '@angular/material/tooltip';
 import {MatTabsModule} from '@angular/material/tabs';
 import {LocationsListComponent} from './locations-list/locations-list.component';
+import {HslocLocationsListComponent} from './hsloc-locations-list/hsloc-locations-list.component';
 import {EncountersListComponent} from './encounters-list/encounters-list.component';
 import {FacilityReportingPlansComponent} from './facility-reporting-plans/facility-reporting-plans.component';
 import {AppConfigService} from '../../../services/app-config.service';
@@ -53,6 +54,7 @@ import {ReportScheduleGridBase} from '../../reports/report-schedule-grid.base';
     MatTooltipModule,
     MatTabsModule,
     LocationsListComponent,
+    HslocLocationsListComponent,
     EncountersListComponent,
     FacilityReportingPlansComponent
   ],

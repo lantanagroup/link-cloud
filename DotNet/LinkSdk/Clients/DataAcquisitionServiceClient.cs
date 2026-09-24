@@ -230,6 +230,12 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data/location-config/facility/{facilityId}")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>

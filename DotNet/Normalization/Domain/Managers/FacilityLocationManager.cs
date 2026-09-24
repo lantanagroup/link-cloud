@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers;
 
 public interface IFacilityLocationManager
 {
+    Task<List<FacilityLocationTreeModel>> GetForFacility(string facilityId, CancellationToken cancellationToken = default);
     Task<FacilityLocationModel?> Get(string facilityId, string locationId, CancellationToken cancellationToken = default);
     Task<FacilityLocationModel> Create(string facilityId, FacilityLocationPostModel model, CancellationToken cancellationToken = default);
     Task Update(string facilityId, string locationId, string locationName, string locationAlias, string? partOfId, CancellationToken cancellationToken = default);
@@ -20,6 +21,32 @@ public class FacilityLocationManager : IFacilityLocationManager
     {
         _dbContext = dbContext;
     }
+
+    public Task<List<FacilityLocationTreeModel>> GetForFacility(string facilityId, CancellationToken cancellationToken = default) =>
+        _dbContext.FacilityLocations
+            .AsNoTracking()
+            .Where(location => location.FacilityId == facilityId)
+            .OrderBy(location => location.LocationName)
+            .ThenBy(location => location.LocationId)
+            .Select(location => new FacilityLocationTreeModel
+            {
+                Id = location.Id,
+                LocationId = location.LocationId,
+                PartOfId = location.PartOfId,
+                LocationName = location.LocationName,
+                LocationAlias = location.LocationAlias,
+                Mappings = location.FacilityLocationLocalCodeMappings!
+                    .OrderBy(mapping => mapping.LocalCodeSystem)
+                    .ThenBy(mapping => mapping.LocalCode)
+                    .Select(mapping => new FacilityLocationTreeMappingModel
+                    {
+                        Id = mapping.Id,
+                        LocalCodeSystem = mapping.LocalCodeSystem,
+                        LocalCode = mapping.LocalCode,
+                        HSLOCId = mapping.HSLOCId,
+                        HSLOCCode = mapping.HSLOC == null ? null : mapping.HSLOC.HSLOCCode
+                    }).ToList()
+            }).ToListAsync(cancellationToken);
 
     public async Task<FacilityLocationModel?> Get(string facilityId, string locationId, CancellationToken cancellationToken = default)
     {

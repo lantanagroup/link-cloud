@@ -7,14 +7,19 @@ namespace LantanaGroup.Link.Normalization.Domain
     public interface IDatabase
     {
         Task SaveChangesAsync();
+        Task SaveChangesAsync(CancellationToken cancellationToken);
         IEntityRepository<Operation> Operations { get; set; }
         IEntityRepository<OperationSequence> OperationSequences { get; set; }
         IEntityRepository<ResourceType> ResourceTypes { get; set; }
         IEntityRepository<OperationResourceType> OperationResourceTypes { get; set; }
         IEntityRepository<VendorVersionOperationPreset> VendorVersionOperationPresets { get; set; }
 
+        bool HasActiveTransaction { get; }
+        void ClearChanges();
         Task<IDbContextTransaction> BeginTransactionAsync();
+        Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken);
         Task RollbackTransactionAsync();
+        Task RollbackTransactionAsync(CancellationToken cancellationToken);
         Task CommitTransactionAsync();
     }
 
@@ -42,14 +47,31 @@ namespace LantanaGroup.Link.Normalization.Domain
             VendorVersionOperationPresets = vendorOperationPresets;
         }
 
-        public async Task<IDbContextTransaction> BeginTransactionAsync()
+        public bool HasActiveTransaction => _dbContext.Database.CurrentTransaction != null;
+
+        public void ClearChanges()
         {
-            return await _dbContext.Database.BeginTransactionAsync();
+            _dbContext.ChangeTracker.Clear();
         }
 
-        public async Task RollbackTransactionAsync()
+        public Task<IDbContextTransaction> BeginTransactionAsync()
         {
-            await _dbContext.Database.RollbackTransactionAsync();
+            return BeginTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken)
+        {
+            return await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        }
+
+        public Task RollbackTransactionAsync()
+        {
+            return RollbackTransactionAsync(CancellationToken.None);
+        }
+
+        public async Task RollbackTransactionAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.Database.RollbackTransactionAsync(cancellationToken);
         }
 
         public async Task CommitTransactionAsync()
@@ -57,9 +79,14 @@ namespace LantanaGroup.Link.Normalization.Domain
             await _dbContext.Database.CommitTransactionAsync();
         }
 
-        public async Task SaveChangesAsync()
+        public Task SaveChangesAsync()
         {
-            await _dbContext.SaveChangesAsync();
+            return SaveChangesAsync(CancellationToken.None);
+        }
+
+        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }

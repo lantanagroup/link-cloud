@@ -19,9 +19,9 @@ public sealed class NormalizationSuiteSeedService : IHostedService
     private static readonly Guid OpRemoveMeasureReportExtensionsId = new("00000000-0000-0000-2000-000000000005");
     private static readonly Guid OpRemoveObservationDatetimeExtensionId = new("00000000-0000-0000-2000-000000000006");
     private static readonly Guid OpRemovePatientMergeInstantExtensionId = new("00000000-0000-0000-2000-000000000007");
-    private static readonly Guid SeqDefaultLocationId = new("00000000-0000-0000-2000-000000000010");
-    private static readonly Guid SeqDefaultCleanupId = new("00000000-0000-0000-2000-000000000011");
-    private static readonly Guid SuiteSystemDefaultId = new("00000000-0000-0000-2000-000000000100");
+    private static readonly Guid SeqDefaultLocationId = FacilityTemplateCatalog.DefaultLocationSequenceId;
+    private static readonly Guid SeqDefaultCleanupId = FacilityTemplateCatalog.DefaultCleanupSequenceId;
+    private static readonly Guid SuiteSystemDefaultId = FacilityTemplateCatalog.SystemNormalizationSuiteId;
 
     private readonly INormalizationStore _store;
     private readonly ILogger<NormalizationSuiteSeedService> _logger;
@@ -215,6 +215,45 @@ public sealed class NormalizationSuiteSeedService : IHostedService
 
         await _store.UpsertSuiteAsync(defaultSuite, cancellationToken);
         _logger.LogInformation("Seeded/refreshed system default normalization suite: {Id}", SuiteSystemDefaultId);
+
+        var cernerCleanup = new NormalizationSequenceDefinition
+        {
+            Id = FacilityTemplateCatalog.CernerCleanupSequenceId,
+            Name = "Cerner Cleanup",
+            Description = "Removes common non-essential extensions. Epic encounter, observation, and patient extensions are left in place because the Cerner ehr-test3 bundle does not carry them.",
+            Entries =
+            [
+                new NormalizationSequenceEntry { OperationId = OpRemoveExtensionsId, Sequence = 1 }
+            ],
+            IsSystem = true,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await _store.UpsertSequenceAsync(cernerCleanup, cancellationToken);
+
+        var epicSuite = new NormalizationSuiteDefinition
+        {
+            Id = FacilityTemplateCatalog.EpicNormalizationSuiteId,
+            Name = "Epic",
+            Description = "Location normalization plus Epic extension cleanup (accident-related encounter, Epic encounter id, observation datetime, patient merge/unmerge). Same operations as the system default suite.",
+            OperationIds = [],
+            SequenceIds = [SeqDefaultLocationId, SeqDefaultCleanupId],
+            IsSystem = true,
+            IsDefault = false,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var cernerSuite = new NormalizationSuiteDefinition
+        {
+            Id = FacilityTemplateCatalog.CernerNormalizationSuiteId,
+            Name = "Cerner",
+            Description = "Location normalization and common extension cleanup. Does not remove Epic-only extensions. Cerner locations from ehr-test3 carry codeset 222 rather than open.epic.com extensions.",
+            OperationIds = [],
+            SequenceIds = [SeqDefaultLocationId, FacilityTemplateCatalog.CernerCleanupSequenceId],
+            IsSystem = true,
+            IsDefault = false,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await _store.UpsertSuiteAsync(epicSuite, cancellationToken);
+        await _store.UpsertSuiteAsync(cernerSuite, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
