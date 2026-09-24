@@ -360,6 +360,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         {
             "fhir" => state with { Fhir = new FhirWorkflowState { ConnectionTested = draft.Fhir.ConnectionTested } },
 
+            "census" => state with { Census = new CensusWorkflowState { SftpConnectionTested = draft.Census.SftpConnectionTested } },
+
             "encounter" => state with { Encounter = new EncounterWorkflowState { CodeSystems = [.. draft.Encounter.CodeSystems] } },
 
             "manual-upload" => state with
@@ -391,7 +393,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             "reporting-plan" => state with { ReportingPlan = new ReportingPlanWorkflowState { Reviewed = draft.ReportingPlan.Reviewed } },
 
-            // welcome, facility-info, census, location-org, hsloc, mrn-intake, complete: no
+            // welcome, facility-info, location-org, hsloc, mrn-intake, complete: no
             // workflow slice of their own. Their data is configuration, or a BFF table written
             // through its own endpoint.
             _ => state
