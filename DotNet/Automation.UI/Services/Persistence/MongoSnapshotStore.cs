@@ -34,6 +34,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
     private readonly IMongoCollection<OwnedFacilityTombstoneDocument> _ownedFacilityTombstones;
+    private readonly IMongoCollection<FacilityTeardownProgressDocument> _facilityTeardownProgress;
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
@@ -46,6 +47,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
         _ownedFacilityTombstones = database.GetCollection<OwnedFacilityTombstoneDocument>("automation_owned_facility_tombstones");
+        _facilityTeardownProgress = database.GetCollection<FacilityTeardownProgressDocument>("automation_facility_teardown_progress");
         _snapshotPayloadStore = snapshotPayloadStore ?? new InlineSnapshotPayloadStore();
         _logger = logger;
     }
@@ -336,6 +338,29 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default)
         => await _ownedFacilityTombstones.DeleteOneAsync(t => t.FacilityId == facilityId, ct);
+
+    public async Task MarkFacilityTeardownProgressAsync(Guid runId, string facilityId, CancellationToken ct = default)
+    {
+        var exists = await _facilityTeardownProgress.Find(p => p.RunId == runId && p.FacilityId == facilityId)
+            .AnyAsync(ct);
+        if (!exists)
+        {
+            await _facilityTeardownProgress.InsertOneAsync(new FacilityTeardownProgressDocument
+            {
+                RunId = runId,
+                FacilityId = facilityId
+            }, cancellationToken: ct);
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default)
+    {
+        var docs = await _facilityTeardownProgress.Find(p => p.RunId == runId).ToListAsync(ct);
+        return docs.Select(doc => doc.FacilityId).ToList();
+    }
+
+    public async Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default)
+        => await _facilityTeardownProgress.DeleteManyAsync(p => p.RunId == runId, ct);
 
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {

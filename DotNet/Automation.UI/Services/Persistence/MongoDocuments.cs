@@ -68,6 +68,14 @@ public sealed class OwnedFacilityTombstoneDocument
     public DateTimeOffset EligibleAt { get; set; }
 }
 
+/// <summary>Facility id already torn down for a run whose snapshot is still waiting to be purged.</summary>
+public sealed class FacilityTeardownProgressDocument
+{
+    public Guid RunId { get; set; }
+
+    public string FacilityId { get; set; } = string.Empty;
+}
+
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>
 public sealed class AutomationRunInputDocument
 {

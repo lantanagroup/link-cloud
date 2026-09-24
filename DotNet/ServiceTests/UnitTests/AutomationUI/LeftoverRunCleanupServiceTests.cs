@@ -385,18 +385,30 @@ public class LeftoverRunCleanupServiceTests
         var first = Run(firstFacility, now.AddDays(-30));
         var second = Run(secondFacility, now.AddDays(-30));
         var deleted = new List<string>();
+        var facilities = new Dictionary<string, string>
+        {
+            [firstFacility] = "first",
+            [first.RunId.ToString()] = "first-run",
+            [secondFacility] = "second",
+            [second.RunId.ToString()] = "second-run"
+        };
         var service = Create(
             now,
             [first, second],
             [],
+            facilities: facilities,
             deletedFacilityIds: deleted,
-            maxFacilitiesPerPass: 1);
+            maxFacilitiesPerPass: 1,
+            dropDeletedFacilities: true);
 
-        var result = await service.RunHistoryPurgeNowAsync();
+        var firstPass = await service.RunHistoryPurgeNowAsync();
+        firstPass.PurgedRunIds.Should().BeEmpty();
+        deleted.Should().ContainSingle();
 
-        deleted.Should().Equal(firstFacility);
-        result.PurgedRunIds.Should().BeEmpty();
-        result.ProcessedAllCandidates.Should().BeFalse();
+        var secondPass = await service.RunHistoryPurgeNowAsync();
+        secondPass.PurgedRunIds.Should().Equal(first.RunId);
+        deleted.Should().HaveCount(2);
+        deleted.Should().OnlyContain(id => id == firstFacility || id == first.RunId.ToString());
     }
 
     [Fact]
@@ -538,16 +550,19 @@ public class LeftoverRunCleanupServiceTests
         IReadOnlyList<string>? retainedFacilityIds = null,
         DateTimeOffset? retainedEligibleAt = null,
         List<string>? releasedFacilityIds = null,
-        int maxFacilitiesPerPass = 25)
+        int maxFacilitiesPerPass = 25,
+        bool dropDeletedFacilities = false)
     {
         var facility = new Mock<IFacilityServiceClient>();
+        var liveFacilities = new Dictionary<string, string>(
+            facilities ?? runs.ToDictionary(run => run.FacilityId!, run => run.FacilityId!),
+            StringComparer.OrdinalIgnoreCase);
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LinkApiResponse<Dictionary<string, string>>
+            .Returns(() => Task.FromResult(new LinkApiResponse<Dictionary<string, string>>
             {
                 StatusCode = 200,
-                Body = facilities?.ToDictionary(pair => pair.Key, pair => pair.Value)
-                    ?? runs.ToDictionary(run => run.FacilityId!, run => run.FacilityId!)
-            });
+                Body = new Dictionary<string, string>(liveFacilities, StringComparer.OrdinalIgnoreCase)
+            }));
         facility.Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse<FacilityModel> { StatusCode = 404 });
         var remainingDeleteFailures = failFacilityDelete ? int.MaxValue : failFirstFacilityDeletes;
@@ -561,12 +576,23 @@ public class LeftoverRunCleanupServiceTests
                     remainingDeleteFailures--;
                 throw new InvalidOperationException("facility delete failed");
             });
+        if (dropDeletedFacilities)
+        {
+            facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns((string facilityId, CancellationToken _) =>
+                {
+                    liveFacilities.Remove(facilityId);
+                    return Task.FromResult(Ok());
+                });
+        }
         if (deletedFacilityIds != null)
         {
             facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns((string facilityId, CancellationToken _) =>
                 {
                     deletedFacilityIds.Add(facilityId);
+                    if (dropDeletedFacilities)
+                        liveFacilities.Remove(facilityId);
                     return Task.FromResult(Ok());
                 });
         }
@@ -617,8 +643,27 @@ public class LeftoverRunCleanupServiceTests
         scopeFactory.Setup(f => f.CreateScope()).Returns(scope.Object);
 
         var snapshots = new Mock<ISnapshotStore>();
+        var teardownProgress = new Dictionary<Guid, List<string>>();
         snapshots.Setup(s => s.GetAllRunSummariesAsync(It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(runs);
+        snapshots.Setup(s => s.GetFacilityTeardownProgressAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid runId, CancellationToken _) =>
+                (IReadOnlyList<string>)(teardownProgress.TryGetValue(runId, out var ids) ? ids.ToList() : []));
+        snapshots.Setup(s => s.MarkFacilityTeardownProgressAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, string, CancellationToken>((runId, facilityId, _) =>
+            {
+                if (!teardownProgress.TryGetValue(runId, out var ids))
+                {
+                    ids = [];
+                    teardownProgress[runId] = ids;
+                }
+                if (!ids.Contains(facilityId, StringComparer.OrdinalIgnoreCase))
+                    ids.Add(facilityId);
+            })
+            .Returns(Task.CompletedTask);
+        snapshots.Setup(s => s.ClearFacilityTeardownProgressAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, CancellationToken>((runId, _) => teardownProgress.Remove(runId))
+            .Returns(Task.CompletedTask);
         snapshots.Setup(s => s.GetRetainedFacilitiesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync((retainedFacilityIds ?? [])
                 .Select(id => new RetainedFacility(id, retainedEligibleAt ?? new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero)))

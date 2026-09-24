@@ -47,6 +47,9 @@ public interface ISnapshotStore
     Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default);
     Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default);
     Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default);
+    Task MarkFacilityTeardownProgressAsync(Guid runId, string facilityId, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default);
+    Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);

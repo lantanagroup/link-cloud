@@ -379,7 +379,7 @@ public sealed class LeftoverRunCleanupService(
                 .Take(Math.Max(0, limit - facilityWork.Count))
                 .ToList();
             var historyWork = new List<AutomationRunSummary>();
-            var partialHistoryTeardown = new List<string>();
+            var partialHistoryTeardown = new List<(Guid RunId, string FacilityId)>();
             if (purgeHistory && (mode == "history-purge" || teardownFacilities))
             {
                 var spent = facilityWork.Count + retainedWork.Count;
@@ -397,15 +397,18 @@ public sealed class LeftoverRunCleanupService(
                     if (spent >= limit)
                         break;
 
+                    var done = new HashSet<string>(
+                        await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
+                        StringComparer.OrdinalIgnoreCase);
                     var owned = OwnedAutomationFacilityIds(run);
-                    var fresh = owned.Where(id => !scheduledTeardown.Contains(id)).ToList();
+                    var fresh = owned.Where(id => !done.Contains(id) && !scheduledTeardown.Contains(id)).ToList();
                     var room = limit - spent;
                     if (fresh.Count > room)
                     {
                         foreach (var id in fresh.Take(room))
                         {
                             scheduledTeardown.Add(id);
-                            partialHistoryTeardown.Add(id);
+                            partialHistoryTeardown.Add((run.RunId, id));
                         }
                         break;
                     }
@@ -524,8 +527,13 @@ public sealed class LeftoverRunCleanupService(
                     var teardownInPurge = mode == "history-purge" || teardownFacilities;
                     // FacilityId and the scenario RunId are both Automation-owned facility ids.
                     // Keep the run snapshot when a required teardown fails so a later pass can retry.
+                    var done = new HashSet<string>(
+                        await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
+                        StringComparer.OrdinalIgnoreCase);
                     var pendingTeardown = teardownInPurge
-                        ? OwnedAutomationFacilityIds(run).Where(id => IsNewHistoryTeardown(id, tornDown)).ToList()
+                        ? OwnedAutomationFacilityIds(run)
+                            .Where(id => !done.Contains(id) && IsNewHistoryTeardown(id, tornDown))
+                            .ToList()
                         : [];
                     var teardownFailed = false;
                     foreach (var facilityId in pendingTeardown)
@@ -555,6 +563,7 @@ public sealed class LeftoverRunCleanupService(
                             tornDown.Add(facilityId);
                             // A custom-range facility pass may already have recorded this id. A successful retry clears it.
                             failedFacilities.RemoveAll(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
+                            await snapshotStore.MarkFacilityTeardownProgressAsync(run.RunId, facilityId, cancellationToken);
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
@@ -587,6 +596,7 @@ public sealed class LeftoverRunCleanupService(
                             cancellationToken,
                             teardownFacility: false);
                         purged.Add(run.RunId);
+                        await snapshotStore.ClearFacilityTeardownProgressAsync(run.RunId, cancellationToken);
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -623,7 +633,7 @@ public sealed class LeftoverRunCleanupService(
                 processed++;
             }
 
-            foreach (var facilityId in partialHistoryTeardown)
+            foreach (var (runId, facilityId) in partialHistoryTeardown)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (tornDown.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
@@ -639,6 +649,7 @@ public sealed class LeftoverRunCleanupService(
                         censusClient, reportClient, abortRegistry, settings, facilityId, cancellationToken);
                     tornDown.Add(facilityId);
                     failedFacilities.RemoveAll(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
+                    await snapshotStore.MarkFacilityTeardownProgressAsync(runId, facilityId, cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -842,8 +853,9 @@ public sealed class LeftoverRunCleanupService(
         {
             foreach (var id in OwnedAutomationFacilityIds(run))
             {
-                if (!heldOutsideThisPurge.Contains(id))
-                    attempted.Add(id);
+                if (heldOutsideThisPurge.Contains(id))
+                    continue;
+                attempted.Add(id);
             }
         }
 
