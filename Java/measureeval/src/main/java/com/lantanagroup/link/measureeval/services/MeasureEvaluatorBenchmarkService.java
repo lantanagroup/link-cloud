@@ -131,7 +131,12 @@ public class MeasureEvaluatorBenchmarkService {
 
         var measurePackage = parseMeasurePackage(measurePackageFile);
         validateMeasurePackage(measurePackage);
-        this.measureEvaluator = MeasureEvaluator.compile(this.fhirContext, measurePackage, true);
+        // isDebug=false: the compile() call is a warmup that evaluates against a synthetic patient
+        // to prime CQL caches. Debug tracing adds no value here and enables a CQF path
+        // (ExpressionDefTraceFrame.fromActivationFrames) that NPEs when compile()'s null
+        // periodStart/periodEnd forces resolveDefaultMeasurementPeriod through the trace builder.
+        // Every other MeasureEvaluator.compile(...) caller in this codebase passes false too.
+        this.measureEvaluator = MeasureEvaluator.compile(this.fhirContext, measurePackage, false);
         logger.info("Measure package validated successfully.");
 
         systemInfo = new SystemInfo();
