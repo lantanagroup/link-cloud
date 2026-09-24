@@ -1,0 +1,199 @@
+using FluentAssertions;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Task = System.Threading.Tasks.Task;
+
+namespace UnitTests.Shared;
+
+[Trait("Category", "UnitTests")]
+public class PipelineAbortRegistryTests
+{
+    [Fact]
+    public async Task Abort_by_facility_is_visible_to_later_checks()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var facilityId = Guid.NewGuid().ToString();
+
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeFalse();
+
+        await registry.AbortAsync(facilityId, reportId: null, TimeSpan.FromDays(14));
+
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeTrue();
+        (await registry.IsAbortedAsync(Guid.NewGuid().ToString(), null)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Abort_by_report_is_visible_even_without_facility()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var reportId = Guid.NewGuid().ToString();
+
+        await registry.AbortAsync(facilityId: null, reportId, TimeSpan.FromDays(14));
+
+        (await registry.IsAbortedAsync(null, reportId)).Should().BeTrue();
+        (await registry.IsAbortedAsync(Guid.NewGuid().ToString(), reportId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Clear_removes_report_abort_without_touching_other_reports()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var reportId = Guid.NewGuid().ToString();
+        var other = Guid.NewGuid().ToString();
+
+        await registry.AbortAsync(null, reportId, TimeSpan.FromDays(14));
+        await registry.AbortAsync(null, other, TimeSpan.FromDays(14));
+        await registry.ClearAsync(null, reportId);
+
+        (await registry.IsAbortedAsync(null, reportId)).Should().BeFalse();
+        (await registry.IsAbortedAsync(null, other)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Abort_expires_after_ttl()
+    {
+        var time = new FrozenTimeProvider { UtcNow = DateTimeOffset.Parse("2026-09-16T12:00:00Z") };
+        var registry = new InMemoryPipelineAbortRegistry(time);
+        var facilityId = Guid.NewGuid().ToString();
+
+        await registry.AbortAsync(facilityId, reportId: null, TimeSpan.FromMinutes(5));
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeTrue();
+
+        time.UtcNow = time.UtcNow.AddMinutes(5).AddSeconds(1);
+        (await registry.IsAbortedAsync(facilityId, null)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Blank_ids_are_never_aborted()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        await registry.AbortAsync(" ", " ", TimeSpan.FromDays(1));
+        (await registry.IsAbortedAsync(null, null)).Should().BeFalse();
+        (await registry.IsAbortedAsync("", "")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Abort_matches_equivalent_guid_representations()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        var guid = Guid.Parse("AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE");
+
+        await registry.AbortAsync(guid.ToString("B").ToUpperInvariant(), guid.ToString("N").ToUpperInvariant(), TimeSpan.FromDays(14));
+
+        (await registry.IsAbortedAsync(guid.ToString("D"), null)).Should().BeTrue();
+        (await registry.IsAbortedAsync(null, guid.ToString("D"))).Should().BeTrue();
+        (await registry.IsAbortedAsync(guid.ToString("P"), guid.ToString("B"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Named_facility_ids_are_trimmed_but_not_rewritten()
+    {
+        var registry = new InMemoryPipelineAbortRegistry();
+        await registry.AbortAsync("  echs  ", reportId: null, TimeSpan.FromDays(14));
+        (await registry.IsAbortedAsync("echs", null)).Should().BeTrue();
+        (await registry.IsAbortedAsync("ECHS", null)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void AddPipelineAbortRegistry_without_redis_requires_explicit_in_memory()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        Action act = () => new ServiceCollection().AddPipelineAbortRegistry(configuration);
+        act.Should().Throw<InvalidOperationException>().WithMessage("*AllowInMemory*");
+    }
+
+    [Fact]
+    public void AddPipelineAbortRegistry_allow_in_memory_registers_local_registry()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [PipelineAbortRegistryExtensions.AllowInMemoryConfigurationKey] = "true"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddPipelineAbortRegistry(configuration);
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IPipelineAbortRegistry>().Should().BeOfType<InMemoryPipelineAbortRegistry>();
+    }
+
+    [Fact]
+    public void ApplyRedisPassword_AddsPasswordWhenConnectionStringHasNone()
+    {
+        var result = PipelineAbortRegistryExtensions.ApplyRedisPassword(
+            "redis_cache:6379,abortConnect=false",
+            "s3cret");
+
+        result.Should().Contain("password=s3cret");
+        result.Should().Contain("redis_cache:6379");
+    }
+
+    [Fact]
+    public void ApplyRedisPassword_DoesNotOverwriteExistingPassword()
+    {
+        var result = PipelineAbortRegistryExtensions.ApplyRedisPassword(
+            "localhost:6379,password=already-set",
+            "other");
+
+        result.Should().Contain("password=already-set");
+        result.Should().NotContain("other");
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_UsesRedisPasswordSection()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "redis_cache:6379,abortConnect=false",
+                ["Redis:Password"] = "from-redis-section"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-redis-section");
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_FallsBackToResourceCachePassword()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "redis_cache:6379",
+                ["ResourceCache:Redis:Password"] = "from-cache"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-cache");
+    }
+
+    private sealed class FrozenTimeProvider : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; }
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+    }
+
+    [Fact]
+    public void BuildRedisConfiguration_FallsBackToRedisPassEnvName()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["REDIS_PASS"] = "from-env"
+            })
+            .Build();
+
+        var result = PipelineAbortRegistryExtensions.BuildRedisConfiguration(configuration);
+
+        result.Should().Contain("password=from-env");
+    }
+}

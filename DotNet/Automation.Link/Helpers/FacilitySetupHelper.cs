@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -21,16 +22,183 @@ public static class FacilitySetupHelper
     /// </summary>
     private const string FacilityTimeZone = "America/Chicago";
 
+    /// <summary>
+    /// Legacy callers omit the vendor and still create an Epic facility.
+    /// An explicit vendor is sent as given. An explicit blank vendor is omitted.
+    /// </summary>
+    private static async Task ApplyExplicitVendorAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        FacilityModel existing,
+        string? vendorName,
+        bool dmrpEnabled,
+        CancellationToken cancellationToken)
+    {
+        var desired = ResolveVendor(vendorName, vendorExplicit: true);
+        var desiredName = desired?.Name;
+        var currentName = existing.Vendor?.Name;
+        if (string.Equals(currentName, desiredName, StringComparison.OrdinalIgnoreCase))
+        {
+            output.WriteLine($"Facility '{existing.FacilityId}' already uses vendor '{currentName ?? "(none)"}'.");
+            return;
+        }
+
+        Guid? vendorVersionId = null;
+        if (!string.IsNullOrWhiteSpace(desiredName))
+            vendorVersionId = await EnsureVendorVersionIdAsync(facilityClient, output, desiredName, cancellationToken);
+
+        var updated = await facilityClient.UpdateAsync(existing.FacilityId!, new FacilityModel
+        {
+            Id = existing.Id,
+            FacilityId = existing.FacilityId,
+            FacilityName = existing.FacilityName,
+            TimeZone = string.IsNullOrWhiteSpace(existing.TimeZone) ? FacilityTimeZone : existing.TimeZone,
+            Vendor = desired,
+            VendorVersionId = vendorVersionId,
+            ScheduledReports = dmrpEnabled
+                ? MonthlySchedule([])
+                : existing.ScheduledReports ?? MonthlySchedule([])
+        }, cancellationToken);
+
+        if (!updated.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to update vendor for facility '{existing.FacilityId}'. HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine($"Updated facility '{existing.FacilityId}' vendor from '{currentName ?? "(none)"}' to '{desiredName ?? "(none)"}'.");
+    }
+
+    private static async Task<Guid> EnsureVendorVersionIdAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
+        var vendorId = await EnsureVendorIdAsync(facilityClient, output, vendorName, cancellationToken);
+        return await EnsureVendorVersionIdAsync(facilityClient, vendorId, vendorName, cancellationToken);
+    }
+
+    /// <summary>
+    /// A failed vendor list is not an empty catalog. Creating from that would duplicate vendors
+    /// and hide the Tenant error. A create that loses a race comes back as a conflict, so the
+    /// list is read again before the failure is reported.
+    /// </summary>
+    private static async Task<Guid> EnsureVendorIdAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
+        var listed = await facilityClient.GetVendorsAsync(cancellationToken);
+        if (!listed.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to list vendors before creating '{vendorName}'. HTTP {listed.StatusCode}: {listed.RawBody ?? "(no body)"}");
+        }
+
+        var existingId = FindVendorId(listed.Body, vendorName);
+        if (existingId is Guid vendorId)
+            return vendorId;
+
+        var created = await facilityClient.CreateVendorAsync(new CreateVendorModel { Name = vendorName }, cancellationToken);
+        if (created.IsSuccessStatusCode && created.Body?.Id is Guid createdId)
+        {
+            output.WriteLine($"Created vendor '{vendorName}'.");
+            return createdId;
+        }
+
+        var reread = await facilityClient.GetVendorsAsync(cancellationToken);
+        if (reread.IsSuccessStatusCode && FindVendorId(reread.Body, vendorName) is Guid racedId)
+        {
+            output.WriteLine($"Vendor '{vendorName}' was created by another run.");
+            return racedId;
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to create vendor '{vendorName}'. HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+    }
+
+    private static Guid? FindVendorId(IEnumerable<VendorModel>? vendors, string vendorName) =>
+        vendors?.FirstOrDefault(v => string.Equals(v.Name, vendorName, StringComparison.OrdinalIgnoreCase))?.Id;
+
+    private static async Task<Guid> EnsureVendorVersionIdAsync(
+        IFacilityServiceClient facilityClient,
+        Guid vendorId,
+        string vendorName,
+        CancellationToken cancellationToken)
+    {
+        var versions = await facilityClient.GetVendorVersionsAsync(vendorId, cancellationToken);
+        if (!versions.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to list vendor versions for '{vendorName}'. HTTP {versions.StatusCode}: {versions.RawBody ?? "(no body)"}");
+        }
+
+        if (FirstVersionId(versions.Body) is Guid existingVersionId)
+            return existingVersionId;
+
+        var createdVersion = await facilityClient.CreateVendorVersionAsync(new CreateVendorVersionModel
+        {
+            VendorId = vendorId,
+            Version = "automation"
+        }, cancellationToken);
+        if (createdVersion.IsSuccessStatusCode && createdVersion.Body?.Id is Guid newVersionId)
+            return newVersionId;
+
+        var reread = await facilityClient.GetVendorVersionsAsync(vendorId, cancellationToken);
+        if (reread.IsSuccessStatusCode && FirstVersionId(reread.Body) is Guid racedVersionId)
+            return racedVersionId;
+
+        throw new InvalidOperationException(
+            $"Failed to create a vendor version for '{vendorName}'. HTTP {createdVersion.StatusCode}: {createdVersion.RawBody ?? "(no body)"}");
+    }
+
+    private static Guid? FirstVersionId(IEnumerable<VendorVersionModel>? versions) =>
+        versions?.Select(v => v.Id).FirstOrDefault(id => id.HasValue);
+
+    /// <summary>
+    /// Tenant stores a facility vendor as <see cref="FacilityModel.VendorVersionId"/>.
+    /// A name on <see cref="FacilityModel.Vendor"/> is not mapped onto that id.
+    /// </summary>
+    private static async Task StampVendorAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        FacilityModel model,
+        string? vendorName,
+        bool vendorExplicit,
+        CancellationToken cancellationToken)
+    {
+        var vendor = ResolveVendor(vendorName, vendorExplicit);
+        model.Vendor = vendor;
+        model.VendorVersionId = string.IsNullOrWhiteSpace(vendor?.Name)
+            ? null
+            : await EnsureVendorVersionIdAsync(facilityClient, output, vendor.Name!, cancellationToken);
+    }
+
+    private static VendorModel? ResolveVendor(string? vendorName, bool vendorExplicit)
+    {
+        if (!vendorExplicit)
+            return new VendorModel { Name = "Epic" };
+
+        if (string.IsNullOrWhiteSpace(vendorName))
+            return null;
+
+        return new VendorModel { Name = vendorName.Trim() };
+    }
+
     public static async Task EnsureFacilityAsync(
         IFacilityServiceClient facilityClient,
         IDmrpServiceClient dmrpClient,
         IAutomationOutput output,
         string facilityId,
         string? measureId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false)
     {
         await EnsureFacilityAsync(facilityClient, dmrpClient, output, facilityId,
-            measureId != null ? [measureId] : [], cancellationToken);
+            measureId != null ? [measureId] : [], cancellationToken, vendorName, vendorExplicit);
     }
 
     /// <summary>
@@ -51,31 +219,38 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         List<string> measureIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
         if (existing.IsSuccessStatusCode && existing.Body != null)
         {
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
+            if (vendorExplicit)
+            {
+                var dmrpEnabledForUpdate = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
+                await ApplyExplicitVendorAsync(
+                    facilityClient, output, existing.Body, vendorName, dmrpEnabledForUpdate, cancellationToken);
+            }
+
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
             return;
         }
 
         var dmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
 
-        var createResponse = await facilityClient.CreateAsync(new FacilityModel
+        var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = new VendorModel
-            {
-                Name = "Epic"
-            },
             // Empty under DMRP, and not merely unselected: a request that names any report is refused
             // outright. The measures are enrolled below instead.
             ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds)
-        }, cancellationToken);
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var createResponse = await facilityClient.CreateAsync(facility, cancellationToken);
 
         if (!createResponse.IsSuccessStatusCode)
         {
@@ -88,7 +263,7 @@ public static class FacilitySetupHelper
         if (dmrpEnabled)
         {
             await EnrollFacilityInDmrpMeasuresAsync(facilityClient, dmrpClient, output, facilityId,
-                measureIds, cancellationToken);
+                measureIds, cancellationToken, vendorName, vendorExplicit);
         }
     }
 
@@ -149,7 +324,9 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId,
         List<string> measureIds,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? vendorName,
+        bool vendorExplicit)
     {
         if (measureIds.Count == 0)
         {
@@ -161,24 +338,22 @@ public static class FacilitySetupHelper
         {
             var mappingId = await EnsureMeasureMappingAsync(dmrpClient, output, measureId, cancellationToken);
 
-            foreach (var (month, year) in ReportingPeriods())
+            foreach (var (month, year) in GetDmrpReportingPeriods())
             {
                 await EnsureReportingPlanAsync(dmrpClient, output, facilityId, mappingId, month, year,
                     cancellationToken);
             }
         }
 
-        var updated = await facilityClient.UpdateAsync(facilityId, new FacilityModel
+        var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            Vendor = new VendorModel
-            {
-                Name = "Epic"
-            },
             ScheduledReports = MonthlySchedule([])
-        }, cancellationToken);
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
 
         if (!updated.IsSuccessStatusCode)
         {
@@ -199,7 +374,7 @@ public static class FacilitySetupHelper
     /// the two saves would otherwise derive an empty schedule from a period nothing was enrolled for,
     /// then fail much later with an error about scheduled reports rather than about the clock.
     /// </remarks>
-    private static IReadOnlyList<(int Month, int Year)> ReportingPeriods()
+    public static IReadOnlyList<(int Month, int Year)> GetDmrpReportingPeriods()
     {
         var now = FacilityLocalNow();
         var next = now.AddMonths(1);
@@ -406,11 +581,15 @@ public static class FacilitySetupHelper
         IDataAcquisitionServiceClient dataAcqClient,
         AutomationConfig config,
         IAutomationOutput output,
-        string facilityId)
+        string facilityId,
+        int? concurrencyOverride = null)
     {
-        // Keep concurrency high enough to avoid single-request bottlenecks,
-        // but cap it to reduce downstream service saturation in large volume runs.
-        var effectiveMaxConcurrentRequests = Math.Clamp(config.FhirQuery.MaxConcurrentRequests, 1, 8);
+        // v1 concurrency is 1–8. Scenario Concurrency maps to DA MaxConcurrentRequests here.
+        // Worker AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions is a separate cap
+        // (also 8 in appsettings). Setting 16 silently becomes 8; lifting this requires changing
+        // both clamps. Do not treat this as a soak or saturation test.
+        var requested = concurrencyOverride ?? config.FhirQuery.MaxConcurrentRequests;
+        var effectiveMaxConcurrentRequests = Math.Clamp(requested, 1, 8);
 
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
@@ -583,6 +762,9 @@ public static class FacilitySetupHelper
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Discharge");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Daily");
         await dataAcqClient.DeleteQueryPlanAsync(facilityId, "Monthly");
+        var fhirList = await dataAcqClient.DeleteFhirListConfigurationAsync(facilityId);
+        if (!fhirList.IsSuccessStatusCode && fhirList.StatusCode != 404)
+            throw new InvalidOperationException($"FHIR list config delete failed for '{facilityId}' (HTTP {fhirList.StatusCode}).");
         await dataAcqClient.DeleteFhirQueryConfigurationAsync(facilityId);
         await facilityClient.DeleteAsync(facilityId);
         output.WriteLine("Facility cleanup complete.");
@@ -627,17 +809,171 @@ public static class FacilitySetupHelper
             SupplementalQueries = jBody["SupplementalQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>()
         };
 
+        // Plans are keyed by facility and type. A reused NHSN facility would otherwise keep
+        // the plan from the previous run, including its EHR description.
+        var deleted = await dataAcqClient.DeleteQueryPlanAsync(facilityId, type);
+        if (!deleted.IsSuccessStatusCode && deleted.StatusCode != (int)HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException(
+                $"Failed to replace {type} query plan for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
+        }
+
         var createdPlan = await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
         if (!createdPlan.IsSuccessStatusCode)
         {
-            if (createdPlan.StatusCode == (int)HttpStatusCode.Conflict)
-            {
-                output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
-                return;
-            }
-
             throw new InvalidOperationException(
                 $"Failed to create {type} query plan for facility '{facilityId}'. HTTP {createdPlan.StatusCode}: {createdPlan.RawBody ?? "(no body)"}");
         }
+
+        output.WriteLine($"Replaced {type} query plan for facility '{facilityId}'.");
+    }
+
+    public static async Task EnsureEmptyDmrpFacilityAsync(
+    IFacilityServiceClient facilityClient,
+    IAutomationOutput output,
+    string facilityId,
+    CancellationToken cancellationToken = default,
+    string? vendorName = null,
+    bool vendorExplicit = false)
+    {
+        var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
+
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            output.WriteLine($"Facility '{facilityId}' already exists.");
+            if (vendorExplicit)
+            {
+                await ApplyExplicitVendorAsync(
+                    facilityClient, output, existing.Body, vendorName, dmrpEnabled: true, cancellationToken);
+            }
+
+            await WaitForFacilityReadConsistencyAsync(
+                facilityClient,
+                output,
+                facilityId,
+                cancellationToken);
+
+            return;
+        }
+
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            ScheduledReports = MonthlySchedule([])
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var created = await facilityClient.CreateAsync(facility, cancellationToken);
+
+        if (!created.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create DMRP facility '{facilityId}'. " +
+                $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+        }
+
+        await WaitForFacilityReadConsistencyAsync(
+            facilityClient,
+            output,
+            facilityId,
+            cancellationToken);
+    }
+
+    public static async Task RefreshDmrpDerivedScheduleAsync(
+    IFacilityServiceClient facilityClient,
+    IAutomationOutput output,
+    string facilityId,
+    CancellationToken cancellationToken = default,
+    string? vendorName = null,
+    bool vendorExplicit = false)
+    {
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            ScheduledReports = MonthlySchedule([])
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+        var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
+
+        if (!updated.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to derive the DMRP schedule for facility '{facilityId}'. " +
+                $"HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(
+            $"Refreshed DMRP-derived schedule for facility '{facilityId}'.");
+    }
+
+    public static async Task<string> EnsureDmrpMeasureMappingAsync(
+    IDmrpServiceClient dmrpClient,
+    IAutomationOutput output,
+    string nhsnMeasure,
+    string dqm,
+    Frequency frequency,
+    CancellationToken cancellationToken = default)
+    {
+        var search = await dmrpClient.SearchMeasureMappingsAsync(
+            measure: nhsnMeasure,
+            dqm: dqm,
+            frequency: frequency,
+            pageSize: 1,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+
+        var existingId = search.Body?.Records?.FirstOrDefault()?.Id;
+
+        if (!string.IsNullOrWhiteSpace(existingId))
+        {
+            output.WriteLine($"DMRP measure mapping '{nhsnMeasure}' -> '{dqm}' already exists. Reusing it.");
+
+            return existingId;
+        }
+
+        var created = await dmrpClient.CreateMeasureMappingAsync(
+            new MeasureMappingModel
+            {
+                Measure = nhsnMeasure,
+                DQM = dqm,
+                Frequency = frequency
+            },
+            cancellationToken);
+
+        if (created.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(created.Body?.Id))
+        {
+            output.WriteLine($"Created DMRP measure mapping '{nhsnMeasure}' -> '{dqm}'.");
+
+            return created.Body!.Id!;
+        }
+
+        if (created.StatusCode == (int)HttpStatusCode.BadRequest)
+        {
+            var concurrentSearch = await dmrpClient.SearchMeasureMappingsAsync(
+                measure: nhsnMeasure,
+                dqm: dqm,
+                frequency: frequency,
+                pageSize: 1,
+                pageNumber: 1,
+                cancellationToken: cancellationToken);
+
+            var concurrentId = concurrentSearch.Body?.Records?.FirstOrDefault()?.Id;
+
+            if (!string.IsNullOrWhiteSpace(concurrentId))
+            {
+                output.WriteLine(
+                    $"DMRP measure mapping '{nhsnMeasure}' -> '{dqm}' " +
+                    $"was created concurrently. Reusing it.");
+
+                return concurrentId;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to create DMRP measure mapping '{nhsnMeasure}' -> '{dqm}'. " +
+            $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
     }
 }

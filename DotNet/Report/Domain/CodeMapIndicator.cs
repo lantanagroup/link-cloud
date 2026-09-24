@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Report.Domain;
 

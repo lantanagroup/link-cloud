@@ -14,7 +14,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 /// Exercises Normalization service CRUD operations via LinkSdk.
 /// Self-contained: creates its own prerequisite facility for each run.
 /// Covers operations/sequences plus the LEGLINK-677 facility-location and HSLOC mapping APIs,
-/// including SDK-reachable 4xx/409 paths and persisted LocationName/LocationAlias/LocalCodeSystem fields.
+/// the LEGLINK-674/675 HSLOC code-set GET, and persisted LocationName/LocationAlias/LocalCodeSystem fields.
 /// </summary>
 public sealed class NormalizationTestSuite : ServiceTestSuiteBase
 {
@@ -89,6 +89,14 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 "/health",
                 ct));
         }
+
+        results.Add(await RunStepAsync(StepNames.HslocGet200, 200, async () =>
+        {
+            var resp = await _client.GetHslocCodesAsync(cancellationToken: ct);
+            if (resp.IsSuccessStatusCode && (resp.Body == null || !resp.Body.Any(code => code.IsActive && !string.IsNullOrWhiteSpace(code.HSLOCCode))))
+                throw new InvalidOperationException("Expected at least one active HSLOC code from GET /api/normalization/HSLOC.");
+            return resp;
+        }, ct: ct));
 
         var facilityId = $"ApiHealth-Norm-{Guid.NewGuid():N}";
         var facilityCreated = false;
@@ -300,6 +308,14 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                     LocationName = locationName,
                     LocationAlias = locationAlias
                 }, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.LocationsGet200, 200, async () =>
+            {
+                var resp = await _client.GetFacilityLocationsAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode && (resp.Body?.Records == null || !resp.Body.Records.Any(location => location.LocationId == locationId)))
+                    throw new InvalidOperationException("Expected the created facility location in the facility locations response.");
+                return resp;
+            }, ct: ct));
 
             results.Add(await RunStepAsync(StepNames.LocationGet200, 200, async () =>
             {

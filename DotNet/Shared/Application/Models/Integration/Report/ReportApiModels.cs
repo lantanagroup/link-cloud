@@ -25,6 +25,8 @@ public class ReportScheduleApiModel
 public class ReportEntryApiModel
 {
     public Guid Id { get; set; }
+    public DateTime? CreateDate { get; set; }
+    public DateTime? ModifyDate { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public string PatientId { get; set; } = string.Empty;
     public ReportingStatus ReportingStatus { get; set; }

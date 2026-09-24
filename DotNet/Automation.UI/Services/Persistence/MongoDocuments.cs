@@ -20,6 +20,7 @@ public sealed class AutomationRunDocument
     public int PatientCount { get; set; }
     public int ResourcesPerPatient { get; set; }
     public int Seed { get; set; }
+    public bool IsMetricsRun { get; set; }
     public string? RunConfigurationJson { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }

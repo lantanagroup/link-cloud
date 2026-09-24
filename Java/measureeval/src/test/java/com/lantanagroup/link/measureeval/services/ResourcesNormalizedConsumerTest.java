@@ -121,6 +121,6 @@ class ResourcesNormalizedConsumerTest {
 
         // Assert - measureReportGeneratedProducer.produceMeasureReportGeneratedRecord was called
         verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(
-                eq(patientStatus), eq(report), anyString(), isNull(), isNull());
+                eq(patientStatus), eq(report), anyString(), isNull(), isNull(), any());
     }
 }

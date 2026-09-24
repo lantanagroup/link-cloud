@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Normalization.Application.Models.FacilityLocations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Filters;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,35 @@ public class FacilityLocationsController : ControllerBase
     public FacilityLocationsController(IFacilityLocationManager facilityLocationManager)
     {
         _facilityLocationManager = facilityLocationManager;
+    }
+
+    [HttpGet("facilities/{facilityId}/locations")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<FacilityLocationTreeModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError, Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<PagedConfigModel<FacilityLocationTreeModel>>> GetForFacility(
+        string facilityId, CancellationToken cancellationToken)
+    {
+        facilityId = SanitizeIdentifier(facilityId);
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            return Problem(detail: "A facility identifier must be provided.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var locations = await _facilityLocationManager.GetForFacility(facilityId, cancellationToken);
+            return Ok(new PagedConfigModel<FacilityLocationTreeModel>(locations,
+                new PaginationMetadata(Math.Max(locations.Count, 1), 1, locations.Count)));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return Problem(detail: "Unable to load facility locations.", statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 
     [HttpGet("facilities/{facilityId}/locations/{locationId}")]

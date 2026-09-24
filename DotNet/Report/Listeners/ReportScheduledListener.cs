@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Jobs;
@@ -129,6 +130,7 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("ReportScheduled event is null.");
                 }
 
+                using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
                 var key = result.Message.Key;
                 var value = result.Message.Value;
 
@@ -147,6 +149,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 var endDate = value.EndDate;
                 var frequency = value.Frequency;
                 var reportId = value.ReportTrackingId;
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, nameof(ReportScheduledListener), facilityId, reportId?.ToString(), cancellationToken))
+                    return;
 
                 var reportTypes = value.ReportTypes;
 

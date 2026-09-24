@@ -46,9 +46,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
         private readonly IFacilityReportingPlanLookAhead _lookAhead;
         private readonly IFacilityExistence _facilityExistence;
         private readonly IDmrpReportingPlanSync _sync;
-        private readonly TimeProvider _timeProvider;
+        private readonly IFacilityReportingPeriodResolver _facilityReportingPeriodResolver;
 
-        public FacilityReportingPlansController(ILogger<FacilityReportingPlansController> logger, IFacilityReportingPlanManager manager, IFacilityReportingPlanQueries queries, IFacilityReportingPlanLookAhead lookAhead, IDmrpReportingPlanSync sync, IFacilityExistence facilityExistence, TimeProvider timeProvider)
+        public FacilityReportingPlansController(
+            ILogger<FacilityReportingPlansController> logger, 
+            IFacilityReportingPlanManager manager, 
+            IFacilityReportingPlanQueries queries, 
+            IFacilityReportingPlanLookAhead lookAhead, 
+            IDmrpReportingPlanSync sync, 
+            IFacilityExistence facilityExistence, 
+            IFacilityReportingPeriodResolver facilityReportingPeriodResolver)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
@@ -56,7 +63,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             _lookAhead = lookAhead ?? throw new ArgumentNullException(nameof(lookAhead));
             _facilityExistence = facilityExistence ?? throw new ArgumentNullException(nameof(facilityExistence));
             _sync = sync ?? throw new ArgumentNullException(nameof(sync));
-            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            _facilityReportingPeriodResolver = facilityReportingPeriodResolver ?? throw new ArgumentNullException(nameof(facilityReportingPeriodResolver));
         }
 
         /// <summary>
@@ -175,14 +182,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// withdrawn from. Omit to return both.
         /// </param>
         /// <param name="monthsAhead">
-        /// Optional look-ahead of 1 to 24 reporting periods, counting the current one. Cannot be
-        /// combined with month or year - a request that supplies both is refused rather than resolved
-        /// by a precedence rule the caller would have to know.
+        /// Optional look-ahead of 1 to 24 reporting periods, counting the current one - the month the
+        /// facility is in by its own timezone, or UTC when it has none. Cannot be combined with month
+        /// or year - a request that supplies both is refused rather than resolved by a precedence rule
+        /// the caller would have to know.
         /// </param>
         /// <param name="refresh">
         /// Asks DMRP for the facility's plan before answering, so the response reflects what DMRP
         /// says now rather than what Link last recorded. Refreshes the period the request is about -
-        /// month and year when given, otherwise the current one.
+        /// month and year when given, otherwise the current one, read in the facility's timezone. A
+        /// month given without a year takes its year from the facility's current period.
         /// </param>
         /// <param name="cancellationToken">Cancels the request.</param>
         /// <response code="200">
@@ -220,12 +229,17 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequestProblem(periodError);
             }
 
-            // The period the request is about. An exact month or year names it; without one the
-            // current period is the only thing the request can mean.
-            var current = CurrentPeriod();
+            ReportingPeriod? current = null;
+
+            // The current period only matters for a look-ahead window or a refresh. Without either, skip the
+            // facility lookup; this is the Admin UI's call.
+            if (monthsAhead is not null || refresh)
+            {
+                current = await _facilityReportingPeriodResolver.ResolveAsync(facilityId, cancellationToken);
+            }
 
             var refreshFailure = await RefreshAsync(refresh, facilityId,
-                new ReportingPeriod(year ?? current.Year, month ?? current.Month), cancellationToken);
+                new ReportingPeriod(year ?? current?.Year ?? 0, month ?? current?.Month ?? 0), cancellationToken);
 
             if (refreshFailure is not null)
             {
@@ -235,7 +249,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plans For Facility");
 
             var results = await _queries.GetForFacilityAsync(facilityId, month, year, isReporting,
-                LookAheadWindow(monthsAhead, current), cancellationToken);
+                current is null ? null : LookAheadWindow(monthsAhead, current.Value), cancellationToken);
 
             return Ok(results);
         }
@@ -250,17 +264,18 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// period with its measures, rather than a row per measure - so the table renders from one
         /// call with no client-side grouping or join to the measure mappings.
         /// <para>
-        /// The look-ahead is anchored on the current month in UTC. A facility whose local month has
-        /// already turned over sees the window start one month behind for those few hours; the
-        /// facility's own timezone is not available to this module, and the reporting workflow reads
-        /// its period from that timezone, so the two can disagree at a month boundary.
+        /// The current period is the month the facility is in by its own timezone, the same month its
+        /// scheduled reports are built from, so the look-ahead agrees with the schedule Link runs even
+        /// near a month boundary. A facility with no usable timezone, or an id Link has no facility
+        /// for, is anchored on the current month in UTC instead.
         /// </para>
         /// </remarks>
         /// <param name="facilityId">The reporting facility, as the Tenant service knows it (the NHSN Org Id).</param>
         /// <param name="monthsAhead">
         /// Optional look-ahead of 1 to 24 reporting periods, counting the current one -
-        /// <c>monthsAhead=6</c> is this month and the next five. Omit to return every period the
-        /// facility has a plan for, past ones included.
+        /// <c>monthsAhead=6</c> is this month and the next five, where this month is the one the
+        /// facility is in by its own timezone, or UTC when it has none. Omit to return every period
+        /// the facility has a plan for, past ones included.
         /// </param>
         /// <param name="isReporting">
         /// Optional. Defaults to true, so the response is what the facility is currently obliged to
@@ -268,9 +283,10 @@ namespace LantanaGroup.Link.DMRP.Controllers
         /// deleted.
         /// </param>
         /// <param name="refresh">
-        /// Asks DMRP for the facility's plan before answering. Refreshes the current period, which is
-        /// the enrollment every projected month in the window is derived from - so one refresh makes
-        /// the whole look-ahead current, rather than one call per month in it.
+        /// Asks DMRP for the facility's plan before answering. Refreshes the current period, read in
+        /// the facility's timezone, which is the enrollment every projected month in the window is
+        /// derived from - so one refresh makes the whole look-ahead current, rather than one call per
+        /// month in it.
         /// </param>
         /// <param name="pageSize">Periods per page, 1 to 100. Defaults to 10.</param>
         /// <param name="pageNumber">One-based page number. Defaults to 1.</param>
@@ -317,12 +333,16 @@ namespace LantanaGroup.Link.DMRP.Controllers
                 return BadRequestProblem(pagingError);
             }
 
-            // One reading for the whole request. The refresh, the window and the period the answer is
-            // anchored on all have to mean the same month, and taking the clock more than once lets a
-            // request that spans midnight on the last of the month disagree with itself.
-            var anchor = CurrentPeriod();
+            ReportingPeriod? anchor = null;
 
-            var refreshFailure = await RefreshAsync(refresh, facilityId, anchor, cancellationToken);
+            // One resolution for the whole request: the refresh, the window and the anchor must all mean the same
+            // month. Only a window or a refresh uses it, so without either the facility lookup is skipped.
+            if (monthsAhead is not null || refresh)
+            {
+                anchor = await _facilityReportingPeriodResolver.ResolveAsync(facilityId, cancellationToken);
+            }
+
+            var refreshFailure = await RefreshAsync(refresh, facilityId, anchor ?? default, cancellationToken);  
 
             if (refreshFailure is not null)
             {
@@ -331,8 +351,13 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facility Reporting Plan Periods");
 
-            var result = await _lookAhead.GetAsync(facilityId, LookAheadWindow(monthsAhead, anchor), anchor,
-                isReporting ?? true, pageSize, pageNumber, cancellationToken);
+            var result = await _lookAhead.GetAsync(
+                facilityId, 
+                anchor is null ? null : LookAheadWindow(monthsAhead, anchor.Value),
+                anchor ?? default,
+                isReporting ?? true, 
+                pageSize, pageNumber, 
+                cancellationToken);
 
             return Ok(result);
         }
@@ -735,18 +760,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
                     statusCode: StatusCodes.Status502BadGateway,
                     title: "Bad Gateway");
             }
-        }
-
-        /// <summary>
-        /// The reporting period the service considers current, in UTC rather than the facility's
-        /// timezone: this module knows whether a facility exists, not where it is. See the remarks on
-        /// <see cref="GetFacilityReportingPlanPeriods"/>.
-        /// </summary>
-        private ReportingPeriod CurrentPeriod()
-        {
-            var now = _timeProvider.GetUtcNow();
-
-            return new ReportingPeriod(now.Year, now.Month);
         }
 
         private static string? ValidatePeriodFilters(int? month, int? year)
