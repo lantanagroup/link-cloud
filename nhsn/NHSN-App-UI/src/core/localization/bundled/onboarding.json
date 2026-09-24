@@ -190,6 +190,7 @@
       },
       "validateButton": "Validate Census Results",
       "validating": "Validating…",
+      "validateSuccess": "All patient lists validated successfully. Click the view results button beside each field to review its results.",
       "viewResultsAria": "View results for {{list}}",
       "listValidatedAria": "{{list}} validated",
       "listValidatedTooltip": "This patient list was read successfully from the EHR.",
@@ -371,41 +372,17 @@
     "reference": {
       "searchPlaceholder": "Search category, type, mnemonic, description, code, definition…",
       "allCategories": "All Categories",
-      "allTypes": "All Types",
       "resultCount": "{{count}} of {{total}} HSLOC codes",
       "noResults": "No matching HSLOC codes.",
       "columns": {
-        "category": "Category",
-        "type": "Type",
         "code": "Code",
-        "description": "Description",
-        "facilities": "Facilities"
+        "description": "Description"
       },
       "detail": {
         "selectPrompt": "Select a row to see which of your entered location codes map to it.",
         "mappedHeading": "Your Mapped Location Codes",
         "noneMapped": "No location codes you've entered map to this HSLOC code yet.",
         "noCode": "(no code)"
-      },
-      "facilityTypes": {
-        "acuteCareAll": "Acute",
-        "ltac": "LTAC",
-        "ltc": "LTC",
-        "inpatientRehab": "Rehab",
-        "outpatientSurgery": "Surgery",
-        "outpatientDialysis": "Dialysis",
-        "oncology": "Oncology",
-        "inpatientPsych": "Psych"
-      },
-      "facilityTypeTitles": {
-        "acuteCareAll": "Acute Care Facilities (All)",
-        "ltac": "Long Term Acute Care Facilities",
-        "ltc": "Long Term Care Facilities",
-        "inpatientRehab": "Inpatient Rehabilitation Facilities",
-        "outpatientSurgery": "Outpatient Ambulatory Surgery Centers",
-        "outpatientDialysis": "Outpatient Dialysis Facilities",
-        "oncology": "Oncology Facilities",
-        "inpatientPsych": "Inpatient Psychiatric Facilities"
       }
     },
     "messages": {
@@ -451,13 +428,10 @@
       "searchPlaceholder": "Search code system, category, code, description…",
       "systemFilterLabel": "Code system",
       "systemFilterAll": "All Code Systems",
-      "categoryFilterLabel": "Category",
-      "categoryFilterAll": "All Categories",
       "resultCount": "{{count}} of {{total}} codes",
       "noResults": "No matching codes.",
       "columns": {
         "system": "System",
-        "category": "Category",
         "code": "Code",
         "description": "Description"
       },

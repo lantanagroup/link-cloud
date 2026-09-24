@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {HslocCode, HslocFacilityType, HslocMapping} from '../../../api/contracts';
+import type {HslocCode, HslocMapping} from '../../../api/contracts';
 import {
   AcronymText,
   acronymLabel,
@@ -72,18 +72,6 @@ function toMappings(rows: MappingRow[]): HslocMapping[] {
   }));
 }
 
-/** Badge render order — matches the POC's HSLOC_FACILITY_TYPES list. */
-const FACILITY_TYPE_ORDER: HslocFacilityType[] = [
-  'acuteCareAll',
-  'ltac',
-  'ltc',
-  'inpatientRehab',
-  'outpatientSurgery',
-  'outpatientDialysis',
-  'oncology',
-  'inpatientPsych'
-];
-
 /**
  * Location Identification (HSLOC). UI follows Organization Identification's
  * conventions (Tabs, FieldLabel + RepeatableList/TextField, SidePanel, the
@@ -143,8 +131,6 @@ export function HslocStep({onNext, onBack}: StepProps) {
   });
 
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   // Mirrors FhirStep: patch() dispatches, and goNext must not run until that
@@ -207,34 +193,19 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const hslocCodeRequiredError = t('onboarding:hsloc.mapping.fields.hslocCodeRequiredError');
   const duplicateFieldError = t('onboarding:hsloc.mapping.fields.duplicateError');
 
-  const categories = useMemo(
-    () => Array.from(new Set(codes.map(row => row.category).filter((value): value is string => Boolean(value)))).sort(),
-    [codes]
-  );
-  const types = useMemo(
-    () => Array.from(new Set(codes.map(row => row.type).filter((value): value is string => Boolean(value)))).sort(),
-    [codes]
-  );
-
   const filteredCodes = useMemo(() => {
     const query = search.trim().toLowerCase();
+    if (!query) {
+      return codes;
+    }
     return codes.filter(row => {
-      if (categoryFilter && row.category !== categoryFilter) {
-        return false;
-      }
-      if (typeFilter && row.type !== typeFilter) {
-        return false;
-      }
-      if (!query) {
-        return true;
-      }
       const haystack = [row.category, row.type, row.code, row.display, row.definition]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [codes, search, categoryFilter, typeFilter]);
+  }, [codes, search]);
 
   // Keeps the detail panel's selection inside whatever the current filters allow.
   useEffect(() => {
@@ -484,30 +455,6 @@ export function HslocStep({onNext, onBack}: StepProps) {
                 value={search}
                 onChange={event => setSearch(event.target.value)}
               />
-              <div className="nhsn-link__hsloc-filter-row">
-                <select
-                  aria-label={t('onboarding:hsloc.reference.allCategories')}
-                  value={categoryFilter}
-                  onChange={event => setCategoryFilter(event.target.value)}>
-                  <option value="">{t('onboarding:hsloc.reference.allCategories')}</option>
-                  {categories.map(category => (
-                    <option value={category} key={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={t('onboarding:hsloc.reference.allTypes')}
-                  value={typeFilter}
-                  onChange={event => setTypeFilter(event.target.value)}>
-                  <option value="">{t('onboarding:hsloc.reference.allTypes')}</option>
-                  {types.map(type => (
-                    <option value={type} key={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <p className="nhsn-link__hint-text">
                 <AcronymText>{t('onboarding:hsloc.reference.resultCount', {count: filteredCodes.length, total: codes.length})}</AcronymText>
               </p>
@@ -518,17 +465,14 @@ export function HslocStep({onNext, onBack}: StepProps) {
                 <caption className="nhsn-link__visually-hidden"><AcronymText>{t('onboarding:hsloc.tabs.reference')}</AcronymText></caption>
                 <thead>
                   <tr>
-                    <th scope="col">{t('onboarding:hsloc.reference.columns.category')}</th>
-                    <th scope="col">{t('onboarding:hsloc.reference.columns.type')}</th>
                     <th scope="col">{t('onboarding:hsloc.reference.columns.code')}</th>
                     <th scope="col">{t('onboarding:hsloc.reference.columns.description')}</th>
-                    <th scope="col">{t('onboarding:hsloc.reference.columns.facilities')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCodes.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="nhsn-link__hsloc-empty-row">
+                      <td colSpan={2} className="nhsn-link__hsloc-empty-row">
                         <AcronymText>{t('onboarding:hsloc.reference.noResults')}</AcronymText>
                       </td>
                     </tr>
@@ -540,22 +484,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
                           key={row.code}
                           className={`nhsn-link__hsloc-row${row.code === selectedCode ? ' nhsn-link__hsloc-row--selected' : ''}`}
                           onClick={() => setSelectedCode(row.code)}>
-                          <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.category}</td>
-                          <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.type}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.code}</td>
                           <td className={mapped ? 'nhsn-link__hsloc-mapped-cell' : undefined}>{row.display}</td>
-                          <td>
-                            <div className="hsloc-badges">
-                              {FACILITY_TYPE_ORDER.filter(type => row.facilityTypes?.includes(type)).map(type => (
-                                <span
-                                  key={type}
-                                  className={`hsloc-badge hsloc-badge--${type}`}
-                                  title={t(`onboarding:hsloc.reference.facilityTypeTitles.${type}`)}>
-                                  {t(`onboarding:hsloc.reference.facilityTypes.${type}`)}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
                         </tr>
                       );
                     })
