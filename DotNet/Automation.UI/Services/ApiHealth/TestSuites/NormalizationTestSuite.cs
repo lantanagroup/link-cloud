@@ -309,6 +309,14 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                     LocationAlias = locationAlias
                 }, ct), ct: ct));
 
+            results.Add(await RunStepAsync(StepNames.LocationsGet200, 200, async () =>
+            {
+                var resp = await _client.GetFacilityLocationsAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode && (resp.Body?.Records == null || !resp.Body.Records.Any(location => location.LocationId == locationId)))
+                    throw new InvalidOperationException("Expected the created facility location in the facility locations response.");
+                return resp;
+            }, ct: ct));
+
             results.Add(await RunStepAsync(StepNames.LocationGet200, 200, async () =>
             {
                 var resp = await _client.GetFacilityLocationAsync(facilityId, locationId, ct);

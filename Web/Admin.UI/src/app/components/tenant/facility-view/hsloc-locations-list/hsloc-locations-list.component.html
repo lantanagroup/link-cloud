@@ -1,0 +1,70 @@
+@if (loading()) {
+	<mat-progress-bar mode="indeterminate" aria-label="Loading facility locations" />
+} @else if (failed()) {
+	<div role="alert">Unable to load facility locations. <button mat-button (click)="load()">Retry</button></div>
+} @else if (!nodes().length) {
+	<p>No locations found.</p>
+} @else {
+	<div class="locations-layout">
+		<section class="location-tree" aria-label="Facility locations">
+			<button type="button" mat-icon-button [disabled]="!branches().length"
+						[attr.aria-label]="allExpanded(tree) ? 'Collapse all' : 'Expand all'"
+						[matTooltip]="allExpanded(tree) ? 'Collapse all' : 'Expand all'" (click)="toggleAll(tree)">
+				<mat-icon>{{ allExpanded(tree) ? 'unfold_less' : 'unfold_more' }}</mat-icon>
+			</button>
+			<mat-tree #tree [dataSource]="nodes()" [childrenAccessor]="childrenAccessor">
+				<mat-nested-tree-node *matTreeNodeDef="let node" [isExpandable]="node.children.length > 0">
+					<div class="location-row" [class.mapped]="node.mapped" [class.unmapped]="!node.mapped"
+							 [class.selected]="selected()?.id === node.id">
+						@if (node.children.length) {
+							<button mat-icon-button matTreeNodeToggle [attr.aria-label]="'Toggle ' + (node.locationName || node.locationId)">
+								<mat-icon>{{ tree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}</mat-icon>
+							</button>
+						} @else {
+							<span class="toggle-spacer"></span>
+						}
+						<div class="location-label">
+							<strong>{{ node.locationName || node.locationId }}</strong>
+							<span>{{ node.locationId }}@if (node.locationAlias) { · {{ node.locationAlias }} }</span>
+						</div>
+						<span class="mapping-status" [class.mapped]="node.mapped">
+							<mat-icon aria-hidden="true">{{ node.mapped ? 'check_circle' : 'link_off' }}</mat-icon>
+							{{ node.mapped ? 'Mapped' : 'Unmapped' }}
+						</span>
+						<button mat-icon-button (click)="selected.set(node)" matTooltip="View local code mappings"
+										[attr.aria-label]="'View mappings for ' + (node.locationName || node.locationId)"
+										[attr.aria-pressed]="selected()?.id === node.id">
+							<mat-icon>list_alt</mat-icon>
+						</button>
+					</div>
+					<div role="group" class="children" [hidden]="!tree.isExpanded(node)">
+						<ng-container matTreeNodeOutlet />
+					</div>
+				</mat-nested-tree-node>
+			</mat-tree>
+		</section>
+		@if (selected(); as location) {
+			<section class="mapping-details" aria-label="Local code mappings" aria-live="polite">
+				<div class="details-heading">
+					<h3>{{ location.locationName || location.locationId }}</h3>
+					<button mat-icon-button (click)="selected.set(null)" matTooltip="Close mappings" aria-label="Close mappings"><mat-icon>close</mat-icon></button>
+				</div>
+				<p>Local code mappings ({{ location.mappings.length }})</p>
+				@if (location.mappings.length) {
+					<div class="table-scroll">
+						<table>
+							<thead><tr><th scope="col">Code system</th><th scope="col">Local code</th><th scope="col">HSLOC</th></tr></thead>
+							<tbody>
+								@for (mapping of location.mappings; track mapping.id) {
+									<tr><td>{{ mapping.localCodeSystem }}</td><td>{{ mapping.localCode }}</td><td>{{ mapping.hslocId == null ? 'Unmapped' : (mapping.hslocCode || mapping.hslocId) }}</td></tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				} @else {
+					<p>No local code mappings.</p>
+				}
+			</section>
+		}
+	</div>
+}
