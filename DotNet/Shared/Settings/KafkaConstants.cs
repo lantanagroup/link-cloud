@@ -7,6 +7,7 @@
         public static class HeaderConstants
         {
             public const string CorrelationId = "X-Correlation-Id";
+            public const string MetricsMode = "X-Metrics-Mode";
             public const string RetryCount = "X-Retry-Count";
             public const string ExceptionFacilityId = "X-Exception-Facility-Id";
             public const string ExceptionService = "X-Exception-Service";

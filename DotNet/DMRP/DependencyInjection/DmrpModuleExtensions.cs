@@ -4,6 +4,7 @@ using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Scheduling;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -31,14 +32,20 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
         /// than replacing them, so the host stays the single place facilities are validated, persisted
         /// and scheduled.
         /// </typeparam>
+        /// <param name="classicJobGroup">
+        /// The Quartz job group the host's own, pre-DMRP report jobs live in. When the module is
+        /// enabled it takes the scheduler over and deletes that group at boot, so jobs left from
+        /// before the flag cannot fire. The host names it because the module has no way to know it.
+        /// </param>
         /// <returns>True when the module was registered, otherwise false.</returns>
         public static bool AddDmrpModule<TDbContext, THostFacilityOperations>(this WebApplicationBuilder builder,
-            IMvcBuilder mvcBuilder)
+            IMvcBuilder mvcBuilder, string classicJobGroup)
             where TDbContext : DbContext
             where THostFacilityOperations : class, IFacilityOperations
         {
             ArgumentNullException.ThrowIfNull(builder);
             ArgumentNullException.ThrowIfNull(mvcBuilder);
+            ArgumentException.ThrowIfNullOrWhiteSpace(classicJobGroup);
 
             var section = builder.Configuration.GetSection(DmrpSettings.ConfigSectionName);
             builder.Services.Configure<DmrpSettings>(section);
@@ -54,6 +61,11 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                 {
                     mvcBuilder.PartManager.ApplicationParts.Remove(part);
                 }
+
+                // The reconciler needs only Quartz and the settings, both of which the host has
+                // whether or not the module is on.
+                builder.Services.AddSingleton<IDmrpNightlyJobReconciler, DmrpNightlyJobReconciler>();
+                builder.Services.AddHostedService<DmrpNightlyScheduleCleanupService>();
 
                 return false;
             }
@@ -94,9 +106,36 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // One derivation of "what does this enrollment schedule", shared by the facility's stored
             // schedule and by the facility-facing look-ahead.
             builder.Services.AddScoped<IReportingPlanScheduleProjector, ReportingPlanScheduleProjector>();
+            builder.Services.AddScoped<IFacilityReportingPeriodResolver, FacilityReportingPeriodResolver>();
             builder.Services.AddScoped<IFacilityReportingPlanLookAhead, FacilityReportingPlanLookAhead>();
 
+            builder.Services.AddSingleton<IDmrpSchedulingMetrics, DmrpSchedulingMetrics>();
+            builder.Services.AddTransient<DmrpNightlyJob>();
+
+            builder.Services.AddSingleton<IDmrpNightlyJobReconciler, DmrpNightlyJobReconciler>();
+
+            // Enabled, the module owns the shared Quartz scheduler's lifecycle - which means it has to
+            // know which group the host's classic jobs are in so it can sweep them before starting it.
+            builder.Services.AddSingleton(new DmrpSchedulingHostOptions(classicJobGroup));
+            builder.Services.AddHostedService<DmrpNightlyScheduleHostedService>();
+
             builder.Services.TryAddSingleton(TimeProvider.System);
+
+            if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityTimeZoneSource)))
+            {
+                throw new InvalidOperationException(
+                    $"The host application must register an {nameof(IFacilityTimeZoneSource)} before calling " +
+                    $"{nameof(AddDmrpModule)}. " +
+                    $"The module needs to know the timezone of a facility to resolve its reporting period, " +
+                    "which is the month the facility is in by its own timezone, not UTC.");
+            }
+
+            if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityDirectory)))
+            {
+                throw new InvalidOperationException(
+                    $"The host must register an {nameof(IFacilityDirectory)} before calling {nameof(AddDmrpModule)}; "
+                    + "the nightly scheduling job enumerates facilities through it.");
+            }
 
             // The host's endpoints resolve IFacilityOperations, so taking over that registration is what
             // puts the module's behavior in front of the host's without moving a route. The host's own
@@ -112,7 +151,8 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             // implementation type itself - to hand it dependencies of its own - has satisfied the same
             // requirement.
             var hostRegisteredItsOperations = builder.Services.Any(d =>
-                d.ServiceType == typeof(IFacilityOperations) || d.ServiceType == typeof(THostFacilityOperations));
+                d.ServiceType == typeof(IFacilityOperations) ||
+                 d.ServiceType == typeof(THostFacilityOperations));
 
             if (!hostRegisteredItsOperations)
             {

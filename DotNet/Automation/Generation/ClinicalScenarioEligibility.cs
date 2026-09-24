@@ -41,6 +41,11 @@ public static class ClinicalScenarioEligibility
     {
         return measure switch
         {
+            // TODO(scenarios): every current story is an inpatient admission, so ACH
+            // Qualifying/NonQualifying both cannot offer a distinct palette. Add
+            // outpatient / observation / ED-only (and other ACH-IP-failing) scenarios
+            // so an ACH non-qualifying cohort has selectable stories. Until then
+            // GetEligibleScenarioIds(ACH, NonQualifying) is empty.
             ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation => true,
             ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation => true,
             ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => HypoglycemicScenarioIds.Contains(scenario.ScenarioId),

@@ -3,6 +3,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -10,10 +11,12 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -97,15 +100,42 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         purger.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task ConsumeMessageAsync_RecordsNormalizationDurationForTheMessage()
+    {
+        var purger = new Mock<IResourceCachePurger>();
+        var metrics = new Mock<INormalizationServiceMetrics>();
+        var resourceCache = new Mock<IResourceCache>();
+        resourceCache
+            .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
+            .Throws(new TransientException("cache is unreachable"));
+
+        var listener = BuildListener(purger, resourceCache: resourceCache, metrics: metrics);
+
+        await listener.ConsumeMessageAsync(BuildConsumeResult(), CancellationToken.None);
+
+        metrics.Verify(
+            item => item.MeasureNormalizationDuration(It.Is<List<KeyValuePair<string, object?>>>(tags =>
+                tags.Count == 2
+                && tags.Exists(tag => tag.Key == DiagnosticNames.FacilityId && (tag.Value as string) == FacilityId)
+                && tags.Exists(tag => tag.Key == DiagnosticNames.Phase && (tag.Value as string) == "Initial"))),
+            Times.Once);
+        metrics.Verify(
+            item => item.MeasureNormalizationDuration(It.IsAny<List<KeyValuePair<string, object?>>>()),
+            Times.Once);
+    }
+
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCachePurger> purger,
         Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>? deadLetterHandler = null,
         Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>? transientHandler = null,
-        Mock<IResourceCache>? resourceCache = null)
+        Mock<IResourceCache>? resourceCache = null,
+        Mock<INormalizationServiceMetrics>? metrics = null)
     {
         deadLetterHandler ??= new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         transientHandler ??= new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         resourceCache ??= new Mock<IResourceCache>();
+        metrics ??= new Mock<INormalizationServiceMetrics>();
 
         deadLetterHandler.SetupProperty(item => item.Topic);
         transientHandler.SetupProperty(item => item.Topic);
@@ -113,8 +143,15 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
+        var services = new ServiceCollection();
+        var serviceProvider = services.BuildServiceProvider();
+        var scope = new Mock<IServiceScope>();
+        scope.SetupGet(item => item.ServiceProvider).Returns(serviceProvider);
         var scopeFactory = new Mock<IServiceScopeFactory>();
-        scopeFactory.Setup(item => item.CreateScope()).Returns(Mock.Of<IServiceScope>());
+        scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
+
+        var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        telemetrySettings.SetupGet(x => x.CurrentValue).Returns(new TelemetrySettings { PatientTags = false });
 
         return new ResourcesAcquiredListener(
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
@@ -124,7 +161,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             consumeExceptionHandler.Object,
             deadLetterHandler.Object,
             transientHandler.Object,
-            Mock.Of<INormalizationServiceMetrics>(),
+            metrics.Object,
             Mock.Of<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
@@ -136,6 +173,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             new RemoveExtensionsOperationService(Mock.Of<ILogger<RemoveExtensionsOperationService>>()),
             resourceCache.Object,
             purger.Object,
+            telemetrySettings.Object,
             Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
     }
 

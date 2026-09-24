@@ -630,7 +630,6 @@ namespace LantanaGroup.Link.Tenant.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("DQM")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
@@ -648,7 +647,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Measure", "DQM")
+                    b.HasIndex("Measure")
                         .IsUnique();
 
                     b.ToTable("MeasureMappings", (string)null);

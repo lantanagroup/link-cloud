@@ -18,7 +18,8 @@ public class ScenarioConfigBuilderTests
         int polling = 3,
         int maxPolling = 0,
         int loki = 30,
-        string nhsnOrganizationId = "10756")
+        string nhsnOrganizationId = "10756",
+        bool isMetricsRun = false)
     {
         return new ResolvedRunOptions(
             PatientCount: 1,
@@ -36,6 +37,7 @@ public class ScenarioConfigBuilderTests
             ReportPeriodStart = start,
             ReportPeriodEnd = end,
             NhsnOrganizationId = nhsnOrganizationId,
+            IsMetricsRun = isMetricsRun,
         };
     }
 
@@ -61,34 +63,14 @@ public class ScenarioConfigBuilderTests
     }
 
     [Fact]
-    public void Bundle_locations_split_first_and_additional_for_multi_measure()
+    public void Measure_bundle_jsons_pass_through()
     {
-        var measures = new List<ProfiledMeasureType>
-        {
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation,
-        };
+        var json = """{"resourceType":"Bundle"}""";
+        var options = OptionsWith() with { MeasureBundleJsons = [json] };
 
-        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith(measures: measures));
+        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, options);
 
-        config.MeasureBundleLocation.Should().Be(ProfiledMeasureCatalog.GetBundleLocation(measures[0]));
-        config.AdditionalMeasureBundleLocations.Should().ContainSingle()
-            .Which.Should().Be(ProfiledMeasureCatalog.GetBundleLocation(measures[1]));
-    }
-
-    [Fact]
-    public void Single_measure_produces_no_additional_bundle_locations()
-    {
-        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith());
-
-        config.AdditionalMeasureBundleLocations.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void Empty_measure_list_produces_empty_bundle_location()
-    {
-        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith(measures: []));
-
+        config.MeasureBundleJsons.Should().ContainSingle().Which.Should().Be(json);
         config.MeasureBundleLocation.Should().BeEmpty();
         config.AdditionalMeasureBundleLocations.Should().BeEmpty();
     }
@@ -130,5 +112,16 @@ public class ScenarioConfigBuilderTests
         config.LokiScrapeWindowMinutes.Should().Be(90);
         config.NhsnOrganizationId.Should().Be("22001");
         config.PatientIds.Should().BeEmpty();
+        config.IsMetricsRun.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsMetricsRun_passes_through_to_scenario_config()
+    {
+        var config = ScenarioConfigBuilder.Build(
+            AutomationScenarioKind.Custom,
+            OptionsWith(isMetricsRun: true));
+
+        config.IsMetricsRun.Should().BeTrue();
     }
 }

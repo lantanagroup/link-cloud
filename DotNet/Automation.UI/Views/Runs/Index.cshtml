@@ -35,13 +35,31 @@
 </style>
 
 <div class="container mt-4">
-    <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
-    <p class="text-muted mb-3">Dashboard overview, quick-launch tests, and run history.</p>
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
+        <p class="text-muted mb-0">Dashboard overview, quick-launch tests, and run history.</p>
+    </div>
 
     @if (TempData["RunStartError"] is string runStartError && !string.IsNullOrWhiteSpace(runStartError))
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-1"></i> @runStartError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["LeftoverCleanupError"] is string leftoverCleanupError && !string.IsNullOrWhiteSpace(leftoverCleanupError))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> @leftoverCleanupError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["LeftoverCleanup"] is string leftoverCleanup && !string.IsNullOrWhiteSpace(leftoverCleanup))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="bi bi-recycle me-1"></i> @leftoverCleanup
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     }
@@ -62,7 +80,7 @@
         </div>
         <div class="col-6 col-md-3">
             <div class="au-kpi-card">
-                <div class="au-kpi-value @(stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@stats.SuccessRate%</div>
+                <div class="au-kpi-value @((stats.Succeeded + stats.Failed) == 0 ? "" : stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@((stats.Succeeded + stats.Failed) == 0 ? "—" : $"{stats.SuccessRate}%")</div>
                 <div class="au-kpi-label">Success Rate</div>
             </div>
         </div>
@@ -79,8 +97,9 @@
         <div class="col-md-4">
             <div class="au-card h-100">
                 <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
-                <div class="card-body d-flex align-items-center justify-content-center" style="min-height:240px;">
-                    <canvas id="statusDoughnut"></canvas>
+                <div class="card-body d-flex align-items-center justify-content-center position-relative" style="min-height:240px;">
+                    <canvas id="statusDoughnut" style="@(stats.TotalRuns == 0 ? "display:none" : "")"></canvas>
+                    <div id="statusDoughnutEmpty" class="text-muted small text-center px-3" style="@(stats.TotalRuns == 0 ? "" : "display:none")">No runs yet</div>
                 </div>
             </div>
         </div>
@@ -107,7 +126,7 @@
                             <div class="fw-semibold">@run.RunName</div>
                             <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
-                                <span class="badge @(run.Status.IsInProgress() ? "au-badge-active" : "au-badge-muted")">@run.Status</span>
+                                <span class="badge @(run.Status.IsInProgress() ? "au-badge-active" : "au-badge-muted")">@run.Status.ToDisplayName()</span>
                                 <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")">@elapsed.ToString(@"mm\:ss") elapsed</span>
                             </div>
                             <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
@@ -394,8 +413,17 @@
         if (s === 'succeeded' || s === '3') return 'au-badge-success';
         if (s === 'failed' || s === '4') return 'au-badge-danger';
         if (s === 'cancelled' || s === '2') return 'au-badge-warning';
-        if (s === 'running' || s === '1' || s === 'livewindowopen' || s === 'reportfinalization' || s === '5' || s === '6') return 'au-badge-active';
+        if (s === 'running' || s === '1' || s === 'livewindowopen' || s === 'reportfinalization' || s === 'collectingmetrics'
+            || s === '5' || s === '6' || s === '7') return 'au-badge-active';
         return 'au-badge-muted';
+    }
+
+    function displayStatus(status) {
+        var s = String(status || '').toLowerCase();
+        if (s === 'collectingmetrics' || s === '7') return 'Collecting';
+        if (s === 'reportfinalization' || s === '6') return 'Finalizing';
+        if (s === 'livewindowopen' || s === '5') return 'Live window';
+        return String(status || '');
     }
 
     function isTerminal(status) {
@@ -405,8 +433,8 @@
 
     function isActive(status) {
         var s = String(status || '').toLowerCase();
-        return s === 'running' || s === 'queued' || s === 'livewindowopen' || s === 'reportfinalization'
-            || s === '0' || s === '1' || s === '5' || s === '6';
+        return s === 'running' || s === 'queued' || s === 'livewindowopen' || s === 'reportfinalization' || s === 'collectingmetrics'
+            || s === '0' || s === '1' || s === '5' || s === '6' || s === '7';
     }
 
     function formatDuration(seconds) {
@@ -513,9 +541,20 @@
         kpiActive.className = 'au-kpi-value' + (active > 0 ? ' text-primary' : '');
         kpiTotal.textContent = s.totalRuns || 0;
 
-        var rate = s.successRate || 0;
-        kpiSuccessRate.textContent = rate + '%';
-        kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
+        var completed = (s.succeeded || 0) + (s.failed || 0);
+        if (!completed) {
+            kpiSuccessRate.textContent = '—';
+            kpiSuccessRate.className = 'au-kpi-value';
+        } else {
+            var rate = s.successRate || 0;
+            kpiSuccessRate.textContent = rate + '%';
+            kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
+        }
+        var empty = document.getElementById('statusDoughnutEmpty');
+        var doughnut = document.getElementById('statusDoughnut');
+        var noRuns = (s.totalRuns || 0) === 0;
+        if (empty) empty.style.display = noRuns ? '' : 'none';
+        if (doughnut) doughnut.style.display = noRuns ? 'none' : '';
 
         kpiAvgDuration.textContent = formatDuration(s.avgDurationSeconds);
     }
@@ -553,7 +592,7 @@
                 '<div class="fw-semibold">' + escapeHtml(run.runName) + '</div>' +
                 '<div class="small text-muted">' + (run.patientCount || 0) + ' patients &middot; seed ' + (run.seed || 0) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
-                '<span class="badge ' + statusBadgeClass(run.status) + '">' + escapeHtml(String(run.status)) + '</span>' +
+                '<span class="badge ' + statusBadgeClass(run.status) + '">' + escapeHtml(displayStatus(run.status)) + '</span>' +
                 '<span class="small text-muted js-elapsed" data-created-at="' + escapeHtml(String(run.createdAt)) + '">' + elapsedStr + ' elapsed</span>' +
                 '</div>' +
                 '<a href="' + url + '" class="btn btn-sm btn-au-action mt-2 w-100"><i class="bi bi-box-arrow-up-right me-1"></i>View Details</a>' +
@@ -769,7 +808,7 @@
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-cancel-run');
         if (!btn) return;
-        if (!confirm('Cancel this running test?')) return;
+        if (!confirm('Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.')) return;
         var runId = btn.getAttribute('data-run-id');
         btn.disabled = true;
         btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -781,25 +820,21 @@
         })
         .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
         .then(function (res) {
-            // Honor the server's success flag. Previously this branch called
-            // refreshDashboard() regardless, so a {success:false} response (e.g.
-            // when the run existed only in Mongo with no in-memory state to
-            // cancel) looked like "nothing happened" to the user.
             if (res.ok && res.body && res.body.success) {
                 refreshDashboard();
                 return;
             }
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-x-circle"></i>';
-            var reason = (res.body && res.body.error)
-                ? res.body.error
-                : 'The server could not cancel this run. It may have already finished or been cancelled elsewhere.';
-            alert('Unable to cancel: ' + reason);
+            var reason = (res.body && (res.body.error || res.body.detail))
+                ? (res.body.error || res.body.detail)
+                : 'This run is not running.';
+            alert(reason);
         })
         .catch(function () {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-x-circle"></i>';
-            alert('Unable to cancel.');
+            alert('Cancel could not be completed. Refresh the page and check the run status.');
         });
     });
 

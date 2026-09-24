@@ -16,6 +16,21 @@ namespace UnitTests.LinkSdk;
 public class NormalizationServiceClientTests
 {
     [Fact]
+    public async Task GetFacilityLocationsAsync_CallsFacilityLocationsEndpoint()
+    {
+        using var server = new OneShotServer("{\"records\":[{\"locationId\":\"location-1\"}]}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityLocationsAsync("facility-1");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/normalization/facility-locations/facilities/facility-1/locations", request.Path);
+        Assert.Equal("location-1", result.Body!.Records[0].LocationId);
+    }
+
+    [Fact]
     public async Task GetFacilityLocationAsync_CallsLocationEndpoint()
     {
         using var server = new OneShotServer("{\"facilityId\":\"facility-1\",\"locationId\":\"location-1\"}");
@@ -138,6 +153,57 @@ public class NormalizationServiceClientTests
         {
             await client.DeleteFacilityLocationLocalCodeMappingsForFacilityAsync("facility-1");
         })];
+    }
+
+    [Fact]
+    public async Task GetHslocCodesAsync_CallsCodeSetEndpoint()
+    {
+        using var server = new OneShotServer("[{\"hslocCode\":\"1025-6\",\"isActive\":true}]");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetHslocCodesAsync();
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/normalization/HSLOC", request.Path);
+        Assert.Contains("includeInactive=False", request.Query);
+        Assert.Equal("1025-6", result.Body![0].HSLOCCode);
+        Assert.True(result.Body[0].IsActive);
+    }
+
+    [Fact]
+    public async Task GetHslocCodesAsync_IncludeInactive_SendsQueryFlag()
+    {
+        using var server = new OneShotServer("[]");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetHslocCodesAsync(includeInactive: true);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Contains("includeInactive=True", request.Query);
+    }
+
+    [Fact]
+    public async Task UpdateHslocCodesAsync_PutsMultipartCsv()
+    {
+        using var server = new OneShotServer(string.Empty, 204);
+        using var client = CreateClient(server.BaseUrl);
+        using var csv = new MemoryStream(Encoding.UTF8.GetBytes("CDCCode,ShortDescription,HSLOCCode,LongDescription\nIN:ACUTE:CC:T,Trauma Critical Care,1025-6,Trauma\n"));
+
+        var callTask = client.UpdateHslocCodesAsync("2022", "2023", csv, "codes.csv");
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/normalization/HSLOC", request.Path);
+        Assert.Contains("OldVersion", request.Body);
+        Assert.Contains("2022", request.Body);
+        Assert.Contains("NewVersion", request.Body);
+        Assert.Contains("2023", request.Body);
+        Assert.Contains("CsvFile", request.Body);
+        Assert.Contains("1025-6", request.Body);
     }
 
     private static NormalizationServiceClient CreateClient(string baseUrl) => new(

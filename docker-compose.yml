@@ -157,7 +157,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "/bin/sh", "-c", "sftp -oBatchMode=no -b - ${SFTP_USER}@localhost -P 22 <<< 'exit' || exit 1"]
+      test: ["CMD", "ssh-keyscan", "-p", "22", "127.0.0.1"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -704,6 +704,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       Automation__LokiBaseUrl: http://loki:3100
+      ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: link-automation-ui
       ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
@@ -717,6 +718,11 @@ services:
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       InternalBlobStorage__GeneratedTemplateBlobRoot: ${INTERNAL_BLOB_GENERATED_TEMPLATE_BLOB_ROOT:-automation/generated-bundles}
+      Telemetry__EnableTelemetry: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
+      Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
+      Redis__Password: ${REDIS_PASS}
+      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -726,6 +732,9 @@ services:
       dockerfile: DotNet/Automation.UI/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
+      secrets:
+        - feed_accesstoken
     networks:
       - link-nw
     depends_on:
@@ -734,6 +743,8 @@ services:
       mongo:
         condition: service_healthy
       admin-bff:
+        condition: service_healthy
+      redis_cache:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
@@ -860,6 +871,7 @@ services:
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      Redis__Password: ${REDIS_PASS}
     ports:
       - "8072:8072"
     build:
@@ -876,6 +888,8 @@ services:
         condition: service_completed_successfully
       azurite_init:
         condition: service_completed_successfully
+      redis_cache:
+        condition: service_healthy
       otel-collector:
         condition: service_started
       loki:
@@ -935,6 +949,10 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      DMRP__Api__BaseUrl: http://mock-dmrp-api:8080
+      DMRP__Api__TokenUrl: http://mock-dmrp-api:8080/api/mock-dmrp/oauth2/token
+      DMRP__Api__ClientId: ${MOCK_DMRP_CLIENT_ID:-link-cloud-dev}
+      DMRP__Api__ClientSecret: ${MOCK_DMRP_CLIENT_SECRET:-link-cloud-dev-secret}
     ports:
       - "8074:8074"
     build:
@@ -1014,6 +1032,9 @@ services:
       dockerfile: DotNet/MockFhirServer/Dockerfile
       args:
         BUILD_CONFIGURATION: Debug
+        FEED_ACCESSTOKEN: ${AZURE_ARTIFACTS_PAT:-}
+      secrets:
+        - feed_accesstoken
     networks:
       - link-nw
     healthcheck:
@@ -1087,6 +1108,10 @@ services:
 networks:
   link-nw:
      
+secrets:
+  feed_accesstoken:
+    environment: AZURE_ARTIFACTS_PAT
+
 volumes:
   kafka_data:
     driver: local
