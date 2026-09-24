@@ -166,6 +166,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
 
   const incompleteRowKeys = useMemo(() => new Set(findIncompleteRowKeys(groups)), [groups]);
   const duplicateCodeSystemGroupKeys = useMemo(() => new Set(findDuplicateCodeSystemIndexes(groups)), [groups]);
+  const missingCodeSystemGroupKeys = useMemo(() => new Set(findMissingCodeSystemGroupKeys(groups)), [groups]);
 
   function addCodeSystem() {
     setGroups(current => [...current, {groupKey: makeKey(), codeSystem: '', mappings: []}]);
@@ -231,7 +232,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
       return false;
     }
     if (findMissingCodeSystemGroupKeys(groups).length > 0) {
-      announceValidationMessage(t('onboarding:encounter.messages.missingCodeSystem'));
+      announceValidationMessage(t('onboarding:encounter.messages.incomplete'));
       return false;
     }
     const pruned = pruneEmptyGroups(groups);
@@ -352,6 +353,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   referenceCodes={referenceCodes}
                   incompleteRowKeys={incompleteRowKeys}
                   duplicate={duplicateCodeSystemGroupKeys.has(group.groupKey)}
+                  missing={missingCodeSystemGroupKeys.has(group.groupKey)}
                   showValidation={validationRequested}
                   onCodeSystemChange={value => updateCodeSystem(group.groupKey, value)}
                   onRemoveGroup={() => removeCodeSystem(group.groupKey)}
@@ -508,6 +510,7 @@ interface CodeSystemBlockProps {
   referenceCodes: EncounterCode[];
   incompleteRowKeys: Set<string>;
   duplicate: boolean;
+  missing: boolean;
   showValidation: boolean;
   onCodeSystemChange: (value: string) => void;
   onRemoveGroup: () => void;
@@ -521,6 +524,7 @@ function CodeSystemBlock({
   referenceCodes,
   incompleteRowKeys,
   duplicate,
+  missing,
   showValidation,
   onCodeSystemChange,
   onRemoveGroup,
@@ -531,6 +535,23 @@ function CodeSystemBlock({
   const {t} = useTranslation('onboarding');
   const codeSystemInputId = `encounter-codesystem-${group.groupKey}`;
   const duplicateHintId = `encounter-codesystem-hint-${group.groupKey}`;
+  const missingHintId = `encounter-codesystem-missing-hint-${group.groupKey}`;
+  const [touched, setTouched] = useState(false);
+  const showDuplicate = duplicate && touched;
+  const showMissing = missing && touched;
+  const describedBy = [showDuplicate && duplicateHintId, showMissing && missingHintId].filter(Boolean).join(' ') || undefined;
+
+  useEffect(() => {
+    if (showValidation && (duplicate || missing)) {
+      setTouched(true);
+    }
+  }, [showValidation]);
+
+  function handleCodeSystemBlur() {
+    if (duplicate || missing) {
+      setTouched(true);
+    }
+  }
 
   return (
     <div className="codesystem-block">
@@ -541,10 +562,11 @@ function CodeSystemBlock({
             id={codeSystemInputId}
             type="text"
             placeholder={t('encounter.fields.codeSystemPlaceholder') ?? ''}
-            aria-invalid={duplicate}
-            aria-describedby={duplicate ? duplicateHintId : undefined}
+            aria-invalid={showDuplicate || showMissing}
+            aria-describedby={describedBy}
             value={group.codeSystem}
-            onChange={event => onCodeSystemChange(event.target.value)} />
+            onChange={event => onCodeSystemChange(event.target.value)}
+            onBlur={handleCodeSystemBlur} />
           <Button
             variant="secondary"
             size="sm"
@@ -557,9 +579,14 @@ function CodeSystemBlock({
             {t('encounter.fields.removeCodeSystem')}
           </Button>
         </div>
-        {duplicate && (
+        {showDuplicate && (
           <span id={duplicateHintId} className="encounter-row-hint" role="alert">
             {t('encounter.fields.duplicateCodeSystemHint')}
+          </span>
+        )}
+        {!showDuplicate && showMissing && (
+          <span id={missingHintId} className="encounter-row-hint" role="alert">
+            {t('encounter.messages.missingCodeSystemHint')}
           </span>
         )}
       </div>
