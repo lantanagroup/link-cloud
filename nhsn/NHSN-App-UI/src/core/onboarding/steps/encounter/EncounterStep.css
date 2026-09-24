@@ -479,11 +479,6 @@
     white-space: nowrap;
   }
 
-  .encounter-mapping .encounter-table td:nth-child(2) {
-    max-width: 170px;
-    white-space: normal;
-  }
-
   .encounter-mapping .encounter-table td:last-child {
     min-width: 260px;
     white-space: normal;

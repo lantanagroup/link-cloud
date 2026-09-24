@@ -55,7 +55,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const [activeTab, setActiveTab] = useState<'mapping' | 'reference'>('mapping');
   const [search, setSearch] = useState('');
   const [systemFilter, setSystemFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [validationRequested, setValidationRequested] = useState(false);
@@ -97,26 +96,11 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     return systems.map(system => ({value: system, label: systemBadgeLabel(system)}));
   }, [referenceCodes]);
 
-  const categoryOptions = useMemo(() => {
-    const byCategory = new Map<string, string>();
-    referenceCodes.forEach(code => {
-      if (code.category && !byCategory.has(code.category)) {
-        byCategory.set(code.category, code.categoryName ?? code.category);
-      }
-    });
-    return Array.from(byCategory.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([value, label]) => ({value, label: `${value} — ${label}`}));
-  }, [referenceCodes]);
-
   const filteredReferenceRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return referenceCodes
       .filter(code => {
         if (systemFilter && code.system !== systemFilter) {
-          return false;
-        }
-        if (categoryFilter && code.category !== categoryFilter) {
           return false;
         }
         if (!q) {
@@ -127,7 +111,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
           .includes(q);
       })
       .map(code => ({...code, key: encodeTarget(code.system, code.code)}));
-  }, [referenceCodes, search, systemFilter, categoryFilter]);
+  }, [referenceCodes, search, systemFilter]);
 
   useEffect(() => {
     setSelectedKey(current => {
@@ -375,14 +359,13 @@ export function EncounterStep({onNext, onBack}: StepProps) {
           {activeTab === 'reference' && (
             <div className="encounter-reference-layout">
               <div className="encounter-reference-main">
-                <TextField
-                  id="encounterSearch"
-                  label={t('onboarding:encounter.reference.searchLabel')}
-                  placeholder={t('onboarding:encounter.reference.searchPlaceholder')}
-                  value={search}
-                  onChange={setSearch} />
-
                 <div className="encounter-filters">
+                  <TextField
+                    id="encounterSearch"
+                    label={t('onboarding:encounter.reference.searchLabel')}
+                    placeholder={t('onboarding:encounter.reference.searchPlaceholder')}
+                    value={search}
+                    onChange={setSearch} />
                   <Select
                     id="encounterSystemFilter"
                     label={t('onboarding:encounter.reference.systemFilterLabel')}
@@ -391,14 +374,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                     value={systemFilter}
                     popupClassName="nhsn-facility-info-popup"
                     onChange={setSystemFilter} />
-                  <Select
-                    id="encounterCategoryFilter"
-                    label={t('onboarding:encounter.reference.categoryFilterLabel')}
-                    placeholder={t('onboarding:encounter.reference.categoryFilterAll')}
-                    options={categoryOptions}
-                    value={categoryFilter}
-                    popupClassName="nhsn-facility-info-popup"
-                    onChange={setCategoryFilter} />
                 </div>
 
                 <p className="form-hint">
@@ -414,7 +389,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                     <thead>
                       <tr>
                         <th scope="col">{t('onboarding:encounter.reference.columns.system')}</th>
-                        <th scope="col">{t('onboarding:encounter.reference.columns.category')}</th>
                         <th scope="col">{t('onboarding:encounter.reference.columns.code')}</th>
                         <th scope="col">{t('onboarding:encounter.reference.columns.description')}</th>
                       </tr>
@@ -422,7 +396,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                     <tbody>
                       {filteredReferenceRows.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="encounter-table-empty">
+                          <td colSpan={3} className="encounter-table-empty">
                             {t('onboarding:encounter.reference.noResults')}
                           </td>
                         </tr>
@@ -439,7 +413,6 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                                 {systemBadgeLabel(row.system)}
                               </span>
                             </td>
-                            <td>{row.categoryName}</td>
                             <td>{row.code}</td>
                             <td>{row.display}</td>
                           </tr>

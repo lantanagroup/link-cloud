@@ -190,6 +190,13 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   const sftpValidated = acquisition === "Sftp" && sftpFiles !== null;
   const resultsReady = allListsQueried || sftpValidated;
 
+  const epicValidateResultRef = useRef<HTMLParagraphElement | null>(null);
+  useEffect(() => {
+    if (allListsQueried) {
+      scrollNearestContainerToBottom(epicValidateResultRef.current);
+    }
+  }, [allListsQueried]);
+
   // A repeat is wrong the moment it's typed, so unlike a blank field it doesn't wait for
   // blur/Continue -- mirrors HslocStep's duplicateRowIndexes. editedListKey is which of the
   // six fields the user is actively typing into, so the error lands on that row rather than
@@ -863,22 +870,33 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                 {frequencySection}
 
                 {patientListsLive && (
-                  <div className="census-inline-actions">
-                    <Button
-                      onClick={handleValidateEpicLists}
-                      disabled={validatingLists}>
-                      {validatingLists
-                        ? t("onboarding:census.epic.validating")
-                        : t("onboarding:census.epic.validateButton")}
-                    </Button>
+                  <>
+                    <div className="census-inline-actions">
+                      <Button
+                        onClick={handleValidateEpicLists}
+                        disabled={validatingLists}>
+                        {validatingLists
+                          ? t("onboarding:census.epic.validating")
+                          : t("onboarding:census.epic.validateButton")}
+                      </Button>
+                      {allListsQueried && (
+                        <DownloadLinkButton
+                          buttonText={t("onboarding:census.fields.exportResults")}
+                          fileName={exportFileName}
+                          onDownload={handleExportEpicResults}
+                        />
+                      )}
+                    </div>
                     {allListsQueried && (
-                      <DownloadLinkButton
-                        buttonText={t("onboarding:census.fields.exportResults")}
-                        fileName={exportFileName}
-                        onDownload={handleExportEpicResults}
-                      />
+                      <p
+                        ref={epicValidateResultRef}
+                        role="status"
+                        aria-live="polite"
+                        className="census-connection-status census-test-success">
+                        {t("onboarding:census.epic.validateSuccess")}
+                      </p>
                     )}
-                  </div>
+                  </>
                 )}
               </>
             )}
