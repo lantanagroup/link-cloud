@@ -434,7 +434,54 @@ public class FacilitySetupHelperTests
             Times.Never);
     }
 
-    private Task EnsureFacilityAsync() =>
+    [Fact]
+    public async Task Returns_false_when_the_facility_already_exists()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object, _dmrpClient.Object, _output.Object, FacilityId, [MeasureId]);
+
+        Assert.False(created);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Returns_true_only_after_it_creates_the_facility()
+    {
+        GivenDmrpIsDisabled();
+
+        var created = await EnsureFacilityAsync();
+
+        Assert.True(created);
+        Assert.Single(_created);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_setup_returns_false_when_the_facility_already_exists()
+    {
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel { FacilityId = FacilityId }));
+
+        var created = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+            _facilityClient.Object, _output.Object, FacilityId);
+
+        Assert.False(created);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Empty_dmrp_setup_returns_true_only_after_it_creates_the_facility()
+    {
+        var created = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+            _facilityClient.Object, _output.Object, FacilityId);
+
+        Assert.True(created);
+        Assert.Single(_created);
+    }
+
+    private Task<bool> EnsureFacilityAsync() =>
         FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
             FacilityId, [MeasureId]);
 
