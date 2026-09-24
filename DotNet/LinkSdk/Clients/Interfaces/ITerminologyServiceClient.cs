@@ -73,4 +73,12 @@ public interface ITerminologyServiceClient
     /// <paramref name="id"/> is supplied). Used for code-detail lookup.
     /// </summary>
     Task<LinkApiResponse<string>> LookupCodeInCodeSystemAsync(string? system = null, string? code = null, string? version = null, string? id = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Looks up the details of a code in a CodeSystem, passing the lookup inputs as a FHIR
+    /// <c>Parameters</c> resource: <c>POST /api/terminology/fhir/CodeSystem/$lookup</c> (or
+    /// <c>/CodeSystem/{id}/$lookup</c> when <paramref name="id"/> is supplied).
+    /// </summary>
+    /// <param name="parametersJson">The FHIR <c>Parameters</c> resource, serialized as JSON. Sent as <c>application/fhir+json</c>.</param>
+    Task<LinkApiResponse<string>> LookupCodeInCodeSystemWithParametersAsync(string parametersJson, string? system = null, string? code = null, string? version = null, string? id = null, CancellationToken cancellationToken = default);
 }

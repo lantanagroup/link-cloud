@@ -242,6 +242,38 @@ public class TerminologyServiceClientTests
         Assert.Contains("code=1234-5", request.Query);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_PostsParametersBody()
+    {
+        const string parameters = "{\"resourceType\":\"Parameters\",\"parameter\":[{\"name\":\"code\",\"valueCode\":\"1234-5\"}]}";
+        using var server = new OneShotServer("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.LookupCodeInCodeSystemWithParametersAsync(parameters, system: "http://loinc.org");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
+        Assert.Contains("system=http", request.Query);
+        Assert.Equal(parameters, request.Body);
+        Assert.Contains("Parameters", result.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_ById_PostsToIdScopedRoute()
+    {
+        using var server = new OneShotServer("{}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.LookupCodeInCodeSystemWithParametersAsync("{\"resourceType\":\"Parameters\"}", id: "loinc");
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/loinc/$lookup", request.Path);
+    }
+
     private static TerminologyServiceClient CreateClient(string baseUrl)
     {
         return new TerminologyServiceClient(

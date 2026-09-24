@@ -107,6 +107,12 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> UpdateOrganizationLocationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
 
     // Organization location mappings
+    /// <summary>Reads one organization/location mapping: <c>GET /api/data/location-mappings/{id}</c>.</summary>
+    Task<LinkApiResponse<OrganizationLocationMappingApiModel>> GetOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes one organization/location mapping: <c>DELETE /api/data/location-mappings/{id}</c>.</summary>
+    Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
+
     /// <summary>Saves the resolved organization/location mapping: <c>PUT /api/data/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse> UpdateOrganizationLocationMappingAsync(int id, object request, CancellationToken cancellationToken = default);
 
@@ -132,4 +138,7 @@ public interface IDataAcquisitionServiceClient
         string? sortOrder = null,
         bool? includeDeleted = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Records an sFTP acquisition log: <c>POST /api/data/sftp-logs</c>.</summary>
+    Task<LinkApiResponse> CreateSftpLogAsync(object request, CancellationToken cancellationToken = default);
 }

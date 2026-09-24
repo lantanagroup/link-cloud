@@ -393,6 +393,41 @@ public class DataAcquisitionServiceClientTests
             await c.TestSavedSftpConnectionAsync("org-1"))];
         yield return ["GET", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
             await c.SearchSftpLogsAsync(facilityId: "f1"))];
+        yield return ["POST", "/api/data/sftp-logs", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.CreateSftpLogAsync(new { facilityId = "f1" }))];
+        yield return ["GET", "/api/data/sftp-configurations/7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10", new Func<DataAcquisitionServiceClient, System.Threading.Tasks.Task>(async c =>
+            await c.GetSftpConfigurationByIdAsync(Guid.Parse("7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10")))];
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
+    {
+        using var server = new OneShotServer("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetOrganizationLocationMappingAsync(7);
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/location-mappings/7", request.Path);
+        Assert.NotNull(result.Body);
+        Assert.Equal(7, result.Body.LocationMappingId);
+        Assert.Equal("ICU", result.Body.LocationName);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteOrganizationLocationMappingAsync_DeletesMappingById()
+    {
+        using var server = new OneShotServer(string.Empty, 202);
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.DeleteOrganizationLocationMappingAsync(7);
+        var request = await server.WaitForRequestAsync();
+        await callTask;
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/data/location-mappings/7", request.Path);
     }
 
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)

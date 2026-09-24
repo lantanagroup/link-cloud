@@ -337,6 +337,18 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     // ----- Organization location mappings -----
 
+    public Task<LinkApiResponse<OrganizationLocationMappingApiModel>> GetOrganizationLocationMappingAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<OrganizationLocationMappingApiModel>(() => Request($"data/location-mappings/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-mappings/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     /// <summary>
     /// Saves the resolved organization/location mapping (including a Cerner "Site" search result):
     /// <c>PUT /api/data/location-mappings/{id}</c>.
@@ -448,4 +460,13 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         if (includeDeleted.HasValue) request = request.SetQueryParam("includeDeleted", includeDeleted.Value);
         return SendAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
+
+    /// <summary>
+    /// Records an sFTP acquisition log: <c>POST /api/data/sftp-logs</c>.
+    /// </summary>
+    public Task<LinkApiResponse> CreateSftpLogAsync(
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("data/sftp-logs")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
 }

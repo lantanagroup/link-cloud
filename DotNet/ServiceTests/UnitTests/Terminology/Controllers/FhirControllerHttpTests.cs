@@ -57,6 +57,17 @@ public class FhirControllerHttpTests
                     { CodeSystemUrl, new List<Code> { new() { Value = "postal", Display = "Postal" } } }
                 }
             });
+        cache.Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemUrl, It.IsAny<string>()))
+            .Returns(new CodeGroup
+            {
+                Id = "address-type",
+                Type = CodeGroup.CodeGroupTypes.CodeSystem,
+                Url = CodeSystemUrl,
+                Codes = new Dictionary<string, List<Code>>
+                {
+                    { CodeSystemUrl, new List<Code> { new() { Value = "postal", Display = "Postal" } } }
+                }
+            });
 
         var builder = new WebHostBuilder()
             .ConfigureServices(services =>
@@ -286,5 +297,36 @@ public class FhirControllerHttpTests
         // code is found across every system in the value set. Looking "null" up as a code system would
         // answer result=false, which the previous payload-substring assertion could not distinguish.
         AssertValidationResult(status, payload, expectedResult: true);
+    }
+
+    private const string LookupParameters = """
+    {
+      "resourceType" : "Parameters",
+      "parameter" : [{
+        "name": "system",
+        "valueUri": "http://hl7.org/fhir/address-type"
+      }, {
+        "name" : "code",
+        "valueCode": "postal"
+      }]
+    }
+    """;
+
+    private static async Task<(HttpStatusCode Status, string Body)> PostLookupAsync(string? bearerToken)
+    {
+        using var server = BuildServer();
+        using var client = server.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/terminology/fhir/CodeSystem/$lookup")
+        {
+            Content = new StringContent(LookupParameters, Encoding.UTF8, "application/fhir+json")
+        };
+        if (bearerToken is not null)
+        {
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+        }
+
+        var response = await client.SendAsync(request);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync());
     }
 }

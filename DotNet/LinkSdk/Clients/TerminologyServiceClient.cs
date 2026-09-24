@@ -83,4 +83,24 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
         if (!string.IsNullOrWhiteSpace(version)) request = request.SetQueryParam("version", version);
         return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse<string>> LookupCodeInCodeSystemWithParametersAsync(
+        string parametersJson,
+        string? system = null,
+        string? code = null,
+        string? version = null,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(parametersJson);
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/CodeSystem/$lookup")
+            : Request($"terminology/fhir/CodeSystem/{id}/$lookup");
+        if (!string.IsNullOrWhiteSpace(system)) request = request.SetQueryParam("system", system);
+        if (!string.IsNullOrWhiteSpace(code)) request = request.SetQueryParam("code", code);
+        if (!string.IsNullOrWhiteSpace(version)) request = request.SetQueryParam("version", version);
+        return SendStringAsync(() => request
+            .WithHeader("Content-Type", "application/fhir+json")
+            .SendStringAsync(HttpMethod.Post, parametersJson, cancellationToken: cancellationToken));
+    }
 }
