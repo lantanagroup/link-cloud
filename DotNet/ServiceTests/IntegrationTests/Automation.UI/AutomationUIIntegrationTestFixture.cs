@@ -86,7 +86,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             new GeneratedTemplateCacheVersionStore(Database),
             Mock.Of<ILivePatientEventInjector>(),
             Mock.Of<IPatientConfigurationStore>(),
-            Mock.Of<IMeasureTemplateStore>());
+            Mock.Of<IMeasureTemplateStore>(),
+            Mock.Of<IFacilityTemplateStore>());
     }
 
     public async Task InitializeAsync()
