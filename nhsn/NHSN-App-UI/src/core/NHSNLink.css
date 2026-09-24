@@ -2243,6 +2243,10 @@
   border-radius: 8px;
 }
 
+.nhsn-link__report-results-table-scroll--compact {
+  max-height: 300px;
+}
+
 .nhsn-link__report-results-table {
   width: 100%;
   border-collapse: collapse;
@@ -2307,7 +2311,8 @@
   white-space: nowrap;
 }
 
-.nhsn-link__report-results-id {
+.nhsn-link__report-results-id,
+.nhsn-link__report-results-ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
