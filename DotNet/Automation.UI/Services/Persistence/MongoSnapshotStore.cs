@@ -379,8 +379,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // pointer records that still reference payload data. The summary stays until
         // those deletes succeed.
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
-        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
         await ClearFacilityTeardownProgressAsync(runId, ct);
+        await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)

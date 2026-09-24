@@ -612,7 +612,6 @@ public sealed class LeftoverRunCleanupService(
                                 continue;
                             await snapshotStore.ReleaseRetainedFacilityAsync(id, cancellationToken);
                         }
-                        await snapshotStore.ClearFacilityTeardownProgressAsync(run.RunId, cancellationToken);
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
