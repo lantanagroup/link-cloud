@@ -44,6 +44,7 @@ export function HslocEvidenceModal({
   const { t } = useTranslation(['onboarding', 'common']);
   const { vendorProfile } = useOnboarding();
 
+  const mappedCodes = new Set(mappings.map((mapping) => mapping.sourceCode));
   const hslocUnmappedCodes = evidence
     ? Array.from(
         new Set(
@@ -51,7 +52,7 @@ export function HslocEvidenceModal({
             .filter(isHslocCodeMap)
             .flatMap((codeMap) => codeMap.unmappedCodes),
         ),
-      )
+      ).filter((code) => !mappedCodes.has(code))
     : [];
 
   return (

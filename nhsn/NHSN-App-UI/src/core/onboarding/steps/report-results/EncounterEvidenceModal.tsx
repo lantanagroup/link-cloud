@@ -53,8 +53,18 @@ export function EncounterEvidenceModal({
   const { t } = useTranslation(['onboarding', 'common']);
   const { draft, goTo } = useOnboarding();
 
+  const mappedKeys = new Set(
+    mappings.map((mapping) => `${mapping.system}|${mapping.code}`),
+  );
   const encounterCodeMaps = evidence
-    ? evidence.codeMaps.filter((codeMap) => !isHslocCodeMap(codeMap))
+    ? evidence.codeMaps
+        .filter((codeMap) => !isHslocCodeMap(codeMap))
+        .map((codeMap) => ({
+          ...codeMap,
+          unmappedCodes: codeMap.unmappedCodes.filter(
+            (code) => !mappedKeys.has(`${codeMap.sourceSystem}|${code}`),
+          ),
+        }))
     : [];
   const encounterGroups = buildGroups(draft.encounter.codeSystems ?? [], mappings);
   const encounterUnmappedEntries = encounterCodeMaps.flatMap((codeMap) =>
