@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   EncounterCode,
@@ -6,7 +6,9 @@ import type {
   PatientMappingEvidence,
 } from '../../../api/contracts';
 import {
+  acronymTitle,
   Button,
+  HeadingPause,
   MessageContainer,
   Modal,
   NHSNLoadingIndicator,
@@ -52,6 +54,7 @@ export function EncounterEvidenceModal({
 }: EncounterEvidenceModalProps) {
   const { t } = useTranslation(['onboarding', 'common']);
   const { draft, goTo } = useOnboarding();
+  const notFoundHintId = useId();
 
   const mappedKeys = new Set(
     mappings.map((mapping) => `${mapping.system}|${mapping.code}`),
@@ -78,8 +81,8 @@ export function EncounterEvidenceModal({
   return (
   <Modal
     open={open}
-    title={t(
-      'onboarding:reportResults.detail.mappingEvidence.encounterTitle',
+    title={acronymTitle(
+      <HeadingPause>{t('onboarding:reportResults.detail.mappingEvidence.encounterTitle')}</HeadingPause>,
     )}
     onClose={onClose}
     size="large"
@@ -308,13 +311,14 @@ export function EncounterEvidenceModal({
     {patientRow &&
       !patientRow.encounterFound && (
         <MessageContainer type="info" showIcon>
-          <p role="status">
+          <p id={notFoundHintId} role="status">
             {t(
               'onboarding:reportResults.detail.mappingEvidence.notFoundEncounterHint',
             )}
           </p>
           <Button
             variant="secondary"
+            aria-describedby={notFoundHintId}
             onClick={() => {
               onClose();
               goTo('encounter');

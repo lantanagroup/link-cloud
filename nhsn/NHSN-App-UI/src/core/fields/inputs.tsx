@@ -16,6 +16,7 @@ import {Input} from '@progress/kendo-react-inputs';
 import {Error as KendoError, Hint} from '@progress/kendo-react-labels';
 import {FaEye, FaEyeSlash} from 'react-icons/fa';
 import {toRenderProps, useFieldId, valueOf, type BaseFieldProps} from './fieldProps';
+import {AcronymText, acronymLabel} from './layout';
 import {Tabs} from './Tabs';
 
 function trimOnBlur(base: BaseFieldProps<string>, skip?: boolean) {
@@ -259,10 +260,10 @@ export function YesNoTabsField({yesLabel, noLabel, value, onChange, ...base}: Ye
   return (
     <FieldWrapper>
       <MistFormLabel editorId={id} editorValid={!base.error} editorDisabled={base.disabled} required={base.required ? 1 : 0}>
-        {base.label}
+        <AcronymText>{base.label}</AcronymText>
       </MistFormLabel>
       <Tabs<'yes' | 'no'>
-        label={base.label}
+        label={acronymLabel(base.label)}
         tabs={[
           {id: 'yes', label: yesLabel, disabled: base.disabled},
           {id: 'no', label: noLabel, disabled: base.disabled}

@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AcquisitionLogEntry } from '../../../api/contracts';
-import { Button, Modal, Select, TextField } from '../../../fields';
+import { acronymTitle, Button, HeadingPause, Modal, Select, TextField } from '../../../fields';
 import { AsyncStatus } from './AsyncStatus';
 import { DownloadIcon } from './icons';
 import { EMPTY_ACQUISITION_LOG_FILTERS, type AcquisitionLogFilters } from './patientRows';
 import { buildXlsxBlob, downloadBlob } from './reportExport';
 import { buildAcquisitionLogSheet } from './xlsxSheets';
+
+const PATIENT_ID_FILTER_ID = 'acquisition-log-filter-patient-id';
 
 export interface AcquisitionLogModalProps {
   open: boolean;
@@ -38,6 +40,19 @@ export function AcquisitionLogModal({
       setFilters(EMPTY_ACQUISITION_LOG_FILTERS);
     }
   }, [open]);
+
+  const hasAutoFocusedFilters = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      hasAutoFocusedFilters.current = false;
+      return;
+    }
+    if (hasAutoFocusedFilters.current || loading || error || entries.length === 0) {
+      return;
+    }
+    hasAutoFocusedFilters.current = true;
+    document.getElementById(PATIENT_ID_FILTER_ID)?.focus();
+  }, [open, loading, error, entries.length]);
 
   // Filter options are derived from whatever the report actually returned, not a fixed list --
   // a report with no Location queries simply shows no "Location" option, matching the data.
@@ -98,8 +113,8 @@ export function AcquisitionLogModal({
   return (
   <Modal
     open={open}
-    title={t(
-      'onboarding:reportResults.detail.actions.viewAcquisitionLog',
+    title={acronymTitle(
+      <HeadingPause>{t('onboarding:reportResults.detail.actions.viewAcquisitionLog')}</HeadingPause>,
     )}
     onClose={onClose}
     size="large"
@@ -129,7 +144,7 @@ export function AcquisitionLogModal({
         <>
           <div className="nhsn-link__report-results-filters">
             <TextField
-              id="acquisition-log-filter-patient-id"
+              id={PATIENT_ID_FILTER_ID}
               label={t(
                 'onboarding:reportResults.detail.columns.patientId',
               )}

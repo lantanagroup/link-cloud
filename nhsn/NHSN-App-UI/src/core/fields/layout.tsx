@@ -23,6 +23,7 @@ export interface ButtonProps {
   loading?: boolean;
   /** Overrides the accessible name when the visible label alone doesn't identify which item this button acts on (e.g. a "Remove" button repeated per row). */
   'aria-label'?: string;
+  'aria-describedby'?: string;
 }
 
 export function Button({
@@ -33,7 +34,8 @@ export function Button({
   size = 'default',
   disabled,
   loading,
-  'aria-label': ariaLabel
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy
 }: ButtonProps) {
   const {t} = useTranslation('common');
   const isBlocked = Boolean(disabled || loading);
@@ -43,6 +45,7 @@ export function Button({
       themeColor={variant === 'primary' ? 'primary' : 'base'}
       className={`${size === 'sm' ? 'nhsn-link__button--sm ' : ''}${isBlocked ? 'nhsn-link__button--disabled' : ''}`.trim() || undefined}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
       onClick={isBlocked ? undefined : onClick}>
       {loading && (
         <span className="nhsn-link__button-spinner" role="status" aria-label={t('status.saving')} />

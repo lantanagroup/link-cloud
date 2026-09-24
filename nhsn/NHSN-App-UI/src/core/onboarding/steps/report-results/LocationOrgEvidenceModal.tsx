@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PatientMappingEvidence } from '../../../api/contracts';
-import { Button, Modal, MessageContainer } from '../../../fields';
+import { acronymTitle, Button, HeadingPause, Modal, MessageContainer } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
 import { METHOD_LABEL_KEYS } from '../location-org/LocationOrgStep';
 import { AsyncStatus } from './AsyncStatus';
@@ -29,12 +29,13 @@ export function LocationOrgEvidenceModal({
   const { t } = useTranslation(['onboarding', 'common']);
   const { draft, goTo } = useOnboarding();
   const locationOrgConfig = locationOrgConfigInfo(draft.locationOrg, t);
+  const notFoundHintId = useId();
 
   return (
   <Modal
     open={open}
-    title={t(
-      'onboarding:reportResults.detail.mappingEvidence.locationOrgTitle',
+    title={acronymTitle(
+      <HeadingPause>{t('onboarding:reportResults.detail.mappingEvidence.locationOrgTitle')}</HeadingPause>,
     )}
     onClose={onClose}
     size="large"
@@ -187,13 +188,14 @@ export function LocationOrgEvidenceModal({
     {patientRow &&
       !patientRow.locationOrgFound && (
         <MessageContainer type="info" showIcon>
-          <p role="status">
+          <p id={notFoundHintId} role="status">
             {t(
               'onboarding:reportResults.detail.mappingEvidence.notFoundLocationOrgHint',
             )}
           </p>
           <Button
             variant="secondary"
+            aria-describedby={notFoundHintId}
             onClick={() => {
               onClose();
               goTo('location-org');
