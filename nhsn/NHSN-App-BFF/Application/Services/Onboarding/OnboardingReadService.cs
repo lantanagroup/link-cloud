@@ -163,6 +163,12 @@ public sealed class OnboardingReadService : IOnboardingReadService
         var hslocMappings = await hslocMappingsTask;
         var mrnIntake = await mrnIntakeTask;
 
+        // Keyed by the latest report's id, so it can only be fetched once that id is known -
+        // unlike censusAccuracyAcknowledged, this can't join the earlier fan-out.
+        var reportResultsAccuracyAcknowledged = report.Value?.ReportId is { } latestReportId
+            ? await _acknowledgementService.GetLatestAsync(facilityId, AcknowledgementKind.ReportAccuracy, latestReportId, cancellationToken)
+            : null;
+
         sources.Add(facilityInfo.Source);
         sources.Add(fhir.Source);
         sources.Add(census.Source);
@@ -178,7 +184,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         {
             Draft = Assemble(facilityRow, storedDraft, facilityInfo.Value, fhir.Value, census.Value, lagDuration.Value,
                 censusAccuracyAcknowledged, sftpConfig.Value, hasCredentials.Value, patientListIds.Value, report.Value,
-                locationOrg.Value, encounterMappings.Value, hslocMappings.Value, mrnIntake.Value),
+                reportResultsAccuracyAcknowledged, locationOrg.Value, encounterMappings.Value, hslocMappings.Value, mrnIntake.Value),
             CommitState = commitState,
             Sources = sources
         };
@@ -196,6 +202,7 @@ public sealed class OnboardingReadService : IOnboardingReadService
         bool? hasCredentials,
         IReadOnlyDictionary<string, string>? patientListIds,
         ReportScheduleSummary? report,
+        bool? reportResultsAccuracyAcknowledged,
         LocationOrgSection? locationOrg,
         IReadOnlyList<EncounterMapping>? encounterMappings,
         IReadOnlyList<HslocMapping>? hslocMappings,
@@ -266,7 +273,8 @@ public sealed class OnboardingReadService : IOnboardingReadService
             ReportResults = new ReportResultsSection
             {
                 ViewingReportId = stored.State.ReportResults.ViewingReportId,
-                LatestStatus = stored.State.ReportResults.LatestStatus
+                LatestStatus = stored.State.ReportResults.LatestStatus,
+                AccuracyAcknowledged = reportResultsAccuracyAcknowledged
             },
 
             ReportingPlan = new ReportingPlanSection { Reviewed = stored.State.ReportingPlan.Reviewed },
