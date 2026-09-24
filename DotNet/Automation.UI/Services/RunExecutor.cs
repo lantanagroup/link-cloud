@@ -666,8 +666,14 @@ internal sealed class RunExecutor
                     measureIds,
                     cancellationToken,
                     state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces);
-                await callbacks.PersistOwnership();
+                    state.Options.HonorExplicitFacilityPieces,
+                    onCreated: async () =>
+                    {
+                        state.AutomationCreatedFacility = true;
+                        await callbacks.PersistOwnership();
+                    });
+                if (!state.AutomationCreatedFacility)
+                    await callbacks.PersistOwnership();
             }
 
             var normalizationSetup = await EnsureNormalizationFromSuiteAsync(

@@ -222,7 +222,8 @@ public static class FacilitySetupHelper
         List<string> measureIds,
         CancellationToken cancellationToken = default,
         string? vendorName = null,
-        bool vendorExplicit = false)
+        bool vendorExplicit = false,
+        Func<Task>? onCreated = null)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
         if (existing.IsSuccessStatusCode && existing.Body != null)
@@ -258,6 +259,9 @@ public static class FacilitySetupHelper
             throw new InvalidOperationException(
                 $"Failed to create facility '{facilityId}'. HTTP {createResponse.StatusCode}: {createResponse.RawBody ?? "(no body)"}");
         }
+
+        if (onCreated != null)
+            await onCreated();
 
         await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
 

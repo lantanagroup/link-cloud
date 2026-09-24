@@ -306,6 +306,35 @@ public class LeftoverRunCleanupServiceTests
         deleted.Should().Equal(retained);
         result.TornDownFacilityIds.Should().Equal(retained);
         released.Should().Equal(retained);
+        result.TeardownCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CustomRange_does_not_tear_down_an_unrelated_retained_facility()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var retainedId = Guid.NewGuid().ToString();
+        var deleted = new List<string>();
+        var released = new List<string>();
+        var facilities = new Dictionary<string, string> { [retainedId] = "retained" };
+        var service = Create(
+            now,
+            [],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [retainedId],
+            releasedFacilityIds: released);
+
+        var result = await service.RunCustomRangeAsync(
+            now.AddDays(-2),
+            now.AddDays(-1),
+            teardownFacilities: true,
+            purgeHistory: false);
+
+        deleted.Should().BeEmpty();
+        released.Should().BeEmpty();
+        result.TornDownFacilityIds.Should().BeEmpty();
     }
 
     [Fact]
