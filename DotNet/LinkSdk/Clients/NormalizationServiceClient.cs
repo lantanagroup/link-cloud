@@ -127,6 +127,12 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<FacilityLocationTreeApiModel>>> GetFacilityLocationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityLocationTreeApiModel>>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations")
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(
         string facilityId,
         string locationId,

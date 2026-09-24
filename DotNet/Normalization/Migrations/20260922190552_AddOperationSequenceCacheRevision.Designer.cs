@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Normalization.Migrations
 {
     [DbContext(typeof(NormalizationDbContext))]
-    partial class NormalizationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260922190552_AddOperationSequenceCacheRevision")]
+    partial class AddOperationSequenceCacheRevision
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -803,18 +806,6 @@ namespace LantanaGroup.Link.Normalization.Migrations
                     b.HasKey("FacilityId");
 
                     b.ToTable("OperationSequenceCacheRevisions");
-                });
-
-            modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.OperationSequenceWriteLock", b =>
-                {
-                    b.Property<string>("FacilityId")
-                        .HasMaxLength(255)
-                        .IsUnicode(false)
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("FacilityId");
-
-                    b.ToTable("OperationSequenceWriteLocks");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.Normalization.Domain.Entities.ResourceType", b =>
