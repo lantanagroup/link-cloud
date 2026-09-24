@@ -157,7 +157,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "/bin/sh", "-c", "sftp -oBatchMode=no -b - ${SFTP_USER}@localhost -P 22 <<< 'exit' || exit 1"]
+      test: ["CMD", "ssh-keyscan", "-p", "22", "127.0.0.1"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -722,7 +722,7 @@ services:
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       Telemetry__PrometheusQueryEndpoint: http://prometheus:9090
       Redis__Password: ${REDIS_PASS}
-      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-true}
+      LeftoverRunCleanup__Enabled: ${LEFTOVER_CLEANUP_ENABLED:-false}
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:

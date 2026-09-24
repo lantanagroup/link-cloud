@@ -61,6 +61,14 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> DeleteFacilityOperationAsync(
+        string facilityId,
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
+            .SetQueryParam("operationId", operationId)
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(
         Guid vendorVersionId,
         CancellationToken cancellationToken = default) =>
@@ -118,6 +126,12 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<FacilityLocationTreeApiModel>>> GetFacilityLocationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<FacilityLocationTreeApiModel>>(() => Request($"normalization/facility-locations/facilities/{facilityId}/locations")
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(
         string facilityId,
