@@ -379,6 +379,7 @@ public sealed class LeftoverRunCleanupService(
                 .Take(Math.Max(0, limit - facilityWork.Count))
                 .ToList();
             var historyWork = new List<AutomationRunSummary>();
+            var partialHistoryTeardown = new List<string>();
             if (purgeHistory)
             {
                 var spent = facilityWork.Count + retainedWork.Count;
@@ -393,15 +394,26 @@ public sealed class LeftoverRunCleanupService(
 
                 foreach (var run in historyRuns)
                 {
-                    var owned = OwnedAutomationFacilityIds(run);
-                    var extra = owned.Count(id => !scheduledTeardown.Contains(id));
-                    if (historyWork.Count > 0 && spent + extra > limit)
+                    if (spent >= limit)
                         break;
+
+                    var owned = OwnedAutomationFacilityIds(run);
+                    var fresh = owned.Where(id => !scheduledTeardown.Contains(id)).ToList();
+                    var room = limit - spent;
+                    if (fresh.Count > room)
+                    {
+                        foreach (var id in fresh.Take(room))
+                        {
+                            scheduledTeardown.Add(id);
+                            partialHistoryTeardown.Add(id);
+                        }
+                        break;
+                    }
 
                     historyWork.Add(run);
                     foreach (var id in owned)
                         scheduledTeardown.Add(id);
-                    spent += extra;
+                    spent += fresh.Count;
                 }
             }
             var purgingRunIds = historyWork.Select(run => run.RunId).ToHashSet();
@@ -424,7 +436,7 @@ public sealed class LeftoverRunCleanupService(
                     heldOutsideThisPurge.Add(other.FacilityId);
                 heldOutsideThisPurge.Add(other.RunId.ToString());
             }
-            var total = facilityWork.Count + retainedWork.Count + historyWork.Count;
+            var total = facilityWork.Count + retainedWork.Count + partialHistoryTeardown.Count + historyWork.Count;
             var processed = 0;
             quiesceCandidateCount = teardownFacilities ? 0 : selectedFacilities.Count;
             teardownCandidateCount = CountTeardownAttempts(
@@ -600,6 +612,33 @@ public sealed class LeftoverRunCleanupService(
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogWarning(ex, "Retained facility teardown failed for {FacilityId}.", facilityId);
+                    if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                        failedFacilities.Add(facilityId);
+                }
+
+                processed++;
+            }
+
+            foreach (var facilityId in partialHistoryTeardown)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (tornDown.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                await PublishProgressAsync(
+                    mode, label, trigger, total, processed, quiesced, tornDown, purged, failedFacilities, failedRuns,
+                    "Tearing down leftover facility", facilityId, cancellationToken);
+                try
+                {
+                    await TearDownOneFacilityAsync(
+                        facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
+                        censusClient, reportClient, abortRegistry, settings, facilityId, cancellationToken);
+                    tornDown.Add(facilityId);
+                    failedFacilities.RemoveAll(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "History facility teardown failed for {FacilityId}.", facilityId);
                     if (!failedFacilities.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
                         failedFacilities.Add(facilityId);
                 }

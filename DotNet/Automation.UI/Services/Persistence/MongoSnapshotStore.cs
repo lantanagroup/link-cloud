@@ -274,6 +274,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default)
     {
+        var hasIdentifiers = !string.IsNullOrWhiteSpace(facilityId)
+            && !string.IsNullOrWhiteSpace(summary.ReportId);
+        var isActive = hasIdentifiers
+            && summary.Status.IsInProgress()
+            && summary.Status != AutomationRunStatus.CollectingMetrics;
+
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.AutomationCreatedFacility, true)
             .Set(r => r.FacilityId, facilityId ?? string.Empty)
@@ -291,7 +297,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .SetOnInsert(r => r.FinishedAt, summary.FinishedAt)
             .SetOnInsert(r => r.Error, summary.Error)
             .SetOnInsert(r => r.ReportId, summary.ReportId ?? string.Empty)
-            .SetOnInsert(r => r.IsActive, true);
+            .SetOnInsert(r => r.IsActive, isActive);
 
         await _runs.UpdateOneAsync(
             r => r.RunId == summary.RunId,

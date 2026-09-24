@@ -112,6 +112,24 @@ public class MongoSnapshotStoreDashboardTests : IAsyncLifetime
         after.Status.Should().Be(AutomationRunStatus.Cancelled);
     }
 
+    [Fact]
+    public async Task Ownership_upsert_of_a_finished_run_is_not_left_active()
+    {
+        var store = _fixture.CreateStore();
+        var summary = MakeSummary(AutomationRunStatus.Succeeded, createdAt: DateTimeOffset.UtcNow.AddMinutes(-5));
+        summary.FacilityId = Guid.NewGuid().ToString();
+        summary.AutomationCreatedFacility = true;
+
+        await store.MarkAutomationCreatedFacilityAsync(summary, summary.FacilityId, CancellationToken.None);
+
+        var raw = await _fixture.RawRunsCollection
+            .Find(Builders<BsonDocument>.Filter.Eq("_id", summary.RunId.ToString()))
+            .FirstAsync();
+
+        raw["IsActive"].AsBoolean.Should().BeFalse();
+        raw["AutomationCreatedFacility"].AsBoolean.Should().BeTrue();
+    }
+
     private static AutomationRunSummary MakeSummary(AutomationRunStatus status, DateTimeOffset createdAt) => new()
     {
         RunId = Guid.NewGuid(),

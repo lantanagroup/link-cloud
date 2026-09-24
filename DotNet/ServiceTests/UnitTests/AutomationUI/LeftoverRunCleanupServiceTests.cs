@@ -357,6 +357,29 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_does_not_exceed_the_facility_cap_on_the_first_run()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var firstFacility = Guid.NewGuid().ToString();
+        var secondFacility = Guid.NewGuid().ToString();
+        var first = Run(firstFacility, now.AddDays(-30));
+        var second = Run(secondFacility, now.AddDays(-30));
+        var deleted = new List<string>();
+        var service = Create(
+            now,
+            [first, second],
+            [],
+            deletedFacilityIds: deleted,
+            maxFacilitiesPerPass: 1);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        deleted.Should().Equal(firstFacility);
+        result.PurgedRunIds.Should().BeEmpty();
+        result.ProcessedAllCandidates.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Teardown_skips_a_retained_facility_younger_than_retention()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -494,7 +517,8 @@ public class LeftoverRunCleanupServiceTests
         List<string>? deletedFacilityIds = null,
         IReadOnlyList<string>? retainedFacilityIds = null,
         DateTimeOffset? retainedEligibleAt = null,
-        List<string>? releasedFacilityIds = null)
+        List<string>? releasedFacilityIds = null,
+        int maxFacilitiesPerPass = 25)
     {
         var facility = new Mock<IFacilityServiceClient>();
         facility.Setup(c => c.GetFacilityListAsync(It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
@@ -601,7 +625,7 @@ public class LeftoverRunCleanupServiceTests
                 return Task.FromResult(new LeftoverRunCleanupSettings
                 {
                     TeardownRetention = TimeSpan.FromDays(14),
-                    MaxFacilitiesPerPass = 25
+                    MaxFacilitiesPerPass = maxFacilitiesPerPass
                 });
             });
 
