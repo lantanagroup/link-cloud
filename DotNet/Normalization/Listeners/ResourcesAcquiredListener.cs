@@ -596,8 +596,9 @@ public class ResourcesAcquiredListener : BackgroundService
     /// </para>
     /// <para>
     /// Searched across every resource type rather than per type, for the same reason. Results are cached
-    /// per facility by <c>OperationSequenceQueries</c>, so this is one lookup per patient-correlation, not
-    /// one per resource.
+    /// per facility by <c>OperationSequenceQueries</c>. The cache key includes a database revision that
+    /// configuration writes increment, so an unchanged facility is still one sequence lookup per
+    /// patient-correlation, not one per resource.
     /// </para>
     /// </remarks>
     private async Task RegisterConfiguredCodeMapsAsync(

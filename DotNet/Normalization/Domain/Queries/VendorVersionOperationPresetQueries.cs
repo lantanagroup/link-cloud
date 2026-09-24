@@ -9,8 +9,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries;
 
 public interface IVendorVersionOperationPresetQueries
 {
-    Task<VendorVersionOperationPresetModel?> Get(Guid id);
-    Task<List<VendorVersionOperationPresetModel>> Search(VendorVersionOperationPresetSearchModel model);
+    Task<VendorVersionOperationPresetModel?> Get(Guid id, CancellationToken cancellationToken = default);
+    Task<List<VendorVersionOperationPresetModel>> Search(VendorVersionOperationPresetSearchModel model, CancellationToken cancellationToken = default);
 }
 
 public class VendorVersionOperationPresetQueries : IVendorVersionOperationPresetQueries
@@ -24,12 +24,12 @@ public class VendorVersionOperationPresetQueries : IVendorVersionOperationPreset
         _vendorVersionResolver = vendorVersionResolver;
     }
 
-    public async Task<VendorVersionOperationPresetModel?> Get(Guid id)
+    public async Task<VendorVersionOperationPresetModel?> Get(Guid id, CancellationToken cancellationToken = default)
     {
-        return (await Search(new VendorVersionOperationPresetSearchModel { Id = id })).SingleOrDefault();
+        return (await Search(new VendorVersionOperationPresetSearchModel { Id = id }, cancellationToken)).SingleOrDefault();
     }
 
-    public async Task<List<VendorVersionOperationPresetModel>> Search(VendorVersionOperationPresetSearchModel model)
+    public async Task<List<VendorVersionOperationPresetModel>> Search(VendorVersionOperationPresetSearchModel model, CancellationToken cancellationToken = default)
     {
         var presets = _dbContext.VendorVersionOperationPresets.AsQueryable();
 
@@ -75,14 +75,14 @@ public class VendorVersionOperationPresetQueries : IVendorVersionOperationPreset
             VendorVersion = new TenantVendorVersionModel { Id = preset.VendorVersionId },
             CreateDate = preset.CreateDate,
             ModifyDate = preset.ModifyDate
-        }).ToListAsync();
+        }).ToListAsync(cancellationToken);
 
         if (records.Count == 0)
         {
             return records;
         }
 
-        var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(records.Select(record => record.VendorVersionId));
+        var resolvedVendorVersions = await _vendorVersionResolver.ResolveAsync(records.Select(record => record.VendorVersionId), cancellationToken);
         foreach (var record in records)
         {
             record.VendorVersion = resolvedVendorVersions[record.VendorVersionId];

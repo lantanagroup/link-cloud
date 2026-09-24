@@ -6,10 +6,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IResourceQueries
     {
-        Task<List<ResourceModel>> GetAll();
+        Task<List<ResourceModel>> GetAll(CancellationToken cancellationToken = default);
         Task<ResourceModel?> Get(Guid resourceId);
-        Task<ResourceModel?> Get(string resourceName);
-        Task<List<ResourceModel>> Search(ResourceSearchModel model);
+        Task<ResourceModel?> Get(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default);
     }
 
     public class ResourceQueries : IResourceQueries
@@ -28,20 +28,20 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).SingleOrDefault();
         }
 
-        public async Task<ResourceModel?> Get(string resourceName)
+        public async Task<ResourceModel?> Get(string resourceName, CancellationToken cancellationToken = default)
         {
             return (await Search(new ResourceSearchModel()
             {
                 Name = resourceName
-            })).FirstOrDefault();
+            }, cancellationToken)).FirstOrDefault();
         }
 
-        public async Task<List<ResourceModel>> GetAll()
+        public async Task<List<ResourceModel>> GetAll(CancellationToken cancellationToken = default)
         {
-            return await Search(new ResourceSearchModel());
+            return await Search(new ResourceSearchModel(), cancellationToken);
         }
 
-        public async Task<List<ResourceModel>> Search(ResourceSearchModel model)
+        public async Task<List<ResourceModel>> Search(ResourceSearchModel model, CancellationToken cancellationToken = default)
         {
             var query = from r in _context.ResourceTypes
                         select new ResourceModel()
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 query = query.Where(q => q.ResourceTypeId == model.ResourceId);
             }
 
-            return await query.OrderBy(q => q.ResourceName).ToListAsync();
+            return await query.OrderBy(q => q.ResourceName).ToListAsync(cancellationToken);
         }
     }
 }
