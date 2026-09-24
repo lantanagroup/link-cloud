@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '../../../fields';
+import { acronymTitle, Button, HeadingPause, Modal } from '../../../fields';
 import { DownloadIcon } from './icons';
 import { buildPieSlices } from './pieChart';
 import { buildResourceBreakdown, type PatientStatusRow } from './patientRows';
@@ -39,7 +39,7 @@ export function PatientDetailModal({
   return (
   <Modal
     open={open}
-    title={t('onboarding:reportResults.detail.patientDetail.title')}
+    title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.patientDetail.title')}</HeadingPause>)}
     onClose={onClose}
     size="large"
     footer={

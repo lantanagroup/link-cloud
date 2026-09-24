@@ -3,7 +3,7 @@ import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {PreQualIssue, ReportingStatus} from '../../../api/contracts';
-import {Button, MessageContainer, Modal, NHSNLoadingIndicator} from '../../../fields';
+import {AcronymText, acronymTitle, Button, HeadingPause, MessageContainer, Modal, NHSNLoadingIndicator} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import {DownloadIcon} from './icons';
 
@@ -520,7 +520,7 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
     return (
       <Modal
         open={open}
-        title={selectedCategory}
+        title={acronymTitle(<HeadingPause><AcronymText>{selectedCategory}</AcronymText></HeadingPause>)}
         onClose={handleClose}
         size="xlarge"
         footer={
@@ -564,7 +564,7 @@ export function PreQualResultsModal({open, onClose, patientId, measureName, repo
   return (
     <Modal
       open={open}
-      title={t('onboarding:reportResults.detail.preQual.title')}
+      title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.preQual.title')}</HeadingPause>)}
       onClose={handleClose}
       size="xlarge"
       footer={

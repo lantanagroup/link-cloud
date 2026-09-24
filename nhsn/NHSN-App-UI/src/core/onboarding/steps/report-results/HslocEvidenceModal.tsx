@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type {
   HslocCode,
   HslocMapping,
   PatientMappingEvidence,
 } from '../../../api/contracts';
-import { Button, Modal, NHSNLoadingIndicator, Select } from '../../../fields';
+import { AcronymText, acronymTitle, Button, HeadingPause, Modal, NHSNLoadingIndicator, Select } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
 import { AsyncStatus } from './AsyncStatus';
 import { isHslocCodeMap } from './patientRows';
@@ -43,6 +43,8 @@ export function HslocEvidenceModal({
 }: HslocEvidenceModalProps) {
   const { t } = useTranslation(['onboarding', 'common']);
   const { vendorProfile } = useOnboarding();
+  const configuredMappingsHeadingId = useId();
+  const acquiredValueHeadingId = useId();
 
   const mappedCodes = new Set(mappings.map((mapping) => mapping.sourceCode));
   const hslocUnmappedCodes = evidence
@@ -58,8 +60,8 @@ export function HslocEvidenceModal({
   return (
   <Modal
     open={open}
-    title={t(
-      'onboarding:reportResults.detail.mappingEvidence.hslocTitle',
+    title={acronymTitle(
+      <HeadingPause><AcronymText>{t('onboarding:reportResults.detail.mappingEvidence.hslocTitle')}</AcronymText></HeadingPause>,
     )}
     onClose={onClose}
     size="large"
@@ -77,18 +79,15 @@ export function HslocEvidenceModal({
       </div>
     </dl>
   
-    <h3 className="nhsn-link__report-results-detail-section-title">
-      {t(
-        'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
-      )}
+    <h3 id={configuredMappingsHeadingId} className="nhsn-link__report-results-detail-section-title">
+      <AcronymText>
+        {t(
+          'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
+        )}
+      </AcronymText>
     </h3>
     <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
-      <table className="nhsn-link__report-results-table">
-        <caption className="nhsn-link__visually-hidden">
-          {t(
-            'onboarding:reportResults.detail.mappingEvidence.configuredHslocMappings',
-          )}
-        </caption>
+      <table className="nhsn-link__report-results-table" aria-labelledby={configuredMappingsHeadingId}>
         <thead>
           <tr>
             <th scope="col">
@@ -103,9 +102,11 @@ export function HslocEvidenceModal({
                 )}
             </th>
             <th scope="col">
-              {t(
-                'onboarding:reportResults.detail.mappingEvidence.hslocCode',
-              )}
+              <AcronymText>
+                {t(
+                  'onboarding:reportResults.detail.mappingEvidence.hslocCode',
+                )}
+              </AcronymText>
             </th>
           </tr>
         </thead>
@@ -143,7 +144,7 @@ export function HslocEvidenceModal({
       !error &&
       hslocUnmappedCodes.length > 0 && (
         <>
-          <h3 className="nhsn-link__report-results-detail-section-title">
+          <h3 id={acquiredValueHeadingId} className="nhsn-link__report-results-detail-section-title">
             {t(
               'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
             )}
@@ -152,12 +153,7 @@ export function HslocEvidenceModal({
             <NHSNLoadingIndicator />
           ) : (
             <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
-              <table className="nhsn-link__report-results-table">
-                <caption className="nhsn-link__visually-hidden">
-                  {t(
-                    'onboarding:reportResults.detail.mappingEvidence.acquiredValueHeading',
-                  )}
-                </caption>
+              <table className="nhsn-link__report-results-table" aria-labelledby={acquiredValueHeadingId}>
                 <thead>
                   <tr>
                     <th scope="col">
@@ -167,9 +163,11 @@ export function HslocEvidenceModal({
                         )}
                     </th>
                     <th scope="col">
-                      {t(
-                        'onboarding:reportResults.detail.mappingEvidence.hslocCode',
-                      )}
+                      <AcronymText>
+                        {t(
+                          'onboarding:reportResults.detail.mappingEvidence.hslocCode',
+                        )}
+                      </AcronymText>
                     </th>
                     <th aria-hidden="true" />
                   </tr>

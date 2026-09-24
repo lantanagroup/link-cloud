@@ -15,7 +15,7 @@ import {useApiClient} from '../api/ApiClientContext';
 import type {DraftEnvelope} from '../api/ApiClient';
 import {HttpError} from '../api/http';
 import type {CommitResult, UserInfoResponse, VendorProfile} from '../api/contracts';
-import {Button, Modal} from '../fields';
+import {acronymTitle, Button, HeadingPause, Modal} from '../fields';
 import {useNotifications} from '../notifications/NotificationProvider';
 import {furthestLegalStep, isUnlocked, nextStepId, previousStepId, resolveStep} from './gating';
 import {buildStepPath, parseStepPath, sameTarget} from './navigation';
@@ -525,7 +525,7 @@ export function OnboardingProvider({
       {children}
       <Modal
         open={pendingStepId !== null}
-        title={t('unsavedChanges.title')}
+        title={acronymTitle(<HeadingPause>{t('unsavedChanges.title')}</HeadingPause>)}
         onClose={() => setPendingStepId(null)}
         showCloseButton
         closeLabel={t('actions.close')}

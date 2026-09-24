@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import type {ReportingStatus} from '../../../api/contracts';
-import {Button, Modal} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, Modal} from '../../../fields';
 
 /**
  * The onboarding POC's "Patient Status Timeline" -- the full conceptual pipeline behind Link's
@@ -196,7 +196,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
   return (
     <Modal
       open={open}
-      title={t('onboarding:reportResults.detail.patientTimeline.title')}
+      title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.patientTimeline.title')}</HeadingPause>)}
       onClose={onClose}
       size="large"
       footer={
@@ -211,8 +211,8 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
       <svg
         viewBox={`-24 -34 ${width + 48} ${height + 68}`}
         className="nhsn-link__report-results-timeline-svg"
-        role="img"
-        aria-label={t('onboarding:reportResults.detail.patientTimeline.title')}>
+        role="group"
+        aria-label={t('onboarding:reportResults.detail.patientTimeline.subtitle', {patientId, measure: measureName ?? ''})}>
         <defs>
           <marker id="nhsn-link-timeline-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
             <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />

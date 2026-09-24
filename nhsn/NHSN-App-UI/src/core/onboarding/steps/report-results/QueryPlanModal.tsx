@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { QueryPlan } from '../../../api/contracts';
-import { AcronymText, Button, Modal } from '../../../fields';
+import { AcronymText, acronymTitle, Button, HeadingPause, Modal } from '../../../fields';
 import { AsyncStatus } from './AsyncStatus';
 import { DownloadIcon } from './icons';
 import { parseQueryPlan } from './queryPlan';
@@ -39,7 +39,7 @@ export function QueryPlanModal({
   return (
     <Modal
       open={open}
-      title={t('onboarding:reportResults.detail.actions.viewQueryPlan')}
+      title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.actions.viewQueryPlan')}</HeadingPause>)}
       onClose={onClose}
       size="large"
       footer={

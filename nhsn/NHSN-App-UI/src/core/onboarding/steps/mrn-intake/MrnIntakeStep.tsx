@@ -400,7 +400,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
         open={selectedPatient !== null}
         title={
           selectedPatient
-            ? t('onboarding:mrnIntake.identifierTable.modalTitle', {patientId: selectedPatient.patientId})
+            ? acronymTitle(<HeadingPause>{t('onboarding:mrnIntake.identifierTable.modalTitle', {patientId: selectedPatient.patientId})}</HeadingPause>)
             : ''
         }
         size="large"

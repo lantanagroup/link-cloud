@@ -414,7 +414,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
       <Modal
         open={searchOpen}
-        title={t('onboarding:locationOrg.locationType.searchTitle', {vendor: vendorName})}
+        title={acronymTitle(<HeadingPause>{t('onboarding:locationOrg.locationType.searchTitle', {vendor: vendorName})}</HeadingPause>)}
         onClose={() => setSearchOpen(false)}
         size="large"
         footer={

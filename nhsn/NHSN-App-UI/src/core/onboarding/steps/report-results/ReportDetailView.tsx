@@ -21,6 +21,7 @@ import { PatientStatusTimelineModal } from './PatientStatusTimeline';
 import { PreQualResultsModal } from './PreQualResults';
 import { QueryPlanModal } from './QueryPlanModal';
 import {
+  AcronymText,
   acronymTitle,
   Button,
   HeadingPause,
@@ -739,9 +740,11 @@ export function ReportDetailView() {
                         )}
                       </th>
                       <th scope="col">
-                        {t(
-                          'onboarding:reportResults.detail.columns.hslocMapping',
-                        )}
+                        <AcronymText>
+                          {t(
+                            'onboarding:reportResults.detail.columns.hslocMapping',
+                          )}
+                        </AcronymText>
                       </th>
                       <th scope="col">
                         {t(
