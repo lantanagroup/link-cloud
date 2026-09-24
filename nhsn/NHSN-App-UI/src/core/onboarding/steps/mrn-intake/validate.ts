@@ -8,8 +8,8 @@ export interface FieldErrors {
 /**
  * The step's own working copy. The wire contract's yes/no answers are plain `boolean` (there is
  * nothing to save until they're answered), but the form itself needs to distinguish "unanswered"
- * from "No" while the user is still working through it — `YesNoField` already renders `undefined`
- * as neither choice selected.
+ * from "No" while the user is still working through it — `YesNoTabsField` already renders
+ * `undefined` as neither choice selected.
  */
 export type MrnIntakeDraft = Omit<
   MrnIntake,

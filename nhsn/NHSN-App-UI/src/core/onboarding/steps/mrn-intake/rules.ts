@@ -103,6 +103,12 @@ export function isMrnRuleElement(value: string): value is MrnRuleElement {
   return MRN_RULE_ELEMENTS.some(def => def.key === value);
 }
 
+/** periodStart/periodEnd values are dates (Patient.identifier.period.start/end), entered with a
+ * date picker rather than free text. */
+export function isDateRuleElement(element: MrnRuleElement): boolean {
+  return element === 'periodStart' || element === 'periodEnd';
+}
+
 // ---------------------------------------------------------------- patient <-> rule linking
 
 /** Which element keys were added to `rules` while a given patient's identifiers were on screen. */

@@ -8,10 +8,164 @@
  * "shared step blocks" section, same as every other step.
  */
 
+/* NHSNLink.css's `.nhsn-link__hint-text` default has no bottom margin - this step's hint
+   paragraphs sit directly above other content (a table, a repeatable list), so a small gap
+   is added below instead. */
+.nhsn-link__mrn-intake .nhsn-link__hint-text {
+  margin: 0.4rem 0 6px 0;
+}
+
 .nhsn-link__mrn-checkbox-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__repeatable-scroll {
+  padding-left: 4px;
+}
+
+.nhsn-link__mrn-intake .k-label svg {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 3px;
+  vertical-align: top;
+  align-self: flex-start;
+}
+
+.nhsn-link__mrn-intake .k-label {
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__mrn-intake .k-form-error {
+  color: var(--kendo-color-error, #cc1b22);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__subtitle {
+  margin-bottom: 16px;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__tabs {
+  margin-top: 5px;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__tab {
+  padding: 5px 18px;
+}
+
+.nhsn-link__mrn-intake .k-dropdownlist {
+  background: var(--kendo-color-app-surface, #ffffff);
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+}
+
+.nhsn-link__mrn-intake .k-dropdownlist.k-focus,
+.nhsn-link__mrn-intake .k-dropdownlist:focus {
+  border-color: var(--kendo-color-primary, #0057b7);
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 1px;
+}
+
+.nhsn-link__mrn-intake .k-dropdownlist .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker {
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  background: var(--kendo-color-app-surface, #ffffff);
+  color: var(--kendo-color-app-text, #1f2328);
+  box-shadow: none;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker:focus-within {
+  outline: 2px solid var(--kendo-color-primary, #0057b7);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input {
+  border: none;
+  background: transparent;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input:focus,
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input:focus-within {
+  outline: none;
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker.k-invalid {
+  border-color: var(--kendo-color-error, #cc1b22);
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker.k-invalid:focus-within {
+  outline-color: var(--kendo-color-error, #cc1b22);
+}
+
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: inherit;
+}
+
+.nhsn-link__mrn-intake-popup.k-list-container {
+  border: 1px solid var(--kendo-color-border, #d0d7de);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
+
+.k-animation-container .nhsn-link__mrn-intake-popup.k-list-container {
+  margin-top: 4px;
+}
+
+.nhsn-link__mrn-intake-popup .k-list {
+  background: var(--kendo-color-app-surface, #ffffff);
+  font-family: inherit;
+}
+
+.nhsn-link__mrn-intake-popup .k-list-item,
+.nhsn-link__mrn-intake-popup .k-list-optionlabel {
+  padding: 9px 11px;
+  font-size: 14px;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__mrn-intake-popup .k-list-item:hover,
+.nhsn-link__mrn-intake-popup .k-list-item.k-hover,
+.nhsn-link__mrn-intake-popup .k-list-optionlabel:hover,
+.nhsn-link__mrn-intake-popup .k-list-optionlabel.k-hover {
+  background: var(--kendo-color-base-hover, #f2f4f7);
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__mrn-intake-popup .k-list-item.k-selected,
+.nhsn-link__mrn-intake-popup .k-list-optionlabel.k-selected {
+  background: var(--kendo-color-primary, #0057b7);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-link__mrn-intake-popup .k-list-item.k-selected:hover,
+.nhsn-link__mrn-intake-popup .k-list-optionlabel.k-selected:hover {
+  background: var(--kendo-color-primary-hover, #032659);
+  color: var(--kendo-color-on-primary, #ffffff);
+}
+
+.nhsn-link__mrn-identifier-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-top: 4px;
+}
+
+.nhsn-link__mrn-id-modal-hint {
+  margin: -5px 0 10px;
 }
 
 .nhsn-link__mrn-patient-table-scroll {
@@ -37,36 +191,47 @@
 .nhsn-link__mrn-identifier-card {
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
+  padding: 14px 16px;
   background: var(--kendo-color-surface, #f7f9fc);
+  min-width: 0;
 }
 
 .nhsn-link__mrn-identifier-card-title {
   font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   margin-bottom: 6px;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  color:  var(--kendo-color-app-text, #1f2328);
 }
 
 .nhsn-link__mrn-id-field {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  border-top: 1px solid var(--kendo-color-border, #d0d7de);
+  flex-direction: column;
+  gap: 6px;
+  padding: 3px 0 1px;
+  font-size: 13px;
+  border-top: 1px solid #eef0f3;
 }
 
 .nhsn-link__mrn-id-field:first-of-type {
   border-top: none;
 }
 
+.nhsn-link__mrn-id-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
 .nhsn-link__mrn-id-field-label {
-  flex: 0 0 100px;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
-  font-size: 12px;
+  flex: 0 0 88px;
+  color: var(--kendo-color-app-text, #1f2328);
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
 .nhsn-link__mrn-id-field-value {
@@ -76,7 +241,7 @@
 }
 
 .nhsn-link__mrn-na {
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
+  color: #9aa4b2;
   font-style: italic;
 }
 
@@ -91,23 +256,39 @@
   margin-left: auto;
 }
 
-/* Editing/adding a rule needs room for the operator select and value field,
-   so - unlike the action row above - it takes the full row width. */
 .nhsn-link__mrn-id-rule-editor {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 240px;
+  margin-left: auto;
 }
 
-/* Pill badge, matching the POC's .mrn-id-rule-badge (index.html:357) and this
-   app's other status pills (NHSNLink.css's .nhsn-link__status-pill). */
+.nhsn-link__mrn-id-rule-editor .k-form-field {
+  flex: 1 1 160px;
+  min-width: 120px;
+  margin-bottom: 0;
+}
+
+.nhsn-link__mrn-id-rule-editor .k-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .nhsn-link__mrn-id-rule-badge {
   display: inline-block;
   font-size: 12px;
-  color: var(--kendo-color-app-text-subtle, #5a5f69);
-  background: var(--kendo-color-border, #d0d7de);
+  color: var(--kendo-color-app-text, #1f2328);
+  background: #eef0f3;
   border-radius: 999px;
   padding: 3px 10px;
   white-space: nowrap;
