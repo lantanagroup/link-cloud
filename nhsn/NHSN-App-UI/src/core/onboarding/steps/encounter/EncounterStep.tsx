@@ -215,16 +215,27 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   }
 
   /**
-   * Diverges from the POC (which sets encounterMappingAcknowledged unconditionally): a code
-   * system left blank while it still has mappings, or a mapping row with only one side filled
-   * in, blocks Continue - see findMissingCodeSystemGroupKeys/findIncompleteRowKeys. Unused
-   * scaffolding (a blank row nobody typed into, an empty group with nothing in it) is pruned
-   * first rather than counted against the user - see pruneEmptyGroups.
+   * Diverges from the POC (which sets encounterMappingAcknowledged unconditionally): a blank
+   * Encounter.type Code System, two Code Systems sharing a value (including both blank), or a
+   * mapping row with only one side filled in, all block Continue - see
+   * findMissingCodeSystemGroupKeys/findDuplicateCodeSystemIndexes/findIncompleteRowKeys. The
+   * first two run against the raw, unpruned groups - a blank Code System block stays on screen
+   * with its own "Remove System" control, so leaving it blank is a choice to hold the user to, not
+   * scaffolding to discard for them. A blank mapping row IS discarded for them - see
+   * pruneEmptyGroups, used only for that, right before the incomplete-row check.
    */
   function validateStep(): boolean {
     setValidationRequested(true);
+    if (findDuplicateCodeSystemIndexes(groups).length > 0) {
+      announceValidationMessage(t('onboarding:encounter.messages.duplicateCodeSystem'));
+      return false;
+    }
+    if (findMissingCodeSystemGroupKeys(groups).length > 0) {
+      announceValidationMessage(t('onboarding:encounter.messages.missingCodeSystem'));
+      return false;
+    }
     const pruned = pruneEmptyGroups(groups);
-    if (findMissingCodeSystemGroupKeys(pruned).length > 0 || findIncompleteRowKeys(pruned).length > 0) {
+    if (findIncompleteRowKeys(pruned).length > 0) {
       announceValidationMessage(t('onboarding:encounter.messages.incomplete'));
       return false;
     }
@@ -611,7 +622,7 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
     if (showValidation && incomplete) {
       setTouched(true);
     }
-  }, [showValidation, incomplete]);
+  }, [showValidation]);
 
   function handleRowBlur(event: React.FocusEvent<HTMLDivElement>) {
     if (!document.hasFocus()) {

@@ -470,7 +470,9 @@
       "loadError": "Unable to load encounter mapping data.",
       "saveError": "Unable to save encounter mappings.",
       "incomplete": "Please complete all fields before continuing.",
-      "missingCodeSystemHint": "An Encounter.type Code System is required for this group's mappings."
+      "missingCodeSystemHint": "An Encounter.type Code System is required for this group's mappings.",
+      "missingCodeSystem": "Fill in each Encounter.type Code System, or remove it, before continuing.",
+      "duplicateCodeSystem": "Two or more Encounter.type Code Systems are the same (or both blank). Fix or remove one of them before continuing."
     }
   },
   "report": {
