@@ -98,7 +98,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
   const viewingDetail = draft.currentView?.view === 'detail';
 
   return viewingDetail ? (
-    <ReportDetailView />
+    <ReportDetailView key={draft.currentView?.params?.reportId} />
   ) : (
     <ReportListView
       onBack={onBack}

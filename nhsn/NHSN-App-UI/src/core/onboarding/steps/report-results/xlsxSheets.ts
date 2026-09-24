@@ -18,11 +18,8 @@ import { toStatusCategory } from './reportStatus';
 // Each sheet covers every measure/patient/query, not just whichever DQM tab is active on screen.
 
 export function buildReportSummarySheet(detail: ReportDetail): XlsxSheet {
-  const rows: Array<[string, string]> = [['Report Id', detail.reportId]];
-  if (detail.regeneratedFrom) {
-    rows.push(['Regenerated From', detail.regeneratedFrom]);
-  }
-  rows.push(
+  const rows: Array<[string, string]> = [
+    ['Report Id', detail.reportId],
     [
       'Reporting Period',
       `${formatDate(detail.startDate)} to ${formatDate(detail.endDate)}`,
@@ -30,7 +27,7 @@ export function buildReportSummarySheet(detail: ReportDetail): XlsxSheet {
     ['Create Date', formatDateTime(detail.createDate)],
     ['Patient Count', String(detail.patientCount)],
     ['Status', detail.status],
-  );
+  ];
   return { name: 'Report Summary', headers: ['Field', 'Value'], rows };
 }
 

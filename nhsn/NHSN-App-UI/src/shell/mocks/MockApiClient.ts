@@ -634,11 +634,6 @@ export class MockApiClient implements ApiClient {
     return new Blob([ndjson], {type: 'application/x-ndjson'});
   }
 
-  async regenerateReport(reportId: string): Promise<Operation<C.ReportSummary>> {
-    const summary = this.buildReport({measures: [], startDate: '', endDate: '', patientIds: []});
-    return immediate({...summary, regeneratedFrom: reportId});
-  }
-
   async getReportAcknowledgement(): Promise<boolean | null> {
     await tick();
     return null;

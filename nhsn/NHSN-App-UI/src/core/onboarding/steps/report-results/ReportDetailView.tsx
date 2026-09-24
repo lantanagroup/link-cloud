@@ -70,7 +70,7 @@ export function ReportDetailView() {
   const { t } = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const { notifySuccess, notifyError } = useNotifications();
-  const { draft, mirror, saving, closeView } = useOnboarding();
+  const { draft, mirror, patch, saving, closeView, openView } = useOnboarding();
   const reportResults = draft.reportResults;
   const queryClient = useQueryClient();
 
@@ -80,7 +80,6 @@ export function ReportDetailView() {
     data: detailData,
     isLoading: detailLoading,
     error: detailQueryError,
-    refetch: refetchDetail,
   } = useQuery({
     queryKey: ['reportDetail', viewingReportId],
     queryFn: async () => {
@@ -123,6 +122,7 @@ export function ReportDetailView() {
       : t('onboarding:reportResults.messages.detailLoadError')
     : null;
   const [activeDqm, setActiveDqm] = useState<string | undefined>();
+  const [regenerating, setRegenerating] = useState(false);
   const [selectedPatientRow, setSelectedPatientRow] =
     useState<PatientStatusRow | null>(null);
   const [timelinePatientRow, setTimelinePatientRow] =
@@ -412,15 +412,47 @@ export function ReportDetailView() {
     });
   }
 
-  async function handleRefreshDetail() {
-    if (!viewingReportId || detailLoading) {
+  async function handleRegenerateReport() {
+    if (!detail || regenerating) {
       return;
     }
-    const result = await refetchDetail();
-    if (result.isSuccess) {
-      notifySuccess(t('onboarding:reportResults.messages.refreshed'));
-    } else {
-      notifyError(t('onboarding:reportResults.messages.detailLoadError'));
+    setRegenerating(true);
+    try {
+      const operation = await api.requestReport({
+        measures: detail.measures,
+        startDate: formatDate(detail.startDate),
+        endDate: formatDate(detail.endDate),
+        patientIds: patients.map((patient) => patient.patientId),
+      });
+      const summary = await operation.result();
+      patch('reportResults', {
+        viewingReportId: summary.reportId,
+        latestStatus: summary.status,
+        requestedMeasuresByReportId: {
+          ...reportResults.requestedMeasuresByReportId,
+          [summary.reportId]:
+            reportResults.requestedMeasuresByReportId?.[detail.reportId] ??
+            detail.measures,
+        },
+      });
+      openView({
+        stepId: 'report-results',
+        view: 'detail',
+        params: { reportId: summary.reportId },
+      });
+      notifySuccess(
+        t('onboarding:reportResults.messages.regenerated', {
+          reportId: summary.reportId,
+        }),
+      );
+    } catch (cause) {
+      notifyError(
+        cause instanceof Error
+          ? cause.message
+          : t('onboarding:reportResults.messages.regenerateError'),
+      );
+    } finally {
+      setRegenerating(false);
     }
   }
 
@@ -530,9 +562,11 @@ export function ReportDetailView() {
       <div className="nhsn-link__report-results-detail-header-actions">
         <button
           type="button"
-          className={`nhsn-link__report-results-icon-button${detailLoading ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
-          onClick={handleRefreshDetail}
-          aria-label={t('common:actions.refresh')}>
+          className={`nhsn-link__report-results-icon-button${regenerating ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
+          onClick={handleRegenerateReport}
+          disabled={regenerating}
+          aria-label={t('onboarding:reportResults.detail.actions.regenerateReport')}
+          title={t('onboarding:reportResults.detail.actions.regenerateReport')}>
           <RefreshIcon />
         </button>
       </div>

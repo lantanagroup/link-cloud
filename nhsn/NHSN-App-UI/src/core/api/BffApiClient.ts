@@ -332,13 +332,6 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
-  async regenerateReport(reportId: string): Promise<Operation<ReportSummary>> {
-    const initial = await this.http.post<ReportSummary>(
-      `/reports/${encodeURIComponent(reportId)}/regenerations`
-    );
-    return pollOperation(this.http, initial, {isDone: isReportSettled});
-  }
-
   async getReportAcknowledgement(reportId: string): Promise<boolean | null> {
     const {data} = await this.http.get<{accepted: boolean | null}>(`/reports/${encodeURIComponent(reportId)}/acknowledgement`);
     return data.accepted;

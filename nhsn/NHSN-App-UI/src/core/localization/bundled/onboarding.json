@@ -571,7 +571,9 @@
       "reportPending": "A report is already pending. Wait for it to complete before generating another.",
       "noReports": "No reports have been generated yet.",
       "notAcknowledged": "Please acknowledge that the generated reports are accurate before continuing.",
-      "ackError": "Unable to record the acknowledgement."
+      "ackError": "Unable to record the acknowledgement.",
+      "regenerated": "Report regenerated as {{reportId}}.",
+      "regenerateError": "Unable to regenerate this report."
     },
     "detail": {
       "title": "Report Details",
@@ -582,7 +584,8 @@
         "viewQueryPlan": "View Query Plan",
         "viewAcquisitionLog": "View Acquisition Log",
         "exportSummary": "Export Report Summary",
-        "exportToExcel": "Export to Excel"
+        "exportToExcel": "Export to Excel",
+        "regenerateReport": "Regenerate Report"
       },
       "queryPlan": {
         "ehrType": "EHR Type",
