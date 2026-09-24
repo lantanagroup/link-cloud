@@ -614,6 +614,9 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
   }, [showValidation, incomplete]);
 
   function handleRowBlur(event: React.FocusEvent<HTMLDivElement>) {
+    if (!document.hasFocus()) {
+      return;
+    }
     if (!event.currentTarget.contains(event.relatedTarget as Node | null) && incomplete) {
       setTouched(true);
     }
