@@ -174,9 +174,10 @@ jobs:
       # API Stability seeds ApiHealthScenario (1 patient) and asserts ABS
       # prediction against that seed. Running it in parallel with the 1000-resource
       # Adhoc categories made DA miss ServiceRequest/Observation on the seed
-      # patient (different type each rerun). Run it first on a quiet stack, then
-      # the remaining categories concurrently. Each `dotnet test` writes its own
-      # log; after they finish we wrap those logs in ::group:: markers.
+      # patient. It still happens sometimes when this test runs first, so
+      # ApiStabilityTest retries only that miss. Run it first on a quiet stack,
+      # then the remaining categories concurrently. Each `dotnet test` writes its
+      # own log; after they finish we wrap those logs in ::group:: markers.
       - name: Backend E2E Tests
         shell: bash
         run: |

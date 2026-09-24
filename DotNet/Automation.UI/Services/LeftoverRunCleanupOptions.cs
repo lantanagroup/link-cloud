@@ -4,13 +4,17 @@ public sealed class LeftoverRunCleanupOptions
 {
     public const string SectionName = "LeftoverRunCleanup";
 
-    public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Master switch for scheduled leftover cleanup. Off unless an operator or
+    /// deployment config turns it on, so installing Automation.UI does not start sweeps.
+    /// </summary>
+    public bool Enabled { get; set; }
 
     /// <summary>
     /// Cheap daytime pass: abort leftover GUID work so DA/census stop hammering.
-    /// Teardown and history purge stay on the off-hours schedule.
+    /// Off until explicitly enabled. Teardown and history purge use the off-hours schedule.
     /// </summary>
-    public bool QuiesceEnabled { get; set; } = true;
+    public bool QuiesceEnabled { get; set; }
 
     /// <summary>How often the sweeper quiesces hot leftover work.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromMinutes(5);
@@ -35,12 +39,12 @@ public sealed class LeftoverRunCleanupOptions
     /// <summary>Cap facilities handled in one pass so a huge leftover set cannot stall the host.</summary>
     public int MaxFacilitiesPerPass { get; set; } = 25;
 
-    public bool DailyTeardownEnabled { get; set; } = true;
+    public bool DailyTeardownEnabled { get; set; }
 
     /// <summary>UTC clock time for the daily 14-day leftover teardown. Default 10:00 UTC.</summary>
     public string DailyTeardownTimeUtc { get; set; } = "10:00";
 
-    public bool WeeklyHistoryPurgeEnabled { get; set; } = true;
+    public bool WeeklyHistoryPurgeEnabled { get; set; }
 
     public DayOfWeek WeeklyHistoryPurgeDay { get; set; } = DayOfWeek.Sunday;
 
