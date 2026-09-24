@@ -131,8 +131,14 @@
         if (!items || !items.length)
             return `<p class="small text-muted mb-3">${esc(emptyText)}</p>`;
 
-        const ranked = items.slice().sort((a, b) =>
-            (pick(b, 'score', 'Score', 0) - pick(a, 'score', 'Score', 0)));
+        const ranked = items.slice().sort((a, b) => {
+            const reuseRank = (pick(b, 'recommendation', 'Recommendation', '') === 'Reuse')
+                - (pick(a, 'recommendation', 'Recommendation', '') === 'Reuse');
+            if (reuseRank) return reuseRank;
+            const scoreRank = pick(b, 'score', 'Score', 0) - pick(a, 'score', 'Score', 0);
+            if (scoreRank) return scoreRank;
+            return String(pick(a, 'name', 'Name', '')).localeCompare(String(pick(b, 'name', 'Name', '')));
+        });
         const [best, ...rest] = ranked;
 
         function card(item, recommended) {
