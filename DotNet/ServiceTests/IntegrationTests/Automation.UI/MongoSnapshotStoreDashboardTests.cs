@@ -130,6 +130,22 @@ public class MongoSnapshotStoreDashboardTests : IAsyncLifetime
         raw["AutomationCreatedFacility"].AsBoolean.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Teardown_progress_can_be_read_after_it_is_recorded()
+    {
+        var store = _fixture.CreateStore();
+        var runId = Guid.NewGuid();
+        var facilityId = Guid.NewGuid().ToString();
+
+        await store.MarkFacilityTeardownProgressAsync(runId, facilityId, CancellationToken.None);
+
+        var ids = await store.GetFacilityTeardownProgressAsync(runId, CancellationToken.None);
+        ids.Should().Equal(facilityId);
+
+        await store.ClearFacilityTeardownProgressAsync(runId, CancellationToken.None);
+        (await store.GetFacilityTeardownProgressAsync(runId, CancellationToken.None)).Should().BeEmpty();
+    }
+
     private static AutomationRunSummary MakeSummary(AutomationRunStatus status, DateTimeOffset createdAt) => new()
     {
         RunId = Guid.NewGuid(),

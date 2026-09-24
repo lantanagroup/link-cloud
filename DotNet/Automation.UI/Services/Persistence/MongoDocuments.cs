@@ -71,6 +71,9 @@ public sealed class OwnedFacilityTombstoneDocument
 /// <summary>Facility id already torn down for a run whose snapshot is still waiting to be purged.</summary>
 public sealed class FacilityTeardownProgressDocument
 {
+    [BsonId]
+    public ObjectId Id { get; set; }
+
     [BsonRepresentation(BsonType.String)]
     public Guid RunId { get; set; }
 

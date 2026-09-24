@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
@@ -347,6 +348,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             await _facilityTeardownProgress.InsertOneAsync(new FacilityTeardownProgressDocument
             {
+                Id = ObjectId.GenerateNewId(),
                 RunId = runId,
                 FacilityId = facilityId
             }, cancellationToken: ct);
