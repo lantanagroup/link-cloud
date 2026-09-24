@@ -97,9 +97,21 @@
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
       "invalidFhirPath": "Enter a valid FHIRPath expression.",
-      "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it or leave it blank to select one online.",
-      "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it or leave it blank to select one online.",
-      "lineFormat": "{{sheet}} {{location}}: {{message}}"
+      "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
+      "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
+      "invalidSftpHost": "Enter a valid SFTP hostname or IP address.",
+      "invalidPullTimeOrder": "Min Acquisition Pull Time must be earlier than Max Acquisition Pull Time.",
+      "requiredFhirBundle": "FHIR Server Base URL, Max Concurrent Requests, Min Acquisition Pull Time, and Max Acquisition Pull Time must all be filled in together, or all left blank.",
+      "requiredLagDuration": "Patient Resource Acquisition Lag Duration must total more than 0 minutes once any of Days/Hours/Minutes is filled in.",
+      "requiredFhirListId": "This FHIR List identifier is required — all six Admit/Discharge identifiers must be filled in together.",
+      "requiredSftpField": "This field is required for a Cerner facility's SFTP acquisition.",
+      "requiredHslocMapping": "At least one complete HSLOC mapping is required.",
+      "partialHslocMapping": "Both Your (local) Code and HSLOC Code are required for a mapping row — remove incomplete rows or fill them in completely.",
+      "duplicateHslocIdentifier": "This Location.identifier.value is used by more than one row — each mapping's local identifier must be unique.",
+      "partialLocationType": "Both columns are required for a Location Type row — remove incomplete rows or fill them in completely.",
+      "partialLocationIdentifier": "Both columns are required for a Location Identifier row — remove incomplete rows or fill them in completely.",
+      "partialEncounterMapping": "All four columns are required for an Encounter Mapping row — remove incomplete rows or fill them in completely.",
+      "lineFormat": "{{sheet}} {{location}}: {{- message}}"
     }
   },
   "fhirServerInfo": {
@@ -305,7 +317,6 @@
       "rowIncomplete": "This field is required.",
       "fieldRequiredError": "{{field}} is required.",
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
-      "listEmpty": "At least one entry is required before continuing.",
       "duplicateManagingOrg": "This Managing Organization has already been added.",
       "duplicateLocationType": "This Location Type has already been added.",
       "duplicateLocationIdentifier": "This Location Identifier has already been added.",

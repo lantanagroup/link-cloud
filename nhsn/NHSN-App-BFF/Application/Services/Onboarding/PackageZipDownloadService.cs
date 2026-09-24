@@ -107,10 +107,15 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
         {
             foreach (var (entryName, filePath) in resolved)
             {
-                var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
+                // The import sheet is named after the facility so a facility juggling multiple
+                // downloads (or re-downloading after a vendor change) can tell its sheets apart
+                // without opening each one.
+                var isXlsx = Path.GetExtension(filePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase);
+                var zipEntryName = isXlsx ? $"{facilityId}_{entryName}" : entryName;
+                var entry = archive.CreateEntry(zipEntryName, CompressionLevel.Optimal);
                 await using var entryStream = entry.Open();
 
-                if (Path.GetExtension(filePath).Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+                if (isXlsx)
                 {
                     var templateBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
                     var personalized = ManualUploadTemplatePersonalizer.Personalize(templateBytes, facilityLine, vendorLine);

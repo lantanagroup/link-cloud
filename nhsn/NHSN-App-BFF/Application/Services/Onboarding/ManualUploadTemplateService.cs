@@ -1,10 +1,8 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
-using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 
@@ -24,19 +22,13 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 {
     private readonly IOnboardingWriteService _writeService;
-    private readonly IFacilityGateway _facilityGateway;
-    private readonly INhsnUserContext _userContext;
     private readonly IReferenceDataService _referenceDataService;
 
     public ManualUploadTemplateService(
         IOnboardingWriteService writeService,
-        IFacilityGateway facilityGateway,
-        INhsnUserContext userContext,
         IReferenceDataService referenceDataService)
     {
         _writeService = writeService;
-        _facilityGateway = facilityGateway;
-        _userContext = userContext;
         _referenceDataService = referenceDataService;
     }
 
@@ -95,64 +87,50 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             return InvalidFormatResult();
         }
 
-        // The sheet's own "Facility: ... (ID)" line (row 2) names which facility it was generated
-        // for. Checked before the vendor line: a sheet downloaded for facility A (or hand-edited to
-        // claim to be one) has no business being applied to facility B's config, regardless of
-        // whether the vendors happen to match - the facility id is the one thing on the sheet
-        // that's supposed to be unique per download.
-        var facilityId = _userContext.RequireFacilityId();
-        var sheetFacilityId = ParseSheetFacilityId(rows);
-        if (sheetFacilityId is not null && !string.Equals(sheetFacilityId, facilityId, StringComparison.OrdinalIgnoreCase))
-        {
-            return FacilityMismatchResult();
-        }
-
-        // The sheet's own "Vendor: Epic"/"Vendor: Cerner" line (row 3 in both templates, but
-        // matched by content rather than position - same reasoning as every other lookup in this
-        // file) names which vendor it was generated for. Uploading the other vendor's sheet would
-        // otherwise silently parse - the two templates share every field key - and write values a
-        // facility never actually entered (an Epic facility has no sftpHost/sftpPassword rows to
-        // fill in, so a Cerner sheet's real SFTP credentials would flow straight into an Epic
-        // facility's config). Only checked once the facility has actually chosen a vendor; nothing
-        // to compare against otherwise.
-        var facility = await _facilityGateway.GetAsync(facilityId, cancellationToken);
-        if (facility?.Vendor is { } configuredVendor)
-        {
-            var sheetVendor = ParseSheetVendor(rows);
-            if (sheetVendor is not null && !string.Equals(sheetVendor, configuredVendor.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                return VendorMismatchResult();
-            }
-        }
-
         var errors = new List<ImportCellError>();
         var values = ReadScalarFields(rows, out var rowNumberByKey, errors);
         ValidateCrossFields(values, rowNumberByKey, rows, errors);
 
+        // Hsloc/Encounter validate as they build (a partial or unresolved row needs the same raw
+        // table data the builder already reads), appending straight into `errors` rather than
+        // returning a separate list - same single `errors` collection every other validation in
+        // this file uses.
         var fields = new ImportedFields
         {
             Fhir = BuildFhir(values),
             Census = BuildCensus(values),
             LocationOrg = BuildLocationOrg(values, rows),
-            Hsloc = await BuildHslocAsync(rows, cancellationToken),
-            Encounter = await BuildEncounterAsync(rows, cancellationToken)
+            Hsloc = await BuildHslocAsync(rows, errors, cancellationToken),
+            Encounter = await BuildEncounterAsync(rows, errors, cancellationToken)
         };
 
         var hslocImported = fields.Hsloc?.Mappings is {Count: > 0};
         var encounterImported = fields.Encounter?.Mappings is {Count: > 0};
+        // Location Types, Location Identifiers and Managing Organizations are three separate
+        // repeating-row tables backing one method each, but they're one section (Organization
+        // Identification) and get one slot here, same as HSLOC and Encounter each get their own -
+        // any one of the three having a row is enough to count the section as touched. locOrgMethod
+        // and customFhirPath are scalar fields and already counted separately via ScalarFieldKeys;
+        // this is only for the table data those two don't cover.
+        var locationOrgTablesImported = fields.LocationOrg is { } locationOrg &&
+            (locationOrg.LocationTypes is {Count: > 0} ||
+             locationOrg.LocationIdentifiers is {Count: > 0} ||
+             locationOrg.ManagingOrganizationIds is {Count: > 0});
 
         var totalFields = rows.Values.Count(row => row.TryGetValue("A", out var key) && ScalarFieldKeys.Contains(key))
+            + 1 // Organization Identification (Location Types / Location Identifiers / Managing Organizations)
             + 1 // HSLOC Location Mapping
             + 1; // Encounter Mapping
 
         // Only a fully valid sheet gets saved - a cell error rejects the whole import (Accepted =
-        // false), so nothing here is ever written half-validated. Accepted is captured before a
-        // save is even attempted, and stays true afterwards regardless of what the save reports:
-        // it means "the sheet itself was well-formed," not "everything on it ended up saved." A
-        // section can still fail once a real cross-service precondition or downstream validator -
-        // never checkable from the sheet alone - rejects it; that's reported as a cell error too,
-        // just added after the fact, so the facility sees why a field came back blank instead of
-        // guessing, without losing the sections that DID save.
+        // false), so nothing here is ever written half-validated. Accepted is captured only once
+        // every validation - scalar, cross-field, and the Hsloc/Encounter builders' own row checks
+        // above - has had a chance to add to `errors`, and stays true afterwards regardless of what
+        // the save reports: it means "the sheet itself was well-formed," not "everything on it ended
+        // up saved." A section can still fail once a real cross-service precondition or downstream
+        // validator - never checkable from the sheet alone - rejects it; that's reported as a cell
+        // error too, just added after the fact, so the facility sees why a field came back blank
+        // instead of guessing, without losing the sections that DID save.
         var accepted = errors.Count == 0;
         if (accepted)
         {
@@ -172,7 +150,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         {
             Accepted = accepted,
             CellErrors = errors,
-            FieldsImported = values.Count + (hslocImported ? 1 : 0) + (encounterImported ? 1 : 0),
+            FieldsImported = values.Count + (locationOrgTablesImported ? 1 : 0) + (hslocImported ? 1 : 0) + (encounterImported ? 1 : 0),
             TotalFields = totalFields,
             Fields = fields
         };
@@ -313,8 +291,14 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 
         var savedByCode = saved.GroupBy(m => m.SourceCode, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        // Only a row THIS import actually resolved a code for prefers the read-back (Link-
+        // normalized) value - a row it left blank (mismatch/unresolved) stays blank here even if
+        // `saved` still has an older mapping for that source code. SaveImportedFieldsAsync protects
+        // that older mapping from being deleted (see its own comment), but the facility still needs
+        // to see "you haven't picked one for this import" rather than a stale value silently
+        // reappearing as if it had resolved.
         var merged = original
-            .Select(row => savedByCode.TryGetValue(row.SourceCode, out var savedRow)
+            .Select(row => row.HslocCode.Length > 0 && savedByCode.TryGetValue(row.SourceCode, out var savedRow)
                 ? new ImportedHslocMapping { SourceCode = savedRow.SourceCode, SourceDisplay = savedRow.SourceDisplay, HslocCode = savedRow.HslocCode }
                 : row)
             .ToList();
@@ -324,7 +308,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
     // Same reasoning as MergeHslocMappings: a row with a blank EncounterType (local system/code
     // entered, reference columns didn't resolve) never round-trips through Normalization's Code Map
     // operation on its own - EncounterMappingService.BuildCodeSystemMaps skips anything it can't
-    // split on '|'. Restricted to rows `original` (this import) actually named: `saved` is the
+    // split on '|'. Restricted to ro   ws `original` (this import) actually named: `saved` is the
     // facility's FULL current Code Map operation, which can hold mappings from a previous, unrelated
     // save - echoing all of it back would resurrect those next to this sheet's own rows. Keyed by
     // (System, Code) since that pair, not a single source code, is what identifies one row.
@@ -338,8 +322,11 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 
         var savedByKey = saved.GroupBy(m => (m.System.ToUpperInvariant(), m.Code.ToUpperInvariant()))
             .ToDictionary(g => g.Key, g => g.First());
+        // Same reasoning as MergeHslocMappings: only a row THIS import actually resolved a
+        // reference for prefers the read-back value - a row it left blank (mismatch/unresolved)
+        // stays blank even if `saved` still has an older mapping for that local system/code.
         var merged = original
-            .Select(row => savedByKey.TryGetValue((row.System.ToUpperInvariant(), row.Code.ToUpperInvariant()), out var savedRow)
+            .Select(row => row.EncounterType.Length > 0 && savedByKey.TryGetValue((row.System.ToUpperInvariant(), row.Code.ToUpperInvariant()), out var savedRow)
                 ? new ImportedEncounterMapping { System = savedRow.System, Code = savedRow.Code, Display = savedRow.Display, EncounterType = savedRow.EncounterType }
                 : row)
             .ToList();
@@ -361,81 +348,6 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         FieldsImported = 0,
         TotalFields = 0
     };
-
-    private static ImportResult VendorMismatchResult() => new()
-    {
-        Accepted = false,
-        CellErrors =
-        [
-            new ImportCellError
-            {
-                Sheet = SheetName,
-                Cell = "A3",
-                MessageKey = "onboarding:manualUpload.errors.vendorMismatch"
-            }
-        ],
-        FieldsImported = 0,
-        TotalFields = 0
-    };
-
-    private static ImportResult FacilityMismatchResult() => new()
-    {
-        Accepted = false,
-        CellErrors =
-        [
-            new ImportCellError
-            {
-                Sheet = SheetName,
-                Cell = "A2",
-                MessageKey = "onboarding:manualUpload.errors.facilityMismatch"
-            }
-        ],
-        FieldsImported = 0,
-        TotalFields = 0
-    };
-
-    private static readonly Regex VendorLinePattern = new(@"^Vendor:\s*(.+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    // Matches PackageZipDownloadService's own "Facility: {name} ({id})" format (see
-    // ManualUploadTemplatePersonalizer) - the id in parentheses at the end of the line, not the
-    // display name before it, since the name alone isn't guaranteed unique and may contain
-    // parentheses of its own.
-    private static readonly Regex FacilityLinePattern = new(@"^Facility:\s*.*\(([^()]+)\)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    // Scans every row rather than assuming row 3, matching how every other lookup in this file
-    // locates content by what it says instead of where it sits.
-    private static string? ParseSheetVendor(Dictionary<int, Dictionary<string, string>> rows)
-    {
-        foreach (var row in rows.Values)
-        {
-            if (row.TryGetValue("A", out var text))
-            {
-                var match = VendorLinePattern.Match(text.Trim());
-                if (match.Success)
-                {
-                    return match.Groups[1].Value.Trim();
-                }
-            }
-        }
-        return null;
-    }
-
-    // Same approach as ParseSheetVendor, against row 2 instead of row 3.
-    private static string? ParseSheetFacilityId(Dictionary<int, Dictionary<string, string>> rows)
-    {
-        foreach (var row in rows.Values)
-        {
-            if (row.TryGetValue("A", out var text))
-            {
-                var match = FacilityLinePattern.Match(text.Trim());
-                if (match.Success)
-                {
-                    return match.Groups[1].Value.Trim();
-                }
-            }
-        }
-        return null;
-    }
 
     // ---------------------------------------------------------------- scalar "Field Key" rows
 
@@ -575,6 +487,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             "maxConcurrentRequests" => ValidateIntRange(value, FieldValidationRules.MaxConcurrentRequestsMin, FieldValidationRules.MaxConcurrentRequestsCap),
             "maxRetries" => ValidateIntRange(value, FieldValidationRules.MaxRetriesMin, FieldValidationRules.MaxRetriesCap),
             "minPullTime" or "maxPullTime" => (ValidatePullTime(value), null),
+            "sftpHost" => (ValidateSftpHost(value), null),
             "sftpPort" => ValidateIntRange(value, FieldValidationRules.SftpPortMin, FieldValidationRules.SftpPortMax),
             "censusFreqHours" or "censusFreqMinutes"
                 or "patientLagDays" or "patientLagHours" or "patientLagMinutes" => (ValidateNonNegativeInteger(value), null),
@@ -586,6 +499,9 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 
     private static string? ValidateAbsoluteUrl(string value) =>
         FieldValidationRules.IsAbsoluteUrl(value) ? null : "onboarding:manualUpload.errors.invalidUrl";
+
+    private static string? ValidateSftpHost(string value) =>
+        FieldValidationRules.IsValidSftpHost(value) ? null : "onboarding:manualUpload.errors.invalidSftpHost";
 
     // Reuses the same alias table BuildLocationOrg normalizes with, rather than a separate list of
     // "valid" strings - a value this rejects would otherwise silently normalize to null and vanish
@@ -656,15 +572,28 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
                 Label = LabelForRow(rows, lagRow)
             });
         }
+        // Required, not merely "must total > 0 once touched": leaving all three blank is exactly as
+        // much an error as filling them in with zeros - a facility must actually set a lag, not skip
+        // the group entirely.
+        else if (totalLagMinutes <= 0 && rowNumberByKey.TryGetValue("patientLagDays", out var lagZeroRow))
+        {
+            errors.Add(new ImportCellError
+            {
+                Sheet = SheetName,
+                Cell = $"C{lagZeroRow}",
+                MessageKey = "onboarding:manualUpload.errors.requiredLagDuration",
+                Section = "fhir",
+                Label = LabelForRow(rows, lagZeroRow)
+            });
+        }
 
         var censusHours = ParseInt(values, "censusFreqHours");
         var censusMinutes = ParseInt(values, "censusFreqMinutes");
-        // Fires as soon as EITHER is present, defaulting the other to 0 the same way the lag
-        // check above does - a facility that fills in only "Hours" (leaving "Minutes" blank,
-        // its default) was previously invisible to this check entirely, since it used to require
-        // both fields non-null before running at all.
-        if ((censusHours is not null || censusMinutes is not null) &&
-            !FieldValidationRules.IsValidCensusFrequency(censusHours ?? 0, censusMinutes ?? 0))
+        // Required, not merely "must be valid once either is touched" - Hours and Minutes are an
+        // either/or pair (the sheet's own "Required" column: "Yes - if Minutes/Hours not provided"),
+        // so leaving both blank is the same failure as an out-of-range total: no acquisition
+        // frequency at all.
+        if (!FieldValidationRules.IsValidCensusFrequency(censusHours ?? 0, censusMinutes ?? 0))
         {
             var censusRow = rowNumberByKey.TryGetValue("censusFreqHours", out var hoursRow)
                 ? hoursRow
@@ -681,7 +610,143 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
                 });
             }
         }
+
+        // WriteFhirSectionAsync (OnboardingWriteService) won't write ANY of the FHIR section unless
+        // all four of these are present - it's a hard requirement of Tenant's own
+        // UpdateFhirServerInfoAsync, not something this sheet can relax. The sheet's own "Required"
+        // column marks fhirBaseUrl and maxConcurrentRequests plain "Yes" (unconditional), so these
+        // four are simply always required, not "required together once one of them is touched" -
+        // a sheet that fills in only some of them (e.g. just maxConcurrentRequests/maxRetries) used
+        // to pass validation, get "Accepted", and then have the whole section silently dropped at
+        // save time with no error anywhere. This also covers "if min there max must be present and
+        // vice versa" - min/max are two of the four, and both are now always required too.
+        RequireFields(
+            values, rowNumberByKey, rows, errors, "fhir",
+            "onboarding:manualUpload.errors.requiredFhirBundle",
+            "fhirBaseUrl", "maxConcurrentRequests", "minPullTime", "maxPullTime");
+
+        // Ordering only means something once both are present and individually well-formed - a
+        // malformed pull time already has its own invalidPullTime cell error from ValidateScalar,
+        // and reporting an ordering problem on top of that would just be noise about a value that's
+        // already flagged as wrong.
+        if (values.TryGetValue("minPullTime", out var minPullTime) && values.TryGetValue("maxPullTime", out var maxPullTime) &&
+            FieldValidationRules.IsPullTime(minPullTime) && FieldValidationRules.IsPullTime(maxPullTime) &&
+            !FieldValidationRules.IsPullTimeOrderValid(minPullTime, maxPullTime) &&
+            rowNumberByKey.TryGetValue("minPullTime", out var minPullTimeRow))
+        {
+            errors.Add(new ImportCellError
+            {
+                Sheet = SheetName,
+                Cell = $"C{minPullTimeRow}",
+                MessageKey = "onboarding:manualUpload.errors.invalidPullTimeOrder",
+                Section = "fhir",
+                Label = LabelForRow(rows, minPullTimeRow)
+            });
+        }
+
+        // Epic's template is the only one with FHIR List admit/discharge id rows at all (see
+        // ScalarFieldKeys' own comment on Epic/Cerner row differences) - their presence in
+        // rowNumberByKey is how this tells an Epic sheet from a Cerner one, without needing a
+        // separate "Vendor:" line parse. All six are one FHIR List configuration in Data
+        // Acquisition; a facility that fills in some but not all would otherwise get a census
+        // silently missing whichever ids they skipped.
+        var epicCensusListKeys = CensusListKeyByFieldKey.Keys.ToArray();
+        if (epicCensusListKeys.Any(rowNumberByKey.ContainsKey))
+        {
+            RequireFields(
+                values, rowNumberByKey, rows, errors, "census",
+                "onboarding:manualUpload.errors.requiredFhirListId",
+                epicCensusListKeys);
+        }
+
+        // Cerner's template is the only one with SFTP rows at all - same row-presence detection as
+        // the Epic block above. Unlike the FHIR bundle (optional until touched), a Cerner sheet's
+        // POI acquisition method IS SFTP, so these four are simply required, not "required once one
+        // of them is filled in."
+        var cernerSftpKeys = new[] {"sftpHost", "sftpPort", "sftpUsername", "sftpPassword"};
+        if (cernerSftpKeys.Any(rowNumberByKey.ContainsKey))
+        {
+            RequireFields(
+                values, rowNumberByKey, rows, errors, "census",
+                "onboarding:manualUpload.errors.requiredSftpField",
+                cernerSftpKeys);
+        }
+
+        // No requiredness here (a facility can leave Resolution Method blank, or leave both tables
+        // untouched, and still move on - see BuildLocationOrg) - only "a row that has anything in it
+        // has BOTH of its columns," independent of which method is selected. A row with just a Code
+        // or just an Alias/System can't have meant to submit it, and LocationOrgFhirPathBuilder.Build
+        // already can't turn a half-filled row into a FHIRPath clause anyway.
+        FlagPartialRows(
+            rows, errors, "Organization Identification — Location Types", "location-org", "A", "B",
+            "onboarding:manualUpload.errors.partialLocationType");
+        FlagPartialRows(
+            rows, errors, "Organization Identification — Location Identifiers", "location-org", "A", "B",
+            "onboarding:manualUpload.errors.partialLocationIdentifier");
     }
+
+    // Flags every row in a two-column table that has SOME data but not both columns - a fully blank
+    // row is left alone (nothing was attempted), and a fully complete row is left alone (nothing
+    // wrong with it). No "at least one complete row" requirement here - see the two call sites above.
+    private static void FlagPartialRows(
+        Dictionary<int, Dictionary<string, string>> rows,
+        List<ImportCellError> errors,
+        string sectionHeader,
+        string section,
+        string columnA,
+        string columnB,
+        string partialMessageKey)
+    {
+        foreach (var (rowNumber, row) in ReadTableRows(rows, sectionHeader))
+        {
+            var a = row.GetValueOrDefault(columnA, "").Trim();
+            var b = row.GetValueOrDefault(columnB, "").Trim();
+            if (a.Length == 0 && b.Length == 0)
+            {
+                continue;
+            }
+            if (a.Length == 0 || b.Length == 0)
+            {
+                errors.Add(new ImportCellError
+                {
+                    Sheet = SheetName,
+                    Cell = $"{(a.Length == 0 ? columnA : columnB)}{rowNumber}",
+                    MessageKey = partialMessageKey,
+                    Section = section
+                });
+            }
+        }
+    }
+
+    // Every key in `keys` must have a value, independent of whether any of the others do - unlike
+    // RequireTogether, this isn't "all or nothing starting from any one," it's "always."
+    private static void RequireFields(
+        Dictionary<string, string> values,
+        Dictionary<string, int> rowNumberByKey,
+        Dictionary<int, Dictionary<string, string>> rows,
+        List<ImportCellError> errors,
+        string section,
+        string messageKey,
+        params string[] keys)
+    {
+        foreach (var missingKey in keys.Where(key => !values.ContainsKey(key)))
+        {
+            if (!rowNumberByKey.TryGetValue(missingKey, out var missingRow))
+            {
+                continue;
+            }
+
+            errors.Add(new ImportCellError
+            {
+                Sheet = SheetName,
+                Cell = $"C{missingRow}",
+                MessageKey = messageKey,
+                Section = section,
+                Label = LabelForRow(rows, missingRow)
+            });
+        }
+    }
+
 
     private static string? LabelForRow(Dictionary<int, Dictionary<string, string>> rows, int rowNumber) =>
         rows.TryGetValue(rowNumber, out var row) ? row.GetValueOrDefault("B") : null;
@@ -793,51 +858,73 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         return IsEmpty(locationOrg) ? null : locationOrg;
     }
 
-    // A row's HSLOC Reference Code is only ever something a facility copied off the HSLOC reference
-    // table (there is no other source for that column), so a code that doesn't resolve there is
-    // typo'd or stale - but the row itself still names a real location identifier the facility wants
-    // mapped, so it's kept rather than dropped. HslocCode comes back blank instead, which HslocStep's
-    // own mapping-row <select> already renders as its "Select an HSLOC code" placeholder (the same
-    // state a brand-new row starts in online) - the facility sees every location they entered and
-    // just has to pick the right code for the ones that didn't resolve, instead of quietly losing
-    // rows to a bad or outdated code. Also enforces "one location identifier maps to one HSLOC code":
-    // Excel allows a facility to paste a row twice or reuse a source code by mistake, and
-    // HslocMappingService.SaveAsync already collapses duplicate source codes down to whichever one
-    // happened to sort first - deduping here, keeping the sheet's first occurrence, makes that
-    // outcome the sheet's own order rather than an implementation detail two layers away.
+    // At least one mapping is required (the sheet's own "Required" column: "Yes — at least one
+    // complete mapping required"), and every row present must have its local half complete: a
+    // source code, not just a display value. The reference half (HSLOC Code) is a different story -
+    // it's only ever something a facility copied off the HSLOC reference table, so a code that's
+    // blank or doesn't resolve there (typo'd, stale, or never filled in) is left blank rather than
+    // raising a cell error. HslocCode comes back "" either way, which HslocStep's own mapping-row
+    // <select> already renders as its "Select an HSLOC code" placeholder (the same state a
+    // brand-new row starts in online) - the facility sees every location they entered and just has
+    // to pick the right code for the ones that didn't resolve, instead of the whole import being
+    // rejected over it. Also enforces "one Location.identifier.value maps to one HSLOC code": both
+    // Epic's and Cerner's templates share this exact table shape, so a facility pasting a row twice
+    // or reusing an identifier by mistake is a possible mistake on either vendor's sheet, not
+    // vendor-specific. Every row sharing a duplicate identifier is flagged - not just the second
+    // one onward - so the facility sees all of them and can tell which to fix, rather than a silent
+    // "keep the first, drop the rest" that used to leave a genuinely different row (different local
+    // code, different target) missing with no explanation at all.
     private async Task<ImportedHsloc?> BuildHslocAsync(
         Dictionary<int, Dictionary<string, string>> rows,
+        List<ImportCellError> errors,
         CancellationToken cancellationToken)
     {
-        var rawRows = ReadTableRows(rows, "HSLOC Location Mapping");
+        const string sectionHeader = "HSLOC Location Mapping";
+        var rawRows = ReadTableRows(rows, sectionHeader);
         if (rawRows.Count == 0)
         {
+            RequireErrorAtHeader(rows, errors, sectionHeader, "hsloc", "onboarding:manualUpload.errors.requiredHslocMapping");
             return null;
         }
 
         var referenceCodes = await _referenceDataService.GetHslocCodesAsync(cancellationToken);
         var referenceByCode = referenceCodes.ToDictionary(c => c.Code, StringComparer.OrdinalIgnoreCase);
 
-        var seenSourceCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var duplicateSourceCodes = rawRows
+            .Select(entry => entry.Row.GetValueOrDefault("B", "").Trim())
+            .Where(code => code.Length > 0)
+            .GroupBy(code => code, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var mappings = new List<ImportedHslocMapping>();
-        foreach (var (_, row) in rawRows)
+        foreach (var (rowNumber, row) in rawRows)
         {
             var sourceCode = row.GetValueOrDefault("B", "").Trim();
             var hslocCode = row.GetValueOrDefault("C", "").Trim();
             var sourceDisplay = row.GetValueOrDefault("A", "").Trim();
-            if (sourceCode.Length == 0)
+            if (sourceDisplay.Length == 0 && sourceCode.Length == 0 && hslocCode.Length == 0)
             {
                 continue;
             }
-            if (!seenSourceCodes.Add(sourceCode))
+            if (sourceCode.Length == 0)
             {
+                errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"B{rowNumber}", MessageKey = "onboarding:manualUpload.errors.partialHslocMapping", Section = "hsloc"});
+                continue;
+            }
+            if (duplicateSourceCodes.Contains(sourceCode))
+            {
+                errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"B{rowNumber}", MessageKey = "onboarding:manualUpload.errors.duplicateHslocIdentifier", Section = "hsloc"});
                 continue;
             }
 
-            // A code that doesn't resolve against the reference table (typo'd, stale, or just
-            // never filled in) is left blank rather than raising a cell error - HslocCode comes
-            // back "" either way, and the facility picks the right one on HslocStep itself, same
-            // as a freshly added row started online. Never rejects the import over this.
+            // Left blank on a mismatch/unresolved code rather than raising a cell error - this is
+            // the honest "you still need to pick one" signal HslocStep's own <select> already
+            // renders as its "Select an HSLOC code" placeholder. OnboardingWriteService.SaveImportedFieldsAsync
+            // and MergeHslocMappings (below) are what keep this from also deleting an existing,
+            // previously-resolved mapping for the same local code - this method only decides what
+            // the facility SEES, not what stays protected in Normalization.
             var resolvedHslocCode = hslocCode.Length > 0 && referenceByCode.TryGetValue(hslocCode, out var reference)
                 ? reference.Code
                 : "";
@@ -850,20 +937,45 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             });
         }
 
-        return mappings.Count > 0 ? new ImportedHsloc { Mappings = mappings } : null;
+        if (mappings.Count == 0)
+        {
+            RequireErrorAtHeader(rows, errors, sectionHeader, "hsloc", "onboarding:manualUpload.errors.requiredHslocMapping");
+            return null;
+        }
+
+        return new ImportedHsloc { Mappings = mappings };
     }
 
-    // Same "resolve against the real reference table, or leave it for the facility to pick" rule as
-    // HSLOC, against Terminology's CPT/SNOMED encounter-type codes instead of Normalization's HSLOC
-    // list. A row whose reference columns don't resolve still names a real local system/code the
-    // facility wants mapped, so it's kept with a blank EncounterType/Display - EncounterStep's own
-    // target-code picker already renders that as an empty combobox ready for a manual pick (the same
-    // state a freshly added row starts in online), and its own validate.ts already flags a
-    // local-value-with-no-target row without blocking Continue over it. The resolved System/Code/
-    // Display come from the reference row rather than the sheet's own text so a facility's casing/
-    // whitespace on the reference columns never diverges from what Link's reference table holds.
+    private static void RequireErrorAtHeader(
+        Dictionary<int, Dictionary<string, string>> rows,
+        List<ImportCellError> errors,
+        string sectionHeader,
+        string section,
+        string messageKey)
+    {
+        var headerRow = FindSectionHeaderRow(rows, sectionHeader);
+        if (headerRow is not null)
+        {
+            errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"A{headerRow}", MessageKey = messageKey, Section = section});
+        }
+    }
+
+    // Encounter Mapping as a whole stays optional - zero rows is fine, matching the sheet's own
+    // "Required" column (no "at least one" note on this table, unlike HSLOC). A row that IS present
+    // must have its local half complete: system AND code, not just one of them. The reference half
+    // (Reference Code System/Code) is a different story - it's only ever something a facility
+    // copied off the reference table, so a value that's blank or doesn't resolve there (typo'd,
+    // stale, or never filled in) is left blank rather than raising a cell error. EncounterType comes
+    // back "" either way, which EncounterStep's own target-code picker already renders as an empty
+    // combobox ready for a manual pick (the same state a freshly added row starts in online) - the
+    // facility sees every local code they entered and just has to pick the right target for the ones
+    // that didn't resolve, instead of the whole import being rejected over it. The resolved
+    // System/Code/Display come from the reference row rather than the sheet's own text so a
+    // facility's casing/whitespace on the reference columns never diverges from what Link's
+    // reference table holds.
     private async Task<ImportedEncounter?> BuildEncounterAsync(
         Dictionary<int, Dictionary<string, string>> rows,
+        List<ImportCellError> errors,
         CancellationToken cancellationToken)
     {
         var rawRows = ReadTableRows(rows, "Encounter Mapping");
@@ -877,21 +989,28 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             c => (System: c.System.ToUpperInvariant(), Code: c.Code.ToUpperInvariant()));
 
         var mappings = new List<ImportedEncounterMapping>();
-        foreach (var (_, row) in rawRows)
+        foreach (var (rowNumber, row) in rawRows)
         {
             var system = row.GetValueOrDefault("A", "").Trim();
             var code = row.GetValueOrDefault("B", "").Trim();
             var referenceSystem = row.GetValueOrDefault("C", "").Trim();
             var referenceCode = row.GetValueOrDefault("D", "").Trim();
-            if (system.Length == 0 || code.Length == 0)
+            if (system.Length == 0 && code.Length == 0 && referenceSystem.Length == 0 && referenceCode.Length == 0)
             {
                 continue;
             }
+            if (system.Length == 0 || code.Length == 0)
+            {
+                errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"{(system.Length == 0 ? "A" : "B")}{rowNumber}", MessageKey = "onboarding:manualUpload.errors.partialEncounterMapping", Section = "encounter"});
+                continue;
+            }
 
-            // A reference System/Code that doesn't resolve (typo'd, stale, or never filled in) is
-            // left blank rather than raising a cell error - EncounterType comes back "" either way,
-            // and the facility picks the right target on EncounterStep itself, same as a freshly
-            // added row started online. Never rejects the import over this.
+            // Left blank on a mismatch/unresolved reference rather than raising a cell error - this
+            // is the honest "you still need to pick a target" signal EncounterStep's own picker
+            // already renders as an empty combobox. OnboardingWriteService.SaveImportedFieldsAsync
+            // and MergeEncounterMappings (below) are what keep this from also deleting an existing,
+            // previously-resolved mapping for the same local system/code - this method only decides
+            // what the facility SEES, not what stays protected in Normalization.
             var resolved = referenceSystem.Length > 0 && referenceCode.Length > 0 &&
                 referenceByKey.TryGetValue((referenceSystem.ToUpperInvariant(), referenceCode.ToUpperInvariant()), out var reference)
                 ? reference
@@ -951,14 +1070,17 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
     // - between two rows they filled in, not just trailing after the last one - is a gap this
     // must skip over rather than treat as the table's end, or everything after that gap silently
     // vanishes even though it's still inside the same table.
+    private static int? FindSectionHeaderRow(Dictionary<int, Dictionary<string, string>> rows, string sectionHeader) =>
+        rows
+            .Where(kv => kv.Value.TryGetValue("A", out var text) && string.Equals(text, sectionHeader, StringComparison.Ordinal))
+            .Select(kv => (int?)kv.Key)
+            .FirstOrDefault();
+
     private static List<(int RowNumber, Dictionary<string, string> Row)> ReadTableRows(
         Dictionary<int, Dictionary<string, string>> rows,
         string sectionHeader)
     {
-        var headerRow = rows
-            .Where(kv => kv.Value.TryGetValue("A", out var text) && string.Equals(text, sectionHeader, StringComparison.Ordinal))
-            .Select(kv => (int?)kv.Key)
-            .FirstOrDefault();
+        var headerRow = FindSectionHeaderRow(rows, sectionHeader);
 
         if (headerRow is null)
         {

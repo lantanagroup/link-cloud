@@ -26,6 +26,13 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string[]>();
   const [importSummary, setImportSummary] = useState<{fileName: string; imported: number; total: number}>();
+  // Set whenever the most recent upload came back rejected (required fields missing, an invalid
+  // cell value, an unreadable file, etc.) - not merely "has an error line", since an *accepted*
+  // sheet can still carry error lines for a section that failed to save downstream (see the
+  // `result.accepted` branch below), and that case is not a reason to block Continue: whatever DID
+  // save should still be usable on the next step. Starts false - a facility that never uploads
+  // anything (this step is optional) must still be able to Continue.
+  const [uploadRejected, setUploadRejected] = useState(false);
 
   // Patches every draft section the sheet had values for, reflecting what the BFF already saved to
   // the owning services (including SFTP credentials, which it forwards straight to Data
@@ -101,15 +108,24 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
         setImportSummary({fileName: file.name, imported: result.fieldsImported, total: result.totalFields});
         // A well-formed sheet can still have sections that failed to actually save (a downstream
         // precondition or validator) - accepted stays true so whatever DID save still applies, but
-        // the facility still needs to see why some of it came back blank.
+        // the facility still needs to see why some of it came back blank. Not a reason to block
+        // Continue - see uploadRejected's own comment.
         setError(errorLines);
+        setUploadRejected(false);
       } else if (isUnreadable) {
         setError([t('onboarding:manualUpload.readError')]);
+        setUploadRejected(true);
       } else {
+        // Required-fields-missing (and every other validation) cell error lands here - nothing was
+        // saved, so applyImportedFields is never called and the next step would otherwise show
+        // stale/previous values with no indication why. Blocking Continue until the sheet is fixed
+        // (or the facility gives up on it) is what surfaces that instead of silently moving on.
         setError(errorLines ?? [t('onboarding:manualUpload.uploadRejected')]);
+        setUploadRejected(true);
       }
     } catch (cause) {
       setError([cause instanceof Error ? cause.message : String(cause)]);
+      setUploadRejected(true);
     } finally {
       setUploading(false);
     }
@@ -127,13 +143,17 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving} loading={savingDirection === 'next'}>
+            <Button
+              onClick={stableOnNext}
+              disabled={saving || uploading || uploadRejected}
+              loading={savingDirection === 'next'}
+            >
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, savingDirection, stableOnBack, stableOnNext]
+      [t, saving, savingDirection, stableOnBack, stableOnNext, uploading, uploadRejected]
     )
   );
 

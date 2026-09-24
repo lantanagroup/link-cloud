@@ -31,7 +31,27 @@ public static class FieldValidationRules
     // understand.
     public static readonly Regex FhirPathCharacterPattern = new("^[\\w\\s.()\\[\\]'\"=!<>,:%$*/+&|-]+$", RegexOptions.Compiled);
 
-    public static bool IsAbsoluteUrl(string value) => Uri.TryCreate(value, UriKind.Absolute, out _);
+    // Just an absolute http(s) URL - "https://fhir.com" is a valid value on its own, same as
+    // "https://fhir.com/r4". A path is common (the template's own example is
+    // "https://FHIR-HOSTNAME/fhir") but not required - a bare origin is still a real, reachable
+    // URL, not something to reject as malformed.
+    public static bool IsAbsoluteUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    // Hostname or IPv4/IPv6 literal, no scheme/path - what an SFTP client connects to, as opposed
+    // to fhirBaseUrl which is a full HTTP(S) URL. Deliberately permissive (this isn't RFC 1123
+    // validation): it exists to catch someone pasting a full sftp:// URL or a path into the Host
+    // cell, not to reject every unusual-but-real hostname.
+    public static readonly Regex SftpHostPattern = new("^[A-Za-z0-9]([A-Za-z0-9.\\-:]*[A-Za-z0-9])?$", RegexOptions.Compiled);
+
+    public static bool IsValidSftpHost(string value) =>
+        value.Trim().Length is > 0 and <= 253 && SftpHostPattern.IsMatch(value.Trim());
+
+    // Both are assumed already individually valid "HH:mm" (24-hour, zero-padded) by the time this
+    // runs - that format sorts correctly as a plain ordinal string, so no TimeSpan parsing needed.
+    public static bool IsPullTimeOrderValid(string minPullTime, string maxPullTime) =>
+        string.CompareOrdinal(minPullTime, maxPullTime) < 0;
 
     public static bool IsNonNegativeInteger(string value) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0;
