@@ -333,9 +333,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
-        var summary = await GetRunSummaryAsync(runId, ct);
-        if (summary != null)
-            await RetainOwnedFacilitiesAsync(summary, ct);
+        var run = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
+        if (run != null)
+            await RetainOwnedFacilitiesAsync(ToSummary(run), ct);
 
         // Drop child history first and the run summary last. A failure after the
         // summary is gone would leave history that the next purge can no longer select.
