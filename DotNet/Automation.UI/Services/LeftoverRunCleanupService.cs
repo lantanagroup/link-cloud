@@ -401,7 +401,10 @@ public sealed class LeftoverRunCleanupService(
                         await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
                         StringComparer.OrdinalIgnoreCase);
                     var owned = OwnedAutomationFacilityIds(run);
-                    var fresh = owned.Where(id => !done.Contains(id) && !scheduledTeardown.Contains(id)).ToList();
+                    var fresh = owned.Where(id =>
+                        !done.Contains(id)
+                        && !scheduledTeardown.Contains(id)
+                        && !ReferencedByAnotherRun(run, id, runs)).ToList();
                     var room = limit - spent;
                     if (fresh.Count > room)
                     {
@@ -650,6 +653,9 @@ public sealed class LeftoverRunCleanupService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (tornDown.Exists(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var owner = runs.FirstOrDefault(run => run.RunId == runId);
+                if (owner != null && ReferencedByAnotherRun(owner, facilityId, runs))
                     continue;
 
                 await PublishProgressAsync(
@@ -935,6 +941,19 @@ public sealed class LeftoverRunCleanupService(
         }
 
         return eligible;
+    }
+
+    private static bool ReferencedByAnotherRun(
+        AutomationRunSummary run,
+        string facilityId,
+        IReadOnlyList<AutomationRunSummary> allRuns)
+    {
+        if (string.Equals(facilityId, run.RunId.ToString(), StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return allRuns.Any(other => other.RunId != run.RunId
+            && (string.Equals(other.FacilityId, facilityId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(other.RunId.ToString(), facilityId, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static bool RetainedFacilityIsShielded(

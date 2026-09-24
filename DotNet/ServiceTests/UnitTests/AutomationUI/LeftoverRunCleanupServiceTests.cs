@@ -450,6 +450,35 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_partial_cap_does_not_delete_a_facility_another_run_uses()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var shared = Guid.NewGuid().ToString();
+        var older = Run(shared, now.AddDays(-30));
+        var newer = Run(shared, now.AddDays(-1));
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string>
+        {
+            [shared] = "shared",
+            [older.RunId.ToString()] = "older-run",
+            [newer.RunId.ToString()] = "newer-run"
+        };
+        var service = Create(
+            now,
+            [older, newer],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            maxFacilitiesPerPass: 1);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        deleted.Should().Equal(older.RunId.ToString());
+        deleted.Should().NotContain(shared);
+        result.PurgedRunIds.Should().Equal(older.RunId);
+    }
+
+    [Fact]
     public async Task Teardown_skips_a_retained_facility_younger_than_retention()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
