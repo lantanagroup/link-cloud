@@ -106,9 +106,10 @@ public static class UploadedBundleAnalyzer
         foreach (var identifier in location.Identifier ?? [])
         {
             var system = identifier.System?.Trim() ?? "";
-            // FHIRPath value equality does not trim. System-only suggestions still use the trimmed system.
+            // A system is required for the identifier to be usable. The value stays exact,
+            // including surrounding spaces, once that system is real.
             var value = identifier.Value ?? "";
-            if (string.IsNullOrWhiteSpace(system) && value.Length == 0)
+            if (string.IsNullOrWhiteSpace(system))
                 continue;
             hasUsableIdentifier = true;
             if (fp.LocationIdentifiers.Any(x => Same(x.System, system) && SameValue(x.Value, value)))

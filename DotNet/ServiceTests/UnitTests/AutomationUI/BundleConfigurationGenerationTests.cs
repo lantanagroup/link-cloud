@@ -129,6 +129,28 @@ public class BundleConfigurationGenerationTests
     }
 
     [Fact]
+    public void Analyzer_does_not_treat_a_systemless_whitespace_identifier_as_usable()
+    {
+        const string hsloc = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
+        var blank = new Location
+        {
+            Identifier = [new Identifier("   ", "   ")],
+            Type = [new CodeableConcept(hsloc, "1099-1", "1099-1")]
+        };
+        var identified = new Location
+        {
+            Identifier = [new Identifier("http://a", "HOSP")]
+        };
+
+        var fp = UploadedBundleAnalyzer.Analyze([blank, identified]);
+
+        fp.LocationsWithoutIdentifier.Should().Be(1);
+        fp.LocationIdentifiers.Should().ContainSingle(i => i.System == "http://a" && i.Value == "HOSP");
+        OrgResourceMapProposalBuilder.Build(fp, []).Conditions
+            .Should().Contain(c => c.FhirPath.Contains("1099-1"));
+    }
+
+    [Fact]
     public void Analyzer_keeps_exact_location_alias_on_the_raw_location()
     {
         var location = new Location
