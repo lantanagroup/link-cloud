@@ -8,19 +8,20 @@ import {
   acronymTitle,
   Button,
   CheckboxField,
+  DateField,
   FieldLabel,
   HeadingPause,
   MessageContainer,
   Modal,
   NHSNLoadingIndicator,
   RepeatableList,
+  RequiredAsterisk,
   Select,
   StepActions,
   TableCaption,
   TextField,
-  YesNoField
+  YesNoTabsField
 } from '../../../fields';
-import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
@@ -28,6 +29,7 @@ import {
   findRuleForElement,
   identifierElementValue,
   IDENTIFIER_FIELD_LABEL_KEYS,
+  isDateRuleElement,
   MRN_RULE_ELEMENTS,
   operatorNeedsValue,
   operatorsForElement,
@@ -57,7 +59,6 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {dispatch, saving, savingDirection} = useOnboarding();
-  const {notifyError} = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -69,6 +70,12 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  function announceValidationMessage(message: string) {
+    setValidationError(null);
+    window.setTimeout(() => setValidationError(message), 0);
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -165,7 +172,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
     setSubmitAttempted(true);
     const validationErrors = validateMrnIntake(draft);
     if (Object.keys(validationErrors).length > 0) {
-      notifyError(t('onboarding:mrnIntake.messages.incomplete'));
+      announceValidationMessage(t('onboarding:mrnIntake.messages.incomplete'));
       return;
     }
 
@@ -242,19 +249,25 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       {/* ---------------------------------------------------------- multiple MRN candidates */}
       <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.multipleMrn')}</div>
       <div className="nhsn-link__field-group">
-        <YesNoField
+        <YesNoTabsField
           label={t('onboarding:mrnIntake.multipleMrn.question')}
           yesLabel={t('common:commonBoolean.yes')}
           noLabel={t('common:commonBoolean.no')}
           value={draft.hasMultipleMrn}
           onChange={hasMultipleMrn => update({hasMultipleMrn})}
           error={errors.hasMultipleMrn && t(errors.hasMultipleMrn)}
+          required
         />
       </div>
 
       {draft.hasMultipleMrn === true && (
         <div className="nhsn-link__field-group">
-          <FieldLabel checked={false}>{t('onboarding:mrnIntake.multipleMrn.selectAllHint')}</FieldLabel>
+          <FieldLabel checked={false}>
+            <span>
+              {t('onboarding:mrnIntake.multipleMrn.selectAllHint')}
+              <RequiredAsterisk />
+            </span>
+          </FieldLabel>
           <CheckboxGroup<string>
             idPrefix="mrn-multiple-type"
             groupLabel={t('onboarding:mrnIntake.multipleMrn.selectAllHint')}
@@ -263,7 +276,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
             onChange={multipleMrnTypes => update({multipleMrnTypes})}
           />
           {errors.multipleMrnTypes && (
-            <p className="nhsn-link__form-error" role="alert">
+            <p className="k-form-error" role="alert">
               {t(errors.multipleMrnTypes)}
             </p>
           )}
@@ -274,6 +287,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
               value={draft.multipleMrnOtherText ?? ''}
               error={errors.multipleMrnOtherText && t(errors.multipleMrnOtherText)}
               onChange={multipleMrnOtherText => update({multipleMrnOtherText})}
+              required
             />
           )}
         </div>
@@ -284,7 +298,12 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
         <>
           <div className="nhsn-link__section-title"><AcronymText>{t('onboarding:mrnIntake.sections.userFacingMrn')}</AcronymText></div>
           <div className="nhsn-link__field-group">
-            <FieldLabel checked={false}><AcronymText>{t('onboarding:mrnIntake.userFacing.question')}</AcronymText></FieldLabel>
+            <FieldLabel checked={false}>
+              <span>
+                <AcronymText>{t('onboarding:mrnIntake.userFacing.question')}</AcronymText>
+                <RequiredAsterisk />
+              </span>
+            </FieldLabel>
             {userFacingOptions.length === 0 ? (
               <p className="nhsn-link__hint-text">{t('onboarding:mrnIntake.userFacing.noOptionsHint')}</p>
             ) : (
@@ -297,20 +316,21 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
               />
             )}
             {errors.userFacingIdentifierNames && (
-              <p className="nhsn-link__form-error" role="alert">
+              <p className="k-form-error" role="alert">
                 {t(errors.userFacingIdentifierNames)}
               </p>
             )}
           </div>
 
           <div className="nhsn-link__field-group">
-            <YesNoField
+            <YesNoTabsField
               label={t('onboarding:mrnIntake.userFacing.isCalledMrnQuestion')}
               yesLabel={t('common:commonBoolean.yes')}
               noLabel={t('common:commonBoolean.no')}
               value={draft.isCalledMrn}
               onChange={isCalledMrn => update({isCalledMrn})}
               error={errors.isCalledMrn && t(errors.isCalledMrn)}
+              required
             />
           </div>
 
@@ -322,18 +342,20 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
                 value={draft.otherTermUsed ?? ''}
                 error={errors.otherTermUsed && t(errors.otherTermUsed)}
                 onChange={otherTermUsed => update({otherTermUsed})}
+                required
               />
             </div>
           )}
 
           <div className="nhsn-link__field-group">
-            <YesNoField
+            <YesNoTabsField
               label={t('onboarding:mrnIntake.userFacing.canSearchQuestion')}
               yesLabel={t('common:commonBoolean.yes')}
               noLabel={t('common:commonBoolean.no')}
               value={draft.canSearchByIdentifier}
               onChange={canSearchByIdentifier => update({canSearchByIdentifier})}
               error={errors.canSearchByIdentifier && t(errors.canSearchByIdentifier)}
+              required
             />
           </div>
         </>
@@ -377,7 +399,11 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
 
       <Modal
         open={selectedPatient !== null}
-        title={selectedPatient?.patientId ?? ''}
+        title={
+          selectedPatient
+            ? t('onboarding:mrnIntake.identifierTable.modalTitle', {patientId: selectedPatient.patientId})
+            : ''
+        }
         size="large"
         onClose={() => setSelectedPatientId(null)}
         footer={
@@ -386,22 +412,30 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
           </Button>
         }>
         {selectedPatient && (
-          <PatientIdentifierDetail
-            patient={selectedPatient}
-            rules={draft.rules}
-            editingTarget={editingTarget}
-            onOpenEditor={setEditingTarget}
-            onCloseEditor={() => setEditingTarget(null)}
-            onSaveRule={(identifierIndex, element, operator, value) =>
-              applyPatientRule(selectedPatient.patientId, identifierIndex, element, operator, value)
-            }
-            onRemoveRule={(identifierIndex, element) => removePatientRule(selectedPatient.patientId, identifierIndex, element)}
-          />
+          <>
+            <p className="nhsn-link__hint-text nhsn-link__mrn-id-modal-hint">
+              {t('onboarding:mrnIntake.identifierTable.modalDescription')}
+            </p>
+            <PatientIdentifierDetail
+              patient={selectedPatient}
+              rules={draft.rules}
+              editingTarget={editingTarget}
+              onOpenEditor={setEditingTarget}
+              onCloseEditor={() => setEditingTarget(null)}
+              onSaveRule={(identifierIndex, element, operator, value) =>
+                applyPatientRule(selectedPatient.patientId, identifierIndex, element, operator, value)
+              }
+              onRemoveRule={(identifierIndex, element) => removePatientRule(selectedPatient.patientId, identifierIndex, element)}
+            />
+          </>
         )}
       </Modal>
 
       {/* ---------------------------------------------------------- rule builder */}
-      <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.ruleToIdentify')}</div>
+      <div className="nhsn-link__section-title">
+        {t('onboarding:mrnIntake.sections.ruleToIdentify')}
+        <RequiredAsterisk />
+      </div>
       <p className="nhsn-link__hint-text">{t('onboarding:mrnIntake.rules.hint')}</p>
       <RepeatableList<MrnIdentifierRule>
         items={draft.rules}
@@ -421,6 +455,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
                 label={t('onboarding:mrnIntake.rules.elementLabel')}
                 options={MRN_RULE_ELEMENTS.map(def => ({value: def.key, label: t(def.labelKey)}))}
                 value={element}
+                popupClassName="nhsn-link__mrn-intake-popup"
                 onChange={nextElement => {
                   const nextOperators = operatorsForElement(nextElement);
                   onRowChange({
@@ -436,30 +471,42 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
                 label={t('onboarding:mrnIntake.rules.operatorLabel')}
                 options={operators.map(operator => ({value: operator.key, label: t(operator.labelKey)}))}
                 value={row.rule as MrnRuleOperator}
+                popupClassName="nhsn-link__mrn-intake-popup"
                 onChange={nextOperator =>
                   onRowChange({...row, rule: nextOperator, value: operatorNeedsValue(element, nextOperator) ? row.value : ''})
                 }
               />
-              {needsValue && (
-                <TextField
-                  id={`mrn-rule-value-${index}`}
-                  label={t('onboarding:mrnIntake.rules.valueLabel')}
-                  placeholder={t(placeholderKeyForElement(element))}
-                  value={row.value}
-                  onChange={value => onRowChange({...row, value})}
-                />
-              )}
+              {needsValue &&
+                (isDateRuleElement(element) ? (
+                  <DateField
+                    id={`mrn-rule-value-${index}`}
+                    label={t('onboarding:mrnIntake.rules.valueLabel')}
+                    format="MM-dd-yyyy"
+                    value={row.value}
+                    onChange={value => onRowChange({...row, value})}
+                    required
+                  />
+                ) : (
+                  <TextField
+                    id={`mrn-rule-value-${index}`}
+                    label={t('onboarding:mrnIntake.rules.valueLabel')}
+                    placeholder={t(placeholderKeyForElement(element))}
+                    value={row.value}
+                    onChange={value => onRowChange({...row, value})}
+                    required
+                  />
+                ))}
             </>
           );
         }}
       />
       {errors.rules && (
-        <p className="nhsn-link__form-error" role="alert">
+        <p className="k-form-error" role="alert">
           {t(errors.rules)}
         </p>
       )}
       {errors.ruleValues && (
-        <p className="nhsn-link__form-error" role="alert">
+        <p className="k-form-error" role="alert">
           {t(errors.ruleValues)}
         </p>
       )}
@@ -467,18 +514,24 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       {/* ---------------------------------------------------------- variance across facilities */}
       <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.variability')}</div>
       <div className="nhsn-link__field-group">
-        <YesNoField
+        <YesNoTabsField
           label={t('onboarding:mrnIntake.variance.question')}
           yesLabel={t('common:commonBoolean.yes')}
           noLabel={t('common:commonBoolean.no')}
           value={draft.variesByFacility}
           onChange={variesByFacility => update({variesByFacility})}
           error={errors.variesByFacility && t(errors.variesByFacility)}
+          required
         />
       </div>
       {draft.variesByFacility === true && (
         <div className="nhsn-link__field-group">
-          <FieldLabel checked={false}>{t('onboarding:mrnIntake.variance.selectAllHint')}</FieldLabel>
+          <FieldLabel checked={false}>
+            <span>
+              {t('onboarding:mrnIntake.variance.selectAllHint')}
+              <RequiredAsterisk />
+            </span>
+          </FieldLabel>
           <CheckboxGroup<string>
             idPrefix="mrn-variance-type"
             groupLabel={t('onboarding:mrnIntake.variance.selectAllHint')}
@@ -487,7 +540,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
             onChange={varianceTypes => update({varianceTypes})}
           />
           {errors.varianceTypes && (
-            <p className="nhsn-link__form-error" role="alert">
+            <p className="k-form-error" role="alert">
               {t(errors.varianceTypes)}
             </p>
           )}
@@ -498,6 +551,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
               value={draft.varianceOtherText ?? ''}
               error={errors.varianceOtherText && t(errors.varianceOtherText)}
               onChange={varianceOtherText => update({varianceOtherText})}
+              required
             />
           )}
         </div>
@@ -506,18 +560,24 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       {/* ---------------------------------------------------------- MRN changes over time */}
       <div className="nhsn-link__section-title">{t('onboarding:mrnIntake.sections.changesOverTime')}</div>
       <div className="nhsn-link__field-group">
-        <YesNoField
+        <YesNoTabsField
           label={t('onboarding:mrnIntake.changes.question')}
           yesLabel={t('common:commonBoolean.yes')}
           noLabel={t('common:commonBoolean.no')}
           value={draft.changesOverTime}
           onChange={changesOverTime => update({changesOverTime})}
           error={errors.changesOverTime && t(errors.changesOverTime)}
+          required
         />
       </div>
       {draft.changesOverTime === true && (
         <div className="nhsn-link__field-group">
-          <FieldLabel checked={false}>{t('onboarding:mrnIntake.changes.selectAllHint')}</FieldLabel>
+          <FieldLabel checked={false}>
+            <span>
+              {t('onboarding:mrnIntake.changes.selectAllHint')}
+              <RequiredAsterisk />
+            </span>
+          </FieldLabel>
           <CheckboxGroup<string>
             idPrefix="mrn-change-type"
             groupLabel={t('onboarding:mrnIntake.changes.selectAllHint')}
@@ -526,7 +586,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
             onChange={changeTypes => update({changeTypes})}
           />
           {errors.changeTypes && (
-            <p className="nhsn-link__form-error" role="alert">
+            <p className="k-form-error" role="alert">
               {t(errors.changeTypes)}
             </p>
           )}
@@ -537,10 +597,17 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
               value={draft.changeOtherText ?? ''}
               error={errors.changeOtherText && t(errors.changeOtherText)}
               onChange={changeOtherText => update({changeOtherText})}
+              required
             />
           )}
         </div>
       )}
+
+      <div aria-live="off">
+        <p className="nhsn-link__form-error" role="alert">
+          {validationError}
+        </p>
+      </div>
 
       {submitError && (
         <MessageContainer type="error" showIcon>
@@ -623,7 +690,7 @@ function PatientIdentifierDetail({
   }
 
   return (
-    <>
+    <div className="nhsn-link__mrn-identifier-grid">
       {patient.elements.map((identifier, index) => (
         <div className="nhsn-link__mrn-identifier-card" key={index}>
           <div className="nhsn-link__mrn-identifier-card-title">
@@ -632,57 +699,60 @@ function PatientIdentifierDetail({
           {MRN_RULE_ELEMENTS.map(def => {
             const value = identifierElementValue(def.key, identifier);
             const existingRule = findRuleForElement(rules, patient.patientId, index, def.key);
+            const isEditing = editingTarget?.identifierIndex === index && editingTarget.element === def.key;
 
             return (
               <div className="nhsn-link__mrn-id-field" key={def.key}>
-                <span className="nhsn-link__mrn-id-field-label">{t(IDENTIFIER_FIELD_LABEL_KEYS[def.key])}</span>
-                <span
-                  className={
-                    value === undefined ? 'nhsn-link__mrn-id-field-value nhsn-link__mrn-na' : 'nhsn-link__mrn-id-field-value'
-                  }>
-                  {value ?? t('onboarding:mrnIntake.identifierTable.notAvailable')}
-                </span>
+                <div className="nhsn-link__mrn-id-field-row">
+                  <span className="nhsn-link__mrn-id-field-label">{t(IDENTIFIER_FIELD_LABEL_KEYS[def.key])}</span>
+                  <span
+                    className={
+                      value === undefined ? 'nhsn-link__mrn-id-field-value nhsn-link__mrn-na' : 'nhsn-link__mrn-id-field-value'
+                    }>
+                    {value ?? t('onboarding:mrnIntake.identifierTable.notAvailable')}
+                  </span>
 
-                {value !== undefined &&
-                  (editingTarget?.identifierIndex === index && editingTarget.element === def.key ? (
-                    <PatientRuleEditor
-                      element={def.key}
-                      existingRule={existingRule}
-                      onSave={(operator, ruleValue) => onSaveRule(index, def.key, operator, ruleValue)}
-                      onCancel={onCloseEditor}
-                    />
-                  ) : existingRule ? (
-                    <div className="nhsn-link__mrn-id-rule-action">
-                      <span className="nhsn-link__mrn-id-rule-badge">
-                        {operatorNeedsValue(def.key, existingRule.rule) && existingRule.value
-                          ? t('onboarding:mrnIntake.identifierTable.ruleAddedWithValue', {
-                              operator: t(operatorLabelKey(def.key, existingRule.rule)),
-                              value: existingRule.value
-                            })
-                          : t('onboarding:mrnIntake.identifierTable.ruleAdded', {
-                              operator: t(operatorLabelKey(def.key, existingRule.rule))
-                            })}
-                      </span>
-                      <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
-                        {t('common:actions.edit')}
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={() => onRemoveRule(index, def.key)}>
-                        {t('common:actions.remove')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="nhsn-link__mrn-id-rule-action">
-                      <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
-                        {t('onboarding:mrnIntake.identifierTable.addRule')}
-                      </Button>
-                    </div>
-                  ))}
+                  {value !== undefined &&
+                    (isEditing ? (
+                      <PatientRuleEditor
+                        element={def.key}
+                        existingRule={existingRule}
+                        onSave={(operator, ruleValue) => onSaveRule(index, def.key, operator, ruleValue)}
+                        onCancel={onCloseEditor}
+                      />
+                    ) : existingRule ? (
+                      <div className="nhsn-link__mrn-id-rule-action">
+                        <span className="nhsn-link__mrn-id-rule-badge">
+                          {operatorNeedsValue(def.key, existingRule.rule) && existingRule.value
+                            ? t('onboarding:mrnIntake.identifierTable.ruleAddedWithValue', {
+                                operator: t(operatorLabelKey(def.key, existingRule.rule)),
+                                value: existingRule.value
+                              })
+                            : t('onboarding:mrnIntake.identifierTable.ruleAdded', {
+                                operator: t(operatorLabelKey(def.key, existingRule.rule))
+                              })}
+                        </span>
+                        <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
+                          {t('common:actions.edit')}
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => onRemoveRule(index, def.key)}>
+                          {t('common:actions.remove')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="nhsn-link__mrn-id-rule-action">
+                        <Button variant="secondary" size="sm" onClick={() => onOpenEditor({identifierIndex: index, element: def.key})}>
+                          {t('onboarding:mrnIntake.identifierTable.addRule')}
+                        </Button>
+                      </div>
+                    ))}
+                </div>
               </div>
             );
           })}
         </div>
       ))}
-    </>
+    </div>
   );
 }
 
@@ -713,6 +783,7 @@ function PatientRuleEditor({element, existingRule, onSave, onCancel}: PatientRul
         label={t('onboarding:mrnIntake.rules.operatorLabel')}
         options={operators.map(def => ({value: def.key, label: t(def.labelKey)}))}
         value={operator}
+        popupClassName="nhsn-link__mrn-intake-popup"
         onChange={next => {
           setOperator(next);
           if (!operatorNeedsValue(element, next)) {
@@ -720,15 +791,24 @@ function PatientRuleEditor({element, existingRule, onSave, onCancel}: PatientRul
           }
         }}
       />
-      {needsValue && (
-        <TextField
-          id={`mrn-id-rule-value-${element}`}
-          label={t('onboarding:mrnIntake.rules.valueLabel')}
-          placeholder={t(placeholderKeyForElement(element))}
-          value={value}
-          onChange={setValue}
-        />
-      )}
+      {needsValue &&
+        (isDateRuleElement(element) ? (
+          <DateField
+            id={`mrn-id-rule-value-${element}`}
+            label={t('onboarding:mrnIntake.rules.valueLabel')}
+            format="MM-dd-yyyy"
+            value={value}
+            onChange={setValue}
+          />
+        ) : (
+          <TextField
+            id={`mrn-id-rule-value-${element}`}
+            label={t('onboarding:mrnIntake.rules.valueLabel')}
+            placeholder={t(placeholderKeyForElement(element))}
+            value={value}
+            onChange={setValue}
+          />
+        ))}
       <Button size="sm" onClick={() => onSave(operator, needsValue ? value.trim() : '')}>
         {t('common:actions.save')}
       </Button>

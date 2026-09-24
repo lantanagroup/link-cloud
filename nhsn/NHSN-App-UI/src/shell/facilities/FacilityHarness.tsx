@@ -64,7 +64,7 @@ export function FacilityHarness() {
     loadActiveProfileId(),
   );
   const [editor, setEditor] = useState<EditorState>(() => createEmptyEditor());
-  const [mode, setMode] = useState<HarnessMode>("bff");
+  const [mode, setMode] = useState<HarnessMode>("mock");
   const [collapsed, setCollapsed] = useState(true);
 
   const activeProfile = useMemo(

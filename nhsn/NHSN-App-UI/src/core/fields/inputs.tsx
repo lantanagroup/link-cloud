@@ -16,6 +16,7 @@ import {Input} from '@progress/kendo-react-inputs';
 import {Error as KendoError, Hint} from '@progress/kendo-react-labels';
 import {FaEye, FaEyeSlash} from 'react-icons/fa';
 import {toRenderProps, useFieldId, valueOf, type BaseFieldProps} from './fieldProps';
+import {Tabs} from './Tabs';
 
 function trimOnBlur(base: BaseFieldProps<string>, skip?: boolean) {
   return () => {
@@ -248,9 +249,37 @@ export function YesNoField({yesLabel, noLabel, value, onChange, ...base}: YesNoF
   );
 }
 
+export function YesNoTabsField({yesLabel, noLabel, value, onChange, ...base}: YesNoFieldProps) {
+  const id = useFieldId(base.id);
+  const showValidationMessage = Boolean(base.error);
+  const showHint = !showValidationMessage && base.hint;
+  const hintId = showHint ? `${id}_hint` : '';
+  const errorId = showValidationMessage ? `${id}_error` : '';
+
+  return (
+    <FieldWrapper>
+      <MistFormLabel editorId={id} editorValid={!base.error} editorDisabled={base.disabled} required={base.required ? 1 : 0}>
+        {base.label}
+      </MistFormLabel>
+      <Tabs<'yes' | 'no'>
+        label={base.label}
+        tabs={[
+          {id: 'yes', label: yesLabel, disabled: base.disabled},
+          {id: 'no', label: noLabel, disabled: base.disabled}
+        ]}
+        activeTab={value === undefined ? undefined : value ? 'yes' : 'no'}
+        onTabChange={next => onChange(next === 'yes')}
+      />
+      {showHint && <Hint id={hintId}>{base.hint}</Hint>}
+      {showValidationMessage && <KendoError id={errorId}>{base.error}</KendoError>}
+    </FieldWrapper>
+  );
+}
+
 export interface DateFieldProps extends BaseFieldProps<string> {
   min?: Date;
   max?: Date;
+  format?: string;
 }
 
 const DATE_DISPLAY_FORMAT = 'dd-MM-yyyy';
@@ -293,7 +322,7 @@ function DateCalendarWithFooter(props: CalendarProps) {
  * Exchanges ISO date strings, not Date objects — the draft is serialized to
  * JSON and round-tripped through the BFF, and a Date would not survive it.
  */
-export function DateField({min, max, ...base}: DateFieldProps) {
+export function DateField({min, max, format = DATE_DISPLAY_FORMAT, ...base}: DateFieldProps) {
   const id = useFieldId(base.id);
   const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null);
 
@@ -303,7 +332,7 @@ export function DateField({min, max, ...base}: DateFieldProps) {
         toRenderProps({...base, id, value: toPickerDate(base.value)}, {
           min,
           max,
-          format: DATE_DISPLAY_FORMAT,
+          format,
           formatPlaceholder: DATE_MASK,
           popupSettings: {
             popupClass: 'nhsn-link__date-popup',
