@@ -102,6 +102,24 @@ internal sealed class DataAcquisitionGateway : IDataAcquisitionGateway
         }
     }
 
+    public async Task<bool> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default)
+    {
+        var response = await _dataAcquisitionClient.CreateQueryPlanAsync(facilityId, request, cancellationToken);
+        if (response.StatusCode == StatusCodes.Status409Conflict)
+        {
+            return false;
+        }
+        LinkResponseHandler.EnsureSuccess(response, ServiceName, nameof(CreateQueryPlanAsync));
+
+        return true;
+    }
+
+    public async Task UpdateQueryPlanAsync(string facilityId, object request, CancellationToken cancellationToken = default)
+    {
+        var response = await _dataAcquisitionClient.UpdateQueryPlanAsync(facilityId, request, cancellationToken);
+        LinkResponseHandler.EnsureSuccess(response, ServiceName, nameof(UpdateQueryPlanAsync));
+    }
+
     public async Task<AcquisitionReportSummary?> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default)
     {
         var response = await _dataAcquisitionClient.GetReportSummaryAsync(reportId, cancellationToken);

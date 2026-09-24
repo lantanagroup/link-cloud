@@ -1,0 +1,204 @@
+{
+  "PlanName": "Cerner-ACHMonthly",
+  "FacilityId": "{FacilityId}",
+  "EHRDescription": "Cerner",
+  "LookBack": "P0D",
+  "InitialQueries": {
+    "0": {
+      "queryConfigType": "Parameter",
+      "resourceType": "Encounter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 1,
+          "format": "ge{0}"
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 3,
+          "format": "le{0}"
+        }
+      ]
+    },
+    "1": {
+      "queryConfigType": "Reference",
+      "resourceType": "Location",
+      "operationType": 2,
+      "paged": 100
+    }
+  },
+  "SupplementalQueries": {
+    "0": {
+      "resourceType": "Condition",
+      "queryConfigType": "Parameter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0,
+          "format": null
+        }
+      ]
+    },
+    "1": {
+      "resourceType": "Coverage",
+      "queryConfigType": "Parameter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0,
+          "format": null
+        }
+      ]
+    },
+    "2": {
+      "queryConfigType": "Parameter",
+      "resourceType": "DiagnosticReport",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 1,
+          "format": "ge{0}"
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 3,
+          "format": "le{0}"
+        }
+      ]
+    },
+    "3": {
+      "queryConfigType": "Parameter",
+      "resourceType": "MedicationAdministration",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0
+        },
+        {
+          "parameterType": "Variable",
+          "name": "effective-time",
+          "variable": 1,
+          "format": "ge{0}"
+        },
+        {
+          "parameterType": "Variable",
+          "name": "effective-time",
+          "variable": 3,
+          "format": "le{0}"
+        }
+      ]
+    },
+    "4": {
+      "resourceType": "MedicationRequest",
+      "queryConfigType": "Parameter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0,
+          "format": null
+        }
+      ]
+    },
+    "5": {
+      "resourceType": "Observation",
+      "queryConfigType": "Parameter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0,
+          "format": null
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 1,
+          "format": "ge{0}"
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 3,
+          "format": "le{0}"
+        },
+        {
+          "parameterType": "Literal",
+          "name": "category",
+          "literal": "imaging,laboratory,procedure,social-history,survey,vital-signs"
+        }
+      ]
+    },
+    "6": {
+      "queryConfigType": "Parameter",
+      "resourceType": "Procedure",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 1,
+          "format": "ge{0}"
+        },
+        {
+          "parameterType": "Variable",
+          "name": "date",
+          "variable": 3,
+          "format": "le{0}"
+        }
+      ]
+    },
+    "7": {
+      "resourceType": "ServiceRequest",
+      "queryConfigType": "Parameter",
+      "parameters": [
+        {
+          "parameterType": "Variable",
+          "name": "patient",
+          "variable": 0,
+          "format": null
+        }
+      ]
+    },
+    "8": {
+      "queryConfigType": "Reference",
+      "resourceType": "Device",
+      "operationType": 2,
+      "paged": 100
+    },
+    "9": {
+      "resourceType": "Medication",
+      "queryConfigType": "Reference",
+      "operationType": 2,
+      "paged": 100
+    },
+    "10": {
+      "queryConfigType": "Reference",
+      "resourceType": "Specimen",
+      "operationType": 2,
+      "paged": 100
+    }
+  },
+  "Type": "Discharge"
+}
