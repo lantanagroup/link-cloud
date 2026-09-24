@@ -313,18 +313,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 {
                     FacilityId = facilityId,
                     RunId = summary.RunId.ToString(),
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    EligibleAt = RunCleanupHelper.RunTimestamp(summary)
                 },
                 new ReplaceOptions { IsUpsert = true },
                 ct);
         }
     }
 
-    public async Task<IReadOnlyList<string>> GetRetainedFacilityIdsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default)
     {
         var docs = await _ownedFacilityTombstones.Find(FilterDefinition<OwnedFacilityTombstoneDocument>.Empty)
             .ToListAsync(ct);
-        return docs.Select(doc => doc.FacilityId).ToList();
+        return docs.Select(doc => new RetainedFacility(doc.FacilityId, doc.EligibleAt)).ToList();
     }
 
     public async Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default)

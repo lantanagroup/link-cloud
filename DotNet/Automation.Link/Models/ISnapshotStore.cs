@@ -31,6 +31,9 @@ public sealed record RunSnapshotMeta
 ///   - Domain snapshots: per-run, per-domain polling data (schedule, entries, etc.)
 ///   - Logs: full log output per run (potentially large)
 /// </summary>
+/// <summary>An Automation-owned facility whose run summary was deleted before teardown.</summary>
+public sealed record RetainedFacility(string FacilityId, DateTimeOffset EligibleAt);
+
 public interface ISnapshotStore
 {
     // --- Run metadata ---
@@ -42,7 +45,7 @@ public interface ISnapshotStore
     /// </summary>
     Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default);
     Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default);
-    Task<IReadOnlyList<string>> GetRetainedFacilityIdsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default);
     Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);

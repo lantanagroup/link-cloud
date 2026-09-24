@@ -369,7 +369,8 @@ public sealed class LeftoverRunCleanupService(
 
             var sweepRetained = mode is "teardown" or "history-purge";
             var retainedEligible = sweepRetained
-                ? await SelectRetainedFacilitiesAsync(facilities, runs, cancellationToken)
+                ? await SelectRetainedFacilitiesAsync(
+                    facilities, runs, now, settings.TeardownRetention, mode, cancellationToken)
                 : [];
             var limit = Math.Max(1, maxFacilitiesOverride ?? settings.MaxFacilitiesPerPass);
             var facilityWork = selectedFacilities.Take(limit).ToList();
@@ -821,20 +822,24 @@ public sealed class LeftoverRunCleanupService(
     private async Task<List<string>> SelectRetainedFacilitiesAsync(
         IReadOnlyDictionary<string, string> facilities,
         IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention,
+        string mode,
         CancellationToken cancellationToken)
     {
-        var retained = await snapshotStore.GetRetainedFacilityIdsAsync(cancellationToken) ?? [];
+        var retained = await snapshotStore.GetRetainedFacilitiesAsync(cancellationToken) ?? [];
         var eligible = new List<string>();
-        foreach (var facilityId in retained)
+        foreach (var tombstone in retained)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var facilityId = tombstone.FacilityId;
             if (string.IsNullOrWhiteSpace(facilityId))
                 continue;
 
-            var stillReferenced = runs.Any(run =>
-                string.Equals(run.FacilityId, facilityId, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(run.RunId.ToString(), facilityId, StringComparison.OrdinalIgnoreCase));
-            if (stillReferenced)
+            if (tombstone.EligibleAt > now - retention)
+                continue;
+
+            if (RetainedFacilityIsShielded(facilityId, runs, now, retention, mode))
                 continue;
 
             if (!facilities.ContainsKey(facilityId))
@@ -847,6 +852,30 @@ public sealed class LeftoverRunCleanupService(
         }
 
         return eligible;
+    }
+
+    private static bool RetainedFacilityIsShielded(
+        string facilityId,
+        IReadOnlyList<AutomationRunSummary> runs,
+        DateTimeOffset now,
+        TimeSpan retention,
+        string mode)
+    {
+        foreach (var run in runs)
+        {
+            var references = string.Equals(run.FacilityId, facilityId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(run.RunId.ToString(), facilityId, StringComparison.OrdinalIgnoreCase);
+            if (!references)
+                continue;
+
+            if (mode == "history-purge")
+                return true;
+
+            if (RunCleanupHelper.RunTimestamp(run) > now - retention)
+                return true;
+        }
+
+        return false;
     }
 
     private async Task TearDownOneFacilityAsync(

@@ -338,6 +338,57 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task Teardown_skips_a_retained_facility_younger_than_retention()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var retainedId = Guid.NewGuid().ToString();
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string> { [retainedId] = "retained" };
+        var service = Create(
+            now,
+            [],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [retainedId],
+            retainedEligibleAt: now.AddDays(-1));
+
+        var result = await service.RunOnceAsync();
+
+        deleted.Should().BeEmpty();
+        result.TornDownFacilityIds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Teardown_does_not_let_an_old_finished_run_shield_a_retained_facility()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var retainedId = Guid.NewGuid().ToString();
+        var oldRun = new AutomationRunSummary
+        {
+            RunId = Guid.NewGuid(),
+            FacilityId = retainedId,
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-30)
+        };
+        var deleted = new List<string>();
+        var facilities = new Dictionary<string, string> { [retainedId] = "retained" };
+        var service = Create(
+            now,
+            [oldRun],
+            [],
+            facilities: facilities,
+            deletedFacilityIds: deleted,
+            retainedFacilityIds: [retainedId],
+            retainedEligibleAt: now.AddDays(-30));
+
+        var result = await service.RunOnceAsync();
+
+        deleted.Should().Contain(retainedId);
+        result.TornDownFacilityIds.Should().Contain(retainedId);
+    }
+
+    [Fact]
     public async Task HistoryPurge_says_so_when_the_report_cannot_be_saved()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -423,6 +474,7 @@ public class LeftoverRunCleanupServiceTests
         List<string>? statusesWhenSettingsLoad = null,
         List<string>? deletedFacilityIds = null,
         IReadOnlyList<string>? retainedFacilityIds = null,
+        DateTimeOffset? retainedEligibleAt = null,
         List<string>? releasedFacilityIds = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
@@ -504,8 +556,10 @@ public class LeftoverRunCleanupServiceTests
         var snapshots = new Mock<ISnapshotStore>();
         snapshots.Setup(s => s.GetAllRunSummariesAsync(It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(runs);
-        snapshots.Setup(s => s.GetRetainedFacilityIdsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(retainedFacilityIds ?? []);
+        snapshots.Setup(s => s.GetRetainedFacilitiesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((retainedFacilityIds ?? [])
+                .Select(id => new RetainedFacility(id, retainedEligibleAt ?? new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero)))
+                .ToList());
         snapshots.Setup(s => s.ReleaseRetainedFacilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback<string, CancellationToken>((id, _) => releasedFacilityIds?.Add(id))
             .Returns(Task.CompletedTask);

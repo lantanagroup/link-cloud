@@ -62,6 +62,10 @@ public sealed class OwnedFacilityTombstoneDocument
 
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The deleted run's cleanup timestamp. Teardown waits until this is older than retention.</summary>
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset EligibleAt { get; set; }
 }
 
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>
