@@ -55,8 +55,7 @@
 
 .nhsn-link .k-input:focus,
 .nhsn-link .k-input:focus-within,
-.nhsn-link .k-input.k-focus,
-.nhsn-link__hsloc-code-select:focus {
+.nhsn-link .k-input.k-focus {
   outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-accent);
   outline-offset: -2px;
 }
@@ -65,6 +64,8 @@
 .nhsn-facility-info .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .k-dropdownlist.k-focus,
 .nhsn-link__mrn-intake .k-dropdownlist:focus,
+.nhsn-link__hsloc .k-dropdownlist.k-focus,
+.nhsn-link__hsloc .k-dropdownlist:focus,
 .nhsn-link__report-results-filters .k-dropdownlist.k-focus,
 .nhsn-link__report-results-filters .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker:focus-within,
@@ -77,6 +78,8 @@
 .nhsn-facility-info .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .k-dropdownlist.k-focus,
 .nhsn-link__mrn-intake .k-dropdownlist:focus,
+.nhsn-link__hsloc .k-dropdownlist.k-focus,
+.nhsn-link__hsloc .k-dropdownlist:focus,
 .nhsn-link__report-results-filters .k-dropdownlist.k-focus,
 .nhsn-link__report-results-filters .k-dropdownlist:focus {
   border-color: var(--nhsn-focus-ring-color-accent);
@@ -1019,6 +1022,7 @@
 }
 
 .nhsn-facility-info .k-dropdownlist,
+.nhsn-link__hsloc .k-dropdownlist,
 .nhsn-link__report-results-filters .k-dropdownlist {
   background: var(--kendo-color-app-surface, #ffffff);
   border: 1px solid var(--kendo-color-border, #d0d7de);
@@ -1026,6 +1030,7 @@
 }
 
 .nhsn-facility-info .k-dropdownlist .k-input-inner,
+.nhsn-link__hsloc .k-dropdownlist .k-input-inner,
 .nhsn-link__report-results-filters .k-dropdownlist .k-input-inner {
   padding: 9px 11px;
   font-size: 14px;
@@ -1854,8 +1859,7 @@
   border-radius: 6px;
 }
 
-.nhsn-link__repeatable-fields .k-form-error,
-.nhsn-link__repeatable-fields .nhsn-link__hsloc-code-error-text {
+.nhsn-link__repeatable-fields .k-form-error {
   position: absolute;
   top: 100%;
   left: 0;
@@ -1863,8 +1867,7 @@
   margin-top: 4px;
 }
 
-.nhsn-link__repeatable-row:has(.k-form-error),
-.nhsn-link__repeatable-row:has(.nhsn-link__hsloc-code-error-text) {
+.nhsn-link__repeatable-row:has(.k-form-error) {
   margin-bottom: 20px;
 }
 

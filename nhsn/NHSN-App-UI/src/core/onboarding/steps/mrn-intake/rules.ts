@@ -135,16 +135,16 @@ export function findRuleForElement(
   );
 }
 
-/** How many of this patient's contributed elements still have a matching rule of theirs (the
- * table's badge) — a rule belonging to a different patient never counts here. */
+/** How many rules this patient contributed (the table's badge) — one per (identifier, element)
+ * pair, so the same element added on two of their identifiers counts twice. A rule belonging to a
+ * different patient never counts here, nor does one whose element was never observed for them. */
 export function ruleCountForPatient(
   rules: readonly MrnIdentifierRule[],
   observations: readonly MrnObservation[],
   patientId: string
 ): number {
   const observed = observations.find(o => o.patientId === patientId)?.elements ?? [];
-  return observed.filter(element => rules.some(rule => rule.patientId === patientId && rule.element === element))
-    .length;
+  return rules.filter(rule => rule.patientId === patientId && observed.includes(rule.element)).length;
 }
 
 /**

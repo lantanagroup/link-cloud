@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
-import type {HslocCode, HslocMapping} from '../../../api/contracts';
+import type {HslocMapping} from '../../../api/contracts';
 import {
   AcronymText,
   acronymLabel,
@@ -14,6 +14,7 @@ import {
   NHSNLoadingIndicator,
   RepeatableList,
   RequiredAsterisk,
+  Select,
   SidePanel,
   SidePanelLayout,
   StepActions,
@@ -238,20 +239,16 @@ export function HslocStep({onNext, onBack}: StepProps) {
     ? rows.filter(row => row.hslocCode === selectedRow.code && row.sourceCode.trim())
     : [];
 
-  // <optgroup> options for the mapping row's HSLOC select, grouped by category.
-  const groupedCodeOptions = useMemo(() => {
-    const byCategory = new Map<string, HslocCode[]>();
-    codes.forEach(row => {
-      const key = row.category ?? '';
-      const group = byCategory.get(key);
-      if (group) {
-        group.push(row);
-      } else {
-        byCategory.set(key, [row]);
-      }
-    });
-    return Array.from(byCategory.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [codes]);
+  // Options for the mapping row's HSLOC dropdown. The shared Select has no <optgroup> equivalent,
+  // so codes are ordered by category instead - same order the old grouped native select showed.
+  const codeOptions = useMemo(
+    () =>
+      codes
+        .map((row, index) => ({row, index}))
+        .sort((a, b) => (a.row.category ?? '').localeCompare(b.row.category ?? '') || a.index - b.index)
+        .map(({row}) => ({value: row.code, label: `${row.code} - ${row.display}`})),
+    [codes]
+  );
 
   /** The step-level message `rows` currently deserves, or null when they're fine to save. */
   function validationMessageFor(current: MappingRow[]): string | null {
@@ -423,40 +420,17 @@ export function HslocStep({onNext, onBack}: StepProps) {
                       onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}});
                     }}
                   />
-                  <div>
-                    <select
-                      id={`hsloc-code-select-${index}`}
-                      className={
-                        hslocCodeInvalid
-                          ? 'nhsn-link__hsloc-code-select nhsn-link__hsloc-code-select--error'
-                          : 'nhsn-link__hsloc-code-select'
-                      }
-                      aria-label={acronymLabel(hslocCodeLabel)}
-                      aria-invalid={hslocCodeInvalid}
-                      aria-required="true"
-                      aria-describedby={hslocCodeInvalid ? `hsloc-code-error-${index}` : undefined}
-                      required
-                      value={row.hslocCode}
-                      onChange={event =>
-                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: true}})
-                      }>
-                      <option value="">{hslocCodeLabel}</option>
-                      {groupedCodeOptions.map(([category, categoryCodes]) => (
-                        <optgroup label={category || t('onboarding:hsloc.reference.allCategories')} key={category}>
-                          {categoryCodes.map(code => (
-                            <option value={code.code} key={code.code}>
-                              {code.code} - {code.display}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    {hslocCodeInvalid && (
-                      <p id={`hsloc-code-error-${index}`} className="nhsn-link__hsloc-code-error-text" role="alert">
-                        {hslocCodeRequiredError}
-                      </p>
-                    )}
-                  </div>
+                  <Select
+                    id={`hsloc-code-select-${index}`}
+                    label={acronymLabel(hslocCodeLabel)}
+                    placeholder={hslocCodeLabel}
+                    required
+                    options={codeOptions}
+                    value={row.hslocCode}
+                    error={hslocCodeInvalid ? hslocCodeRequiredError : undefined}
+                    popupClassName="nhsn-link__select-popup"
+                    onChange={hslocCode => onRowChange({...row, hslocCode, dirty: {...row.dirty, hslocCode: true}})}
+                  />
                 </>
               );
             }}
