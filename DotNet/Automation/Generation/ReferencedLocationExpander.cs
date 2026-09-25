@@ -106,6 +106,13 @@ public static class ReferencedLocationExpander
         if (node is ResourceReference resourceReference
             && TryParseLocationId(resourceReference.Reference, configuredFhirBase, out var id))
         {
+            // Query-plan simulation matches the literal prefix Location/{id}.
+            // A same-base absolute reference has to be rewritten to that form or
+            // the Location this method reads never enters the manifest.
+            var relative = $"Location/{id}";
+            if (!string.Equals(resourceReference.Reference, relative, StringComparison.Ordinal))
+                resourceReference.Reference = relative;
+
             yield return id;
         }
 

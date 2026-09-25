@@ -197,7 +197,7 @@ public static class FhirGenerationPipeline
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
         output.WriteLine($"[Pipeline] Uploading {sharedBundles.Count} shared infrastructure bundle(s)...");
-        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, sharedBundles, "[shared] ");
+        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, sharedBundles, "[shared] ", cancellationToken: cancellationToken);
 
         // Record shared entries in manifest
         manifestBuilder.AddEntries(string.Empty, sharedEntries);
@@ -335,7 +335,8 @@ public static class FhirGenerationPipeline
         IPatientEntryGenerator? patientEntryGenerator = null,
         ISharedInfrastructureGenerator? sharedInfrastructureGenerator = null,
         IGeneratedPatientTemplateCache? generatedTemplateCache = null,
-        IReadOnlyList<string>? measureBundleJsons = null)
+        IReadOnlyList<string>? measureBundleJsons = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(profile);
@@ -353,7 +354,7 @@ public static class FhirGenerationPipeline
         {
             var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
             output.WriteLine($"[Pipeline] Uploading {sharedBundles.Count} shared infrastructure bundle(s) for mid-window generate...");
-            await fhirDataLoader.UploadBundlesSequentiallyAsync(output, sharedBundles, "[shared] ");
+            await fhirDataLoader.UploadBundlesSequentiallyAsync(output, sharedBundles, "[shared] ", cancellationToken: cancellationToken);
         }
 
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries = null;
@@ -385,7 +386,8 @@ public static class FhirGenerationPipeline
             ids,
             generatedTemplateCache,
             patientEntryGenerator,
-            measureBundleJsons);
+            measureBundleJsons,
+            cancellationToken);
 
         var slice = sliceBuilder.Build(measures);
         targetManifest.AppendFrom(slice);
@@ -666,7 +668,7 @@ public static class FhirGenerationPipeline
         entries.Clear();
 
         var progress = $"[{patientId}] ";
-        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, progress, logSuccessfulPosts: false);
+        await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, progress, logSuccessfulPosts: false, cancellationToken: cancellationToken);
 
         var bundleCount = bundles.Count;
 
@@ -777,7 +779,8 @@ public static class FhirGenerationPipeline
         {
             var bundles = ChunkEntries(entries, patientId, 0);
             entries.Clear();
-            var ok = await fhirDataLoader.UploadBundlesSequentiallyAsync(output, bundles, $"[imported:{patientId}] ", logSuccessfulPosts: false);
+            var ok = await fhirDataLoader.UploadBundlesSequentiallyAsync(
+                output, bundles, $"[imported:{patientId}] ", logSuccessfulPosts: false, cancellationToken: cancellationToken);
             if (!ok)
                 throw new InvalidOperationException($"Failed to upload imported bundle for patient '{patientId}'.");
             bundleCount = bundles.Count;

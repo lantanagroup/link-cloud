@@ -491,16 +491,18 @@ public class FhirDataLoader
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles,
         string progressPrefix = "",
-        bool logSuccessfulPosts = true)
+        bool logSuccessfulPosts = true,
+        CancellationToken cancellationToken = default)
     {
         for (var i = 0; i < bundles.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (name, json) = bundles[i];
             var progress = string.IsNullOrEmpty(progressPrefix)
                 ? $"[{i + 1}/{bundles.Count}]"
                 : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
 
-            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts);
+            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts, cancellationToken);
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -950,13 +952,15 @@ public class FhirDataLoader
         string name,
         string progress,
         IAutomationOutput output,
-        bool logSuccessfulPosts = true)
+        bool logSuccessfulPosts = true,
+        CancellationToken cancellationToken = default)
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
 
@@ -965,7 +969,7 @@ public class FhirDataLoader
 
             request.AddStringBody(bundleJson, DataFormat.Json);
 
-            lastResponse = await _restClient.ExecuteAsync(request);
+            lastResponse = await _restClient.ExecuteAsync(request, cancellationToken);
 
             if (lastResponse.IsSuccessful)
             {
@@ -989,7 +993,7 @@ public class FhirDataLoader
             if (attempt < MaxRetries)
             {
                 output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
-                await Task.Delay(delay);
+                await Task.Delay(delay, cancellationToken);
                 delay *= 2;
             }
             else

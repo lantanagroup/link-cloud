@@ -56,7 +56,8 @@ internal sealed class LivePatientProvisioner(
             generationRequirementsPlan,
             acquisitionSimulation,
             generatedTemplateCache: generatedTemplateCache,
-            measureBundleJsons: measureBundleJsons);
+            measureBundleJsons: measureBundleJsons,
+            cancellationToken: cancellationToken);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
