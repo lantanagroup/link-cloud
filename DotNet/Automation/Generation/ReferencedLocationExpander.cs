@@ -43,16 +43,18 @@ public static class ReferencedLocationExpander
         }
 
         var added = 0;
+        var reads = 0;
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (added >= MaxLocationReads)
+            if (reads >= MaxLocationReads)
             {
                 output?.WriteLine(
                     $"  [imported] Stopped resolving referenced Locations after {MaxLocationReads} reads.");
                 break;
             }
 
+            reads++;
             var id = pending.Dequeue();
             var location = await readLocation(id, cancellationToken).ConfigureAwait(false);
             if (location == null)

@@ -200,6 +200,51 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
+    public async Task Referenced_location_reads_stop_at_the_cap_when_targets_are_missing()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-cap",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        for (var i = 0; i < ReferencedLocationExpander.MaxLocationReads + 25; i++)
+        {
+            encounter.Location.Add(new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/missing-{i:D4}")
+            });
+        }
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent
+                {
+                    Method = Bundle.HTTPVerb.PUT,
+                    Url = "Encounter/enc-cap"
+                }
+            }
+        };
+
+        var reads = 0;
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (_, _) =>
+            {
+                reads++;
+                return Task.FromResult<Location?>(null);
+            },
+            output: null,
+            CancellationToken.None);
+
+        reads.Should().Be(ReferencedLocationExpander.MaxLocationReads);
+        added.Should().Be(0);
+        entries.Should().ContainSingle();
+    }
+
+    [Fact]
     public void Imported_patient_predictor_excludes_diagnostic_reports_outside_ip_window()
     {
         // Run df6f9b8e: mega AddById patient. DA acquired 360 DiagnosticReports;
