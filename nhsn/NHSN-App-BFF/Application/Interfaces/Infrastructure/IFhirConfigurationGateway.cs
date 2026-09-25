@@ -25,7 +25,8 @@ public sealed record FhirConfigurationSave
     public required string FhirServerBaseUrl { get; init; }
     public required int MaxConcurrentRequests { get; init; }
     public required int MaxRetries { get; init; }
-    public required TimeSpan MinAcquisitionPullTime { get; init; }
-    public required TimeSpan MaxAcquisitionPullTime { get; init; }
+    // Optional as a pair - both null means Data Acquisition applies no pull-time window.
+    public TimeSpan? MinAcquisitionPullTime { get; init; }
+    public TimeSpan? MaxAcquisitionPullTime { get; init; }
     public string? TimeZone { get; init; }
 }

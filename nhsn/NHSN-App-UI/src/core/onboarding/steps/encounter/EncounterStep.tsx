@@ -664,25 +664,14 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
 
   useEffect(() => () => window.clearTimeout(blurTimeout.current), []);
 
-  // Reopening an existing selection leaves `query` holding the full resolved label (badge + code
-  // + display), which is never a substring of any single code's own raw fields - filtering by it
-  // verbatim would always come back empty. Treat that unchanged-since-open value as no search yet,
-  // so reopening shows the whole list (with the current selection browsable in it) instead of "No
-  // matching codes." The moment the facility types something new, query moves past this and normal
-  // filtering resumes.
-  const effectiveQuery = selected && query === referenceLabel(selected) ? '' : query;
-
+  // Always filtered by exactly what's in the input, matched against the same label an option shows -
+  // so typing, backspacing and reopening after a selection all behave the same way: a selected
+  // value's own label matches just that code, and each deleted character widens the list again.
   const matches = useMemo(() => {
-    const q = effectiveQuery.trim().toLowerCase();
-    const pool = !q
-      ? referenceCodes
-      : referenceCodes.filter(code =>
-          `${code.system} ${code.code} ${code.display} ${code.category ?? ''} ${code.categoryName ?? ''}`
-            .toLowerCase()
-            .includes(q)
-        );
+    const q = normalizeSearchText(query);
+    const pool = !q ? referenceCodes : referenceCodes.filter(code => referenceSearchText(code).includes(q));
     return pool.slice(0, 25);
-  }, [referenceCodes, effectiveQuery]);
+  }, [referenceCodes, query]);
 
   useEffect(() => {
     setHighlightedIndex(open && matches.length > 0 ? 0 : -1);
@@ -808,7 +797,9 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
                       selectMatch(code);
                     }}>
                     <span className="encounter-code-option-system">{systemBadgeLabel(code.system)}</span>{' '}
-                    <span className="encounter-code-option-code">{code.code}</span> {code.display}
+                    <span className="encounter-code-option-code">{code.code}</span>
+                    {CODE_DISPLAY_SEPARATOR}
+                    {code.display}
                   </div>
                 ))
               )}
@@ -851,7 +842,25 @@ function systemBadgeLabel(system: string): string {
 function referenceLabel(code: EncounterCode): string {
   // Shown as the picker's query text once a code is selected — the short mnemonic (CPT/SNOMED)
   // reads far better there than the FHIR canonical url code.system actually holds.
-  return `${systemBadgeLabel(code.system)} ${code.code} ${code.display}`;
+  return `${systemBadgeLabel(code.system)} ${code.code}${CODE_DISPLAY_SEPARATOR}${code.display}`;
+}
+
+/** Between a code and its display, for every system: "CPT 99283 - Emergency department visit". */
+const CODE_DISPLAY_SEPARATOR = ' - ';
+
+/**
+ * Case-, whitespace- and separator-insensitive, so "cpt 99283 emergency" still matches
+ * "CPT 99283 - Emergency department visit" - the hyphen is display punctuation, not part of the code.
+ */
+function normalizeSearchText(value: string): string {
+  return value.toLowerCase().replace(/\s+-\s+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** The option's visible label plus the fields behind it (canonical system url, category), normalized. */
+function referenceSearchText(code: EncounterCode): string {
+  return normalizeSearchText(
+    `${referenceLabel(code)} ${code.system} ${code.category ?? ''} ${code.categoryName ?? ''}`
+  );
 }
 
 /** Exported for the Report Details "Encounter Mapping" modal, which encodes a new mapping's target the same way. */

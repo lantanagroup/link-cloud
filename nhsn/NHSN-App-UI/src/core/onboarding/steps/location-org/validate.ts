@@ -23,6 +23,57 @@ export function findIncompleteLocationIdentifierIndexes(rows: LocationIdentifier
   return incomplete;
 }
 
+/**
+ * Two rows with the same pair of values configure the same thing twice, so only the "extra" rows in
+ * a colliding group come back - the row being edited carries the error, falling back to the first
+ * occurrence in list order when none is. Compared trimmed and case-insensitively; a row missing
+ * either value is left to the find-incomplete checks above. Mirrors HslocStep's
+ * findDuplicateSourceCodeIndexes.
+ */
+function findDuplicatePairIndexes(pairs: Array<[string, string]>, editedIndex?: number): number[] {
+  const indexesByKey = new Map<string, number[]>();
+
+  pairs.forEach(([first, second], index) => {
+    const a = first.trim().toLowerCase();
+    const b = second.trim().toLowerCase();
+    if (!a || !b) {
+      return;
+    }
+    const key = `${a}|${b}`;
+    const indexes = indexesByKey.get(key);
+    if (indexes) {
+      indexes.push(index);
+    } else {
+      indexesByKey.set(key, [index]);
+    }
+  });
+
+  const duplicates = new Set<number>();
+  indexesByKey.forEach(indexes => {
+    if (indexes.length < 2) {
+      return;
+    }
+    const kept = indexes.find(index => index !== editedIndex) ?? indexes[0];
+    indexes.forEach(index => {
+      if (index !== kept) {
+        duplicates.add(index);
+      }
+    });
+  });
+
+  return Array.from(duplicates).sort((a, b) => a - b);
+}
+
+/** Location Type rows that repeat another row's code + alias. */
+export function findDuplicateLocationTypeIndexes(rows: LocationTypeEntry[], editedIndex?: number): number[] {
+  return findDuplicatePairIndexes(rows.map(row => [row.code, row.alias]), editedIndex);
+}
+
+/** Location Identifier rows that repeat another row's system + code. */
+export function findDuplicateLocationIdentifierIndexes(rows: LocationIdentifierEntry[], editedIndex?: number): number[] {
+  return findDuplicatePairIndexes(rows.map(row => [row.system, row.code]), editedIndex);
+}
+
 // Same character set the BFF's FieldValidationRules.FhirPathCharacterPattern allows for an
 // imported custom FHIRPath, so an expression typed here and one uploaded in the sheet are held to
 // the same rule.

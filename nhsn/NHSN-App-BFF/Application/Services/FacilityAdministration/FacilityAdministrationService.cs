@@ -160,6 +160,14 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         var minPullTime = ParsePullTime(request.MinAcquisitionPullTime, "MinAcquisitionPullTime");
         var maxPullTime = ParsePullTime(request.MaxAcquisitionPullTime, "MaxAcquisitionPullTime");
 
+        // Both blank means no pull-time window. Only one set isn't a window at all - Data
+        // Acquisition's IsWithinAcquisitionWindow compares against the missing side, which never
+        // matches - so it's rejected rather than saved as a configuration that silently never pulls.
+        if (minPullTime.HasValue != maxPullTime.HasValue)
+        {
+            throw new InvalidOperationException("MinAcquisitionPullTime and MaxAcquisitionPullTime must both be set or both be left blank.");
+        }
+
         var facility = await _facilityGateway.GetAsync(facilityId, cancellationToken);
         if (facility is null)
         {
@@ -231,8 +239,13 @@ public class FacilityAdministrationService : IFacilityAdministrationService
     private static string BuildLagDuration(int days, int hours, int minutes) =>
         XmlConvert.ToString(new TimeSpan(days, hours, minutes, 0));
 
-    private static TimeSpan ParsePullTime(string value, string fieldName)
+    private static TimeSpan? ParsePullTime(string? value, string fieldName)
     {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
         if (!TimeSpan.TryParseExact(value, @"hh\:mm", System.Globalization.CultureInfo.InvariantCulture, out var parsed) || parsed < TimeSpan.Zero || parsed >= TimeSpan.FromDays(1))
         {
             throw new InvalidOperationException($"{fieldName} must be a valid 24-hour time in HH:MM format.");

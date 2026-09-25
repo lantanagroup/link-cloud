@@ -97,16 +97,21 @@ export function validateFhir(
     errors.maxRetries = 'onboarding:fhirServerInfo.messages.invalidMaxRetries';
   }
 
-  if (!values.minAcquisitionPullTime) {
-    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.minPullTimeRequired';
-  } else if (!PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
+  // Optional, but only as a pair: both blank means no pull-time window, while just one set is a
+  // window Data Acquisition can never open - so the blank side is required once the other is filled.
+  const hasMinPullTime = Boolean(values.minAcquisitionPullTime);
+  const hasMaxPullTime = Boolean(values.maxAcquisitionPullTime);
+
+  if (hasMinPullTime && !PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
     errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
+  } else if (!hasMinPullTime && hasMaxPullTime) {
+    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.minPullTimeRequired';
   }
 
-  if (!values.maxAcquisitionPullTime) {
-    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.maxPullTimeRequired';
-  } else if (!PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
+  if (hasMaxPullTime && !PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
     errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
+  } else if (!hasMaxPullTime && hasMinPullTime) {
+    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.maxPullTimeRequired';
   }
 
   // Only compare once both sides are individually well-formed - comparing against a pattern

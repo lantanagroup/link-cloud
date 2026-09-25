@@ -65,6 +65,8 @@
 .nhsn-facility-info .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .k-dropdownlist.k-focus,
 .nhsn-link__mrn-intake .k-dropdownlist:focus,
+.nhsn-link__report-results-filters .k-dropdownlist.k-focus,
+.nhsn-link__report-results-filters .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker:focus-within,
 .nhsn-link__chip-select:focus-within {
   outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-accent);
@@ -74,7 +76,9 @@
 .nhsn-facility-info .k-dropdownlist.k-focus,
 .nhsn-facility-info .k-dropdownlist:focus,
 .nhsn-link__mrn-intake .k-dropdownlist.k-focus,
-.nhsn-link__mrn-intake .k-dropdownlist:focus {
+.nhsn-link__mrn-intake .k-dropdownlist:focus,
+.nhsn-link__report-results-filters .k-dropdownlist.k-focus,
+.nhsn-link__report-results-filters .k-dropdownlist:focus {
   border-color: var(--nhsn-focus-ring-color-accent);
 }
 
@@ -1014,35 +1018,42 @@
   display: block;
 }
 
-.nhsn-facility-info .k-dropdownlist {
+.nhsn-facility-info .k-dropdownlist,
+.nhsn-link__report-results-filters .k-dropdownlist {
   background: var(--kendo-color-app-surface, #ffffff);
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
 }
 
-.nhsn-facility-info .k-dropdownlist .k-input-inner {
+.nhsn-facility-info .k-dropdownlist .k-input-inner,
+.nhsn-link__report-results-filters .k-dropdownlist .k-input-inner {
   padding: 9px 11px;
   font-size: 14px;
   color: var(--kendo-color-app-text, #1f2328);
 }
 
-.nhsn-facility-info-popup.k-list-container {
+.nhsn-facility-info-popup.k-list-container,
+.nhsn-link__select-popup.k-list-container {
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
-.k-animation-container .nhsn-facility-info-popup.k-list-container {
+.k-animation-container .nhsn-facility-info-popup.k-list-container,
+.k-animation-container .nhsn-link__select-popup.k-list-container {
   margin-top: 4px;
 }
 
-.nhsn-facility-info-popup .k-list {
+.nhsn-facility-info-popup .k-list,
+.nhsn-link__select-popup .k-list {
   background: var(--kendo-color-app-surface, #ffffff);
   font-family: inherit;
 }
 
 .nhsn-facility-info-popup .k-list-item,
-.nhsn-facility-info-popup .k-list-optionlabel {
+.nhsn-facility-info-popup .k-list-optionlabel,
+.nhsn-link__select-popup .k-list-item,
+.nhsn-link__select-popup .k-list-optionlabel {
   padding: 9px 11px;
   font-size: 14px;
   color: var(--kendo-color-app-text, #1f2328);
@@ -1051,19 +1062,27 @@
 .nhsn-facility-info-popup .k-list-item:hover,
 .nhsn-facility-info-popup .k-list-item.k-hover,
 .nhsn-facility-info-popup .k-list-optionlabel:hover,
-.nhsn-facility-info-popup .k-list-optionlabel.k-hover {
+.nhsn-facility-info-popup .k-list-optionlabel.k-hover,
+.nhsn-link__select-popup .k-list-item:hover,
+.nhsn-link__select-popup .k-list-item.k-hover,
+.nhsn-link__select-popup .k-list-optionlabel:hover,
+.nhsn-link__select-popup .k-list-optionlabel.k-hover {
   background: var(--kendo-color-base-hover, #f2f4f7);
   color: var(--kendo-color-app-text, #1f2328);
 }
 
 .nhsn-facility-info-popup .k-list-item.k-selected,
-.nhsn-facility-info-popup .k-list-optionlabel.k-selected {
+.nhsn-facility-info-popup .k-list-optionlabel.k-selected,
+.nhsn-link__select-popup .k-list-item.k-selected,
+.nhsn-link__select-popup .k-list-optionlabel.k-selected {
   background: var(--kendo-color-primary, #0057b7);
   color: var(--kendo-color-on-primary, #ffffff);
 }
 
 .nhsn-facility-info-popup .k-list-item.k-selected:hover,
-.nhsn-facility-info-popup .k-list-optionlabel.k-selected:hover {
+.nhsn-facility-info-popup .k-list-optionlabel.k-selected:hover,
+.nhsn-link__select-popup .k-list-item.k-selected:hover,
+.nhsn-link__select-popup .k-list-optionlabel.k-selected:hover {
   background: var(--kendo-color-primary-hover, #032659);
   color: var(--kendo-color-on-primary, #ffffff);
 }
@@ -2097,7 +2116,8 @@
    .k-button svg) -- without it, an inline SVG icon sits at text baseline with no gap, which reads
    as the icon and label sitting on separate lines. Every Modal footer button (Export to Excel,
    Export Report Summary, ...) needs this, not just the two containers that already had it. */
-.nhsn-link__modal-actions .k-button svg {
+.nhsn-link__modal-actions .k-button svg,
+.nhsn-link__step-actions .k-button svg {
   margin-right: 6px;
   vertical-align: -2px;
 }
@@ -2597,15 +2617,47 @@
 }
 
 .nhsn-link__report-results-filters {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
+/* The package's .k-form-field reserves right padding and bottom margin for the next field in a
+   form - the grid's own gap already spaces these, so without resetting both the filters don't
+   start and end on the same lines as the table below. */
 .nhsn-link__report-results-filters > * {
-  flex: 1;
-  min-width: 160px;
+  min-width: 0;
+  margin: 0;
+  padding-right: 0;
+}
+
+.nhsn-link__report-results-filters .k-input,
+.nhsn-link__report-results-filters .k-picker {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+  .nhsn-link__report-results-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Same label treatment as Facility Information, so the text box and dropdowns line up. */
+.nhsn-link__report-results-filters .k-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--kendo-color-app-text, #1f2328);
+}
+
+.nhsn-link__report-results-filters .k-input:not(.k-dropdownlist) .k-input-inner {
+  padding: 9px 11px;
+  font-size: 14px;
 }
 
 .nhsn-link__report-results-result-count {
