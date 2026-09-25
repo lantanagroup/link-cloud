@@ -57,6 +57,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     private readonly IDataAcquisitionGateway _dataAcquisitionGateway;
     private readonly IQueryPlanTemplateProvider _queryPlanTemplateProvider;
     private readonly QueryPlanAutoSeedSettings _queryPlanAutoSeedSettings;
+    private readonly IReportingPlanGateway _reportingPlanGateway;
+    private readonly MeasureReportingAutoEnrollSettings _measureReportingAutoEnrollSettings;
     private readonly ILogger<OnboardingWriteService> _logger;
 
     public OnboardingWriteService(
@@ -79,6 +81,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         IDataAcquisitionGateway dataAcquisitionGateway,
         IQueryPlanTemplateProvider queryPlanTemplateProvider,
         IOptions<QueryPlanAutoSeedSettings> queryPlanAutoSeedSettings,
+        IReportingPlanGateway reportingPlanGateway,
+        IOptions<MeasureReportingAutoEnrollSettings> measureReportingAutoEnrollSettings,
         ILogger<OnboardingWriteService> logger)
     {
         _dbContext = dbContext;
@@ -100,6 +104,8 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
         _dataAcquisitionGateway = dataAcquisitionGateway;
         _queryPlanTemplateProvider = queryPlanTemplateProvider;
         _queryPlanAutoSeedSettings = queryPlanAutoSeedSettings.Value;
+        _reportingPlanGateway = reportingPlanGateway;
+        _measureReportingAutoEnrollSettings = measureReportingAutoEnrollSettings.Value;
         _logger = logger;
     }
 
@@ -532,6 +538,21 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     {
         switch (stepId)
         {
+            case "reporting-plan":
+                if (_measureReportingAutoEnrollSettings.Enabled)
+                {
+                    try
+                    {
+                        await _reportingPlanGateway.EnsureFacilityEnrolledInMeasureAsync(facility.FacilityId, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        // A DMRP outage here must not fail the step save.
+                        _logger.LogError(ex, "Measure reporting auto-enroll failed for facility {FacilityId}.", facility.FacilityId);
+                    }
+                }
+                break;
+
             case "facility-info":
                 var previousVendor = facility.Vendor;
 
