@@ -128,10 +128,10 @@ public static class ReferencedLocationExpander
     }
 
     /// <summary>
-    /// A relative reference must be exactly <c>Location/{id}</c>. An absolute or
-    /// protocol-relative reference must sit directly under
-    /// <paramref name="configuredFhirBase"/>, so a different FHIR path on the
-    /// same host is not read as <c>Location/{id}</c> from this server.
+    /// A relative reference must be <c>Location/{id}</c> or
+    /// <c>Location/{id}/_history/{version}</c>. An absolute or protocol-relative
+    /// reference must sit directly under <paramref name="configuredFhirBase"/>.
+    /// The returned id is the logical id, without the history segment.
     /// </summary>
     internal static bool TryParseLocationId(string? reference, Uri? configuredFhirBase, out string locationId)
     {
@@ -142,21 +142,27 @@ public static class ReferencedLocationExpander
         if (!TryGetLocationRelativePath(reference, configuredFhirBase, out var relativePath))
             return false;
 
-        var slash = relativePath.IndexOf('/');
-        if (slash <= 0 || slash != relativePath.LastIndexOf('/'))
-            return false;
-
-        if (!string.Equals(relativePath[..slash], "Location", StringComparison.Ordinal))
-            return false;
-
-        locationId = relativePath[(slash + 1)..];
-        if (!IsLogicalId(locationId))
+        var parts = relativePath.Split('/');
+        if (parts.Length == 2)
         {
-            locationId = string.Empty;
-            return false;
+            if (!string.Equals(parts[0], "Location", StringComparison.Ordinal) || !IsLogicalId(parts[1]))
+                return false;
+
+            locationId = parts[1];
+            return true;
         }
 
-        return true;
+        if (parts.Length == 4
+            && string.Equals(parts[0], "Location", StringComparison.Ordinal)
+            && string.Equals(parts[2], "_history", StringComparison.Ordinal)
+            && IsLogicalId(parts[1])
+            && IsLogicalId(parts[3]))
+        {
+            locationId = parts[1];
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

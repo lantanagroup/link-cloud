@@ -314,6 +314,11 @@ public class AbsSubmissionPredictorTests
     [InlineData("Location/id_underscore", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     [InlineData("Location/caf\u00e9", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     [InlineData("Location/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/2", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/Location/abc/_history/2", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("Location/abc/_history", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/2/extra", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/..", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     public void Location_reference_id_stays_on_the_configured_server(
         string reference,
         string fhirBase,
@@ -327,6 +332,42 @@ public class AbsSubmissionPredictorTests
 
         parsed.Should().Be(expected);
         locationId.Should().Be(expectedId);
+    }
+
+    [Fact]
+    public async Task Versioned_location_reference_is_read_as_the_logical_id()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-ver",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/stay/_history/3")
+        });
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Encounter/enc-ver" }
+            }
+        };
+
+        var reads = new List<string>();
+        await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                return Task.FromResult<Location?>(new Location { Id = id });
+            },
+            output: null,
+            CancellationToken.None);
+
+        reads.Should().Equal("stay");
+        encounter.Location.Single().Location.Reference.Should().Be("Location/stay");
     }
 
     [Fact]

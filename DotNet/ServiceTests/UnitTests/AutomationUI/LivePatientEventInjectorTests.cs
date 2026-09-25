@@ -112,6 +112,17 @@ public class LivePatientEventInjectorTests
 
         var act = async () => await injector.ReferencePoolPatientAsync(runId, "fhir-99");
         await act.Should().ThrowAsync<OperationCanceledException>();
+
+        var throughManager = async () => await AutomationRunManager.InvokeLivePoolAsync(
+            () => injector.ReferencePoolPatientAsync(runId, "fhir-99"),
+            _ => { });
+        await throughManager.Should().ThrowAsync<OperationCanceledException>();
+
+        var fault = async () => await AutomationRunManager.InvokeLivePoolAsync(
+            () => Task.FromException<LivePatientPoolEntry>(new InvalidOperationException("boom")),
+            _ => { });
+        (await fault.Should().ThrowAsync<LiveInjectionException>()).Which.StatusCode
+            .Should().Be(StatusCodes.Status500InternalServerError);
     }
 
     [Fact]
