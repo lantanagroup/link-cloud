@@ -57,7 +57,9 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const [systemFilter, setSystemFilter] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
-  const [validationRequested, setValidationRequested] = useState(false);
+  // Counts Continue attempts rather than flagging only the first, so every attempt re-flags the
+  // rows/code systems that are wrong *now* - including ones added, or broken, since the last one.
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const [validationError, setValidationError] = useState<string | null>(null);
   // Captured once, at mount -- not a "have we run yet" flag, because StrictMode invokes
   // effects twice on mount against the same committed state, and a boolean flag would be
@@ -209,24 +211,44 @@ export function EncounterStep({onNext, onBack}: StepProps) {
    * scaffolding to discard for them. A blank mapping row IS discarded for them - see
    * pruneEmptyGroups, used only for that, right before the incomplete-row check.
    */
-  function validateStep(): boolean {
-    setValidationRequested(true);
-    if (findDuplicateCodeSystemIndexes(groups).length > 0) {
-      announceValidationMessage(t('onboarding:encounter.messages.duplicateCodeSystem'));
-      return false;
+  function validationMessageFor(current: CodeSystemGroupState[]): string | null {
+    if (findDuplicateCodeSystemIndexes(current).length > 0) {
+      return t('onboarding:encounter.messages.duplicateCodeSystem');
     }
-    if (findMissingCodeSystemGroupKeys(groups).length > 0) {
-      announceValidationMessage(t('onboarding:encounter.messages.incomplete'));
-      return false;
+    if (findMissingCodeSystemGroupKeys(current).length > 0) {
+      return t('onboarding:encounter.messages.incomplete');
     }
-    const pruned = pruneEmptyGroups(groups);
-    if (findIncompleteRowKeys(pruned).length > 0) {
-      announceValidationMessage(t('onboarding:encounter.messages.incomplete'));
-      return false;
+    if (findIncompleteRowKeys(pruneEmptyGroups(current)).length > 0) {
+      return t('onboarding:encounter.messages.incomplete');
     }
-    setValidationError(null);
-    return true;
+    return null;
   }
+
+  function validateStep(): boolean {
+    setValidationAttempt(attempt => attempt + 1);
+    const message = validationMessageFor(groups);
+    if (message === null) {
+      setValidationError(null);
+      return true;
+    }
+    // The problem is always on the Mapping tab, so a Continue from Reference jumps back to it -
+    // otherwise the message and the flagged fields (only rendered there) would stay hidden.
+    setActiveTab('mapping');
+    announceValidationMessage(message);
+    return false;
+  }
+
+  // Once shown, the message follows the rows live, same as FhirStep/HslocStep - fixing the problem
+  // clears it (or swaps it for the next remaining one) without another click on Continue.
+  useEffect(() => {
+    if (validationError === null) {
+      return;
+    }
+    const message = validationMessageFor(groups);
+    if (message !== validationError) {
+      setValidationError(message);
+    }
+  }, [groups]);
 
   function handleNext() {
     if (!validateStep()) {
@@ -338,7 +360,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                   incompleteRowKeys={incompleteRowKeys}
                   duplicate={duplicateCodeSystemGroupKeys.has(group.groupKey)}
                   missing={missingCodeSystemGroupKeys.has(group.groupKey)}
-                  showValidation={validationRequested}
+                  validationAttempt={validationAttempt}
                   onCodeSystemChange={value => updateCodeSystem(group.groupKey, value)}
                   onRemoveGroup={() => removeCodeSystem(group.groupKey)}
                   onAddRow={() => addMappingRow(group.groupKey)}
@@ -350,9 +372,11 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                 {t('onboarding:encounter.fields.addCodeSystem')}
               </Button>
 
-              <p className="nhsn-link__form-error" role="alert">
-                {validationError}
-              </p>
+              <div aria-live="off">
+                <p className="nhsn-link__form-error" role="alert">
+                  {validationError}
+                </p>
+              </div>
             </div>
           )}
 
@@ -484,7 +508,7 @@ interface CodeSystemBlockProps {
   incompleteRowKeys: Set<string>;
   duplicate: boolean;
   missing: boolean;
-  showValidation: boolean;
+  validationAttempt: number;
   onCodeSystemChange: (value: string) => void;
   onRemoveGroup: () => void;
   onAddRow: () => void;
@@ -498,7 +522,7 @@ function CodeSystemBlock({
   incompleteRowKeys,
   duplicate,
   missing,
-  showValidation,
+  validationAttempt,
   onCodeSystemChange,
   onRemoveGroup,
   onAddRow,
@@ -515,10 +539,10 @@ function CodeSystemBlock({
   const describedBy = [showDuplicate && duplicateHintId, showMissing && missingHintId].filter(Boolean).join(' ') || undefined;
 
   useEffect(() => {
-    if (showValidation && (duplicate || missing)) {
+    if (validationAttempt > 0 && (duplicate || missing)) {
       setTouched(true);
     }
-  }, [showValidation]);
+  }, [validationAttempt]);
 
   function handleCodeSystemBlur() {
     if (duplicate || missing) {
@@ -576,7 +600,7 @@ function CodeSystemBlock({
               row={row}
               referenceCodes={referenceCodes}
               incomplete={incompleteRowKeys.has(row.rowKey)}
-              showValidation={showValidation}
+              validationAttempt={validationAttempt}
               onChange={rowPatch => onUpdateRow(row.rowKey, rowPatch)}
               onRemove={() => onRemoveRow(row.rowKey)} />
           ))}
@@ -595,12 +619,12 @@ interface MappingRowProps {
   row: MappingRowState;
   referenceCodes: EncounterCode[];
   incomplete: boolean;
-  showValidation: boolean;
+  validationAttempt: number;
   onChange: (rowPatch: Partial<MappingRowState>) => void;
   onRemove: () => void;
 }
 
-function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, onRemove}: MappingRowProps) {
+function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChange, onRemove}: MappingRowProps) {
   const {t} = useTranslation('onboarding');
   const incompleteHintId = `encounter-row-hint-${row.rowKey}`;
   const selected = referenceCodes.find(code => code.system === row.targetSystem && code.code === row.targetCode);
@@ -619,10 +643,10 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
   const targetHintId = `${incompleteHintId}-target`;
 
   useEffect(() => {
-    if (showValidation && incomplete) {
+    if (validationAttempt > 0 && incomplete) {
       setTouched(true);
     }
-  }, [showValidation]);
+  }, [validationAttempt]);
 
   function handleRowBlur(event: React.FocusEvent<HTMLDivElement>) {
     if (!document.hasFocus()) {

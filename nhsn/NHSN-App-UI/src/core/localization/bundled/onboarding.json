@@ -153,6 +153,7 @@
       "invalidMaxRetries": "Max Retries must be a whole number between 0 and 10.",
       "invalidPullTime": "Enter a valid 24-hour time in HH:MM format.",
       "pullTimeRangeInvalid": "Min Acquisition Pull Time must be earlier than Max Acquisition Pull Time.",
+      "pullTimeRangeInvalidMax": "Max Acquisition Pull Time must be later than Min Acquisition Pull Time.",
       "invalidLagDays": "Days must be a whole number between 0 and 59.",
       "invalidLagHours": "Hours must be a whole number between 0 and 23.",
       "invalidLagMinutes": "Minutes must be a whole number between 0 and 59.",
@@ -338,10 +339,7 @@
       "rowIncomplete": "This field is required.",
       "fieldRequiredError": "{{field}} is required.",
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
-      "duplicateManagingOrg": "This Managing Organization has already been added.",
-      "duplicateLocationType": "This Location Type has already been added.",
-      "duplicateLocationIdentifier": "This Location Identifier has already been added.",
-      "duplicateRows": "Each entry must be unique - remove or change any repeated entries before continuing."
+      "invalidFhirPath": "Enter a valid FHIRPath expression (e.g. Location.identifier.where(system = 'urn:oid:1.2.3' and value = 'ABC').exists())."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },

@@ -131,7 +131,10 @@ export function FhirStep({onNext, onBack}: StepProps) {
     return touched[field] && errors[field] ? t(errors[field]) : undefined;
   }
 
-  const RANGE_INVALID_KEY = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+  const RANGE_INVALID_KEY: Record<'minAcquisitionPullTime' | 'maxAcquisitionPullTime', string> = {
+    minAcquisitionPullTime: 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid',
+    maxAcquisitionPullTime: 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalidMax'
+  };
   const PULL_TIME_REQUIRED_KEY: Record<'minAcquisitionPullTime' | 'maxAcquisitionPullTime', string> = {
     minAcquisitionPullTime: 'onboarding:fhirServerInfo.errors.minPullTimeRequired',
     maxAcquisitionPullTime: 'onboarding:fhirServerInfo.errors.maxPullTimeRequired'
@@ -149,13 +152,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
    */
   function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', value: string): string | undefined {
     if (pullTimeRangeConflictField === field) {
-      return t(RANGE_INVALID_KEY);
+      return t(RANGE_INVALID_KEY[field]);
     }
     if (touched[field] && !value.trim()) {
       return t(PULL_TIME_REQUIRED_KEY[field]);
     }
     const storedError = errors[field];
-    return touched[field] && storedError && storedError !== RANGE_INVALID_KEY && storedError !== PULL_TIME_REQUIRED_KEY[field]
+    return touched[field] && storedError && storedError !== RANGE_INVALID_KEY[field] && storedError !== PULL_TIME_REQUIRED_KEY[field]
       ? t(storedError)
       : undefined;
   }

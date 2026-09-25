@@ -28,7 +28,6 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const {draft, patch, saving} = useOnboarding();
   const report = draft.report;
 
-  const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [validationError, setValidationError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
@@ -61,27 +60,12 @@ export function ReportStep({onNext, onBack}: StepProps) {
     }
   }, [advanceAfterRequest, report.lastRequestedReportId, onNext]);
 
-  function clearFieldError(field: string) {
-    setErrors(previous => {
-      if (!previous[field]) {
-        return previous;
-      }
-      const next = {...previous};
-      delete next[field];
-      return next;
-    });
-  }
-
   function markTouched(field: string) {
     setTouched(previous => (previous[field] ? previous : {...previous, [field]: true}));
   }
 
   function draftForValidation() {
     return {...draft, report: {...draft.report, measures: selectedMeasures}};
-  }
-
-  function refreshErrors() {
-    setErrors(validateReport(draftForValidation()));
   }
 
   // True when the sole problem is a duplicate patient id and every other field is
@@ -115,7 +99,6 @@ export function ReportStep({onNext, onBack}: StepProps) {
   function validateStep(): boolean {
     setTouched({measures: true, startDate: true, endDate: true, patientIds: true});
     const nextErrors = validateReport(draftForValidation());
-    setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
       setValidationError(null);
       return true;
@@ -189,6 +172,23 @@ export function ReportStep({onNext, onBack}: StepProps) {
   const validMeasureNames = new Set(availableMeasures.map(measure => measure.name));
   const selectedMeasures = (report.measures ?? []).filter(name => validMeasureNames.has(name));
 
+  // Same as FhirStep: errors are checked against the live draft, and only shown once a field is
+  // touched (blurred, or flagged by Generate Report) - so fixing a field clears its error
+  // immediately, and re-breaking it (e.g. moving the end date back before the start) shows it
+  // again, without waiting for another blur or click.
+  const errors = validateReport(draftForValidation());
+  const incompleteMessage = t('onboarding:report.messages.incomplete');
+  const stepIncomplete = Object.keys(errors).length > 0 && !isOnlyPatientIdsDuplicate(errors);
+
+  // Once the "incomplete" banner is shown, it follows the fields live - fixing every one of them
+  // clears it without another click, same as FhirStep. A leftover duplicate id alone doesn't hold
+  // it up: that has its own message (see validateStep).
+  useEffect(() => {
+    if (validationError === incompleteMessage && !stepIncomplete) {
+      setValidationError(null);
+    }
+  }, [validationError, incompleteMessage, stepIncomplete]);
+
   useStepValidator(validateStep);
 
   const stableOnBack = useStableCallback(onBack);
@@ -239,14 +239,8 @@ export function ReportStep({onNext, onBack}: StepProps) {
             selectedLabel={t('onboarding:report.fields.measuresSelected')}
             removeLabel={label => t('onboarding:report.fields.measuresRemove', {measure: label})}
             error={fieldError('measures')}
-            onChange={selected => {
-              patch('report', {measures: selected});
-              clearFieldError('measures');
-            }}
-            onBlur={() => {
-              markTouched('measures');
-              refreshErrors();
-            }} />
+            onChange={selected => patch('report', {measures: selected})}
+            onBlur={() => markTouched('measures')} />
 
           <div className="triplet">
             <DateField
@@ -255,28 +249,16 @@ export function ReportStep({onNext, onBack}: StepProps) {
               required
               value={report.startDate}
               error={fieldError('startDate')}
-              onChange={value => {
-                patch('report', {startDate: value});
-                clearFieldError('startDate');
-              }}
-              onBlur={() => {
-                markTouched('startDate');
-                refreshErrors();
-              }} />
+              onChange={value => patch('report', {startDate: value})}
+              onBlur={() => markTouched('startDate')} />
             <DateField
               id="reportEndDate"
               label={t('onboarding:report.fields.endDateLabel')}
               required
               value={report.endDate}
               error={fieldError('endDate')}
-              onChange={value => {
-                patch('report', {endDate: value});
-                clearFieldError('endDate');
-              }}
-              onBlur={() => {
-                markTouched('endDate');
-                refreshErrors();
-              }} />
+              onChange={value => patch('report', {endDate: value})}
+              onBlur={() => markTouched('endDate')} />
           </div>
 
           <PatientSelection
@@ -284,14 +266,13 @@ export function ReportStep({onNext, onBack}: StepProps) {
             disabled={requesting}
             error={fieldError('patientIds')}
             showEmptyRowErrors={touched.patientIds}
-            onChange={next => {
-              patch('report', {patientIds: next});
-              clearFieldError('patientIds');
-            }} />
+            onChange={next => patch('report', {patientIds: next})} />
 
-          <p className="nhsn-link__form-error" role="alert">
-            {validationError}
-          </p>
+          <div aria-live="off">
+            <p className="nhsn-link__form-error" role="alert">
+              {validationError}
+            </p>
+          </div>
     </div>
   );
 }

@@ -282,9 +282,12 @@ export function CensusStep({ onNext, onBack }: StepProps) {
   }
 
   function updateSftpField(fields: Partial<typeof census>) {
+    // Only the host and port define the connection that was tested, so only they invalidate it -
+    // and with it the acknowledgement of that test's results. Remote directory and "remove after
+    // processing" are saved with the rest of the step on Continue and don't need a re-test.
     const retested = "sftpHost" in fields || "sftpPort" in fields;
     patch("census", retested ? { ...fields, sftpConnectionTested: false } : fields);
-    if (validationLive && census.accuracyAcknowledged) {
+    if (retested && validationLive && census.accuracyAcknowledged) {
       revokeAcknowledgement();
       announceValidationMessage(
         t("onboarding:census.messages.testConnectionBeforeAck"),
@@ -427,8 +430,10 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
           detail: t("onboarding:census.cerner.testTimeout"),
         });
       } else {
+        // A 4xx carries the BFF's own facility-readable explanation; a 5xx (or a network drop)
+        // is a raw downstream "An error occurred in our API..." - not something to show as-is.
         notifyError(
-          cause instanceof Error
+          cause instanceof HttpError && cause.status < 500
             ? cause.message
             : t("onboarding:census.cerner.testError"),
         );
@@ -458,10 +463,8 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     patch("census", { accuracyAcknowledged: true });
   }
 
-  function validateStep(): boolean {
-    if (acquisition === "PatientList") {
-      setTouchedListKeys(new Set(CENSUS_LIST_KEYS));
-    }
+  /** Everything Continue checks field-by-field, before the connection/acknowledgement gates. */
+  function currentStepErrors(): FieldErrors {
     const nextErrors = validateCensus(draft, acquisition);
     const hoursError = frequencyHoursError(frequencyHours);
     const minutesError = frequencyMinutesError(
@@ -474,6 +477,53 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     if (minutesError) {
       nextErrors.frequencyMinutes = minutesError;
     }
+    return nextErrors;
+  }
+
+  // Same as FhirStep: once shown, errors follow the fields live. An error already on screen is
+  // re-checked on every edit - fixing the field clears it immediately instead of waiting for blur -
+  // but nothing new is added here, so a field still being typed into for the first time isn't
+  // flagged early. The "incomplete" banner likewise clears once every field is fixed; the
+  // connection/acknowledgement banners are separate gates that editing can't satisfy, so they're
+  // left alone.
+  useEffect(() => {
+    const liveErrors = currentStepErrors();
+    setErrors((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      Object.keys(prev).forEach((field) => {
+        if (liveErrors[field] !== prev[field]) {
+          changed = true;
+          if (liveErrors[field]) {
+            next[field] = liveErrors[field];
+          } else {
+            delete next[field];
+          }
+        }
+      });
+      return changed ? next : prev;
+    });
+    if (
+      validationMessage?.text === t("onboarding:census.messages.incomplete") &&
+      Object.keys(liveErrors).length === 0
+    ) {
+      setValidationMessage(null);
+    }
+  }, [
+    acquisition,
+    census.patientListIds,
+    census.sftpHost,
+    census.sftpPort,
+    census.acquisitionFrequency,
+    frequencyHours,
+    frequencyMinutes,
+  ]);
+
+  function validateStep(): boolean {
+    if (acquisition === "PatientList") {
+      setTouchedListKeys(new Set(CENSUS_LIST_KEYS));
+    }
+    const nextErrors = currentStepErrors();
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       announceValidationMessage(t("onboarding:census.messages.incomplete"));
@@ -491,7 +541,16 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     return true;
   }
 
+  // Continue clicked while Test Connection is still running waits for its result instead of
+  // failing with "test the connection" - and keeps the step's save from racing the test's own
+  // write of the same sFTP configuration.
+  const [continueAfterTest, setContinueAfterTest] = useState(false);
+
   async function handleNext() {
+    if (testingConnection) {
+      setContinueAfterTest(true);
+      return;
+    }
     if (!validateStep()) {
       return;
     }
@@ -521,6 +580,13 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
   const stableOnBack = useStableCallback(onBack);
   const stableHandleNext = useStableCallback(handleNext);
 
+  useEffect(() => {
+    if (continueAfterTest && !testingConnection) {
+      setContinueAfterTest(false);
+      void stableHandleNext();
+    }
+  }, [continueAfterTest, testingConnection, stableHandleNext]);
+
   useStepChrome(
     useMemo(
       () => ({
@@ -539,13 +605,13 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             <Button
               onClick={stableHandleNext}
               disabled={saving}
-              loading={savingDirection === "next"}>
+              loading={savingDirection === "next" || continueAfterTest}>
               {t("common:actions.continue")}
             </Button>
           </StepActions>
         )
       }),
-      [t, vendorProfile, stableOnBack, saving, savingDirection, stableHandleNext]
+      [t, vendorProfile, stableOnBack, saving, savingDirection, continueAfterTest, stableHandleNext]
     )
   );
 

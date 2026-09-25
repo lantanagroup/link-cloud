@@ -19,13 +19,11 @@ import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import type {LocationIdentifierEntry, LocationTypeEntry} from '../../types';
+import type {LocationIdentifierEntry, LocationOrgDraft, LocationTypeEntry} from '../../types';
 import {
-  findDuplicateLocationIdentifierIndexes,
-  findDuplicateLocationTypeIndexes,
-  findDuplicateManagingOrgIndexes,
   findIncompleteLocationIdentifierIndexes,
-  findIncompleteLocationTypeIndexes
+  findIncompleteLocationTypeIndexes,
+  isPlausibleFhirPath
 } from './validate';
 
 /** Organization Identification. Methods and instructions PDF both come from `vendorProfile` - no vendor name here. */
@@ -100,46 +98,88 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   // naturally empty, so no separate "is everything blank" check is needed here.
   const hasIncompleteRows = incompleteRowIndexes.length > 0;
 
-  // Shown on the repeat as soon as it's typed - unlike a blank field, an exact repeat is already
-  // wrong, not just unfinished. Only the active method's list is checked.
-  const duplicateRowIndexes = new Set(
-    activeMethod === 'managing-org'
-      ? findDuplicateManagingOrgIndexes(managingOrganizations)
-      : activeMethod === 'location-type'
-        ? findDuplicateLocationTypeIndexes(locationTypes)
-        : activeMethod === 'location-identifier'
-          ? findDuplicateLocationIdentifierIndexes(locationIdentifiers)
-          : []
-  );
-  const hasDuplicateRows = duplicateRowIndexes.size > 0;
+  // Only the Custom FHIRPath tab has a free-form expression to check; Data Acquisition compiles it
+  // on save, and without this a typo only surfaces as a bare "DataAcquisition returned 400".
+  const customFhirPath = locationOrg.customFhirPath ?? '';
+  const hasInvalidFhirPath = activeMethod === 'custom-fhir-path' && !isPlausibleFhirPath(customFhirPath);
+  const [fhirPathBlurred, setFhirPathBlurred] = useState(false);
 
   // No error is worth showing before the facility has actually tried to move on - an untouched,
   // still-blank list isn't wrong yet, just not started. Once shown, though, it tracks the live state
   // below, so fixing (or re-breaking) it updates the errors without another click.
-  const [continueAttempted, setContinueAttempted] = useState(false);
-  // Rows that existed at the last Continue attempt - only these get "required" errors on their
-  // blank fields. A row added afterwards stays quiet until the next
-  // attempt, instead of showing up already in error.
-  const [flaggedRowCount, setFlaggedRowCount] = useState(0);
+  //
+  // Kept per method: the value is how many rows existed at that method's last Continue attempt -
+  // only these get "required" errors on their blank fields, so a row added afterwards stays quiet
+  // until the next attempt instead of showing up already in error. Switching tabs and coming back
+  // doesn't clear it - the rows are still just as incomplete, so their errors come back with them.
+  const [flaggedRowCounts, setFlaggedRowCounts] = useState<Partial<Record<LocationMethod, number>>>({});
+  const continueAttempted = activeMethod !== undefined && flaggedRowCounts[activeMethod] !== undefined;
+  const flaggedRowCount = (activeMethod && flaggedRowCounts[activeMethod]) ?? 0;
   const isRowFlagged = (index: number) => index < flaggedRowCount;
   const hasFlaggedIncompleteRows = hasIncompleteRows && incompleteRowIndexes.some(isRowFlagged);
+  const showFhirPathError = hasInvalidFhirPath && (fhirPathBlurred || continueAttempted);
 
   function validateStep(): boolean {
-    setContinueAttempted(true);
-    setFlaggedRowCount(activeRowCount);
-    return !hasIncompleteRows && !hasDuplicateRows;
+    if (activeMethod) {
+      setFlaggedRowCounts(counts => ({...counts, [activeMethod]: activeRowCount}));
+    }
+    setFhirPathBlurred(true);
+    return !hasIncompleteRows && !hasInvalidFhirPath;
   }
 
-  /** Keeps `flaggedRowCount` pointing at the same rows when one of them is removed. */
+  /** Keeps the active method's flagged count pointing at the same rows when one of them is removed. */
   function trackRemoval<T>(previous: T[], next: T[]) {
-    if (next.length < previous.length) {
-      const removedIndex = previous.findIndex((row, index) => row !== next[index]);
-      setFlaggedRowCount(count => (removedIndex < count ? count - 1 : count));
+    if (!activeMethod || next.length >= previous.length) {
+      return;
     }
+    const removedIndex = previous.findIndex((row, index) => row !== next[index]);
+    setFlaggedRowCounts(counts => {
+      const count = counts[activeMethod];
+      return count !== undefined && removedIndex < count ? {...counts, [activeMethod]: count - 1} : counts;
+    });
+  }
+
+  // Advancing is deferred a render when inactive tabs were just cleared, so that patch is in the
+  // draft the provider saves - `onNext` saves the draft it was rendered with (same as FhirStep).
+  const [readyToAdvance, setReadyToAdvance] = useState(false);
+  useEffect(() => {
+    if (readyToAdvance) {
+      setReadyToAdvance(false);
+      onNext();
+    }
+  }, [readyToAdvance, onNext]);
+
+  /**
+   * Only the active method is ever saved - the BFF turns it alone into Data Acquisition's
+   * conditions and rebuilds this section from those on the next load - so whatever sits in the
+   * other tabs is unsaved and would otherwise linger in memory (an abandoned incomplete row coming
+   * back on the next visit). Continuing drops it, leaving the draft matching what was saved.
+   * Limited to the tabs this vendor offers: a method only the other vendor offers is hidden, not
+   * abandoned, so switching vendor never costs that data.
+   */
+  function discardInactiveTabs(): boolean {
+    const cleared: Partial<LocationOrgDraft> = {};
+    methods.forEach(method => {
+      const field = METHOD_FIELDS[method];
+      const value = locationOrg[field];
+      if (method !== activeMethod && (Array.isArray(value) ? value.length > 0 : Boolean(value))) {
+        Object.assign(cleared, {[field]: field === 'customFhirPath' ? undefined : []});
+      }
+    });
+    if (Object.keys(cleared).length === 0) {
+      return false;
+    }
+    patch('locationOrg', cleared);
+    return true;
   }
 
   function handleContinue() {
-    if (validateStep()) {
+    if (!validateStep()) {
+      return;
+    }
+    if (discardInactiveTabs()) {
+      setReadyToAdvance(true);
+    } else {
       onNext();
     }
   }
@@ -151,8 +191,6 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   }
 
   function handleMethodChange(method: LocationMethod) {
-    setContinueAttempted(false);
-    setFlaggedRowCount(0);
     patch('locationOrg', {method});
   }
 
@@ -227,8 +265,10 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         id="custom-fhir-path"
         label={t('onboarding:locationOrg.customFhirPath.label')}
         placeholder={t('onboarding:locationOrg.customFhirPath.placeholder')}
-        value={locationOrg.customFhirPath ?? ''}
-        onChange={customFhirPath => patch('locationOrg', {customFhirPath})}
+        value={customFhirPath}
+        error={showFhirPathError ? t('onboarding:locationOrg.errors.invalidFhirPath') : undefined}
+        onChange={value => patch('locationOrg', {customFhirPath: value})}
+        onBlur={() => setFhirPathBlurred(true)}
       />
     </div>
   );
@@ -295,9 +335,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                       error={
                         flagBlank && !row.alias.trim()
                           ? requiredError(t('onboarding:locationOrg.locationType.aliasLabel'))
-                          : duplicateRowIndexes.has(index)
-                            ? t('onboarding:locationOrg.errors.duplicateLocationType')
-                            : undefined
+                          : undefined
                       }
                       onChange={alias => onRowChange({...row, alias})}
                     />
@@ -330,9 +368,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 error={
                   isRowFlagged(index) && !row.trim()
                     ? requiredError(t('onboarding:locationOrg.managingOrg.placeholder'))
-                    : duplicateRowIndexes.has(index)
-                      ? t('onboarding:locationOrg.errors.duplicateManagingOrg')
-                      : undefined
+                    : undefined
                 }
                 onChange={onRowChange}
               />
@@ -389,9 +425,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                       error={
                         flagBlank && !row.code.trim()
                           ? requiredError(t('onboarding:locationOrg.locationIdentifier.codeLabel'))
-                          : duplicateRowIndexes.has(index)
-                            ? t('onboarding:locationOrg.errors.duplicateLocationIdentifier')
-                            : undefined
+                          : undefined
                       }
                       onChange={code => onRowChange({...row, code})}
                     />
@@ -461,14 +495,6 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
           </p>
         </div>
       )}
-
-      {continueAttempted && !hasFlaggedIncompleteRows && hasDuplicateRows && (
-        <div aria-live="off">
-          <p className="nhsn-link__form-error" role="alert">
-            {t('onboarding:locationOrg.errors.duplicateRows')}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -504,6 +530,14 @@ interface CandidateTableProps {
   emptyLabel: string;
   caption: string;
 }
+
+/** The draft field each method's tab edits. */
+const METHOD_FIELDS: Record<LocationMethod, keyof Omit<LocationOrgDraft, 'method'>> = {
+  'managing-org': 'managingOrganizationIds',
+  'location-identifier': 'locationIdentifiers',
+  'location-type': 'locationTypes',
+  'custom-fhir-path': 'customFhirPath'
+};
 
 /** Multi-select over search results. Columns match the POC's Cerner site-location table. */
 function CandidateTable({

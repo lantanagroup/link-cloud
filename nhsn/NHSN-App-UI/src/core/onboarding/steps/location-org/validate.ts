@@ -23,35 +23,78 @@ export function findIncompleteLocationIdentifierIndexes(rows: LocationIdentifier
   return incomplete;
 }
 
-/** Indexes of every row whose values repeat an earlier row's (case-insensitive, trimmed). The
- *  first occurrence is left unflagged - it's the repeats that need removing. A row with any blank
- *  value is skipped; that's a required-field problem, not a duplicate. */
-function findDuplicateIndexes<T>(rows: T[], values: (row: T) => string[]): number[] {
-  const seen = new Set<string>();
-  const duplicates: number[] = [];
-  rows.forEach((row, index) => {
-    const parts = values(row).map(value => value.trim().toLowerCase());
-    if (parts.some(part => !part)) {
-      return;
+// Same character set the BFF's FieldValidationRules.FhirPathCharacterPattern allows for an
+// imported custom FHIRPath, so an expression typed here and one uploaded in the sheet are held to
+// the same rule.
+const FHIR_PATH_CHARACTERS = /^[\w\s.()[\]'"=!<>,:%$*/+&|-]+$/;
+
+/**
+ * A structural check on a custom FHIRPath - not a full parse (Data Acquisition compiles it with
+ * Firely on save and has the final word), but enough to catch what that compile rejects most often
+ * before the facility gets a bare "DataAcquisition returned 400": an unclosed quote or bracket, a
+ * dangling `.` ("Encounter.", "Encounter..id", ".id"), or an expression that ends on an operator.
+ * A blank value is not invalid here - the tab can be left empty, same as a method with zero rows.
+ */
+export function isPlausibleFhirPath(value: string): boolean {
+  const expression = value.trim();
+  if (!expression) {
+    return true;
+  }
+  if (!FHIR_PATH_CHARACTERS.test(expression)) {
+    return false;
+  }
+
+  // Collapse each quoted literal to a single placeholder so its contents (which may legitimately
+  // hold a '.', '(' or an operator) aren't mistaken for structure below.
+  let structure = '';
+  let quote: string | null = null;
+  for (const char of expression) {
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      }
+      continue;
     }
-    const key = JSON.stringify(parts);
-    if (seen.has(key)) {
-      duplicates.push(index);
-    } else {
-      seen.add(key);
+    if (char === '\'' || char === '"') {
+      quote = char;
+      structure += 'x';
+      continue;
     }
-  });
-  return duplicates;
-}
+    structure += char;
+  }
+  if (quote) {
+    return false;
+  }
 
-export function findDuplicateManagingOrgIndexes(ids: string[]): number[] {
-  return findDuplicateIndexes(ids, id => [id]);
-}
+  const stack: string[] = [];
+  for (const char of structure) {
+    if (char === '(' || char === '[') {
+      stack.push(char === '(' ? ')' : ']');
+    } else if (char === ')' || char === ']') {
+      if (stack.pop() !== char) {
+        return false;
+      }
+    }
+  }
+  if (stack.length > 0) {
+    return false;
+  }
 
-export function findDuplicateLocationTypeIndexes(rows: LocationTypeEntry[]): number[] {
-  return findDuplicateIndexes(rows, row => [row.code, row.alias]);
-}
+  // Every '.' must join two path parts: something that can be navigated from on its left (a name,
+  // a literal, a closing bracket) and a name on its right - or digits on both sides, for a decimal.
+  const compact = structure.replace(/\s+/g, '');
+  for (let index = 0; index < compact.length; index++) {
+    if (compact[index] !== '.') {
+      continue;
+    }
+    const before = compact[index - 1] ?? '';
+    const after = compact[index + 1] ?? '';
+    const isDecimal = /\d/.test(before) && /\d/.test(after);
+    if (!isDecimal && !(/[\w)\]]/.test(before) && /[A-Za-z_]/.test(after))) {
+      return false;
+    }
+  }
 
-export function findDuplicateLocationIdentifierIndexes(rows: LocationIdentifierEntry[]): number[] {
-  return findDuplicateIndexes(rows, row => [row.system, row.code]);
+  // Can't end on an operator or separator - there's nothing for it to apply to.
+  return !/[.=!<>,:+\-*/&|(]$/.test(compact);
 }

@@ -120,7 +120,11 @@ export function validateFhir(
     // census list id - only the field just edited carries the error, not both sides of the
     // pair. With no active edit (initial load, a blur on neither field), max defaults to the
     // flagged side.
-    errors[editedPullTimeField ?? 'maxAcquisitionPullTime'] = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+    const flaggedField = editedPullTimeField ?? 'maxAcquisitionPullTime';
+    errors[flaggedField] =
+      flaggedField === 'maxAcquisitionPullTime'
+        ? 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalidMax'
+        : 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
   }
 
   if (values.lagDays != null && (!Number.isInteger(values.lagDays) || values.lagDays < 0 || values.lagDays > LAG_DAYS_CAP)) {
