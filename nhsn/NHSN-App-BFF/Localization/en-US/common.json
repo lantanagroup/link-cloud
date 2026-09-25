@@ -107,6 +107,7 @@
   },
   "a11y": {
     "opensInNewTab": "(opens in a new tab)",
-    "table": "Table"
+    "table": "Table",
+    "alert": "Alert:"
   }
 }

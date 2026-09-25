@@ -447,7 +447,7 @@ export function FhirStep({onNext, onBack}: StepProps) {
           </div>
 
           <div className="form-group" role="group" aria-labelledby="fhir-lag-duration-label">
-            <label id="fhir-lag-duration-label">
+            <label id="fhir-lag-duration-label" htmlFor="lagDays">
               {t('onboarding:fhirServerInfo.fields.lagLabel')}
               <RequiredAsterisk />
               <InfoTooltip
