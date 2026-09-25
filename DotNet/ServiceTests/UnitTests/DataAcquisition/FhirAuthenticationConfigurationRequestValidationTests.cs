@@ -92,11 +92,18 @@ public class FhirAuthenticationConfigurationRequestValidationTests
         Assert.Equal("TokenUrl is required.", error.ErrorMessage);
     }
 
+    /// <summary>
+    /// A rooted path is the case that differs by host: on Linux "/oauth2/token" parses as an absolute
+    /// file: URI, on Windows it does not parse at all. Both must reach the same message, or this suite
+    /// passes on a developer's machine and fails in CI.
+    /// </summary>
     [Theory]
     [InlineData("oauth2/token")]
     [InlineData("/oauth2/token")]
     [InlineData("not a url")]
-    public void Validate_RelativeTokenUrl_ReportsNotAbsolute(string tokenUrl)
+    [InlineData("file:///oauth2/token")]
+    [InlineData(@"C:\oauth2\token")]
+    public void Validate_TokenUrlThatIsNotAnAbsoluteWebUrl_ReportsNotAbsolute(string tokenUrl)
     {
         var request = CreateValidRequest();
         request.TokenUrl = tokenUrl;
@@ -110,7 +117,7 @@ public class FhirAuthenticationConfigurationRequestValidationTests
 
     [Theory]
     [InlineData("ftp://vendor.test/token")]
-    [InlineData("file:///c:/token")]
+    [InlineData("gopher://vendor.test/token")]
     public void Validate_NonHttpTokenUrlScheme_ReportsScheme(string tokenUrl)
     {
         var request = CreateValidRequest();

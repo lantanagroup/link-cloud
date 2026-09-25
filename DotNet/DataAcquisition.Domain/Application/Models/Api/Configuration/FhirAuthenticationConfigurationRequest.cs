@@ -62,7 +62,11 @@ public class FhirAuthenticationConfigurationRequest : IValidatableObject
             yield break;
         }
 
-        if (!Uri.TryCreate(TokenUrl.Trim(), UriKind.Absolute, out var tokenUri))
+        // IsFile is what keeps this answer the same on every host. On Linux a rooted path such as
+        // "/oauth2/token" parses as an absolute file: URI, where on Windows it does not parse at all,
+        // so without this the same request is a scheme failure in a container and a format failure
+        // on a developer's machine.
+        if (!Uri.TryCreate(TokenUrl.Trim(), UriKind.Absolute, out var tokenUri) || tokenUri.IsFile)
         {
             yield return new ValidationResult("TokenUrl must be a valid absolute URL.", new[] { nameof(TokenUrl) });
             yield break;
