@@ -311,11 +311,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default)
     {
-        foreach (var facilityId in new[] { summary.FacilityId, summary.RunId.ToString() })
+        foreach (var facilityId in DistinctOwnedFacilityIds(summary))
         {
-            if (!RunCleanupHelper.IsOwnedAutomationFacilityId(summary, facilityId) || facilityId is null)
-                continue;
-
             await _ownedFacilityTombstones.ReplaceOneAsync(
                 t => t.FacilityId == facilityId,
                 new OwnedFacilityTombstoneDocument
@@ -328,6 +325,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 new ReplaceOptions { IsUpsert = true },
                 ct);
         }
+    }
+
+    internal static IReadOnlyList<string> DistinctOwnedFacilityIds(AutomationRunSummary summary)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var facilityId in new[] { summary.FacilityId, summary.RunId.ToString() })
+        {
+            if (!RunCleanupHelper.IsOwnedAutomationFacilityId(summary, facilityId) || string.IsNullOrWhiteSpace(facilityId))
+                continue;
+            if (seen.Add(facilityId))
+                ids.Add(facilityId);
+        }
+
+        return ids;
     }
 
     public async Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default)

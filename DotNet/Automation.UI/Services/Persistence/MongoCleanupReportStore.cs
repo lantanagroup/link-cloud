@@ -174,10 +174,10 @@ public sealed class MongoCleanupReportStore(IMongoDatabase database, ILogger<Mon
         public int TeardownCandidateCount { get; set; }
         public List<string> TornDownFacilityIds { get; set; } = [];
         public int HistoryPurgeCandidateCount { get; set; }
-        [BsonRepresentation(BsonType.String)]
+        [BsonSerializer(typeof(GuidStringListSerializer))]
         public List<Guid> PurgedRunIds { get; set; } = [];
         public List<string> FailedFacilityIds { get; set; } = [];
-        [BsonRepresentation(BsonType.String)]
+        [BsonSerializer(typeof(GuidStringListSerializer))]
         public List<Guid> FailedRunIds { get; set; } = [];
         public string Message { get; set; } = "";
     }
