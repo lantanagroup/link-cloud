@@ -31,6 +31,12 @@
           "literal": "Encounter:location"
         }
       ]
+    },
+    "1": {
+      "queryConfigType": "Reference",
+      "resourceType": "Location",
+      "operationType": 2,
+      "paged": 100
     }
   },
   "SupplementalQueries": {
