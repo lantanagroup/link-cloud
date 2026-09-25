@@ -539,6 +539,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-nhsn-app-bff;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       NhsnJwt__Issuer: "https://docker-nhsn-app.example.org"
       NhsnJwt__PublicCertificatePem: "-----BEGIN CERTIFICATE-----\nMIIB3DCCAYGgAwIBAgIUObyb9ja4QmXXTPwxebJLlhIww3kwCgYIKoZIzj0EAwIwLTErMCkGA1UEAwwiTkhTTiBBcHAgRG9ja2VyIFB1YmxpYyBDZXJ0aWZpY2F0ZTAeFw0yNjA3MjAyMTU3MDZaFw0zNjA3MTcyMTU3MDZaMC0xKzApBgNVBAMMIk5IU04gQXBwIERvY2tlciBQdWJsaWMgQ2VydGlmaWNhdGUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQNoNqXozIM+J/ZIq6fa/vhsayZ+GlYE2kQAYPpDGfo3boxro6EDvNAj5D+EbY5650CZZhBQTin3r3Ahk6/nNk2o38wfTAdBgNVHQ4EFgQUibv8wUiYJ0f2WlW4B77hwQoXOyMwHwYDVR0jBBgwFoAUibv8wUiYJ0f2WlW4B77hwQoXOyMwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsGAQUFBwMBMAoGCCqGSM49BAMCA0kAMEYCIQDDijBXksQqxiOhRCC8j47ufj3sfUO3EFoy2FqHfq7clQIhAPkG+Qqvk4ZQWIGX5BGi8cAUxGHSUDjvnUhSA2xYXR08\n-----END CERTIFICATE-----"
+      ReportBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
     ports:
       - "8079:8079"
     build:
@@ -553,6 +554,8 @@ services:
         condition: service_completed_successfully
       terminology:
         condition: service_healthy
+      azurite_init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8079/health"]
       start_period: 5s
@@ -647,7 +650,8 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
-      ResourceCache__CacheImplementation: Hybrid
+      ResourceCache__CacheImplementation: ABS
+      ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
       ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -689,7 +693,7 @@ services:
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
-       ResourceCache__CacheImplementation: Hybrid
+       ResourceCache__CacheImplementation: ABS
        ResourceCache__Redis__MaxMemoryBytes: 268435456
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
        ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -843,7 +847,7 @@ services:
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
-      ResourceCache__CacheImplementation: Hybrid
+      ResourceCache__CacheImplementation: ABS
     ports:
       - "8068:8068"
     build:

@@ -182,17 +182,13 @@ public class ReportsEndpoints : IApi
                 CancellationToken cancellationToken) =>
             {
                 var sanitizedMeasure = measure.Sanitize();
-                var resource = await service.GetPatientMeasureReportResourceAsync(reportId, patientId, sanitizedMeasure, cancellationToken);
-                if (resource is null)
+                var download = await service.GetPatientReportDownloadAsync(reportId, patientId, sanitizedMeasure, cancellationToken);
+                if (download is null)
                 {
                     return Results.NotFound();
                 }
 
-                var ndjson = JsonSerializer.Serialize(resource);
-                return Results.File(
-                    System.Text.Encoding.UTF8.GetBytes(ndjson),
-                    "application/x-ndjson",
-                    $"{patientId}_{sanitizedMeasure}_report.ndjson");
+                return Results.File(download.Content, download.ContentType, download.FileName);
             })
             .WithName("ExportPatientReport")
             .Produces(StatusCodes.Status200OK)
@@ -200,12 +196,12 @@ public class ReportsEndpoints : IApi
             .ProducesProblem(StatusCodes.Status404NotFound)
             .WithOpenApi(operation =>
             {
-                operation.Summary = "Downloads one patient's MeasureReport for a report type as an ndjson file.";
+                operation.Summary = "Downloads one patient's generated report for a report type.";
                 operation.Description =
-                    "Carries the MeasureReport resource and its evaluated-resource references only -- " +
-                    "Report exposes no operation that returns the underlying clinical resources' " +
-                    "content, so the Patient/Encounter/MedicationRequest bodies those references " +
-                    "point to are not included.";
+                    "Streams the ndjson bundle Report itself generated and stored -- the per-measure " +
+                    "report when one has been recorded for this report type, falling back to the " +
+                    "patient's whole aggregate report otherwise. Not found when Report has no entry " +
+                    "for this patient, no report blob recorded yet, or the blob itself is missing.";
                 return operation;
             });
 

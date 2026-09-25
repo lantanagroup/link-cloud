@@ -11,6 +11,7 @@ public sealed class ReportingService : IReportingService
 {
     private readonly IFacilityGateway _facilityGateway;
     private readonly IReportGateway _reportGateway;
+    private readonly IReportBlobStorageClient _reportBlobStorageClient;
     private readonly IDataAcquisitionGateway _dataAcquisitionGateway;
     private readonly IAcknowledgementService _acknowledgementService;
     private readonly IValidationGateway _validationGateway;
@@ -20,6 +21,7 @@ public sealed class ReportingService : IReportingService
     public ReportingService(
         IFacilityGateway facilityGateway,
         IReportGateway reportGateway,
+        IReportBlobStorageClient reportBlobStorageClient,
         IDataAcquisitionGateway dataAcquisitionGateway,
         IAcknowledgementService acknowledgementService,
         IValidationGateway validationGateway,
@@ -28,6 +30,7 @@ public sealed class ReportingService : IReportingService
     {
         _facilityGateway = facilityGateway;
         _reportGateway = reportGateway;
+        _reportBlobStorageClient = reportBlobStorageClient;
         _dataAcquisitionGateway = dataAcquisitionGateway;
         _acknowledgementService = acknowledgementService;
         _validationGateway = validationGateway;
@@ -124,35 +127,25 @@ public sealed class ReportingService : IReportingService
     public Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default) =>
         _dataAcquisitionGateway.GetReportSummaryAsync(reportId, cancellationToken);
 
-    public async Task<MeasureReportResource?> GetPatientMeasureReportResourceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
+    public async Task<PatientReportDownload?> GetPatientReportDownloadAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
     {
-        var export = await _reportGateway.GetPatientMeasureReportExportAsync(reportId, patientId, reportType, cancellationToken);
-        if (export is null)
+        var reference = await _reportGateway.GetPatientReportBlobReferenceAsync(reportId, patientId, reportType, cancellationToken);
+        if (reference is null)
         {
             return null;
         }
 
-        return new MeasureReportResource
+        var content = await _reportBlobStorageClient.DownloadAsync(reference.Uri, cancellationToken);
+        if (content is null)
         {
-            Id = export.MeasureReportId ?? $"{reportId}-{patientId}-{reportType}",
-            Measure = export.ReportType,
-            Date = DateTime.UtcNow.ToString("O"),
-            Reporter = _userContext.FacilityName is null ? null : new MeasureReportReporter {Display = _userContext.FacilityName},
-            Period = export.PeriodStart is null || export.PeriodEnd is null
-                ? null
-                : new MeasureReportPeriod
-                {
-                    Start = export.PeriodStart.Value.ToString("yyyy-MM-dd"),
-                    End = export.PeriodEnd.Value.ToString("yyyy-MM-dd")
-                },
-            Subject = new MeasureReportReference {Reference = $"Patient/{patientId}"},
-            EvaluatedResource = export.EvaluatedResources
-                .Select(resource => new MeasureReportReference {Reference = $"{resource.ResourceType}/{resource.ResourceId}"})
-                .ToArray(),
-            Extension =
-            [
-                new MeasureReportExtension {Url = "urn:nhsn-link:reportingStatus", ValueString = export.ReportingStatus}
-            ]
+            return null;
+        }
+
+        return new PatientReportDownload
+        {
+            Content = content,
+            ContentType = "application/x-ndjson",
+            FileName = reference.FileName
         };
     }
 

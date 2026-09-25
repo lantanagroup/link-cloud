@@ -45,9 +45,10 @@ public interface IReportGateway
     Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Reads one patient's measure-report data and evaluated-resource references for the given
-    /// report type, for the patient report download -- or null when Report has no entry, or no
-    /// measure report of that type, for this patient.
+    /// Resolves the blob storage location of one patient's generated report for a report type --
+    /// the per-measure report if one has been recorded, falling back to the patient's whole
+    /// aggregate report otherwise -- or null when Report has no entry for this patient, or no
+    /// report URI recorded yet (not through submission).
     /// </summary>
-    Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
+    Task<PatientReportBlobReference?> GetPatientReportBlobReferenceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
 }
