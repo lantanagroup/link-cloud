@@ -155,16 +155,51 @@ public class FhirAuthenticationConfigurationControllerTests
         _serviceMock.Verify(s => s.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    /// <summary>
+    /// Sanitising strips characters rather than failing, so "fac!ility@1" would become "facility1".
+    /// On an endpoint that reads and overwrites credentials that is an identity change: the caller
+    /// would be served a different facility than the one they named. It has to be a 400.
+    /// </summary>
+    [Theory]
+    [InlineData("fac!ility@1")]
+    [InlineData("facility/1")]
+    [InlineData("facility 1<b>")]
+    public async Task GetFhirAuthenticationConfiguration_FacilityIdThatSanitisingWouldChange_ReturnsBadRequest(
+        string facilityId)
+    {
+        var response = await _controller.GetFhirAuthenticationConfiguration(facilityId, CancellationToken.None);
+
+        AssertProblem(response, StatusCodes.Status400BadRequest);
+        _serviceMock.Verify(s => s.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
-    public async Task GetFhirAuthenticationConfiguration_SanitizesTheFacilityIdBeforeCallingTheService()
+    public async Task CreateOrUpdateFhirAuthenticationConfiguration_FacilityIdThatSanitisingWouldChange_ReturnsBadRequest()
+    {
+        var response = await _controller.CreateOrUpdateFhirAuthenticationConfiguration("fac!ility@1",
+                                                                                       CreateRequest(),
+                                                                                       CancellationToken.None);
+
+        AssertProblem(response, StatusCodes.Status400BadRequest);
+        _serviceMock.Verify(s => s.CreateOrUpdateAsync(It.IsAny<string>(),
+                                                       It.IsAny<FhirAuthenticationConfigurationRequest>(),
+                                                       It.IsAny<CancellationToken>()),
+                            Times.Never);
+    }
+
+    /// <summary>
+    /// A facility id that sanitising leaves alone is passed through untouched.
+    /// </summary>
+    [Fact]
+    public async Task GetFhirAuthenticationConfiguration_AcceptableFacilityId_ReachesTheServiceUnchanged()
     {
         _serviceMock
             .Setup(s => s.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateResponse());
 
-        await _controller.GetFhirAuthenticationConfiguration("fac!ility@1", CancellationToken.None);
+        await _controller.GetFhirAuthenticationConfiguration("Facility_01.a-B", CancellationToken.None);
 
-        _serviceMock.Verify(s => s.GetAsync("facility1", It.IsAny<CancellationToken>()), Times.Once);
+        _serviceMock.Verify(s => s.GetAsync("Facility_01.a-B", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>

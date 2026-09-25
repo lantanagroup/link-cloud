@@ -64,7 +64,7 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
             throw new BadRequestException("FacilityId is required.");
         }
 
-        var stored = await _fhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, ct);
+        var stored = (await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, ct))?.Authentication;
 
         if (!IsGenericOAuth(stored))
         {
@@ -98,7 +98,16 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
             throw new BadRequestException("A configuration is required.");
         }
 
-        var stored = await _fhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, ct);
+        // The row has to exist before anything else is decided: the manager's own check fires too late,
+        // after the secrets are written. See docs/other-vendor-oauth-configuration.md.
+        var queryConfiguration = await _fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, ct);
+
+        if (queryConfiguration is null)
+        {
+            throw new NotFoundException("No FHIR query configuration exists for this facility.");
+        }
+
+        var stored = queryConfiguration.Authentication;
         var storedSecretName = IsGenericOAuth(stored) ? stored!.ClientSecret : null;
         var replacingSecret = !string.IsNullOrWhiteSpace(request.ClientSecret);
 
@@ -115,8 +124,8 @@ public class FhirAuthenticationConfigurationService : IFhirAuthenticationConfigu
             ? BuildSecretName(facilityId, ClientSecretSuffix)
             : storedSecretName!;
 
-        // The secrets are written before the row so that the row never points at a name that was never
-        // written. The reverse would leave acquisition unable to resolve the credentials.
+        // Secrets before the row, so the row never points at a name that was never written. The window
+        // this leaves on a repeat write is deliberate. See docs/other-vendor-oauth-configuration.md.
         await WriteSecretAsync(clientIdName, request.ClientId.Trim(), ct);
 
         if (replacingSecret)

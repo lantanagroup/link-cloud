@@ -51,7 +51,7 @@ public class FhirAuthenticationConfigurationController : ControllerBase
     {
         try
         {
-            var facilityIdSafe = Sanitize(facilityId);
+            var facilityIdSafe = Validated(facilityId);
 
             var result = await _fhirAuthenticationConfigurationService.GetAsync(facilityIdSafe, cancellationToken);
 
@@ -111,7 +111,7 @@ public class FhirAuthenticationConfigurationController : ControllerBase
     {
         try
         {
-            var facilityIdSafe = Sanitize(facilityId);
+            var facilityIdSafe = Validated(facilityId);
 
             var result = await _fhirAuthenticationConfigurationService.CreateOrUpdateAsync(facilityIdSafe,
                                                                                            request,
@@ -148,16 +148,27 @@ public class FhirAuthenticationConfigurationController : ControllerBase
         }
     }
 
-    private static string Sanitize(string? input)
+    /// <summary>
+    /// Validates the facility id rather than repairing it. <c>SanitizeAndRemove</c> strips characters
+    /// instead of failing, so "fac!ility@1" becomes "facility1" - on an endpoint that reads and
+    /// overwrites credentials, that would serve or overwrite a different facility than the caller
+    /// named. See docs/other-vendor-oauth-configuration.md.
+    /// </summary>
+    private static string Validated(string? facilityId)
     {
-        var inputSafe = HtmlInputSanitizer.SanitizeAndRemove(input ?? string.Empty);
+        var sanitized = HtmlInputSanitizer.SanitizeAndRemove(facilityId ?? string.Empty);
 
-        if (string.IsNullOrWhiteSpace(inputSafe))
+        if (string.IsNullOrWhiteSpace(sanitized))
         {
             throw new BadRequestException("FacilityId is required.");
         }
 
-        return inputSafe;
+        if (!string.Equals(sanitized, facilityId, StringComparison.Ordinal))
+        {
+            throw new BadRequestException("FacilityId contains characters that are not allowed.");
+        }
+
+        return sanitized;
     }
 
     /// <summary>

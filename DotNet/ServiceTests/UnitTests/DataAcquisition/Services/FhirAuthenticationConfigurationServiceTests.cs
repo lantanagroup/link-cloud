@@ -1,6 +1,7 @@
 using Azure;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -67,11 +68,24 @@ public class FhirAuthenticationConfigurationServiceTests
         Scope = Scope
     };
 
+    /// <summary>
+    /// The facility has a FHIR query configuration row, carrying the given authentication (or none).
+    /// </summary>
     private void StoredConfiguration(AuthenticationConfigurationModel? stored)
     {
         _queries
-            .Setup(x => x.GetAuthenticationConfigurationByFacilityId(FacilityId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(stored);
+            .Setup(x => x.GetByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = FacilityId, Authentication = stored });
+    }
+
+    /// <summary>
+    /// The facility has no FHIR query configuration row at all.
+    /// </summary>
+    private void NoConfigurationRow()
+    {
+        _queries
+            .Setup(x => x.GetByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FhirQueryConfigurationModel)null!);
     }
 
     private void SecretResolvesTo(string secretName, string? value)
@@ -327,23 +341,55 @@ public class FhirAuthenticationConfigurationServiceTests
     }
 
     /// <summary>
-    /// The manager raises NotFoundException when the facility has no FHIR query configuration row to
-    /// attach authentication to. That is the endpoint's 404, and it must not look like a success.
+    /// No FHIR query configuration row means there is nothing to attach authentication to. The check
+    /// has to happen before the vault writes, or a 404 leaves the facility's credentials behind in the
+    /// secret manager with no configuration referencing them.
     /// </summary>
     [Fact]
-    public async Task CreateOrUpdateAsync_NoFhirQueryConfigurationRow_PropagatesNotFoundAndSkipsTheCacheEviction()
+    public async Task CreateOrUpdateAsync_NoFhirQueryConfigurationRow_ThrowsNotFoundAndWritesNothing()
     {
-        StoredConfiguration(null);
-        _manager
-            .Setup(x => x.UpdateAuthenticationConfiguration(FacilityId,
-                                                            It.IsAny<AuthenticationConfiguration>(),
-                                                            It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new NotFoundException("No configuration found for facilityId: test-facility."));
+        NoConfigurationRow();
 
         await Assert.ThrowsAsync<NotFoundException>(
             () => CreateService().CreateOrUpdateAsync(FacilityId, CreateRequest(), CancellationToken.None));
 
+        _secretManager.Verify(x => x.SetSecretAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                              Times.Never);
+        _manager.Verify(x => x.UpdateAuthenticationConfiguration(It.IsAny<string>(),
+                                                                 It.IsAny<AuthenticationConfiguration>(),
+                                                                 It.IsAny<CancellationToken>()),
+                        Times.Never);
         _cacheService.Verify(x => x.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    /// <summary>
+    /// The same missing row, but with no secret supplied. Without the row check this answered the
+    /// ClientSecret 400, telling the caller to send a secret when the real problem is that the facility
+    /// has no configuration at all.
+    /// </summary>
+    [Fact]
+    public async Task CreateOrUpdateAsync_NoFhirQueryConfigurationRowAndNoSecretSupplied_ThrowsNotFoundNotBadRequest()
+    {
+        NoConfigurationRow();
+        var request = CreateRequest();
+        request.ClientSecret = null;
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => CreateService().CreateOrUpdateAsync(FacilityId, request, CancellationToken.None));
+
+        _secretManager.Verify(x => x.SetSecretAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                              Times.Never);
+    }
+
+    /// <summary>
+    /// A missing row reads as no configuration, which the controller answers with a 404.
+    /// </summary>
+    [Fact]
+    public async Task GetAsync_NoFhirQueryConfigurationRow_ReturnsNull()
+    {
+        NoConfigurationRow();
+
+        Assert.Null(await CreateService().GetAsync(FacilityId, CancellationToken.None));
     }
 
     [Theory]
@@ -398,8 +444,8 @@ public class FhirAuthenticationConfigurationServiceTests
     {
         var queries = new Mock<IFhirQueryConfigurationQueries>();
         queries
-            .Setup(x => x.GetAuthenticationConfigurationByFacilityId(facilityId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((AuthenticationConfigurationModel?)null);
+            .Setup(x => x.GetByFacilityIdAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = facilityId });
 
         var names = new List<string>();
         var secretManager = new Mock<ISecretManager>();
