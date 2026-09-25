@@ -41,8 +41,12 @@ public interface IReportingService
     /// <summary>Reads DataAcquisition's own summary counts for this report, for the export action.</summary>
     Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default);
 
-    /// <summary>Builds the synthetic FHIR MeasureReport resource for one patient's report-type export.</summary>
-    Task<MeasureReportResource?> GetPatientMeasureReportResourceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Downloads the real report Report generated and stored for one patient's report type -- the
+    /// per-measure report when one exists, falling back to the patient's whole aggregate report --
+    /// or null when Report has no entry, no report blob recorded, or the blob itself is missing.
+    /// </summary>
+    Task<PatientReportDownload?> GetPatientReportDownloadAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The most recently recorded report-accuracy acknowledgement for this report, or null when

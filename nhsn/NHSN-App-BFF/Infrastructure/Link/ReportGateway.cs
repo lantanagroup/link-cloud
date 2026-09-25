@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
@@ -7,17 +8,22 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link;
 
-// IReportGateway over LinkSdk's IReportServiceClient.
+// IReportGateway over LinkSdk's IReportServiceClient, plus IReportRawClient for the one route
+// whose fields the typed client drops (see IReportRawClient).
 internal sealed class ReportGateway : IReportGateway
 {
     private const string ServiceName = "Report";
 
+    private static readonly JsonSerializerOptions JsonOptions = new() {PropertyNameCaseInsensitive = true};
+
     private readonly IReportServiceClient _reportClient;
+    private readonly IReportRawClient _reportRawClient;
     private readonly IReportingPlanGateway _reportingPlanGateway;
 
-    public ReportGateway(IReportServiceClient reportClient, IReportingPlanGateway reportingPlanGateway)
+    public ReportGateway(IReportServiceClient reportClient, IReportRawClient reportRawClient, IReportingPlanGateway reportingPlanGateway)
     {
         _reportClient = reportClient;
+        _reportRawClient = reportRawClient;
         _reportingPlanGateway = reportingPlanGateway;
     }
 
@@ -236,38 +242,45 @@ internal sealed class ReportGateway : IReportGateway
         };
     }
 
-    public async Task<PatientMeasureReportExport?> GetPatientMeasureReportExportAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
+    public async Task<PatientReportBlobReference?> GetPatientReportBlobReferenceAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
     {
-        var entryResponse = await _reportClient.GetEntryByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
-        var entry = LinkResponseHandler.Optional(entryResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync));
-        var measureReport = entry?.MeasureReports.FirstOrDefault(report => report.ReportType == reportType);
-        if (entry is null || measureReport is null)
+        var raw = await _reportRawClient.GetEntryDetailRawAsync(reportId, patientId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(raw))
         {
             return null;
         }
 
-        var resourcesResponse = await _reportClient.GetResourcesByScheduleAndPatientAsync(reportId, patientId, cancellationToken);
-        var resources = LinkResponseHandler.Optional(resourcesResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync)) ?? [];
-
-        var scheduleResponse = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
-        var schedule = LinkResponseHandler.Optional(scheduleResponse, ServiceName, nameof(GetPatientMeasureReportExportAsync));
-
-        return new PatientMeasureReportExport
+        var entry = JsonSerializer.Deserialize<EntryDetailWire>(raw, JsonOptions);
+        var uri = entry?.MeasureReports?.FirstOrDefault(report => report.ReportType == reportType)?.MeasureReportUri;
+        if (string.IsNullOrWhiteSpace(uri))
         {
-            PatientId = patientId,
-            ReportType = reportType,
-            MeasureReportId = measureReport.MeasureReportId,
-            ReportingStatus = entry.ReportingStatus.ToString(),
-            PeriodStart = schedule?.ReportStartDate,
-            PeriodEnd = schedule?.ReportEndDate,
-            ResourceCountsByType = measureReport.ResourceCount,
-            EvaluatedResources = resources
-                .Where(resource => resource.MeasureReportId == measureReport.MeasureReportId)
-                .Select(resource => new EvaluatedResourceReference {ResourceType = resource.ResourceType, ResourceId = resource.ResourceId})
-                .ToList()
+            uri = entry?.AggregateReportUri;
+        }
+
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return null;
+        }
+
+        return new PatientReportBlobReference
+        {
+            Uri = uri,
+            FileName = new Uri(uri).Segments[^1]
         };
     }
 
     private static bool IsMapped(MappingIndicatorStatus status) =>
         status is MappingIndicatorStatus.Mapped or MappingIndicatorStatus.PartiallyMapped or MappingIndicatorStatus.Assumed;
+
+    private sealed record EntryDetailWire
+    {
+        public string? AggregateReportUri { get; init; }
+        public List<MeasureReportWire>? MeasureReports { get; init; }
+    }
+
+    private sealed record MeasureReportWire
+    {
+        public string? ReportType { get; init; }
+        public string? MeasureReportUri { get; init; }
+    }
 }
