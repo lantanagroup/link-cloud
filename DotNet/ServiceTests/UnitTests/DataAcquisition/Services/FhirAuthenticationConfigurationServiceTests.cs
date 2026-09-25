@@ -88,19 +88,6 @@ public class FhirAuthenticationConfigurationServiceTests
             .ThrowsAsync(new RequestFailedException(404, "Secret not found."));
     }
 
-    private AuthenticationConfiguration CaptureSavedConfiguration()
-    {
-        AuthenticationConfiguration? saved = null;
-        _manager
-            .Setup(x => x.UpdateAuthenticationConfiguration(FacilityId,
-                                                            It.IsAny<AuthenticationConfiguration>(),
-                                                            It.IsAny<CancellationToken>()))
-            .Callback<string, AuthenticationConfiguration, CancellationToken>((_, config, _) => saved = config)
-            .ReturnsAsync(new AuthenticationConfigurationModel());
-
-        return saved ??= new AuthenticationConfiguration();
-    }
-
     // ---- CreateOrUpdateAsync: the happy path ----
 
     [Fact]
@@ -472,6 +459,10 @@ public class FhirAuthenticationConfigurationServiceTests
         Assert.True(response.ClientSecretStored);
     }
 
+    /// <summary>
+    /// The configuration still exists, so it is returned. ClientSecretStored is what tells the caller
+    /// the secret is missing.
+    /// </summary>
     [Fact]
     public async Task GetAsync_SecretManagerReturnsNull_ReportsTheSecretAsNotStored()
     {
@@ -481,6 +472,7 @@ public class FhirAuthenticationConfigurationServiceTests
 
         var response = await CreateService().GetAsync(FacilityId, CancellationToken.None);
 
+        Assert.NotNull(response);
         Assert.False(response!.ClientSecretStored);
     }
 
@@ -497,6 +489,7 @@ public class FhirAuthenticationConfigurationServiceTests
 
         var response = await CreateService().GetAsync(FacilityId, CancellationToken.None);
 
+        Assert.NotNull(response);
         Assert.False(response!.ClientSecretStored);
     }
 
