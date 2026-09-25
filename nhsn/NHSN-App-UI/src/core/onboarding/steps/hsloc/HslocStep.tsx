@@ -300,6 +300,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
         prev.map((row, index) => (incompleteRowIndexes.includes(index) ? {...row, dirty: ALL_DIRTY} : row))
       );
     }
+    // The problem is always in a mapping row, so a Continue from the Reference tab jumps back to
+    // Mapping - otherwise the message (only rendered there) and the flagged fields would stay hidden.
+    setTab('mapping');
     announceValidationMessage(message);
     return false;
   }
@@ -544,7 +547,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
       <div aria-live="off">
         <p className="nhsn-link__form-error" role="alert">
-          {validationError && <AcronymText>{validationError}</AcronymText>}
+          {/* About the mapping rows, so it's only shown alongside them - not on the Reference tab. */}
+          {tab === 'mapping' && validationError && <AcronymText>{validationError}</AcronymText>}
         </p>
       </div>
     </div>
