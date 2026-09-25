@@ -91,6 +91,7 @@
     }
   },
   "a11y": {
-    "opensInNewTab": "(opens in a new tab)"
+    "opensInNewTab": "(opens in a new tab)",
+    "alert": "Alert:"
   }
 }

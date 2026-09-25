@@ -151,9 +151,6 @@ export function ReportListView({
       </p>
 
       <div className="nhsn-link__report-results-actions">
-        <Button variant="secondary" onClick={onBack} disabled={saving}>
-          {t('common:actions.back')}
-        </Button>
         <Button onClick={handleGenerateNew} disabled={saving || loading}>
           {t('onboarding:reportResults.actions.generateNewReport')}
         </Button>

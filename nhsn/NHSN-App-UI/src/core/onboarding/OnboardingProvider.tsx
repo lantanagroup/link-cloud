@@ -25,6 +25,21 @@ import {createEmptyDraft, migrateDraft, type FacilityDraft, type StepId, type St
 
 type LoadState = 'loading' | 'ready' | 'error';
 
+/**
+ * A step whose editable data doesn't live in `FacilityDraft` (it's normalized server-side, saved
+ * through its own endpoint - currently only MrnIntakeStep) registers one of these so the unsaved-
+ * changes guard (`goTo`, driving both the sidebar and Back) still knows about it: `patch()`'s
+ * `dirtyRef` alone would never see this step's edits, so without this the guard would let the user
+ * navigate away, and "Save and Continue" would have nothing of this step's own to save.
+ */
+export interface StepUnsavedChanges {
+  isDirty: () => boolean;
+  /** Resolves false (after showing its own error) if the save failed - navigation is cancelled. */
+  save: () => Promise<boolean>;
+  /** Reverts the step's local state to what `save` last wrote (or what it loaded, if never saved). */
+  discard: () => void;
+}
+
 // Maps a BFF ProblemDetails errorCode (HttpError.errorCode) to a translation key, so a save
 // rejection shows a localized message instead of the BFF's English-only Detail text. Codes with no
 // entry here fall back to that raw Detail - see persistDraft below.
@@ -65,6 +80,7 @@ interface OnboardingContextValue {
   reloadDraft: () => Promise<void>;
   dispatch: React.Dispatch<DraftAction>;
   registerStepValidator: (validate: (() => boolean) | null) => void;
+  registerStepUnsavedChanges: (handler: StepUnsavedChanges | null) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -89,6 +105,18 @@ export function useStepValidator(validate: () => boolean) {
     registerStepValidator(stableValidate);
     return () => registerStepValidator(null);
   }, [registerStepValidator, stableValidate]);
+}
+
+/** See `StepUnsavedChanges` - only a step whose data isn't part of `FacilityDraft` needs this. */
+export function useStepUnsavedChanges(handler: StepUnsavedChanges) {
+  const {registerStepUnsavedChanges} = useOnboarding();
+  const stableIsDirty = useStableCallback(handler.isDirty);
+  const stableSave = useStableCallback(handler.save);
+  const stableDiscard = useStableCallback(handler.discard);
+  useEffect(() => {
+    registerStepUnsavedChanges({isDirty: stableIsDirty, save: stableSave, discard: stableDiscard});
+    return () => registerStepUnsavedChanges(null);
+  }, [registerStepUnsavedChanges, stableIsDirty, stableSave, stableDiscard]);
 }
 
 export function OnboardingProvider({
@@ -128,6 +156,7 @@ export function OnboardingProvider({
   const dirtyRef = useRef(false);
   const lastSavedDraftRef = useRef<FacilityDraft>();
   const activeValidatorRef = useRef<(() => boolean) | null>(null);
+  const stepUnsavedRef = useRef<StepUnsavedChanges | null>(null);
   const [pendingStepId, setPendingStepId] = useState<StepId | null>(null);
   const [errorStepIds, setErrorStepIdsState] = useState<ReadonlySet<StepId>>(() => new Set());
 
@@ -137,6 +166,10 @@ export function OnboardingProvider({
 
   const registerStepValidator = useCallback((validate: (() => boolean) | null) => {
     activeValidatorRef.current = validate;
+  }, []);
+
+  const registerStepUnsavedChanges = useCallback((handler: StepUnsavedChanges | null) => {
+    stepUnsavedRef.current = handler;
   }, []);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
@@ -297,10 +330,14 @@ export function OnboardingProvider({
             const translationKey = cause instanceof HttpError && cause.errorCode
               ? SAVE_ERROR_CODE_KEYS[cause.errorCode]
               : undefined;
+            // Only an HttpError's message is written for a facility to read (it's the BFF's own
+            // ProblemDetails detail/title). Anything else - a TimeoutError, a network drop - is a
+            // raw technical string (e.g. "Request timed out after 30000ms."), so it falls back to
+            // the same generic, friendly message a non-Error rejection already gets.
             notifyError(
               translationKey
                 ? t(translationKey)
-                : cause instanceof Error
+                : cause instanceof HttpError
                   ? cause.message
                   : t('errors.saveFailed')
             );
@@ -347,7 +384,7 @@ export function OnboardingProvider({
 
   const goTo = useCallback(
     (stepId: StepId) => {
-      if (dirtyRef.current) {
+      if (dirtyRef.current || Boolean(stepUnsavedRef.current?.isDirty())) {
         setPendingStepId(stepId);
         return;
       }
@@ -366,10 +403,17 @@ export function OnboardingProvider({
       notifyError(t('unsavedChanges.messages.incomplete'));
       return;
     }
-    persistDraft(draft).then(saved => {
-      if (saved) {
-        completeGoTo(stepId);
+    const stepHandler = stepUnsavedRef.current;
+    const stepSaved = stepHandler ? stepHandler.save() : Promise.resolve(true);
+    stepSaved.then(ok => {
+      if (!ok) {
+        return;
       }
+      persistDraft(draft).then(saved => {
+        if (saved) {
+          completeGoTo(stepId);
+        }
+      });
     });
   }, [pendingStepId, draft, persistDraft, completeGoTo, notifyError, t]);
 
@@ -379,6 +423,7 @@ export function OnboardingProvider({
     }
     const stepId = pendingStepId;
     setPendingStepId(null);
+    stepUnsavedRef.current?.discard();
     const savedContent = lastSavedDraftRef.current;
     // Only the section fields the user just edited are "dirty" -- which steps are
     // unlocked never goes through patch(), so it never gets saved on a transition that
@@ -491,7 +536,8 @@ export function OnboardingProvider({
       closeView,
       reloadDraft,
       dispatch,
-      registerStepValidator
+      registerStepValidator,
+      registerStepUnsavedChanges
     }),
     [
       loadState,
@@ -516,6 +562,7 @@ export function OnboardingProvider({
       openView,
       closeView,
       registerStepValidator,
+      registerStepUnsavedChanges,
       reloadDraft
     ]
   );

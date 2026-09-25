@@ -459,11 +459,6 @@
   background: #eaf2fc;
 }
 
-.encounter-mapping .encounter-table-scroll:focus,
-.encounter-mapping .encounter-table-scroll:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 2px;
-}
 
 @container (max-width: 780px) {
   .encounter-mapping .encounter-reference-layout {

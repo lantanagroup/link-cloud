@@ -640,8 +640,16 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
 
   useEffect(() => () => window.clearTimeout(blurTimeout.current), []);
 
+  // Reopening an existing selection leaves `query` holding the full resolved label (badge + code
+  // + display), which is never a substring of any single code's own raw fields - filtering by it
+  // verbatim would always come back empty. Treat that unchanged-since-open value as no search yet,
+  // so reopening shows the whole list (with the current selection browsable in it) instead of "No
+  // matching codes." The moment the facility types something new, query moves past this and normal
+  // filtering resumes.
+  const effectiveQuery = selected && query === referenceLabel(selected) ? '' : query;
+
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = effectiveQuery.trim().toLowerCase();
     const pool = !q
       ? referenceCodes
       : referenceCodes.filter(code =>
@@ -650,7 +658,7 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
             .includes(q)
         );
     return pool.slice(0, 25);
-  }, [referenceCodes, query]);
+  }, [referenceCodes, effectiveQuery]);
 
   useEffect(() => {
     setHighlightedIndex(open && matches.length > 0 ? 0 : -1);
@@ -741,6 +749,16 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
             onBlur={() => {
               blurTimeout.current = window.setTimeout(() => {
                 setOpen(false);
+                // An emptied field is a deliberate clear, not an abandoned edit - leave it
+                // empty (and drop the row's target code with it) instead of snapping back to
+                // whatever was selected before.
+                if (!query.trim()) {
+                  if (selected) {
+                    onChange({targetSystem: '', targetCode: '', targetDisplay: ''});
+                  }
+                  setQuery('');
+                  return;
+                }
                 setQuery(selected ? referenceLabel(selected) : '');
               }, 150);
             }} />
@@ -766,7 +784,7 @@ function MappingRow({row, referenceCodes, incomplete, showValidation, onChange, 
                       selectMatch(code);
                     }}>
                     <span className="encounter-code-option-system">{systemBadgeLabel(code.system)}</span>{' '}
-                    <span className="encounter-code-option-code">{code.code}</span> — {code.display}
+                    <span className="encounter-code-option-code">{code.code}</span> {code.display}
                   </div>
                 ))
               )}
@@ -809,7 +827,7 @@ function systemBadgeLabel(system: string): string {
 function referenceLabel(code: EncounterCode): string {
   // Shown as the picker's query text once a code is selected — the short mnemonic (CPT/SNOMED)
   // reads far better there than the FHIR canonical url code.system actually holds.
-  return `${systemBadgeLabel(code.system)} ${code.code} — ${code.display}`;
+  return `${systemBadgeLabel(code.system)} ${code.code} ${code.display}`;
 }
 
 /** Exported for the Report Details "Encounter Mapping" modal, which encodes a new mapping's target the same way. */

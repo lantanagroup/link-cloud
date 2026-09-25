@@ -1,4 +1,4 @@
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AcronymText, NHSNLoadingIndicator, PageHeader } from '../fields';
 import { getStep, visibleSteps } from './flow';
@@ -63,6 +63,16 @@ export function StepHost() {
   const { t } = useTranslation(['onboarding', 'common']);
   const { loadState, error, target } = useOnboarding();
   const [chrome, setChrome] = useState<StepChrome | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const previousStepId = useRef(target.stepId);
+
+  // Moves focus into the new step's content when the Step Rail navigates here, so Tab continues in-page instead of falling out to browser.
+  useEffect(() => {
+    if (previousStepId.current !== target.stepId) {
+      previousStepId.current = target.stepId;
+      panelRef.current?.focus();
+    }
+  }, [target.stepId]);
 
   if (loadState === 'loading') {
     return <NHSNLoadingIndicator />;
@@ -79,7 +89,7 @@ export function StepHost() {
   const step = getStep(target.stepId);
 
   return (
-    <section className="nhsn-link__step-panel" aria-live="polite">
+    <section className="nhsn-link__step-panel" aria-live="polite" tabIndex={-1} ref={panelRef}>
       {step ? (
         <div className={chrome ? 'nhsn-link__content' : 'nhsn-link__content nhsn-link__content--bare'}>
           {chrome && <PageHeader title={chrome.title} />}
