@@ -104,6 +104,7 @@
   },
   "a11y": {
     "opensInNewTab": "(se abre en una pestaña nueva)",
-    "table": "Tabla"
+    "table": "Tabla",
+    "alert": "Alerta:"
   }
 }

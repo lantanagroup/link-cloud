@@ -193,18 +193,20 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
               fileName: importSummary.fileName
             })}
       </p>
-      <p className="nhsn-link__visually-hidden" role="alert">
-        {error && <AcronymText>{error.join(' ')}</AcronymText>}
-      </p>
-      {error && error.length > 0 && (
-        <MessageContainer type="error" showIcon>
-          <ul className="nhsn-link__error-list">
-            {error.map((line, index) => (
-              <li key={index}><AcronymText>{line}</AcronymText></li>
-            ))}
-          </ul>
-        </MessageContainer>
-      )}
+      <div aria-live="off">
+        <p className="nhsn-link__visually-hidden" role="alert">
+          {error && <AcronymText>{`${t('common:a11y.alert')} ${error.join(' ')}`}</AcronymText>}
+        </p>
+        {error && error.length > 0 && (
+          <MessageContainer type="error" showIcon>
+            <ul className="nhsn-link__error-list">
+              {error.map((line, index) => (
+                <li key={index}><AcronymText>{line}</AcronymText></li>
+              ))}
+            </ul>
+          </MessageContainer>
+        )}
+      </div>
     </div>
   );
 }
