@@ -187,7 +187,7 @@ public static class FacilitySetupHelper
         return new VendorModel { Name = vendorName.Trim() };
     }
 
-    public static async Task EnsureFacilityAsync(
+    public static async Task<bool> EnsureFacilityAsync(
         IFacilityServiceClient facilityClient,
         IDmrpServiceClient dmrpClient,
         IAutomationOutput output,
@@ -197,7 +197,7 @@ public static class FacilitySetupHelper
         string? vendorName = null,
         bool vendorExplicit = false)
     {
-        await EnsureFacilityAsync(facilityClient, dmrpClient, output, facilityId,
+        return await EnsureFacilityAsync(facilityClient, dmrpClient, output, facilityId,
             measureId != null ? [measureId] : [], cancellationToken, vendorName, vendorExplicit);
     }
 
@@ -213,7 +213,8 @@ public static class FacilitySetupHelper
     /// letting Tenant derive it. Both paths leave the same monthly schedule behind, which is what the
     /// rest of the run and the tenant database validator expect.
     /// </remarks>
-    public static async Task EnsureFacilityAsync(
+    /// <returns>True when this call created the facility. False when it already existed.</returns>
+    public static async Task<bool> EnsureFacilityAsync(
         IFacilityServiceClient facilityClient,
         IDmrpServiceClient dmrpClient,
         IAutomationOutput output,
@@ -221,7 +222,8 @@ public static class FacilitySetupHelper
         List<string> measureIds,
         CancellationToken cancellationToken = default,
         string? vendorName = null,
-        bool vendorExplicit = false)
+        bool vendorExplicit = false,
+        Func<Task>? onCreated = null)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
         if (existing.IsSuccessStatusCode && existing.Body != null)
@@ -235,7 +237,7 @@ public static class FacilitySetupHelper
             }
 
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
-            return;
+            return false;
         }
 
         var dmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
@@ -258,6 +260,9 @@ public static class FacilitySetupHelper
                 $"Failed to create facility '{facilityId}'. HTTP {createResponse.StatusCode}: {createResponse.RawBody ?? "(no body)"}");
         }
 
+        if (onCreated != null)
+            await onCreated();
+
         await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
 
         if (dmrpEnabled)
@@ -265,6 +270,8 @@ public static class FacilitySetupHelper
             await EnrollFacilityInDmrpMeasuresAsync(facilityClient, dmrpClient, output, facilityId,
                 measureIds, cancellationToken, vendorName, vendorExplicit);
         }
+
+        return true;
     }
 
     private static TenantScheduledReportConfig MonthlySchedule(IReadOnlyList<string> measureIds) => new()
@@ -828,13 +835,15 @@ public static class FacilitySetupHelper
         output.WriteLine($"Replaced {type} query plan for facility '{facilityId}'.");
     }
 
-    public static async Task EnsureEmptyDmrpFacilityAsync(
+    /// <returns>True when this call created the facility. False when it already existed.</returns>
+    public static async Task<bool> EnsureEmptyDmrpFacilityAsync(
     IFacilityServiceClient facilityClient,
     IAutomationOutput output,
     string facilityId,
     CancellationToken cancellationToken = default,
     string? vendorName = null,
-    bool vendorExplicit = false)
+    bool vendorExplicit = false,
+    Func<Task>? onCreated = null)
     {
         var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
 
@@ -853,7 +862,7 @@ public static class FacilitySetupHelper
                 facilityId,
                 cancellationToken);
 
-            return;
+            return false;
         }
 
         var facility = new FacilityModel
@@ -873,11 +882,15 @@ public static class FacilitySetupHelper
                 $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
         }
 
+        if (onCreated != null)
+            await onCreated();
+
         await WaitForFacilityReadConsistencyAsync(
             facilityClient,
             output,
             facilityId,
             cancellationToken);
+        return true;
     }
 
     public static async Task RefreshDmrpDerivedScheduleAsync(
