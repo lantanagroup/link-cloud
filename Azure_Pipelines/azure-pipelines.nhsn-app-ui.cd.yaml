@@ -1,0 +1,143 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Build_And_Push_All
+    trigger: true
+
+  repositories:
+  - repository: nhsnlink
+    type: git
+    name: nhsnlink
+    ref: refs/heads/main
+
+trigger:
+  branches:
+    include:
+    - nhsn-app-component
+  paths:
+    include:
+    - nhsn/NHSN-App-UI/*
+    exclude:
+    - '*'
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+
+- name: project
+  value: 'nhsn/NHSN-App-UI/NHSN-App-UI.esproj'
+
+- name: registry-repo-name
+  value: 'link-nhsn-app-ui'
+
+- name: dockerPath
+  value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI/Dockerfile'
+
+- name: workingDir
+  value: '$(Pipeline.Workspace)/link-cloud/nhsn/NHSN-App-UI'
+
+- name: reactCorePackage
+  value: '$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz'
+
+steps:
+
+- checkout: self
+  path: link-cloud
+  fetchDepth: 0
+  fetchTags: true
+
+- checkout: nhsnlink
+  path: nhsnlink
+  fetchDepth: 0
+  fetchTags: true
+
+# Install Node.js
+- task: NodeTool@0
+  displayName: 'Install Node.js'
+  inputs:
+    versionSpec: '20.x'
+
+# Get Git commit
+- task: Bash@3
+  inputs:
+    targetType: 'inline'
+    workingDirectory: '$(Pipeline.Workspace)/link-cloud'
+    script: |
+      GIT_COMMIT=$(git rev-parse --short HEAD)
+      echo "GIT_COMMIT: ${GIT_COMMIT}"
+      echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+# - task: PythonScript@0
+#   displayName: "Inject Service Info"
+#   inputs:
+#     scriptSource: 'filePath'
+#     scriptPath: $(Pipeline.Workspace)/link-cloud/Scripts/set_service_info.py
+#     workingDirectory: '$(Pipeline.Workspace)/link-cloud'
+#     arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+
+# Copy into Packages Folder
+- task: Bash@3
+  displayName: 'Copy reactCorePackage in Packages Folder'
+  inputs:
+    targetType: 'inline'
+    script: |
+      mkdir -p "$(workingDir)/packages"
+      cp "$(Pipeline.Workspace)/nhsnlink/nhsn-app-ui/nhsn-react-core-2.4.1.tgz" "$(workingDir)/packages/"
+
+# # Install NPM dependencies
+# - task: Npm@1
+#   displayName: 'npm install'
+#   inputs:
+#     command: 'custom'
+#     workingDir: '$(workingDir)'
+#     customCommand: 'install $(reactCorePackage)'
+
+# # Build NHSN App UI
+# - task: Npm@1
+#   displayName: 'Build NHSN App UI'
+#   inputs:
+#     command: 'custom'
+#     workingDir: '$(workingDir)'
+#     customCommand: 'run build'
+#     verbose: false
+
+# Generate Docker image tag
+- task: PowerShell@2
+  displayName: 'Generate Docker Image Tag'
+  inputs:
+    targetType: 'inline'
+    script: |
+      if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+      }
+      else {
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+      }
+
+      Write-Host "Docker image tag: $myTag1"
+
+      Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+
+# Build and Push Docker Image
+- task: Docker@2
+  displayName: 'Build & Push NHSN-App-UI Docker Image'
+  inputs:
+    containerRegistry: '$(containerRegistry)'
+    repository: '$(registry-repo-name)'
+    command: 'buildAndPush'
+    Dockerfile: '$(dockerPath)'
+    buildContext: '$(workingDir)'
+    tags: |
+      latest
+      $(MyTag)
+
+# Publish Artifact
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish Manifest Artifact'
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)'
+    artifact: 'manifest'

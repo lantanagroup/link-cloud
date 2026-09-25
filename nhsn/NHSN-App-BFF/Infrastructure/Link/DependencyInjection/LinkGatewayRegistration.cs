@@ -1,0 +1,57 @@
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Infrastructure;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Concurrency;
+using LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Storage;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
+using LantanaGroup.Link.Sdk.DependencyInjection;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using LantanaGroup.Link.Shared.Settings;
+
+namespace LantanaGroup.Link.Nhsn.App.Bff.Infrastructure.Link.DependencyInjection;
+
+public static class LinkGatewayRegistration
+{
+    public static IServiceCollection AddLinkGateways(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<ServiceRegistry>(configuration.GetSection(ServiceRegistry.ConfigSectionName));
+        services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+        services.Configure<LinkCapabilitiesSettings>(configuration.GetSection(LinkCapabilitiesSettings.SectionName));
+        services.Configure<FacilityWriteLockSettings>(configuration.GetSection(FacilityWriteLockSettings.SectionName));
+        services.Configure<QueryPlanAutoSeedSettings>(configuration.GetSection(QueryPlanAutoSeedSettings.SectionName));
+        services.Configure<MeasureReportingAutoEnrollSettings>(configuration.GetSection(MeasureReportingAutoEnrollSettings.SectionName));
+        services.Configure<ReportBlobStorageSettings>(configuration.GetSection(ReportBlobStorageSettings.SectionName));
+
+        var allowAnonymous = configuration.GetValue<bool?>("Authentication:AllowAnonymous") ?? false;
+        services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(options =>
+        {
+            options.AllowAnonymous = allowAnonymous;
+        });
+
+        services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
+        services.AddLinkSdk();
+        services.AddHttpClient();
+
+        services.AddScoped<IFacilityGateway, FacilityGateway>();
+        services.AddScoped<IReportingPlanGateway, ReportingPlanGateway>();
+        services.AddScoped<IFhirConfigurationGateway, FhirConfigurationGateway>();
+        services.AddScoped<IOrganizationLocationConfigurationGateway, OrganizationLocationConfigurationGateway>();
+        services.AddSingleton<INormalizationRawClient, NormalizationRawClient>();
+        services.AddSingleton<IValidationRawClient, ValidationRawClient>();
+        services.AddSingleton<IReportRawClient, ReportRawClient>();
+        services.AddSingleton<IReportBlobStorageClient, ReportBlobStorageClient>();
+        services.AddScoped<ICensusConfigurationGateway, CensusConfigurationGateway>();
+        services.AddScoped<IQueryDispatchGateway, QueryDispatchGateway>();
+        services.AddScoped<IReportGateway, ReportGateway>();
+        services.AddScoped<IDataAcquisitionGateway, DataAcquisitionGateway>();
+        services.AddScoped<IValidationGateway, ValidationGateway>();
+        services.AddScoped<IFacilityWriteLock, SqlFacilityWriteLock>();
+        services.AddScoped<ISftpFileGateway, SftpFileGateway>();
+        services.AddScoped<ISftpConfigurationGateway, SftpConfigurationGateway>();
+        services.AddScoped<IPatientListGateway, PatientListGateway>();
+        services.AddScoped<IPatientIdentifierGateway, PatientIdentifierGateway>();
+
+        return services;
+    }
+}

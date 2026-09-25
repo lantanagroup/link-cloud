@@ -1,0 +1,23 @@
+# Build output
+/dist
+/obj
+
+# Dependencies
+/node_modules
+
+# Logs
+npm-debug.log
+yarn-error.log
+
+# IDE/editor
+.idea/
+.vscode/
+
+# Coverage / temp
+/coverage
+/tmp
+
+# Local-only config
+app.config.local.json
+
+packages/

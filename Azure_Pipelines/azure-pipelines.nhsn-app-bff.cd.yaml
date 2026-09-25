@@ -26,9 +26,9 @@ variables:
 # - name: testProject
 #   value: 'DotNet/AccountUnitTests/AccountUnitTests.csproj'
 - name: serviceName
-  value: 'app-bff'
+  value: 'nhsn-app-bff'
 - name: registry-repo-Name
-  value: 'link-app-bff'
+  value: 'link-nhsn-app-bff'
 - name: dockerPath
   value: '**/nhsn/NHSN-App-BFF/Dockerfile'
 - name: projectDir
