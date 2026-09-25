@@ -700,6 +700,7 @@ public static class FhirGenerationPipeline
         IReadOnlyList<string>? measureBundleJsons = null,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
         if (string.IsNullOrWhiteSpace(imported.PatientId))

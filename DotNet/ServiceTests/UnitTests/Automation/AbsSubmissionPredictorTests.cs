@@ -335,6 +335,38 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
+    public async Task Preloaded_import_stops_when_already_canceled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var manifest = new GenerationManifest();
+        var imported = new ImportedPatientInput
+        {
+            Source = ImportedPatientSource.ExistingId,
+            PatientId = "p-cancel",
+            PreLoadedEntries =
+            [
+                new Bundle.EntryComponent
+                {
+                    Resource = new Patient { Id = "p-cancel" },
+                    Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Patient/p-cancel" }
+                }
+            ]
+        };
+
+        var act = async () => await FhirGenerationPipeline.ImportAndAppendPatientAsync(
+            new ConsoleAutomationOutput(),
+            new LantanaGroup.Automation.FhirDataLoader("https://ehr-test.nhsnlink.org/fhir"),
+            manifest,
+            imported,
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        manifest.PatientIds.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Versioned_location_reference_is_read_as_the_logical_id()
     {
         var encounter = new Encounter
