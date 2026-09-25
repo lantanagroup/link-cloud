@@ -52,6 +52,32 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     /// <summary>
+    /// Reads the generic OAuth configuration of a facility whose EHR vendor is "Other":
+    /// <c>GET /api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</c>.
+    /// Returns 404 when the facility has no such configuration. The client secret is never returned;
+    /// <c>clientSecretStored</c> reports whether one is held.
+    /// </summary>
+    public Task<LinkApiResponse> GetFhirAuthenticationConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data-acquisition/facilities/{facilityId}/fhir-authentication-configuration")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// Creates or replaces the generic OAuth configuration of a facility whose EHR vendor is "Other":
+    /// <c>PUT /api/data-acquisition/facilities/{facilityId}/fhir-authentication-configuration</c>.
+    /// Omit the client secret to keep the one already stored.
+    /// </summary>
+    public Task<LinkApiResponse> UpdateFhirAuthenticationConfigurationAsync(
+        string facilityId,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        // The body carries the OAuth client secret, so it must not be copied into LinkApiResponse.RequestBody
+        SendAsync(() => Request($"data-acquisition/facilities/{facilityId}/fhir-authentication-configuration")
+            .PutJsonAsync(request, cancellationToken: cancellationToken),
+            captureRequestBody: false);
+
+    /// <summary>
     /// Facility-scoped FHIR connection probe, run once a facility's FHIR configuration has been
     /// saved: <c>GET /api/data/connectionValidation/{facilityId}/$validate</c>.
     /// </summary>
