@@ -74,8 +74,11 @@ export class BffApiClient implements ApiClient {
     return data;
   }
 
+  // Saving the draft can trigger synchronous downstream work (e.g. re-validating patients-of-
+  // interest configuration) that occasionally runs past the client's default 30s budget on a slow
+  // connection - give it more room than a plain field save needs before giving up.
   async saveDraft(draft: FacilityDraft): Promise<DraftEnvelope> {
-    const {data} = await this.http.put<DraftEnvelope>('/onboarding', draft);
+    const {data} = await this.http.put<DraftEnvelope>('/onboarding', draft, {timeoutMs: 60_000});
     return data;
   }
 

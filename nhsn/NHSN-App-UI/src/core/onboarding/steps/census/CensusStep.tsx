@@ -828,7 +828,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
                             label={t("onboarding:census.epic.listValidatedAria", {
                               list: t(LIST_LABEL_KEYS[key]),
                             })}
-                            content={t("onboarding:census.epic.listValidatedTooltip")}
+                            content={<AcronymText>{t("onboarding:census.epic.listValidatedTooltip")}</AcronymText>}
                           />
                         )}
                         {state?.untested && (

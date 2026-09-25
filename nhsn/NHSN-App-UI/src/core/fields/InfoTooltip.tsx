@@ -4,7 +4,7 @@ export interface InfoTooltipProps {
   /** Already translated: the trigger's accessible name. */
   label: string;
   /** Already translated: the tooltip body. */
-  content: string;
+  content: React.ReactNode;
   /** The trigger's visible glyph. Defaults to "?". */
   icon?: React.ReactNode;
   /** Recolors the trigger for a status other than a plain info hint. Defaults to 'info'. */

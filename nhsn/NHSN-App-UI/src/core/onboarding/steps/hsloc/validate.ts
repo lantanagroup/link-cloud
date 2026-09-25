@@ -29,28 +29,42 @@ export function findIncompleteRowIndexes(rows: MappingRowValues[]): number[] {
 }
 
 /**
-  Two rows mapping the same local code to different HSLOC codes is ambiguous —
- * the save path (HslocMappingService.SaveAsync) groups incoming rows by local code
- * case-insensitively and keeps only one, so an unflagged duplicate here would silently lose
- * a row on save. Blank sourceCode values are excluded; findIncompleteRowIndexes already
- * flags those. Both rows in a colliding pair are returned, not just the second.
+ * Two rows mapping the same local code to different HSLOC codes is ambiguous — the save path
+ * (HslocMappingService.SaveAsync) groups incoming rows by local code case-insensitively and keeps
+ * only one, so an unflagged duplicate here would silently lose a row on save. Blank sourceCode
+ * values are excluded; findIncompleteRowIndexes already flags those. Only the "extra" rows in a
+ * colliding group come back - the row the facility is actively editing is treated as the one that
+ * caused the collision and gets the error, leaving the other, already-there row clean (falls back
+ * to the first row in list order when no row is actively being edited, e.g. on initial load).
+ * Mirrors CensusStep's findDuplicatePatientListIdKeys.
  */
-export function findDuplicateSourceCodeIndexes(rows: MappingRowValues[]): number[] {
-  const firstIndexByCode = new Map<string, number>();
-  const duplicates = new Set<number>();
+export function findDuplicateSourceCodeIndexes(rows: MappingRowValues[], editedIndex?: number): number[] {
+  const indexesByCode = new Map<string, number[]>();
 
   rows.forEach((row, index) => {
     const code = row.sourceCode.trim().toLowerCase();
     if (!code) {
       return;
     }
-    const firstIndex = firstIndexByCode.get(code);
-    if (firstIndex === undefined) {
-      firstIndexByCode.set(code, index);
+    const indexes = indexesByCode.get(code);
+    if (indexes) {
+      indexes.push(index);
+    } else {
+      indexesByCode.set(code, [index]);
+    }
+  });
+
+  const duplicates = new Set<number>();
+  indexesByCode.forEach(indexes => {
+    if (indexes.length < 2) {
       return;
     }
-    duplicates.add(firstIndex);
-    duplicates.add(index);
+    const kept = indexes.find(index => index !== editedIndex) ?? indexes[0];
+    indexes.forEach(index => {
+      if (index !== kept) {
+        duplicates.add(index);
+      }
+    });
   });
 
   return Array.from(duplicates).sort((a, b) => a - b);

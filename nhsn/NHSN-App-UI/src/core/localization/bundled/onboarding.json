@@ -168,7 +168,8 @@
     },
     "errors": {
       "baseUrlRequired": "FHIR Server Base URL is required.",
-      "pullTimePairRequired": "Min and Max Acquisition Pull Time must both be provided together."
+      "minPullTimeRequired": "Min Acquisition Pull Time is required.",
+      "maxPullTimeRequired": "Max Acquisition Pull Time is required."
     }
   },
   "census": {
@@ -193,7 +194,7 @@
       "validateSuccess": "All patient lists validated successfully. Click the view results button beside each field to review its results.",
       "viewResultsAria": "View results for {{list}}",
       "listValidatedAria": "{{list}} validated",
-      "listValidatedTooltip": "This patient list was read successfully from the EHR.",
+      "listValidatedTooltip": "This patient list was read successfully from the EHR",
       "listUntestedAria": "{{list}} not tested",
       "listUntestedTooltip": "Not yet checked - validation stopped at an earlier list's error. Fix that list, then validate again.",
       "queryError": "Unable to query this patient list.",
@@ -386,8 +387,8 @@
       }
     },
     "messages": {
-      "empty": "At least one HSLOC Code Mapping is required.",
-      "incomplete": "Please complete all fields for at least one mapping row before continuing.",
+      "empty": "Please fill all required fields before continuing.",
+      "incomplete": "Please complete each mapping row's fields, or remove the row, before continuing.",
       "duplicate": "Two or more rows map the same location code to different HSLOC codes. Each location code must be unique.",
       "loadError": "Unable to load HSLOC reference data.",
       "saveError": "Unable to save HSLOC location mappings."
@@ -840,7 +841,7 @@
       "describeOtherIdentifier": "Please describe the other identifier.",
       "describeOtherTerm": "Please describe the term used.",
       "addAtLeastOneRule": "Please add at least one rule.",
-      "ruleValueRequired": "Please provide a value for every rule that requires one.",
+      "ruleValueRequired": "Please fill the required field.",
       "describeOtherVariance": "Please describe the other variance.",
       "describeOtherChange": "Please describe the other change."
     }

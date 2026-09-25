@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {MrnIdentifierRule, MrnIntake, MrnIntakeOptions, PatientIdentifier} from '../../../api/contracts';
@@ -22,7 +22,7 @@ import {
   YesNoTabsField
 } from '../../../fields';
 import type {StepProps} from '../../flow';
-import {useOnboarding} from '../../OnboardingProvider';
+import {useOnboarding, useStepUnsavedChanges, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import {
   findRuleForElement,
@@ -70,6 +70,10 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  // What's actually saved on the server right now - loaded on mount, updated after every
+  // successful save. Compared against `draft` for the unsaved-changes guard, and what
+  // "Discard Changes" reverts `draft` back to.
+  const savedSnapshotRef = useRef<MrnIntakeDraft>(defaultMrnIntake());
 
   function announceValidationMessage(message: string) {
     setValidationError(null);
@@ -84,7 +88,9 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
         if (!mounted) {
           return;
         }
-        setDraft(intake ?? defaultMrnIntake());
+        const loaded = intake ?? defaultMrnIntake();
+        setDraft(loaded);
+        savedSnapshotRef.current = loaded;
         setPatients(identifiers);
         setOptions(mrnIntakeOptions);
       })
@@ -109,6 +115,14 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
   }, [selectedPatientId]);
 
   const errors = useMemo(() => (submitAttempted ? validateMrnIntake(draft) : {}), [submitAttempted, draft]);
+
+  // Once the banner has been shown, remove it the moment the draft becomes valid again - don't
+  // make the user click Complete Enrollment a second time just to see it clear.
+  useEffect(() => {
+    if (submitAttempted && Object.keys(errors).length === 0) {
+      setValidationError(null);
+    }
+  }, [submitAttempted, errors]);
 
   // Question 2's options mirror whichever identifier types were checked in Question 1, using the
   // free-text label for "Other" — matches the POC's getMrnUserFacingOptions (index.html:5171-5178).
@@ -167,11 +181,47 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
     setDraft(prev => ({...prev, rules, observations}));
   }
 
-  async function handleComplete() {
+  function validateStep(): boolean {
     setSubmitAttempted(true);
     const validationErrors = validateMrnIntake(draft);
     if (Object.keys(validationErrors).length > 0) {
       announceValidationMessage(t('onboarding:mrnIntake.messages.incomplete'));
+      return false;
+    }
+    return true;
+  }
+
+  /** Saves the current draft as-is, without completing enrollment - used by the unsaved-changes
+   *  guard when the user navigates elsewhere (sidebar, Back) instead of clicking Complete
+   *  Enrollment. Assumes the caller already confirmed `validateStep()`. */
+  async function saveIntake(): Promise<boolean> {
+    try {
+      await api.saveMrnIntake(toMrnIntake(draft));
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : t('onboarding:mrnIntake.messages.saveError'));
+      return false;
+    }
+    savedSnapshotRef.current = draft;
+    return true;
+  }
+
+  /** "Discard Changes" in the unsaved-changes popup - reverts to what's actually on the server. */
+  function discardIntakeChanges() {
+    setDraft(savedSnapshotRef.current);
+    setSubmitAttempted(false);
+    setEditingTarget(null);
+    setSelectedPatientId(null);
+  }
+
+  useStepValidator(validateStep);
+  useStepUnsavedChanges({
+    isDirty: () => JSON.stringify(draft) !== JSON.stringify(savedSnapshotRef.current),
+    save: saveIntake,
+    discard: discardIntakeChanges
+  });
+
+  async function handleComplete() {
+    if (!validateStep()) {
       return;
     }
 
@@ -186,6 +236,7 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       setSubmitError(cause instanceof Error ? cause.message : t('onboarding:mrnIntake.messages.saveError'));
       return;
     }
+    savedSnapshotRef.current = draft;
 
     try {
       await api.completeOnboarding();
@@ -482,6 +533,9 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
                     label={t('onboarding:mrnIntake.rules.valueLabel')}
                     format="MM-dd-yyyy"
                     value={row.value}
+                    error={
+                      submitAttempted && !row.value.trim() ? t('onboarding:mrnIntake.errors.ruleValueRequired') : undefined
+                    }
                     onChange={value => onRowChange({...row, value})}
                     required
                   />
@@ -491,6 +545,9 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
                     label={t('onboarding:mrnIntake.rules.valueLabel')}
                     placeholder={t(placeholderKeyForElement(element))}
                     value={row.value}
+                    error={
+                      submitAttempted && !row.value.trim() ? t('onboarding:mrnIntake.errors.ruleValueRequired') : undefined
+                    }
                     onChange={value => onRowChange({...row, value})}
                     required
                   />
@@ -502,11 +559,6 @@ export function MrnIntakeStep({onNext, onBack}: StepProps) {
       {errors.rules && (
         <p className="k-form-error" role="alert">
           {t(errors.rules)}
-        </p>
-      )}
-      {errors.ruleValues && (
-        <p className="k-form-error" role="alert">
-          {t(errors.ruleValues)}
         </p>
       )}
 
@@ -773,7 +825,17 @@ function PatientRuleEditor({element, existingRule, onSave, onCancel}: PatientRul
     existingRule ? (existingRule.rule as MrnRuleOperator) : operators[0].key
   );
   const [value, setValue] = useState(existingRule?.value ?? '');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const needsValue = operatorNeedsValue(element, operator);
+  const showValueError = submitAttempted && needsValue && !value.trim();
+
+  function handleSave() {
+    if (needsValue && !value.trim()) {
+      setSubmitAttempted(true);
+      return;
+    }
+    onSave(operator, needsValue ? value.trim() : '');
+  }
 
   return (
     <div className="nhsn-link__mrn-id-rule-editor">
@@ -797,6 +859,7 @@ function PatientRuleEditor({element, existingRule, onSave, onCancel}: PatientRul
             label={t('onboarding:mrnIntake.rules.valueLabel')}
             format="MM-dd-yyyy"
             value={value}
+            error={showValueError ? t('onboarding:mrnIntake.errors.ruleValueRequired') : undefined}
             onChange={setValue}
           />
         ) : (
@@ -805,10 +868,11 @@ function PatientRuleEditor({element, existingRule, onSave, onCancel}: PatientRul
             label={t('onboarding:mrnIntake.rules.valueLabel')}
             placeholder={t(placeholderKeyForElement(element))}
             value={value}
+            error={showValueError ? t('onboarding:mrnIntake.errors.ruleValueRequired') : undefined}
             onChange={setValue}
           />
         ))}
-      <Button size="sm" onClick={() => onSave(operator, needsValue ? value.trim() : '')}>
+      <Button size="sm" onClick={handleSave}>
         {t('common:actions.save')}
       </Button>
       <Button variant="secondary" size="sm" onClick={onCancel}>

@@ -62,12 +62,6 @@
   border-radius: 8px;
 }
 
-.nhsn-link__mrn-intake .k-dropdownlist.k-focus,
-.nhsn-link__mrn-intake .k-dropdownlist:focus {
-  border-color: var(--kendo-color-primary, #0057b7);
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 1px;
-}
 
 .nhsn-link__mrn-intake .k-dropdownlist .k-input-inner {
   padding: 9px 11px;
@@ -86,19 +80,12 @@
 }
 
 .nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker:focus-within {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 1px;
   box-shadow: none;
 }
 
 .nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input {
   border: none;
   background: transparent;
-}
-
-.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input:focus,
-.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker > .k-input:focus-within {
-  outline: none;
 }
 
 .nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker.k-invalid {
@@ -181,11 +168,6 @@
   text-decoration: underline;
   font: inherit;
   cursor: pointer;
-}
-
-.nhsn-link__mrn-patient-button:focus-visible {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 2px;
 }
 
 .nhsn-link__mrn-identifier-card {
