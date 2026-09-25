@@ -37,7 +37,6 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
       return;
     }
     const next = enabled[(index + enabled.length) % enabled.length];
-    onTabChange(next.id);
     // useId ids contain colons, invalid in a CSS selector - match by id instead.
     const targetId = tabId(next.id);
     window.requestAnimationFrame(() => {
@@ -50,9 +49,8 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const enabled = tabs.filter(tab => !tab.disabled);
-    // -1 while nothing is selected, so the first arrow press lands on an end
-    // rather than two places away from one.
-    const current = enabled.findIndex(tab => tab.id === activeTab);
+    const focusedId = (event.target as HTMLElement).id;
+    const current = enabled.findIndex(tab => tabId(tab.id) === focusedId);
 
     switch (event.key) {
       case 'ArrowRight':
@@ -100,10 +98,10 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
               // Roving tabindex: one stop for the whole list, arrows move within it.
               tabIndex={tab.id === rovingId ? 0 : -1}
               disabled={tab.disabled}
-              onClick={() => {
+              onClick={event => {
                 const isSwitchingTab = tab.id !== activeTab;
                 onTabChange(tab.id);
-                if (isSwitchingTab && children !== undefined) {
+                if (isSwitchingTab && children !== undefined && event.detail !== 0) {
                   window.setTimeout(() => panelRef.current?.focus(), 50);
                 }
               }}>
