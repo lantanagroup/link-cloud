@@ -729,7 +729,7 @@ public class FhirDataLoader
             {
                 throw;
             }
-            catch (Exception ex) when (attempt < MaxRetries)
+            catch (Exception ex)
             {
                 lastException = ex;
             }
