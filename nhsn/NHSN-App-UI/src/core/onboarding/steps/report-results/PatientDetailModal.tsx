@@ -40,6 +40,7 @@ export function PatientDetailModal({
     title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.patientDetail.title')}</HeadingPause>)}
     onClose={onClose}
     size="large"
+    focusDialogOnOpen
     footer={
       <Button
         variant="secondary"
