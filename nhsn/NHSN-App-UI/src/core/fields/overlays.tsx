@@ -13,6 +13,7 @@ export interface ModalProps {
   showCloseButton?: boolean;
   /** Already translated. Required when `showCloseButton` is true. */
   closeLabel?: string;
+  focusDialogOnOpen?: boolean;
 }
 
 const FOCUSABLE =
@@ -32,7 +33,8 @@ export function Modal({
   footer,
   size = 'medium',
   showCloseButton = false,
-  closeLabel
+  closeLabel,
+  focusDialogOnOpen = false
 }: ModalProps) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -45,14 +47,14 @@ export function Modal({
 
     restoreFocusTo.current = document.activeElement;
     const dialog = dialogRef.current;
-    const first = dialog?.querySelector<HTMLElement>(FOCUSABLE);
+    const first = focusDialogOnOpen ? null : dialog?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? dialog)?.focus();
 
     return () => {
       // Restore focus to the trigger, not the top of the page.
       (restoreFocusTo.current as HTMLElement | null)?.focus?.();
     };
-  }, [open]);
+  }, [open, focusDialogOnOpen]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
