@@ -19,6 +19,7 @@ public static class LinkGatewayRegistration
         services.Configure<LinkCapabilitiesSettings>(configuration.GetSection(LinkCapabilitiesSettings.SectionName));
         services.Configure<FacilityWriteLockSettings>(configuration.GetSection(FacilityWriteLockSettings.SectionName));
         services.Configure<QueryPlanAutoSeedSettings>(configuration.GetSection(QueryPlanAutoSeedSettings.SectionName));
+        services.Configure<MeasureReportingAutoEnrollSettings>(configuration.GetSection(MeasureReportingAutoEnrollSettings.SectionName));
 
         var allowAnonymous = configuration.GetValue<bool?>("Authentication:AllowAnonymous") ?? false;
         services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(options =>

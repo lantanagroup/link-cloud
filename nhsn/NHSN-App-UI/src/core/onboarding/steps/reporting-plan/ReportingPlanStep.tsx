@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {useTranslation} from 'react-i18next';
 import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
@@ -67,7 +67,7 @@ function buildReportingPlanRows(referenceDate: Date): ReportingPlanRow[] {
 
 export function ReportingPlanStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
-  const {saving, savingDirection} = useOnboarding();
+  const {saving, savingDirection, save} = useOnboarding();
 
   // Built locally on every visit — deterministic in the current month, so
   // nothing needs to be persisted for it to survive a reload.
@@ -80,8 +80,17 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
   }, []);
   const hasSchedule = rows.length > 0;
 
+  // No editable fields means patch() never fires, so advanceTo() would skip the save that
+  // enrolls the facility server-side -- force it directly instead.
+  const handleNext = useCallback(async () => {
+    const saved = await save();
+    if (saved) {
+      onNext();
+    }
+  }, [save, onNext]);
+
   const stableOnBack = useStableCallback(onBack);
-  const stableOnNext = useStableCallback(onNext);
+  const stableOnNext = useStableCallback(handleNext);
 
   useStepChrome(
     useMemo(
