@@ -57,11 +57,25 @@ public class FhirControllerHttpTests
                     { CodeSystemUrl, new List<Code> { new() { Value = "postal", Display = "Postal" } } }
                 }
             });
+        cache.Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, CodeSystemUrl, It.IsAny<string>()))
+            .Returns(new CodeGroup
+            {
+                Id = "address-type",
+                Type = CodeGroup.CodeGroupTypes.CodeSystem,
+                Url = CodeSystemUrl,
+                Codes = new Dictionary<string, List<Code>>
+                {
+                    { CodeSystemUrl, new List<Code> { new() { Value = "postal", Display = "Postal" } } }
+                }
+            });
 
         var builder = new WebHostBuilder()
             .ConfigureServices(services =>
             {
                 services.AddLogging();
+                // CodeSystem $lookup (POST) carries an antiforgery filter, which resolves IAntiforgery for
+                // any request that is not bearer-authenticated.
+                services.AddAntiforgery();
                 services.AddSingleton(cache.Object);
                 services.AddSingleton(Mock.Of<ITerminologyServiceMetrics>());
                 services.AddSingleton(TerminologyTestConfig.Options());
@@ -286,5 +300,63 @@ public class FhirControllerHttpTests
         // code is found across every system in the value set. Looking "null" up as a code system would
         // answer result=false, which the previous payload-substring assertion could not distinguish.
         AssertValidationResult(status, payload, expectedResult: true);
+    }
+
+    private const string LookupParameters = """
+    {
+      "resourceType" : "Parameters",
+      "parameter" : [{
+        "name": "system",
+        "valueUri": "http://hl7.org/fhir/address-type"
+      }, {
+        "name" : "code",
+        "valueCode": "postal"
+      }]
+    }
+    """;
+
+    private static async Task<(HttpStatusCode Status, string Body)> PostLookupAsync(string? bearerToken)
+    {
+        using var server = BuildServer();
+        using var client = server.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/terminology/fhir/CodeSystem/$lookup")
+        {
+            Content = new StringContent(LookupParameters, Encoding.UTF8, "application/fhir+json")
+        };
+        if (bearerToken is not null)
+        {
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+        }
+
+        var response = await client.SendAsync(request);
+        return (response.StatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// Service-to-service callers such as LinkSdk authenticate with a bearer token and never hold an
+    /// antiforgery token, so a bearer-authenticated POST $lookup must reach the action.
+    /// </summary>
+    [Fact]
+    public async Task LookupCodeInCodeSystem_Post_WithBearerToken_IsNotRejectedByAntiforgery()
+    {
+        var (status, payload) = await PostLookupAsync("service-token");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var document = JsonDocument.Parse(payload);
+        Assert.Equal("Parameters", document.RootElement.GetProperty("resourceType").GetString());
+        Assert.Contains("Postal", payload);
+    }
+
+    /// <summary>
+    /// Without a bearer token the request could be a cookie-authenticated browser call, so the CSRF
+    /// protection must still apply.
+    /// </summary>
+    [Fact]
+    public async Task LookupCodeInCodeSystem_Post_WithoutBearerOrAntiforgeryToken_Returns400()
+    {
+        var (status, _) = await PostLookupAsync(bearerToken: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
     }
 }
