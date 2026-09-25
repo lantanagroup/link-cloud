@@ -13,6 +13,8 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthSeedOrchestrator seedOrchestrator,
     IApiHealthSeedContextAccessor seedContext,
     IApiHealthRunStore store,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
@@ -345,8 +347,111 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
+    private async Task EnsureHostServiceInformationAsync(
+    string suiteServiceName,
+    IDictionary<string, ServiceInformation> serviceInformationByService)
+    {
+        var metadataServiceName = GetMetadataServiceName(suiteServiceName);
+
+        if (string.Equals(
+                metadataServiceName,
+                suiteServiceName,
+                StringComparison.OrdinalIgnoreCase)
+            || serviceInformationByService.ContainsKey(metadataServiceName))
+        {
+            return;
+        }
+
+        var serviceInfo = await FetchHostServiceInformationAsync(
+            metadataServiceName,
+            CancellationToken.None);
+
+        if (serviceInfo != null)
+            serviceInformationByService[metadataServiceName] = serviceInfo;
+    }
+
+    private async Task<ServiceInformation?> FetchHostServiceInformationAsync(
+    string serviceName,
+    CancellationToken ct)
+    {
+        string? baseUrl;
+        string relativePath;
+
+        if (string.Equals(
+            serviceName,
+            ApiEndPointLibrary.ServiceNames.Tenant,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = configuration["ServiceRegistry:TenantServiceApiUrl"];
+            relativePath = "/facility/info";
+        }
+        else if (string.Equals(
+            serviceName,
+            ApiEndPointLibrary.ServiceNames.AdminBff,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = configuration["ServiceRegistry:AdminBffServiceUrl"];
+            relativePath = "/api/info";
+        }
+        else
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            logger.LogWarning(
+                "Unable to resolve Service Info for {ServiceName} because its service URL is not configured.",
+                serviceName);
+
+            return null;
+        }
+
+        baseUrl = baseUrl.TrimEnd('/');
+
+        try
+        {
+            var client = httpClientFactory.CreateClient("ApiHealthTest");
+
+            using var response = await client.GetAsync(
+                $"{baseUrl}{relativePath}",
+                ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning(
+                    "Unable to resolve Service Info for {ServiceName}. HTTP {StatusCode}.",
+                    serviceName,
+                    (int)response.StatusCode);
+
+                return null;
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+            return DeserializeServiceInformation(
+                responseBody,
+                serviceName);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Unable to resolve Service Info for {ServiceName}.",
+                serviceName);
+
+            return null;
+        }
+    }
+
     private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite, IDictionary<string, ServiceInformation> serviceInformationByService)
     {
+        await EnsureHostServiceInformationAsync(suite.ServiceName, serviceInformationByService);
+
         IReadOnlyList<ApiTestRunResult> results;
         try
         {
@@ -434,7 +539,9 @@ public sealed class ApiHealthExecutionRunManager(
         return suiteServiceName;
     }
 
-    private ServiceInformation? GetServiceInformation(IReadOnlyList<ApiTestRunResult> results, string serviceName)
+    private ServiceInformation? GetServiceInformation(
+    IReadOnlyList<ApiTestRunResult> results,
+    string serviceName)
     {
         var serviceInfoResult = results.FirstOrDefault(result =>
             string.Equals(
@@ -446,10 +553,19 @@ public sealed class ApiHealthExecutionRunManager(
         if (serviceInfoResult == null)
             return null;
 
-        if (string.IsNullOrWhiteSpace(serviceInfoResult.ResponseBody))
+        return DeserializeServiceInformation(
+            serviceInfoResult.ResponseBody,
+            serviceName);
+    }
+
+    private ServiceInformation? DeserializeServiceInformation(
+        string? responseBody,
+        string serviceName)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
         {
             logger.LogWarning(
-                "Service Info step passed for {ServiceName}, but the response body was empty.",
+                "Service Info response for {ServiceName} was empty.",
                 serviceName);
 
             return null;
@@ -457,7 +573,7 @@ public sealed class ApiHealthExecutionRunManager(
 
         try
         {
-            using var document = JsonDocument.Parse(serviceInfoResult.ResponseBody);
+            using var document = JsonDocument.Parse(responseBody);
 
             if (document.RootElement.ValueKind == JsonValueKind.Object)
             {
@@ -470,7 +586,9 @@ public sealed class ApiHealthExecutionRunManager(
 
             if (document.RootElement.ValueKind == JsonValueKind.Array)
             {
-                var first = document.RootElement.EnumerateArray().FirstOrDefault();
+                var first = document.RootElement
+                    .EnumerateArray()
+                    .FirstOrDefault();
 
                 if (first.ValueKind == JsonValueKind.Undefined)
                     return null;
@@ -483,7 +601,7 @@ public sealed class ApiHealthExecutionRunManager(
             }
 
             logger.LogWarning(
-                "Service Info step passed for {ServiceName}, but the response body was neither an object nor an array.",
+                "Service Info response for {ServiceName} was neither an object nor an array.",
                 serviceName);
 
             return null;
@@ -492,7 +610,7 @@ public sealed class ApiHealthExecutionRunManager(
         {
             logger.LogWarning(
                 ex,
-                "Service Info step passed for {ServiceName}, but the response body could not be parsed.",
+                "Service Info response for {ServiceName} could not be parsed.",
                 serviceName);
 
             return null;

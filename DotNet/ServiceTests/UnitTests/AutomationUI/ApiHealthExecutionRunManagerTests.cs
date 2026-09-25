@@ -6,6 +6,9 @@ using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Task = System.Threading.Tasks.Task;
+using System.Net;
+using System.Net.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace UnitTests.AutomationUI;
 
@@ -17,23 +20,15 @@ public class ApiHealthExecutionRunManagerTests
     private const string TestEndpointKey = "TestService::TestEndpoint";
 
     [Fact]
-    public async Task RunAll_HostedSuitesUseMetadataFromTheirHostServices()
+    public async Task RunAll_HostedSuitesUseMetadataWithoutDependingOnHostSuiteOrder()
     {
-        var adminBffResults = CreateServiceResults(
-            ApiEndPointLibrary.ServiceNames.AdminBff,
-            """
-        {
-          "serviceName": "Link Admin BFF",
-          "version": "0.7.1+admin123",
-          "productVersion": "admin-dev",
-          "commit": "admin123",
-          "build": "admin-build"
-        }
-        """);
-
         var dmrpResults = CreateHostedResults(
             ApiEndPointLibrary.ServiceNames.Dmrp,
             ApiEndPointLibrary.DmrpSteps.MappingPost201);
+
+        var adminBffAuthResults = CreateHostedResults(
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+            "Admin BFF Auth Step");
 
         var tenantResults = CreateServiceResults(
             ApiEndPointLibrary.ServiceNames.Tenant,
@@ -47,14 +42,27 @@ public class ApiHealthExecutionRunManagerTests
         }
         """);
 
-        var adminBffAuthResults = CreateHostedResults(
-            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
-            "Admin BFF Auth Step");
+        var adminBffResults = CreateServiceResults(
+            ApiEndPointLibrary.ServiceNames.AdminBff,
+            """
+        [
+          {
+            "serviceName": "Link Admin BFF",
+            "version": "0.7.1+admin123",
+            "productVersion": "admin-dev",
+            "commit": "admin123",
+            "build": "admin-build"
+          }
+        ]
+        """);
+
+        var httpClientFactory = CreateHostMetadataHttpClientFactory();
 
         var store = await RunAllAsync(
+            httpClientFactory,
             new TestServiceSuite(
-                ApiEndPointLibrary.ServiceNames.AdminBff,
-                adminBffResults),
+                ApiEndPointLibrary.ServiceNames.Dmrp,
+                dmrpResults),
             new TestServiceSuite(
                 ApiEndPointLibrary.ServiceNames.AdminBffAuth,
                 adminBffAuthResults),
@@ -62,8 +70,8 @@ public class ApiHealthExecutionRunManagerTests
                 ApiEndPointLibrary.ServiceNames.Tenant,
                 tenantResults),
             new TestServiceSuite(
-                ApiEndPointLibrary.ServiceNames.Dmrp,
-                dmrpResults));
+                ApiEndPointLibrary.ServiceNames.AdminBff,
+                adminBffResults));
 
         var dmrpResult = store.SavedResults.Single(
             result => result.ServiceName == ApiEndPointLibrary.ServiceNames.Dmrp);
@@ -299,6 +307,72 @@ public class ApiHealthExecutionRunManagerTests
         result.ProductVersion.Should().Be("dev");
     }
 
+    [Fact]
+    public async Task DmrpOnlyRun_FetchesTenantMetadataFromHostService()
+    {
+        var suite = new TestServiceSuite(
+            ApiEndPointLibrary.ServiceNames.Dmrp,
+            CreateHostedResults(
+                ApiEndPointLibrary.ServiceNames.Dmrp,
+                ApiEndPointLibrary.DmrpSteps.MappingPost201));
+
+        var store = new TestApiHealthRunStore();
+
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry([suite]),
+            new TestSeedOrchestrator(),
+            new ApiHealthSeedContextAccessor(),
+            store,
+            CreateHostMetadataHttpClientFactory(),
+            CreateConfiguration(),
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartServiceAsync(
+            ApiEndPointLibrary.ServiceNames.Dmrp);
+
+        await WaitForCompletionAsync(manager, runId);
+
+        var result = store.SavedResults.Single();
+
+        result.Commit.Should().Be("tenant123");
+        result.Build.Should().Be("tenant-build");
+        result.Version.Should().Be("0.7.1+tenant123");
+        result.ProductVersion.Should().Be("tenant-dev");
+    }
+
+    [Fact]
+    public async Task AdminBffAuthOnlyRun_FetchesAdminBffMetadataFromHostService()
+    {
+        var suite = new TestServiceSuite(
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+            CreateHostedResults(
+                ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+                "Admin BFF Auth Step"));
+
+        var store = new TestApiHealthRunStore();
+
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry([suite]),
+            new TestSeedOrchestrator(),
+            new ApiHealthSeedContextAccessor(),
+            store,
+            CreateHostMetadataHttpClientFactory(),
+            CreateConfiguration(),
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartServiceAsync(
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth);
+
+        await WaitForCompletionAsync(manager, runId);
+
+        var result = store.SavedResults.Single();
+
+        result.Commit.Should().Be("admin123");
+        result.Build.Should().Be("admin-build");
+        result.Version.Should().Be("0.7.1+admin123");
+        result.ProductVersion.Should().Be("admin-dev");
+    }
+
     private static IReadOnlyList<ApiTestRunResult> CreateResults(
         bool passed,
         string? responseBody)
@@ -343,6 +417,8 @@ public class ApiHealthExecutionRunManagerTests
             new TestSeedOrchestrator(),
             new ApiHealthSeedContextAccessor(),
             store,
+            CreateDefaultHttpClientFactory(),
+            CreateConfiguration(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(TestServiceName);
@@ -352,8 +428,7 @@ public class ApiHealthExecutionRunManagerTests
         return store;
     }
 
-    private static async Task<TestApiHealthRunStore> RunAllAsync(
-    params IServiceTestSuite[] suites)
+    private static async Task<TestApiHealthRunStore> RunAllAsync(IHttpClientFactory httpClientFactory, params IServiceTestSuite[] suites)
     {
         var store = new TestApiHealthRunStore();
 
@@ -362,6 +437,8 @@ public class ApiHealthExecutionRunManagerTests
             new TestSeedOrchestrator(),
             new ApiHealthSeedContextAccessor(),
             store,
+            httpClientFactory,
+            CreateConfiguration(),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartAllAsync();
@@ -558,5 +635,94 @@ public class ApiHealthExecutionRunManagerTests
             DateTimeOffset finishedAt,
             CancellationToken ct = default) =>
             Task.CompletedTask;
+    }
+
+    private sealed class TestHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(handler(request));
+        }
+    }
+
+    private static IConfiguration CreateConfiguration()
+    {
+        return new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ServiceRegistry:TenantServiceApiUrl"] = "http://tenant.test/api",
+                ["ServiceRegistry:AdminBffServiceUrl"] = "http://adminbff.test"
+            })
+            .Build();
+    }
+
+    private static IHttpClientFactory CreateDefaultHttpClientFactory()
+    {
+        var handler = new TestHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        return new TestHttpClientFactory(new HttpClient(handler));
+    }
+
+    private static IHttpClientFactory CreateHostMetadataHttpClientFactory()
+    {
+        var handler = new TestHttpMessageHandler(request =>
+        {
+            var uri = request.RequestUri?.ToString();
+
+            if (uri == "http://tenant.test/api/facility/info")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                    {
+                      "serviceName": "Tenant",
+                      "version": "0.7.1+tenant123",
+                      "productVersion": "tenant-dev",
+                      "commit": "tenant123",
+                      "build": "tenant-build"
+                    }
+                    """)
+                };
+            }
+
+            if (uri == "http://adminbff.test/api/info")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """
+                    [
+                      {
+                        "serviceName": "Link Admin BFF",
+                        "version": "0.7.1+admin123",
+                        "productVersion": "admin-dev",
+                        "commit": "admin123",
+                        "build": "admin-build"
+                      },
+                      {
+                        "serviceName": "Account",
+                        "version": "0.7.1+wrong456",
+                        "productVersion": "wrong-dev",
+                        "commit": "wrong456",
+                        "build": "wrong-build"
+                      }
+                    ]
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        return new TestHttpClientFactory(new HttpClient(handler));
+    }
+
+    private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
     }
 }
