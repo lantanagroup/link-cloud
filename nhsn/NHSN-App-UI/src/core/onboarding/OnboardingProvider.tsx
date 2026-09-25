@@ -159,6 +159,15 @@ export function OnboardingProvider({
   const stepUnsavedRef = useRef<StepUnsavedChanges | null>(null);
   const [pendingStepId, setPendingStepId] = useState<StepId | null>(null);
   const [errorStepIds, setErrorStepIdsState] = useState<ReadonlySet<StepId>>(() => new Set());
+  const [saveAnnouncement, setSaveAnnouncement] = useState('');
+
+  useEffect(() => {
+    if (!saveAnnouncement) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setSaveAnnouncement(''), 1000);
+    return () => window.clearTimeout(timeoutId);
+  }, [saveAnnouncement]);
 
   const setErrorStepIds = useCallback((stepIds: Iterable<StepId>) => {
     setErrorStepIdsState(new Set(stepIds));
@@ -325,6 +334,7 @@ export function OnboardingProvider({
               await queryClient.invalidateQueries({queryKey: ['reportAccuracyAcknowledgement']});
             }
 
+            setSaveAnnouncement(t('status.saved'));
             return true;
           } catch (cause) {
             const translationKey = cause instanceof HttpError && cause.errorCode
@@ -570,6 +580,9 @@ export function OnboardingProvider({
   return (
     <OnboardingContext.Provider value={value}>
       {children}
+      <div className="nhsn-link__visually-hidden" role="status">
+        {saveAnnouncement}
+      </div>
       <Modal
         open={pendingStepId !== null}
         title={acronymTitle(<HeadingPause>{t('unsavedChanges.title')}</HeadingPause>)}

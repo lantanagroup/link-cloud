@@ -46,7 +46,8 @@
   outline-offset: 2px;
 }
 
-.nhsn-link__step-panel:focus-visible {
+.nhsn-link__step-panel:focus-visible,
+.nhsn-link__tab-panel:focus-visible {
   outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
   outline-offset: -2px;
 }

@@ -101,8 +101,9 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
               tabIndex={tab.id === rovingId ? 0 : -1}
               disabled={tab.disabled}
               onClick={() => {
+                const isSwitchingTab = tab.id !== activeTab;
                 onTabChange(tab.id);
-                if (children !== undefined) {
+                if (isSwitchingTab && children !== undefined) {
                   window.setTimeout(() => panelRef.current?.focus(), 50);
                 }
               }}>
@@ -116,6 +117,7 @@ export function Tabs<T extends string>({tabs, activeTab, onTabChange, label, chi
         <div
           ref={panelRef}
           id={panelId}
+          className="nhsn-link__tab-panel"
           role="tabpanel"
           aria-labelledby={activeTab && tabs.some(tab => tab.id === activeTab) ? tabId(activeTab) : undefined}
           tabIndex={-1}>
