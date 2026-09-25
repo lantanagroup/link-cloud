@@ -44,13 +44,22 @@ describe('findIncompleteRowIndexes', () => {
 });
 
 describe('findDuplicateSourceCodeIndexes', () => {
-  it('flags both rows sharing the same source code', () => {
+  it('keeps the first row clean and flags the rest when no row is being edited', () => {
     const rows = [
       {sourceDisplay: 'ICU', sourceCode: 'ICU-1', hslocCode: '1030'},
       {sourceDisplay: 'ED', sourceCode: 'ED-1', hslocCode: '1002'},
       {sourceDisplay: 'ICU Alt', sourceCode: 'ICU-1', hslocCode: '1031'}
     ];
-    expect(findDuplicateSourceCodeIndexes(rows)).toEqual([0, 2]);
+    expect(findDuplicateSourceCodeIndexes(rows)).toEqual([2]);
+  });
+
+  it('flags the row being edited, leaving the other occurrence clean', () => {
+    const rows = [
+      {sourceDisplay: 'ICU', sourceCode: 'ICU-1', hslocCode: '1030'},
+      {sourceDisplay: 'ED', sourceCode: 'ED-1', hslocCode: '1002'},
+      {sourceDisplay: 'ICU Alt', sourceCode: 'ICU-1', hslocCode: '1031'}
+    ];
+    expect(findDuplicateSourceCodeIndexes(rows, 0)).toEqual([0]);
   });
 
   it('compares trimmed and case-insensitively, matching the save path', () => {
@@ -58,7 +67,7 @@ describe('findDuplicateSourceCodeIndexes', () => {
       {sourceDisplay: 'ICU', sourceCode: ' icu-1 ', hslocCode: '1030'},
       {sourceDisplay: 'ICU Alt', sourceCode: 'ICU-1', hslocCode: '1031'}
     ];
-    expect(findDuplicateSourceCodeIndexes(rows)).toEqual([0, 1]);
+    expect(findDuplicateSourceCodeIndexes(rows)).toEqual([1]);
   });
 
   it('ignores blank source codes, which findIncompleteRowIndexes already flags', () => {

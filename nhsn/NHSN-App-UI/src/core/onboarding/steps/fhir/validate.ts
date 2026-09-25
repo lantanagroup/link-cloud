@@ -98,17 +98,13 @@ export function validateFhir(
   }
 
   if (!values.minAcquisitionPullTime) {
-    if (values.maxAcquisitionPullTime) {
-      errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.pullTimePairRequired';
-    }
+    errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.minPullTimeRequired';
   } else if (!PULL_TIME_PATTERN.test(values.minAcquisitionPullTime)) {
     errors.minAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
 
   if (!values.maxAcquisitionPullTime) {
-    if (values.minAcquisitionPullTime) {
-      errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.pullTimePairRequired';
-    }
+    errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.errors.maxPullTimeRequired';
   } else if (!PULL_TIME_PATTERN.test(values.maxAcquisitionPullTime)) {
     errors.maxAcquisitionPullTime = 'onboarding:fhirServerInfo.messages.invalidPullTime';
   }
