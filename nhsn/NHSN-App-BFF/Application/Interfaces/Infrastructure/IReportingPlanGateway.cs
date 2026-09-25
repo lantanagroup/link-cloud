@@ -14,4 +14,11 @@ public interface IReportingPlanGateway
     /// state a facility can be in, not a failure to resolve one.
     /// </summary>
     Task<IReadOnlyList<AvailableMeasure>> GetAvailableMeasuresAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ensures the facility has a DMRP reporting plan for ACH Monthly for the current reporting
+    /// period, creating the measure mapping first if DMRP has none yet. Returns <c>false</c> (not
+    /// an error) when the facility is already enrolled for this period.
+    /// </summary>
+    Task<bool> EnsureFacilityEnrolledInMeasureAsync(string facilityId, CancellationToken cancellationToken = default);
 }
