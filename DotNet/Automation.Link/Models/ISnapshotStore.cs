@@ -22,6 +22,9 @@ public sealed record RunSnapshotMeta
     public bool IsMetricsRun { get; init; }
 }
 
+/// <summary>An Automation-owned facility whose run summary was deleted before teardown.</summary>
+public sealed record RetainedFacility(string FacilityId, DateTimeOffset EligibleAt);
+
 /// <summary>
 /// Abstraction for persisting and reading automation run data.
 /// Implementations can target MongoDB, SQL Server, or any other store.
@@ -36,6 +39,17 @@ public interface ISnapshotStore
     // --- Run metadata ---
     Task RegisterRunAsync(Guid runId, RunSnapshotMeta meta, CancellationToken ct = default);
     Task UpdateRunMetaAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default);
+    /// <summary>
+    /// Sets the created-facility marker without rewriting status, timestamps, or errors.
+    /// When the run row is missing, inserts a complete summary so the marker is durable.
+    /// </summary>
+    Task MarkAutomationCreatedFacilityAsync(AutomationRunSummary summary, string facilityId, CancellationToken ct = default);
+    Task RetainOwnedFacilitiesAsync(AutomationRunSummary summary, CancellationToken ct = default);
+    Task<IReadOnlyList<RetainedFacility>> GetRetainedFacilitiesAsync(CancellationToken ct = default);
+    Task ReleaseRetainedFacilityAsync(string facilityId, CancellationToken ct = default);
+    Task MarkFacilityTeardownProgressAsync(Guid runId, string facilityId, CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default);
+    Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default);
     Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);
@@ -47,6 +61,13 @@ public interface ISnapshotStore
     Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default);
     Task<IReadOnlyDictionary<Guid, ImportedBundleSnapshot>> GetImportedBundlesByIdsAsync(IEnumerable<Guid> bundleIds, CancellationToken ct = default);
     Task DeleteRunAsync(Guid runId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes the run. Owned facility ids are tombstoned first only when
+    /// <paramref name="retainOwnedFacilities"/> is true. A history-only purge passes false
+    /// so a later daily teardown does not delete facilities the caller left in place.
+    /// </summary>
+    Task DeleteRunAsync(Guid runId, bool retainOwnedFacilities, CancellationToken ct = default);
 
     // --- Domain snapshots (per-run, per-service polling data) ---
     Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default);
