@@ -459,6 +459,19 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
+    public void Returned_location_id_must_match_the_requested_id()
+    {
+        var same = ImportedPatientLoader.RequireMatchingLocationId(new Location { Id = "abc" }, "abc");
+        same.Id.Should().Be("abc");
+
+        var missing = ImportedPatientLoader.RequireMatchingLocationId(new Location(), "abc");
+        missing.Id.Should().Be("abc");
+
+        var mismatch = () => ImportedPatientLoader.RequireMatchingLocationId(new Location { Id = "ABC" }, "abc");
+        mismatch.Should().Throw<InvalidOperationException>().WithMessage("*Location/ABC*Location/abc*");
+    }
+
+    [Fact]
     public void Deleted_location_read_is_treated_as_missing()
     {
         LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.NotFound).Should().BeTrue();

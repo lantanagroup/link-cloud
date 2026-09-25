@@ -203,8 +203,27 @@ public static class ImportedPatientLoader
         if (location == null)
             throw new InvalidOperationException($"FHIR server returned an empty Location for Location/{locationId}.");
 
+        return RequireMatchingLocationId(location, locationId);
+    }
+
+    /// <summary>
+    /// A successful read must be the Location that was requested. FHIR ids are
+    /// case-sensitive. An empty id is filled from the request. A different id
+    /// fails the import so the manifest is not built from the wrong resource.
+    /// </summary>
+    internal static Location RequireMatchingLocationId(Location location, string locationId)
+    {
         if (string.IsNullOrWhiteSpace(location.Id))
+        {
             location.Id = locationId;
+            return location;
+        }
+
+        if (!string.Equals(location.Id, locationId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"FHIR server returned Location/{location.Id} for a request for Location/{locationId}.");
+        }
 
         return location;
     }
