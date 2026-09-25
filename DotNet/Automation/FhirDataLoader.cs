@@ -25,6 +25,12 @@ public class FhirDataLoader
     /// </summary>
     private readonly Uri _baseUri;
     private readonly Uri _baseUriForRelativeResolution;
+
+    /// <summary>
+    /// FHIR server this loader authenticates to. Location reference expansion uses it
+    /// to ignore absolute references that point at a different server.
+    /// </summary>
+    public Uri FhirServerBase => _baseUri;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
@@ -485,16 +491,18 @@ public class FhirDataLoader
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles,
         string progressPrefix = "",
-        bool logSuccessfulPosts = true)
+        bool logSuccessfulPosts = true,
+        CancellationToken cancellationToken = default)
     {
         for (var i = 0; i < bundles.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (name, json) = bundles[i];
             var progress = string.IsNullOrEmpty(progressPrefix)
                 ? $"[{i + 1}/{bundles.Count}]"
                 : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
 
-            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts);
+            var response = await PostBundleWithRetryAsync(json, name, progress, output, logSuccessfulPosts, cancellationToken);
 
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
@@ -589,6 +597,10 @@ public class FhirDataLoader
                 descriptionForError: $"Patient/{patientId}/$everything",
                 ct);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
@@ -639,6 +651,10 @@ public class FhirDataLoader
                     descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
                     ct);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 throw new InvalidOperationException(
@@ -671,6 +687,84 @@ public class FhirDataLoader
 
         return rootBundle.ToJsonString();
     }
+
+    /// <summary>
+    /// GETs one resource relative to the configured FHIR base. Returns null on 404
+    /// and on 410 (a deleted resource). 408, 429, and 5xx are retried the same way
+    /// as Patient/$everything paging. Any other unsuccessful response throws with
+    /// the response body, so a live resource is not treated as missing.
+    /// </summary>
+    public async Task<string?> TryReadResourceJsonAsync(string relativeUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            throw new ArgumentException("A relative FHIR URL is required.", nameof(relativeUrl));
+        if (relativeUrl.Contains("://", StringComparison.Ordinal) || relativeUrl.StartsWith("//", StringComparison.Ordinal))
+            throw new ArgumentException($"Refusing absolute URL '{relativeUrl}'.", nameof(relativeUrl));
+
+        RestResponse? response = null;
+        Exception? lastException = null;
+        var delay = InitialRetryDelay;
+        var path = relativeUrl.TrimStart('/');
+
+        for (var attempt = 1; attempt <= MaxRetries; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            response = null;
+
+            try
+            {
+                var request = new RestRequest(path, Method.Get);
+                request.AddHeader("Accept", "application/fhir+json");
+                if (!string.IsNullOrEmpty(_authorization))
+                    request.AddHeader("Authorization", _authorization);
+
+                response = await _restClient.ExecuteAsync(request, ct);
+                if (IsAbsentResource(response.StatusCode))
+                    return null;
+
+                if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
+                    return response.Content;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+            }
+
+            if (attempt < MaxRetries && IsRetriablePagingFailure(response))
+            {
+                await Task.Delay(delay, ct);
+                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+                continue;
+            }
+
+            break;
+        }
+
+        if (lastException != null && response == null)
+        {
+            throw new InvalidOperationException(
+                $"FHIR server request failed for {relativeUrl} after {MaxRetries} attempt(s): {lastException.Message}",
+                lastException);
+        }
+
+        var statusCode = response != null ? (int)response.StatusCode : 0;
+        var statusText = response?.StatusCode.ToString() ?? "(no status)";
+        var responseBody = response?.Content ?? "";
+        throw new InvalidOperationException(
+            $"FHIR server returned {statusCode} {statusText} for {relativeUrl}. " +
+            $"Automation issued the request successfully, but the server response was unsuccessful or empty. " +
+            $"Response body: {responseBody}");
+    }
+
+    /// <summary>
+    /// 404 is an unknown resource. 410 is a deleted one. Neither can be added to the manifest.
+    /// </summary>
+    internal static bool IsAbsentResource(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone;
 
     /// <summary>
     /// Performs a single GET against the FHIR server and returns the response body.
@@ -730,6 +824,10 @@ public class FhirDataLoader
 
                 if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
                     return response.Content;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex) when (attempt < MaxRetries)
             {
@@ -866,13 +964,15 @@ public class FhirDataLoader
         string name,
         string progress,
         IAutomationOutput output,
-        bool logSuccessfulPosts = true)
+        bool logSuccessfulPosts = true,
+        CancellationToken cancellationToken = default)
     {
         var delay = InitialRetryDelay;
         RestResponse? lastResponse = null;
 
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var request = new RestRequest("", Method.Post);
             request.AddHeader("Content-Type", "application/fhir+json");
 
@@ -881,7 +981,7 @@ public class FhirDataLoader
 
             request.AddStringBody(bundleJson, DataFormat.Json);
 
-            lastResponse = await _restClient.ExecuteAsync(request);
+            lastResponse = await _restClient.ExecuteAsync(request, cancellationToken);
 
             if (lastResponse.IsSuccessful)
             {
@@ -905,7 +1005,7 @@ public class FhirDataLoader
             if (attempt < MaxRetries)
             {
                 output.WriteLine($"  {progress} Posted {name} => {lastResponse.StatusCode} (attempt {attempt}/{MaxRetries}, retrying in {delay.TotalSeconds:F0}s...)");
-                await Task.Delay(delay);
+                await Task.Delay(delay, cancellationToken);
                 delay *= 2;
             }
             else
