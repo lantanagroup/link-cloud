@@ -360,6 +360,11 @@
   overflow: hidden;
 }
 
+.nhsn-link__step-panel:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: -2px;
+}
+
 .nhsn-link__step-panel > .nhsn-link__content {
   border: 1px solid var(--kendo-color-border, #d0d7de);
   flex: 1 1 auto;
