@@ -17,6 +17,72 @@ public class ApiHealthExecutionRunManagerTests
     private const string TestEndpointKey = "TestService::TestEndpoint";
 
     [Fact]
+    public async Task RunAll_HostedSuitesUseMetadataFromTheirHostServices()
+    {
+        var adminBffResults = CreateServiceResults(
+            ApiEndPointLibrary.ServiceNames.AdminBff,
+            """
+        {
+          "serviceName": "Link Admin BFF",
+          "version": "0.7.1+admin123",
+          "productVersion": "admin-dev",
+          "commit": "admin123",
+          "build": "admin-build"
+        }
+        """);
+
+        var dmrpResults = CreateHostedResults(
+            ApiEndPointLibrary.ServiceNames.Dmrp,
+            ApiEndPointLibrary.DmrpSteps.MappingPost201);
+
+        var tenantResults = CreateServiceResults(
+            ApiEndPointLibrary.ServiceNames.Tenant,
+            """
+        {
+          "serviceName": "Tenant",
+          "version": "0.7.1+tenant123",
+          "productVersion": "tenant-dev",
+          "commit": "tenant123",
+          "build": "tenant-build"
+        }
+        """);
+
+        var adminBffAuthResults = CreateHostedResults(
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+            "Admin BFF Auth Step");
+
+        var store = await RunAllAsync(
+            new TestServiceSuite(
+                ApiEndPointLibrary.ServiceNames.AdminBff,
+                adminBffResults),
+            new TestServiceSuite(
+                ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+                adminBffAuthResults),
+            new TestServiceSuite(
+                ApiEndPointLibrary.ServiceNames.Tenant,
+                tenantResults),
+            new TestServiceSuite(
+                ApiEndPointLibrary.ServiceNames.Dmrp,
+                dmrpResults));
+
+        var dmrpResult = store.SavedResults.Single(
+            result => result.ServiceName == ApiEndPointLibrary.ServiceNames.Dmrp);
+
+        dmrpResult.Commit.Should().Be("tenant123");
+        dmrpResult.Build.Should().Be("tenant-build");
+        dmrpResult.Version.Should().Be("0.7.1+tenant123");
+        dmrpResult.ProductVersion.Should().Be("tenant-dev");
+
+        var adminBffAuthResult = store.SavedResults.Single(
+            result => result.ServiceName == ApiEndPointLibrary.ServiceNames.AdminBffAuth);
+
+        adminBffAuthResult.Commit.Should().Be("admin123");
+        adminBffAuthResult.Build.Should().Be("admin-build");
+        adminBffAuthResult.Version.Should().Be("0.7.1+admin123");
+        adminBffAuthResult.ProductVersion.Should().Be("admin-dev");
+    }
+
+    [Fact]
     public async Task PassedServiceInfo_StampsDeploymentMetadataOnResults()
     {
         var store = await RunServiceAsync(
@@ -127,6 +193,112 @@ public class ApiHealthExecutionRunManagerTests
         result.ProductVersion.Should().Be("dev");
     }
 
+    [Fact]
+    public async Task AdminBffServiceInfoArray_UsesFirstObjectMetadata()
+    {
+        var store = await RunServiceAsync(
+            CreateResults(
+                passed: true,
+                responseBody: """
+            [
+              {
+                "serviceName": "Link Admin BFF",
+                "version": "0.7.1+admin123",
+                "productVersion": "admin-dev",
+                "commit": "admin123",
+                "build": "admin-build"
+              },
+              {
+                "serviceName": "Account",
+                "version": "0.7.1+account456",
+                "productVersion": "account-dev",
+                "commit": "account456",
+                "build": "account-build"
+              }
+            ]
+            """));
+
+        var result = GetTestEndpointResult(store);
+
+        result.Commit.Should().Be("admin123");
+        result.Build.Should().Be("admin-build");
+        result.Version.Should().Be("0.7.1+admin123");
+        result.ProductVersion.Should().Be("admin-dev");
+    }
+
+    [Fact]
+    public async Task VersionWithoutSuffix_DoesNotUseVersionAsCommit()
+    {
+        var store = await RunServiceAsync(
+            CreateResults(
+                passed: true,
+                responseBody: """
+            {
+              "serviceName": "TestService",
+              "version": "0.7.1",
+              "productVersion": "dev",
+              "build": "20260925.1"
+            }
+            """));
+
+        var result = GetTestEndpointResult(store);
+
+        result.Commit.Should().BeNull();
+        result.Build.Should().Be("20260925.1");
+        result.Version.Should().Be("0.7.1");
+        result.ProductVersion.Should().Be("dev");
+    }
+
+    [Fact]
+    public async Task NoServiceInfoStep_DoesNotStampDeploymentMetadata()
+    {
+        var results = new List<ApiTestRunResult>
+    {
+        new()
+        {
+            EndpointKey = TestEndpointKey,
+            ServiceName = TestServiceName,
+            EndpointName = TestEndpointName,
+            Passed = true,
+            ExpectedStatusCode = 200,
+            ActualStatusCode = 200
+        }
+    };
+
+        var store = await RunServiceAsync(results);
+
+        var result = GetTestEndpointResult(store);
+
+        result.Commit.Should().BeNull();
+        result.Build.Should().BeNull();
+        result.Version.Should().BeNull();
+        result.ProductVersion.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ExplicitCommit_DoesNotUseDifferentVersionSuffix()
+    {
+        var store = await RunServiceAsync(
+            CreateResults(
+                passed: true,
+                responseBody: """
+            {
+              "serviceName": "TestService",
+              "version": "0.7.1+suffix456",
+              "productVersion": "dev",
+              "commit": "explicit123",
+              "build": "20260925.1"
+            }
+            """));
+
+        var result = GetTestEndpointResult(store);
+
+        result.Commit.Should().Be("explicit123");
+        result.Build.Should().Be("20260925.1");
+        result.Version.Should().Be("0.7.1+suffix456");
+        result.ProductVersion.Should().Be("dev");
+    }
+
     private static IReadOnlyList<ApiTestRunResult> CreateResults(
         bool passed,
         string? responseBody)
@@ -161,10 +333,9 @@ public class ApiHealthExecutionRunManagerTests
             result => result.EndpointKey == TestEndpointKey);
     }
 
-    private static async Task<TestApiHealthRunStore> RunServiceAsync(
-        IReadOnlyList<ApiTestRunResult> results)
+    private static async Task<TestApiHealthRunStore> RunServiceAsync(IReadOnlyList<ApiTestRunResult> results)
     {
-        var suite = new TestServiceSuite(results);
+        var suite = new TestServiceSuite(TestServiceName, results);
         var store = new TestApiHealthRunStore();
 
         var manager = new ApiHealthExecutionRunManager(
@@ -175,6 +346,25 @@ public class ApiHealthExecutionRunManagerTests
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(TestServiceName);
+
+        await WaitForCompletionAsync(manager, runId);
+
+        return store;
+    }
+
+    private static async Task<TestApiHealthRunStore> RunAllAsync(
+    params IServiceTestSuite[] suites)
+    {
+        var store = new TestApiHealthRunStore();
+
+        var manager = new ApiHealthExecutionRunManager(
+            new ApiEndpointRegistry(suites),
+            new TestSeedOrchestrator(),
+            new ApiHealthSeedContextAccessor(),
+            store,
+            NullLogger<ApiHealthExecutionRunManager>.Instance);
+
+        var runId = await manager.StartAllAsync();
 
         await WaitForCompletionAsync(manager, runId);
 
@@ -197,10 +387,55 @@ public class ApiHealthExecutionRunManagerTests
             $"API Health test run {runId} did not complete within the expected time.");
     }
 
-    private sealed class TestServiceSuite(
-        IReadOnlyList<ApiTestRunResult> results) : IServiceTestSuite
+    private static IReadOnlyList<ApiTestRunResult> CreateServiceResults(
+    string serviceName,
+    string responseBody)
     {
-        public string ServiceName => TestServiceName;
+        return
+        [
+            new ApiTestRunResult
+        {
+            EndpointKey = $"{serviceName}::ServiceInfo",
+            ServiceName = serviceName,
+            EndpointName = ApiEndPointLibrary.ServiceInfoGet200,
+            Passed = true,
+            ExpectedStatusCode = 200,
+            ActualStatusCode = 200,
+            ResponseBody = responseBody
+        },
+        new ApiTestRunResult
+        {
+            EndpointKey = $"{serviceName}::TestEndpoint",
+            ServiceName = serviceName,
+            EndpointName = "Test Endpoint",
+            Passed = true,
+            ExpectedStatusCode = 200,
+            ActualStatusCode = 200
+        }
+        ];
+    }
+
+    private static IReadOnlyList<ApiTestRunResult> CreateHostedResults(
+        string serviceName,
+        string endpointName)
+    {
+        return
+        [
+            new ApiTestRunResult
+        {
+            EndpointKey = $"{serviceName}::{endpointName}",
+            ServiceName = serviceName,
+            EndpointName = endpointName,
+            Passed = true,
+            ExpectedStatusCode = 200,
+            ActualStatusCode = 200
+        }
+        ];
+    }
+
+    private sealed class TestServiceSuite(string serviceName, IReadOnlyList<ApiTestRunResult> results) : IServiceTestSuite
+    {
+        public string ServiceName => serviceName;
 
         public IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions() => [];
 
@@ -245,7 +480,9 @@ public class ApiHealthExecutionRunManagerTests
 
     private sealed class TestApiHealthRunStore : IApiHealthRunStore
     {
-        public IReadOnlyList<ApiTestRunResult> SavedResults { get; private set; } = [];
+        private readonly List<ApiTestRunResult> _savedResults = [];
+
+        public IReadOnlyList<ApiTestRunResult> SavedResults => _savedResults;
 
         public Task SaveRunResultsAsync(
             IEnumerable<ApiTestRunResult> results,
@@ -253,7 +490,7 @@ public class ApiHealthExecutionRunManagerTests
             DateTimeOffset startedAt,
             CancellationToken ct = default)
         {
-            SavedResults = results.ToList();
+            _savedResults.AddRange(results);
             return Task.CompletedTask;
         }
 

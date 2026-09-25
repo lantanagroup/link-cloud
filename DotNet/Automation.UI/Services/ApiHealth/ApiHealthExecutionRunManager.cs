@@ -222,6 +222,8 @@ public sealed class ApiHealthExecutionRunManager(
             var abortedBySeedCancellation = false;
             try
             {
+                var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var suite in suites)
                 {
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
@@ -231,7 +233,7 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite);
+                    await RunSuiteAsync(run, suite, serviceInformationByService);
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -295,6 +297,8 @@ public sealed class ApiHealthExecutionRunManager(
             var abortedBySeedCancellation = false;
             try
             {
+                var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (var suite in suites)
                 {
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
@@ -304,7 +308,7 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite);
+                    await RunSuiteAsync(run, suite, serviceInformationByService);
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -341,7 +345,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite)
+    private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite, IDictionary<string, ServiceInformation> serviceInformationByService)
     {
         IReadOnlyList<ApiTestRunResult> results;
         try
@@ -371,6 +375,20 @@ public sealed class ApiHealthExecutionRunManager(
             .ToHashSet();
 
         var serviceInfo = GetServiceInformation(results, suite.ServiceName);
+
+        if (serviceInfo != null)
+        {
+            serviceInformationByService[suite.ServiceName] = serviceInfo;
+        }
+        else
+        {
+            var metadataServiceName = GetMetadataServiceName(suite.ServiceName);
+
+            serviceInformationByService.TryGetValue(
+                metadataServiceName,
+                out serviceInfo);
+        }
+
         var commit = GetCommit(serviceInfo);
 
         foreach (var result in results)
@@ -393,6 +411,27 @@ public sealed class ApiHealthExecutionRunManager(
             var json = JsonSerializer.Serialize(result, _jsonOptions);
             AddEvent(run, "result", json);
         }
+    }
+
+    private static string GetMetadataServiceName(string suiteServiceName)
+    {
+        if (string.Equals(
+            suiteServiceName,
+            ApiEndPointLibrary.ServiceNames.AdminBffAuth,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiEndPointLibrary.ServiceNames.AdminBff;
+        }
+
+        if (string.Equals(
+            suiteServiceName,
+            ApiEndPointLibrary.ServiceNames.Dmrp,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiEndPointLibrary.ServiceNames.Tenant;
+        }
+
+        return suiteServiceName;
     }
 
     private ServiceInformation? GetServiceInformation(IReadOnlyList<ApiTestRunResult> results, string serviceName)
@@ -418,12 +457,36 @@ public sealed class ApiHealthExecutionRunManager(
 
         try
         {
-            return JsonSerializer.Deserialize<ServiceInformation>(
-                serviceInfoResult.ResponseBody,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+            using var document = JsonDocument.Parse(serviceInfoResult.ResponseBody);
+
+            if (document.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                return document.RootElement.Deserialize<ServiceInformation>(
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+
+            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                var first = document.RootElement.EnumerateArray().FirstOrDefault();
+
+                if (first.ValueKind == JsonValueKind.Undefined)
+                    return null;
+
+                return first.Deserialize<ServiceInformation>(
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+            }
+
+            logger.LogWarning(
+                "Service Info step passed for {ServiceName}, but the response body was neither an object nor an array.",
+                serviceName);
+
+            return null;
         }
         catch (JsonException ex)
         {
