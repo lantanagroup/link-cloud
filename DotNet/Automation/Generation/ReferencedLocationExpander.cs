@@ -50,11 +50,13 @@ public static class ReferencedLocationExpander
         while (pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // The check is before the next GET, so a partOf enqueued by the last
+            // successful read is still pending here. Leaving it unread would publish
+            // a short manifest as a green run.
             if (reads >= MaxLocationReads)
             {
-                output?.WriteLine(
-                    $"  [imported] Stopped resolving referenced Locations after {MaxLocationReads} reads.");
-                break;
+                throw new InvalidOperationException(
+                    $"Referenced Location expansion hit the {MaxLocationReads}-read cap with {pending.Count} reference(s) still unread. The import is stopping.");
             }
 
             reads++;

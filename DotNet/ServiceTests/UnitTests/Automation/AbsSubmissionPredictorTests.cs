@@ -200,7 +200,7 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
-    public async Task Referenced_location_reads_stop_at_the_cap_when_targets_are_missing()
+    public async Task Referenced_location_read_cap_fails_the_import_when_targets_remain()
     {
         var encounter = new Encounter
         {
@@ -229,7 +229,7 @@ public class AbsSubmissionPredictorTests
         };
 
         var reads = 0;
-        var added = await ReferencedLocationExpander.AppendMissingAsync(
+        var act = async () => await ReferencedLocationExpander.AppendMissingAsync(
             entries,
             (_, _) =>
             {
@@ -239,9 +239,61 @@ public class AbsSubmissionPredictorTests
             output: null,
             CancellationToken.None);
 
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{ReferencedLocationExpander.MaxLocationReads}-read cap*");
         reads.Should().Be(ReferencedLocationExpander.MaxLocationReads);
-        added.Should().Be(0);
         entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Referenced_location_read_cap_fails_when_the_last_read_enqueues_partOf()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-chain",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/loc-0000")
+        });
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent
+                {
+                    Method = Bundle.HTTPVerb.PUT,
+                    Url = "Encounter/enc-chain"
+                }
+            }
+        };
+
+        var reads = new List<string>();
+        var act = async () => await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                var index = int.Parse(id["loc-".Length..], System.Globalization.CultureInfo.InvariantCulture);
+                return Task.FromResult<Location?>(new Location
+                {
+                    Id = id,
+                    PartOf = new ResourceReference($"Location/loc-{(index + 1):D4}")
+                });
+            },
+            output: null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*still unread*");
+        var unread = $"loc-{ReferencedLocationExpander.MaxLocationReads:D4}";
+        reads.Should().HaveCount(ReferencedLocationExpander.MaxLocationReads);
+        reads.Should().NotContain(unread);
+        entries.Select(e => e.Resource).OfType<Location>().Select(location => location.Id)
+            .Should().NotContain(unread);
     }
 
     [Theory]

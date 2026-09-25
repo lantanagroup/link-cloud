@@ -680,8 +680,9 @@ public class FhirDataLoader
 
     /// <summary>
     /// GETs one resource relative to the configured FHIR base. Returns null on 404
-    /// and on 410 (a deleted resource). Any other unsuccessful response throws:
-    /// treating a live resource as missing under-predicts the manifest.
+    /// and on 410 (a deleted resource). 408, 429, and 5xx are retried the same way
+    /// as Patient/$everything paging. Any other unsuccessful response throws with
+    /// the response body, so a live resource is not treated as missing.
     /// </summary>
     public async Task<string?> TryReadResourceJsonAsync(string relativeUrl, CancellationToken ct = default)
     {
@@ -690,23 +691,63 @@ public class FhirDataLoader
         if (relativeUrl.Contains("://", StringComparison.Ordinal) || relativeUrl.StartsWith("//", StringComparison.Ordinal))
             throw new ArgumentException($"Refusing absolute URL '{relativeUrl}'.", nameof(relativeUrl));
 
-        var request = new RestRequest(relativeUrl.TrimStart('/'), Method.Get);
-        request.AddHeader("Accept", "application/fhir+json");
-        if (!string.IsNullOrEmpty(_authorization))
-            request.AddHeader("Authorization", _authorization);
+        RestResponse? response = null;
+        Exception? lastException = null;
+        var delay = InitialRetryDelay;
+        var path = relativeUrl.TrimStart('/');
 
-        var response = await _restClient.ExecuteAsync(request, ct);
-        if (IsAbsentResource(response.StatusCode))
-            return null;
-
-        if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+        for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
-            var statusCode = (int)response.StatusCode;
-            throw new InvalidOperationException(
-                $"FHIR server returned {statusCode} {response.StatusCode} for {relativeUrl}.");
+            ct.ThrowIfCancellationRequested();
+            response = null;
+
+            try
+            {
+                var request = new RestRequest(path, Method.Get);
+                request.AddHeader("Accept", "application/fhir+json");
+                if (!string.IsNullOrEmpty(_authorization))
+                    request.AddHeader("Authorization", _authorization);
+
+                response = await _restClient.ExecuteAsync(request, ct);
+                if (IsAbsentResource(response.StatusCode))
+                    return null;
+
+                if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
+                    return response.Content;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (attempt < MaxRetries)
+            {
+                lastException = ex;
+            }
+
+            if (attempt < MaxRetries && IsRetriablePagingFailure(response))
+            {
+                await Task.Delay(delay, ct);
+                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+                continue;
+            }
+
+            break;
         }
 
-        return response.Content;
+        if (lastException != null && response == null)
+        {
+            throw new InvalidOperationException(
+                $"FHIR server request failed for {relativeUrl} after {MaxRetries} attempt(s): {lastException.Message}",
+                lastException);
+        }
+
+        var statusCode = response != null ? (int)response.StatusCode : 0;
+        var statusText = response?.StatusCode.ToString() ?? "(no status)";
+        var responseBody = response?.Content ?? "";
+        throw new InvalidOperationException(
+            $"FHIR server returned {statusCode} {statusText} for {relativeUrl}. " +
+            $"Automation issued the request successfully, but the server response was unsuccessful or empty. " +
+            $"Response body: {responseBody}");
     }
 
     /// <summary>
