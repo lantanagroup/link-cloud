@@ -34,6 +34,7 @@ internal sealed class MutableRunState(
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? FacilityId { get; set; }
+    public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
