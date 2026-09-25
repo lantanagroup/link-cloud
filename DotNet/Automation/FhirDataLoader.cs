@@ -25,6 +25,12 @@ public class FhirDataLoader
     /// </summary>
     private readonly Uri _baseUri;
     private readonly Uri _baseUriForRelativeResolution;
+
+    /// <summary>
+    /// FHIR server this loader authenticates to. Location reference expansion uses it
+    /// to ignore absolute references that point at a different server.
+    /// </summary>
+    public Uri FhirServerBase => _baseUri;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
@@ -673,9 +679,9 @@ public class FhirDataLoader
     }
 
     /// <summary>
-    /// GETs one resource relative to the configured FHIR base. Returns null on 404.
-    /// Any other unsuccessful response throws: treating a live resource as missing
-    /// under-predicts the manifest.
+    /// GETs one resource relative to the configured FHIR base. Returns null on 404
+    /// and on 410 (a deleted resource). Any other unsuccessful response throws:
+    /// treating a live resource as missing under-predicts the manifest.
     /// </summary>
     public async Task<string?> TryReadResourceJsonAsync(string relativeUrl, CancellationToken ct = default)
     {
@@ -690,7 +696,7 @@ public class FhirDataLoader
             request.AddHeader("Authorization", _authorization);
 
         var response = await _restClient.ExecuteAsync(request, ct);
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (IsAbsentResource(response.StatusCode))
             return null;
 
         if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
@@ -702,6 +708,12 @@ public class FhirDataLoader
 
         return response.Content;
     }
+
+    /// <summary>
+    /// 404 is an unknown resource. 410 is a deleted one. Neither can be added to the manifest.
+    /// </summary>
+    internal static bool IsAbsentResource(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone;
 
     /// <summary>
     /// Performs a single GET against the FHIR server and returns the response body.

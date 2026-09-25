@@ -63,7 +63,8 @@ public static class ImportedPatientLoader
                     imp.PreLoadedEntries,
                     (id, token) => ReadLocationAsync(fhirDataLoader, id, token),
                     output,
-                    ct).ConfigureAwait(false);
+                    ct,
+                    fhirDataLoader.FhirServerBase).ConfigureAwait(false);
             }
 
             // Backfill PatientId from the bundle when the user didn't specify one.
@@ -171,7 +172,7 @@ public static class ImportedPatientLoader
     }
 
     /// <summary>
-    /// Reads Location/{id}. A 404 is a dangling reference and returns null.
+    /// Reads Location/{id}. A 404 or 410 is a missing reference and returns null.
     /// </summary>
     public static async Task<Location?> ReadLocationAsync(
         FhirDataLoader fhirDataLoader,

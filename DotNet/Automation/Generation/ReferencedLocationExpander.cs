@@ -18,7 +18,8 @@ public static class ReferencedLocationExpander
         IList<Bundle.EntryComponent> entries,
         Func<string, CancellationToken, Task<Location?>> readLocation,
         IAutomationOutput? output,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Uri? configuredFhirBase = null)
     {
         if (entries == null)
             throw new ArgumentNullException(nameof(entries));
@@ -38,7 +39,7 @@ public static class ReferencedLocationExpander
         {
             if (entry?.Resource == null)
                 continue;
-            foreach (var id in ReferencedLocationIds(entry.Resource))
+            foreach (var id in ReferencedLocationIds(entry.Resource, configuredFhirBase))
                 Enqueue(requested, pending, id);
         }
 
@@ -83,7 +84,7 @@ public static class ReferencedLocationExpander
             output?.WriteLine(
                 $"  [imported] Patient/$everything omitted Location/{location.Id}; included it for manifest prediction.");
 
-            foreach (var referencedId in ReferencedLocationIds(location))
+            foreach (var referencedId in ReferencedLocationIds(location, configuredFhirBase))
                 Enqueue(requested, pending, referencedId);
         }
 
@@ -96,10 +97,10 @@ public static class ReferencedLocationExpander
             pending.Enqueue(id);
     }
 
-    private static IEnumerable<string> ReferencedLocationIds(Base node)
+    private static IEnumerable<string> ReferencedLocationIds(Base node, Uri? configuredFhirBase)
     {
         if (node is ResourceReference resourceReference
-            && TryParseLocationId(resourceReference.Reference, out var id))
+            && TryParseLocationId(resourceReference.Reference, configuredFhirBase, out var id))
         {
             yield return id;
         }
@@ -110,15 +111,23 @@ public static class ReferencedLocationExpander
         foreach (var child in node.Children())
 #pragma warning restore CS0618
         {
-            foreach (var nested in ReferencedLocationIds(child))
+            foreach (var nested in ReferencedLocationIds(child, configuredFhirBase))
                 yield return nested;
         }
     }
 
-    internal static bool TryParseLocationId(string? reference, out string locationId)
+    /// <summary>
+    /// Relative <c>Location/{id}</c> references, and absolute ones on
+    /// <paramref name="configuredFhirBase"/>, yield the id. An absolute or
+    /// protocol-relative reference on another host does not: reading that id
+    /// from the configured server can return a different Location.
+    /// </summary>
+    internal static bool TryParseLocationId(string? reference, Uri? configuredFhirBase, out string locationId)
     {
         locationId = string.Empty;
         if (string.IsNullOrWhiteSpace(reference))
+            return false;
+        if (!IsOnConfiguredServer(reference, configuredFhirBase))
             return false;
 
         var parts = reference.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -133,4 +142,28 @@ public static class ReferencedLocationExpander
                && locationId.IndexOf('?') < 0
                && !string.Equals(locationId, "_history", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsOnConfiguredServer(string reference, Uri? configuredFhirBase)
+    {
+        if (reference.StartsWith("//", StringComparison.Ordinal))
+        {
+            if (configuredFhirBase == null)
+                return false;
+            return Uri.TryCreate(configuredFhirBase.Scheme + ":" + reference, UriKind.Absolute, out var protocolRelative)
+                   && SameOrigin(protocolRelative, configuredFhirBase);
+        }
+
+        if (!reference.Contains("://", StringComparison.Ordinal))
+            return true;
+
+        if (configuredFhirBase == null || !Uri.TryCreate(reference, UriKind.Absolute, out var absolute))
+            return false;
+
+        return SameOrigin(absolute, configuredFhirBase);
+    }
+
+    private static bool SameOrigin(Uri left, Uri right) =>
+        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
+        && left.Port == right.Port;
 }

@@ -244,6 +244,35 @@ public class AbsSubmissionPredictorTests
         entries.Should().ContainSingle();
     }
 
+    [Theory]
+    [InlineData("Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("//ehr-test.nhsnlink.org/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("//other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    public void Location_reference_id_stays_on_the_configured_server(
+        string reference,
+        string fhirBase,
+        bool expected,
+        string expectedId)
+    {
+        var parsed = ReferencedLocationExpander.TryParseLocationId(
+            reference,
+            new Uri(fhirBase),
+            out var locationId);
+
+        parsed.Should().Be(expected);
+        locationId.Should().Be(expectedId);
+    }
+
+    [Fact]
+    public void Deleted_location_read_is_treated_as_missing()
+    {
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.NotFound).Should().BeTrue();
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.Gone).Should().BeTrue();
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.InternalServerError).Should().BeFalse();
+    }
+
     [Fact]
     public void Imported_patient_predictor_excludes_diagnostic_reports_outside_ip_window()
     {

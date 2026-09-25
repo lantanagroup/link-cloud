@@ -738,7 +738,8 @@ public static class FhirGenerationPipeline
                     entries,
                     (id, token) => ImportedPatientLoader.ReadLocationAsync(fhirDataLoader, id, token),
                     output,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    fhirDataLoader.FhirServerBase).ConfigureAwait(false);
             }
         }
 
