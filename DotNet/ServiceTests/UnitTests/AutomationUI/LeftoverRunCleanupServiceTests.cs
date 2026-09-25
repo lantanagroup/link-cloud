@@ -544,6 +544,55 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task CustomRange_purges_a_run_whose_teardown_already_used_the_facility_cap()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var first = new AutomationRunSummary
+        {
+            RunId = firstId,
+            FacilityId = firstId.ToString(),
+            AutomationCreatedFacility = true,
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-2)
+        };
+        var second = new AutomationRunSummary
+        {
+            RunId = secondId,
+            FacilityId = secondId.ToString(),
+            AutomationCreatedFacility = true,
+            ReportId = Guid.NewGuid().ToString(),
+            Status = AutomationRunStatus.Succeeded,
+            FinishedAt = now.AddDays(-2)
+        };
+        var deleted = new List<string>();
+        var service = Create(
+            now,
+            [first, second],
+            [],
+            facilities: new Dictionary<string, string>
+            {
+                [firstId.ToString()] = "first",
+                [secondId.ToString()] = "second"
+            },
+            deletedFacilityIds: deleted,
+            maxFacilitiesPerPass: 1);
+
+        var result = await service.RunCustomRangeAsync(
+            now.AddDays(-3),
+            now.AddDays(-1),
+            teardownFacilities: true,
+            purgeHistory: true);
+
+        deleted.Should().Equal(firstId.ToString());
+        result.TornDownFacilityIds.Should().Equal(firstId.ToString());
+        result.PurgedRunIds.Should().Equal(first.RunId);
+        result.PurgedRunIds.Should().NotContain(second.RunId);
+    }
+
+    [Fact]
     public async Task HistoryPurge_does_not_exceed_the_facility_cap_on_the_first_run()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);

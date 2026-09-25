@@ -397,7 +397,7 @@ public sealed class LeftoverRunCleanupService(
 
                 foreach (var run in historyRuns)
                 {
-                    if (historyWork.Count >= historyLimit || spent >= limit)
+                    if (historyWork.Count >= historyLimit)
                         break;
 
                     var done = new HashSet<string>(
@@ -413,12 +413,19 @@ public sealed class LeftoverRunCleanupService(
                     var room = limit - spent;
                     if (fresh.Count > room)
                     {
-                        foreach (var id in fresh.Take(room))
+                        // This run still needs a teardown that does not fit. Leave it for a later pass.
+                        // Keep scanning: a later run whose teardown is already scheduled can still be purged.
+                        if (room > 0)
                         {
-                            scheduledTeardown.Add(id);
-                            partialHistoryTeardown.Add((run.RunId, id));
+                            foreach (var id in fresh.Take(room))
+                            {
+                                scheduledTeardown.Add(id);
+                                partialHistoryTeardown.Add((run.RunId, id));
+                                spent++;
+                            }
                         }
-                        break;
+
+                        continue;
                     }
 
                     historyWork.Add(run);
