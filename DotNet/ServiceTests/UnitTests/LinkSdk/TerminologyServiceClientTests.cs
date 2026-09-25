@@ -181,6 +181,108 @@ public class TerminologyServiceClientTests
         Assert.Contains("Terminology", ex.Message);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_ByUrl_CallsExpandRoute()
+    {
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"ValueSet\"}");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.ExpandValueSetAsync(url: "http://example.org/vs/encounter-type");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet/$expand", request.Path);
+        Assert.Contains("url=http", request.Query);
+        Assert.Contains("ValueSet", result.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_ById_CallsIdScopedExpandRoute()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.ExpandValueSetAsync(id: "vs-1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet/vs-1/$expand", request.Path);
+        Assert.DoesNotContain("count=", request.Query);
+        Assert.DoesNotContain("offset=", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExpandValueSetAsync_SendsPagingParameters()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.ExpandValueSetAsync(id: "vs-1", count: 50, offset: 100);
+        var request = http.SingleRequest();
+
+        Assert.Contains("count=50", request.Query);
+        Assert.Contains("offset=100", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetValueSetsAsync_CallsValueSetRoute()
+    {
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Bundle\"}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetValueSetsAsync(url: "http://example.org/vs/encounter-type");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/ValueSet", request.Path);
+        Assert.Contains("url=http", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemAsync_CallsLookupRouteWithQuery()
+    {
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.LookupCodeInCodeSystemAsync(system: "http://loinc.org", code: "1234-5");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
+        Assert.Contains("system=http", request.Query);
+        Assert.Contains("code=1234-5", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_PostsParametersBody()
+    {
+        const string parameters = "{\"resourceType\":\"Parameters\",\"parameter\":[{\"name\":\"code\",\"valueCode\":\"1234-5\"}]}";
+        using var http = new FakeHttpBoundary("{\"resourceType\":\"Parameters\"}");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.LookupCodeInCodeSystemWithParametersAsync(parameters, system: "http://loinc.org");
+        var request = http.SingleRequest();
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/$lookup", request.Path);
+        Assert.Contains("system=http", request.Query);
+        Assert.Equal(parameters, request.Body);
+        Assert.Contains("Parameters", result.Body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task LookupCodeInCodeSystemWithParametersAsync_ById_PostsToIdScopedRoute()
+    {
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.LookupCodeInCodeSystemWithParametersAsync("{\"resourceType\":\"Parameters\"}", id: "loinc");
+        var request = http.SingleRequest();
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/terminology/fhir/CodeSystem/loinc/$lookup", request.Path);
+    }
+
     private static TerminologyServiceClient CreateClient(string baseUrl)
     {
         return new TerminologyServiceClient(
