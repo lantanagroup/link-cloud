@@ -19,10 +19,10 @@ public class EncounterEndpoints : IApi
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .WithOpenApi(operation =>
             {
-                operation.Summary = "CPT/SNOMED reference codes for the Encounter Mapping step, expanded live from Terminology.";
+                operation.Summary = "CPT/SNOMED reference codes for the Encounter Mapping step, read live from Terminology.";
                 operation.Description =
-                    "Returns the whole expansion for every configured ValueSet; the UI filters it " +
-                    "client-side. Terminology's ValueSet/$expand has no filter parameter of its own.";
+                    "Returns every code loaded under each configured CodeSystem; the UI filters it " +
+                    "client-side.";
                 return operation;
             });
 

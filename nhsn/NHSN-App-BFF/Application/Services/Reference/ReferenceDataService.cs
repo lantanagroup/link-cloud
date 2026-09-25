@@ -89,45 +89,53 @@ public sealed class ReferenceDataService : IReferenceDataService
     // in effect the first time this ran.
     public IReadOnlyList<TimezoneResponse> GetTimezones() => BuildTimezones();
 
+    // Terminology clamps pageSize to this internally; requesting it directly keeps the page count
+    // (and therefore the round-trip count) as low as the service allows.
+    private const int MaxPageSize = 100;
+
     public async Task<IReadOnlyList<EncounterCode>> GetEncounterCodesAsync(CancellationToken cancellationToken = default)
     {
         var codes = new List<EncounterCode>();
 
-        foreach (var (system, url) in _encounterCodeSettings.ValueSetUrls)
+        foreach (var (system, codeSystemUrl) in _encounterCodeSettings.CodeSystemUrls)
         {
-            if (string.IsNullOrWhiteSpace(url))
+            if (string.IsNullOrWhiteSpace(codeSystemUrl))
             {
                 continue;
             }
 
-            var response = await _terminologyClient.ExpandValueSetAsync(url: url, cancellationToken: cancellationToken);
-            var body = LinkResponseHandler.Optional<string>(response, TerminologyServiceName, nameof(GetEncounterCodesAsync));
-            if (body is null)
+            var pageNumber = 1;
+            long totalPages;
+            do
             {
-                _logger.LogInformation(
-                    "No ValueSet loaded in Terminology for encounter code system {System} (url {Url}); skipping.", system, url);
-                continue;
-            }
-
-            var valueSet = DeserializeFhir<ValueSetJson>(body, TerminologyServiceName, nameof(GetEncounterCodesAsync));
-            foreach (var contains in valueSet?.Expansion?.Contains ?? [])
-            {
-                if (string.IsNullOrWhiteSpace(contains.Code) || string.IsNullOrWhiteSpace(contains.Display))
+                var response = await _terminologyClient.SearchCodesAsync(
+                    codeSystem: codeSystemUrl,
+                    pageNumber: pageNumber,
+                    pageSize: MaxPageSize,
+                    cancellationToken: cancellationToken);
+                var page = LinkResponseHandler.Optional(response, TerminologyServiceName, nameof(GetEncounterCodesAsync));
+                if (page is null)
                 {
-                    continue;
+                    _logger.LogInformation(
+                        "No CodeSystem loaded in Terminology for encounter code system {System} (url {Url}); skipping.", system, codeSystemUrl);
+                    break;
                 }
 
-                var resolvedSystem = string.IsNullOrWhiteSpace(contains.System) ? system : contains.System;
-
-                codes.Add(new EncounterCode
+                foreach (var record in page.Records)
                 {
-                    System = resolvedSystem,
-                    Code = contains.Code,
-                    Display = contains.Display,
-                    Category = null,
-                    CategoryName = null
-                });
-            }
+                    codes.Add(new EncounterCode
+                    {
+                        System = record.System,
+                        Code = record.Code,
+                        Display = record.Display,
+                        Category = null,
+                        CategoryName = null
+                    });
+                }
+
+                totalPages = page.Metadata.TotalPages;
+                pageNumber++;
+            } while (pageNumber <= totalPages);
         }
 
         return codes;
