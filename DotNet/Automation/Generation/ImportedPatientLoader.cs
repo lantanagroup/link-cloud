@@ -179,12 +179,9 @@ public static class ImportedPatientLoader
         string locationId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(locationId)
-            || locationId.Contains('/')
-            || locationId.Contains('\\')
-            || locationId.Contains('?'))
+        if (!ReferencedLocationExpander.IsLogicalId(locationId))
         {
-            throw new ArgumentException($"Location ID '{locationId}' is not a single resource id.", nameof(locationId));
+            throw new ArgumentException($"Location ID '{locationId}' is not a FHIR logical id.", nameof(locationId));
         }
 
         var json = await fhirDataLoader.TryReadResourceJsonAsync($"Location/{locationId}", cancellationToken)

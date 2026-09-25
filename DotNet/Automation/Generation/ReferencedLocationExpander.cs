@@ -150,10 +150,36 @@ public static class ReferencedLocationExpander
             return false;
 
         locationId = relativePath[(slash + 1)..];
-        return !string.IsNullOrWhiteSpace(locationId)
-               && locationId.IndexOf('?') < 0
-               && locationId.IndexOf('#') < 0
-               && !string.Equals(locationId, "_history", StringComparison.Ordinal);
+        if (!IsLogicalId(locationId))
+        {
+            locationId = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// FHIR id: 1-64 ASCII letters, digits, '-' or '.'. '.' and '..' match that
+    /// character set but are path segments, so they are not requested.
+    /// </summary>
+    internal static bool IsLogicalId(string? id)
+    {
+        if (string.IsNullOrEmpty(id) || id.Length > 64 || id is "." or "..")
+            return false;
+
+        foreach (var c in id)
+        {
+            var allowed = (c >= 'A' && c <= 'Z')
+                          || (c >= 'a' && c <= 'z')
+                          || (c >= '0' && c <= '9')
+                          || c == '-'
+                          || c == '.';
+            if (!allowed)
+                return false;
+        }
+
+        return true;
     }
 
     private static bool TryGetLocationRelativePath(string reference, Uri? configuredFhirBase, out string relativePath)

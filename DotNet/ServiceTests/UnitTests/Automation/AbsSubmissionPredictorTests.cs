@@ -306,6 +306,14 @@ public class AbsSubmissionPredictorTests
     [InlineData("/other/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     [InlineData("https://ehr-test.nhsnlink.org/another-fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     [InlineData("https://ehr-test.nhsnlink.org/fhir/extra/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/ab-c.d", "https://ehr-test.nhsnlink.org/fhir", true, "ab-c.d")]
+    [InlineData("Location/%2e%2e%2fPatient%2f123", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/has space", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/..", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/.", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/id_underscore", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/caf\u00e9", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     public void Location_reference_id_stays_on_the_configured_server(
         string reference,
         string fhirBase,
