@@ -597,6 +597,10 @@ public class FhirDataLoader
                 descriptionForError: $"Patient/{patientId}/$everything",
                 ct);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             throw new InvalidOperationException(
@@ -646,6 +650,10 @@ public class FhirDataLoader
                     useFullUrl: true,
                     descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
                     ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -816,6 +824,10 @@ public class FhirDataLoader
 
                 if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
                     return response.Content;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex) when (attempt < MaxRetries)
             {

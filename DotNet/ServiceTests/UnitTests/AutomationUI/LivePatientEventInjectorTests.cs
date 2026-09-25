@@ -100,6 +100,21 @@ public class LivePatientEventInjectorTests
     }
 
     [Fact]
+    public async Task Canceled_pool_provisioning_stays_canceled()
+    {
+        var injector = CreateInjector();
+        var runId = Guid.NewGuid();
+        injector.OpenSession(
+            runId,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5),
+            patientProvisioner: new CancelingProvisioner());
+
+        var act = async () => await injector.ReferencePoolPatientAsync(runId, "fhir-99");
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task Pool_ops_after_close_return_409()
     {
         var injector = CreateInjector();
@@ -315,5 +330,17 @@ public class LivePatientEventInjectorTests
             ReferenceCalls++;
             return Task.FromResult(new LiveProvisionedPatient("ref-appended", ExpectedInReport: false));
         }
+    }
+
+    private sealed class CancelingProvisioner : ILivePatientProvisioner
+    {
+        public Task<LiveProvisionedPatient> GenerateQualifyingPatientAsync(CancellationToken cancellationToken)
+            => throw new OperationCanceledException(cancellationToken);
+
+        public Task<LiveProvisionedPatient> UploadPatientAsync(string content, string? fileName, CancellationToken cancellationToken)
+            => throw new OperationCanceledException(cancellationToken);
+
+        public Task<LiveProvisionedPatient> ReferencePatientAsync(string patientId, CancellationToken cancellationToken)
+            => throw new OperationCanceledException(cancellationToken);
     }
 }
