@@ -91,6 +91,17 @@ describe('findRuleForElement / ruleCountForPatient', () => {
     expect(ruleCountForPatient(rules, observations, 'p2')).toBe(0);
     expect(ruleCountForPatient(rules, observations, 'p3')).toBe(0);
   });
+
+  it('counts the same element on two identifiers of the patient as two rules', () => {
+    const rules = [
+      rule({element: 'value', patientId: 'p1', identifierIndex: 0}),
+      rule({element: 'assigner', patientId: 'p1', identifierIndex: 0}),
+      rule({element: 'value', patientId: 'p1', identifierIndex: 1}),
+      rule({element: 'assigner', patientId: 'p1', identifierIndex: 1})
+    ];
+    const observations: MrnObservation[] = [{patientId: 'p1', elements: ['value', 'assigner']}];
+    expect(ruleCountForPatient(rules, observations, 'p1')).toBe(4);
+  });
 });
 
 describe('upsertPatientRule', () => {
