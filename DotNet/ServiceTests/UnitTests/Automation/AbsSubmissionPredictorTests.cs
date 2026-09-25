@@ -250,6 +250,10 @@ public class AbsSubmissionPredictorTests
     [InlineData("//ehr-test.nhsnlink.org/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
     [InlineData("https://other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     [InlineData("//other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("foo/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("/other/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("https://ehr-test.nhsnlink.org/another-fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/extra/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
     public void Location_reference_id_stays_on_the_configured_server(
         string reference,
         string fhirBase,
@@ -263,6 +267,50 @@ public class AbsSubmissionPredictorTests
 
         parsed.Should().Be(expected);
         locationId.Should().Be(expectedId);
+    }
+
+    [Fact]
+    public async Task Location_ids_that_differ_only_by_case_are_both_kept()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-case",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/abc")
+        });
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = new Location { Id = "ABC" },
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Location/ABC" }
+            },
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Encounter/enc-case" }
+            }
+        };
+
+        var reads = new List<string>();
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                return Task.FromResult<Location?>(new Location { Id = id });
+            },
+            output: null,
+            CancellationToken.None);
+
+        reads.Should().Equal("abc");
+        added.Should().Be(1);
+        entries.Select(e => e.Resource).OfType<Location>().Select(location => location.Id)
+            .Should().BeEquivalentTo("ABC", "abc");
     }
 
     [Fact]

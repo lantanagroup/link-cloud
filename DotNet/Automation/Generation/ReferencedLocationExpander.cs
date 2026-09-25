@@ -26,14 +26,16 @@ public static class ReferencedLocationExpander
         if (readLocation == null)
             throw new ArgumentNullException(nameof(readLocation));
 
-        var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // FHIR logical ids are case-sensitive. Collapsing them would skip a
+        // referenced Location whose id differs only by case from one already present.
+        var present = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in entries)
         {
             if (entry?.Resource is Location location && !string.IsNullOrWhiteSpace(location.Id))
                 present.Add(location.Id);
         }
 
-        var requested = new HashSet<string>(present, StringComparer.OrdinalIgnoreCase);
+        var requested = new HashSet<string>(present, StringComparer.Ordinal);
         var pending = new Queue<string>();
         foreach (var entry in entries)
         {
@@ -117,49 +119,73 @@ public static class ReferencedLocationExpander
     }
 
     /// <summary>
-    /// Relative <c>Location/{id}</c> references, and absolute ones on
-    /// <paramref name="configuredFhirBase"/>, yield the id. An absolute or
-    /// protocol-relative reference on another host does not: reading that id
-    /// from the configured server can return a different Location.
+    /// A relative reference must be exactly <c>Location/{id}</c>. An absolute or
+    /// protocol-relative reference must sit directly under
+    /// <paramref name="configuredFhirBase"/>, so a different FHIR path on the
+    /// same host is not read as <c>Location/{id}</c> from this server.
     /// </summary>
     internal static bool TryParseLocationId(string? reference, Uri? configuredFhirBase, out string locationId)
     {
         locationId = string.Empty;
         if (string.IsNullOrWhiteSpace(reference))
             return false;
-        if (!IsOnConfiguredServer(reference, configuredFhirBase))
+
+        if (!TryGetLocationRelativePath(reference, configuredFhirBase, out var relativePath))
             return false;
 
-        var parts = reference.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2)
+        var slash = relativePath.IndexOf('/');
+        if (slash <= 0 || slash != relativePath.LastIndexOf('/'))
             return false;
 
-        if (!string.Equals(parts[^2], "Location", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(relativePath[..slash], "Location", StringComparison.Ordinal))
             return false;
 
-        locationId = parts[^1];
+        locationId = relativePath[(slash + 1)..];
         return !string.IsNullOrWhiteSpace(locationId)
                && locationId.IndexOf('?') < 0
-               && !string.Equals(locationId, "_history", StringComparison.OrdinalIgnoreCase);
+               && locationId.IndexOf('#') < 0
+               && !string.Equals(locationId, "_history", StringComparison.Ordinal);
     }
 
-    private static bool IsOnConfiguredServer(string reference, Uri? configuredFhirBase)
+    private static bool TryGetLocationRelativePath(string reference, Uri? configuredFhirBase, out string relativePath)
     {
-        if (reference.StartsWith("//", StringComparison.Ordinal))
+        relativePath = string.Empty;
+        if (reference.Contains("://", StringComparison.Ordinal) || reference.StartsWith("//", StringComparison.Ordinal))
         {
             if (configuredFhirBase == null)
                 return false;
-            return Uri.TryCreate(configuredFhirBase.Scheme + ":" + reference, UriKind.Absolute, out var protocolRelative)
-                   && SameOrigin(protocolRelative, configuredFhirBase);
+
+            Uri absolute;
+            if (reference.StartsWith("//", StringComparison.Ordinal))
+            {
+                if (!Uri.TryCreate(configuredFhirBase.Scheme + ":" + reference, UriKind.Absolute, out absolute!))
+                    return false;
+            }
+            else if (!Uri.TryCreate(reference, UriKind.Absolute, out absolute!))
+            {
+                return false;
+            }
+
+            if (!SameOrigin(absolute, configuredFhirBase))
+                return false;
+
+            var basePath = configuredFhirBase.AbsolutePath.TrimEnd('/');
+            var referencePath = absolute.AbsolutePath;
+            var prefix = basePath + "/";
+            if (!referencePath.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+
+            relativePath = Uri.UnescapeDataString(referencePath[prefix.Length..]);
+            return true;
         }
 
-        if (!reference.Contains("://", StringComparison.Ordinal))
-            return true;
-
-        if (configuredFhirBase == null || !Uri.TryCreate(reference, UriKind.Absolute, out var absolute))
+        // A path-absolute reference such as /other/Location/abc is not relative
+        // to the FHIR base, so it is not read from this server.
+        if (reference.StartsWith('/'))
             return false;
 
-        return SameOrigin(absolute, configuredFhirBase);
+        relativePath = reference;
+        return true;
     }
 
     private static bool SameOrigin(Uri left, Uri right) =>
