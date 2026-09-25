@@ -1,3 +1,49 @@
+/*
+ * Only what has no shared equivalent lives here: the native HSLOC-code
+ * <select> used inside a RepeatableList row (kept native, not the Select
+ * field, so its <optgroup> category grouping survives), the reference tab's
+ * search bar, and structural sizing for its table and side panel.
+ * Everything else (tabs, field labels, the repeatable list, the table's
+ * base look, the docked detail panel) comes from the shared classes in
+ * NHSNLink.css's "shared step blocks" section, same as Organization
+ * Identification.
+ */
+
+/* ------------------------------------------------------- content layout */
+
+/* The reference table's own scroll region (.nhsn-link__hsloc-table-scroll below) only actually
+   contains the scrolling if every ancestor between it and the step's own content area passes a
+   real height down instead of sizing to its natural content. NHSNLink.css's shared
+   `.nhsn-link__step-panel > .nhsn-link__content > *` rule keeps a step's own root from shrinking,
+   which is right for a step that already fits, but wrong here: the reference tab's search bar +
+   table are taller than the card, so without this chain the whole card - search bar and all -
+   would scroll along with them instead of just the table. Overridden here, not in NHSNLink.css, so
+   no other step is affected. */
+.nhsn-link__step-panel > .nhsn-link__content > .nhsn-link__hsloc {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.nhsn-link__hsloc > .nhsn-link__field-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* core/fields/Tabs.tsx's own tabpanel wrapper carries no class - matched structurally instead.
+   overflow-y is a fallback, not the primary scroll region: it only engages if a tab's content is
+   still taller than the space this chain hands it. */
+.nhsn-link__hsloc [role='tabpanel'] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 /* ---------------------------------------------------------- mapping tab */
 
 /* Matches Kendo's own .k-input chrome (see NHSNLink.css) so this native
@@ -35,6 +81,15 @@
 
 /* ---------------------------------------------------------- reference tab */
 
+/* Already gets a real height from the shared .nhsn-link__side-panel-layout > *:first-child rule
+   (flex: 1 1 auto, stretched by the row's align-items) - this just turns that into a column so the
+   table-scroll below can claim whatever of it the search bar and result count don't need. */
+.nhsn-link__hsloc-reference-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .nhsn-link__hsloc-search {
   box-sizing: border-box;
   width: 100%;
@@ -48,12 +103,18 @@
   margin-bottom: 10px;
 }
 
+/* Fills whatever height .nhsn-link__hsloc-reference-main has left after the search bar - see the
+   flex chain below - instead of a flat vh value, so only this box scrolls internally and nothing
+   above it (search bar, result count) or outside it (the step's own content area) has to. Growing
+   without a cap could shrink the search bar's row in a very short viewport, so it keeps a floor;
+   below that, [role="tabpanel"]'s own overflow-y is the fallback. */
 .nhsn-link__hsloc-table-scroll {
-  max-height: 48vh;
+  flex: 1 1 auto;
+  min-height: 160px;
 }
 
-/* Fixed layout + percentage widths keep both columns inside the panel
-   instead of growing to each cell's content width. */
+/* Fixed layout + percentage widths keep both columns inside the panel instead of growing to each
+   cell's content width - Description is free text and would otherwise dominate the row. */
 .nhsn-link__hsloc-table {
   table-layout: fixed;
 }
@@ -65,6 +126,7 @@
 
 .nhsn-link__hsloc-table th:nth-child(2),
 .nhsn-link__hsloc-table td:nth-child(2) {
+  width: 80%;
   width: 80%;
 }
 
@@ -154,4 +216,23 @@
    and the tab row - so this keeps the two from butting up against each other. */
 .nhsn-link__hsloc-mapping {
   margin-top: 16px;
+}
+
+/* The shared repeatable-fields styling (NHSNLink.css) absolutely-positions a row's error text and
+   reserves a flat 20px for it, which is enough for one line but not for a message that wraps to
+   two at a narrow width. The overflow still counts toward .nhsn-link__repeatable-scroll's own
+   scrollable area, so a wrapped error alone could push that container into an internal scrollbar
+   it otherwise wouldn't need. Letting the error sit in normal flow here instead - scoped to this
+   step so Organization Identification and MRN Intake, which share the same base styling, are
+   unaffected - grows the row by exactly however many lines the message needs, no reservation to
+   run short. */
+.nhsn-link__hsloc .nhsn-link__repeatable-fields .k-form-error,
+.nhsn-link__hsloc .nhsn-link__repeatable-fields .nhsn-link__hsloc-code-error-text {
+  position: static;
+  margin-top: 4px;
+}
+
+.nhsn-link__hsloc .nhsn-link__repeatable-row:has(.k-form-error),
+.nhsn-link__hsloc .nhsn-link__repeatable-row:has(.nhsn-link__hsloc-code-error-text) {
+  margin-bottom: 0;
 }

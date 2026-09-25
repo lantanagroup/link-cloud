@@ -13,6 +13,7 @@ import {
   NewTabAnnouncement,
   NHSNLoadingIndicator,
   RepeatableList,
+  RequiredAsterisk,
   SidePanel,
   SidePanelLayout,
   StepActions,
@@ -28,9 +29,9 @@ import './HslocStep.css';
 
 type HslocTab = 'mapping' | 'reference';
 
-/** Which fields show their "required" error. Set only by a Continue attempt, and cleared again the
- *  moment that field is edited - so emptying a field while editing never flags it until the facility
- *  next tries to move on. */
+/** Which fields show their "required" error. A field becomes eligible the first time it's edited or
+ *  a failed Continue attempt flags it, and stays eligible afterward - so blanking it out later shows
+ *  the error immediately, with no need to hit Continue again. Mirrors CensusStep's touchedListKeys. */
 interface RowDirtyState {
   sourceDisplay: boolean;
   sourceCode: boolean;
@@ -90,6 +91,10 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const [rows, setRows] = useState<MappingRow[]>(() => [blankMappingRow()]);
   const [readyToAdvance, setReadyToAdvance] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  // Which row's location value was most recently edited, so a fresh duplicate created by that
+  // edit is flagged on the row that caused it rather than the other, already-there row - mirrors
+  // CensusStep's editedListKey.
+  const [editedRowIndex, setEditedRowIndex] = useState<number | null>(null);
   const hasHydratedMappings = useRef(false);
 
   function announceValidationMessage(message: string) {
@@ -180,14 +185,24 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const yourCodeLabel = t('onboarding:hsloc.mapping.fields.yourCodePlaceholder');
   const hslocCodeLabel = t('onboarding:hsloc.mapping.fields.hslocCodePlaceholder');
   const hslocCodeHeading = t('onboarding:hsloc.mapping.fields.hslocCodeHeading');
-  const mappingColumnHeadings = [yourCodeLabel, locationValueLabel, hslocCodeHeading];
+  // The column heading is the visible label here - each row's own field label carries the same
+  // text for assistive tech but is visually hidden (see .nhsn-link__repeatable-fields .k-label),
+  // so the required marker has to go on the heading for sighted users to see it.
+  const mappingColumnHeadings = [
+    <>{yourCodeLabel}<RequiredAsterisk /></>,
+    <>{locationValueLabel}<RequiredAsterisk /></>,
+    <>{hslocCodeHeading}<RequiredAsterisk /></>
+  ];
 
   function isCodeMapped(code: string): boolean {
     return rows.some(row => row.hslocCode === code && row.sourceCode.trim());
   }
 
   const completeRows = useMemo(() => rows.filter(isRowComplete), [rows]);
-  const duplicateRowIndexes = useMemo(() => new Set(findDuplicateSourceCodeIndexes(rows)), [rows]);
+  const duplicateRowIndexes = useMemo(
+    () => new Set(findDuplicateSourceCodeIndexes(rows, editedRowIndex ?? undefined)),
+    [rows, editedRowIndex]
+  );
   const yourCodeRequiredError = t('onboarding:hsloc.mapping.fields.fieldRequiredError', {field: yourCodeLabel});
   const locationValueRequiredError = t('onboarding:hsloc.mapping.fields.fieldRequiredError', {field: locationValueLabel});
   const hslocCodeRequiredError = t('onboarding:hsloc.mapping.fields.hslocCodeRequiredError');
@@ -389,7 +404,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     value={row.sourceDisplay}
                     error={sourceDisplayInvalid ? yourCodeRequiredError : undefined}
                     onChange={sourceDisplay =>
-                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: false}})
+                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: true}})
                     }
                   />
                   <TextField
@@ -400,7 +415,10 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     error={
                       sourceCodeInvalid ? locationValueRequiredError : sourceCodeDuplicate ? duplicateFieldError : undefined
                     }
-                    onChange={sourceCode => onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: false}})}
+                    onChange={sourceCode => {
+                      setEditedRowIndex(index);
+                      onRowChange({...row, sourceCode, dirty: {...row.dirty, sourceCode: true}});
+                    }}
                   />
                   <div>
                     <select
@@ -417,7 +435,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
                       required
                       value={row.hslocCode}
                       onChange={event =>
-                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: false}})
+                        onRowChange({...row, hslocCode: event.target.value, dirty: {...row.dirty, hslocCode: true}})
                       }>
                       <option value="">{hslocCodeLabel}</option>
                       {groupedCodeOptions.map(([category, categoryCodes]) => (
@@ -445,7 +463,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
 
       {tab === 'reference' && (
         <SidePanelLayout>
-          <div>
+          <div className="nhsn-link__hsloc-reference-main">
             <div className="nhsn-link__field-group">
               <input
                 type="text"

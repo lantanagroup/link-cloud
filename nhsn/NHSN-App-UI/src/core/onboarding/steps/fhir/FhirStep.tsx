@@ -132,18 +132,32 @@ export function FhirStep({onNext, onBack}: StepProps) {
   }
 
   const RANGE_INVALID_KEY = 'onboarding:fhirServerInfo.messages.pullTimeRangeInvalid';
+  const PULL_TIME_REQUIRED_KEY: Record<'minAcquisitionPullTime' | 'maxAcquisitionPullTime', string> = {
+    minAcquisitionPullTime: 'onboarding:fhirServerInfo.errors.minPullTimeRequired',
+    maxAcquisitionPullTime: 'onboarding:fhirServerInfo.errors.maxPullTimeRequired'
+  };
 
   /**
-   * Like fieldError, but the range conflict comes from the live pullTimeRangeConflictField
-   * instead of the touched/blur-gated errors state -- errors[field] can still hold a stale
-   * pullTimeRangeInvalid from an earlier blur even after a later edit has cleared it live, so
-   * that one key is deliberately excluded from the blur-gated fallback.
+   * Like fieldError, but two keys come from live checks instead of the touched/blur-gated errors
+   * state, so blanking or filling either field shows/clears its error immediately, the same as
+   * HslocStep's mapping rows, without waiting for blur: the range conflict (pullTimeRangeConflictField)
+   * and now "required" (checked directly against the current value rather than errors[field], which
+   * can still hold a stale required error from an earlier blur even after a later edit fills the
+   * field). Format errors (not empty, not a valid HH:MM) still wait for blur - normalizePullTime
+   * builds the value up digit by digit, so validating every keystroke would flag a still-incomplete
+   * entry as invalid.
    */
-  function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime'): string | undefined {
+  function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', value: string): string | undefined {
     if (pullTimeRangeConflictField === field) {
       return t(RANGE_INVALID_KEY);
     }
-    return touched[field] && errors[field] && errors[field] !== RANGE_INVALID_KEY ? t(errors[field]) : undefined;
+    if (touched[field] && !value.trim()) {
+      return t(PULL_TIME_REQUIRED_KEY[field]);
+    }
+    const storedError = errors[field];
+    return touched[field] && storedError && storedError !== RANGE_INVALID_KEY && storedError !== PULL_TIME_REQUIRED_KEY[field]
+      ? t(storedError)
+      : undefined;
   }
 
   function handleBaseUrlBlur() {
@@ -170,7 +184,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
       setValidationError(null);
       return;
     }
-    setValidationError(null);
 
     setTesting(true);
     setTestResult(null);
@@ -191,6 +204,13 @@ export function FhirStep({onNext, onBack}: StepProps) {
         message: t(result.success ? 'onboarding:fhirServerInfo.messages.testSuccess' : 'onboarding:fhirServerInfo.messages.testFailure')
       });
       setTestedBaseUrl(result.success ? trimmedBaseUrl : null);
+      if (result.success) {
+        // A prior Continue attempt's "test the connection before continuing" banner no longer
+        // applies once a test actually succeeds - clear it immediately rather than leaving it up
+        // until the next Continue click re-evaluates it. A failed test leaves it in place: the
+        // connection still isn't tested, and the failure detail below (testResult) explains why.
+        setValidationError(null);
+      }
     } catch (cause) {
       setTestResult({
         success: false,
@@ -239,6 +259,19 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setValidationError(null);
     return true;
   }
+
+  // Once the "incomplete" banner is shown, it follows the fields live - fixing every one of them
+  // clears it without another click on Continue, mirroring HslocStep's rows-follow effect.
+  // connectionNotTested is a separate gate (Test Connection has to actually run again), so it's
+  // left alone here - fixing fields can't satisfy it.
+  useEffect(() => {
+    if (validationError !== t('onboarding:fhirServerInfo.messages.incomplete')) {
+      return;
+    }
+    if (Object.keys(validateFhir(currentFieldValues())).length === 0) {
+      setValidationError(null);
+    }
+  }, [baseUrl, maxConcurrentRequests, maxRetries, minPullTime, maxPullTime, lagDays, lagHours, lagMinutes]);
 
   function handleNext() {
     if (!validateStep()) {
@@ -379,13 +412,15 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.minPullTimeLabel')}
               hint={t('onboarding:fhirServerInfo.fields.minPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
+              required
               maxLength={5}
               value={minPullTime}
-              error={pullTimeFieldError('minAcquisitionPullTime')}
+              error={pullTimeFieldError('minAcquisitionPullTime', minPullTime)}
               onChange={value => {
                 const normalized = normalizePullTime(value);
                 setMinPullTime(normalized);
                 setEditedPullTimeField('minAcquisitionPullTime');
+                markTouched('minAcquisitionPullTime');
                 resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
               }}
@@ -395,13 +430,15 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxPullTimeLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
+              required
               maxLength={5}
               value={maxPullTime}
-              error={pullTimeFieldError('maxAcquisitionPullTime')}
+              error={pullTimeFieldError('maxAcquisitionPullTime', maxPullTime)}
               onChange={value => {
                 const normalized = normalizePullTime(value);
                 setMaxPullTime(normalized);
                 setEditedPullTimeField('maxAcquisitionPullTime');
+                markTouched('maxAcquisitionPullTime');
                 resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
               }}
