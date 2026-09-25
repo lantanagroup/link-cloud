@@ -206,6 +206,20 @@ public class NormalizationServiceClientTests
         Assert.Contains("1025-6", request.Body);
     }
 
+    [Fact]
+    public async Task DeleteAllHslocCodesAsync_DeletesCodeSetEndpoint()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.DeleteAllHslocCodesAsync();
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/normalization/HSLOC", request.Path);
+        Assert.Equal(204, result.StatusCode);
+    }
+
     private static NormalizationServiceClient CreateClient(string baseUrl) => new(
         Options.Create(new ServiceRegistry { NormalizationServiceUrl = baseUrl }),
         Options.Create(new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }),

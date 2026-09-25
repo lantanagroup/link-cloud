@@ -220,4 +220,9 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         content.AddFile("CsvFile", csvFile, string.IsNullOrWhiteSpace(fileName) ? "hsloc.csv" : fileName, "text/csv");
         return SendAsync(() => request.SendAsync(HttpMethod.Put, content, cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse> DeleteAllHslocCodesAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("normalization/HSLOC")
+            .DeleteAsync(cancellationToken: cancellationToken));
 }
