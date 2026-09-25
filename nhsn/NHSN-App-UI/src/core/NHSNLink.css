@@ -33,20 +33,11 @@
   outline-offset: 0;
 }
 
-.nhsn-link__reporting-plan-table-scroll:focus,
-.nhsn-link__reporting-plan-table-scroll:focus-visible,
-.nhsn-link__modal-close:focus-visible,
-.nhsn-link__table-scroll:focus,
-.nhsn-link__table-scroll:focus-visible,
-.encounter-mapping .encounter-table-scroll:focus,
-.encounter-mapping .encounter-table-scroll:focus-visible,
-.report-generate .report-patient-scroll:focus,
-.report-generate .report-patient-scroll:focus-visible {
+.nhsn-link__modal-close:focus-visible {
   outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
   outline-offset: 2px;
 }
 
-.nhsn-link__step-panel:focus-visible,
 .nhsn-link__tab-panel:focus-visible {
   outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
   outline-offset: -2px;
@@ -431,6 +422,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  outline: none;
 }
 
 .nhsn-link__step-panel > .nhsn-link__content {
@@ -796,6 +788,7 @@
   overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
+  outline: none;
 }
 
 .nhsn-link__reporting-plan-table {
@@ -2116,6 +2109,7 @@
   overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
+  outline: none;
 }
 
 .nhsn-link__table {

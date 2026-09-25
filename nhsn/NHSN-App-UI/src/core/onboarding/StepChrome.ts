@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef } from 'react';
 
 export interface StepChrome {
   title: string;
@@ -26,9 +26,9 @@ export function useStepChrome(chrome: StepChrome | null) {
     throw new Error('useStepChrome used outside StepHost');
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setChrome(chrome);
   }, [setChrome, chrome]);
 
-  useEffect(() => () => setChrome(null), [setChrome]);
+  useLayoutEffect(() => () => setChrome(null), [setChrome]);
 }

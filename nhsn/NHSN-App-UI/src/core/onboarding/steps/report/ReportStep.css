@@ -188,6 +188,7 @@
   border: 1px solid var(--report-gray-200);
   border-radius: var(--report-radius);
   margin-bottom: 12px;
+  outline: none;
 }
 
 
