@@ -194,7 +194,7 @@
       "validateSuccess": "All patient lists validated successfully. Click the view results button beside each field to review its results.",
       "viewResultsAria": "View results for {{list}}",
       "listValidatedAria": "{{list}} validated",
-      "listValidatedTooltip": "This patient list was read successfully from the EHR.",
+      "listValidatedTooltip": "This patient list was read successfully from the EHR",
       "listUntestedAria": "{{list}} not tested",
       "listUntestedTooltip": "Not yet checked - validation stopped at an earlier list's error. Fix that list, then validate again.",
       "queryError": "Unable to query this patient list.",
