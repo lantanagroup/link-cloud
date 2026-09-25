@@ -405,6 +405,7 @@
   overflow-x: auto;
   border: 1px solid var(--encounter-gray-200);
   border-radius: var(--encounter-radius);
+  outline: none;
 }
 
 .encounter-mapping .encounter-table {
