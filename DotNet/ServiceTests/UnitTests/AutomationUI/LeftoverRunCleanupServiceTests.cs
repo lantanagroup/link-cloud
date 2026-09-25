@@ -452,6 +452,78 @@ public class LeftoverRunCleanupServiceTests
     }
 
     [Fact]
+    public async Task HistoryPurge_does_not_count_a_facility_torn_down_on_an_earlier_pass()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var facilityId = Guid.NewGuid().ToString();
+        var run = Run(facilityId, now.AddDays(-30));
+        var service = Create(
+            now,
+            [run],
+            [],
+            initialTeardownProgress: new Dictionary<Guid, IReadOnlyList<string>>
+            {
+                [run.RunId] = [facilityId]
+            });
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().Equal(run.RunId.ToString());
+        result.TeardownCandidateCount.Should().Be(1);
+        result.PurgedRunIds.Should().Equal(run.RunId);
+        result.ProcessedAllCandidates.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HistoryPurge_caps_retries_when_teardown_was_already_recorded()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var runs = Enumerable.Range(0, 201)
+            .Select(_ => Run(Guid.NewGuid().ToString(), now.AddDays(-30)))
+            .ToList();
+        var progress = runs.ToDictionary(
+            run => run.RunId,
+            run => (IReadOnlyList<string>)[run.FacilityId!, run.RunId.ToString()]);
+        var service = Create(
+            now,
+            runs,
+            [],
+            initialTeardownProgress: progress,
+            maxFacilitiesPerPass: 1);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.PurgedRunIds.Should().HaveCount(200);
+        result.FailedFacilityIds.Should().BeEmpty();
+        result.FailedRunIds.Should().BeEmpty();
+        result.ProcessedAllCandidates.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HistoryPurge_clears_a_retained_facility_failure_when_the_retry_succeeds()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var facilityId = Guid.NewGuid().ToString();
+        var saved = new List<CleanupReport>();
+        var service = Create(
+            now,
+            [],
+            saved,
+            retainedFacilityIds: [facilityId],
+            retainedEligibleAt: now.AddDays(-40),
+            failFirstFacilityDeletes: 1);
+
+        var result = await service.RunHistoryPurgeNowAsync();
+
+        result.TornDownFacilityIds.Should().Equal(facilityId);
+        result.FailedFacilityIds.Should().BeEmpty();
+        result.PurgedRunIds.Should().BeEmpty();
+        saved.Should().ContainSingle();
+        saved[0].Status.Should().Be("completed");
+        saved[0].FailedFacilityIds.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task CustomRange_history_only_does_not_partially_tear_down_when_the_cap_is_one()
     {
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
@@ -675,7 +747,8 @@ public class LeftoverRunCleanupServiceTests
         DateTimeOffset? retainedEligibleAt = null,
         List<string>? releasedFacilityIds = null,
         int maxFacilitiesPerPass = 25,
-        bool dropDeletedFacilities = false)
+        bool dropDeletedFacilities = false,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? initialTeardownProgress = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         var liveFacilities = new Dictionary<string, string>(
@@ -768,6 +841,11 @@ public class LeftoverRunCleanupServiceTests
 
         var snapshots = new Mock<ISnapshotStore>();
         var teardownProgress = new Dictionary<Guid, List<string>>();
+        if (initialTeardownProgress != null)
+        {
+            foreach (var pair in initialTeardownProgress)
+                teardownProgress[pair.Key] = pair.Value.ToList();
+        }
         snapshots.Setup(s => s.GetAllRunSummariesAsync(It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(runs);
         snapshots.Setup(s => s.GetFacilityTeardownProgressAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))

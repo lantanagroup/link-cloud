@@ -381,8 +381,10 @@ public sealed class LeftoverRunCleanupService(
                 .ToList();
             var historyWork = new List<AutomationRunSummary>();
             var partialHistoryTeardown = new List<(Guid RunId, string FacilityId)>();
+            var recordedProgress = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (purgeHistory && (mode == "history-purge" || teardownFacilities))
             {
+                var historyLimit = Math.Max(limit, 200);
                 var spent = facilityWork.Count + retainedWork.Count;
                 var scheduledTeardown = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (teardownFacilities)
@@ -395,12 +397,14 @@ public sealed class LeftoverRunCleanupService(
 
                 foreach (var run in historyRuns)
                 {
-                    if (spent >= limit)
+                    if (historyWork.Count >= historyLimit || spent >= limit)
                         break;
 
                     var done = new HashSet<string>(
                         await snapshotStore.GetFacilityTeardownProgressAsync(run.RunId, cancellationToken) ?? [],
                         StringComparer.OrdinalIgnoreCase);
+                    foreach (var id in done)
+                        recordedProgress.Add(id);
                     var owned = OwnedAutomationFacilityIds(run);
                     var fresh = owned.Where(id =>
                         !done.Contains(id)
@@ -456,7 +460,8 @@ public sealed class LeftoverRunCleanupService(
                 selectedFacilities,
                 retainedEligible,
                 historyRuns,
-                heldOutsideThisPurge);
+                heldOutsideThisPurge,
+                recordedProgress);
             historyCandidateCount = historyRuns.Count;
 
             await PublishProgressAsync(
@@ -716,6 +721,7 @@ public sealed class LeftoverRunCleanupService(
                             facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
                             censusClient, reportClient, abortRegistry, settings, facilityId, cancellationToken);
                         tornDown.Add(facilityId);
+                        failedFacilities.RemoveAll(id => string.Equals(id, facilityId, StringComparison.OrdinalIgnoreCase));
                         await snapshotStore.ReleaseRetainedFacilityAsync(facilityId, cancellationToken);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
@@ -900,7 +906,8 @@ public sealed class LeftoverRunCleanupService(
         IReadOnlyList<string> selectedFacilities,
         IReadOnlyList<string> retainedEligible,
         IReadOnlyList<AutomationRunSummary> historyRuns,
-        HashSet<string> heldOutsideThisPurge)
+        HashSet<string> heldOutsideThisPurge,
+        HashSet<string> recordedProgress)
     {
         var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (teardownFacilities)
@@ -919,7 +926,7 @@ public sealed class LeftoverRunCleanupService(
         {
             foreach (var id in OwnedAutomationFacilityIds(run))
             {
-                if (heldOutsideThisPurge.Contains(id))
+                if (heldOutsideThisPurge.Contains(id) || recordedProgress.Contains(id))
                     continue;
                 attempted.Add(id);
             }
