@@ -454,10 +454,6 @@ export function ReportDetailView() {
     }
   }
 
-  function handleDownloadUnavailable() {
-    notifyError(t('onboarding:reportResults.detail.downloadUnavailable'));
-  }
-
   const stableHandleViewQueryPlan = useStableCallback(handleViewQueryPlan);
   const stableHandleViewAcquisitionLog = useStableCallback(handleViewAcquisitionLog);
   const stableHandleExportSummary = useStableCallback(handleExportSummary);
@@ -950,7 +946,6 @@ export function ReportDetailView() {
         currentDqm={currentDqm}
         downloadingPatientId={downloadingPatientId}
         onDownloadReport={handleDownloadPatientReport}
-        onDownloadUnavailable={handleDownloadUnavailable}
       />
 
       {timelinePatientRow && (

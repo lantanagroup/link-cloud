@@ -172,6 +172,7 @@ export function AcquisitionLogModal({
                 label: value,
               }))}
               value={filters.resource}
+              popupClassName="nhsn-link__select-popup"
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -192,6 +193,7 @@ export function AcquisitionLogModal({
                 label: value,
               }))}
               value={filters.queryPhase}
+              popupClassName="nhsn-link__select-popup"
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -212,6 +214,7 @@ export function AcquisitionLogModal({
                 label: value,
               }))}
               value={filters.queryType}
+              popupClassName="nhsn-link__select-popup"
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -232,6 +235,7 @@ export function AcquisitionLogModal({
                 label: value,
               }))}
               value={filters.status}
+              popupClassName="nhsn-link__select-popup"
               onChange={(value) =>
                 setFilters((prev) => ({
                   ...prev,

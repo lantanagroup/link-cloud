@@ -247,6 +247,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
               id="reportStartDate"
               label={t('onboarding:report.fields.startDateLabel')}
               required
+              format="MM-dd-yyyy"
               value={report.startDate}
               error={fieldError('startDate')}
               onChange={value => patch('report', {startDate: value})}
@@ -255,6 +256,7 @@ export function ReportStep({onNext, onBack}: StepProps) {
               id="reportEndDate"
               label={t('onboarding:report.fields.endDateLabel')}
               required
+              format="MM-dd-yyyy"
               value={report.endDate}
               error={fieldError('endDate')}
               onChange={value => patch('report', {endDate: value})}

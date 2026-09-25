@@ -710,17 +710,12 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
     // Returns whether the configuration was actually written, not just attempted.
     private async Task<bool> WriteFhirSectionAsync(string facilityId, FhirSection fhir, CancellationToken cancellationToken)
     {
-        // FhirServerBaseUrl, MaxConcurrentRequests and BOTH pull times are hard requirements of
-        // FacilityAdministrationService.UpdateFhirServerInfoAsync itself - MinAcquisitionPullTime/
-        // MaxAcquisitionPullTime are parsed with TimeSpan.TryParseExact("hh\:mm") and it throws
-        // rather than defaulting when that fails, so an empty string is not a valid "not set" value
-        // here the way it is for other optional fields. Only maxRetries has a real default (0 is a
-        // valid value in its own 0-10 range check) - everything else in this guard is load-bearing,
-        // not a leftover overly-strict check.
+        // FhirServerBaseUrl and MaxConcurrentRequests are hard requirements of
+        // FacilityAdministrationService.UpdateFhirServerInfoAsync itself. The pull times are
+        // optional - both blank means no pull-time window - and that service rejects only one of the
+        // pair being set. maxRetries has a real default (0 is valid in its own 0-10 range check).
         if (string.IsNullOrWhiteSpace(fhir.FhirServerBaseUrl) ||
-            fhir.MaxConcurrentRequests is null ||
-            string.IsNullOrWhiteSpace(fhir.MinAcquisitionPullTime) ||
-            string.IsNullOrWhiteSpace(fhir.MaxAcquisitionPullTime))
+            fhir.MaxConcurrentRequests is null)
         {
             return false;
         }

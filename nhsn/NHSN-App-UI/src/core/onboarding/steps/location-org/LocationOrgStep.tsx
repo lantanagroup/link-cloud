@@ -21,6 +21,8 @@ import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
 import type {LocationIdentifierEntry, LocationOrgDraft, LocationTypeEntry} from '../../types';
 import {
+  findDuplicateLocationIdentifierIndexes,
+  findDuplicateLocationTypeIndexes,
   findIncompleteLocationIdentifierIndexes,
   findIncompleteLocationTypeIndexes,
   isPlausibleFhirPath
@@ -98,6 +100,23 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   // naturally empty, so no separate "is everything blank" check is needed here.
   const hasIncompleteRows = incompleteRowIndexes.length > 0;
 
+  // A repeated pair (Location Type code + alias, or Location Identifier system + code) is wrong the
+  // moment it's typed, so - like HslocStep's mapping rows - it's checked live rather than waiting for
+  // Continue. editedRowIndex is the row being typed into, so the error lands on that row rather than
+  // the one already there. Only the active tab's rows are checked, same as incompleteRowIndexes.
+  const [editedRowIndex, setEditedRowIndex] = useState<number | null>(null);
+  const duplicateRowIndexes = useMemo(() => {
+    const edited = editedRowIndex ?? undefined;
+    return new Set(
+      activeMethod === 'location-type'
+        ? findDuplicateLocationTypeIndexes(locationTypes, edited)
+        : activeMethod === 'location-identifier'
+          ? findDuplicateLocationIdentifierIndexes(locationIdentifiers, edited)
+          : []
+    );
+  }, [activeMethod, locationTypes, locationIdentifiers, editedRowIndex]);
+  const hasDuplicateRows = duplicateRowIndexes.size > 0;
+
   // Only the Custom FHIRPath tab has a free-form expression to check; Data Acquisition compiles it
   // on save, and without this a typo only surfaces as a bare "DataAcquisition returned 400".
   const customFhirPath = locationOrg.customFhirPath ?? '';
@@ -124,7 +143,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
       setFlaggedRowCounts(counts => ({...counts, [activeMethod]: activeRowCount}));
     }
     setFhirPathBlurred(true);
-    return !hasIncompleteRows && !hasInvalidFhirPath;
+    return !hasIncompleteRows && !hasDuplicateRows && !hasInvalidFhirPath;
   }
 
   /** Keeps the active method's flagged count pointing at the same rows when one of them is removed. */
@@ -132,6 +151,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
     if (!activeMethod || next.length >= previous.length) {
       return;
     }
+    // Indexes shift on removal, so the edited index no longer names the same row.
+    setEditedRowIndex(null);
     const removedIndex = previous.findIndex((row, index) => row !== next[index]);
     setFlaggedRowCounts(counts => {
       const count = counts[activeMethod];
@@ -191,6 +212,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   }
 
   function handleMethodChange(method: LocationMethod) {
+    setEditedRowIndex(null);
     patch('locationOrg', {method});
   }
 
@@ -315,6 +337,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 // Blank fields are only flagged once Continue has been tried with this row present - not
                 // while the facility is still filling it in.
                 const flagBlank = isRowFlagged(index);
+                const isDuplicate = duplicateRowIndexes.has(index);
                 return (
                   <>
                     <TextField
@@ -326,7 +349,10 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                           ? requiredError(t('onboarding:locationOrg.locationType.codeLabel'))
                           : undefined
                       }
-                      onChange={code => onRowChange({...row, code})}
+                      onChange={code => {
+                        setEditedRowIndex(index);
+                        onRowChange({...row, code});
+                      }}
                     />
                     <TextField
                       id={`location-type-alias-${index}`}
@@ -335,9 +361,14 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                       error={
                         flagBlank && !row.alias.trim()
                           ? requiredError(t('onboarding:locationOrg.locationType.aliasLabel'))
-                          : undefined
+                          : isDuplicate
+                            ? t('onboarding:locationOrg.locationType.duplicateError')
+                            : undefined
                       }
-                      onChange={alias => onRowChange({...row, alias})}
+                      onChange={alias => {
+                        setEditedRowIndex(index);
+                        onRowChange({...row, alias});
+                      }}
                     />
                   </>
                 );
@@ -405,6 +436,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               ]}
               renderItem={(row, index, onRowChange) => {
                 const flagBlank = isRowFlagged(index);
+                const isDuplicate = duplicateRowIndexes.has(index);
                 return (
                   <>
                     <TextField
@@ -416,7 +448,10 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                           ? requiredError(t('onboarding:locationOrg.locationIdentifier.systemLabel'))
                           : undefined
                       }
-                      onChange={system => onRowChange({...row, system})}
+                      onChange={system => {
+                        setEditedRowIndex(index);
+                        onRowChange({...row, system});
+                      }}
                     />
                     <TextField
                       id={`location-identifier-code-${index}`}
@@ -425,9 +460,14 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                       error={
                         flagBlank && !row.code.trim()
                           ? requiredError(t('onboarding:locationOrg.locationIdentifier.codeLabel'))
-                          : undefined
+                          : isDuplicate
+                            ? t('onboarding:locationOrg.locationIdentifier.duplicateError')
+                            : undefined
                       }
-                      onChange={code => onRowChange({...row, code})}
+                      onChange={code => {
+                        setEditedRowIndex(index);
+                        onRowChange({...row, code});
+                      }}
                     />
                   </>
                 );
@@ -488,10 +528,14 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         )}
       </Modal>
 
-      {continueAttempted && hasFlaggedIncompleteRows && (
+      {continueAttempted && (hasFlaggedIncompleteRows || hasDuplicateRows) && (
         <div aria-live="off">
           <p className="nhsn-link__form-error" role="alert">
-            {t('onboarding:locationOrg.errors.incompleteRows')}
+            {hasFlaggedIncompleteRows
+              ? t('onboarding:locationOrg.errors.incompleteRows')
+              : activeMethod === 'location-type'
+                ? t('onboarding:locationOrg.errors.duplicateLocationTypes')
+                : t('onboarding:locationOrg.errors.duplicateLocationIdentifiers')}
           </p>
         </div>
       )}

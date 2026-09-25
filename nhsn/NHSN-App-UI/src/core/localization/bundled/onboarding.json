@@ -104,7 +104,8 @@
       "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
       "invalidSftpHost": "Enter a valid SFTP hostname or IP address.",
       "invalidPullTimeOrder": "Min Acquisition Pull Time must be earlier than Max Acquisition Pull Time.",
-      "requiredFhirBundle": "FHIR Server Base URL, Max Concurrent Requests, Min Acquisition Pull Time, and Max Acquisition Pull Time must all be filled in together, or all left blank.",
+      "requiredFhirBundle": "FHIR Server Base URL and Max Concurrent Requests are required.",
+      "requiredPullTimePair": "Min Acquisition Pull Time and Max Acquisition Pull Time must both be filled in, or both left blank.",
       "requiredLagDuration": "Patient Resource Acquisition Lag Duration must total more than 0 minutes once any of Days/Hours/Minutes is filled in.",
       "requiredFhirListId": "This FHIR List identifier is required — all six Admit/Discharge identifiers must be filled in together.",
       "requiredSftpField": "This field is required for a Cerner facility's SFTP acquisition.",
@@ -169,8 +170,8 @@
     },
     "errors": {
       "baseUrlRequired": "FHIR Server Base URL is required.",
-      "minPullTimeRequired": "Min Acquisition Pull Time is required.",
-      "maxPullTimeRequired": "Max Acquisition Pull Time is required."
+      "minPullTimeRequired": "Min Acquisition Pull Time is required when Max Acquisition Pull Time is set.",
+      "maxPullTimeRequired": "Max Acquisition Pull Time is required when Min Acquisition Pull Time is set."
     }
   },
   "census": {
@@ -305,6 +306,7 @@
       "listLabel": "Location Type Code / Location Alias",
       "codeLabel": "Location Type Code",
       "aliasLabel": "Location Alias",
+      "duplicateError": "This Location Type Code and Location Alias combination is already used in another row.",
       "add": "+ Add Location Type",
       "columns": {
         "id": "Location Id",
@@ -323,6 +325,7 @@
       "codeLabel": "Location Identifier Code",
       "codePlaceholder": "location.identifier.code",
       "add": "+ Add Location Identifier",
+      "duplicateError": "This Location Identifier System and Code combination is already used in another row.",
       "tooltip": "Add the identifier system and code that uniquely identify your facility's Location resource in the FHIR data."
     },
     "customFhirPath": {
@@ -339,6 +342,8 @@
       "rowIncomplete": "This field is required.",
       "fieldRequiredError": "{{field}} is required.",
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
+      "duplicateLocationTypes": "Two or more rows have the same Location Type Code and Location Alias. Each combination must be unique.",
+      "duplicateLocationIdentifiers": "Two or more rows have the same Location Identifier System and Code. Each combination must be unique.",
       "invalidFhirPath": "Enter a valid FHIRPath expression (e.g. Location.identifier.where(system = 'urn:oid:1.2.3' and value = 'ABC').exists())."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
@@ -739,7 +744,7 @@
     "userFacing": {
       "question": "From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)",
       "noOptionsHint": "Select at least one identifier in the question above to choose from here.",
-      "isCalledMrnQuestion": "Is this the identifier staff call the MRN?",
+      "isCalledMrnQuestion": "Is this the identifier staff use as the MRN?",
       "otherTermLabel": "If no, what term is used?",
       "canSearchQuestion": "Can staff search for patients using this identifier?"
     },

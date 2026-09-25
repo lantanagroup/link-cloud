@@ -612,18 +612,24 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         }
 
         // WriteFhirSectionAsync (OnboardingWriteService) won't write ANY of the FHIR section unless
-        // all four of these are present - it's a hard requirement of Tenant's own
-        // UpdateFhirServerInfoAsync, not something this sheet can relax. The sheet's own "Required"
-        // column marks fhirBaseUrl and maxConcurrentRequests plain "Yes" (unconditional), so these
-        // four are simply always required, not "required together once one of them is touched" -
-        // a sheet that fills in only some of them (e.g. just maxConcurrentRequests/maxRetries) used
-        // to pass validation, get "Accepted", and then have the whole section silently dropped at
-        // save time with no error anywhere. This also covers "if min there max must be present and
-        // vice versa" - min/max are two of the four, and both are now always required too.
+        // both of these are present - a sheet that fills in only some of the section used to pass
+        // validation, get "Accepted", and then have the whole section silently dropped at save time
+        // with no error anywhere, so they're always required here.
         RequireFields(
             values, rowNumberByKey, rows, errors, "fhir",
             "onboarding:manualUpload.errors.requiredFhirBundle",
-            "fhirBaseUrl", "maxConcurrentRequests", "minPullTime", "maxPullTime");
+            "fhirBaseUrl", "maxConcurrentRequests");
+
+        // The pull times are optional, but only as a pair: both blank means no pull-time window,
+        // while only one set is rejected by UpdateFhirServerInfoAsync - so the missing side is
+        // flagged here instead of failing the whole section at save time.
+        if (values.ContainsKey("minPullTime") != values.ContainsKey("maxPullTime"))
+        {
+            RequireFields(
+                values, rowNumberByKey, rows, errors, "fhir",
+                "onboarding:manualUpload.errors.requiredPullTimePair",
+                "minPullTime", "maxPullTime");
+        }
 
         // Ordering only means something once both are present and individually well-formed - a
         // malformed pull time already has its own invalidPullTime cell error from ValidateScalar,

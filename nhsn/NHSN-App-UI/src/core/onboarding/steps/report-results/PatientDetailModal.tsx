@@ -15,7 +15,6 @@ export interface PatientDetailModalProps {
   currentDqm: string | undefined;
   downloadingPatientId: string | null;
   onDownloadReport: (patientId: string, dqmId: string | undefined) => void;
-  onDownloadUnavailable: () => void;
 }
 
 export function PatientDetailModal({
@@ -27,7 +26,6 @@ export function PatientDetailModal({
   currentDqm,
   downloadingPatientId,
   onDownloadReport,
-  onDownloadUnavailable,
 }: PatientDetailModalProps) {
   const { t } = useTranslation(['onboarding', 'common']);
 
@@ -129,12 +127,6 @@ export function PatientDetailModal({
         )}
   
         <div className="nhsn-link__report-results-patient-detail-actions">
-          <Button variant="secondary" onClick={onDownloadUnavailable}>
-            <DownloadIcon />
-            {t(
-              'onboarding:reportResults.detail.patientDetail.downloadResourceBundle',
-            )}
-          </Button>
           <Button
             variant="secondary"
             onClick={() => onDownloadReport(patientRow.patientId, currentDqm)}

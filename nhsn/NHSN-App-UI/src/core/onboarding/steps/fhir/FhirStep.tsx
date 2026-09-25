@@ -85,8 +85,12 @@ export function FhirStep({onNext, onBack}: StepProps) {
     setTestResult(null);
   }
 
+  // Validated on every change, like the number fields below, so an invalid URL is flagged - and a
+  // corrected one cleared - as it's typed rather than on blur.
   function handleBaseUrlChange(value: string) {
     setBaseUrl(value);
+    markTouched('fhirServerBaseUrl');
+    refreshErrors({fhirServerBaseUrl: value});
     resetConnectionTest();
     patch('fhir', {fhirServerBaseUrl: value});
   }
@@ -144,17 +148,18 @@ export function FhirStep({onNext, onBack}: StepProps) {
    * Like fieldError, but two keys come from live checks instead of the touched/blur-gated errors
    * state, so blanking or filling either field shows/clears its error immediately, the same as
    * HslocStep's mapping rows, without waiting for blur: the range conflict (pullTimeRangeConflictField)
-   * and now "required" (checked directly against the current value rather than errors[field], which
-   * can still hold a stale required error from an earlier blur even after a later edit fills the
-   * field). Format errors (not empty, not a valid HH:MM) still wait for blur - normalizePullTime
-   * builds the value up digit by digit, so validating every keystroke would flag a still-incomplete
-   * entry as invalid.
+   * and now "required" - only once the other pull time is filled in, since the pair is optional -
+   * (checked directly against the current values rather than errors[field], which can still hold a
+   * stale required error from an earlier blur even after a later edit fills the field). Format
+   * errors (not empty, not a valid HH:MM) still wait for blur - normalizePullTime builds the value up
+   * digit by digit, so validating every keystroke would flag a still-incomplete entry as invalid.
    */
   function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', value: string): string | undefined {
     if (pullTimeRangeConflictField === field) {
       return t(RANGE_INVALID_KEY[field]);
     }
-    if (touched[field] && !value.trim()) {
+    const otherValue = field === 'minAcquisitionPullTime' ? maxPullTime : minPullTime;
+    if (touched[field] && !value.trim() && otherValue.trim()) {
       return t(PULL_TIME_REQUIRED_KEY[field]);
     }
     const storedError = errors[field];
@@ -415,7 +420,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.minPullTimeLabel')}
               hint={t('onboarding:fhirServerInfo.fields.minPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
-              required
               maxLength={5}
               value={minPullTime}
               error={pullTimeFieldError('minAcquisitionPullTime', minPullTime)}
@@ -433,7 +437,6 @@ export function FhirStep({onNext, onBack}: StepProps) {
               label={t('onboarding:fhirServerInfo.fields.maxPullTimeLabel')}
               hint={t('onboarding:fhirServerInfo.fields.maxPullTimeTooltip')}
               placeholder={t('onboarding:fhirServerInfo.fields.pullTimePlaceholder')}
-              required
               maxLength={5}
               value={maxPullTime}
               error={pullTimeFieldError('maxAcquisitionPullTime', maxPullTime)}
