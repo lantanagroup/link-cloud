@@ -183,7 +183,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
   const path = TIMELINE_PATH_BY_STATUS[reportingStatus];
   const currentId = path[path.length - 1];
   const doneSet = new Set(path.slice(0, -1));
-  const [selectedNodeId, setSelectedNodeId] = useState(currentId);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const nodeById = new Map(TIMELINE_NODES.map(node => [node.id, node]));
   const maxCol = Math.max(...TIMELINE_NODES.map(node => node.col));
@@ -191,7 +191,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
   const width = maxCol * COL_PITCH + NODE_WIDTH;
   const height = maxRow * ROW_PITCH + NODE_HEIGHT;
 
-  const selectedNode = nodeById.get(selectedNodeId) ?? nodeById.get(currentId);
+  const selectedNode = (selectedNodeId ? nodeById.get(selectedNodeId) : undefined) ?? nodeById.get(currentId);
 
   return (
     <Modal
@@ -199,6 +199,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
       title={acronymTitle(<HeadingPause>{t('onboarding:reportResults.detail.patientTimeline.title')}</HeadingPause>)}
       onClose={onClose}
       size="large"
+      focusDialogOnOpen
       footer={
         <Button variant="secondary" onClick={onClose}>
           {t('common:actions.close')}
@@ -265,6 +266,7 @@ export function PatientStatusTimelineModal({open, onClose, patientId, measureNam
           return (
             <g
               key={node.id}
+              className="nhsn-link__timeline-node"
               role="button"
               tabIndex={0}
               aria-label={node.label}
