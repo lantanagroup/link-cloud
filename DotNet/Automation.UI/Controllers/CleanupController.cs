@@ -10,6 +10,7 @@ namespace Automation.UI.Controllers;
 public class CleanupController(
     ILeftoverRunCleanup leftoverRunCleanup,
     ICleanupSettingsStore settingsStore,
+    ICleanupReportStore reportStore,
     TimeProvider time,
     ILogger<CleanupController> logger) : Controller
 {
@@ -28,7 +29,8 @@ public class CleanupController(
                 : null,
             FromDate = now.UtcDateTime.Date.AddDays(-settings.TeardownRetention.TotalDays),
             ToDate = now.UtcDateTime.Date,
-            CurrentActivity = leftoverRunCleanup.CurrentActivity
+            CurrentActivity = leftoverRunCleanup.CurrentActivity,
+            RecentReports = await reportStore.ListRecentAsync(25, cancellationToken)
         };
         return View(vm);
     }
@@ -36,6 +38,18 @@ public class CleanupController(
     [HttpGet]
     public IActionResult Progress()
         => Json(leftoverRunCleanup.CurrentActivity);
+
+    [HttpGet]
+    public async Task<IActionResult> Report(Guid id, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid || id == Guid.Empty)
+            return BadRequest("Invalid Id format");
+
+        var report = await reportStore.GetAsync(id, cancellationToken);
+        if (report == null)
+            return NotFound();
+        return Json(report);
+    }
 
     [HttpPost]
     [ValidateAntiForgeryToken]

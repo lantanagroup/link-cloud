@@ -12,6 +12,8 @@ public sealed class AutomationRunDocument
     public Guid RunId { get; set; }
 
     public string FacilityId { get; set; } = string.Empty;
+    /// <summary>True when this run created <see cref="FacilityId"/> rather than reusing a tenant.</summary>
+    public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
 
     public string RunName { get; set; } = string.Empty;
@@ -48,6 +50,34 @@ public sealed class AutomationRunDocument
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
+}
+
+/// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
+public sealed class OwnedFacilityTombstoneDocument
+{
+    [BsonId]
+    public string FacilityId { get; set; } = string.Empty;
+
+    public string RunId { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The deleted run's cleanup timestamp. Teardown waits until this is older than retention.</summary>
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset EligibleAt { get; set; }
+}
+
+/// <summary>Facility id already torn down for a run whose snapshot is still waiting to be purged.</summary>
+public sealed class FacilityTeardownProgressDocument
+{
+    [BsonId]
+    public ObjectId Id { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string FacilityId { get; set; } = string.Empty;
 }
 
 /// <summary>MongoDB document for automation_run_inputs collection.</summary>
