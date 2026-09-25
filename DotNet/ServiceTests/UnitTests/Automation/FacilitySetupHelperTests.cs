@@ -3,6 +3,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -57,6 +58,17 @@ public class FacilitySetupHelperTests
                 _updated.Add(model);
                 return Response(200, model);
             });
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorModel model, CancellationToken _) =>
+                Response(201, new VendorModel { Id = Guid.NewGuid(), Name = model.Name }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CreateVendorVersionModel model, CancellationToken _) =>
+                Response(201, new VendorVersionModel { Id = Guid.NewGuid(), VendorId = model.VendorId, Version = model.Version }));
     }
 
     [Fact]
@@ -68,7 +80,155 @@ public class FacilitySetupHelperTests
 
         var created = Assert.Single(_created);
         Assert.Equal([MeasureId], created.ScheduledReports.Monthly);
+        Assert.Equal("Epic", created.Vendor?.Name);
+        Assert.NotNull(created.VendorVersionId);
         Assert.Empty(_updated);
+    }
+
+    [Fact]
+    public async Task Posts_the_named_vendor_when_the_caller_sets_one()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        Assert.Equal("Cerner", Assert.Single(_created).Vendor?.Name);
+    }
+
+    [Fact]
+    public async Task Omits_the_vendor_when_the_caller_explicitly_leaves_it_blank()
+    {
+        GivenDmrpIsDisabled();
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: " ",
+            vendorExplicit: true);
+
+        Assert.Null(Assert.Single(_created).Vendor);
+    }
+
+    [Fact]
+    public async Task Updates_the_vendor_when_a_reused_facility_switches_template()
+    {
+        GivenDmrpIsDisabled();
+        var versionId = Guid.NewGuid();
+        var vendorId = Guid.NewGuid();
+
+        _facilityClient.Setup(f => f.GetAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new FacilityModel
+            {
+                FacilityId = FacilityId,
+                FacilityName = FacilityId,
+                TimeZone = "America/Chicago",
+                Vendor = new VendorModel { Name = "Epic" },
+                ScheduledReports = new TenantScheduledReportConfig { Monthly = [MeasureId], Daily = [], Weekly = [] }
+            }));
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Cerner" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>()));
+        _facilityClient.Setup(f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorVersionModel { Id = versionId, VendorId = vendorId, Version = "automation" }));
+
+        await FacilitySetupHelper.EnsureFacilityAsync(
+            _facilityClient.Object,
+            _dmrpClient.Object,
+            _output.Object,
+            FacilityId,
+            [MeasureId],
+            vendorName: "Cerner",
+            vendorExplicit: true);
+
+        var updated = Assert.Single(_updated);
+        Assert.Equal("Cerner", updated.Vendor?.Name);
+        Assert.Equal(versionId, updated.VendorVersionId);
+        Assert.Equal([MeasureId], updated.ScheduledReports.Monthly);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Refuses_to_create_a_vendor_when_the_vendor_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorModel>>(503, rawBody: "tenant down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureFacilityAsync(
+                _facilityClient.Object, _dmrpClient.Object, _output.Object, FacilityId, [MeasureId]));
+
+        Assert.Contains("Failed to list vendors", exception.Message);
+        Assert.Contains("503", exception.Message);
+        _facilityClient.Verify(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Empty(_created);
+    }
+
+    [Fact]
+    public async Task Reuses_the_vendor_when_create_loses_a_race()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        var versionId = Guid.NewGuid();
+        var lists = 0;
+
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                lists++;
+                return lists == 1
+                    ? Response(200, new List<VendorModel>())
+                    : Response(200, new List<VendorModel> { new() { Id = vendorId, Name = "Epic" } });
+            });
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<VendorModel>(409, rawBody: "already exists"));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorVersionModel>
+            {
+                new() { Id = versionId, VendorId = vendorId, Version = "default" }
+            }));
+
+        await EnsureFacilityAsync();
+
+        Assert.Equal(versionId, Assert.Single(_created).VendorVersionId);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Refuses_to_create_a_vendor_version_when_the_version_list_fails()
+    {
+        GivenDmrpIsDisabled();
+        var vendorId = Guid.NewGuid();
+        _facilityClient.Setup(f => f.GetVendorsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(200, new List<VendorModel>()));
+        _facilityClient.Setup(f => f.CreateVendorAsync(It.IsAny<CreateVendorModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response(201, new VendorModel { Id = vendorId, Name = "Epic" }));
+        _facilityClient.Setup(f => f.GetVendorVersionsAsync(vendorId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Response<List<VendorVersionModel>>(500, rawBody: "versions down"));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(EnsureFacilityAsync);
+
+        Assert.Contains("Failed to list vendor versions", exception.Message);
+        _facilityClient.Verify(
+            f => f.CreateVendorVersionAsync(It.IsAny<CreateVendorVersionModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        Assert.Empty(_created);
     }
 
     [Fact]
@@ -234,6 +394,46 @@ public class FacilitySetupHelperTests
         _dmrpClient.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task Replaces_an_existing_query_plan_instead_of_keeping_it()
+    {
+        var createdTypes = new List<string>();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 204 });
+        dataAcq.Setup(d => d.CreateQueryPlanAsync(FacilityId, It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, CreateQueryPlanRequestApiModel plan, CancellationToken _) =>
+            {
+                createdTypes.Add(plan.Type ?? "");
+                return new LinkApiResponse { StatusCode = 201 };
+            });
+
+        await FacilitySetupHelper.EnsureQueryPlansAsync(
+            dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner");
+
+        Assert.Equal(["Discharge", "Daily", "Monthly"], createdTypes);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Discharge", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Daily", It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(d => d.DeleteQueryPlanAsync(FacilityId, "Monthly", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Does_not_create_a_query_plan_when_the_old_plan_cannot_be_deleted()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        dataAcq.Setup(d => d.DeleteQueryPlanAsync(FacilityId, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 500, RawBody = "down" });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            FacilitySetupHelper.EnsureQueryPlansAsync(
+                dataAcq.Object, _output.Object, FacilityId, [MeasureId], "Cerner"));
+
+        Assert.Contains("Failed to replace", exception.Message);
+        dataAcq.Verify(
+            d => d.CreateQueryPlanAsync(It.IsAny<string>(), It.IsAny<CreateQueryPlanRequestApiModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private Task EnsureFacilityAsync() =>
         FacilitySetupHelper.EnsureFacilityAsync(_facilityClient.Object, _dmrpClient.Object, _output.Object,
             FacilityId, [MeasureId]);
@@ -286,6 +486,6 @@ public class FacilitySetupHelperTests
         return plans;
     }
 
-    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default) =>
-        new() { StatusCode = statusCode, Body = body };
+    private static LinkApiResponse<T> Response<T>(int statusCode, T? body = default, string? rawBody = null) =>
+        new() { StatusCode = statusCode, Body = body, RawBody = rawBody };
 }

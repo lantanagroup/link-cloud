@@ -569,6 +569,22 @@ services:
     - key: "DataProtection:KeyCollectionName"
       description: "Mongo collection name used by Automation.UI to store Data Protection keys. Defaults to 'automation_data_protection_keys' when unset."
       required: false
+    - key: "LeftoverRunCleanup:Enabled"
+      description: "Master switch for scheduled Automation.UI leftover cleanup. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:QuiesceEnabled"
+      description: "Whether the daytime leftover quiesce pass is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off so a new environment does not abort pipeline work on a schedule."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:DailyTeardownEnabled"
+      description: "Whether the daily off-hours leftover facility teardown is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:WeeklyHistoryPurgeEnabled"
+      description: "Whether the weekly scenario-run history purge is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."

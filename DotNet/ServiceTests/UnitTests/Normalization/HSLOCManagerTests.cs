@@ -157,6 +157,45 @@ public class HSLOCManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task Update_EmptyCatalog_ImportsActiveRowsWithNewVersion()
+    {
+        using var context = CreateContext();
+        await using var csv = CreateCsv("new-cdc,new short,A1,new long");
+
+        await CreateManager(context).Update("2025", "2026", csv);
+
+        var imported = Assert.Single(await context.HSLOCS.AsNoTracking().ToListAsync());
+        Assert.Equal("A1", imported.HSLOCCode);
+        Assert.Equal("new-cdc", imported.CDCCode);
+        Assert.Equal("new short", imported.ShortDescription);
+        Assert.Equal("new long", imported.LongDescription);
+        Assert.Equal("2026", imported.Version);
+        Assert.True(imported.IsActive);
+    }
+
+    [Fact]
+    public async Task Update_MissingOldVersionInPopulatedCatalog_ThrowsArgumentExceptionWithoutWritingChanges()
+    {
+        using var context = CreateContext();
+        context.HSLOCS.Add(CreateHSLOC("A1", "2024"));
+        await context.SaveChangesAsync();
+
+        await using var csv = CreateCsv("new-cdc,new short,A1,new long");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            CreateManager(context).Update("2025", "2026", csv));
+
+        Assert.Equal("oldVersion", exception.ParamName);
+        Assert.Contains("does not exist", exception.Message);
+        Assert.False(context.ChangeTracker.HasChanges());
+        var stored = await context.HSLOCS.AsNoTracking().ToListAsync();
+        var unchanged = Assert.Single(stored);
+        Assert.Equal("2024", unchanged.Version);
+        Assert.Equal("cdc-A1", unchanged.CDCCode);
+        Assert.True(unchanged.IsActive);
+    }
+
+    [Fact]
     public async Task Update_DuplicateImportedCode_ThrowsArgumentExceptionWithoutWritingChanges()
     {
         using var context = CreateContext();

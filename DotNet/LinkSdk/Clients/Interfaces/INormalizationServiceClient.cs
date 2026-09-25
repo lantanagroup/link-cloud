@@ -10,6 +10,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(Guid vendorVersionId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationAsync(CreateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteFacilityOperationAsync(string facilityId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationSequencesAsync(string facilityId, string resourceType, List<CreateNormalizationOperationSequenceApiModel> sequences, CancellationToken cancellationToken = default);
@@ -17,6 +18,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<NormalizationVendorVersionOperationPresetApiModel>> CreateVendorVersionOperationPresetAsync(CreateNormalizationVendorVersionOperationPresetRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>> GetVendorVersionOperationPresetsAsync(Guid? vendorVersionId = null, string? resource = null, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationPresetAsync(Guid vendorVersionId, Guid presetId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<PagedConfigModel<FacilityLocationTreeApiModel>>> GetFacilityLocationsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityLocationApiModel>> GetFacilityLocationAsync(string facilityId, string locationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<FacilityLocationApiModel>> CreateFacilityLocationAsync(string facilityId, CreateFacilityLocationRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<FacilityLocationLocalCodeMappingApiModel>>> SearchFacilityLocationLocalCodeMappingsAsync(SearchFacilityLocationLocalCodeMappingsRequestApiModel request, CancellationToken cancellationToken = default);
@@ -27,4 +29,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes every HSLOC code, across all versions: <c>DELETE /api/normalization/HSLOC</c>.</summary>
+    Task<LinkApiResponse> DeleteAllHslocCodesAsync(CancellationToken cancellationToken = default);
 }

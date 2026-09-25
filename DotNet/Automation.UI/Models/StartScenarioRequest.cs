@@ -104,6 +104,13 @@ public class StartScenarioRequest : IValidatableObject
     /// </summary>
     public Guid? OrganizationResourceMapTemplateId { get; set; }
 
+    public FacilityConfigurationMode FacilityConfigurationMode { get; set; }
+
+    public Guid? FacilityTemplateId { get; set; }
+
+    /// <summary>Ala carte vendor. Empty means the run does not send a vendor.</summary>
+    public string? VendorName { get; set; }
+
     /// <summary>
     /// When true, a ScheduledReport run holds a short live window and accepts
     /// Admit/Discharge injections before finalizing the report.
@@ -162,6 +169,9 @@ public class StartScenarioRequest : IValidatableObject
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,
         OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
+        FacilityConfigurationMode = scenario.FacilityConfigurationMode,
+        FacilityTemplateId = scenario.FacilityTemplateId,
+        VendorName = scenario.VendorName,
         IsLiveSimulation = scenario.IsLiveSimulation,
         ReportingWindowMinutes = scenario.ReportingWindowMinutes,
         IsMetricsRun = scenario.IsMetricsRun,

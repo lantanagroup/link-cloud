@@ -8,12 +8,35 @@ public interface IDataAcquisitionServiceClient
 {
     Task<LinkApiResponse> GetFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(CreateFhirQueryConfigurationRequestApiModel request, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves/updates the FHIR server connection settings: <c>PUT /api/data/fhirQueryConfiguration</c>.</summary>
+    Task<LinkApiResponse> UpdateFhirQueryConfigurationAsync(object request, CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>Facility-scoped FHIR connection probe: <c>GET /api/data/connectionValidation/{facilityId}/$validate</c>.</summary>
+    Task<LinkApiResponse> ValidateFacilityConnectionAsync(
+        string facilityId,
+        string? patientId = null,
+        string? patientIdentifier = null,
+        string? measureId = null,
+        DateTime? start = null,
+        DateTime? end = null,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, bool includePatients = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves/updates the Epic patient-list configurations: <c>PUT /api/data/fhirQueryList</c>.</summary>
+    Task<LinkApiResponse> UpdateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> DeleteFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves/updates the pre-configured per-vendor query plan: <c>PUT /api/data/{facilityId}/QueryPlan</c>.</summary>
+    Task<LinkApiResponse> UpdateQueryPlanAsync(string facilityId, object request, CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SoftDeleteLogsByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>> SearchAcquisitionLogsAsync(
@@ -51,6 +74,10 @@ public interface IDataAcquisitionServiceClient
         CreateOrganizationLocationConfigurationApiModel request,
         CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse> DeleteOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default);
@@ -75,4 +102,44 @@ public interface IDataAcquisitionServiceClient
         SftpTestConnectionRequestApiModel request,
         bool includeFileContent = false,
         CancellationToken cancellationToken = default);
+
+    // Organization location configuration (update)
+    Task<LinkApiResponse> UpdateOrganizationLocationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
+
+    // Organization location mappings
+    /// <summary>Reads one organization/location mapping: <c>GET /api/data/location-mappings/{id}</c>.</summary>
+    Task<LinkApiResponse<OrganizationLocationMappingApiModel>> GetOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes one organization/location mapping: <c>DELETE /api/data/location-mappings/{id}</c>.</summary>
+    Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Saves the resolved organization/location mapping: <c>PUT /api/data/location-mappings/{id}</c>.</summary>
+    Task<LinkApiResponse> UpdateOrganizationLocationMappingAsync(int id, object request, CancellationToken cancellationToken = default);
+
+    // sFTP acquisition configuration (Cerner)
+    Task<LinkApiResponse> GetSftpConfigurationByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> GetOrganizationSftpConfigurationAsync(string organizationId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> CreateSftpConfigurationAsync(string organizationId, object request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpdateSftpConfigurationAsync(string organizationId, string configurationId, object request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteSftpConfigurationAsync(string organizationId, string configurationId, CancellationToken cancellationToken = default);
+    /// <summary>Saves the write-only sFTP credentials. The request body is not captured in the response, because it carries the password.</summary>
+    Task<LinkApiResponse> UpdateSftpCredentialsAsync(string organizationId, object credentials, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteSftpCredentialsAsync(string organizationId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> TestSavedSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> SearchSftpLogsAsync(
+        string? facilityId = null,
+        string? status = null,
+        string? acquisitionType = null,
+        string? subType = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? sortBy = null,
+        string? sortOrder = null,
+        bool? includeDeleted = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Records an sFTP acquisition log: <c>POST /api/data/sftp-logs</c>.</summary>
+    Task<LinkApiResponse> CreateSftpLogAsync(object request, CancellationToken cancellationToken = default);
 }

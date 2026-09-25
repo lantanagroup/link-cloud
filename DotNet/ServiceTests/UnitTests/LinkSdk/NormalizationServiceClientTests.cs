@@ -16,6 +16,21 @@ namespace UnitTests.LinkSdk;
 public class NormalizationServiceClientTests
 {
     [Fact]
+    public async Task GetFacilityLocationsAsync_CallsFacilityLocationsEndpoint()
+    {
+        using var server = new OneShotServer("{\"records\":[{\"locationId\":\"location-1\"}]}");
+        using var client = CreateClient(server.BaseUrl);
+
+        var callTask = client.GetFacilityLocationsAsync("facility-1");
+        var request = await server.WaitForRequestAsync();
+        var result = await callTask;
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/normalization/facility-locations/facilities/facility-1/locations", request.Path);
+        Assert.Equal("location-1", result.Body!.Records[0].LocationId);
+    }
+
+    [Fact]
     public async Task GetFacilityLocationAsync_CallsLocationEndpoint()
     {
         using var server = new OneShotServer("{\"facilityId\":\"facility-1\",\"locationId\":\"location-1\"}");
@@ -189,6 +204,20 @@ public class NormalizationServiceClientTests
         Assert.Contains("2023", request.Body);
         Assert.Contains("CsvFile", request.Body);
         Assert.Contains("1025-6", request.Body);
+    }
+
+    [Fact]
+    public async Task DeleteAllHslocCodesAsync_DeletesCodeSetEndpoint()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 204);
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.DeleteAllHslocCodesAsync();
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/normalization/HSLOC", request.Path);
+        Assert.Equal(204, result.StatusCode);
     }
 
     private static NormalizationServiceClient CreateClient(string baseUrl) => new(

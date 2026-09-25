@@ -1,0 +1,90 @@
+<section class="hsloc-page" [attr.aria-busy]="busy">
+  <header>
+    <h1>HSLOC Configuration</h1>
+  </header>
+  <p><a href="https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html" target="_blank" rel="noopener noreferrer">Code System: HSLOC | NHSN | CDC</a></p>
+  @if (busy) { <mat-progress-bar mode="indeterminate" aria-label="Loading HSLOC codes"></mat-progress-bar> }
+  @if (success) { <p role="status">{{ success }}</p> }
+
+  <section class="upload-section" aria-labelledby="upload-title">
+    <h2 id="upload-title">Upload HSLOC CSV</h2>
+    <form (ngSubmit)="upload(fileInput)">
+      <mat-form-field appearance="outline">
+        <mat-label>Old version</mat-label>
+        <input matInput name="oldVersion" [(ngModel)]="oldVersion" required [disabled]="busy">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>New version</mat-label>
+        <input matInput name="newVersion" [(ngModel)]="newVersion" required [disabled]="busy">
+      </mat-form-field>
+      <div class="file-field">
+        <label for="hsloc-csv">CSV file</label>
+        <input #fileInput id="hsloc-csv" type="file" accept=".csv,text/csv" [disabled]="busy" (change)="selectFile($event)" aria-describedby="file-error">
+        @if (fileError) { <span id="file-error" role="alert" class="error">{{ fileError }}</span> }
+      </div>
+      <button mat-flat-button color="primary" type="submit" [disabled]="busy || !loaded || !file || !oldVersion.trim() || !newVersion.trim()">
+        <mat-icon>upload</mat-icon>Upload
+      </button>
+    </form>
+  </section>
+
+  <section aria-labelledby="codes-title">
+    <h2 id="codes-title">HSLOC Codes</h2>
+    <div class="filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Search codes and descriptions</mat-label>
+        <input matInput [(ngModel)]="search" (ngModelChange)="applyFilter()">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Version</mat-label>
+        <mat-select [(ngModel)]="version" (selectionChange)="applyFilter()">
+          <mat-option value="">All versions</mat-option>
+          @for (item of versions; track item) { <mat-option [value]="item">{{ item }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <mat-checkbox [(ngModel)]="includeInactive" (change)="applyFilter()">Include inactive</mat-checkbox>
+    </div>
+    <div class="table-container" tabindex="0" role="region" aria-label="HSLOC codes">
+      <table mat-table [dataSource]="dataSource" matSort matSortActive="hslocCode" matSortDirection="asc">
+        <ng-container matColumnDef="hslocCode">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>HSLOC Code</th>
+          <td mat-cell *matCellDef="let row">{{ row.hslocCode }}</td>
+        </ng-container>
+        <ng-container matColumnDef="cdcCode">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>CDC Code</th>
+          <td mat-cell *matCellDef="let row">{{ row.cdcCode }}</td>
+        </ng-container>
+        <ng-container matColumnDef="shortDescription">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Short Description</th>
+          <td mat-cell *matCellDef="let row">{{ row.shortDescription }}</td>
+        </ng-container>
+        <ng-container matColumnDef="longDescription">
+          <th mat-header-cell *matHeaderCellDef>Long Description</th>
+          <td mat-cell *matCellDef="let row">{{ row.longDescription }}</td>
+        </ng-container>
+        <ng-container matColumnDef="version">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Version</th>
+          <td mat-cell *matCellDef="let row">{{ row.version }}</td>
+        </ng-container>
+        <ng-container matColumnDef="isActive">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let row">{{ row.isActive ? 'Active' : 'Inactive' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let row">
+            <button mat-icon-button color="warn" type="button" [attr.aria-label]="'Delete HSLOC code ' + row.hslocCode" matTooltip="Delete code" [disabled]="busy" (click)="deleteCode(row)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td [attr.colspan]="columns.length" class="empty-state">{{ busy ? 'Loading HSLOC codes...' : loadFailed ? 'HSLOC codes unavailable.' : 'No HSLOC codes found.' }}</td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator [pageSize]="25" [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons aria-label="HSLOC code pagination"></mat-paginator>
+  </section>
+</section>
