@@ -673,6 +673,37 @@ public class FhirDataLoader
     }
 
     /// <summary>
+    /// GETs one resource relative to the configured FHIR base. Returns null on 404.
+    /// Any other unsuccessful response throws: treating a live resource as missing
+    /// under-predicts the manifest.
+    /// </summary>
+    public async Task<string?> TryReadResourceJsonAsync(string relativeUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            throw new ArgumentException("A relative FHIR URL is required.", nameof(relativeUrl));
+        if (relativeUrl.Contains("://", StringComparison.Ordinal) || relativeUrl.StartsWith("//", StringComparison.Ordinal))
+            throw new ArgumentException($"Refusing absolute URL '{relativeUrl}'.", nameof(relativeUrl));
+
+        var request = new RestRequest(relativeUrl.TrimStart('/'), Method.Get);
+        request.AddHeader("Accept", "application/fhir+json");
+        if (!string.IsNullOrEmpty(_authorization))
+            request.AddHeader("Authorization", _authorization);
+
+        var response = await _restClient.ExecuteAsync(request, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+        {
+            var statusCode = (int)response.StatusCode;
+            throw new InvalidOperationException(
+                $"FHIR server returned {statusCode} {response.StatusCode} for {relativeUrl}.");
+        }
+
+        return response.Content;
+    }
+
+    /// <summary>
     /// Performs a single GET against the FHIR server and returns the response body.
     /// When <paramref name="useFullUrl"/> is true the URL is treated as absolute
     /// (used for paging links) and is required to share scheme+host+port with

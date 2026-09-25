@@ -76,7 +76,8 @@ internal sealed class LivePatientProvisioner(
             imported,
             selectedMeasures,
             acquisitionSimulation,
-            measureBundleJsons);
+            measureBundleJsons,
+            cancellationToken);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(patientId, effectiveProfile);
@@ -101,7 +102,8 @@ internal sealed class LivePatientProvisioner(
             imported,
             selectedMeasures,
             acquisitionSimulation,
-            measureBundleJsons);
+            measureBundleJsons,
+            cancellationToken);
 
         await PersistManifestAsync(cancellationToken);
         return ToProvisioned(id, effectiveProfile);

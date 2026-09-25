@@ -127,6 +127,79 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
+    public async Task Pk_hsloc_01a0cfc5_includes_encounter_location_omitted_by_everything()
+    {
+        // Run a3756e88 / patient 01a0cfc5 on ehr-test. Patient/$everything returned the
+        // 195 resources the manifest counted and omitted Location/15eeb878, which the
+        // Encounter still references and which GET Location/{id} returns. ABS then had
+        // Encounter 8 and Location 7, including that Location. The org condition is the
+        // identifier system carried by every location in this graph, including the
+        // unmapped root that has no partOf parent, so it matches the raw resource
+        // before normalization.
+        const string patientId = "01a0cfc5-e9f7-762b-a544-debb1c474a5b";
+        const string missingLocationId = "15eeb878-9317-4033-9fbd-ce59258c2f6f";
+        const string encounterId = "3c95b03a-b4fc-4a44-82c1-61df9d8fe7e3";
+        const string brokenParentId = "b222be8d-0142-4e12-8ea0-c33bec179876";
+        var periodStart = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodEnd = new DateTime(2026, 9, 30, 23, 59, 59, DateTimeKind.Utc);
+        string[] orgPaths =
+        [
+            "identifier.where(system = 'http://hospital.example.org/locations').exists()"
+        ];
+
+        var entries = ImportedPatientLoader.ParseBundleEntries(
+            ReadEmbedded("pk-hsloc-01a0cfc5.everything.json"), patientId);
+        var omitted = JsonSerializer.Deserialize<Location>(
+            ReadEmbedded("pk-hsloc-01a0cfc5.location-15eeb878.json"),
+            FhirSerializerOptions.ForFhirWithoutValidation());
+        omitted.Should().NotBeNull();
+
+        var reads = new List<string>();
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                if (string.Equals(id, missingLocationId, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult(omitted);
+                if (string.Equals(id, brokenParentId, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult<Location?>(null);
+                throw new InvalidOperationException($"Unexpected Location read: {id}");
+            },
+            output: null,
+            CancellationToken.None);
+
+        added.Should().Be(1);
+        reads.Should().BeEquivalentTo(new[] { missingLocationId, brokenParentId });
+
+        var manifest = AbsSubmissionPredictor.PredictImportedBundle(
+            SerializeEntries(entries),
+            patientId,
+            periodStart,
+            periodEnd,
+            organizationLocationConditionFhirPaths: orgPaths);
+        var predicted = ClinicalCounts(manifest, patientId);
+
+        AssertCount(predicted, "Encounter", 8);
+        AssertCount(predicted, "Location", 7);
+        AssertCount(predicted, "Condition", 2);
+        AssertCount(predicted, "Coverage", 1);
+        AssertCount(predicted, "DiagnosticReport", 7);
+        AssertCount(predicted, "Medication", 2);
+        AssertCount(predicted, "MedicationRequest", 2);
+        AssertCount(predicted, "Observation", 129);
+        AssertCount(predicted, "ServiceRequest", 7);
+        AssertCount(predicted, "Specimen", 7);
+        AssertCount(predicted, "Patient", 1);
+        predicted.Should().NotContainKey("MedicationAdministration");
+
+        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+        keys.Should().Contain($"Location/{missingLocationId}");
+        keys.Should().Contain($"Encounter/{encounterId}");
+        manifest.ResourceKeysByPatient[patientId].Should().Contain($"Location/{missingLocationId}");
+    }
+
+    [Fact]
     public void Imported_patient_predictor_excludes_diagnostic_reports_outside_ip_window()
     {
         // Run df6f9b8e: mega AddById patient. DA acquired 360 DiagnosticReports;
@@ -524,6 +597,16 @@ public class AbsSubmissionPredictorTests
         return counts
             .Where(kv => !PipelineDerivedTypes.Contains(kv.Key))
             .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string SerializeEntries(List<Bundle.EntryComponent> entries)
+    {
+        var bundle = new Bundle
+        {
+            Type = Bundle.BundleType.Collection,
+            Entry = entries
+        };
+        return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 
     private static string WrapClinicalNdjsonAsBundle(string ndjson)

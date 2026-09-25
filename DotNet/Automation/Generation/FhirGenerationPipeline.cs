@@ -287,7 +287,8 @@ public static class FhirGenerationPipeline
                     acquisitionSimulation,
                     generationClinicalPeriodStart,
                     generationClinicalPeriodEnd,
-                    measureBundleJsons);
+                    measureBundleJsons,
+                    cancellationToken);
 
                 importedPatientIds.Add(patientId);
                 totalBundlesUploaded += bundleCount;
@@ -406,7 +407,8 @@ public static class FhirGenerationPipeline
         ImportedPatientInput imported,
         IReadOnlyList<ProfiledMeasureType> measures,
         AcquisitionSimulationConfig? acquisitionSimulation = null,
-        IReadOnlyList<string>? measureBundleJsons = null)
+        IReadOnlyList<string>? measureBundleJsons = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(targetManifest);
         ArgumentNullException.ThrowIfNull(imported);
@@ -425,7 +427,8 @@ public static class FhirGenerationPipeline
             acquisitionSimulation,
             periodStart,
             periodEnd,
-            measureBundleJsons);
+            measureBundleJsons,
+            cancellationToken);
 
         var slice = sliceBuilder.Build(measures);
         targetManifest.AppendFrom(slice);
@@ -692,7 +695,8 @@ public static class FhirGenerationPipeline
         AcquisitionSimulationConfig? acquisitionSimulation,
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
-        IReadOnlyList<string>? measureBundleJsons = null)
+        IReadOnlyList<string>? measureBundleJsons = null,
+        CancellationToken cancellationToken = default)
     {
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
@@ -715,7 +719,7 @@ public static class FhirGenerationPipeline
             if (imported.Source == ImportedPatientSource.ExistingId)
             {
                 output.WriteLine($"  [imported:id] Fetching Patient/{patientId}/$everything from FHIR server...");
-                bundleJson = await fhirDataLoader.FetchPatientEverythingAsync(patientId);
+                bundleJson = await fhirDataLoader.FetchPatientEverythingAsync(patientId, cancellationToken);
             }
             else
             {
@@ -726,6 +730,11 @@ public static class FhirGenerationPipeline
             }
 
             entries = ImportedPatientLoader.ParseBundleEntries(bundleJson, patientId);
+            await ReferencedLocationExpander.AppendMissingAsync(
+                entries,
+                (id, token) => ImportedPatientLoader.ReadLocationAsync(fhirDataLoader, id, token),
+                output,
+                cancellationToken).ConfigureAwait(false);
         }
 
         if (entries.Count == 0)

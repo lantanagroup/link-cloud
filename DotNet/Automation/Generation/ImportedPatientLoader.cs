@@ -54,6 +54,11 @@ public static class ImportedPatientLoader
             }
 
             imp.PreLoadedEntries = ParseBundleEntries(bundleJson, imp.PatientId);
+            await ReferencedLocationExpander.AppendMissingAsync(
+                imp.PreLoadedEntries,
+                (id, token) => ReadLocationAsync(fhirDataLoader, id, token),
+                output,
+                ct).ConfigureAwait(false);
 
             // Backfill PatientId from the bundle when the user didn't specify one.
             if (string.IsNullOrWhiteSpace(imp.PatientId))
@@ -157,6 +162,47 @@ public static class ImportedPatientLoader
                 $"FHIR bundle does not contain Patient/{expectedPatientId}. Bundle imports must include a Patient resource whose id matches the configured value.");
 
         return result;
+    }
+
+    /// <summary>
+    /// Reads Location/{id}. A 404 is a dangling reference and returns null.
+    /// </summary>
+    public static async Task<Location?> ReadLocationAsync(
+        FhirDataLoader fhirDataLoader,
+        string locationId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(locationId)
+            || locationId.Contains('/')
+            || locationId.Contains('\\')
+            || locationId.Contains('?'))
+        {
+            throw new ArgumentException($"Location ID '{locationId}' is not a single resource id.", nameof(locationId));
+        }
+
+        var json = await fhirDataLoader.TryReadResourceJsonAsync($"Location/{locationId}", cancellationToken)
+            .ConfigureAwait(false);
+        if (json == null)
+            return null;
+
+        Location? location;
+        try
+        {
+            location = JsonSerializer.Deserialize<Location>(json, FhirSerializerOptions.ForFhirWithoutValidation());
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"FHIR server returned an unparseable body for Location/{locationId}.", ex);
+        }
+
+        if (location == null)
+            throw new InvalidOperationException($"FHIR server returned an empty Location for Location/{locationId}.");
+
+        if (string.IsNullOrWhiteSpace(location.Id))
+            location.Id = locationId;
+
+        return location;
     }
 
     private static DateTime? ParseFhirDateTime(string? s)
