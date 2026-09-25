@@ -376,10 +376,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     public async Task ClearFacilityTeardownProgressAsync(Guid runId, CancellationToken ct = default)
         => await _facilityTeardownProgress.DeleteManyAsync(p => p.RunId == runId, ct);
 
-    public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
+    public Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
+        => DeleteRunAsync(runId, retainOwnedFacilities: true, ct);
+
+    public async Task DeleteRunAsync(Guid runId, bool retainOwnedFacilities, CancellationToken ct = default)
     {
         var run = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
-        if (run != null)
+        if (run != null && retainOwnedFacilities)
             await RetainOwnedFacilitiesAsync(ToSummary(run), ct);
 
         // Drop child history first and the run summary last. A failure after the

@@ -603,7 +603,8 @@ public sealed class LeftoverRunCleanupService(
                             alreadyCleaned.Add(id);
 
                         // Owned ids were already torn down above. Do not let the helper fall back to run.FacilityId.
-                        // DeleteRunAsync writes a tombstone for every owned id. Drop the ones already cleaned.
+                        // A teardown purge tombstones owned ids, then releases the ones already cleaned.
+                        // History-only leaves the facilities alone, so it does not write those tombstones.
                         await RunCleanupHelper.PurgeRunHistoryAsync(
                             facilityClient,
                             normalizationClient,
@@ -617,7 +618,8 @@ public sealed class LeftoverRunCleanupService(
                             run,
                             settings.AbortTtl,
                             cancellationToken,
-                            teardownFacility: false);
+                            teardownFacility: false,
+                            retainOwnedFacilities: teardownInPurge);
                         purged.Add(run.RunId);
                         foreach (var id in OwnedAutomationFacilityIds(run))
                         {

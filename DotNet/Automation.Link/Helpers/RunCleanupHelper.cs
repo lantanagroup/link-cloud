@@ -295,7 +295,8 @@ public static class RunCleanupHelper
         TimeSpan abortTtl,
         CancellationToken cancellationToken = default,
         bool teardownFacility = true,
-        ISet<string>? alreadyTornDownFacilityIds = null)
+        ISet<string>? alreadyTornDownFacilityIds = null,
+        bool retainOwnedFacilities = true)
     {
         ArgumentNullException.ThrowIfNull(reportClient);
         ArgumentNullException.ThrowIfNull(snapshotStore);
@@ -332,7 +333,10 @@ public static class RunCleanupHelper
             EnsureApiSuccess(scheduleResult, $"report schedule soft-delete for '{run.ReportId}'", 404);
         }
 
-        await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
+        if (retainOwnedFacilities)
+            await snapshotStore.DeleteRunAsync(run.RunId, cancellationToken);
+        else
+            await snapshotStore.DeleteRunAsync(run.RunId, retainOwnedFacilities: false, cancellationToken);
     }
 
     public static void EnsureApiSuccess(LinkApiResponse response, string operation, params int[] allowedStatusCodes)

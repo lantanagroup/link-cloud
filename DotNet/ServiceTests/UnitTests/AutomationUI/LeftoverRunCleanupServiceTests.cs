@@ -110,13 +110,15 @@ public class LeftoverRunCleanupServiceTests
         var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
         var run = Run(Guid.NewGuid().ToString(), now.AddDays(-30));
         var saved = new List<CleanupReport>();
-        var service = Create(now, [run], saved, throwOnTerminalPublish: true);
+        var retains = new List<bool>();
+        var service = Create(now, [run], saved, throwOnTerminalPublish: true, deleteRunRetains: retains);
 
         var result = await service.RunHistoryPurgeNowAsync();
 
         result.PurgedRunIds.Should().Equal(run.RunId);
         saved.Should().ContainSingle();
         saved[0].Status.Should().Be("completed");
+        retains.Should().Equal(true);
     }
 
     [Fact]
@@ -530,7 +532,14 @@ public class LeftoverRunCleanupServiceTests
         var facilityId = Guid.NewGuid().ToString();
         var run = Run(facilityId, now.AddDays(-2));
         var deleted = new List<string>();
-        var service = Create(now, [run], [], deletedFacilityIds: deleted, maxFacilitiesPerPass: 1);
+        var retains = new List<bool>();
+        var service = Create(
+            now,
+            [run],
+            [],
+            deletedFacilityIds: deleted,
+            maxFacilitiesPerPass: 1,
+            deleteRunRetains: retains);
 
         var result = await service.RunCustomRangeAsync(
             now.AddDays(-3),
@@ -541,6 +550,7 @@ public class LeftoverRunCleanupServiceTests
         deleted.Should().BeEmpty();
         result.TornDownFacilityIds.Should().BeEmpty();
         result.PurgedRunIds.Should().Equal(run.RunId);
+        retains.Should().Equal(false);
     }
 
     [Fact]
@@ -797,7 +807,8 @@ public class LeftoverRunCleanupServiceTests
         List<string>? releasedFacilityIds = null,
         int maxFacilitiesPerPass = 25,
         bool dropDeletedFacilities = false,
-        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? initialTeardownProgress = null)
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? initialTeardownProgress = null,
+        List<bool>? deleteRunRetains = null)
     {
         var facility = new Mock<IFacilityServiceClient>();
         var liveFacilities = new Dictionary<string, string>(
@@ -925,6 +936,16 @@ public class LeftoverRunCleanupServiceTests
         snapshots.Setup(s => s.DeleteRunAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .Callback(() =>
             {
+                deleteRunRetains?.Add(true);
+                cancelAfterFirstDelete?.Cancel();
+                if (deleteRunError != null)
+                    throw deleteRunError;
+            })
+            .Returns(Task.CompletedTask);
+        snapshots.Setup(s => s.DeleteRunAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Callback<Guid, bool, CancellationToken>((_, retain, _) =>
+            {
+                deleteRunRetains?.Add(retain);
                 cancelAfterFirstDelete?.Cancel();
                 if (deleteRunError != null)
                     throw deleteRunError;

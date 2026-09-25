@@ -62,6 +62,13 @@ public interface ISnapshotStore
     Task<IReadOnlyDictionary<Guid, ImportedBundleSnapshot>> GetImportedBundlesByIdsAsync(IEnumerable<Guid> bundleIds, CancellationToken ct = default);
     Task DeleteRunAsync(Guid runId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Deletes the run. Owned facility ids are tombstoned first only when
+    /// <paramref name="retainOwnedFacilities"/> is true. A history-only purge passes false
+    /// so a later daily teardown does not delete facilities the caller left in place.
+    /// </summary>
+    Task DeleteRunAsync(Guid runId, bool retainOwnedFacilities, CancellationToken ct = default);
+
     // --- Domain snapshots (per-run, per-service polling data) ---
     Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default);
     Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default);
