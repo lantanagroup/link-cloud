@@ -75,6 +75,7 @@
   },
   "status": {
     "saving": "Saving…",
+    "saved": "Saved",
     "loading": "Loading…",
     "stepComplete": "(completed)"
   },
