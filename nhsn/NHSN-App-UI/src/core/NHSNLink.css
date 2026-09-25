@@ -18,6 +18,83 @@
   position: relative;
   --nhsn-scrollbar-thumb: var(--kendo-color-border, #d0d7de);
   --nhsn-scrollbar-thumb-hover: var(--kendo-color-app-text-subtle, #5a5f69);
+  --nhsn-focus-ring-width: 2px;
+  --nhsn-focus-ring-color: #000000;
+  --nhsn-focus-ring-color-inverse: #ffffff;
+  --nhsn-focus-ring-color-accent: var(--kendo-color-primary, #0057b7);
+}
+
+.nhsn-link .k-button:focus-visible,
+.nhsn-link__hint-trigger:focus-visible,
+.nhsn-link__tab:focus-visible,
+.info-icon:focus-visible,
+.report-generate .report-source-btn:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
+  outline-offset: 0;
+}
+
+.nhsn-link__reporting-plan-table-scroll:focus,
+.nhsn-link__reporting-plan-table-scroll:focus-visible,
+.nhsn-link__modal-close:focus-visible,
+.nhsn-link__table-scroll:focus,
+.nhsn-link__table-scroll:focus-visible,
+.encounter-mapping .encounter-table-scroll:focus,
+.encounter-mapping .encounter-table-scroll:focus-visible,
+.report-generate .report-patient-scroll:focus,
+.report-generate .report-patient-scroll:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
+  outline-offset: 2px;
+}
+
+.nhsn-link__step-panel:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color);
+  outline-offset: -2px;
+}
+
+.nhsn-link__step-button:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-inverse);
+  outline-offset: -2px;
+}
+
+.nhsn-link__chip-remove:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-inverse);
+  outline-offset: 1px;
+}
+
+.nhsn-link .k-input:focus,
+.nhsn-link .k-input:focus-within,
+.nhsn-link .k-input.k-focus,
+.nhsn-link__hsloc-code-select:focus {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-accent);
+  outline-offset: -2px;
+}
+
+.nhsn-facility-info .k-dropdownlist.k-focus,
+.nhsn-facility-info .k-dropdownlist:focus,
+.nhsn-link__mrn-intake .k-dropdownlist.k-focus,
+.nhsn-link__mrn-intake .k-dropdownlist:focus,
+.nhsn-link__mrn-intake .nhsn-link__date-field .k-datepicker:focus-within,
+.nhsn-link__chip-select:focus-within {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-accent);
+  outline-offset: 1px;
+}
+
+.nhsn-facility-info .k-dropdownlist.k-focus,
+.nhsn-facility-info .k-dropdownlist:focus,
+.nhsn-link__mrn-intake .k-dropdownlist.k-focus,
+.nhsn-link__mrn-intake .k-dropdownlist:focus {
+  border-color: var(--nhsn-focus-ring-color-accent);
+}
+
+.nhsn-link__content .k-radio:focus-visible,
+.nhsn-link__mrn-patient-button:focus-visible {
+  outline: var(--nhsn-focus-ring-width) solid var(--nhsn-focus-ring-color-accent);
+  outline-offset: 2px;
+}
+
+.nhsn-link__date-field .k-datepicker > .k-input:focus,
+.nhsn-link__date-field .k-datepicker > .k-input:focus-within {
+  outline: none;
 }
 
 .nhsn-link h1,
@@ -292,11 +369,6 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-.nhsn-link__step-button:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: -2px;
-}
-
 .nhsn-link__step-index {
   flex: 0 0 auto;
   display: inline-flex;
@@ -358,11 +430,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.nhsn-link__step-panel:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: -2px;
 }
 
 .nhsn-link__step-panel > .nhsn-link__content {
@@ -521,32 +588,6 @@
   box-shadow: none !important;
 }
 
-.nhsn-link .k-button:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
-}
-
-.nhsn-link__step-actions .k-button:focus,
-.nhsn-link__step-actions .k-button.k-focus {
-  box-shadow: none !important;
-}
-
-.nhsn-link__step-actions .k-button.k-button-primary:focus,
-.nhsn-link__step-actions .k-button.k-button-primary.k-focus,
-.nhsn-link__step-actions .k-button.k-button-secondary:focus,
-.nhsn-link__step-actions .k-button.k-button-secondary.k-focus,
-.nhsn-link__step-actions .k-button.k-button-tertiary:focus,
-.nhsn-link__step-actions .k-button.k-button-tertiary.k-focus {
-  box-shadow: none !important;
-}
-
-.nhsn-link__step-actions .k-button:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
-}
-
-
-
 .nhsn-link__step-panel > .nhsn-link__content:has(> .nhsn-link__step-actions) {
   padding-bottom: 0;
 }
@@ -691,10 +732,9 @@
 .nhsn-link .k-input:focus,
 .nhsn-link .k-input:focus-within,
 .nhsn-link .k-input.k-focus {
-  /* Inset (negative offset) so the ring stays inside the input's own box and
-     is never clipped by a scrollable ancestor like .nhsn-link__repeatable-scroll. */
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: -2px;
+  /* Outline itself lives in the shared focus-styles block above, so its ring
+     stays inset (never clipped by a scrollable ancestor like
+     .nhsn-link__repeatable-scroll) without repeating the value here. */
   border-color: var(--kendo-color-border, #d0d7de);
   color: inherit;
   background: var(--kendo-color-app-surface, #ffffff);
@@ -755,12 +795,6 @@
   overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
-}
-
-.nhsn-link__reporting-plan-table-scroll:focus,
-.nhsn-link__reporting-plan-table-scroll:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 2px;
 }
 
 .nhsn-link__reporting-plan-table {
@@ -951,11 +985,6 @@
   display: block;
 }
 
-.nhsn-link__hint-trigger:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
-}
-
 .nhsn-link__hint-trigger-bubble {
   display: none;
   position: absolute;
@@ -995,13 +1024,6 @@
   background: var(--kendo-color-app-surface, #ffffff);
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
-}
-
-.nhsn-facility-info .k-dropdownlist.k-focus,
-.nhsn-facility-info .k-dropdownlist:focus {
-  border-color: var(--kendo-color-primary, #0057b7);
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 1px;
 }
 
 .nhsn-facility-info .k-dropdownlist .k-input-inner {
@@ -1325,11 +1347,6 @@
   background: var(--kendo-color-primary, #0057b7);
 }
 
-.nhsn-link__content .k-radio:focus-visible {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 2px;
-}
-
 .nhsn-link__content .k-radio-label {
   font-size: 14px;
   color: var(--kendo-color-app-text, #1f2328);
@@ -1410,11 +1427,6 @@
 .nhsn-link__tab--selected:hover:not(:disabled) {
   background: var(--kendo-color-primary, #0057b7);
   color: var(--kendo-color-on-primary, #ffffff);
-}
-
-.nhsn-link__tab:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
 }
 
 .nhsn-link__tab:disabled {
@@ -1621,11 +1633,6 @@
   background: var(--kendo-color-app-surface, #ffffff);
 }
 
-.nhsn-link__chip-select:focus-within {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: 1px;
-}
-
 .nhsn-link__chip-select-input {
   width: 100%;
   border: none;
@@ -1687,11 +1694,6 @@
 
 .nhsn-link__chip-remove:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.45);
-}
-
-.nhsn-link__chip-remove:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: 1px;
 }
 
 .nhsn-link__chip-remove:disabled {
@@ -1957,11 +1959,6 @@
   vertical-align: middle;
 }
 
-.info-icon:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
-}
-
 .info-icon.info-icon--success {
   background: var(--kendo-color-success, #1e5f25);
   color: var(--kendo-color-on-inverse, #ffffff);
@@ -2088,11 +2085,6 @@
   cursor: pointer;
 }
 
-.nhsn-link__modal-close:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 2px;
-}
-
 .nhsn-link__modal-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -2116,16 +2108,6 @@
   vertical-align: -2px;
 }
 
-.nhsn-link__modal-actions .k-button:focus,
-.nhsn-link__modal-actions .k-button.k-focus {
-  box-shadow: none !important;
-}
-
-.nhsn-link__modal-actions .k-button:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 0;
-}
-
 /* ---- plain data table (pickers and reference tables) */
 
 .nhsn-link__table-scroll {
@@ -2133,12 +2115,6 @@
   overflow-y: auto;
   border: 1px solid var(--kendo-color-border, #d0d7de);
   border-radius: 8px;
-}
-
-.nhsn-link__table-scroll:focus,
-.nhsn-link__table-scroll:focus-visible {
-  outline: 2px solid #000000;
-  outline-offset: 2px;
 }
 
 .nhsn-link__table {

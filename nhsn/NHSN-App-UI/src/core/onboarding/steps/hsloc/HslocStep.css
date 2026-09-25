@@ -64,10 +64,6 @@
   font-family: inherit;
 }
 
-.nhsn-link__hsloc-code-select:focus {
-  outline: 2px solid var(--kendo-color-primary, #0057b7);
-  outline-offset: -2px;
-}
 
 .nhsn-link__hsloc-code-select--error {
   border-color: var(--kendo-color-error, #cc1b22);
