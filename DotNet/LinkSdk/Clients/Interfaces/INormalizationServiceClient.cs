@@ -29,4 +29,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes every HSLOC code, across all versions: <c>DELETE /api/normalization/HSLOC</c>.</summary>
+    Task<LinkApiResponse> DeleteAllHslocCodesAsync(CancellationToken cancellationToken = default);
 }
