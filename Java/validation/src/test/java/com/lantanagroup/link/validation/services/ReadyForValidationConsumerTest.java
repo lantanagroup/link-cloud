@@ -342,7 +342,8 @@ public class ReadyForValidationConsumerTest {
         CategoryRepository categoryRepository = mock(CategoryRepository.class);
         when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
         CategorizationService realCategorizationService = new CategorizationService(
-                new ObjectMapper(), categoryRepository, mock(CategoryRuleRepository.class), resultRepository);
+                new ObjectMapper(), categoryRepository, mock(CategoryRuleRepository.class), resultRepository,
+                validationMetrics);
 
         ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
                 fhirContext, reportClient, validationService, realCategorizationService, resultRepository,

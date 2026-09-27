@@ -9,6 +9,12 @@
       "field": "MESSAGE",
       "regex": "^Wrong Display Name '.*' for .* should be .*'.*' .*",
       "inverted": false
+    },
+    "strategy": "SKIP",
+    "scope": {
+      "excludeActions": [
+        "InvalidDisplay"
+      ]
     }
   },
   {
@@ -137,7 +143,25 @@
       ],
       "requiresAllChildren": false,
       "inverted": false
-    }
+    },
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "https?://fhir\\.cerner\\.com/.*",
+        "https?://open\\.epic\\.com/FHIR/StructureDefinition/.*",
+        "urn:oid:1\\.2\\.840\\.114350\\..*",
+        "urn:oid:1\\.2\\.246\\.537\\.6\\.96.*"
+      ]
+    },
+    "suppressMessageIds": [
+      "Terminology_TX_System_Unknown",
+      "Coding_has_no_system__cannot_validate",
+      "TERMINOLOGY_TX_SYSTEM_NO_CODE",
+      "UNKNOWN_CODESYSTEM",
+      "UNKNOWN_CODESYSTEM_VERSION",
+      "UNKNOWN_CODESYSTEM_VERSION_UNK",
+      "UNKNOWN_CODESYSTEM_VERSION_NONE"
+    ]
   },
   {
     "id": "unresolved_code_system",
@@ -160,7 +184,14 @@
       ],
       "requiresAllChildren": true,
       "inverted": false
-    }
+    },
+    "strategy": "SUPPRESS",
+    "suppressMessageIds": [
+      "Type_Specific_Checks_DT_URL_Resolve"
+    ],
+    "suppressPathPatterns": [
+      "\\.coding\\[[0-9]+\\]\\.system"
+    ]
   },
   {
     "id": "whitespace_in_patient_resource",
