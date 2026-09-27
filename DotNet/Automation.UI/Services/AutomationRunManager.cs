@@ -108,7 +108,8 @@ public class AutomationRunManager : IAutomationRunManager
                 var callbacks = new RunExecutor.ExecutorCallbacks(
                     Output: output,
                     BroadcastStatus: () => BroadcastStatus(state),
-                    PersistRunSummary: () => PersistRunSummaryAsync(state));
+                    PersistRunSummary: () => PersistRunSummaryAsync(state),
+                    PersistOwnership: () => PersistOwnershipAsync(state));
 
                 await _runExecutor.ExecuteAsync(state, callbacks, state.RunCancellation.Token);
             }
@@ -672,23 +673,43 @@ public class AutomationRunManager : IAutomationRunManager
         await PersistRunSummaryAsync(state);
     }
 
+    private async Task PersistOwnershipAsync(MutableRunState state)
+    {
+        // Independent of run cancellation. CancelRunAsync persists a summary before it
+        // cancels the run token, and that write must not abort this marker.
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        const int attempts = 3;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                var summary = ToSummary(state);
+                if (!summary.AutomationCreatedFacility)
+                    return;
+
+                await _snapshotStore.MarkAutomationCreatedFacilityAsync(
+                    summary, summary.FacilityId ?? string.Empty, budget.Token);
+                return;
+            }
+            catch (OperationCanceledException) when (budget.IsCancellationRequested)
+            {
+                throw new InvalidOperationException(
+                    $"Ownership summary persist timed out for {state.RunId}.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && attempt < attempts)
+            {
+                _logger.LogWarning(ex,
+                    "Ownership summary persist failed for {RunId}; retrying.", state.RunId);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), budget.Token);
+            }
+        }
+    }
+
     private async Task PersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
-            AutomationRunSummary summary;
-            string? facilityId;
-            string? reportId;
-
-            lock (state.Sync)
-            {
-                summary = ToSummary(state);
-                facilityId = state.FacilityId;
-                reportId = state.ReportId;
-            }
-
-            summary.RunConfigurationJson = null;
-            await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
+            await WriteRunSummaryAsync(state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -702,6 +723,23 @@ public class AutomationRunManager : IAutomationRunManager
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
         }
+    }
+
+    private async Task WriteRunSummaryAsync(MutableRunState state, CancellationToken cancellationToken)
+    {
+        AutomationRunSummary summary;
+        string? facilityId;
+        string? reportId;
+
+        lock (state.Sync)
+        {
+            summary = ToSummary(state);
+            facilityId = state.FacilityId;
+            reportId = state.ReportId;
+        }
+
+        summary.RunConfigurationJson = null;
+        await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
     }
 
     /// <summary>
@@ -757,6 +795,7 @@ public class AutomationRunManager : IAutomationRunManager
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
                 FacilityId = state.FacilityId,
+                AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,
                 GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,

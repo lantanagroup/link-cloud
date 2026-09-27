@@ -5,12 +5,12 @@
     var activity = Model.CurrentActivity;
 }
 
-<div class="container mt-4">
-    <div class="mb-3">
+<div class="container mt-4 au-cleanup-page">
+    <div class="mb-4">
         <h2 class="fw-bold mb-1"><i class="bi bi-recycle me-2"></i>Admin Cleanup</h2>
         <p class="text-muted mb-0">
-            Abort leftover Automation pipeline work, tear down GUID facilities after retention, and purge old scenario-run history.
-            Named production facilities are never selected. Heavy teardown runs off-hours (default 10:00 UTC).
+            Stops leftover <strong>Automation.UI</strong> pipeline work, tears down those scenario facilities after retention,
+            and purges old run history. Named production facilities and other GUID tenants that were not created by Automation.UI are never selected.
         </p>
     </div>
 
@@ -30,24 +30,49 @@
         </div>
     }
 
-    <div class="row g-3">
-        <div class="col-lg-7">
-            <div class="au-card">
-                <div class="card-header"><i class="bi bi-sliders me-2"></i>Schedule and retention</div>
-                <div class="card-body">
-                    <form id="cleanup-settings-form" asp-action="SaveSettings" method="post">
-                        @Html.AntiForgeryToken()
-                        <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="Enabled" name="Enabled" value="true" @(s.Enabled ? "checked" : null) />
-                            <label class="form-check-label" for="Enabled">Cleanup enabled</label>
-                        </div>
+    <div class="au-card au-cleanup-activity mb-4" id="cleanup-activity-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-activity me-2"></i>Live activity</span>
+            <span id="cleanup-activity-badge" class="badge text-bg-secondary">Idle</span>
+        </div>
+        <div class="card-body">
+            <p id="cleanup-activity-label" class="fw-semibold mb-1">No cleanup pass running</p>
+            <p id="cleanup-activity-message" class="small text-muted mb-2">Scheduled daytime quiesce, daily teardown, weekly purge, and custom-range runs show up here while they work. Completed passes are saved under Cleanup reports.</p>
+            <div id="cleanup-activity-progress" class="progress mb-2" role="progressbar" aria-labelledby="cleanup-activity-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div id="cleanup-activity-bar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <dl class="row mb-0 small">
+                <dt class="col-sm-2">Processed</dt>
+                <dd class="col-sm-4" id="cleanup-activity-counts">0 / 0</dd>
+                <dt class="col-sm-2">Current</dt>
+                <dd class="col-sm-4 text-break" id="cleanup-activity-current">—</dd>
+            </dl>
+        </div>
+    </div>
 
-                        <div class="au-cleanup-section">
-                            <h6 class="fw-semibold">Daytime quiesce (cheap)</h6>
-                            <p class="small text-muted">Stops leftover DA retries and census jobs so they do not hammer the stack. Does not delete facility configs.</p>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="QuiesceEnabled" name="QuiesceEnabled" value="true" @(s.QuiesceEnabled ? "checked" : null) />
-                                <label class="form-check-label" for="QuiesceEnabled">Quiesce leftover GUID work during the day</label>
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <form id="cleanup-settings-form" asp-action="SaveSettings" method="post">
+                @Html.AntiForgeryToken()
+                <div class="au-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-sliders me-2"></i>Schedule and retention</span>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="Enabled" name="Enabled" value="true" @(s.Enabled ? "checked" : null) />
+                            <label class="form-check-label text-white" for="Enabled">Cleanup enabled</label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="au-cleanup-phase">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                <div>
+                                    <h6 class="fw-semibold mb-1">Daytime quiesce</h6>
+                                    <p class="small text-muted mb-0">Cheap. Stops leftover DA retries and census jobs for finished Automation.UI runs. Does not delete facility configs.</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="QuiesceEnabled" name="QuiesceEnabled" value="true" @(s.QuiesceEnabled ? "checked" : null) />
+                                    <label class="form-check-label" for="QuiesceEnabled">Enabled</label>
+                                </div>
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-md-4">
@@ -68,12 +93,16 @@
                             </button>
                         </div>
 
-                        <div class="au-cleanup-section">
-                            <h6 class="fw-semibold">Off-hours teardown</h6>
-                            <p class="small text-muted">Daily job removes leftover GUID facility configs older than retention, including stale in-progress Automation jobs. Default 10:00 UTC (before US hospital prime hours).</p>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="DailyTeardownEnabled" name="DailyTeardownEnabled" value="true" @(s.DailyTeardownEnabled ? "checked" : null) />
-                                <label class="form-check-label" for="DailyTeardownEnabled">Daily leftover teardown</label>
+                        <div class="au-cleanup-phase">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                <div>
+                                    <h6 class="fw-semibold mb-1">Off-hours teardown</h6>
+                                    <p class="small text-muted mb-0">Daily job removes leftover Automation.UI facility configs older than retention, including stale in-progress scenario jobs. Default 10:00 UTC.</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="DailyTeardownEnabled" name="DailyTeardownEnabled" value="true" @(s.DailyTeardownEnabled ? "checked" : null) />
+                                    <label class="form-check-label" for="DailyTeardownEnabled">Enabled</label>
+                                </div>
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-md-4">
@@ -90,17 +119,21 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-au-action btn-sm cleanup-run-btn" name="runKind" value="teardown"
-                                    data-confirm="Tear down leftover GUID facilities older than retention, including stale in-progress Automation jobs? Named production facilities are not touched.">
+                                    data-confirm="Teardown leftover Automation.UI facilities older than retention, including stale in-progress scenario jobs? Named production facilities are not touched.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run teardown
                             </button>
                         </div>
 
-                        <div class="au-cleanup-section">
-                            <h6 class="fw-semibold">Weekly history purge</h6>
-                            <p class="small text-muted">Deletes Automation.UI run snapshots, logs, and payloads older than retention after tearing down leftover facilities.</p>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="WeeklyHistoryPurgeEnabled" name="WeeklyHistoryPurgeEnabled" value="true" @(s.WeeklyHistoryPurgeEnabled ? "checked" : null) />
-                                <label class="form-check-label" for="WeeklyHistoryPurgeEnabled">Weekly scenario-run history purge</label>
+                        <div class="au-cleanup-phase au-cleanup-phase-last">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                <div>
+                                    <h6 class="fw-semibold mb-1">Weekly history purge</h6>
+                                    <p class="small text-muted mb-0">Deletes Automation.UI run snapshots, logs, and payloads older than retention, and tears down each purged run's Automation.UI facility. Named production facilities are not touched.</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="WeeklyHistoryPurgeEnabled" name="WeeklyHistoryPurgeEnabled" value="true" @(s.WeeklyHistoryPurgeEnabled ? "checked" : null) />
+                                    <label class="form-check-label" for="WeeklyHistoryPurgeEnabled">Enabled</label>
+                                </div>
                             </div>
                             <div class="row g-2 mb-2">
                                 <div class="col-md-4">
@@ -129,96 +162,138 @@
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-outline-danger btn-sm cleanup-run-btn" name="runKind" value="history-purge"
-                                    data-confirm="Tear down leftover GUID facilities and delete Automation run history older than retention? This cannot be undone.">
+                                    data-confirm="Delete Automation.UI run history older than retention and tear down each purged run's Automation.UI facility? Named production facilities are not touched. This cannot be undone.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run weekly purge
                             </button>
                         </div>
 
                         <button type="submit" class="btn btn-outline-secondary" name="runKind" value="">Save settings</button>
-                    </form>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
 
-        <div class="col-lg-5">
-            <div class="au-card au-cleanup-activity" id="cleanup-activity-card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span><i class="bi bi-activity me-2"></i>Live activity</span>
-                    <span id="cleanup-activity-badge" class="badge text-bg-secondary">Idle</span>
-                </div>
-                <div class="card-body">
-                    <p id="cleanup-activity-label" class="fw-semibold mb-1">No cleanup pass running</p>
-                    <p id="cleanup-activity-message" class="small text-muted mb-2">Scheduled daytime quiesce, daily teardown, and weekly purge will show up here while they work.</p>
-                    <div class="progress mb-2" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-                        <div id="cleanup-activity-bar" class="progress-bar" style="width: 0%"></div>
+        <div class="col-lg-4">
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-6">Now (UTC)</dt>
+                            <dd class="col-6" id="cleanup-now">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
+                            <dt class="col-6">Next daily teardown</dt>
+                            <dd class="col-6">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                            <dt class="col-6">Next weekly purge</dt>
+                            <dd class="col-6">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                            <dt class="col-6">Last daily</dt>
+                            <dd class="col-6">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                            <dt class="col-6">Last weekly</dt>
+                            <dd class="col-6">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                            <dt class="col-6">Last quiesce</dt>
+                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
+                        </dl>
+                        @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
+                        {
+                            <p class="small text-muted mb-1 mt-3">@s.LastDailyTeardownResult</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(s.LastWeeklyPurgeResult))
+                        {
+                            <p class="small text-muted mb-0">@s.LastWeeklyPurgeResult</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.LastQuiesceResult))
+                        {
+                            <p class="small text-muted mb-0" id="cleanup-last-quiesce-result">Last quiesce: @Model.LastQuiesceResult</p>
+                        }
                     </div>
-                    <dl class="row mb-0 small">
-                        <dt class="col-5">Processed</dt>
-                        <dd class="col-7" id="cleanup-activity-counts">0 / 0</dd>
-                        <dt class="col-5">Current</dt>
-                        <dd class="col-7 text-break" id="cleanup-activity-current">—</dd>
-                    </dl>
                 </div>
-            </div>
 
-            <div class="au-card">
-                <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
-                <div class="card-body">
-                    <dl class="row mb-0 small">
-                        <dt class="col-sm-5">Now (UTC)</dt>
-                        <dd class="col-sm-7" id="cleanup-now">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
-                        <dt class="col-sm-5">Next daily teardown</dt>
-                        <dd class="col-sm-7">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-                        <dt class="col-sm-5">Next weekly purge</dt>
-                        <dd class="col-sm-7">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-                        <dt class="col-sm-5">Last daily</dt>
-                        <dd class="col-sm-7">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
-                        <dt class="col-sm-5">Last weekly</dt>
-                        <dd class="col-sm-7">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
-                        <dt class="col-sm-5">Last quiesce</dt>
-                        <dd class="col-sm-7" id="cleanup-last-quiesce">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
-                    </dl>
-                    @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
-                    {
-                        <p class="small text-muted mb-1 mt-3">@s.LastDailyTeardownResult</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(s.LastWeeklyPurgeResult))
-                    {
-                        <p class="small text-muted mb-0">@s.LastWeeklyPurgeResult</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(Model.LastQuiesceResult))
-                    {
-                        <p class="small text-muted mb-0" id="cleanup-last-quiesce-result">Last quiesce: @Model.LastQuiesceResult</p>
-                    }
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-calendar-range me-2"></i>Custom range</div>
+                    <div class="card-body">
+                        <p class="small text-muted">Cleans terminal Automation.UI runs whose finish time falls in this UTC date range.</p>
+                        <form id="cleanup-range-form" asp-action="RunCustomRange" method="post"
+                              data-confirm="Run cleanup for the selected UTC date range?">
+                            @Html.AntiForgeryToken()
+                            <div class="mb-2">
+                                <label class="form-label small" for="FromDate">From (UTC)</label>
+                                <input class="form-control" type="date" id="FromDate" name="FromDate" value="@Model.FromDate.ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small" for="ToDate">To (UTC, inclusive)</label>
+                                <input class="form-control" type="date" id="ToDate" name="ToDate" value="@Model.ToDate.ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="TeardownFacilities" name="TeardownFacilities" value="true" />
+                                <label class="form-check-label" for="TeardownFacilities">Teardown leftover Automation.UI facilities</label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="PurgeHistory" name="PurgeHistory" value="true" />
+                                <label class="form-check-label" for="PurgeHistory">Purge matching run history</label>
+                            </div>
+                            <button type="submit" class="btn btn-au-action w-100 cleanup-run-btn">Run custom range</button>
+                        </form>
+                    </div>
                 </div>
-            </div>
+        </div>
+    </div>
 
-            <div class="au-card">
-                <div class="card-header"><i class="bi bi-calendar-range me-2"></i>Custom range</div>
-                <div class="card-body">
-                    <p class="small text-muted">Cleans terminal Automation runs whose finish time falls in this UTC date range. Named production facilities are never selected.</p>
-                    <form id="cleanup-range-form" asp-action="RunCustomRange" method="post"
-                          data-confirm="Run cleanup for the selected UTC date range?">
-                        @Html.AntiForgeryToken()
-                        <div class="mb-2">
-                            <label class="form-label small" for="FromDate">From (UTC)</label>
-                            <input class="form-control" type="date" id="FromDate" name="FromDate" value="@Model.FromDate.ToString("yyyy-MM-dd")" required />
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small" for="ToDate">To (UTC, inclusive)</label>
-                            <input class="form-control" type="date" id="ToDate" name="ToDate" value="@Model.ToDate.ToString("yyyy-MM-dd")" required />
-                        </div>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="TeardownFacilities" name="TeardownFacilities" value="true" checked />
-                            <label class="form-check-label" for="TeardownFacilities">Tear down leftover GUID facilities</label>
-                        </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="PurgeHistory" name="PurgeHistory" value="true" />
-                            <label class="form-check-label" for="PurgeHistory">Purge matching run history</label>
-                        </div>
-                        <button type="submit" class="btn btn-au-action w-100 cleanup-run-btn">Run custom range</button>
-                    </form>
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-journal-text me-2"></i>Cleanup reports</div>
+        <div class="card-body p-0">
+            @if (Model.RecentReports.Count == 0)
+            {
+                <p class="small text-muted mb-0 p-3">No cleanup passes have been recorded yet. After a run finishes, it will show up here so you can review what was quiesced, torn down, or purged.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 au-cleanup-reports">
+                        <thead>
+                            <tr>
+                                <th>Finished (UTC)</th>
+                                <th>Pass</th>
+                                <th>Trigger</th>
+                                <th>Status</th>
+                                <th>Work</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var report in Model.RecentReports)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@report.FinishedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@report.Label</td>
+                                <td>@report.Trigger</td>
+                                <td>
+                                    <span class="badge @(report.Status == "failed" ? "text-bg-danger" : "text-bg-success")">@report.Status</span>
+                                </td>
+                                <td class="small">
+                                    quiesced @report.QuiescedFacilityIds.Count/@report.QuiesceCandidateCount,
+                                    torn down @report.TornDownFacilityIds.Count/@report.TeardownCandidateCount,
+                                    purged @report.PurgedRunIds.Count/@report.HistoryPurgeCandidateCount
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary cleanup-open-report" data-report-id="@report.Id" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")">View</button>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
                 </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cleanupReportModal" tabindex="-1" aria-labelledby="cleanupReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cleanupReportModalLabel">Cleanup report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="cleanupReportModalBody">
+                <p class="text-muted mb-0">Loading…</p>
             </div>
         </div>
     </div>
@@ -231,9 +306,14 @@
     var progressUrl = '@Url.Action("Progress", "Cleanup")';
     var saveUrl = '@Url.Action("SaveSettings", "Cleanup")';
     var rangeUrl = '@Url.Action("RunCustomRange", "Cleanup")';
+    var reportUrl = '@Url.Action("Report", "Cleanup")';
     var initialActivity = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(activity, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
     var runButtons = document.querySelectorAll('.cleanup-run-btn');
     var pollTimer = null;
+    var sawRunning = false;
+    var latestAt = 0;
+    var passArmed = false;
+    var armedAfter = 0;
 
     function token(form) {
         var input = form.querySelector('input[name="__RequestVerificationToken"]');
@@ -278,9 +358,30 @@
         return activity[name] !== undefined ? activity[name] : activity[name.charAt(0).toUpperCase() + name.slice(1)];
     }
 
+    function activityTime(activity) {
+        var at = field(activity, 'at');
+        var parsed = at ? Date.parse(at) : NaN;
+        return isNaN(parsed) ? 0 : parsed;
+    }
+
     function applyActivity(activity) {
         if (!activity) return;
         var status = field(activity, 'status') || 'idle';
+        var at = activityTime(activity);
+        if (at > latestAt) latestAt = at;
+        if (status === 'running') sawRunning = true;
+        var terminal = status === 'completed' || status === 'failed';
+        // A start response can still echo the previous pass. Reload only for a newer terminal update.
+        var staleArmedTerminal = passArmed && terminal && at > 0 && at <= armedAfter;
+        if (staleArmedTerminal)
+            return;
+        var newerArmedTerminal = passArmed && terminal && at > armedAfter;
+        if (terminal && (sawRunning || newerArmedTerminal)) {
+            sawRunning = false;
+            passArmed = false;
+            window.location.reload();
+            return;
+        }
         var running = status === 'running';
         setRunning(running);
 
@@ -304,11 +405,14 @@
             var trigger = field(activity, 'trigger') ? ' (' + field(activity, 'trigger') + ')' : '';
             message.textContent = (field(activity, 'message') || '') + trigger;
         }
+        var percent = Number(field(activity, 'percent') || 0);
         if (bar) {
-            bar.style.width = (field(activity, 'percent') || 0) + '%';
+            bar.style.width = percent + '%';
             bar.classList.toggle('progress-bar-animated', running);
             bar.classList.toggle('progress-bar-striped', running);
         }
+        var progress = document.getElementById('cleanup-activity-progress');
+        if (progress) progress.setAttribute('aria-valuenow', String(percent));
         if (counts) {
             counts.textContent = (field(activity, 'processed') || 0) + ' / ' + (field(activity, 'total') || 0) +
                 '  ·  quiesced ' + (field(activity, 'quiesced') || 0) +
@@ -348,6 +452,60 @@
         });
     }
 
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function listBlock(title, items) {
+        if (!items || !items.length) {
+            return '<p class="small text-muted mb-2"><strong>' + escapeHtml(title) + ':</strong> none</p>';
+        }
+        return '<p class="small mb-1"><strong>' + escapeHtml(title) + '</strong></p><ul class="small mb-3">' +
+            items.map(function (item) { return '<li class="text-break">' + escapeHtml(item) + '</li>'; }).join('') +
+            '</ul>';
+    }
+
+    function showReport(report) {
+        var body = document.getElementById('cleanupReportModalBody');
+        var title = document.getElementById('cleanupReportModalLabel');
+        if (title) title.textContent = (report.label || report.Label || 'Cleanup report');
+        var finished = report.finishedAt || report.FinishedAt;
+        var started = report.startedAt || report.StartedAt;
+        var html = '';
+        html += '<p class="small text-muted">' + escapeHtml(report.trigger || report.Trigger || '') +
+            ' · ' + escapeHtml(report.status || report.Status || '') +
+            ' · ' + escapeHtml(started) + ' → ' + escapeHtml(finished) + '</p>';
+        html += '<p>' + escapeHtml(report.message || report.Message || '') + '</p>';
+        html += listBlock('Quiesced facilities', report.quiescedFacilityIds || report.QuiescedFacilityIds);
+        html += listBlock('Torn-down facilities', report.tornDownFacilityIds || report.TornDownFacilityIds);
+        html += listBlock('Purged run ids', report.purgedRunIds || report.PurgedRunIds);
+        html += listBlock('Failed facilities', report.failedFacilityIds || report.FailedFacilityIds);
+        html += listBlock('Failed run ids', report.failedRunIds || report.FailedRunIds);
+        if (body) body.innerHTML = html;
+        var modalEl = document.getElementById('cleanupReportModal');
+        if (window.bootstrap && modalEl) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    }
+
+    document.querySelectorAll('.cleanup-open-report').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-report-id');
+            fetch(reportUrl + '/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } })
+                .then(function (r) {
+                    if (r.status === 404) throw new Error('Report not found');
+                    if (!r.ok) throw new Error('Could not load cleanup report');
+                    return r.json();
+                })
+                .then(showReport)
+                .catch(function (err) { setFlash(err.message || 'Could not load cleanup report', true); });
+        });
+    });
+
     document.getElementById('cleanup-settings-form')?.addEventListener('submit', function (e) {
         var submitter = e.submitter;
         var runKind = submitter && submitter.name === 'runKind' ? (submitter.value || '') : '';
@@ -357,14 +515,22 @@
             return;
         }
         e.preventDefault();
-        if (runKind) setRunning(true);
+        if (runKind) {
+            passArmed = true;
+            armedAfter = latestAt;
+            setRunning(true);
+        }
         postForm(e.currentTarget, { runKind: runKind }, saveUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
             if (payload.activity) applyActivity(payload.activity);
             if (runKind && result.ok) refreshProgress();
-            if (!result.ok) setRunning(false);
+            if (!result.ok) {
+                passArmed = false;
+                setRunning(false);
+            }
         }).catch(function (err) {
+            passArmed = false;
             setRunning(false);
             setFlash('Could not talk to the cleanup endpoint: ' + err, true);
         });
@@ -377,14 +543,20 @@
             return;
         }
         e.preventDefault();
+        passArmed = true;
+        armedAfter = latestAt;
         setRunning(true);
         postForm(e.currentTarget, null, rangeUrl).then(function (result) {
             var payload = result.payload || {};
             setFlash(payload.message || payload.error, !result.ok);
             if (payload.activity) applyActivity(payload.activity);
             if (result.ok) refreshProgress();
-            else setRunning(false);
+            else {
+                passArmed = false;
+                setRunning(false);
+            }
         }).catch(function (err) {
+            passArmed = false;
             setRunning(false);
             setFlash('Could not start custom-range cleanup: ' + err, true);
         });

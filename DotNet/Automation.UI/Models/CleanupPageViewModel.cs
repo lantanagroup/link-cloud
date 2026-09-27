@@ -20,6 +20,7 @@ public sealed class CleanupPageViewModel
     public DateTime FromDate { get; set; }
     public DateTime ToDate { get; set; }
     public CleanupActivity CurrentActivity { get; set; } = CleanupActivity.Idle;
+    public IReadOnlyList<CleanupReport> RecentReports { get; set; } = [];
 }
 
 public sealed class CleanupSettingsForm
