@@ -44,4 +44,67 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
             .SetQueryParam("pageNumber", pageNumber)
             .SetQueryParam("pageSize", pageSize)
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> ExpandValueSetAsync(
+        string? id = null,
+        string? url = null,
+        string? date = null,
+        int? count = null,
+        int? offset = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/ValueSet/$expand")
+            : Request($"terminology/fhir/ValueSet/{id}/$expand");
+        if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
+        if (!string.IsNullOrWhiteSpace(date)) request = request.SetQueryParam("date", date);
+        if (count.HasValue) request = request.SetQueryParam("count", count.Value);
+        if (offset.HasValue) request = request.SetQueryParam("offset", offset.Value);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> GetValueSetsAsync(
+        string? url = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = Request("terminology/fhir/ValueSet");
+        if (!string.IsNullOrWhiteSpace(url)) request = request.SetQueryParam("url", url);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> LookupCodeInCodeSystemAsync(
+        string? system = null,
+        string? code = null,
+        string? version = null,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/CodeSystem/$lookup")
+            : Request($"terminology/fhir/CodeSystem/{id}/$lookup");
+        if (!string.IsNullOrWhiteSpace(system)) request = request.SetQueryParam("system", system);
+        if (!string.IsNullOrWhiteSpace(code)) request = request.SetQueryParam("code", code);
+        if (!string.IsNullOrWhiteSpace(version)) request = request.SetQueryParam("version", version);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> LookupCodeInCodeSystemWithParametersAsync(
+        string parametersJson,
+        string? system = null,
+        string? code = null,
+        string? version = null,
+        string? id = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(parametersJson);
+        var request = string.IsNullOrWhiteSpace(id)
+            ? Request("terminology/fhir/CodeSystem/$lookup")
+            : Request($"terminology/fhir/CodeSystem/{id}/$lookup");
+        if (!string.IsNullOrWhiteSpace(system)) request = request.SetQueryParam("system", system);
+        if (!string.IsNullOrWhiteSpace(code)) request = request.SetQueryParam("code", code);
+        if (!string.IsNullOrWhiteSpace(version)) request = request.SetQueryParam("version", version);
+        return SendStringAsync(() => request
+            .WithHeader("Content-Type", "application/fhir+json")
+            .SendStringAsync(HttpMethod.Post, parametersJson, cancellationToken: cancellationToken));
+    }
 }

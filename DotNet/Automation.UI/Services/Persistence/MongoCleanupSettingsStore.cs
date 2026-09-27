@@ -18,16 +18,16 @@ public interface ICleanupSettingsStore
 
 public sealed class LeftoverRunCleanupSettings
 {
-    public bool Enabled { get; set; } = true;
-    public bool QuiesceEnabled { get; set; } = true;
+    public bool Enabled { get; set; }
+    public bool QuiesceEnabled { get; set; }
     public TimeSpan QuiesceInterval { get; set; } = TimeSpan.FromMinutes(5);
     public TimeSpan QuiesceGrace { get; set; } = TimeSpan.FromMinutes(2);
     public TimeSpan TeardownRetention { get; set; } = TimeSpan.FromDays(14);
     public TimeSpan AbortTtl { get; set; } = TimeSpan.FromDays(14);
     public int MaxFacilitiesPerPass { get; set; } = 25;
-    public bool DailyTeardownEnabled { get; set; } = true;
+    public bool DailyTeardownEnabled { get; set; }
     public TimeOnly DailyTeardownTimeUtc { get; set; } = new(10, 0);
-    public bool WeeklyHistoryPurgeEnabled { get; set; } = true;
+    public bool WeeklyHistoryPurgeEnabled { get; set; }
     public DayOfWeek WeeklyHistoryPurgeDay { get; set; } = DayOfWeek.Sunday;
     public TimeOnly WeeklyHistoryPurgeTimeUtc { get; set; } = new(10, 0);
     public TimeSpan CatchUpWindow { get; set; } = TimeSpan.FromHours(3);
@@ -183,16 +183,16 @@ public sealed class MongoCleanupSettingsStore(
         [BsonId]
         public string Id { get; set; } = DefaultId;
 
-        public bool Enabled { get; set; } = true;
-        public bool QuiesceEnabled { get; set; } = true;
+        public bool Enabled { get; set; }
+        public bool QuiesceEnabled { get; set; }
         public int QuiesceIntervalMinutes { get; set; } = 5;
         public int QuiesceGraceMinutes { get; set; } = 2;
         public int TeardownRetentionDays { get; set; } = 14;
         public int AbortTtlDays { get; set; } = 14;
         public int MaxFacilitiesPerPass { get; set; } = 25;
-        public bool DailyTeardownEnabled { get; set; } = true;
+        public bool DailyTeardownEnabled { get; set; }
         public string DailyTeardownTimeUtc { get; set; } = "10:00";
-        public bool WeeklyHistoryPurgeEnabled { get; set; } = true;
+        public bool WeeklyHistoryPurgeEnabled { get; set; }
         public string WeeklyHistoryPurgeDay { get; set; } = "Sunday";
         public string WeeklyHistoryPurgeTimeUtc { get; set; } = "10:00";
         public int CatchUpWindowHours { get; set; } = 3;

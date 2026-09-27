@@ -47,7 +47,6 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
-ConfigureLogging(builder);
 RegisterServices(builder);
 var app = builder.Build();
 SetupMiddleware(app);
@@ -273,6 +272,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
     builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
     builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
+
+    ConfigureLogging(builder);
 
     builder.Services.AddLinkCorsService(options =>
     {
