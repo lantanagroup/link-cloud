@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
@@ -373,7 +374,7 @@ public class FhirController(FhirService fhirService) : Controller
     /// </summary>
     [HttpPost("CodeSystem/$lookup")]
     [HttpPost("CodeSystem/{id}/$lookup")]
-    [ValidateAntiForgeryToken]
+    [ValidateAntiForgeryOrBearerToken]
     public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
     {

@@ -21,6 +21,11 @@ public class AutomationRunSummary
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
     public string? FacilityId { get; set; }
+    /// <summary>
+    /// True when this run created <see cref="FacilityId"/>. A differing id that already
+    /// existed, such as a DMRP NHSN organization, is not an Automation leftover.
+    /// </summary>
+    public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }
     public string? RunConfigurationJson { get; set; }
     public Guid? GeneratedTemplateCacheVersionId { get; set; }
