@@ -42,11 +42,20 @@ variables:
   value: 'DotNet/MockDmrpApi'
 
 steps:
+  # The test step below restores ServiceTests, which references the Automation projects and
+  # therefore the LantanaGroup.Thetis.* packages that nuget.config maps to the private
+  # Shared_BOTW_Feed (LEGLINK-1126). Without this task that restore gets a 401 and no test runs.
+  # Same pair of steps as azure-pipelines.automation.cd.yaml.
+  - task: NuGetAuthenticate@1
+    displayName: Authenticate Shared_BOTW_Feed
+
   - task: DotNetCoreCLI@2
     displayName: Restore
     inputs:
       command: restore
       projects: '$(project)'
+      feedsToUse: config
+      nugetConfigPath: nuget.config
 
   - task: Bash@3
     inputs:

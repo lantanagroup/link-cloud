@@ -2,6 +2,7 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Confluent.Kafka.Extensions.OpenTelemetry;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -134,9 +135,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             if (telemetryServiceOptions.EnableMetrics)
             {
                 otel.WithMetrics(metricsProviderBuilder =>
+                {
                     metricsProviderBuilder
                         .AddAspNetCoreInstrumentation()
-                        .AddProcessInstrumentation());
+                        .AddProcessInstrumentation();
+                    AddDurationHistogramViews(metricsProviderBuilder);
+                });
 
                 if (!string.IsNullOrEmpty(telemetryServiceOptions.MeterName))
                 {
@@ -182,6 +186,17 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             }
 
             return services;
+        }
+
+        private static void AddDurationHistogramViews(MeterProviderBuilder metricsProviderBuilder)
+        {
+            foreach (var instrumentName in LinkDurationHistogramBuckets.InstrumentNames)
+            {
+                metricsProviderBuilder.AddView(instrumentName, new ExplicitBucketHistogramConfiguration
+                {
+                    Boundaries = LinkDurationHistogramBuckets.Milliseconds
+                });
+            }
         }
 
         public class TelemetryServiceOptions : TelemetrySettings

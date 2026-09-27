@@ -137,6 +137,18 @@ internal static class NormalizationOperationMapper
                 var maps = codeSystemMaps.Select(ToEngineCodeSystemMap).ToList();
                 return new CodeMapOperation(name, codeMapFhirPath, maps, description ?? "");
             }
+
+            if (operationType.Equals("HSLOCMap", StringComparison.OrdinalIgnoreCase)
+                && codeSystemMaps is { Count: > 0 })
+            {
+                var maps = codeSystemMaps.Select(ToEngineCodeSystemMap).ToList();
+                var operation = new HSLOCMapOperation(maps);
+                if (!string.IsNullOrWhiteSpace(name))
+                    operation.Name = name;
+                if (!string.IsNullOrWhiteSpace(description))
+                    operation.Description = description;
+                return operation;
+            }
         }
         catch (ArgumentException)
         {

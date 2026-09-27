@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
     public class DataAcquisitionServiceMetrics : IDataAcquisitionServiceMetrics
     {
         private readonly Histogram<double> _dataRequestDuration;
+        private readonly Histogram<double> _semaphoreWaitDuration;
         private readonly Counter<long> _resourceAcquiredCounter;
         private readonly TimeProvider _timeProvider;
 
@@ -20,6 +21,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             Meter meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
             _resourceAcquiredCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionResourceAcquiredCount);
             _dataRequestDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionQueryDuration, "ms");
+            _semaphoreWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionSemaphoreWaitDuration, "ms");
         }
 
         public void IncrementResourceAcquiredCounter(List<KeyValuePair<string, object?>> tags)
@@ -30,6 +32,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
         public TrackedRequestDuration MeasureDataRequestDuration(List<KeyValuePair<string, object?>> tags)
         {
             return new TrackedRequestDuration(_dataRequestDuration, _timeProvider, tags);
+        }
+
+        public void RecordSemaphoreWaitDuration(string facilityId, double durationMilliseconds)
+        {
+            _semaphoreWaitDuration.Record(durationMilliseconds,
+            [
+                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId)
+            ]);
         }
     }
 }

@@ -2,21 +2,20 @@
 
 /// <summary>
 /// Per-patient profile that drives measure-aware generation.
-/// Each profile carries a per-measure eligibility map so the generator knows
-/// exactly which measures this patient should satisfy.
+/// Clinical shape lives on <see cref="Intent"/>.
+/// <see cref="MeasureEligibilities"/> is a derived IP prediction, not a generation switch.
 /// </summary>
 /// <param name="MeasureEligibilities">
-/// Per-measure eligibility map. Every selected measure must have an entry.
-/// Drives encounter type (inpatient vs ambulatory) and measure-specific resources
-/// (e.g., diabetic medication for Hypo).
+/// Derived per-measure initial-population prediction from the clinical shape.
+/// Used by report-membership prediction. Generation reads encounter class and
+/// insulin from <see cref="Intent"/>.
 /// </param>
 /// <param name="SeedOffset">
 /// Optional per-patient seed offset. When null the generator assigns one
 /// automatically from the patient's ordinal position.
 /// </param>
 /// <param name="ClinicalScenarioId">
-/// Optional stable clinical scenario ID override. When provided, generation uses this
-/// scenario instead of deriving one from seed.
+/// Unused at generation time. Retained for imported-patient classification and logs.
 /// </param>
 /// <param name="ResourcesPerPatient">
 /// Optional per-patient resource target. When null, run-level default is used.
@@ -27,7 +26,8 @@ public record PatientProfile(
     string? ClinicalScenarioId = null,
     int? ResourcesPerPatient = null,
     ScheduledInpatientPattern? ScheduledInpatientPattern = null,
-    MeasureEligibility CohortQualification = MeasureEligibility.Qualifying)
+    MeasureEligibility CohortQualification = MeasureEligibility.Qualifying,
+    PatientGenerationIntent? Intent = null)
 {
     /// <summary>
     /// Returns true when this profile qualifies for the given measure.
@@ -37,19 +37,24 @@ public record PatientProfile(
         => MeasureEligibilities.TryGetValue(measure, out var e) && e == MeasureEligibility.Qualifying;
 
     /// <summary>
-    /// Returns true when this profile requires an inpatient encounter
-    /// (i.e., qualifies for any ACH-type measure).
+    /// True when the clinical shape uses an ACH/Hypo inpatient encounter class.
+    /// Unset class defaults to inpatient.
     /// </summary>
     public bool RequiresInpatientEncounter()
-        => QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
-           || QualifiesFor(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+    {
+        var classCode = Intent?.EncounterClass;
+        if (string.IsNullOrWhiteSpace(classCode))
+            return true;
+        return EncounterIpClassification.ClassCodeQualifiesIp(classCode, EncounterIpClassification.IpProfile.Ach)
+               || EncounterIpClassification.ClassCodeQualifiesIp(classCode, EncounterIpClassification.IpProfile.Hypoglycemic);
+    }
 
     /// <summary>
-    /// Returns true when this profile qualifies for the Hypoglycemic measure,
-    /// requiring diabetic medication generation.
+    /// True when generation should include the hypoglycemic insulin pair.
+    /// Driven by the configuration (explicit insulin flag or diabetes medication code).
     /// </summary>
     public bool RequiresHypoglycemicMedication()
-        => QualifiesFor(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+        => ConfigurationQualification.ResolveHypoglycemicInsulin(Intent);
 
     /// <summary>
     /// Returns true when this profile qualifies for ALL of the specified measures.
@@ -71,14 +76,11 @@ public record PatientProfile(
         => measures.All(m => !QualifiesFor(m));
 
     /// <summary>
-    /// Returns true when this patient is expected to be report-eligible from cohort-level
-    /// designation and inpatient-pattern inclusion rules.
+    /// True when the inpatient pattern places this stay in the report window.
+    /// Measure IP is <see cref="QualifiesFor"/>; both must hold to predict submission.
     /// </summary>
     public bool IsExpectedInReportByCohortAndPattern()
     {
-        if (CohortQualification == MeasureEligibility.NonQualifying)
-            return false;
-
         var pattern = ScheduledInpatientPattern
             ?? global::LantanaGroup.Automation.Generation.ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
         return pattern.GetCensusBehavior().ExpectedInReport;

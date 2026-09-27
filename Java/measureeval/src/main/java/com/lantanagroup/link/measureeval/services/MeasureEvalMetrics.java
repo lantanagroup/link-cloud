@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.HistogramBuckets;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
@@ -46,10 +47,16 @@ public class MeasureEvalMetrics {
                 .build();
         evaluationDuration = meter.histogramBuilder("link_measureeval_eval_duration")
                 .ofLongs()
-                .setDescription("The duration of the evaluation of a measure").setUnit("ms").build();
+                .setDescription("The duration of the evaluation of a measure")
+                .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_LONG)
+                .build();
         normalizedToReportGeneratedDuration = meter.histogramBuilder("MeasureEval.normalized_to_report_generated.duration")
                 .ofLongs()
-                .setDescription("End-to-end duration from Kafka Normalized message ingestion to MeasureReportGenerated production").setUnit("ms").build();
+                .setDescription("End-to-end duration from Kafka Normalized message ingestion to MeasureReportGenerated production")
+                .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_LONG)
+                .build();
     }
 
     public void IncrementPatientReportableCounter(Attributes attributes, boolean reportable) {
@@ -79,19 +86,23 @@ public class MeasureEvalMetrics {
 
     public static Attributes buildAttributes(String queryType,
                                              PatientReportingEvaluationStatus patientStatus,
-                                             String reportTrackingId,
-                                             Integer resourceCount) {
+                                             String reportType) {
         AttributesBuilder builder = Attributes.builder()
                 .put(stringKey(DiagnosticNames.FACILITY_ID), safe(patientStatus.getFacilityId()))
-                .put(stringKey(DiagnosticNames.PATIENT_ID), safe(patientStatus.getPatientId()))
-                .put(stringKey(DiagnosticNames.REPORT_TRACKING_ID), safe(reportTrackingId))
-                .put(stringKey(DiagnosticNames.PHASE), DiagnosticNames.normalizePhase(queryType))
-                .put(stringKey(DiagnosticNames.CORRELATION_ID), safe(patientStatus.getCorrelationId()));
-
-        if (resourceCount != null) {
-            builder.put(stringKey(DiagnosticNames.RESOURCE_COUNT), String.valueOf(resourceCount));
+                .put(stringKey("report.type"), safe(reportType));
+        if (queryType != null) {
+            builder.put(stringKey(DiagnosticNames.PHASE), DiagnosticNames.normalizePhase(queryType));
         }
+        return builder.build();
+    }
 
+    public static Attributes buildPatientOutcomeAttributes(String queryType,
+                                                           PatientReportingEvaluationStatus patientStatus) {
+        AttributesBuilder builder = Attributes.builder()
+                .put(stringKey(DiagnosticNames.FACILITY_ID), safe(patientStatus.getFacilityId()));
+        if (queryType != null) {
+            builder.put(stringKey(DiagnosticNames.PHASE), DiagnosticNames.normalizePhase(queryType));
+        }
         return builder.build();
     }
 

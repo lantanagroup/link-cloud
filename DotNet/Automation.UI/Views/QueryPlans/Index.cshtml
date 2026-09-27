@@ -14,17 +14,17 @@
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0" id="qpTable">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Resource Types</th>
-                        <th>EHR</th>
-                        <th>LookBack</th>
-                        <th>Queries</th>
-                        <th>Type</th>
-                        <th>Updated</th>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="types" data-sort-type="number">Resource Types</th>
+                        <th data-sort="ehr">EHR</th>
+                        <th data-sort="lookback">LookBack</th>
+                        <th data-sort="queries" data-sort-type="number">Queries</th>
+                        <th data-sort="type">Type</th>
+                        <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                         <th style="width:220px;"></th>
                     </tr>
                 </thead>
@@ -32,7 +32,14 @@
                     @foreach (var t in Model)
                     {
                         var acquiredTypes = t.GetAcquiredResourceTypes();
-                        <tr data-id="@t.Id">
+                        <tr data-id="@t.Id"
+                            data-name="@t.Name"
+                            data-types="@acquiredTypes.Count"
+                            data-ehr="@t.EhrDescription"
+                            data-lookback="@t.LookBack"
+                            data-queries="@(t.InitialQueries.Count + t.SupplementalQueries.Count)"
+                            data-type="@(t.IsSystem ? "System" : "Custom")"
+                            data-updated="@t.UpdatedAt.ToUnixTimeMilliseconds()">
                             <td>
                                 <strong>@t.Name</strong>
                                 @if (t.IsDefault)
@@ -96,7 +103,7 @@
 </div>
 
 @* ========== Query Plan Editor Modal ========== *@
-<div id="qpModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="qpModal" class="au-modal-overlay" style="display:none;">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:1100px;display:flex;flex-direction:column;max-height:90vh;">
             @* ---- Modal Header ---- *@

@@ -189,6 +189,7 @@ namespace IntegrationTests.DataAcquisition
             // OrganizationLocationConfigurationManager (write).
             builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+            builder.Services.AddSingleton<IPipelineAbortRegistry, InMemoryPipelineAbortRegistry>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();

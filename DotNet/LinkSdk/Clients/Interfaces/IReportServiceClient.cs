@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
@@ -15,7 +15,7 @@ public interface IReportServiceClient
     Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(string? facilityId = null, ReportStatus? status = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<ReportSummaryApiModel>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool allowInProgress = false);
     Task<LinkApiResponse> RestoreScheduleAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SetReportsDeletedStatusForFacilityAsync(string facilityId, bool deleted, CancellationToken cancellationToken = default);
 

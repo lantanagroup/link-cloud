@@ -71,12 +71,12 @@ public static class ScheduledInpatientPatternExtensions
     /// </summary>
     public static string GetUiShortLabel(this ScheduledInpatientPattern pattern) => pattern switch
     {
-        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod => "Before -> Remains after",
-        ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod => "Before -> Discharged during",
-        ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod => "During -> Remains after",
-        ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod => "During -> Discharged during",
-        ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod => "Before -> Before",
-        ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod => "After -> After",
+        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod => "Before → after",
+        ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod => "Before → during",
+        ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod => "During → after",
+        ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod => "During → during",
+        ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod => "Entirely before",
+        ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod => "Entirely after",
         _ => pattern.ToString()
     };
 

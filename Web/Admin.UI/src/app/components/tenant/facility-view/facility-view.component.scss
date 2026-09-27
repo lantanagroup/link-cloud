@@ -90,6 +90,15 @@ button[color="warn"] {
   color: #e53935;
 }
 
+.link-button.secondary,
+.link-button.error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;

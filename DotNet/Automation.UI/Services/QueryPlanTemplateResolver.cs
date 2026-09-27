@@ -24,12 +24,24 @@ public sealed class QueryPlanTemplateResolver
     /// <see cref="QueryPlanResolution.Input"/> = <c>null</c> to indicate the
     /// caller should use built-in defaults.
     /// </summary>
-    public async Task<QueryPlanResolution> ResolveAsync(Guid? templateId, CancellationToken ct = default)
+    public async Task<QueryPlanResolution> ResolveAsync(
+        Guid? templateId,
+        CancellationToken ct = default,
+        bool honorExplicitSelection = false)
     {
         QueryPlanTemplate? template = null;
 
         if (templateId.HasValue)
             template = await _store.GetByIdAsync(templateId.Value, ct);
+
+        if (honorExplicitSelection)
+        {
+            if (!templateId.HasValue)
+                return new QueryPlanResolution(null, "Not configured");
+            if (template == null)
+                throw new InvalidOperationException($"Query plan template '{templateId.Value}' was not found.");
+            return new QueryPlanResolution(ToQueryPlanInput(template), template.Name);
+        }
 
         // Fall back to the default template if no explicit one was provided or it wasn't found.
         template ??= await _store.GetDefaultAsync(ct);

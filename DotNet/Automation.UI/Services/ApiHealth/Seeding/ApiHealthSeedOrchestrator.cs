@@ -196,7 +196,7 @@ public sealed class ApiHealthSeedOrchestrator(
                         Success = false,
                         SeedRunId = runId,
                         SeedRunName = scenario.Name,
-                        Error = SanitizedInternalError
+                        Error = string.IsNullOrWhiteSpace(run.Error) ? SanitizedInternalError : run.Error
                     };
                 }
 

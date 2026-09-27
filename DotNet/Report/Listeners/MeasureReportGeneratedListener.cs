@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -10,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Diagnostics;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -144,6 +146,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
         public async Task ProcessMessageAsync(ConsumeResult<Null, MeasureReportGeneratedValue> result, string facilityId, CancellationToken cancellationToken)
         {
+            using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
+
             if (result.Message.Value == null)
                 throw new DeadLetterException($"{Name}: MeasureReportGenerated event value segment missing");
 
@@ -156,6 +160,10 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
 
             using var scope = _serviceScopeFactory.CreateScope();
+            if (await PipelineAbortSkip.ShouldSkipAsync(
+                    scope.ServiceProvider, _logger, Name, facilityId, messageValue.ReportTrackingId, cancellationToken))
+                return;
+
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
             var reportResourceManager = scope.ServiceProvider.GetRequiredService<IReportResourceManager>();
@@ -167,7 +175,12 @@ namespace LantanaGroup.Link.Report.Listeners
             var schedule = await reportScheduledManager.GetReportSchedule(messageValue.FacilityId, reportTrackingId, cancellationToken);
 
             if (schedule == null)
-                throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {facilityId}).");
+            {
+                _logger.LogDebug(
+                    "{Name}: Skipping MeasureReportGenerated; no scheduled report remains (ReportId = {ReportId}, FacilityId = {FacilityId}).",
+                    Name, messageValue.ReportTrackingId, facilityId);
+                return;
+            }
 
             var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue, cancellationToken);
 
@@ -242,7 +255,7 @@ namespace LantanaGroup.Link.Report.Listeners
             
             try
             {
-                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId, cancellationToken);
+                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId, cancellationToken, KafkaHeaderHelper.GetMetricsMode(result.Message.Headers));
             }
             catch (Exception ex)
             {

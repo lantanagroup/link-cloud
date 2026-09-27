@@ -70,13 +70,13 @@ namespace UnitTests.DMRP
         /// does not use throw rather than delegate: a double that quietly answers calls it was
         /// never meant to serve hides the test drifting away from the code.
         /// </remarks>
-        private sealed class SaveInterceptingRepository : IEntityRepository<FacilityReportingPlan>
+        private sealed class SaveInterceptingRepository<T> : IEntityRepository<T> where T : class
         {
-            private readonly IEntityRepository<FacilityReportingPlan> _inner;
+            private readonly IEntityRepository<T> _inner;
             private readonly Func<Task> _beforeFirstSave;
             private bool _fired;
 
-            public SaveInterceptingRepository(IEntityRepository<FacilityReportingPlan> inner,
+            public SaveInterceptingRepository(IEntityRepository<T> inner,
                 Func<Task> beforeFirstSave)
             {
                 _inner = inner;
@@ -94,38 +94,38 @@ namespace UnitTests.DMRP
                 await _inner.SaveChangesAsync(cancellationToken);
             }
 
-            public Task<List<FacilityReportingPlan>> FindAsync(
-                Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) =>
+            public Task<List<T>> FindAsync(
+                Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) =>
                 _inner.FindAsync(predicate, cancellationToken);
 
-            public Task<FacilityReportingPlan> AddAsync(FacilityReportingPlan entity,
+            public Task<T> AddAsync(T entity,
                 CancellationToken cancellationToken) =>
                 _inner.AddAsync(entity, cancellationToken);
 
-            public void Remove(FacilityReportingPlan entity) => _inner.Remove(entity);
+            public void Remove(T entity) => _inner.Remove(entity);
 
-            public void Update(FacilityReportingPlan entity) => _inner.Update(entity);
+            public void Update(T entity) => _inner.Update(entity);
 
             public Task SaveChangesAsync() => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> AddAsync(FacilityReportingPlan entity) => throw new NotSupportedException();
-            public Task AddRangeAsync(IEnumerable<FacilityReportingPlan> entity) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> GetAsync(object id) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> GetAsync(object id, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<List<FacilityReportingPlan>> GetAllAsync() => throw new NotSupportedException();
-            public Task<List<FacilityReportingPlan>> GetAllAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<List<FacilityReportingPlan>> FindAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan?> FirstOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan?> FirstOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> FirstAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> FirstAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan?> SingleOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan?> SingleOrDefaultAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> SingleAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<FacilityReportingPlan> SingleAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<int> ExecuteDeleteAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<int> ExecuteDeleteAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<(List<FacilityReportingPlan>, PaginationMetadata)> SearchAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber) => throw new NotSupportedException();
-            public Task<(List<FacilityReportingPlan>, PaginationMetadata)> SearchAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<T> AddAsync(T entity) => throw new NotSupportedException();
+            public Task AddRangeAsync(IEnumerable<T> entity) => throw new NotSupportedException();
+            public Task<T> GetAsync(object id) => throw new NotSupportedException();
+            public Task<T> GetAsync(object id, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<List<T>> GetAllAsync() => throw new NotSupportedException();
+            public Task<List<T>> GetAllAsync(CancellationToken cancellationToken) => _inner.GetAllAsync(cancellationToken);
+            public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<T> FirstAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<T> FirstAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<T> SingleAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<T> SingleAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber) => throw new NotSupportedException();
+            public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task<HealthCheckResult> HealthCheck(int eventId) => throw new NotSupportedException();
             public Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task StartTransactionAsync() => throw new NotSupportedException();
@@ -134,8 +134,8 @@ namespace UnitTests.DMRP
             public Task CommitTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task RollbackTransactionAsync() => throw new NotSupportedException();
             public Task RollbackTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<bool> AnyAsync(Expression<Func<FacilityReportingPlan, bool>> predicate) => throw new NotSupportedException();
-            public Task<bool> AnyAsync(Expression<Func<FacilityReportingPlan, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
+            public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
+            public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
         }
 
         private static DmrpReportingPlanSync CreateSync(TenantDbContext context, params DmrpReportingPlanEntry[] entries) =>
@@ -172,7 +172,7 @@ namespace UnitTests.DMRP
             // simply finds the first one's row.
             var winnerCommitted = false;
 
-            var plans = new SaveInterceptingRepository(
+            var plans = new SaveInterceptingRepository<FacilityReportingPlan>(
                 new EntityRepository<FacilityReportingPlan, TenantDbContext>(loserContext),
                 async () =>
                 {
@@ -308,7 +308,7 @@ namespace UnitTests.DMRP
         }
 
         [Fact]
-        public async Task Sync_RecordsAMeasureWithNoMappingAndLeavesItUnmapped()
+        public async Task Sync_RecordsAMeasureMappingForAMeasureLinkCannotMapYet()
         {
             using var context = CreateContext();
 
@@ -319,9 +319,119 @@ namespace UnitTests.DMRP
             Assert.Equal(1, result.Recorded);
             Assert.Equal(1, result.Unmapped);
 
+            // The measure mappings table is the source of truth for what Link can schedule, so the
+            // measure belongs in it even before anyone supplies a dQM.
+            var mapping = await context.MeasureMappings.SingleAsync();
+            Assert.Equal("UNMAPPED", mapping.Measure);
+            Assert.Null(mapping.DQM);
+            Assert.Equal(Frequency.Adhoc, mapping.Frequency);
+
             var plan = await context.FacilityReportingPlans.SingleAsync();
             Assert.Equal("UNMAPPED", plan.Measure);
-            Assert.Null(plan.MeasureMappingId);
+            Assert.Equal(mapping.Id, plan.MeasureMappingId);
+        }
+
+        /// <summary>
+        /// The sync runs on every refresh. Recording the measure again each time would fill the
+        /// measure mappings page with repeats of the one row the admin is meant to complete.
+        /// </summary>
+        [Fact]
+        public async Task Sync_RecordsAMeasureItCannotMapOnlyOnce()
+        {
+            using var context = CreateContext();
+
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            Assert.Equal(1, await context.MeasureMappings.CountAsync());
+        }
+
+        /// <summary>
+        /// A sync that loses the race on one measure must still record the others it named.
+        /// </summary>
+        /// <remarks>
+        /// Two syncs overlap: the first records A, the second is recording A and B together. The
+        /// second's insert fails on A, and reading back finds A but says nothing about B. Stopping
+        /// there would leave B off the measure mappings page — invisible until some later sync
+        /// happened to run — which is the gap recording measures exists to close.
+        /// </remarks>
+        [Fact]
+        public async Task Sync_RecordsTheOtherMeasuresWhenOneLosesTheRace()
+        {
+            using var setup = CreateContext();
+            using var winnerContext = CreateContext();
+            using var loserContext = CreateContext();
+
+            // As with the reporting-plan race above, the overlap has to be built deliberately: the
+            // loser must read before the winner commits and save after it. Running one sync and then
+            // the other proves nothing, because the second one's read simply finds the first's row.
+            var winnerCommitted = false;
+
+            var mappings = new SaveInterceptingRepository<MeasureMapping>(
+                new EntityRepository<MeasureMapping, TenantDbContext>(loserContext),
+                async () =>
+                {
+                    if (winnerCommitted)
+                    {
+                        return;
+                    }
+
+                    winnerCommitted = true;
+
+                    // The winner names A only, so the loser's insert collides on A while B is still
+                    // pending — the case where stopping at the reread would lose B.
+                    await CreateSync(winnerContext, Entry("A")).SyncAsync(FacilityId, Month, Year);
+                });
+
+            var loser = new DmrpReportingPlanSync(
+                new StubClient([Entry("A"), Entry("B")]),
+                new EntityRepository<FacilityReportingPlan, TenantDbContext>(loserContext),
+                mappings,
+                NullLogger<DmrpReportingPlanSync>.Instance);
+
+            var result = await loser.SyncAsync(FacilityId, Month, Year);
+
+            var measures = await setup.MeasureMappings.Select(m => m.Measure).ToListAsync();
+            Assert.Equal(2, measures.Count);
+            Assert.Contains("A", measures);
+            Assert.Contains("B", measures);
+
+            // And B's plan points at its mapping rather than being left unlinked, which is what would
+            // have kept it off the measure mappings page.
+            var planB = await setup.FacilityReportingPlans.SingleAsync(
+                p => p.FacilityId == FacilityId && p.Measure == "B");
+            Assert.NotNull(planB.MeasureMappingId);
+
+            Assert.Equal(2, result.Unmapped);
+        }
+
+        /// <summary>
+        /// Completing a measure sets the dQM on the row the sync recorded, so the facilities already
+        /// enrolled in it start reporting without their plans being touched. This is the whole reason
+        /// the measure is recorded rather than merely counted.
+        /// </summary>
+        [Fact]
+        public async Task Sync_CountsAMeasureAsMappedOnceItsDqmIsSupplied()
+        {
+            using var context = CreateContext();
+
+            await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            var recorded = await context.MeasureMappings.SingleAsync();
+            var planBefore = await context.FacilityReportingPlans.SingleAsync();
+
+            // What an administrator does on the measure mappings page: complete the row, not add one.
+            recorded.DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
+            recorded.Frequency = Frequency.Monthly;
+            await context.SaveChangesAsync();
+
+            var result = await CreateSync(context, Entry("UNMAPPED")).SyncAsync(FacilityId, Month, Year);
+
+            Assert.Equal(0, result.Unmapped);
+
+            var planAfter = await context.FacilityReportingPlans.SingleAsync();
+            Assert.Equal(planBefore.MeasureMappingId, planAfter.MeasureMappingId);
+            Assert.Equal(recorded.Id, planAfter.MeasureMappingId);
         }
 
         [Fact]

@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -23,6 +24,40 @@ public class ReportScheduledListenerTests
     public ReportScheduledListenerTests(ReportIntegrationTestFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_AbortedFacility_DoesNotCreateSchedule()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var abort = scope.ServiceProvider.GetRequiredService<IPipelineAbortRegistry>();
+        var listener = scope.ServiceProvider.GetRequiredService<ReportScheduledListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var reportId = Guid.NewGuid();
+        await abort.AbortAsync(facilityId, reportId: null, TimeSpan.FromDays(14));
+
+        var consumeResult = new ConsumeResult<string, ReportScheduledValue>
+        {
+            Message = new Message<string, ReportScheduledValue>
+            {
+                Key = facilityId,
+                Value = new ReportScheduledValue
+                {
+                    ReportTrackingId = reportId,
+                    StartDate = DateTimeOffset.UtcNow.AddDays(-1),
+                    EndDate = DateTimeOffset.UtcNow.AddDays(30),
+                    Frequency = Frequency.Monthly,
+                    ReportTypes = new List<string> { "DE-111" }
+                }
+            }
+        };
+
+        await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
+
+        var created = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == reportId);
+        Assert.Null(created);
     }
 
     [Fact]

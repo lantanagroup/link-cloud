@@ -126,7 +126,7 @@ class AbstractResourceConsumerTest {
         ReflectionTestUtils.invokeMethod(
                 consumer, "evaluateMeasures", value, patientStatus, bundle, System.currentTimeMillis());
 
-        verify(blobStorageService).storePatientInBlobStorage(eq(patientStatus), eq(report), eq(measureReport));
+        verify(blobStorageService).storePatientInBlobStorage(eq(patientStatus), eq(report), eq(measureReport), any());
     }
 
 
@@ -228,7 +228,7 @@ class AbstractResourceConsumerTest {
         assertFalse(result);
         assertFalse(report.getReportable());
         verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(
-                eq(patientStatus), eq(report), anyString(), isNull(), isNull());
+                eq(patientStatus), eq(report), anyString(), isNull(), isNull(), any());
     }
 
     @Test

@@ -4,7 +4,7 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSort, Sort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
-import { faRotate } from '@fortawesome/free-solid-svg-icons';
+import { faBan, faRotate } from '@fortawesome/free-solid-svg-icons';
 import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, take } from 'rxjs/operators';
 
@@ -14,6 +14,8 @@ import { ResubmitDialogComponent } from '../tenant/facility-view/resubmit-dialog
 import { IReportSchedule } from '../../interfaces/report/report-schedule.interface';
 import {
   SCHEDULE_STATUS_OPTIONS,
+  canCleanUpScheduleStatus,
+  isInProgressScheduleStatus,
   scheduleStatusBadgeClass,
   scheduleStatusLabel
 } from '../../interfaces/report/schedule-status';
@@ -47,6 +49,7 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
   protected readonly snackBar = inject(MatSnackBar);
 
   faRotate = faRotate;
+  faBan = faBan;
 
   defaultPageNumber = 0;
   defaultPageSize = 10;
@@ -70,6 +73,8 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
   readonly statusOptions = SCHEDULE_STATUS_OPTIONS;
   readonly statusLabel = scheduleStatusLabel;
   readonly statusBadgeClass = scheduleStatusBadgeClass;
+  readonly isInProgressStatus = isInProgressScheduleStatus;
+  readonly canCleanUp = canCleanUpScheduleStatus;
   readonly frequencyOptions = ['Monthly', 'Weekly', 'Daily', 'Adhoc'];
 
   currentSortBy = 'CreateDate';
@@ -302,11 +307,54 @@ export abstract class ReportScheduleGridBase implements OnDestroy {
     });
   }
 
+  onAbortReport(reportScheduleId: string): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '480px',
+      data: {
+        title: 'Abort In-Progress Report',
+        message: 'Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.',
+        icon: 'cancel',
+        iconColor: 'warn',
+        confirmButtonText: 'Abort report'
+      }
+    });
+
+    dialogRef.afterClosed().pipe(take(1)).subscribe(confirmed => {
+      if (!confirmed) return;
+
+      const progressSnackBar = this.snackBar.open('Aborting report, please wait...', 'Close');
+
+      this.aggregationService.abortReport(reportScheduleId).subscribe({
+        next: () => {
+          progressSnackBar.dismiss();
+          this.snackBar.open('Report aborted. In-flight work for this report will stop.', 'Close', { duration: 3000, panelClass: 'success-snackbar' });
+          this.paginationMetadata.pageNumber = 0;
+          this.loadReportSchedules();
+        },
+        error: (err) => {
+          progressSnackBar.dismiss();
+          const detail = this.extractDetail(err);
+          this.dialog.open(AlertDialogComponent, {
+            width: '420px',
+            data: {
+              title: 'Abort Failed',
+              message: detail || 'Failed to abort the report. Please try again.',
+              icon: 'error',
+              iconColor: 'warn'
+            }
+          });
+        }
+      });
+    });
+  }
+
   onSoftDeleteReport(reportScheduleId: string): void {
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       width: '400px',
       data: {
-        message: 'Are you sure you want to soft delete this report and all its associated acquisition logs?'
+        title: 'Clean Up Report',
+        message: 'Remove this report and its associated acquisition logs? It can be restored later.',
+        confirmButtonText: 'Clean up'
       }
     });
 

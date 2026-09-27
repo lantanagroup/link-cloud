@@ -35,7 +35,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Measure ' + pm.collectionVariables.get('reportType') + ' is loaded in MeasureEval', function () {",
-                  "    pm.expect(pm.response.code, 'If this is 404, load the measure first: PUT {{bff}}/api/measureeval/measure-definition with the bundle from DotNet/Automation/measures/NHSNAcuteCareHospitalMonthlyInitialPopulation.json').to.eql(200);",
+                  "    pm.expect(pm.response.code, 'If this is 404, load the measure first: PUT {{bff}}/api/measureeval/measure-definition with the Validation 2.0 ACH Monthly bundle (Automation.UI Measures store / DotNet/Automation/measures).').to.eql(200);",
                   "});"
                 ]
               }

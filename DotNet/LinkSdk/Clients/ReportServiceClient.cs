@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -64,8 +64,13 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
     public Task<LinkApiResponse<ReportSummaryApiModel>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendAsync<ReportSummaryApiModel>(() => Request($"/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/schedules/{reportId}").DeleteAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool allowInProgress = false)
+    {
+        var request = Request($"/schedules/{reportId}");
+        if (allowInProgress)
+            request = request.SetQueryParam("allowInProgress", "true");
+        return SendAsync(() => request.DeleteAsync(cancellationToken: cancellationToken));
+    }
 
     public Task<LinkApiResponse> RestoreScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/schedules/{reportId}/restore").PatchAsync(cancellationToken: cancellationToken));

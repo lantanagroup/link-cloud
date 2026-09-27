@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
 using System.IO.Compression;
@@ -65,7 +66,8 @@ public class ReportApiHelper
             StartDate = DateTime.Parse(config.StartDate),
             EndDate = DateTime.Parse(config.EndDate),
             ReportTypes = measureIds,
-            PatientIds = config.PatientIds
+            PatientIds = config.PatientIds,
+            MetricsMode = config.IsMetricsRun ? "performance" : null
         };
 
         var response = await _facilityClient.GenerateAdhocReportAsync(facilityId, body);
@@ -80,14 +82,15 @@ public class ReportApiHelper
     /// Triggers a regeneration of an existing submitted report.
     /// Returns the new report ID created by the regeneration.
     /// </summary>
-    public async Task<string> RegenerateReportAsync(string facilityId, string existingReportId)
+    public async Task<string> RegenerateReportAsync(string facilityId, string existingReportId, bool isMetricsRun = false)
     {
         _output.WriteLine($"Regenerating report (facilityId={facilityId}, existingReportId={existingReportId})...");
 
         var request = new RegenerateReportRequest
         {
             ReportId = existingReportId,
-            BypassSubmission = false
+            BypassSubmission = false,
+            MetricsMode = isMetricsRun ? "performance" : null
         };
 
         var response = await _facilityClient.RegenerateReportAsync(facilityId, request);
@@ -106,7 +109,8 @@ public class ReportApiHelper
         DateTimeOffset startDateUtc,
         TimeSpan reportDuration,
         Frequency frequency,
-        string? reportTrackingId = null)
+        string? reportTrackingId = null,
+        bool isMetricsRun = false)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("facilityId is required.", nameof(facilityId));
@@ -151,10 +155,7 @@ public class ReportApiHelper
             {
                 Key = facilityId,
                 Value = value,
-                Headers = new Headers
-                {
-                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
-                }
+                Headers = CreateScheduledReportHeaders(trackingId, isMetricsRun)
             });
 
         producer.Flush(TimeSpan.FromSeconds(5));
@@ -163,6 +164,20 @@ public class ReportApiHelper
             $"Scheduled report event produced via Kafka: reportTrackingId={trackingId}, " +
             $"start={startDateUtc:O}, end={endDateUtc:O}, durationMinutes={reportDuration.TotalMinutes:F0}");
         return trackingId;
+    }
+
+    private static Headers CreateScheduledReportHeaders(string trackingId, bool isMetricsRun)
+    {
+        var headers = new Headers
+        {
+            { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
+        };
+        if (isMetricsRun)
+        {
+            KafkaHeaderHelper.SetMetricsMode(headers, "performance");
+        }
+
+        return headers;
     }
 
     /// <summary>
@@ -274,7 +289,11 @@ public class ReportApiHelper
         _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
     }
 
-    public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
+    public async Task<bool> CheckSubmissionStatusAsync(
+        string reportId,
+        TestScenarioConfig config,
+        BackgroundDiagnosticsMonitor? diagnostics = null,
+        CancellationToken cancellationToken = default)
     {
         var pollingInterval = TimeSpan.FromSeconds(Math.Max(1, config.PollingIntervalSeconds));
         var hardTimeout = GetEffectiveSubmissionTimeout(config);
@@ -298,6 +317,7 @@ public class ReportApiHelper
                 : milestonePhaseStart + hardTimeout;
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
                 {
                     if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
@@ -321,7 +341,7 @@ public class ReportApiHelper
                 // Entryless scheduled runs are valid when prediction says no
                 // patients should participate. In that case the report can reach a terminal
                 // status without ever emitting ReportEntriesCreated.
-                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
+                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
                 if (scheduleProbe.IsSuccessStatusCode
                     && scheduleProbe.Body?.Status.IsTerminal() == true)
                 {
@@ -332,7 +352,7 @@ public class ReportApiHelper
                     break;
                 }
 
-                await Task.Delay(pollingInterval);
+                await Task.Delay(pollingInterval, cancellationToken);
             }
 
             if (diagnostics.HasCriticalFailure)
@@ -371,6 +391,7 @@ public class ReportApiHelper
             : submissionPhaseStart + hardTimeout;
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
             {
                 if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
@@ -391,7 +412,7 @@ public class ReportApiHelper
             }
 
             string currentStatus;
-            var response = await _reportClient.GetScheduleAsync(reportId);
+            var response = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode == (int)HttpStatusCode.NotFound)
@@ -428,7 +449,7 @@ public class ReportApiHelper
                 lastStatus = currentStatus;
             }
 
-            await Task.Delay(pollingInterval);
+            await Task.Delay(pollingInterval, cancellationToken);
         }
 
         _output.WriteLine($"Report {reportId} was not submitted before timeout.");
@@ -559,7 +580,7 @@ public class ReportApiHelper
         }
 
         _output.WriteLine(
-            $"[DIAG][DataAcq] Keep-alive: acquisition still progressing " +
+            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
             $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
             $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
         return true;

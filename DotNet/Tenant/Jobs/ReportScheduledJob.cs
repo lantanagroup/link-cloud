@@ -6,8 +6,9 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Interfaces;
-using LantanaGroup.Link.Tenant.Models.Messages;
 using LantanaGroup.Link.Tenant.Services;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Quartz;
 using static LantanaGroup.Link.Tenant.Services.ScheduleService;
 
@@ -46,44 +47,24 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 TimeZoneInfo timeZone = TimeZoneInfo.FindSystemTimeZoneById(facility.TimeZone); // based on location
 
-                // Get the date part only (year, month, day) based on location timezone
-                DateTimeOffset utcNow = DateTimeOffset.UtcNow;
-                DateTimeOffset currentDateTimeInTimeZone = TimeZoneInfo.ConvertTime(utcNow, timeZone);
+                // Anchor on Quartz's scheduled fire time rather than reading the wall clock again, so
+                // the whole of this job's period math comes from one instant. It is not misfire
+                // recovery: these triggers carry Quartz's smart policy, which for a cron trigger means
+                // fire once now, and Quartz implements that by moving the scheduled
+                // time to the recovery instant, so a fire recovered late announces the period of the
+                // recovery instant - the same behaviour as before this was anchored.
+                DateTimeOffset scheduledUtc = context.ScheduledFireTimeUtc ?? context.FireTimeUtc;
+                DateTime currentDateInTimeZone = TimeZoneInfo.ConvertTime(scheduledUtc, timeZone).DateTime;
 
-                DateTime currentDateInTimeZone = currentDateTimeInTimeZone.DateTime;
-
-                // initialize startDate, endDate
-                DateTime startDate = currentDateInTimeZone;
-                DateTime endDate = currentDateInTimeZone;
-
-                // adjust startDate, endDate based on frequency
-                switch (frequency)
+                reportTypes = frequency switch
                 {
-                    case ScheduleService.MONTHLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, 1, 0, 0, 0);
-                        endDate = startDate.AddMonths(1).AddSeconds(-1);
-                        reportTypes = facility.ScheduledReports.Monthly;
-                        break;
-                    case ScheduleService.WEEKLY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day, 0, 0, 0);
-                        // set to beginning of week in case is not exactly that
-                        DayOfWeek startOfWeek = DayOfWeek.Sunday;
-                        DayOfWeek currentDay = startDate.DayOfWeek;
-                        int difference = currentDay - startOfWeek;
-                        startDate = startDate.AddDays(-difference);
-                        // end date of the week
-                        endDate = startDate.AddDays(7).AddSeconds(-1);
-                        reportTypes = facility.ScheduledReports.Weekly;
-                        break;
-                    case ScheduleService.DAILY:
-                        startDate = new DateTime(currentDateInTimeZone.Year, currentDateInTimeZone.Month, currentDateInTimeZone.Day, 0, 0, 0);
-                        endDate = startDate.AddDays(1).AddSeconds(-1);
-                        reportTypes = facility.ScheduledReports.Daily;
-                        break;
-                }
-                // convert to UTC
-                startDate = TimeZoneInfo.ConvertTimeToUtc(startDate, timeZone);
-                endDate = TimeZoneInfo.ConvertTimeToUtc(endDate, timeZone);
+                    ScheduleService.MONTHLY => facility.ScheduledReports.Monthly,
+                    ScheduleService.WEEKLY => facility.ScheduledReports.Weekly,
+                    ScheduleService.DAILY => facility.ScheduledReports.Daily,
+                    _ => []
+                };
+
+                var (startDate, endDate) = ReportingPeriodMath.ForFrequency(frequency, currentDateInTimeZone, timeZone);
 
                 _logger.LogInformation("Produce {Topic} event on facility time {CurrentDateTime} for facility {FacilityId}, frequency {Frequency}, trigger: {Trigger}", KafkaTopic.ReportScheduled, currentDateInTimeZone, facility.FacilityId, frequency, trigger);
 
@@ -121,9 +102,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 _metrics.IncrementReportScheduledCounter([
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facility.FacilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportTypes),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodStart, startDate),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PeriodEnd, endDate)
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportType, reportTypes)
                 ]);
 
             }

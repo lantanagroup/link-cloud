@@ -137,7 +137,7 @@ class EvaluationRequestedConsumerTest {
         assertDoesNotThrow(() -> consumer.process(buildRecord("facility-1", value)));
 
         verifyNoInteractions(evaluateMeasureService);
-        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(any(), any(), any(), isNull(), isNull());
+        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(any(), any(), any(), isNull(), isNull(), any());
         verifyNoInteractions(blobStorageService);
     }
 
@@ -197,7 +197,7 @@ class EvaluationRequestedConsumerTest {
 
         assertDoesNotThrow(() -> consumer.process(buildRecord("facility-1", value)));
 
-        verify(blobStorageService).storePatientInBlobStorage(any(), any(), eq(measureReport));
+        verify(blobStorageService).storePatientInBlobStorage(any(), any(), eq(measureReport), any());
         verifyNoInteractions(measureReportGeneratedProducer);
     }
 }

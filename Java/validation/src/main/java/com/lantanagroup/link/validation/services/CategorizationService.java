@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -106,6 +107,13 @@ public class CategorizationService {
     }
 
     private void doCategorize(List<Result> results, List<CategoryRule> categoryRules) {
+        int total = results.size();
+        if (total == 0) {
+            return;
+        }
+
+        logger.info("Categorizing validation results: 0/{}", total);
+        AtomicInteger done = new AtomicInteger();
         results.parallelStream().forEach(result -> {
             List<Category> categories = categoryRules.stream()
                     .filter(Objects::nonNull)
@@ -113,6 +121,10 @@ public class CategorizationService {
                     .map(CategoryRule::getCategory)
                     .toList();
             result.setCategories(categories);
+            int n = done.incrementAndGet();
+            if (n == total || n % 5000 == 0) {
+                logger.info("Categorizing validation results: {}/{}", n, total);
+            }
         });
     }
 

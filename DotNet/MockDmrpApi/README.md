@@ -554,7 +554,9 @@ When disabled:
 - every route answers **`503`** with problem details carrying a `traceId`
 - `/health` and `/api/mock-dmrp/info` keep answering, so the container stays healthy rather
   than looking like an outage
-- **EF migration is skipped** — a dormant deployment has no business altering a schema
+- **EF migration still runs if a database connection string is configured**, so the schema
+  is ready before the mock is switched on; with no connection string it is skipped, and the
+  pod stays dormant rather than crash-looping
 - a warning is logged naming the environment, the key that decided it, and the routes that remain
 
 ### 6.2 Error responses

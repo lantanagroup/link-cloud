@@ -24,6 +24,9 @@ public class MeasureMappingsControllerTests : IDisposable
     private readonly IServiceScope _scope;
     private readonly MeasureMappingsController _controller;
 
+    /// <summary>Kept so a test can prove the required-dQM guard returns before MeasureEval is asked.</summary>
+    private readonly Mock<IMeasureEvalServiceClient> _measureEvalClient;
+
     public MeasureMappingsControllerTests(DmrpIntegrationTestFixture fixture)
     {
         _scope = fixture.ServiceProvider.CreateScope();
@@ -33,6 +36,7 @@ public class MeasureMappingsControllerTests : IDisposable
         var manager = sp.GetRequiredService<IMeasureMappingManager>();
         var queries = sp.GetRequiredService<IMeasureMappingQueries>();
         var measureEvalClient = new Mock<IMeasureEvalServiceClient>();
+        _measureEvalClient = measureEvalClient;
         measureEvalClient
             .Setup(client => client.GetMeasureDefinitionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string dqm, CancellationToken _) => new LinkApiResponse<string>
@@ -52,6 +56,59 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     public void Dispose() => _scope.Dispose();
+
+    /// <summary>
+    /// The API requires a dQM. Only the DMRP sync records a measure without one, and it does that
+    /// through the repository rather than through here.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateMeasureMapping_WithoutDqm_ReturnsBadRequestWithoutAskingMeasureEval(string? dqm)
+    {
+        _measureEvalClient.Invocations.Clear();
+
+        var result = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = dqm,
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+
+        // The guard returns before the lookup, so a missing dQM costs no call to MeasureEval.
+        _measureEvalClient.Verify(
+            client => client.GetMeasureDefinitionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateMeasureMapping_WithoutDqm_ReturnsBadRequestWithoutAskingMeasureEval(string? dqm)
+    {
+        var id = await CreateMappingAsync();
+
+        // Cleared after the setup call, which legitimately asked MeasureEval about its own dQM.
+        _measureEvalClient.Invocations.Clear();
+
+        var result = await _controller.UpdateMeasureMapping(id, new MeasureMappingModel
+        {
+            Id = id,
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = dqm,
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+
+        _measureEvalClient.Verify(
+            client => client.GetMeasureDefinitionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 
     /// <summary>
     /// A mapping that reporting plans still point at cannot be removed: the foreign key restricts it.
@@ -225,7 +282,7 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateMeasureMapping_WithDuplicateMeasureAndDqm_ReturnsMeasureValidationProblem()
+    public async Task CreateMeasureMapping_WithDuplicateMeasure_ReturnsMeasureValidationProblem()
     {
         var measure = $"Duplicate Measure {Guid.NewGuid()}";
         const string dqm = "Duplicate DQM";
@@ -237,10 +294,12 @@ public class MeasureMappingsControllerTests : IDisposable
             Frequency = Frequency.Daily
         }, CancellationToken.None);
 
+        // A different dQM on purpose. Repeating the first one would also have been refused by the old
+        // index over (Measure, DQM), so the test would pass without proving the measure-only rule.
         var result = await _controller.CreateMeasureMapping(new MeasureMappingModel
         {
             Measure = measure,
-            DQM = dqm,
+            DQM = $"Second DQM {Guid.NewGuid()}",
             Frequency = Frequency.Daily
         }, CancellationToken.None);
 
@@ -248,7 +307,7 @@ public class MeasureMappingsControllerTests : IDisposable
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
         var problemDetails = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
-        Assert.Equal("A measure mapping for this measure and dQM already exists.", problemDetails.Errors["measure"].Single());
+        Assert.Equal("A measure mapping for this measure already exists.", problemDetails.Errors["measure"].Single());
     }
 
     [Fact]
@@ -342,7 +401,7 @@ public class MeasureMappingsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateMeasureMapping_WithDuplicateMeasureAndDqm_ReturnsMeasureValidationProblem()
+    public async Task UpdateMeasureMapping_WithDuplicateMeasure_ReturnsMeasureValidationProblem()
     {
         var original = Assert.IsType<MeasureMappingModel>(((CreatedResult)await _controller.CreateMeasureMapping(new MeasureMappingModel
         {
@@ -361,7 +420,9 @@ public class MeasureMappingsControllerTests : IDisposable
         {
             Id = mappingToUpdate.Id,
             Measure = original.Measure,
-            DQM = original.DQM,
+            // Keeps its own dQM: the collision has to be the measure, not the pair, or the old index
+            // would have rejected this too and the test would prove nothing about the new one.
+            DQM = mappingToUpdate.DQM,
             Frequency = original.Frequency
         }, CancellationToken.None);
 
@@ -369,7 +430,7 @@ public class MeasureMappingsControllerTests : IDisposable
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
         var problemDetails = Assert.IsType<ValidationProblemDetails>(badRequest.Value);
-        Assert.Equal("A measure mapping for this measure and dQM already exists.", problemDetails.Errors["measure"].Single());
+        Assert.Equal("A measure mapping for this measure already exists.", problemDetails.Errors["measure"].Single());
     }
 
     [Fact]
@@ -411,7 +472,12 @@ public class MeasureMappingsControllerTests : IDisposable
     [Fact]
     public async Task UpdateMeasureMapping_MismatchedId_ReturnsBadRequest()
     {
-        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel(), CancellationToken.None);
+        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
         var created = (MeasureMappingModel)((CreatedResult)createResult).Value!;
 
         var result = await _controller.UpdateMeasureMapping(created.Id!,
@@ -423,7 +489,12 @@ public class MeasureMappingsControllerTests : IDisposable
     [Fact]
     public async Task DeleteMeasureMapping_ThenGet_ReturnsNotFound()
     {
-        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel(), CancellationToken.None);
+        var createResult = await _controller.CreateMeasureMapping(new MeasureMappingModel
+        {
+            Measure = $"MEASURE-{Guid.NewGuid():N}",
+            DQM = "NHSNAcuteCareHospitalMonthlyInitialPopulation",
+            Frequency = Frequency.Monthly
+        }, CancellationToken.None);
         var created = (MeasureMappingModel)((CreatedResult)createResult).Value!;
 
         var deleteResult = await _controller.DeleteMeasureMapping(created.Id!, CancellationToken.None);

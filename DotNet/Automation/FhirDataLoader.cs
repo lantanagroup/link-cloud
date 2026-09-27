@@ -100,6 +100,87 @@ public class FhirDataLoader
     }
 
     /// <summary>
+    /// Issues a FHIR search with <c>_summary=count</c> and returns <c>Bundle.total</c>.
+    /// Used after upload to wait until HAPI search indexes catch up before Data Acquisition.
+    /// </summary>
+    public async Task<int> SearchResourceCountAsync(
+        string resourceType,
+        IReadOnlyDictionary<string, string> queryParameters,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(resourceType))
+            throw new ArgumentException("Resource type is required.", nameof(resourceType));
+
+        Exception? lastException = null;
+        var delay = InitialRetryDelay;
+
+        for (var attempt = 1; attempt <= MaxRetries; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var request = new RestRequest(resourceType.Trim(), Method.Get);
+                request.AddHeader("Accept", "application/fhir+json");
+                if (!string.IsNullOrEmpty(_authorization))
+                    request.AddHeader("Authorization", _authorization);
+
+                if (queryParameters != null)
+                {
+                    foreach (var (name, value) in queryParameters)
+                    {
+                        if (string.IsNullOrWhiteSpace(name) || value == null)
+                            continue;
+                        request.AddQueryParameter(name, value);
+                    }
+                }
+
+                request.AddQueryParameter("_summary", "count");
+                request.AddQueryParameter("_count", "0");
+
+                var response = await _restClient.ExecuteAsync(request, ct);
+                if (response.IsSuccessful && !string.IsNullOrWhiteSpace(response.Content))
+                    return ParseSearchBundleTotal(response.Content);
+
+                var status = (int)response.StatusCode;
+                if (status != 0 && status < 500)
+                {
+                    throw new InvalidOperationException(
+                        $"FHIR search count for {resourceType} returned {status} {response.StatusCode}. Response body: {response.Content}");
+                }
+
+                lastException = new InvalidOperationException(
+                    $"FHIR search count for {resourceType} returned {status} {response.StatusCode}.");
+            }
+            catch (Exception ex) when (attempt < MaxRetries && ex is not InvalidOperationException)
+            {
+                lastException = ex;
+            }
+
+            if (attempt < MaxRetries)
+            {
+                await Task.Delay(delay, ct);
+                delay = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * 2);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"FHIR search count for {resourceType} failed after {MaxRetries} attempt(s).", lastException);
+    }
+
+    internal static int ParseSearchBundleTotal(string json)
+    {
+        var node = JsonNode.Parse(json);
+        if (node?["total"] is JsonValue totalValue && totalValue.TryGetValue<int>(out var total))
+            return total;
+
+        if (node?["entry"] is JsonArray entries)
+            return entries.Count;
+
+        return 0;
+    }
+
+    /// <summary>
     /// Waits until a Patient is no longer available from the FHIR server. This is used
     /// after requesting an expunge, which can complete asynchronously on deployed servers.
     /// </summary>

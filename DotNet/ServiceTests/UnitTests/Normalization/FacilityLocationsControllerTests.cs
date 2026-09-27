@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Normalization.Application.Models.FacilityLocations;
 using LantanaGroup.Link.Normalization.Controllers;
 using LantanaGroup.Link.Normalization.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System.Net;
@@ -11,6 +12,47 @@ namespace UnitTests.Normalization;
 [Trait("Category", "UnitTests")]
 public class FacilityLocationsControllerTests
 {
+    [Fact]
+    public async Task GetForFacility_ReturnsEmptyCollectionAndForwardsToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var manager = new Mock<IFacilityLocationManager>();
+        manager.Setup(service => service.GetForFacility("facility-1", cancellation.Token)).ReturnsAsync([]);
+        var controller = new FacilityLocationsController(manager.Object);
+
+        var result = await controller.GetForFacility(" facility-1 ", cancellation.Token);
+
+        var response = Assert.IsType<PagedConfigModel<FacilityLocationTreeModel>>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Empty(response.Records);
+        Assert.NotNull(response.Metadata);
+        manager.Verify(service => service.GetForFacility("facility-1", cancellation.Token), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetForFacility_EmptyIdentifier_ReturnsBadRequest()
+    {
+        var manager = new Mock<IFacilityLocationManager>(MockBehavior.Strict);
+        var controller = new FacilityLocationsController(manager.Object);
+
+        var result = await controller.GetForFacility(" ", CancellationToken.None);
+
+        AssertProblem(result.Result!, HttpStatusCode.BadRequest);
+        manager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task GetForFacility_CancellationIsNotConvertedToServerError()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var manager = new Mock<IFacilityLocationManager>();
+        manager.Setup(service => service.GetForFacility("facility-1", cancellation.Token))
+            .ThrowsAsync(new OperationCanceledException(cancellation.Token));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new FacilityLocationsController(manager.Object).GetForFacility("facility-1", cancellation.Token));
+    }
+
     [Fact]
     public async Task Post_ValidFacilityLocation_ReturnsCreatedAndPassesSanitizedModelToManager()
     {

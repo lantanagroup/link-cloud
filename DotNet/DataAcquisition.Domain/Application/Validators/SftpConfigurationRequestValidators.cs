@@ -151,6 +151,51 @@ public class SftpCredentialsModelValidator : AbstractValidator<SftpCredentialsMo
     }
 }
 
+public class SftpTestConnectionRequestModelValidator : AbstractValidator<SftpTestConnectionRequestModel>
+{
+    private const int MaxUsernameLength = 256;
+    private const int MaxPasswordLength = 1024;
+
+    public SftpTestConnectionRequestModelValidator(IOptions<SftpValidationSettings> options)
+    {
+        var settings = options.Value.Connection;
+
+        RuleFor(x => x.HostName)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("HostName is required.")
+            .MaximumLength(settings.MaxHostLength)
+            .WithMessage($"HostName cannot exceed {settings.MaxHostLength} characters.")
+            .Must(SftpConfigurationValidationRules.BeValidHostName)
+            .WithMessage("HostName must be a valid hostname or IP address.");
+
+        RuleFor(x => x.HostUrlPort)
+            .InclusiveBetween(1, 65535)
+            .WithMessage("HostUrlPort must be between 1 and 65535.");
+
+        RuleFor(x => x.ReportDirectory)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty()
+            .WithMessage("ReportDirectory is required. Use '/' for the root directory.")
+            .MaximumLength(settings.MaxRemoteDirectoryLength)
+            .WithMessage($"ReportDirectory path cannot exceed {settings.MaxRemoteDirectoryLength} characters.")
+            .Must(SftpConfigurationValidationRules.BeValidRemoteDirectoryPath)
+            .WithMessage("ReportDirectory path contains invalid characters.");
+
+        RuleFor(x => x.Username)
+            .NotEmpty()
+            .WithMessage("Username is required when providing credentials.")
+            .MaximumLength(MaxUsernameLength)
+            .WithMessage($"Username cannot exceed {MaxUsernameLength} characters.");
+
+        RuleFor(x => x.Password)
+            .NotEmpty()
+            .WithMessage("Password is required when providing credentials.")
+            .MaximumLength(MaxPasswordLength)
+            .WithMessage($"Password cannot exceed {MaxPasswordLength} characters.");        
+    }
+}
+
 /// <summary>
 /// Shared validation rules for SFTP configuration
 /// </summary>

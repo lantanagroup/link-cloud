@@ -60,15 +60,15 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
                     throw new ApplicationException($"Unable to deactivate user.");
                 }
 
-                //generate tags for telemetry
-                List<KeyValuePair<string, object?>> tagList = [new KeyValuePair<string, object?>(DiagnosticNames.UserId, userId)];
+                //generate tags for telemetry (facility only — never user.id on meters)
+                List<KeyValuePair<string, object?>> metricTags = [];
                 foreach (var claim in user.Claims.Where(x => x.ClaimType == LinkAuthorizationConstants.LinkSystemClaims.Facility))
                 {
                     var tag = new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, claim.ClaimValue);
-                    tagList.Add(tag);
+                    metricTags.Add(tag);
                     activity?.AddTag(tag.Key, tag.Value);
                 }
-                _metrics.IncrementAccountDeactivatedCounter(tagList);
+                _metrics.IncrementAccountDeactivatedCounter(metricTags);
                 _logger.LogDeactivateUser(user.Id.ToString(), requestor?.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Unknown");
 
                 //generate audit event

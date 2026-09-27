@@ -39,11 +39,11 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "The Data Acquisition and Normalization metrics are high-volume, which are negatively impacted by long/sustained patientId and correlationId tags. Link only includes patientId and correlationId tags in the metrics for DA and Normalization when configured to do so... If Link is configured NOT to produce those tags, then DA and Normalization will show \"No Data\".",
+        "content": "Metrics are aggregated by facility_id. Patient, correlation, resource, and report-tracking IDs are not emitted on Prometheus meters (Telemetry:PatientTags is a lab break-glass only).",
         "mode": "markdown"
       },
       "pluginVersion": "12.0.2",
-      "title": "Notice about Patient-based Metrics",
+      "title": "Notice about Facility-based Metrics",
       "transparent": true,
       "type": "text"
     },
@@ -119,7 +119,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -218,13 +218,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_data_acq_query_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Acquisition per Patient over time",
+      "title": "Average Acquisition per Facility over time",
       "type": "timeseries"
     },
     {
@@ -264,23 +264,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{__name__=\"link_normalization_duration_milliseconds_count\", correlation_id=\"bc9e4fdb-3965-41e7-853a-57a7e33b12f3\", exported_instance=\"f7cf3bc8-2e54-4c11-b0df-e03eee1a72f2\", exported_job=\"Normalization\", facility_id=\"ehr-test\", instance=\"otel-collector:8889\", job=\"otel-collector\", label1=\"value1\", operation_type=\"CodeMap\", patient_id=\"NVoWSPJDl70AB9xvkk5R4LFmXbdtw4WR4BLJum5R5nieT\", phase=\"Initial\", report_tracking_id=\"e77a9a82-8463-4a09-853a-9a770cb98c7f\", resource_type=\"Location\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": []
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -315,7 +299,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -324,7 +308,7 @@
           "useBackend": false
         }
       ],
-      "title": "Average Normalization per Patient",
+      "title": "Average Normalization per Facility",
       "type": "stat"
     },
     {
@@ -384,23 +368,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "{__name__=\"link_normalization_duration_milliseconds_count\", correlation_id=\"bc9e4fdb-3965-41e7-853a-57a7e33b12f3\", exported_instance=\"f7cf3bc8-2e54-4c11-b0df-e03eee1a72f2\", exported_job=\"Normalization\", facility_id=\"ehr-test\", instance=\"otel-collector:8889\", job=\"otel-collector\", label1=\"value1\", operation_type=\"CodeMap\", patient_id=\"NVoWSPJDl70AB9xvkk5R4LFmXbdtw4WR4BLJum5R5nieT\", phase=\"Initial\", report_tracking_id=\"e77a9a82-8463-4a09-853a-9a770cb98c7f\", resource_type=\"Location\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": []
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 5,
@@ -431,7 +399,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_normalization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$rate_period]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -440,7 +408,7 @@
           "useBackend": false
         }
       ],
-      "title": "Average Normalization per Patient over time",
+      "title": "Average Normalization per Facility over time",
       "type": "timeseries"
     },
     {
@@ -514,12 +482,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Evaluation per Patient",
+      "title": "Average Evaluation per Facility",
       "type": "stat"
     },
     {
@@ -609,12 +577,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_measureeval_eval_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Evaluation per Patient over time",
+      "title": "Average Evaluation per Facility over time",
       "type": "timeseries"
     },
     {
@@ -688,12 +656,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Validation per Patient",
+      "title": "Average Validation per Facility",
       "type": "stat"
     },
     {
@@ -783,12 +751,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_validate_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Validation per Patient over time",
+      "title": "Average Validation per Facility over time",
       "type": "timeseries"
     },
     {
@@ -849,12 +817,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Categorization per Patient",
+      "title": "Average Categorization per Facility",
       "type": "stat"
     },
     {
@@ -944,12 +912,12 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_sum{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_validation_categorization_duration_milliseconds_count{\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Categorization per Patient over time",
+      "title": "Average Categorization per Facility over time",
       "type": "timeseries"
     },
     {
@@ -1023,13 +991,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_sum {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_count {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_sum {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_count {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Submission Time per Patient",
+      "title": "Average Submission Time per Facility",
       "type": "stat"
     },
     {
@@ -1119,13 +1087,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_sum {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_count {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_sum {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_duration_milliseconds_count {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n)",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Submission Time per Patient over time",
+      "title": "Average Submission Time per Facility over time",
       "type": "timeseries"
     },
     {
@@ -1186,13 +1154,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_sum {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_count {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n) / 1024",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_sum {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_count {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n) / 1024",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Submission Size (Kb) per Patient",
+      "title": "Average Submission Size (Kb) per Facility",
       "type": "stat"
     },
     {
@@ -1282,13 +1250,13 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "avg(\r\n  (\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_sum {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (patient_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_count {\r\n          facility_id=~\"${facility_id:regex}\",\r\n          report_tracking_id=~\"${report_tracking_id:regex}\",\r\n          patient_id=~\"${patient_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n) / 1024",
+          "expr": "avg(\r\n  (\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_sum {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    )\r\n  )\r\n  /\r\n  clamp_min(\r\n    sum by (facility_id) (\r\n      last_over_time(\r\n        link_submission_upload_size_bytes_count {\r\n          facility_id=~\"${facility_id:regex}\"\r\n        }[$__range]\r\n      )\r\n    ),\r\n    1\r\n  )\r\n) / 1024",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Submission Size (Kb) per Patient over time",
+      "title": "Average Submission Size (Kb) per Facility over time",
       "type": "timeseries"
     }
   ],
@@ -1317,62 +1285,6 @@
         "query": {
           "qryType": 1,
           "query": "label_values(facility_id)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 2,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
-        },
-        "definition": "label_values(report_tracking_id)",
-        "description": "",
-        "includeAll": true,
-        "label": "Report Tracking ID",
-        "multi": true,
-        "name": "report_tracking_id",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(report_tracking_id)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 2,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
-        },
-        "definition": "label_values(patient_id)",
-        "description": "",
-        "includeAll": true,
-        "label": "Patient ID",
-        "multi": true,
-        "name": "patient_id",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(patient_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1452,7 +1364,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Link Patient-Based Performance",
+  "title": "Link Facility Performance",
   "uid": "4d747f1d-456c-4974-b619-63d3d2b24b38",
   "version": 10
 }
