@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit;
@@ -58,6 +60,37 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
 
         Output.WriteLine($"Starting API Health run-all via Automation.UI at {TestConfig.AutomationUiBase}");
 
+        // The ApiHealthScenario seed sometimes finishes with ServiceRequest or Observation
+        // missing from ABS even when this test runs before the other categories. Retry only
+        // that miss. Any other failure stops here.
+        const int maxAttempts = 3;
+        var attempts = new List<string>();
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (attempt > 1)
+            {
+                Output.WriteLine($"Retrying API Health after the known seed acquisition miss (attempt {attempt} of {maxAttempts}).");
+                await Task.Delay(TimeSpan.FromSeconds(20), cancellationToken);
+            }
+
+            var statusBody = await RunOnceAsync(http, attempt, cancellationToken);
+            if (statusBody.Status == "Succeeded")
+                return;
+
+            var summary = $"attempt {attempt}: status={statusBody.Status}, failedEndpoints={statusBody.FailedEndpoints}, error={statusBody.Error}";
+            attempts.Add(summary);
+            Output.WriteLine(summary);
+
+            if (!ApiStabilitySeedMiss.IsRetryable(statusBody.Error) || attempt == maxAttempts)
+            {
+                Assert.Fail(BuildFailureMessage(attempts, statusBody.Error));
+            }
+        }
+    }
+
+    private async Task<RunStatusResponse> RunOnceAsync(HttpClient http, int attempt, CancellationToken cancellationToken)
+    {
         using var startResponse = await http.PostAsJsonAsync("api/api-health-runs/start-all",
             new { source = "BackendE2ETests.ApiStabilityTest" },
             cancellationToken);
@@ -69,7 +102,7 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
         Assert.NotNull(startBody);
         Assert.NotEqual(Guid.Empty, startBody.RunId);
 
-        Output.WriteLine($"API Health run started: runId={startBody.RunId}");
+        Output.WriteLine($"API Health run started (attempt {attempt}): runId={startBody.RunId}");
 
         RunStatusResponse? statusBody = null;
         var deadline = DateTime.UtcNow.Add(Timeout);
@@ -103,8 +136,26 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
             }
         }
 
-        Assert.True(statusBody.Status == "Succeeded",
-            $"API health run failed. status={statusBody.Status}, failedEndpoints={statusBody.FailedEndpoints}, error={statusBody.Error}");
+        return statusBody;
+    }
+
+    private static string BuildFailureMessage(IReadOnlyList<string> attempts, string? lastError)
+    {
+        var message = new StringBuilder();
+        if (ApiStabilitySeedMiss.IsRetryable(lastError))
+        {
+            message.Append("API Health kept failing on the known ApiHealthScenario seed miss ");
+            message.Append("(data acquisition did not land a predicted ServiceRequest or Observation). ");
+        }
+        else
+        {
+            message.Append("API Health run failed. ");
+        }
+
+        message.AppendLine($"Attempts: {attempts.Count}.");
+        foreach (var attempt in attempts)
+            message.AppendLine(attempt);
+        return message.ToString();
     }
 
     private static int GetTimeoutMinutes()

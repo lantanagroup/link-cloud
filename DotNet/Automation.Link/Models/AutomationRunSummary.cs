@@ -9,6 +9,10 @@ public class AutomationRunSummary
     public int PatientCount { get; set; }
     public int ResourcesPerPatient { get; set; }
     public int Seed { get; set; }
+    /// <summary>
+    /// When true, this Automation run minted X-Metrics-Mode=performance at the report origin.
+    /// </summary>
+    public bool IsMetricsRun { get; set; }
     public AutomationRunStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
@@ -17,6 +21,11 @@ public class AutomationRunSummary
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
     public string? FacilityId { get; set; }
+    /// <summary>
+    /// True when this run created <see cref="FacilityId"/>. A differing id that already
+    /// existed, such as a DMRP NHSN organization, is not an Automation leftover.
+    /// </summary>
+    public bool AutomationCreatedFacility { get; set; }
     public string? ReportId { get; set; }
     public string? RunConfigurationJson { get; set; }
     public Guid? GeneratedTemplateCacheVersionId { get; set; }

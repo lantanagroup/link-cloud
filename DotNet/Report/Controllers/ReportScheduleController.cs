@@ -148,13 +148,18 @@ namespace LantanaGroup.Link.Report.Controllers
         /// Soft deletes a single report schedule by its ID.
         /// </summary>
         /// <param name="id">The ID of the report schedule to soft delete.</param>
+        /// <param name="allowInProgress">
+        /// When true, allows soft-delete of an in-progress schedule (New or EndOfPeriod).
+        /// Used by Admin abort so pipeline work can be stopped and the schedule removed.
+        /// Defaults to false; regular deletes still return 409 for in-progress reports.
+        /// </param>
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> SoftDelete(string id)
+        public async Task<IActionResult> SoftDelete(string id, [FromQuery] bool allowInProgress = false)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id is required.");
@@ -164,7 +169,7 @@ namespace LantanaGroup.Link.Report.Controllers
 
             try
             {
-                await _reportScheduledManager.SoftDeleteByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                await _reportScheduledManager.SoftDeleteByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted, allowInProgress);
                 return NoContent();
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
@@ -174,7 +179,7 @@ namespace LantanaGroup.Link.Report.Controllers
             catch (InvalidOperationException ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "Failed to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
-                return Conflict(ex.Message);
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
             }
             catch (Exception ex)
             {

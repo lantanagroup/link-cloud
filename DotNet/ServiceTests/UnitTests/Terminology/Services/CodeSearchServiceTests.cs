@@ -33,7 +33,7 @@ public class CodeSearchServiceTests
 
     public CodeSearchServiceTests()
     {
-        var fhirService = new FhirService(_cache.Object, Mock.Of<ILogger<FhirService>>());
+        var fhirService = new FhirService(_cache.Object, Mock.Of<ILogger<FhirService>>(), Mock.Of<ITerminologyServiceMetrics>(), TerminologyTestConfig.Options());
         _service = new CodeSearchService(_cache.Object, fhirService);
     }
 

@@ -252,6 +252,14 @@
               <fa-icon [icon]="faRotate"></fa-icon>
               Resubmit...
             </button>
+            <button type="button"
+                    *ngIf="isInProgressStatus(element.status) && !element.isDeleted"
+                    class="link-button error"
+                    matTooltip="Stop this in-progress report"
+                    (click)="onAbortReport(element.id)">
+              <fa-icon [icon]="faBan"></fa-icon>
+              Abort
+            </button>
           </td>
         </ng-container>
         <!-- Delete Column -->
@@ -259,8 +267,8 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let element">
             <button mat-icon-button color="warn"
-                    *ngIf="(element.status === 'Submitted' || element.status === 'CompletedNotSubmitted' || element.status === 'Scheduled') && !element.isDeleted"
-                    matTooltip="Soft delete this report"
+                    *ngIf="canCleanUp(element.status) && !element.isDeleted"
+                    matTooltip="Clean up this report"
                     (click)="onSoftDeleteReport(element.id)">
               <mat-icon>delete</mat-icon>
             </button>
@@ -313,7 +321,12 @@
     </div>
     }
     </mat-tab>
-    <mat-tab label="Locations">
+    <mat-tab label="HSLOC Locations">
+      <ng-template matTabContent>
+        <app-hsloc-locations-list [facilityId]="facilityId"></app-hsloc-locations-list>
+      </ng-template>
+    </mat-tab>
+    <mat-tab label="Org Locations">
       <ng-template matTabContent>
         <app-locations-list [facilityId]="facilityId"></app-locations-list>
       </ng-template>

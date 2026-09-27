@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -753,6 +754,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         if (string.IsNullOrEmpty(map.TargetSystem))
                         {
                             builder.AppendLine($"CodeSystemMap.TargetSystem cannot be null or empty.");
+                        }
+
+                        if (operation is HSLOCMapOperation && map.TargetSystem != MappingTargetSystems.HslocUrl)
+                        {
+                            builder.AppendLine($"HSLOCMap target system must be {MappingTargetSystems.HslocUrl}.");
                         }
 
                         if (map.CodeMaps == null)

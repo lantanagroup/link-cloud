@@ -71,6 +71,10 @@ public class BlobStorageService {
     }
 
     public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, PatientReportingEvaluationStatus.Report report, MeasureReport measureReport) {
+        storePatientInBlobStorage(status, report, measureReport, null);
+    }
+
+    public void storePatientInBlobStorage(PatientReportingEvaluationStatus status, PatientReportingEvaluationStatus.Report report, MeasureReport measureReport, org.apache.kafka.common.header.Headers inboundHeaders) {
         IParser jsonParser = this.fhirContext.newJsonParser()
                 //.setSuppressNarratives(true)    // consider this if narrative "text" fields aren't desired downstream
                 .setPrettyPrint(false);     // Ensure no tab delim so that it serializes to a single line per each resource
@@ -107,7 +111,7 @@ public class BlobStorageService {
         }
 
         // Produce MeasureReportGenerated event
-        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport.getIdPart(), patientPayloadUri, blobName);
+        this.measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(status, report, measureReport.getIdPart(), patientPayloadUri, blobName, inboundHeaders);
     }
 
     private List<Resource> normalize(MeasureReport measureReport) {
