@@ -41,7 +41,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
 
-        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
+        Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default, bool allowInProgress = false);
         Task RestoreByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default);
         Task<PagedConfigModel<ReportSummaryApiModel>> GetReportSummaries(
             string? facilityId, ReportStatus? status, string? sortBy, SortOrder? sortOrder,
@@ -432,7 +432,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             while (batch.Count == BatchSize);
         }
 
-        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default)
+        public async Task SoftDeleteByReportTrackingIdAsync(Guid reportTrackingId, CancellationToken cancellationToken = default, bool allowInProgress = false)
         {
             var entity = await _context.ReportSchedule
                 .FirstOrDefaultAsync(r => r.Id == reportTrackingId && (!r.IsDeleted.HasValue || r.IsDeleted == false), cancellationToken);
@@ -440,7 +440,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             if (entity == null)
                 throw new InvalidOperationException($"Report schedule with ID '{reportTrackingId}' not found.");
 
-            if (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod)
+            if (!allowInProgress && (entity.Status == ScheduleStatus.New || entity.Status == ScheduleStatus.EndOfPeriod))
                 throw new InvalidOperationException($"Report schedule '{reportTrackingId}' is currently in progress and cannot be deleted.");
 
             if (entity.Status == ScheduleStatus.Scheduled)

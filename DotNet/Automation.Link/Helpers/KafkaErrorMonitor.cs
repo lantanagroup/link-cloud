@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -41,19 +40,19 @@ public class KafkaErrorMonitor : IAsyncDisposable
     public bool HasErrors => !_capturedErrors.IsEmpty;
 
     /// <summary>
-    /// Counts captured errors whose Kafka message key matches the supplied facility id
-    /// (or has no key at all, so the error can't be ruled out as foreign). Errors keyed
-    /// to a different facility are noise from a sibling test and are excluded.
+    /// Counts captured -Error and -Retry messages that belong to the supplied facility
+    /// (JSON ResourceKey / ReadyForValidation.Key, X-Exception-Facility-Id, or a raw
+    /// facility-id key). Messages with no identifiable facility still count so they
+    /// cannot be ruled out as foreign.
     /// </summary>
-    public int GetErrorCountForFacility(string? facilityId)
-    {
-        if (string.IsNullOrEmpty(facilityId))
-            return _capturedErrors.Count;
+    public int GetErrorCountForFacility(string? facilityId) =>
+        CountForFacility(facilityId, e => true);
 
-        return _capturedErrors.Count(e =>
-            string.IsNullOrEmpty(e.Key) ||
-            string.Equals(e.Key, facilityId, StringComparison.Ordinal));
-    }
+    public int GetDeadLetterCountForFacility(string? facilityId) =>
+        CountForFacility(facilityId, e => e.IsDeadLetter);
+
+    public int GetRetryCountForFacility(string? facilityId) =>
+        CountForFacility(facilityId, e => e.IsRetry);
 
     /// <summary>
     /// Captured-error rows scoped to the supplied facility id (same filter rules as
@@ -61,20 +60,28 @@ public class KafkaErrorMonitor : IAsyncDisposable
     /// </summary>
     public IReadOnlyList<string> GetErrorsForFacility(string? facilityId)
     {
-        if (string.IsNullOrEmpty(facilityId))
-            return [.. _capturedErrors.Select(e => e.Message)];
-
-        return [.. _capturedErrors
-            .Where(e => string.IsNullOrEmpty(e.Key) || string.Equals(e.Key, facilityId, StringComparison.Ordinal))
-            .Select(e => e.Message)];
+        return [.. MatchingFacility(_capturedErrors, facilityId).Select(e => e.Message)];
     }
 
-    private sealed record CapturedKafkaError(string? Key, string Message);
+    private int CountForFacility(string? facilityId, Func<CapturedKafkaError, bool> predicate) =>
+        MatchingFacility(_capturedErrors, facilityId).Count(predicate);
 
-    private const int DefaultValuePreviewLength = 500;
-    private const int DefaultHeaderPreviewLength = 100;
-    private const int ResourceNormalizedValuePreviewLength = 4000;
-    private const int ResourceNormalizedHeaderPreviewLength = 2000;
+    private static IEnumerable<CapturedKafkaError> MatchingFacility(
+        IEnumerable<CapturedKafkaError> errors,
+        string? facilityId)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+            return errors;
+
+        return errors.Where(e => KafkaDeadLetterContract.MatchesFacility(e.Key, e.Headers, facilityId));
+    }
+
+    private sealed record CapturedKafkaError(
+        string? Key,
+        IReadOnlyDictionary<string, string> Headers,
+        bool IsDeadLetter,
+        bool IsRetry,
+        string Message);
 
     public KafkaErrorMonitor(IAutomationOutput output, AutomationConfig config, KafkaConnection kafkaConnection)
     {
@@ -178,34 +185,7 @@ public class KafkaErrorMonitor : IAsyncDisposable
                     var result = _consumer.Consume(cancellationToken);
                     if (result?.Message == null) continue;
 
-                    var topic = result.Topic;
-                    var key = result.Message.Key ?? "(null)";
-                    var value = result.Message.Value ?? "(null)";
-
-                    var isResourceNormalizedError =
-                        topic.Equals("ResourceNormalized-Error", StringComparison.OrdinalIgnoreCase);
-
-                    var headerPreviewLength = isResourceNormalizedError
-                        ? ResourceNormalizedHeaderPreviewLength
-                        : DefaultHeaderPreviewLength;
-
-                    var valuePreviewLength = isResourceNormalizedError
-                        ? ResourceNormalizedValuePreviewLength
-                        : DefaultValuePreviewLength;
-
-                    var headers = ExtractHeaders(result.Message.Headers, headerPreviewLength);
-                    var resourceSummary = isResourceNormalizedError
-                        ? TryBuildResourceNormalizedSummary(value)
-                        : null;
-
-                    var message = $"[DIAG][Kafka][{topic}] Key={key}{headers} Value={Truncate(value, valuePreviewLength)}";
-                    if (!string.IsNullOrWhiteSpace(resourceSummary))
-                        message += $" | Parsed={resourceSummary}";
-
-                    _output.WriteLine(message);
-                    _capturedErrors.Add(new CapturedKafkaError(
-                        Key: result.Message.Key,
-                        Message: message));
+                    ObserveMessage(result.Topic, result.Message.Key, result.Message.Headers, result.Message.Value ?? "(null)");
                 }
                 catch (ConsumeException ex)
                 {
@@ -252,63 +232,47 @@ public class KafkaErrorMonitor : IAsyncDisposable
         }
     }
 
-    private static string ExtractHeaders(Headers? headers, int maxLengthPerHeaderValue)
+    private void ObserveMessage(string topic, string? key, Headers? headers, string value)
     {
-        if (headers == null || headers.Count == 0) return "";
+        var headerMap = KafkaDeadLetterContract.ReadHeaders(headers);
+        var isResourcesNormalized = KafkaDeadLetterContract.IsResourcesNormalizedFailureTopic(topic);
+        var isDeadLetter = KafkaDeadLetterContract.IsErrorTopic(topic);
+        var isRetry = KafkaDeadLetterContract.IsRetryTopic(topic);
 
-        var parts = new List<string>();
-        foreach (var header in headers)
-        {
-            try
-            {
-                var value = header.GetValueBytes() != null
-                    ? Encoding.UTF8.GetString(header.GetValueBytes())
-                    : "(null)";
+        var headerPreview = FormatHeaders(headerMap, isResourcesNormalized);
+        var valuePreviewLength = KafkaDeadLetterContract.ValuePreviewLength(isResourcesNormalized);
+        var resourceSummary = isResourcesNormalized
+            ? KafkaDeadLetterContract.TrySummarizeResourcesNormalized(key, value)
+            : null;
 
-                var limit = ShouldUseExtendedHeaderLimit(header.Key)
-                    ? 12000
-                    : maxLengthPerHeaderValue;
+        var displayKey = key ?? "(null)";
+        var message = $"[DIAG][Kafka][{topic}] Key={displayKey}{headerPreview} Value={Truncate(value, valuePreviewLength)}";
+        if (!string.IsNullOrWhiteSpace(resourceSummary))
+            message += $" | Parsed={resourceSummary}";
 
-                parts.Add($"{header.Key}={Truncate(value, limit)}");
-            }
-            catch
-            {
-                // Skip malformed headers
-            }
-        }
+        _output.WriteLine(message);
 
-        return parts.Count > 0 ? $" Headers=[{string.Join(", ", parts)}]" : "";
+        var captured = new CapturedKafkaError(
+            Key: key,
+            Headers: headerMap,
+            IsDeadLetter: isDeadLetter,
+            IsRetry: isRetry,
+            Message: message);
+        _capturedErrors.Add(captured);
     }
 
-    private static bool ShouldUseExtendedHeaderLimit(string headerKey)
+    private static string FormatHeaders(IReadOnlyDictionary<string, string> headers, bool isResourcesNormalizedFailureTopic)
     {
-        return headerKey.Contains("exception-stacktrace", StringComparison.OrdinalIgnoreCase)
-               || headerKey.Contains("exception-message", StringComparison.OrdinalIgnoreCase)
-               || headerKey.Contains("exception-cause", StringComparison.OrdinalIgnoreCase);
-    }
+        if (headers.Count == 0)
+            return "";
 
-    private static string? TryBuildResourceNormalizedSummary(string rawValue)
-    {
-        try
+        var parts = headers.Select(header =>
         {
-            var json = JObject.Parse(rawValue);
-            var patientId = json["PatientId"]?.ToString() ?? json["patientId"]?.ToString();
-            var queryType = json["QueryType"]?.ToString() ?? json["queryType"]?.ToString();
-            var reportableEvent = json["ReportableEvent"]?.ToString() ?? json["reportableEvent"]?.ToString();
+            var limit = KafkaDeadLetterContract.HeaderPreviewLength(header.Key, isResourcesNormalizedFailureTopic);
+            return $"{header.Key}={Truncate(header.Value, limit)}";
+        });
 
-            var resourceToken = json["Resource"] ?? json["resource"];
-            var resourceType = resourceToken?["resourceType"]?.ToString();
-            var resourceId = resourceToken?["id"]?.ToString();
-
-            var scheduledReports = json["ScheduledReports"] ?? json["scheduledReports"];
-            var scheduledCount = scheduledReports is JArray reports ? reports.Count : 0;
-
-            return $"patientId={patientId ?? "(null)"}, queryType={queryType ?? "(null)"}, reportableEvent={reportableEvent ?? "(null)"}, resourceType={resourceType ?? "(null)"}, resourceId={resourceId ?? "(null)"}, scheduledReports={scheduledCount}";
-        }
-        catch
-        {
-            return null;
-        }
+        return $" Headers=[{string.Join(", ", parts)}]";
     }
 
     private static string Truncate(string value, int maxLength)

@@ -48,14 +48,15 @@ public sealed class ImportedPatientInput
     public string? BundleJson { get; set; }
 
     /// <summary>
-    /// When true, run the classifier on the patient's resources to seed <see cref="MeasureEligibilities"/>.
-    /// When false, <see cref="MeasureEligibilities"/> is taken as-is (manual override).
+    /// When true, run the classifier on the patient's resources to derive
+    /// <see cref="MeasureEligibilities"/>. Always true for new UI saves; kept for
+    /// older payloads.
     /// </summary>
     public bool AutoDetect { get; set; } = true;
 
     /// <summary>
-    /// Per-measure eligibility for this patient. Populated by the classifier when <see cref="AutoDetect"/>
-    /// is true and may be overridden by the user. Drives Q/NQ classification in the manifest.
+    /// Derived per-measure IP prediction from the imported resources. Display snapshot
+    /// only; the pipeline re-classifies from the bundle at run time.
     /// </summary>
     public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = [];
 

@@ -42,6 +42,7 @@ public class ApiEndPointLibraryTests
             ApiEndPointLibrary.NormalizationSteps.LocationPost201,
             ApiEndPointLibrary.NormalizationSteps.LocationPost400EmptyLocationId,
             ApiEndPointLibrary.NormalizationSteps.LocationPost409Duplicate,
+            ApiEndPointLibrary.NormalizationSteps.LocationsGet200,
             ApiEndPointLibrary.NormalizationSteps.LocationGet200,
             ApiEndPointLibrary.NormalizationSteps.LocationGet400EmptyLocationId,
             ApiEndPointLibrary.NormalizationSteps.LocationGet404,
@@ -61,7 +62,8 @@ public class ApiEndPointLibraryTests
             ApiEndPointLibrary.NormalizationSteps.MappingDelete204,
             ApiEndPointLibrary.NormalizationSteps.MappingDelete400EmptyId,
             ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility204,
-            ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility400EmptyFacility
+            ApiEndPointLibrary.NormalizationSteps.MappingDeleteFacility400EmptyFacility,
+            ApiEndPointLibrary.NormalizationSteps.HslocGet200
         ]);
     }
 }

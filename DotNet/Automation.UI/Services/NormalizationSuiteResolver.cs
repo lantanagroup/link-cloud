@@ -20,7 +20,10 @@ public sealed class NormalizationSuiteResolver
     /// Resolves the suite and expands it into the full set of operations to apply.
     /// Returns the resolved operations in sequence order.
     /// </summary>
-    public async Task<NormalizationSuiteResolution> ResolveAsync(Guid? suiteId, CancellationToken ct = default)
+    public async Task<NormalizationSuiteResolution> ResolveAsync(
+        Guid? suiteId,
+        CancellationToken ct = default,
+        bool honorExplicitSelection = false)
     {
         NormalizationSuiteDefinition? suite = null;
 
@@ -30,7 +33,7 @@ public sealed class NormalizationSuiteResolver
             if (suite == null)
                 throw new InvalidOperationException($"Normalization suite '{suiteId.Value}' was not found.");
         }
-        else
+        else if (!honorExplicitSelection)
         {
             suite = await _store.GetDefaultSuiteAsync(ct);
         }

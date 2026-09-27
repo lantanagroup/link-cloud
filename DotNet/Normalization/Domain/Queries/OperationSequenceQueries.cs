@@ -14,7 +14,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     {
         Task<OperationSequenceModel> Get(string resourceType, string? facilityId);
         Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default);
-        void ClearCache(OperationSequenceSearchModel model);
+        Task ClearCache(OperationSequenceSearchModel model, CancellationToken cancellationToken = default);
+        Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default);
+        Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
+        Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<string>> CanonicalResourceNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default);
+        Task<List<string>> ResourceTypeNamesForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+        Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default);
+        Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default);
+        Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default);
     }
 
     public class OperationSequenceQueries : IOperationSequenceQueries
@@ -51,7 +61,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).Single();
         }
 
-        private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId) BuildCacheKey(OperationSequenceSearchModel model) => (model.FacilityId, model.ResourceType, model.ResourceTypeId);
+        private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId, long Revision) BuildCacheKey(OperationSequenceSearchModel model, long revision) => (model.FacilityId, model.ResourceType, model.ResourceTypeId, revision);
 
 
         public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default)
@@ -61,7 +71,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                 return await QueryAsync(model, cancellationToken);
             }
 
-            var cacheKey = BuildCacheKey(model);
+            // The revision lives in the database, so a write committed on any replica changes the key
+            // this process computes. Unchanged facilities keep their entries.
+            var revision = await _dbContext.OperationSequenceCacheRevisions.AsNoTracking()
+                .Where(row => row.FacilityId == model.FacilityId)
+                .Select(row => row.Revision)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var cacheKey = BuildCacheKey(model, revision);
             if (_cache.TryGetValue(cacheKey, out List<OperationSequenceModel>? cacheResult) && cacheResult != null)
             {
                 return cacheResult;
@@ -73,8 +90,251 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             return result;
         }
 
-        public void ClearCache(OperationSequenceSearchModel model) {
-            _cache.Remove(BuildCacheKey(model));
+        public Task ClearCache(OperationSequenceSearchModel model, CancellationToken cancellationToken = default)
+        {
+            return InvalidateFacilityAsync(model.FacilityId, cancellationToken);
+        }
+
+        public async Task InvalidateFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(facilityId))
+            {
+                return;
+            }
+
+            const int maxAttempts = 3;
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var revision = await _dbContext.OperationSequenceCacheRevisions
+                    .FirstOrDefaultAsync(row => row.FacilityId == facilityId, cancellationToken);
+                if (revision == null)
+                {
+                    _dbContext.OperationSequenceCacheRevisions.Add(new OperationSequenceCacheRevision
+                    {
+                        FacilityId = facilityId,
+                        Revision = 1
+                    });
+                }
+                else
+                {
+                    revision.Revision++;
+                }
+
+                try
+                {
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    return;
+                }
+                catch (DbUpdateException) when (attempt < maxAttempts)
+                {
+                    foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceCacheRevision>().ToList())
+                    {
+                        if (entry.State == EntityState.Added)
+                        {
+                            entry.State = EntityState.Detached;
+                        }
+                        else
+                        {
+                            await entry.ReloadAsync(cancellationToken);
+                        }
+                    }
+                }
+            }
+        }
+
+        public async Task InvalidateFacilitiesAsync(IEnumerable<string> facilityIds, CancellationToken cancellationToken = default)
+        {
+            foreach (var facilityId in facilityIds.Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal))
+            {
+                await InvalidateFacilityAsync(facilityId, cancellationToken);
+            }
+        }
+
+        public async Task LockFacilitySequenceWritesAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            // Not a facility revision. Sequence create and delete lock this row before operation rows,
+            // so a delete-all waits out a concurrent create that uses a different operation id.
+            if (!_dbContext.Database.IsRelational() || string.IsNullOrEmpty(facilityId))
+            {
+                return;
+            }
+
+            if (await HoldSequenceWriteLockAsync(facilityId, cancellationToken))
+            {
+                return;
+            }
+
+            var transaction = _dbContext.Database.CurrentTransaction;
+            var savepoint = "s" + Guid.NewGuid().ToString("N")[..31];
+            if (transaction != null)
+            {
+                await transaction.CreateSavepointAsync(savepoint, cancellationToken);
+            }
+
+            try
+            {
+                _dbContext.OperationSequenceWriteLocks.Add(new OperationSequenceWriteLock
+                {
+                    FacilityId = facilityId
+                });
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // The other writer inserted the lock row. Roll back to the savepoint so this
+                // transaction can still commit, then wait on that row.
+                if (transaction != null)
+                {
+                    await transaction.RollbackToSavepointAsync(savepoint, cancellationToken);
+                }
+
+                foreach (var entry in _dbContext.ChangeTracker.Entries<OperationSequenceWriteLock>().ToList())
+                {
+                    if (entry.Entity.FacilityId == facilityId && entry.State == EntityState.Added)
+                    {
+                        entry.State = EntityState.Detached;
+                    }
+                }
+            }
+
+            if (!await HoldSequenceWriteLockAsync(facilityId, cancellationToken))
+            {
+                throw new InvalidOperationException("Could not acquire the operation sequence write lock.");
+            }
+        }
+
+        private async Task<bool> HoldSequenceWriteLockAsync(string facilityId, CancellationToken cancellationToken)
+        {
+            var entityType = _dbContext.Model.FindEntityType(typeof(OperationSequenceWriteLock));
+            var table = entityType?.GetTableName();
+            if (string.IsNullOrEmpty(table))
+            {
+                return false;
+            }
+
+            var schema = entityType!.GetSchema();
+            var target = string.IsNullOrEmpty(schema) ? table : schema + "." + table;
+            var updated = await _dbContext.Database.ExecuteSqlRawAsync(
+                $"UPDATE {target} SET FacilityId = FacilityId WHERE FacilityId = {{0}}",
+                new object[] { facilityId },
+                cancellationToken);
+            return updated > 0;
+        }
+
+        public async Task<List<string>> CanonicalResourceNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default)
+        {
+            var requested = names
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (requested.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            var persisted = await _dbContext.ResourceTypes.AsNoTracking()
+                .Select(resource => resource.Name)
+                .ToListAsync(cancellationToken);
+            var canonical = new List<string>();
+            foreach (var name in requested)
+            {
+                var stored = persisted.FirstOrDefault(existing => string.Equals(existing, name, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(stored))
+                {
+                    canonical.Add(stored);
+                    continue;
+                }
+
+                if (Enum.TryParse<Hl7.Fhir.Model.ResourceType>(name, ignoreCase: true, out var parsed))
+                {
+                    canonical.Add(parsed.ToString());
+                }
+                else
+                {
+                    canonical.Add(name);
+                }
+            }
+
+            return canonical.Distinct(StringComparer.Ordinal).OrderBy(name => name, StringComparer.Ordinal).ToList();
+        }
+
+        public async Task LockResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)
+        {
+            // Sequence creates take this row before they insert, and resource deletes take it before
+            // they look up facilities, so a delete cannot miss a facility a concurrent create adds.
+            if (!_dbContext.Database.IsRelational() || string.IsNullOrEmpty(resourceName))
+            {
+                return;
+            }
+
+            var entityType = _dbContext.Model.FindEntityType(typeof(ResourceType));
+            var table = entityType?.GetTableName();
+            if (string.IsNullOrEmpty(table))
+            {
+                return;
+            }
+
+            var schema = entityType!.GetSchema();
+            var target = string.IsNullOrEmpty(schema) ? table : schema + "." + table;
+            await _dbContext.Database.ExecuteSqlRawAsync(
+                $"UPDATE {target} SET Name = Name WHERE Name = {{0}}",
+                new object[] { resourceName },
+                cancellationToken);
+        }
+
+        public Task<List<string>> ResourceTypeNamesForFacilityAsync(string facilityId, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationResourceTypes.AsNoTracking()
+                .Where(map => map.Operation.FacilityId == facilityId)
+                .Select(map => map.ResourceType.Name)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<string>> FacilitiesUsingResourceTypeAsync(string resourceName, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationSequences.AsNoTracking()
+                .Where(sequence => sequence.OperationResourceType.ResourceType.Name == resourceName)
+                .Select(sequence => sequence.FacilityId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task LockOperationAsync(Guid operationId, CancellationToken cancellationToken = default)
+        {
+            // InMemory has no row locks. On SQL Server and SQLite this update keeps an exclusive lock
+            // on the operation until the caller's transaction commits, so a sequence write cannot land
+            // between the facility snapshot and the revision bump.
+            if (!_dbContext.Database.IsRelational())
+            {
+                return;
+            }
+
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Operation SET ModifyDate = ModifyDate WHERE Id = {operationId}",
+                cancellationToken);
+        }
+
+        public async Task<List<Guid>> OperationsInFacilitySequencesAsync(string facilityId, string? resourceType, CancellationToken cancellationToken = default)
+        {
+            var query = _dbContext.OperationSequences.AsNoTracking().Where(sequence => sequence.FacilityId == facilityId);
+            if (!string.IsNullOrEmpty(resourceType))
+            {
+                query = query.Where(sequence => sequence.OperationResourceType.ResourceType.Name == resourceType);
+            }
+
+            return await query.Select(sequence => sequence.OperationResourceType.OperationId).Distinct().OrderBy(id => id).ToListAsync(cancellationToken);
+        }
+
+        public Task<List<string>> FacilitiesReferencingOperationAsync(Guid operationId, CancellationToken cancellationToken = default)
+        {
+            return _dbContext.OperationSequences.AsNoTracking()
+                .Where(sequence => sequence.OperationResourceType.OperationId == operationId)
+                .Select(sequence => sequence.FacilityId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
         }
 
         private async Task<List<OperationSequenceModel>> QueryAsync(OperationSequenceSearchModel model, CancellationToken cancellationToken)
