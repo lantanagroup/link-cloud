@@ -3,8 +3,9 @@
 namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
-/// Central catalog for measure metadata used by automation (bundle location,
-/// display name, and embedded CQL used by instance-level ABS prediction).
+/// Display names, bundle resource URIs, and embedded measure-definition JSON.
+/// ACH Daily/Monthly are Validation NHSN 2.0.0-cibuild; Hypoglycemic is the current
+/// NHSN hypoglycemic package (no 2.0 file in-repo).
 /// </summary>
 public static class ProfiledMeasureCatalog
 {

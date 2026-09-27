@@ -30,7 +30,8 @@ public static class AbsSubmissionPredictor
         DateTime? measurementPeriodStart,
         DateTime? measurementPeriodEnd,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
-        IAutomationOutput? output)
+        IAutomationOutput? output,
+        IReadOnlyList<string>? measureBundleJsons = null)
     {
         HashSet<string>? cqlFilteredKeys = null;
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries, sharedSimEntries);
@@ -90,12 +91,13 @@ public static class AbsSubmissionPredictor
                 cqlInput = RestrictEncountersToAcquired(cqlInput, acquiredKeys);
             }
 
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (cqlInput != null && qualifyingMeasures.Count > 0)
-            {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+            cqlFilteredKeys = ComputeCqlFilteredKeys(
+                cqlInput,
+                measures,
+                effectiveProfile,
+                measureBundleJsons);
+            if (cqlFilteredKeys != null)
                 manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
 
             acquiredKeys = OrgResourceMapPredictionFilter.Apply(
                 acquiredKeys,
@@ -107,12 +109,13 @@ public static class AbsSubmissionPredictor
         }
         else
         {
-            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
-            if (cqlInput != null && qualifyingMeasures.Count > 0)
-            {
-                cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+            cqlFilteredKeys = ComputeCqlFilteredKeys(
+                cqlInput,
+                measures,
+                effectiveProfile,
+                measureBundleJsons);
+            if (cqlFilteredKeys != null)
                 manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
         }
 
         return effectiveProfile;
@@ -244,6 +247,46 @@ public static class AbsSubmissionPredictor
         }
 
         return profile with { MeasureEligibilities = adjusted };
+    }
+
+    private static HashSet<string>? ComputeCqlFilteredKeys(
+        CqlFilterSimulator.PatientCqlInput? cqlInput,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        PatientProfile effectiveProfile,
+        IReadOnlyList<string>? measureBundleJsons)
+    {
+        var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+        if (cqlInput == null || qualifyingMeasures.Count == 0)
+            return null;
+
+        var bundles = ResolveMeasureBundles(measureBundleJsons, measures, qualifyingMeasures);
+        return CqlFilterSimulator.ComputeFilteredKeys(bundles, cqlInput);
+    }
+
+    private static IReadOnlyList<string> ResolveMeasureBundles(
+        IReadOnlyList<string>? measureBundleJsons,
+        IReadOnlyList<ProfiledMeasureType> allMeasures,
+        IReadOnlyList<ProfiledMeasureType> qualifyingMeasures)
+    {
+        if (measureBundleJsons != null
+            && allMeasures.Count > 0
+            && measureBundleJsons.Count == allMeasures.Count)
+        {
+            return allMeasures
+                .Select((measure, index) => (measure, json: measureBundleJsons[index]))
+                .Where(pair => qualifyingMeasures.Contains(pair.measure) && !string.IsNullOrWhiteSpace(pair.json))
+                .Select(pair => pair.json)
+                .ToList();
+        }
+
+        if (measureBundleJsons != null
+            && measureBundleJsons.Count > 0
+            && measureBundleJsons.Count == qualifyingMeasures.Count)
+        {
+            return measureBundleJsons.Where(json => !string.IsNullOrWhiteSpace(json)).ToList();
+        }
+
+        return qualifyingMeasures.Select(measure => ProfiledMeasureCatalog.ReadBundleJson(measure)).ToList();
     }
 
     private static CqlFilterSimulator.PatientCqlInput RestrictEncountersToAcquired(

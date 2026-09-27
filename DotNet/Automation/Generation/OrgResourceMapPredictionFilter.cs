@@ -272,17 +272,8 @@ public static class OrgResourceMapPredictionFilter
             if (location is null)
                 return false;
 
-            var element = location.ToTypedElement();
             var compiled = new FhirPathCompiler().Compile(path);
-            var results = compiled(element, new EvaluationContext()).ToList();
-
-            if (results.Count == 0)
-                return false;
-
-            if (results.Count == 1 && results[0].Value is bool isMatch)
-                return isMatch;
-
-            return true;
+            return compiled.IsTrue(location.ToPocoNode(), new EvaluationContext());
         }
         catch
         {

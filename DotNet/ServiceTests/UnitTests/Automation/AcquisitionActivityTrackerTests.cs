@@ -108,4 +108,10 @@ public class AcquisitionActivityTrackerTests
 
         extended.Should().BeFalse();
     }
+
+    [Fact]
+    public void Max_extra_duration_is_six_hours_so_validation_can_outlive_the_hard_timeout()
+    {
+        AcquisitionActivityTracker.MaxExtraDuration.Should().Be(TimeSpan.FromHours(6));
+    }
 }

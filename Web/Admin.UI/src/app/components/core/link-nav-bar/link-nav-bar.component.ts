@@ -38,6 +38,7 @@ export class LinkNavBarComponent {
     {
       label: 'Configuration',
       children: [
+        { label: 'HSLOC', path: '/hsloc' },
         { label: 'Implementation Guides', path: '/validation-config' },
         { label: 'Measure Definitions', path: '/measure-def' },
         // DMRP screens only exist while the module is enabled (DmrpGuard covers direct URLs).

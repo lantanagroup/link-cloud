@@ -1,5 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Application;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
@@ -123,6 +124,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
+            using var metricsMode = MetricsModeScope.Begin(KafkaHeaderHelper.IsPerformanceMode(result.Message?.Headers));
             string facilityId = result.Message.Key;
 
             try
@@ -142,6 +144,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 {
                     throw new DeadLetterException("Invalid Patient Event");
                 }
+
+                if (await PipelineAbortSkip.ShouldSkipAsync(
+                        scope.ServiceProvider, _logger, Name, facilityId, reportId: null, cancellationToken))
+                    return;
 
                 if (value.EventType != PatientEvents.Admit.ToString() && value.EventType != PatientEvents.Discharge.ToString())
                 {
@@ -163,6 +169,10 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 foreach (var scheduledReport in scheduledReports)
                 {
+                    if (await PipelineAbortSkip.ShouldSkipAsync(
+                            scope.ServiceProvider, _logger, Name, facilityId, scheduledReport.Id.ToString(), cancellationToken))
+                        continue;
+
                     var entry = await reportEntryManager.SingleOrDefaultAsync(e => e.ReportScheduleId == scheduledReport.Id && e.PatientId == value.PatientId, cancellationToken);
 
                     if (entry == null)

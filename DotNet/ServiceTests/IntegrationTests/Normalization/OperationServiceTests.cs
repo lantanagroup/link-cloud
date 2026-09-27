@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.Json;
@@ -281,7 +282,7 @@ namespace IntegrationTests.Normalization
 
             Assert.NotNull(modifiedResource.Code);
             Assert.NotNull(modifiedResource.Code.Text);
-            Assert.Equal(resource.Value.First().Value.ToString(), modifiedResource.Code.Text);
+            Assert.Equal(GetPrimitiveValue(resource.Value)?.ToString(), modifiedResource.Code.Text);
         }
 
         [Fact]
@@ -2493,7 +2494,7 @@ namespace IntegrationTests.Normalization
             {
                 Assert.All(location.Alias, alias =>
                     Assert.Contains(modifiedLocation.Type.SelectMany(concept => concept.Coding), coding =>
-                        coding.System == HSLOCMapOperationService.LocationAliasCodeSystem && coding.Code == alias));
+                        coding.System == MappingTargetSystems.LocationAliasCodeSystem && coding.Code == alias));
             }
         }
 
@@ -2668,5 +2669,12 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(taskResult.ErrorMessage);
             Assert.Contains("absolute", taskResult.ErrorMessage, StringComparison.OrdinalIgnoreCase);
         }
+
+        private static object? GetPrimitiveValue(DataType? value) => value switch
+        {
+            Quantity quantity => quantity.Value,
+            PrimitiveType primitive => primitive.ObjectValue,
+            _ => value
+        };
     }
 }

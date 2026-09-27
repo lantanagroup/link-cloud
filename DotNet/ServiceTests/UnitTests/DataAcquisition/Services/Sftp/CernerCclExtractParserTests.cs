@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -221,6 +222,95 @@ public class CernerCclExtractParserTests
             {
             }
         });
+    }
+
+    #endregion
+
+    #region Preview
+
+    [Fact]
+    public async Task Preview_ValidRows_ReturnsPatientIdNameAndAdmissionDate()
+    {
+        var content = """
+            person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
+            12345.00|67890.00|FacA|UnitB|101|A|FIN001|MRN001|Doe, John|Active|Inpatient|20230707130643|20230710080000
+            11111.00|22222.00|FacA|UnitC|102|B|FIN002|MRN002|Smith, Jane|Discharged|Emergency|20230801093015|20230801170000
+            """;
+
+        var patients = await PreviewContentAsync(content);
+
+        Assert.Equal(2, patients.Count);
+        Assert.Equal("12345", patients[0].PatientId);
+        Assert.Equal("Doe, John", patients[0].PatientName);
+        Assert.Equal(new DateTime(2023, 7, 7, 13, 6, 43, DateTimeKind.Utc), patients[0].AdmissionDate);
+        Assert.Equal("11111", patients[1].PatientId);
+        Assert.Equal("Smith, Jane", patients[1].PatientName);
+    }
+
+    [Fact]
+    public async Task Preview_PatientOnSeveralEncounterRows_ReturnedOnceFromFirstRow()
+    {
+        var content = """
+            12345.00|67890.00|FacA|UnitB|101|A|FIN001|MRN001|Doe, John|Active|Inpatient|20230707130643|
+            12345.00|67891.00|FacA|UnitB|101|A|FIN003|MRN001|Doe, John|Active|Inpatient|20230708130643|
+            """;
+
+        var patients = await PreviewContentAsync(content);
+
+        var patient = Assert.Single(patients);
+        Assert.Equal(new DateTime(2023, 7, 7, 13, 6, 43, DateTimeKind.Utc), patient.AdmissionDate);
+    }
+
+    [Fact]
+    public async Task Preview_RowsParseAsyncWouldSkip_AreSkipped()
+    {
+        var content = """
+            person_id|encntr_id|facility|unit|room|bed|fin|mrn|pat_nam|enc_status|enc_type|admit_dt|disch_dt
+            12345.00|67890.00|only|three|fields
+            |67890.00|Fac|Unit|101|A|FIN|MRN|No Patient Id|Active|IP|20230101120000|
+            33333.00||Fac|Unit|101|A|FIN|MRN|No Encounter Id|Active|IP|20230101120000|
+
+            11111.00|22222.00|Fac|Unit|102|B|FIN2|MRN2|Kept, Patient|Active|IP|20230201120000|
+            """;
+
+        var patients = await PreviewContentAsync(content);
+
+        var patient = Assert.Single(patients);
+        Assert.Equal("11111", patient.PatientId);
+        Assert.Equal("Kept, Patient", patient.PatientName);
+    }
+
+    [Fact]
+    public async Task Preview_EmptyAdmitDate_AdmissionDateIsNull()
+    {
+        var patients = await PreviewContentAsync("12345|67890|Fac|Unit|101|A|FIN|MRN|Doe, John|Active|IP||");
+
+        Assert.Null(Assert.Single(patients).AdmissionDate);
+    }
+
+    [Fact]
+    public async Task Preview_CancellationRequested_ThrowsOperationCanceled()
+    {
+        var content = "12345|67890|Fac|Unit|101|A|FIN|MRN|Doe, John|Active|IP|20230101120000|";
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (var _ in _parser.Preview(CreateStream(content), null, cts.Token))
+            {
+            }
+        });
+    }
+
+    private async Task<List<SftpTestFilePatientModel>> PreviewContentAsync(string content)
+    {
+        var results = new List<SftpTestFilePatientModel>();
+        await foreach (var patient in _parser.Preview(CreateStream(content), null, CancellationToken.None))
+        {
+            results.Add(patient);
+        }
+        return results;
     }
 
     #endregion

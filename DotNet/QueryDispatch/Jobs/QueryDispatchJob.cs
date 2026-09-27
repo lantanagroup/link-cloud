@@ -5,9 +5,11 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Quartz;
+using QueryDispatch.Application.Interfaces;
 using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Settings;
 using QueryDispatch.Domain.Managers;
+using System.Diagnostics;
 using System.Text;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
@@ -19,17 +21,20 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
         private readonly IProducer<string, DataAcquisitionRequestedValue> _acquisitionProducer;
         private readonly IProducer<string, AuditEventMessage> _auditProducer;
         private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly IQueryDispatchServiceMetrics _metrics;
 
         public QueryDispatchJob(
             ILogger<QueryDispatchJob> logger,
             IServiceScopeFactory serviceScopeFactory,
             IProducer<string, DataAcquisitionRequestedValue> acquisitionProducer,
-            IProducer<string, AuditEventMessage> auditProducer)
+            IProducer<string, AuditEventMessage> auditProducer,
+            IQueryDispatchServiceMetrics metrics)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
             _acquisitionProducer = acquisitionProducer;
             _auditProducer = auditProducer;
+            _metrics = metrics;
         }
 
         public async Task Execute(IJobExecutionContext context)
@@ -43,6 +48,8 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             };
 
 
+            var stopwatch = Stopwatch.StartNew();
+            var outcome = "success";
             try
             {
                 using var scope = _serviceScopeFactory.CreateScope();
@@ -89,7 +96,17 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
             }
             catch (Exception ex)
             {
+                outcome = "failure";
                 _logger.LogError(ex, "Failed to generate a Data Acquisition Requested event");
+            }
+            finally
+            {
+                stopwatch.Stop();
+                if (patientDispatchEntity != null)
+                {
+                    _metrics.RecordDispatchDuration(patientDispatchEntity.FacilityId, stopwatch.Elapsed.TotalMilliseconds);
+                    _metrics.IncrementPatientsDispatched(patientDispatchEntity.FacilityId, outcome);
+                }
             }
 
 

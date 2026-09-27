@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace UnitTests.Report;
 

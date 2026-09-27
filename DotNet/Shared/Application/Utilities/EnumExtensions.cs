@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Utility;
-using Microsoft.AspNetCore.Razor.TagHelpers;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Shared.Application.Utilities
 {
@@ -7,26 +6,18 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
     {
         public static string GetStringValue(this Enum value)
         {
-            string retVal;
-
             try
             {
-                var x = value.GetAttributeOnEnum<StringValueAttribute>();
-                if (x != null)
-                {
-                    retVal = value.GetAttributeOnEnum<StringValueAttribute>().StringValue;
-                }
-                else
-                {
-                    retVal = value?.ToString() ?? string.Empty;
-                }
+                var attr = value.GetType()
+                    .GetField(value.ToString())
+                    ?.GetCustomAttribute<StringValueAttribute>();
+
+                return attr?.StringValue ?? value.ToString() ?? string.Empty;
             }
             catch
             {
-                retVal = value?.ToString() ?? string.Empty;
+                return value?.ToString() ?? string.Empty;
             }
-
-            return retVal;
         }
     }
 }

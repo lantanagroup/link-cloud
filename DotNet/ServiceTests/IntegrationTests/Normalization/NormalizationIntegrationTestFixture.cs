@@ -122,6 +122,11 @@ namespace IntegrationTests.Normalization
             builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, LantanaGroup.Link.Normalization.Domain.Database>();
             builder.Services.AddScoped<IOperationManager, OperationManager>();
             builder.Services.AddScoped<IResourceManager, LantanaGroup.Link.Normalization.Domain.Managers.ResourceManager>();
+            builder.Services.AddScoped<IFacilityLocationManager, FacilityLocationManager>();
+            builder.Services.AddScoped<IFacilityLocationLocalCodeMappingManager, FacilityLocationLocalCodeMappingManager>();
+            builder.Services.AddScoped<IFacilityLocationLocalCodeMappingQueries, FacilityLocationLocalCodeMappingQueries>();
+            builder.Services.AddScoped<IHSLOCQueries, HSLOCQueries>();
+            builder.Services.AddSingleton<IHSLOCLookupCache, HSLOCLookupCache>();
             builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
             builder.Services.AddScoped<IOperationQueries, OperationQueries>();
             builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();

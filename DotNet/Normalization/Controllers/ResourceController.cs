@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Filters;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,7 +26,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Get(string resource)
+        public async Task<ActionResult<ResourceModel>> Get(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -34,7 +35,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var foundResource = await _resourceQueries.Get(resource);
+                var foundResource = await _resourceQueries.Get(resource, cancellationToken);
 
                 if (foundResource == null)
                 {
@@ -42,6 +43,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
 
                 return Ok(foundResource);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -53,13 +58,17 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ResourceModel>>> Get()
+        public async Task<ActionResult<List<ResourceModel>>> Get(CancellationToken cancellationToken = default)
         {
             try
             {
-                var foundResources = await _resourceQueries.GetAll();
+                var foundResources = await _resourceQueries.GetAll(cancellationToken);
 
                 return Ok(foundResources);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -70,13 +79,18 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [HttpPost("initialize")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ResourceModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ResourceModel>>> Initialize()
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<ActionResult<List<ResourceModel>>> Initialize(CancellationToken cancellationToken = default)
         {
             try
             {
-                var resourceModels = await _resourceManager.InitializeResources();
+                var resourceModels = await _resourceManager.InitializeResources(cancellationToken);
 
                 return Ok(resourceModels);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -89,7 +103,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> Post(string resource)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<ActionResult<ResourceModel>> Post(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -98,7 +113,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var createdResource = await _resourceManager.CreateResource(resource);
+                var createdResource = await _resourceManager.CreateResource(resource, cancellationToken: cancellationToken);
 
                 if (createdResource == null)
                 {
@@ -106,6 +121,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
 
                 return Created("", createdResource);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -117,7 +136,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(ResourceModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<ActionResult<ResourceModel>> PostWithBypass(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -126,7 +146,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                var foundResource = await _resourceManager.CreateResource(resource, true);
+                var foundResource = await _resourceManager.CreateResource(resource, true, cancellationToken);
 
                 if (foundResource == null)
                 {
@@ -134,6 +154,10 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 }
 
                 return Created("", foundResource);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -145,7 +169,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Delete(string resource)
+        [ValidateAntiForgeryOrBearerToken]
+        public async Task<IActionResult> Delete(string resource, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -154,9 +179,13 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Required parameter 'resource' cannot be null, empty, or whitespace.");
                 }
 
-                await _resourceManager.DeleteResource(resource);
+                await _resourceManager.DeleteResource(resource, cancellationToken);
 
                 return Accepted();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -25,7 +25,9 @@ namespace LantanaGroup.Link.MockDmrpApi.Application.Middleware;
 /// </para>
 /// <para>
 /// Both the request pipeline and startup consult this, so a disabled deployment cannot end
-/// up serving traffic but skipping migrations, or the reverse.
+/// up serving traffic. It does not gate migration on its own: startup migrates whenever the
+/// mock is enabled, and also when it is disabled but a database connection string is
+/// configured, so the schema is ready before the mock is switched on.
 /// </para>
 /// </remarks>
 public static class DmrpAvailability

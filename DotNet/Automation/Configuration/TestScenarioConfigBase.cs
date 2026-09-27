@@ -18,8 +18,8 @@ public class TestScenarioConfigBase
     public int MaxPollingDurationMinutes { get; set; } = 3;
 
     /// <summary>
-    /// Path/location of the measure bundle to load. Implementations may support
-    /// "file://", "resource://", "http://" prefixes.
+    /// Optional file:// or http(s):// location of a measure bundle. Runs that already
+    /// have <c>MeasureBundleJsons</c> do not use this.
     /// </summary>
     public string MeasureBundleLocation { get; set; } = "";
 

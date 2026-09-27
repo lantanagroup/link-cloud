@@ -5,8 +5,11 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Quartz;
 using System.Diagnostics;
@@ -23,18 +26,21 @@ public class AcquisitionProcessingJob : IJob
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
     private readonly AcquisitionWorkerProcessorSettings _settings;
+    private readonly ICacheService? _cache;
     private const int BatchSize = 100;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<long, ReadyToAcquire> readyToAcquireProducer,
-        IOptions<AcquisitionWorkerProcessorSettings> settings)
+        IOptions<AcquisitionWorkerProcessorSettings> settings,
+        ICacheService? cache = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
         _settings = settings?.Value ?? new AcquisitionWorkerProcessorSettings();
+        _cache = cache;
     }
 
     public async Task Execute(IJobExecutionContext context)
@@ -144,6 +150,14 @@ public class AcquisitionProcessingJob : IJob
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
+            var abortRegistry = scope.ServiceProvider.GetService<IPipelineAbortRegistry>();
+            if (abortRegistry != null &&
+                await abortRegistry.IsAbortedAsync(facilityId, reportId: null, cancellationToken))
+            {
+                _logger.LogInformation("Skipping pending logs for aborted facility {FacilityId}.", facilityId.SanitizeForLog());
+                return;
+            }
+
             var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
             var fhirQueryConfigurationQueries = scope.ServiceProvider.GetRequiredService<IFhirQueryConfigurationQueries>();
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
@@ -237,6 +251,32 @@ public class AcquisitionProcessingJob : IJob
                     .Select(r => r.Id)
                     .ToList();
 
+                var abortedRequestIds = new HashSet<long>();
+                if (abortRegistry != null)
+                {
+                    foreach (var request in requests)
+                    {
+                        if (await abortRegistry.IsAbortedAsync(facilityId, request.ReportTrackingId, cancellationToken))
+                            abortedRequestIds.Add(request.Id);
+                    }
+                }
+
+                if (abortedRequestIds.Count > 0)
+                {
+                    var cancellableAbortedIds = abortedRequestIds.Except(maxRetriesReachedIds).ToList();
+                    if (cancellableAbortedIds.Count > 0)
+                    {
+                        await dataAcquisitionLogManager.UpdateStatusBatchAsync(
+                            cancellableAbortedIds, RequestStatus.Cancelled, false, cancellationToken);
+                    }
+
+                    _logger.LogInformation(
+                        "Cancelled {Count} aborted acquisition logs for facility {FacilityId}.",
+                        cancellableAbortedIds.Count, facilityId.SanitizeForLog());
+                    pendingLogIds = pendingLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
+                    retryableFailedLogIds = retryableFailedLogIds.Where(id => !abortedRequestIds.Contains(id)).ToList();
+                }
+
                 if (maxRetriesReachedIds.Any())
                 {
                     await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, false, cancellationToken);
@@ -256,6 +296,14 @@ public class AcquisitionProcessingJob : IJob
                 {
                     if (maxRetriesReachedIds.Contains(request.Id)) continue;
 
+                    if (abortedRequestIds.Contains(request.Id))
+                    {
+                        _logger.LogDebug(
+                            "Skipping ReadyToAcquire for aborted report {ReportTrackingId}, log {LogId}.",
+                            request.ReportTrackingId.SanitizeForLog(), request.Id.SanitizeForLog());
+                        continue;
+                    }
+
                     try
                     {
                         _logger.LogDebug("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id, facilityId.Sanitize());
@@ -264,6 +312,10 @@ public class AcquisitionProcessingJob : IJob
                         {
                             { "X-Correlation-Id", Encoding.UTF8.GetBytes(request.CorrelationId?.ToString() ?? string.Empty) }
                         };
+                        KafkaHeaderHelper.ApplyIfPerformance(
+                            headers,
+                            await ReportMetricsModeCache.TryGetAsync(
+                                _cache, facilityId, request.ReportTrackingId, cancellationToken));
 
                         await _readyToAcquireProducer.ProduceAsync(
                             KafkaTopic.ReadyToAcquire.ToString(),

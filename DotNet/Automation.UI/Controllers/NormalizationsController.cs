@@ -1,5 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Automation.Link.Validation;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
@@ -40,6 +42,13 @@ public class NormalizationsController(INormalizationStore store) : Controller
             return BadRequest("Operation type is required.");
         if (model.ResourceTypes.Count == 0)
             return BadRequest("At least one resource type is required.");
+
+        var hslocError = GetHslocMapSaveError(model);
+        if (hslocError != null)
+            return BadRequest(hslocError);
+
+        if (string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            model.CodeMapFhirPath = HslocMappingDefaults.FhirPath;
 
         var existing = await store.GetOperationByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
@@ -108,6 +117,32 @@ public class NormalizationsController(INormalizationStore store) : Controller
 
         await store.UpsertOperationAsync(clone, ct);
         return Json(new { id = clone.Id });
+    }
+
+    internal static string? GetHslocMapSaveError(NormalizationOperationDefinition model)
+    {
+        if (!string.Equals(model.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (model.ResourceTypes is not { Count: 1 }
+            || !string.Equals(model.ResourceTypes[0], "Location", StringComparison.Ordinal))
+            return "HSLOCMap operations must target only the Location resource type.";
+
+        if (!string.IsNullOrWhiteSpace(model.CodeMapFhirPath)
+            && !string.Equals(model.CodeMapFhirPath.Trim(), HslocMappingDefaults.FhirPath, StringComparison.Ordinal))
+            return $"HSLOCMap FhirPath must be {HslocMappingDefaults.FhirPath}.";
+
+        if (model.CodeSystemMaps.Count == 0)
+            return "HSLOCMap requires at least one Code System Map.";
+
+        for (var i = 0; i < model.CodeSystemMaps.Count; i++)
+        {
+            var target = model.CodeSystemMaps[i].TargetSystem?.Trim() ?? string.Empty;
+            if (!string.Equals(target, MappingTargetSystems.HslocUrl, StringComparison.Ordinal))
+                return $"Code System Map #{i + 1} target system must be {MappingTargetSystems.HslocUrl}.";
+        }
+
+        return null;
     }
 
     // ===== Sequences =====

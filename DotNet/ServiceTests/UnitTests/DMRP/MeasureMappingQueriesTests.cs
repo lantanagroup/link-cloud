@@ -98,24 +98,28 @@ namespace UnitTests.DMRP
                 DQM = "Preventive Care",
                 Frequency = Frequency.Monthly
             };
+            // A measure holds at most one mapping, so the decoys cannot repeat the measure outright.
+            // They do not need to: the measure filter matches on substring, so a measure that merely
+            // starts with the one being searched for still passes it, leaving the dQM and frequency
+            // filters to do the discriminating.
             context.MeasureMappings.AddRange(
                 matchingMapping,
                 new MeasureMapping
                 {
-                    Measure = "CMS130v13",
+                    Measure = "CMS130v13-Alternate",
                     DQM = "Diabetes Care",
+                    Frequency = Frequency.Monthly
+                },
+                new MeasureMapping
+                {
+                    Measure = "CMS130v13-Supplemental",
+                    DQM = "Preventive Care",
                     Frequency = Frequency.Daily
                 },
                 new MeasureMapping
                 {
                     Measure = "CMS122v12",
                     DQM = "Preventive Care",
-                    Frequency = Frequency.Monthly
-                },
-                new MeasureMapping
-                {
-                    Measure = "CMS130v13",
-                    DQM = "Immunization Status",
                     Frequency = Frequency.Monthly
                 });
             await context.SaveChangesAsync();

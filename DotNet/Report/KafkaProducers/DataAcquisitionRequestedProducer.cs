@@ -3,6 +3,7 @@ using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
@@ -23,7 +24,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _dataAcqProducer = dataAcqProducer;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null, CancellationToken cancellationToken = default)
+        public async Task<bool> Produce(ReportScheduleModel schedule, List<string>? patientsToEvaluate = null, CancellationToken cancellationToken = default, string? metricsMode = null)
         {
             var _database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
 
@@ -111,6 +112,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                 };
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(traceparentValue));
+                if (!string.IsNullOrWhiteSpace(metricsMode))
+                {
+                    KafkaHeaderHelper.SetMetricsMode(headers, metricsMode);
+                }
 
                 var capturedPatientId = patientId;
                 _dataAcqProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested),

@@ -83,6 +83,50 @@ public class GenerationManifestAppendTests
     }
 
     [Fact]
+    public void IncrementalBuilder_records_template_cache_key_on_snapshot()
+    {
+        var builder = new GenerationManifest.IncrementalBuilder();
+        builder.AddPatient("Patient-1", Qualifying("Patient-1"));
+        builder.SetTemplateCacheKey("Patient-1", "template-key-abc");
+
+        var snapshot = builder.Build([Ach]).ToSnapshot();
+
+        snapshot.TemplateCacheKeyByPatient.Should().ContainKey("Patient-1");
+        snapshot.TemplateCacheKeyByPatient["Patient-1"].Should().Be("template-key-abc");
+    }
+
+    [Fact]
+    public void AppendFrom_copies_template_cache_keys()
+    {
+        var original = new GenerationManifest
+        {
+            PatientIds = ["cohort-1"],
+            Profiles = [Qualifying("cohort-1")],
+            SelectedMeasures = [Ach],
+            TemplateCacheKeyByPatient = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["cohort-1"] = "key-original"
+            }
+        };
+
+        var slice = new GenerationManifest
+        {
+            PatientIds = ["live-1"],
+            Profiles = [Qualifying("live-1")],
+            SelectedMeasures = [Ach],
+            TemplateCacheKeyByPatient = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["live-1"] = "key-live"
+            }
+        };
+
+        original.AppendFrom(slice).Should().Be(1);
+        original.TemplateCacheKeyByPatient["cohort-1"].Should().Be("key-original");
+        original.TemplateCacheKeyByPatient["live-1"].Should().Be("key-live");
+        original.ToSnapshot().TemplateCacheKeyByPatient["live-1"].Should().Be("key-live");
+    }
+
+    [Fact]
     public void TryAppendPatient_non_qualifying_import_is_tracked_but_not_submitted()
     {
         var manifest = new GenerationManifest

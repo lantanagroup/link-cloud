@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return (passed, false, null);
             }
 
-            var scopedNode = resource.ToTypedElement();
+            var scopedNode = resource.ToPocoNode();
             var sourceValueResult = OperationServiceHelper.ExtractValueFromFhirPath(scopedNode, condition.FhirPathSource, Logger);
             object propertyValue = sourceValueResult.Success
                 ? sourceValueResult.Value
@@ -244,7 +244,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (!result.IsValid)
                 return OperationResult.Failure($"Invalid target FHIRPath expression: {targetFhirPath}. {result.ErrorMessage}", resource);
 
-            var scopedNode = resource.ToTypedElement();
+            var scopedNode = resource.ToPocoNode();
             var setResult = OperationServiceHelper.SetValueViaFhirPath(resource, targetFhirPath, targetValue, scopedNode, Logger);
             if (setResult.Result)
                 return OperationResult.Success(resource);

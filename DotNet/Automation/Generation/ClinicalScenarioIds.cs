@@ -6,6 +6,11 @@
 /// eligibility/qualification logic must reference these constants rather than
 /// duplicating GUID literals.
 /// </summary>
+/// <remarks>
+/// Follow-up: expand the story catalog (more dx patterns) and add ACH-IP
+/// non-qualifying stories (ambulatory, ED-only, observation) so a non-qualifying
+/// ACH cohort has selectable scenarios. See <see cref="ClinicalScenarioEligibility"/>.
+/// </remarks>
 public static class ClinicalScenarioIds
 {
     public static readonly Guid Pneumonia                = new("f640c3ef-a8f4-4f85-87f1-1f1df74c8a01");

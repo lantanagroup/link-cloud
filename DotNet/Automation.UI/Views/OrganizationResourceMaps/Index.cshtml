@@ -26,21 +26,24 @@
             <span>All Templates</span>
             <button type="button" class="btn btn-sm btn-success" id="btnNewMap">New</button>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-au-table>
             <table class="table au-table mb-0">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Conditions</th>
-                        <th>Kind</th>
-                        <th>Updated</th>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="conditions" data-sort-type="number">Conditions</th>
+                        <th data-sort="type">Kind</th>
+                        <th data-sort="updated" data-sort-type="number" data-sort-default="desc">Updated</th>
                         <th style="width:250px"></th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var t in Model)
                 {
-                    <tr>
+                    <tr data-name="@t.Name"
+                        data-conditions="@t.Conditions.Count"
+                        data-type="@(t.IsSystem ? "System" : "Custom")"
+                        data-updated="@t.UpdatedAt.ToUnixTimeMilliseconds()">
                         <td>
                             <strong>@t.Name</strong>
                             @if (t.IsDefault)
@@ -53,7 +56,16 @@
                             }
                         </td>
                         <td><small class="text-muted">@t.Conditions.Count condition(s)</small></td>
-                        <td>@(t.IsSystem ? "System" : "Custom")</td>
+                        <td>
+                            @if (t.IsSystem)
+                            {
+                                <span class="badge bg-dark">System</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-dark border">Custom</span>
+                            }
+                        </td>
                         <td class="small text-muted">@t.UpdatedAt.LocalDateTime.ToString("g")</td>
                         <td class="text-nowrap">
                             <button class="btn btn-sm btn-outline-primary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
@@ -75,7 +87,7 @@
     </div>
 </div>
 
-<div id="mapModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="mapModal" class="au-modal-overlay" style="display:none;">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:900px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;" class="d-flex justify-content-between align-items-center">

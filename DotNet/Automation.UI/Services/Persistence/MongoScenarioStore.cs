@@ -397,14 +397,19 @@ public sealed class MongoScenarioStore : IScenarioStore
             Name = model.Name,
             Description = model.Description,
             IsSystemScenario = model.IsSystemScenario,
+            FacilityConfigurationMode = model.FacilityConfigurationMode.ToString(),
+            FacilityTemplateId = model.FacilityTemplateId,
+            VendorName = model.VendorName,
             ReportMethod = model.ReportMethod.ToString(),
             SelectedMeasures = model.SelectedMeasures.Select(m => m.ToString()).ToList(),
+            SelectedMeasureIds = model.SelectedMeasureIds.Select(id => id.ToString()).ToList(),
             Seed = model.Seed,
             PatientCount = model.PatientCount,
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
             NhsnOrganizationId = model.NhsnOrganizationId,
+            EnableDmrp = model.EnableDmrp,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
             NormalizationSuiteId = model.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = model.OrganizationResourceMapTemplateId,
@@ -414,23 +419,39 @@ public sealed class MongoScenarioStore : IScenarioStore
             ReportPeriodEnd = model.ReportPeriodEnd?.UtcDateTime,
             IsLiveSimulation = model.IsLiveSimulation,
             ReportingWindowMinutes = model.ReportingWindowMinutes,
+            IsMetricsRun = model.IsMetricsRun,
+            BenchmarkKey = model.BenchmarkKey,
+            TargetDurationSeconds = model.TargetDurationSeconds,
+            Concurrency = model.Concurrency,
+            FailRunOnBenchmark = model.FailRunOnBenchmark,
             ImportedPatientIdsJson = JsonSerializer.Serialize(model.ImportedPatientIds),
             ImportedPatientBundlesJson = JsonSerializer.Serialize(sanitizedBundles),
             ImportedBundleRefs = bundleRefs,
             UpdatedAt = model.UpdatedAt
         };
 
-    private static TestScenarioDefinition ToModel(TestScenarioDocument doc) => new()
+    private static TestScenarioDefinition ToModel(TestScenarioDocument doc)
+    {
+        var model = new TestScenarioDefinition
         {
             Id = doc.Id,
             Name = doc.Name,
             Description = doc.Description,
             IsSystemScenario = doc.IsSystemScenario,
+            FacilityConfigurationMode = Enum.TryParse<FacilityConfigurationMode>(doc.FacilityConfigurationMode, true, out var facilityMode)
+                ? facilityMode
+                : FacilityConfigurationMode.Unspecified,
+            FacilityTemplateId = doc.FacilityTemplateId,
+            VendorName = doc.VendorName,
             ReportMethod = Enum.TryParse<ReportMethod>(doc.ReportMethod, true, out var rm) ? rm : ReportMethod.Adhoc,
             SelectedMeasures = doc.SelectedMeasures
                 .Select(s => Enum.TryParse<ProfiledMeasureType>(s, true, out var m) ? m : (ProfiledMeasureType?)null)
                 .Where(m => m.HasValue)
                 .Select(m => m!.Value)
+                .ToList(),
+            SelectedMeasureIds = (doc.SelectedMeasureIds ?? [])
+                .Select(s => Guid.TryParse(s, out var id) ? id : Guid.Empty)
+                .Where(id => id != Guid.Empty)
                 .ToList(),
             Seed = doc.Seed,
             PatientCount = doc.PatientCount,
@@ -438,6 +459,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
             NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
+            EnableDmrp = doc.EnableDmrp,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
             NormalizationSuiteId = doc.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = doc.OrganizationResourceMapTemplateId,
@@ -447,10 +469,18 @@ public sealed class MongoScenarioStore : IScenarioStore
             ReportPeriodEnd = doc.ReportPeriodEnd.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodEnd.Value, DateTimeKind.Utc)) : null,
             IsLiveSimulation = doc.IsLiveSimulation,
             ReportingWindowMinutes = doc.ReportingWindowMinutes > 0 ? doc.ReportingWindowMinutes : 10,
+            IsMetricsRun = doc.IsMetricsRun,
+            BenchmarkKey = doc.BenchmarkKey,
+            TargetDurationSeconds = doc.TargetDurationSeconds,
+            Concurrency = doc.Concurrency,
+            FailRunOnBenchmark = doc.FailRunOnBenchmark,
             ImportedPatientIds = DeserializeImported(doc.ImportedPatientIdsJson),
             ImportedPatientBundles = AttachBundleReferences(doc),
             UpdatedAt = doc.UpdatedAt
         };
+        model.NormalizeMeasureSelection();
+        return model;
+    }
 
     /// <summary>
     /// Attaches each external bundle id to its scenario input without loading raw bundle

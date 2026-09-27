@@ -4,7 +4,9 @@ using System.Text.RegularExpressions;
 using FluentAssertions;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation.Thetis;
 using LantanaGroup.Automation.Helpers;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Automation;
 
@@ -63,6 +65,15 @@ public class AbsSubmissionPredictorTests
     [
         ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
         ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation,
+        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+    ];
+
+    // Thetis DiagnosticReports use laboratory LOINC 11502-2, which Daily CQL
+    // retrieves but the predictor does not keep (Daily SDE is COVID/flu/RSV).
+    // Seed-sweep invariants therefore skip Daily.
+    private static readonly ProfiledMeasureType[] GeneratedPatientInvariantMeasures =
+    [
+        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
         ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
     ];
 
@@ -233,22 +244,39 @@ public class AbsSubmissionPredictorTests
             PeriodStart,
             PeriodEnd,
             organizationLocationConditionFhirPaths: [orgCondition]);
-        var predicted = ClinicalCounts(manifest, patientId);
-        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+        AssertOrgScopedCqlKeys(manifest, patientId);
 
-        AssertCount(predicted, "Encounter", 1);
-        AssertCount(predicted, "DiagnosticReport", 1);
-        AssertCount(predicted, "MedicationRequest", 1);
-        keys.Should().Contain("Encounter/E-ORG");
-        keys.Should().NotContain("Encounter/E-OTHER");
-        keys.Should().Contain("DiagnosticReport/DR-IN");
-        keys.Should().NotContain("DiagnosticReport/DR-OUT");
-        keys.Should().Contain("MedicationRequest/MR-IN");
-        keys.Should().NotContain("MedicationRequest/MR-OUT");
+        // Live generation passes run measure JSON into PopulateManifest. Same
+        // org-scope must hold when CQL reads those bundles instead of the catalog.
+        var measures = new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+        var builder = new GenerationManifest.IncrementalBuilder();
+        var queryPlan = QueryPlanDefaults.GetDefaultAsInput();
+        AbsSubmissionPredictor.PopulateManifest(
+            builder,
+            patientId,
+            new PatientProfile(measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying)),
+            ImportedPatientLoader.ParseBundleEntries(bundleJson, patientId),
+            measures,
+            new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = queryPlan,
+                ClinicalPeriodStart = PeriodStart.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                ClinicalPeriodEnd = PeriodEnd.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                OrganizationLocationConditionFhirPaths = [orgCondition]
+            },
+            PeriodStart,
+            PeriodEnd,
+            sharedSimEntries: null,
+            output: null,
+            measureBundleJsons: [ProfiledMeasureCatalog.ReadBundleJson(measures[0])]);
+        var liveManifest = builder.Build(measures);
+        liveManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(queryPlan);
+        liveManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(measures);
+        AssertOrgScopedCqlKeys(liveManifest, patientId);
     }
 
     [Fact]
-    public void Generated_patients_across_seeds_match_cql_invariants_per_measure()
+    public async Task Generated_patients_across_seeds_match_cql_invariants_per_measure()
     {
         var failures = new List<string>();
         var (ids, sharedEntries, practitionerIds, medicationIds) = FhirBundleGenerator.BuildSharedResources();
@@ -261,15 +289,13 @@ public class AbsSubmissionPredictorTests
             List<Bundle.EntryComponent> entries;
             try
             {
-                entries = FhirBundleGenerator.GeneratePatientEntries(
+                entries = await GenerateThetisPatientEntriesAsync(
                     patientId,
                     ids,
                     practitionerIds,
                     medicationIds,
                     totalResourcesPerPatient: 220,
-                    seed: seed,
-                    clinicalPeriodStart: PeriodStart,
-                    clinicalPeriodEnd: PeriodEnd);
+                    seed: seed);
             }
             catch (Exception ex)
             {
@@ -290,7 +316,7 @@ public class AbsSubmissionPredictorTests
                 MeasurementPeriodEnd = PeriodEnd
             };
 
-            foreach (var measure in GeneratedPatientMeasures)
+            foreach (var measure in GeneratedPatientInvariantMeasures)
             {
                 try
                 {
@@ -308,17 +334,15 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
-    public void Same_generated_patient_predicted_counts_differ_by_measure_family()
+    public async Task Same_generated_patient_predicted_counts_differ_by_measure_family()
     {
         var (ids, sharedEntries, practitionerIds, medicationIds) = FhirBundleGenerator.BuildSharedResources();
         var sharedSim = AbsSubmissionPredictor.IndexEntries(sharedEntries);
         var patientId = ids.PatientId(0);
-        var entries = FhirBundleGenerator.GeneratePatientEntries(
+        var entries = await GenerateThetisPatientEntriesAsync(
             patientId, ids, practitionerIds, medicationIds,
             totalResourcesPerPatient: 400,
-            seed: 42,
-            clinicalPeriodStart: PeriodStart,
-            clinicalPeriodEnd: PeriodEnd);
+            seed: 42);
 
         var monthly = PredictGenerated(
             patientId, entries, sharedSim, ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation);
@@ -469,6 +493,22 @@ public class AbsSubmissionPredictorTests
             organizationLocationConditionFhirPaths: orgFhirPaths);
         return manifest.GetExpectedAbsCountsForPatient(patientId)
                ?? throw new InvalidOperationException(patientId);
+    }
+
+    private static void AssertOrgScopedCqlKeys(GenerationManifest manifest, string patientId)
+    {
+        var predicted = ClinicalCounts(manifest, patientId);
+        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+
+        AssertCount(predicted, "Encounter", 1);
+        AssertCount(predicted, "DiagnosticReport", 1);
+        AssertCount(predicted, "MedicationRequest", 1);
+        keys.Should().Contain("Encounter/E-ORG");
+        keys.Should().NotContain("Encounter/E-OTHER");
+        keys.Should().Contain("DiagnosticReport/DR-IN");
+        keys.Should().NotContain("DiagnosticReport/DR-OUT");
+        keys.Should().Contain("MedicationRequest/MR-IN");
+        keys.Should().NotContain("MedicationRequest/MR-OUT");
     }
 
     private static void AssertCount(Dictionary<string, int> predicted, string resourceType, int expected)
@@ -799,6 +839,33 @@ public class AbsSubmissionPredictorTests
             failures.Add($"seed={seed} {ShortName(measure)} predicted zero ABS keys for a qualifying generated patient");
         if (!keys.Contains($"Patient/{patientId}"))
             failures.Add($"seed={seed} {ShortName(measure)} missing Patient/{patientId} in predicted ABS keys");
+    }
+
+    private static Task<List<Bundle.EntryComponent>> GenerateThetisPatientEntriesAsync(
+        string patientId,
+        FhirBundleGenerator.SharedIds ids,
+        List<string> practitionerIds,
+        List<string> medicationIds,
+        int totalResourcesPerPatient,
+        int seed)
+    {
+        var request = new PatientEntryRequest
+        {
+            Profile = new PatientProfile(
+                GeneratedPatientMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying)),
+            PatientIndex = 0,
+            BaseSeed = seed,
+            TotalResourcesPerPatient = totalResourcesPerPatient,
+            SharedPractitionerIds = practitionerIds,
+            SharedMedicationIds = medicationIds,
+            Measures = GeneratedPatientMeasures,
+            ClinicalPeriodStart = PeriodStart,
+            ClinicalPeriodEnd = PeriodEnd,
+            Config = new FhirGenerationConfig(),
+            Ids = ids,
+            PatientId = patientId
+        };
+        return ThetisPatientEntryGenerator.Shared.GenerateAsync(request);
     }
 
     private static GenerationManifest PredictGenerated(

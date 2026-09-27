@@ -1,0 +1,313 @@
+@model List<FacilityTemplate>
+@{
+    ViewData["Title"] = "Facility Templates";
+    var queryPlans = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+    var suites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
+    var maps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
+    var patients = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
+    string PieceName<T>(IEnumerable<T> items, Guid? id, Func<T, Guid> idOf, Func<T, string> nameOf) where T : class
+    {
+        if (!id.HasValue) return "Not configured";
+        var match = items.FirstOrDefault(i => idOf(i) == id.Value);
+        return match == null ? "Missing" : nameOf(match);
+    }
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-hospital me-2"></i>Facility Templates</h2>
+    <p class="text-muted mb-3">A facility template owns the query plan, normalization suite, organization resource map, vendor, and which patient configurations a scenario may use. System Default is what system scenarios run. Epic and Cerner are convenience copies of those customer shapes. Create your own for anything else.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>All templates</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewFacility">New</button>
+        </div>
+        <div class="card-body p-0" data-au-table>
+            <table class="table au-table mb-0">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="vendor">Vendor</th>
+                        <th>Pieces</th>
+                        <th data-sort="type">Kind</th>
+                        <th style="width:220px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in Model)
+                {
+                    <tr data-name="@t.Name" data-vendor="@(t.VendorName ?? "")" data-type="@(t.IsSystem ? "System" : "Custom")">
+                        <td>
+                            <strong>@t.Name</strong>
+                            @if (t.IsDefault)
+                            {
+                                <span class="badge bg-success ms-1">System config</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <br /><small class="text-muted">@t.Description</small>
+                            }
+                        </td>
+                        <td>@(string.IsNullOrWhiteSpace(t.VendorName) ? "None" : t.VendorName)</td>
+                        <td class="small">
+                            Query plan: @PieceName(queryPlans, t.QueryPlanTemplateId, q => q.Id, q => q.Name)<br />
+                            Normalization: @PieceName(suites, t.NormalizationSuiteId, s => s.Id, s => s.Name)<br />
+                            Org map: @(t.EnableOrganizationLocationMapping ? PieceName(maps, t.OrganizationResourceMapTemplateId, m => m.Id, m => m.Name) : "Off")<br />
+                            Other patient configs: @(t.AllowPatientConfigurationsOutsideSet ? "Allowed" : "Not allowed")
+                        </td>
+                        <td>
+                            @if (t.IsSystem)
+                            {
+                                <span class="badge bg-dark">System</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-dark border">Custom</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-clone" data-id="@t.Id">Clone</button>
+                            @if (!t.IsSystem)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-facility-delete" data-id="@t.Id">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="facilityBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1040;"></div>
+<div id="facilityModal" class="card shadow" style="display:none;position:fixed;z-index:1050;top:4vh;left:50%;transform:translateX(-50%);width:min(820px,96vw);max-height:92vh;overflow:auto;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong id="facilityModalTitle">Facility template</strong>
+        <button type="button" class="btn-close" id="facilityModalClose" aria-label="Close"></button>
+    </div>
+    <div class="card-body">
+        <div id="facilityFormErrors" class="alert alert-danger" style="display:none;"></div>
+        <input type="hidden" id="facilityId" />
+        <div class="row g-3">
+            <div class="col-md-8">
+                <label class="form-label" for="facilityName">Name</label>
+                <input class="form-control" id="facilityName" maxlength="120" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="facilityVendor">Vendor</label>
+                <input class="form-control" id="facilityVendor" maxlength="80" placeholder="Blank sends no vendor" />
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="facilityDescription">Description</label>
+                <textarea class="form-control" id="facilityDescription" rows="2"></textarea>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="facilityQueryPlan">Query plan</label>
+                <select class="form-select" id="facilityQueryPlan">
+                    <option value="">(not configured)</option>
+                    @foreach (var qp in queryPlans)
+                    {
+                        <option value="@qp.Id">@qp.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="facilityNormalization">Normalization suite</label>
+                <select class="form-select" id="facilityNormalization">
+                    <option value="">(not configured)</option>
+                    @foreach (var suite in suites)
+                    {
+                        <option value="@suite.Id">@suite.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="facilityOrm">Organization resource map</label>
+                <select class="form-select" id="facilityOrm">
+                    <option value="">(not configured)</option>
+                    @foreach (var map in maps)
+                    {
+                        <option value="@map.Id">@map.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="facilityOrgMapping" />
+                    <label class="form-check-label" for="facilityOrgMapping">Organization location mapping on</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="facilityAllowOutside" checked />
+                    <label class="form-check-label" for="facilityAllowOutside">Allow patient configurations outside the set</label>
+                </div>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="facilityPatients">Available patient configurations</label>
+                <select class="form-select" id="facilityPatients" multiple size="6">
+                    @foreach (var patient in patients)
+                    {
+                        <option value="@patient.Id">@patient.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer text-end">
+        <button type="button" class="btn btn-outline-secondary" id="facilityCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="facilitySave">Save</button>
+    </div>
+</div>
+
+@Html.AntiForgeryToken()
+<script>
+(function () {
+    const modal = document.getElementById('facilityModal');
+    const backdrop = document.getElementById('facilityBackdrop');
+    const errors = document.getElementById('facilityFormErrors');
+    const saveUrl = '@Url.Action("SaveInline", "FacilityTemplates")';
+    const getUrl = '@Url.Action("GetJson", "FacilityTemplates")';
+    const cloneUrl = '@Url.Action("CloneInline", "FacilityTemplates")';
+    const deleteUrl = '@Url.Action("DeleteInline", "FacilityTemplates")';
+    function token() {
+        const field = document.querySelector('input[name="__RequestVerificationToken"]');
+        return field ? field.value : '';
+    }
+    function show() { modal.style.display = ''; backdrop.style.display = ''; }
+    function hide() { modal.style.display = 'none'; backdrop.style.display = 'none'; errors.style.display = 'none'; }
+    async function post(url, body) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
+            body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error((await response.text()) || ('Server ' + response.status));
+        return response.headers.get('content-type')?.includes('json') ? response.json() : null;
+    }
+    function setEditable(editable) {
+        modal.querySelectorAll('input, select, textarea').forEach(function (el) {
+            if (el.id === 'facilityId') return;
+            el.disabled = !editable;
+        });
+        document.getElementById('facilitySave').style.display = editable ? '' : 'none';
+    }
+    function selectedPatients() {
+        return Array.prototype.filter.call(document.getElementById('facilityPatients').options, function (option) {
+            return option.selected;
+        }).map(function (option) { return option.value; });
+    }
+    function applyPatients(ids) {
+        const wanted = new Set((ids || []).map(function (id) { return String(id).toLowerCase(); }));
+        Array.prototype.forEach.call(document.getElementById('facilityPatients').options, function (option) {
+            option.selected = wanted.has(String(option.value).toLowerCase());
+        });
+    }
+    function blank() {
+        document.getElementById('facilityId').value = '';
+        document.getElementById('facilityName').value = '';
+        document.getElementById('facilityVendor').value = '';
+        document.getElementById('facilityDescription').value = '';
+        document.getElementById('facilityQueryPlan').value = '';
+        document.getElementById('facilityNormalization').value = '';
+        document.getElementById('facilityOrm').value = '';
+        document.getElementById('facilityOrgMapping').checked = false;
+        document.getElementById('facilityAllowOutside').checked = true;
+        applyPatients([]);
+    }
+    function fill(model) {
+        document.getElementById('facilityId').value = model.id || '';
+        document.getElementById('facilityName').value = model.name || '';
+        document.getElementById('facilityVendor').value = model.vendorName || '';
+        document.getElementById('facilityDescription').value = model.description || '';
+        document.getElementById('facilityQueryPlan').value = model.queryPlanTemplateId || '';
+        document.getElementById('facilityNormalization').value = model.normalizationSuiteId || '';
+        document.getElementById('facilityOrm').value = model.organizationResourceMapTemplateId || '';
+        document.getElementById('facilityOrgMapping').checked = !!model.enableOrganizationLocationMapping;
+        document.getElementById('facilityAllowOutside').checked = model.allowPatientConfigurationsOutsideSet !== false;
+        applyPatients(model.allowedPatientConfigurationIds || []);
+    }
+    document.getElementById('btnNewFacility').addEventListener('click', function () {
+        blank();
+        setEditable(true);
+        document.getElementById('facilityModalTitle').textContent = 'New facility template';
+        show();
+    });
+    document.getElementById('facilityModalClose').addEventListener('click', hide);
+    document.getElementById('facilityCancel').addEventListener('click', hide);
+    document.getElementById('facilityBackdrop').addEventListener('click', hide);
+    document.getElementById('facilitySave').addEventListener('click', async function () {
+        errors.style.display = 'none';
+        if (!document.getElementById('facilityQueryPlan').value) {
+            errors.textContent = 'A facility template needs a query plan.';
+            errors.style.display = '';
+            return;
+        }
+        if (document.getElementById('facilityOrgMapping').checked && !document.getElementById('facilityOrm').value) {
+            errors.textContent = 'Organization location mapping is on, so an organization resource map is required.';
+            errors.style.display = '';
+            return;
+        }
+        if (!document.getElementById('facilityAllowOutside').checked && selectedPatients().length === 0) {
+            errors.textContent = 'A closed patient configuration set needs at least one patient configuration.';
+            errors.style.display = '';
+            return;
+        }
+        const body = {
+            id: document.getElementById('facilityId').value || '00000000-0000-0000-0000-000000000000',
+            name: document.getElementById('facilityName').value,
+            description: document.getElementById('facilityDescription').value,
+            vendorName: document.getElementById('facilityVendor').value,
+            queryPlanTemplateId: document.getElementById('facilityQueryPlan').value || null,
+            normalizationSuiteId: document.getElementById('facilityNormalization').value || null,
+            organizationResourceMapTemplateId: document.getElementById('facilityOrm').value || null,
+            enableOrganizationLocationMapping: document.getElementById('facilityOrgMapping').checked,
+            allowPatientConfigurationsOutsideSet: document.getElementById('facilityAllowOutside').checked,
+            allowedPatientConfigurationIds: selectedPatients()
+        };
+        if (!body.id || body.id === '00000000-0000-0000-0000-000000000000')
+            body.id = crypto.randomUUID();
+        try {
+            await post(saveUrl, body);
+            window.location.reload();
+        } catch (err) {
+            errors.textContent = err.message || 'Save failed';
+            errors.style.display = '';
+        }
+    });
+    document.querySelectorAll('.btn-facility-open').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            const response = await fetch(getUrl + '?id=' + encodeURIComponent(button.dataset.id));
+            if (!response.ok) { alert(await response.text()); return; }
+            fill(await response.json());
+            const view = button.dataset.mode === 'view';
+            setEditable(!view);
+            document.getElementById('facilityModalTitle').textContent = view ? 'View facility template' : 'Edit facility template';
+            show();
+        });
+    });
+    document.querySelectorAll('.btn-facility-clone').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            try {
+                await post(cloneUrl, { id: button.dataset.id });
+                window.location.reload();
+            } catch (err) {
+                alert(err.message || 'Clone failed');
+            }
+        });
+    });
+    document.querySelectorAll('.btn-facility-delete').forEach(function (button) {
+        button.addEventListener('click', async function () {
+            if (!window.confirm('Delete this facility template?')) return;
+            try {
+                await post(deleteUrl, { id: button.dataset.id });
+                window.location.reload();
+            } catch (err) {
+                alert(err.message || 'Delete failed');
+            }
+        });
+    });
+})();
+</script>

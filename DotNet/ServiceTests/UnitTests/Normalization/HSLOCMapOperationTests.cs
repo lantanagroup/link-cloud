@@ -12,6 +12,27 @@ namespace UnitTests.Normalization;
 [Trait("Category", "UnitTests")]
 public class HSLOCMapOperationTests
 {
+    [Theory]
+    [InlineData("https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html", true)]
+    [InlineData("urn:oid:2.16.840.1.113883.6.259", false)]
+    [InlineData("urn:other", false)]
+    [InlineData("", false)]
+    public async Task Validation_RequiresCanonicalTargetSystem(string targetSystem, bool expectedValid)
+    {
+        var operation = new HSLOCMapOperation(
+            [new CodeSystemMap("urn:local", targetSystem, new Dictionary<string, CodeMap>
+            {
+                ["ICU"] = new CodeMap("1027-4", "Medical critical care")
+            })]);
+
+        var result = await OperationServiceHelper.ValidateOperation(
+            "HSLOCMap", JsonSerializer.Serialize(operation), ["Location"]);
+
+        Assert.Equal(expectedValid, result.IsValid);
+        if (!expectedValid)
+            Assert.Contains("HSLOCMap target system must be", result.ErrorMessage);
+    }
+
     [Fact]
     public void OperationType_IsPreservedThroughBaseAndInterface()
     {

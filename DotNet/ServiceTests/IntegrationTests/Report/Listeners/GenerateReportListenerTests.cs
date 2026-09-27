@@ -5,6 +5,7 @@ using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
@@ -367,5 +368,99 @@ public class GenerateReportListenerTests
                 It.Is<DeadLetterException>(ex => ex.Message.Contains("No ReportSchedule found")),
                 facilityId),
             Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_AbortedAdhocReportId_DoesNotCreateSchedule()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var abort = scope.ServiceProvider.GetRequiredService<IPipelineAbortRegistry>();
+        var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var facilityId = Guid.NewGuid().ToString();
+        var adhocReportId = Guid.NewGuid();
+        await abort.AbortAsync(facilityId: null, adhocReportId.ToString(), TimeSpan.FromDays(14));
+
+        var value = new GenerateReportValue
+        {
+            AdhocReportId = adhocReportId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow.AddDays(30),
+            ReportTypes = new List<string> { "DE-111" }
+        };
+
+        var consumeResult = new ConsumeResult<string, GenerateReportValue>
+        {
+            Message = new Message<string, GenerateReportValue>
+            {
+                Key = facilityId,
+                Value = value
+            }
+        };
+
+        await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
+
+        var schedule = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == adhocReportId);
+        Assert.Null(schedule);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_Regenerate_AbortedSourceReport_StillCreatesTargetSchedule()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var abort = scope.ServiceProvider.GetRequiredService<IPipelineAbortRegistry>();
+        var listener = scope.ServiceProvider.GetRequiredService<GenerateReportListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var facilityId = $"test-facility-regen-aborted-source-{Guid.NewGuid():N}";
+        var originalReportId = Guid.NewGuid();
+        var newAdhocReportId = Guid.NewGuid();
+        await abort.AbortAsync(facilityId: null, originalReportId.ToString(), TimeSpan.FromDays(14));
+
+        await reportScheduledManager.AddAsync(new ReportScheduleModel
+        {
+            Id = originalReportId,
+            FacilityId = facilityId,
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-60),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(-30),
+            Frequency = Frequency.Monthly,
+            ReportTypes = { "DE-111" },
+            Status = ScheduleStatus.Scheduled,
+            CreateDate = DateTime.UtcNow
+        }, CancellationToken.None);
+
+        await reportEntryManager.AddAsync(new ReportEntryModel
+        {
+            PatientId = "pat-regen-aborted-source",
+            ReportScheduleId = originalReportId,
+            FacilityId = facilityId,
+            ReportingStatus = ReportingStatus.PatientIdentified,
+            CreateDate = DateTime.UtcNow,
+            MeasureReports = new List<EntryMeasureReportModel>
+            {
+                new() { ReportType = "DE-111", Status = MeasureReportStatus.ReadyForValidation }
+            }
+        }, CancellationToken.None);
+
+        var consumeResult = new ConsumeResult<string, GenerateReportValue>
+        {
+            Message = new Message<string, GenerateReportValue>
+            {
+                Key = facilityId,
+                Value = new GenerateReportValue
+                {
+                    ReportId = originalReportId,
+                    AdhocReportId = newAdhocReportId,
+                    Regenerate = true
+                }
+            }
+        };
+
+        await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
+
+        var newSchedule = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == newAdhocReportId);
+        Assert.NotNull(newSchedule);
     }
 }

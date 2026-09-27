@@ -19,6 +19,9 @@ public class ScenariosController(
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
+    IPatientConfigurationStore patientConfigurationStore,
+    IMeasureTemplateStore measureTemplateStore,
+    IFacilityTemplateStore facilityTemplateStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database,
     IImportedBundleContentStore bundleContentStore,
@@ -36,6 +39,9 @@ public class ScenariosController(
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
+        ViewBag.PatientConfigurations = await patientConfigurationStore.GetAllAsync(ct);
+        ViewBag.MeasureTemplates = await measureTemplateStore.GetAllAsync(ct);
+        ViewBag.FacilityTemplates = await facilityTemplateStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -54,11 +60,41 @@ public class ScenariosController(
         if (string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Scenario name is required.");
 
+        if (model.EnableDmrp && string.IsNullOrWhiteSpace(model.NhsnOrganizationId))
+            return BadRequest("NHSN Organization ID is required when DMRP is enabled.");
+
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
+
+        if (model.FacilityConfigurationMode == FacilityConfigurationMode.Facility)
+        {
+            if (!model.FacilityTemplateId.HasValue)
+                return BadRequest("Select a facility template, or switch to ala carte.");
+
+            var facilityTemplate = await facilityTemplateStore.GetByIdAsync(model.FacilityTemplateId.Value, ct);
+            if (facilityTemplate == null)
+                return BadRequest("Facility template was not found.");
+
+            var patientConfigError = FacilityConfigurationPolicy.ValidatePatientConfigurations(
+                facilityTemplate, model.PatientCohorts);
+            if (patientConfigError != null)
+                return BadRequest(patientConfigError);
+
+            model.QueryPlanTemplateId = null;
+            model.NormalizationSuiteId = null;
+            model.OrganizationResourceMapTemplateId = null;
+            model.VendorName = null;
+        }
+        else if (model.FacilityConfigurationMode == FacilityConfigurationMode.AlaCarte)
+        {
+            model.FacilityTemplateId = null;
+            model.VendorName = string.IsNullOrWhiteSpace(model.VendorName) ? null : model.VendorName.Trim();
+            if (!model.QueryPlanTemplateId.HasValue)
+                return BadRequest("Ala carte needs a query plan.");
+        }
 
         foreach (var cohort in model.PatientCohorts)
         {
@@ -69,12 +105,11 @@ public class ScenariosController(
 
             cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
 
-            var allNonQualifying = model.SelectedMeasures.Count > 0
-                && model.SelectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
-
-            // Back-compat normalization for payloads that do not yet send cohortQualification.
-            if (allNonQualifying)
-                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+            var prediction = ConfigurationQualification.Predict(
+                cohort.Intent,
+                cohort.ScheduledInpatientPattern);
+            cohort.MeasureEligibilities = prediction.MeasureEligibilities;
+            cohort.CohortQualification = prediction.CohortQualification;
         }
 
         // ----- Imported-patient validation (fail save on bad input) -----
@@ -87,6 +122,14 @@ public class ScenariosController(
             : model.NhsnOrganizationId.Trim();
         
         model.UpdatedAt = DateTimeOffset.UtcNow;
+        if (model.SelectedMeasureIds.Count > 0)
+        {
+            var templates = await measureTemplateStore.GetByIdsAsync(model.SelectedMeasureIds, ct);
+            if (templates.Count != model.SelectedMeasureIds.Distinct().Count())
+                return BadRequest("One or more selected measures were not found.");
+            model.SelectedMeasures = templates.Select(t => t.GenerationFamily).Distinct().ToList();
+        }
+        model.NormalizeMeasureSelection();
 
         await scenarioStore.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
@@ -600,9 +643,11 @@ public class ScenariosController(
             IsSystemScenario = false,
             ReportMethod = source.ReportMethod,
             SelectedMeasures = [.. source.SelectedMeasures],
+            SelectedMeasureIds = [.. source.SelectedMeasureIds],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
             NhsnOrganizationId = source.NhsnOrganizationId,
+            EnableDmrp = source.EnableDmrp,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
@@ -612,14 +657,26 @@ public class ScenariosController(
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
                     ResourcesPerPatientMax = c.ResourcesPerPatientMax,
-                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern,
+                    PatientConfigurationId = c.PatientConfigurationId,
+                    Intent = PatientGenerationIntent.Clone(c.Intent)
                 })
                 .ToList(),
+            FacilityConfigurationMode = source.FacilityConfigurationMode,
+            FacilityTemplateId = source.FacilityTemplateId,
+            VendorName = source.VendorName,
             QueryPlanTemplateId = source.QueryPlanTemplateId,
             NormalizationSuiteId = source.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,
             CleanupServiceData = source.CleanupServiceData,
             CleanupFhirData = source.CleanupFhirData,
+            IsMetricsRun = source.IsMetricsRun,
+            BenchmarkKey = source.BenchmarkKey,
+            TargetDurationSeconds = source.TargetDurationSeconds,
+            Concurrency = source.Concurrency,
+            FailRunOnBenchmark = source.FailRunOnBenchmark,
+            IsLiveSimulation = source.IsLiveSimulation,
+            ReportingWindowMinutes = source.ReportingWindowMinutes,
             ReportPeriodStart = source.ReportPeriodStart,
             ReportPeriodEnd = source.ReportPeriodEnd,
             ImportedPatientIds = source.ImportedPatientIds

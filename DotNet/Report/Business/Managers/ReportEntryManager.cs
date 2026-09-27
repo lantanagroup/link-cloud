@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -8,8 +9,11 @@ using LantanaGroup.Link.Report.Domain;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Report.Domain.Managers
@@ -77,11 +81,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
     public class ReportEntryManager : IReportEntryManager
     {
         private readonly ReportDbContext _dbContext;
+        private readonly IReportServiceMetrics _metrics;
         private readonly ILogger<ReportEntryManager> _logger;
 
-        public ReportEntryManager(ReportDbContext dbContext, ILogger<ReportEntryManager> logger)
+        public ReportEntryManager(ReportDbContext dbContext, IReportServiceMetrics metrics, ILogger<ReportEntryManager> logger)
         {
             _dbContext = dbContext;
+            _metrics = metrics;
             _logger = logger;
         }
 
@@ -397,11 +403,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             entity.ModifyDate = DateTime.UtcNow;
             entity.AggregateReportUri = model.AggregateReportUri;
             entity.AggregateReportBlobName = model.AggregateReportBlobName;
+            string? reportingFrom = null;
+            string? reportingTo = null;
+            if (entity.ReportingStatus != model.ReportingStatus)
+            {
+                reportingFrom = entity.ReportingStatus.ToString();
+                reportingTo = model.ReportingStatus.ToString();
+            }
             entity.ReportingStatus = model.ReportingStatus;
             entity.SubmissionStatus = model.SubmissionStatus;
             entity.SubmitReportDateTime = model.SubmitReportDateTime;
 
             var existingMeasureReports = entity.MeasureReports.ToList();
+            var measureTransitions = new List<(string From, string To)>();
 
             foreach (var measureModel in model.MeasureReports)
             {
@@ -424,6 +438,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
                 else
                 {
+                    if (existing.Status != measureModel.Status)
+                    {
+                        measureTransitions.Add((existing.Status.ToString(), measureModel.Status.ToString()));
+                    }
                     existing.Status = measureModel.Status;
                     existing.MeasureReportId = measureModel.MeasureReportId;
                     existing.MeasureReportUri = measureModel.MeasureReportUri;
@@ -459,7 +477,11 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 entity.MeasureReports.Remove(orphan);
 
             _dbContext.Update(entity);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await PersistAsync(entity.FacilityId, cancellationToken);
+            if (reportingFrom != null && reportingTo != null)
+                _metrics.IncrementStatusTransition(entity.FacilityId, reportingFrom, reportingTo);
+            foreach (var (from, to) in measureTransitions)
+                _metrics.IncrementStatusTransition(entity.FacilityId, from, to);
             return model;
         }
 
@@ -519,7 +541,8 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             await _dbContext.ReportEntry.AddRangeAsync(entities, cancellationToken);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            var facilityId = entities[0].FacilityId;
+            await PersistAsync(facilityId, cancellationToken);
 
             var entityArray = entities.ToArray();
             int index = 0;
@@ -527,6 +550,19 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 model.Id = entityArray[index++].Id;
             }
+        }
+
+        private async Task PersistAsync(string facilityId, CancellationToken cancellationToken)
+        {
+            if (!MetricsModeScope.IsPerformance)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
+            var started = Stopwatch.GetTimestamp();
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            _metrics.RecordPersistDuration(facilityId, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
 
         public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)

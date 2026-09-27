@@ -50,8 +50,8 @@ namespace LantanaGroup.Automation.Generation;
 /// pre-populated checkboxes in the scenario editor.
 /// </para>
 ///
-/// Results are advisory only and are intended to be presented to the user as
-/// pre-populated checkboxes that they can override before saving the scenario.
+/// Results are the derived Q/NQ display for imported patients. The pipeline
+/// re-classifies from the bundle at run time; there is no manual override.
 /// </summary>
 public static class ImportedPatientClassifier
 {

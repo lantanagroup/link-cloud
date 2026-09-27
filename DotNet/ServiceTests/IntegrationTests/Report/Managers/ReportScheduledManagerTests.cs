@@ -434,6 +434,44 @@ public class ReportScheduledManagerTests
         Assert.True(updated!.IsDeleted);
     }
 
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    public async Task SoftDeleteByReportTrackingIdAsync_WithInProgressReport_Throws(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status);
+        await SeedAsync(context, report);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.SoftDeleteByReportTrackingIdAsync(report.Id));
+
+        Assert.Contains("currently in progress", ex.Message);
+        context.ChangeTracker.Clear();
+        Assert.False((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
+    [Theory]
+    [InlineData(ScheduleStatus.New)]
+    [InlineData(ScheduleStatus.EndOfPeriod)]
+    public async Task SoftDeleteByReportTrackingIdAsync_WithInProgressReport_AllowInProgress_Succeeds(ScheduleStatus status)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+        var sut = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+        var report = CreateReport(Guid.NewGuid().ToString(), status);
+        await SeedAsync(context, report);
+
+        await sut.SoftDeleteByReportTrackingIdAsync(report.Id, allowInProgress: true);
+
+        context.ChangeTracker.Clear();
+        Assert.True((await context.ReportSchedule.FindAsync(report.Id))!.IsDeleted);
+    }
+
     #endregion
 
     private static ReportSchedule CreateReport(string facilityId, ScheduleStatus status, bool isDeleted = false)

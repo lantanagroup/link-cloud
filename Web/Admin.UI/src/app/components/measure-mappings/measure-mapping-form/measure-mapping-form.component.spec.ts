@@ -45,6 +45,19 @@ describe('MeasureMappingFormComponent', () => {
     fixture.detectChanges();
   }
 
+  /**
+   * Opening a mapping the sync recorded is how it gets completed. The dQM arrives null, so the
+   * form has to hold it invalid until one is chosen rather than offering to save it as it stands.
+   */
+  it('holds a mapping with no dQM invalid until one is chosen', () => {
+    initWith({ id: 'mm-3', measure: 'HOB', dqm: null, frequency: Frequency.Adhoc }, FormMode.Edit);
+
+    expect(component.measure.value).toBe('HOB');
+    expect(component.dqm.value).toBe('');
+    expect(component.dqm.invalid).toBeTrue();
+    expect(component.measureMappingForm.invalid).toBeTrue();
+  });
+
   it('populates the fields from the item in Edit mode', () => {
     initWith(ach, FormMode.Edit);
 

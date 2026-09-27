@@ -11,9 +11,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 {
     public interface IResourceManager
     {
-        Task<List<ResourceModel>> InitializeResources();
-        Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false);
-        Task DeleteResource(string resource);
+        Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default);
+        Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default);
+        Task DeleteResource(string resource, CancellationToken cancellationToken = default);
     }
 
     public class ResourceManager : IResourceManager
@@ -22,15 +22,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
+        private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly ILogger<ResourceManager> _logger;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, ILogger<ResourceManager> logger)
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, IOperationSequenceQueries operationSequenceQueries, ILogger<ResourceManager> logger)
         {
             _database = database;
             _resourceQueries = resourceQueries;
+            _operationSequenceQueries = operationSequenceQueries;
             _logger = logger;
         }
 
-        public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
+        public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(resourceName))
             {
@@ -48,10 +50,10 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 resourceName = resourceType.ToString();
             }
 
-            await CreateResourceLock.WaitAsync();
+            await CreateResourceLock.WaitAsync(cancellationToken);
             try
             {
-                var existing = await _resourceQueries.Get(resourceName);
+                var existing = await _resourceQueries.Get(resourceName, cancellationToken);
 
                 if (existing != null)
                 {
@@ -59,17 +61,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 }
 
                 var entity = new Entities.ResourceType() { Name = resourceName };
-                await _database.ResourceTypes.AddAsync(entity);
-                await _database.SaveChangesAsync();
+                await _database.ResourceTypes.AddAsync(entity, cancellationToken);
+                await _database.SaveChangesAsync(cancellationToken);
 
-                return await _resourceQueries.Get(resourceName);
+                return await _resourceQueries.Get(resourceName, cancellationToken);
             }
             catch (DbUpdateException ex)
             {
                 var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
                 _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
 
-                var existing = await _resourceQueries.Get(resourceName);
+                var existing = await _resourceQueries.Get(resourceName, cancellationToken);
                 if (existing != null)
                 {
                     return existing;
@@ -83,28 +85,50 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
         }
 
-        public async Task DeleteResource(string resource)
+        public async Task DeleteResource(string resource, CancellationToken cancellationToken = default)
         {
-            var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
+            var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource, cancellationToken);
 
             if (resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
             {
                 throw new InvalidOperationException("An Error has occurred while deleting the Resource.");
             }
 
-            _database.ResourceTypes.Remove(resourceEntity.Single());
+            await using var transaction = await _database.BeginTransactionAsync(cancellationToken);
+            await _operationSequenceQueries.LockResourceTypeAsync(resource, cancellationToken);
+            var affectedFacilities = await _operationSequenceQueries.FacilitiesUsingResourceTypeAsync(resource, cancellationToken);
+            foreach (var facilityId in affectedFacilities.OrderBy(id => id, StringComparer.Ordinal))
+            {
+                await _operationSequenceQueries.LockFacilitySequenceWritesAsync(facilityId, cancellationToken);
+            }
 
-            await _database.SaveChangesAsync();
+            var operationIds = (await _database.OperationResourceTypes.FindAsync(
+                map => map.ResourceType.Name == resource,
+                cancellationToken)).Select(map => map.OperationId).Distinct().OrderBy(id => id);
+            foreach (var operationId in operationIds)
+            {
+                await _operationSequenceQueries.LockOperationAsync(operationId, cancellationToken);
+            }
+
+            var presets = await _database.VendorVersionOperationPresets.FindAsync(
+                preset => preset.OperationResourceType.ResourceType.Name == resource,
+                cancellationToken);
+            presets.ForEach(_database.VendorVersionOperationPresets.Remove);
+            _database.ResourceTypes.Remove(resourceEntity.Single());
+            await _database.SaveChangesAsync(cancellationToken);
+            await _operationSequenceQueries.InvalidateFacilitiesAsync(affectedFacilities, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
 
-        public async Task<List<ResourceModel>> InitializeResources()
+        public async Task<List<ResourceModel>> InitializeResources(CancellationToken cancellationToken = default)
         {
             List<string> resources = new List<string>(Enum.GetNames(typeof(ResourceType)));
 
             List<ResourceModel> resourceModels = new();
             foreach (var resource in resources)
             {
-                var created = await CreateResource(resource);
+                cancellationToken.ThrowIfCancellationRequested();
+                var created = await CreateResource(resource, cancellationToken: cancellationToken);
                 if (created != null)
                 {
                     resourceModels.Add(created);

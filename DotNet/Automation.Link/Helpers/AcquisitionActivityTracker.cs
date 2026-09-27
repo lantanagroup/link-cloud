@@ -9,7 +9,12 @@ public sealed class AcquisitionActivityTracker
 {
     public static readonly TimeSpan ProgressWindow = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan DeadlineExtension = TimeSpan.FromMinutes(5);
-    public static readonly TimeSpan MaxExtraDuration = TimeSpan.FromMinutes(60);
+    /// <summary>
+    /// Extra wait allowed after the original hard timeout while DA paging or
+    /// Validation is still logging progress. Cancel is how an operator stops a
+    /// run that is legitimately still working.
+    /// </summary>
+    public static readonly TimeSpan MaxExtraDuration = TimeSpan.FromHours(6);
 
     private int _lastLogCount = -1;
     private int _lastCompleted = -1;
@@ -22,7 +27,7 @@ public sealed class AcquisitionActivityTracker
 
     /// <summary>
     /// Records progress from a signal other than the DA report summary,
-    /// such as FHIR paging INFO logs scraped from Loki.
+    /// such as FHIR paging or Validation heartbeat INFO logs scraped from Loki.
     /// </summary>
     public void MarkProgress(DateTime utcNow) => LastProgressUtc = utcNow;
 
@@ -84,7 +89,7 @@ public sealed class AcquisitionActivityTracker
 
     /// <summary>
     /// When the poll loop would otherwise time out, slide the deadline forward
-    /// if acquisition is still producing resources. Caps total wait at
+    /// if DA or Validation is still logging progress. Caps total wait at
     /// <paramref name="hardTimeout"/> + <see cref="MaxExtraDuration"/>.
     /// </summary>
     public static bool TryExtendDeadline(

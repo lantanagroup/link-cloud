@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.DMRP.Business.Queries
             // the database collation (and holds under the tests' SQLite provider too).
             var (records, metadata) = await _repository.SearchAsync(
                 m => (measure == null || m.Measure.ToLower().Contains(measure))
-                    && (dqm == null || m.DQM.ToLower().Contains(dqm))
+                    && (dqm == null || (m.DQM != null && m.DQM.ToLower().Contains(dqm)))
                     && (!frequency.HasValue || m.Frequency == frequency.Value),
                 searchDto.SortBy, searchDto.SortOrder,
                 searchDto.PageSize, searchDto.PageNumber, cancellationToken);

@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
     internal sealed class DuplicateMeasureMappingException : ApplicationException
     {
         public DuplicateMeasureMappingException(Exception innerException)
-            : base("A measure mapping with this measure and DQM already exists.", innerException)
+            : base("A measure mapping for this measure already exists.", innerException)
         {
         }
     }
@@ -72,8 +72,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
         }
 
         private static bool IsUniqueIndexViolation(DbUpdateException exception) =>
-            exception.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 }
-            || exception.InnerException is SqlException { Number: 2601 or 2627 };
+            DuplicateMeasureMapping.Matches(exception);
 
         // Backstop for the window between the pre-check below and the delete. Which error the database
         // raises depends on EF's change tracker, not just the schema: with the dependent untracked the
