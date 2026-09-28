@@ -382,8 +382,8 @@ public sealed class ApiHealthExecutionRunManager(
             ApiEndPointLibrary.ServiceNames.Tenant,
             StringComparison.OrdinalIgnoreCase))
         {
-            baseUrl = configuration["ServiceRegistry:TenantServiceApiUrl"];
-            relativePath = "/facility/info";
+            baseUrl = configuration["ServiceRegistry:TenantService:TenantServiceUrl"];
+            relativePath = "/api/facility/info";
         }
         else if (string.Equals(
             serviceName,
@@ -391,7 +391,7 @@ public sealed class ApiHealthExecutionRunManager(
             StringComparison.OrdinalIgnoreCase))
         {
             baseUrl = configuration["ServiceRegistry:AdminBffServiceUrl"];
-            relativePath = "/api/info";
+            relativePath = "/facility/info";
         }
         else
         {
