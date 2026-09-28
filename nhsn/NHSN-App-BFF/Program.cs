@@ -145,14 +145,25 @@ static void RegisterServices(WebApplicationBuilder builder)
             };
         });
 
+    var nhsnJwtSettings = builder.Configuration.GetRequiredSection(NhsnJwtSettings.SectionName).Get<NhsnJwtSettings>()
+        ?? throw new InvalidOperationException($"{NhsnJwtSettings.SectionName} configuration is required.");
+
     builder.Services.AddAuthorizationBuilder()
-        .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
+        .AddPolicy(NhsnAuthorizationPolicies.AuthenticatedUser, policy => policy.RequireAuthenticatedUser())
+        .AddPolicy(NhsnAuthorizationPolicies.FacilityAdministrator, policy =>
+            policy.RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    context.User.FindAll(nhsnJwtSettings.FacilityIdClaimType)
+                        .Any(claim => !string.IsNullOrWhiteSpace(claim.Value))
+                    && context.User.FindAll(nhsnJwtSettings.GroupsClaimType)
+                        .Any(claim => string.Equals(claim.Value.Trim(), "FACADMIN", StringComparison.OrdinalIgnoreCase))));
 
     builder.Services.AddLinkGateways(builder.Configuration);
     builder.Services.AddExceptionHandler<FacilityWriteLockExceptionHandler>();
     builder.Services.AddExceptionHandler<InvalidFhirConfigurationExceptionHandler>();
     builder.Services.AddExceptionHandler<PatientListRetrievalFailedExceptionHandler>();
     builder.Services.AddExceptionHandler<LinkServiceExceptionHandler>();
+    builder.Services.AddExceptionHandler<ReportNotFoundExceptionHandler>();
 
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {

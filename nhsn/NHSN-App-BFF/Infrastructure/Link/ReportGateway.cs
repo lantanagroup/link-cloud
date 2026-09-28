@@ -90,6 +90,13 @@ internal sealed class ReportGateway : IReportGateway
         return ToDetail(schedule, summary, availableMeasures);
     }
 
+    public async Task<string?> GetReportFacilityIdAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        var scheduleResponse = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
+        var schedule = LinkResponseHandler.Optional(scheduleResponse, ServiceName, nameof(GetReportFacilityIdAsync));
+        return schedule?.FacilityId;
+    }
+
     public async Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default)
     {
         var response = await _reportClient.GetEntriesByScheduleAsync(reportId, cancellationToken);

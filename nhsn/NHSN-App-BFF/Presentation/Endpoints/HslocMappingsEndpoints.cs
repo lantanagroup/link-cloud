@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Hsloc;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -12,7 +13,7 @@ public class HslocMappingsEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/hsloc-mappings")
             .WithTags("HslocMappings")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/", async (IHslocMappingService service, CancellationToken cancellationToken) =>
                 Results.Ok(await service.GetAsync(cancellationToken)))

@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -8,7 +9,7 @@ public class FhirServerEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/fhir-server")
             .WithTags("NHSN App BFF")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapPost("/test-connection", async (FhirConnectionTestRequest request, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
             {
