@@ -27,6 +27,11 @@ public sealed class NormalizationEvidenceSnapshot
     /// </summary>
     public int EvidenceChunkCount { get; set; }
 
+    /// <summary>
+    /// Identifies one persistence attempt. Chunks from another attempt are ignored on export.
+    /// </summary>
+    public string EvidenceAttemptId { get; set; } = string.Empty;
+
     public static string ChunkDomain(int oneBasedIndex) => $"{Domain}-chunk-{oneBasedIndex}";
 
     public List<string> SummaryLines { get; set; } = [];
@@ -86,6 +91,7 @@ public sealed class NormalizationEvidenceStep
 /// <summary>One Cosmos-sized piece of a normalization evidence snapshot.</summary>
 public sealed class NormalizationEvidenceChunk
 {
+    public string EvidenceAttemptId { get; set; } = string.Empty;
     public List<string> SummaryLines { get; set; } = [];
     public List<NormalizationEvidenceStep> ParsedSteps { get; set; } = [];
 }

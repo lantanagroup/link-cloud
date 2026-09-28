@@ -60,6 +60,8 @@ public class NormalizationEvidencePersistenceTests
         plan.Header.ParsedSteps.Should().ContainSingle();
         plan.Header.ParsedSteps[0].Count.Should().Be(30);
         plan.Header.CollectedLineCount.Should().Be(lines.Length);
+        plan.Header.EvidenceAttemptId.Should().NotBeNullOrEmpty();
+        plan.Chunks.Should().OnlyContain(c => c.EvidenceAttemptId == plan.Header.EvidenceAttemptId);
         NormalizationDiagnosticsWriter.SerializedUtf8Bytes(plan.Header).Should().BeLessThanOrEqualTo(4_000);
         foreach (var chunk in plan.Chunks)
         {
@@ -73,9 +75,25 @@ public class NormalizationEvidencePersistenceTests
         assembled.StepsCollapsed.Should().BeFalse();
 
         var partial = NormalizationDiagnosticsWriter.Assemble(plan.Header, plan.Chunks.Take(1).ToList());
+        partial.SummaryLines.Should().BeEmpty();
+        partial.RawLinesOmitted.Should().BeTrue();
         partial.ParsedSteps.Should().ContainSingle();
         partial.ParsedSteps[0].Count.Should().Be(30);
         partial.StepsCollapsed.Should().BeTrue();
+        NormalizationDiagnosticsWriter.FormatExportAppendix(partial).Should().NotContain(lines[0]);
+
+        var stale = new NormalizationEvidenceChunk
+        {
+            EvidenceAttemptId = "previous-attempt",
+            SummaryLines = ["stale line"],
+            ParsedSteps = [Step("Observation", "stale", 1, "Failed")]
+        };
+        var mixed = plan.Chunks.Take(plan.Chunks.Count - 1).Append(stale).ToList();
+        var mixedExport = NormalizationDiagnosticsWriter.Assemble(plan.Header, mixed);
+        mixedExport.ParsedSteps.Should().ContainSingle();
+        mixedExport.ParsedSteps[0].Count.Should().Be(30);
+        mixedExport.SummaryLines.Should().BeEmpty();
+        NormalizationDiagnosticsWriter.FormatExportAppendix(mixedExport).Should().NotContain("stale line");
     }
 
     [Fact]

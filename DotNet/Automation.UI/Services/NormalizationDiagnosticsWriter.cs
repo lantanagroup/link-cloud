@@ -223,16 +223,19 @@ internal static class NormalizationDiagnosticsWriter
         {
             var inline = Copy(source);
             inline.EvidenceChunkCount = 0;
+            inline.EvidenceAttemptId = string.Empty;
             return new PersistencePlan(inline, []);
         }
 
-        var chunks = PackChunks(source.SummaryLines, source.ParsedSteps, maxUtf8Bytes);
+        var attemptId = Guid.NewGuid().ToString("N");
+        var chunks = PackChunks(source.SummaryLines, source.ParsedSteps, maxUtf8Bytes, attemptId);
         var header = Copy(source);
         header.SummaryLines = [];
         header.RawLinesOmitted = false;
         header.ParsedSteps = Collapse(source.ParsedSteps);
         header.StepsCollapsed = source.ParsedSteps.Count > 0;
         header.EvidenceChunkCount = chunks.Count;
+        header.EvidenceAttemptId = attemptId;
         return new PersistencePlan(header, chunks);
     }
 
@@ -240,18 +243,26 @@ internal static class NormalizationDiagnosticsWriter
         NormalizationEvidenceSnapshot header,
         IReadOnlyList<NormalizationEvidenceChunk> chunks)
     {
-        if (header.EvidenceChunkCount == 0 || chunks.Count == 0)
+        if (header.EvidenceChunkCount == 0)
             return header;
 
+        var usable = ChunksForAttempt(header, chunks);
+        if (usable.Count != header.EvidenceChunkCount)
+        {
+            var incomplete = Copy(header);
+            incomplete.SummaryLines = [];
+            incomplete.RawLinesOmitted = true;
+            incomplete.EvidenceChunkCount = 0;
+            return incomplete;
+        }
+
         var assembled = Copy(header);
-        var lines = chunks.SelectMany(c => c.SummaryLines).ToList();
+        var lines = usable.SelectMany(c => c.SummaryLines).ToList();
         if (lines.Count > 0)
             assembled.SummaryLines = lines;
 
-        // A missing chunk would make a partial step list look like the full inventory
-        // and hide the collapsed counts that were stored on the header.
-        var steps = chunks.SelectMany(c => c.ParsedSteps).ToList();
-        if (chunks.Count >= header.EvidenceChunkCount && steps.Count > 0)
+        var steps = usable.SelectMany(c => c.ParsedSteps).ToList();
+        if (steps.Count > 0)
         {
             assembled.ParsedSteps = steps;
             assembled.StepsCollapsed = false;
@@ -260,77 +271,110 @@ internal static class NormalizationDiagnosticsWriter
         return assembled;
     }
 
+    private static List<NormalizationEvidenceChunk> ChunksForAttempt(
+        NormalizationEvidenceSnapshot header,
+        IReadOnlyList<NormalizationEvidenceChunk> chunks)
+    {
+        if (string.IsNullOrEmpty(header.EvidenceAttemptId))
+            return [.. chunks];
+
+        return chunks.Where(c => c.EvidenceAttemptId == header.EvidenceAttemptId).ToList();
+    }
+
     private static List<NormalizationEvidenceChunk> PackChunks(
         IReadOnlyList<string> lines,
         IReadOnlyList<NormalizationEvidenceStep> steps,
-        int maxUtf8Bytes)
+        int maxUtf8Bytes,
+        string attemptId)
     {
         var chunks = new List<NormalizationEvidenceChunk>();
-        var current = new NormalizationEvidenceChunk();
+        var lineBuffer = new List<string>();
+        var stepBuffer = new List<NormalizationEvidenceStep>();
+        var used = EmptyChunkBytes(attemptId);
 
         void Flush()
         {
-            if (current.SummaryLines.Count == 0 && current.ParsedSteps.Count == 0)
+            if (lineBuffer.Count == 0 && stepBuffer.Count == 0)
                 return;
-            chunks.Add(current);
-            current = new NormalizationEvidenceChunk();
+            chunks.Add(new NormalizationEvidenceChunk
+            {
+                EvidenceAttemptId = attemptId,
+                SummaryLines = [.. lineBuffer],
+                ParsedSteps = [.. stepBuffer]
+            });
+            lineBuffer.Clear();
+            stepBuffer.Clear();
+            used = EmptyChunkBytes(attemptId);
         }
 
         foreach (var line in lines)
         {
             var stored = line;
-            var candidate = CopyChunk(current);
-            candidate.SummaryLines.Add(stored);
-            if (SerializedChunkBytes(candidate) > maxUtf8Bytes && (current.SummaryLines.Count > 0 || current.ParsedSteps.Count > 0))
+            var cost = JsonStringBytes(stored) + (lineBuffer.Count == 0 ? 0 : 1) + 8;
+            if (used + cost > maxUtf8Bytes && (lineBuffer.Count > 0 || stepBuffer.Count > 0))
             {
                 Flush();
-                candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+                cost = JsonStringBytes(stored) + 8;
             }
 
-            if (SerializedChunkBytes(candidate) > maxUtf8Bytes)
-                candidate = FitSingleLine(stored, maxUtf8Bytes);
+            if (used + cost > maxUtf8Bytes)
+            {
+                stored = FitSingleLine(stored, maxUtf8Bytes, attemptId);
+                cost = JsonStringBytes(stored);
+            }
 
-            current = candidate;
+            lineBuffer.Add(stored);
+            used += cost;
         }
 
         foreach (var step in steps)
         {
-            var candidate = CopyChunk(current);
-            candidate.ParsedSteps.Add(step);
-            if (SerializedChunkBytes(candidate) > maxUtf8Bytes && (current.SummaryLines.Count > 0 || current.ParsedSteps.Count > 0))
+            var cost = StepBytes(step) + (stepBuffer.Count == 0 ? 0 : 1) + 8;
+            if (used + cost > maxUtf8Bytes && (lineBuffer.Count > 0 || stepBuffer.Count > 0))
             {
                 Flush();
-                candidate = new NormalizationEvidenceChunk { ParsedSteps = [step] };
+                cost = StepBytes(step) + 8;
             }
 
-            current = candidate;
+            stepBuffer.Add(step);
+            used += cost;
         }
 
         Flush();
         return chunks;
     }
 
-    private static NormalizationEvidenceChunk FitSingleLine(string line, int maxUtf8Bytes)
+    private static string FitSingleLine(string line, int maxUtf8Bytes, string attemptId)
     {
         const string suffix = " [truncated: exceeded snapshot chunk budget]";
         var stored = line;
-        var candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+        var candidate = new NormalizationEvidenceChunk
+        {
+            EvidenceAttemptId = attemptId,
+            SummaryLines = [stored]
+        };
         while (SerializedChunkBytes(candidate) > maxUtf8Bytes && stored.Length > suffix.Length + 32)
         {
             var keepChars = Math.Max(32, (stored.Length - suffix.Length) / 2);
             stored = stored[..keepChars] + suffix;
-            candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+            candidate = new NormalizationEvidenceChunk
+            {
+                EvidenceAttemptId = attemptId,
+                SummaryLines = [stored]
+            };
         }
 
-        return candidate;
+        return stored;
     }
 
-    private static NormalizationEvidenceChunk CopyChunk(NormalizationEvidenceChunk source)
-        => new()
-        {
-            SummaryLines = [.. source.SummaryLines],
-            ParsedSteps = [.. source.ParsedSteps]
-        };
+    private static int EmptyChunkBytes(string attemptId)
+        => SerializedChunkBytes(new NormalizationEvidenceChunk { EvidenceAttemptId = attemptId });
+
+    private static int JsonStringBytes(string value)
+        => Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(value));
+
+    private static int StepBytes(NormalizationEvidenceStep step)
+        => Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(step));
 
     private static int SerializedChunkBytes(NormalizationEvidenceChunk chunk)
         => Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(chunk));
@@ -361,6 +405,7 @@ internal static class NormalizationDiagnosticsWriter
             RawLinesOmitted = source.RawLinesOmitted,
             StepsCollapsed = source.StepsCollapsed,
             EvidenceChunkCount = source.EvidenceChunkCount,
+            EvidenceAttemptId = source.EvidenceAttemptId,
             SummaryLines = [.. source.SummaryLines],
             RuntimeSequences = [.. source.RuntimeSequences],
             SuiteSequences = [.. source.SuiteSequences],

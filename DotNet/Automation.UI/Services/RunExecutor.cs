@@ -1184,6 +1184,26 @@ internal sealed class RunExecutor
             async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
             {
                 var plan = NormalizationDiagnosticsWriter.PlanPersistence(evidence);
+                for (var index = 0; index < plan.Chunks.Count; index++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await _snapshotStore.SetDomainAsync(
+                            state.RunId,
+                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
+                            plan.Chunks[index],
+                            ct);
+                    }
+                    catch (Exception ex) when (!ct.IsCancellationRequested)
+                    {
+                        output.WriteLine(
+                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}");
+                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                        return;
+                    }
+                }
+
                 try
                 {
                     await _snapshotStore.SetDomainAsync(
@@ -1199,28 +1219,10 @@ internal sealed class RunExecutor
                     return;
                 }
 
-                if (plan.Chunks.Count == 0)
-                    return;
-
-                output.WriteLine(
-                    $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
-
-                for (var index = 0; index < plan.Chunks.Count; index++)
+                if (plan.Chunks.Count > 0)
                 {
-                    ct.ThrowIfCancellationRequested();
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
-                            plan.Chunks[index],
-                            ct);
-                    }
-                    catch (Exception ex) when (!ct.IsCancellationRequested)
-                    {
-                        output.WriteLine(
-                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}. Suite validation continues with the collected Loki lines.");
-                    }
+                    output.WriteLine(
+                        $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
                 }
             }
 
