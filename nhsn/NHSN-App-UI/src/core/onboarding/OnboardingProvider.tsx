@@ -386,6 +386,9 @@ export function OnboardingProvider({
 
   const completeGoTo = useCallback((stepId: StepId) => {
     startStepTransition(() => {
+      // Cleared inside the transition so the button spinner holds until the new step commits,
+      // not just until the save resolves - otherwise a slow step load shows no feedback at all.
+      setNavDirection(null);
       setUrlTarget(undefined);
       dispatch({type: 'step/unlock', stepId});
       dispatch({type: 'step/goto', stepId});
@@ -467,15 +470,16 @@ export function OnboardingProvider({
 
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
+      setNavDirection(direction);
       if (!dirtyRef.current) {
         completeGoTo(stepId);
         return;
       }
-      setNavDirection(direction);
       persistDraft(draft).then(saved => {
-        setNavDirection(null);
         if (saved) {
           completeGoTo(stepId);
+        } else {
+          setNavDirection(null);
         }
       });
     },
@@ -497,6 +501,11 @@ export function OnboardingProvider({
     }
     const previous = previousStepId(target.stepId, draft, user);
     if (previous) {
+      // A dirty step routes through the unsaved-changes prompt instead, so only a direct move
+      // marks Back as the button in progress.
+      if (!dirtyRef.current && !stepUnsavedRef.current?.isDirty()) {
+        setNavDirection('back');
+      }
       goTo(previous);
     }
   }, [target, draft, user, goTo]);
@@ -533,7 +542,7 @@ export function OnboardingProvider({
       commitState,
       goHome: onGoHome,
       saving: saving || isStepPending,
-      savingDirection: saving ? navDirection : null,
+      savingDirection: saving || isStepPending ? navDirection : null,
       patch,
       mirror,
       save,
