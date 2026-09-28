@@ -576,7 +576,8 @@ public class LokiScraper
     public async Task<string?> GetValidationActivitySummaryAsync(
         TimeSpan lookback,
         string? facilityId = null,
-        string? reportId = null)
+        string? reportId = null,
+        CancellationToken cancellationToken = default)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -591,7 +592,8 @@ public class LokiScraper
             query += $" |= \"{reportId}\"";
         try
         {
-            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            var (statusCode, content) = await ExecuteQueryRangeAsync(
+                query, startUnix, endUnix, limit: 200, cancellationToken: cancellationToken);
             if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 

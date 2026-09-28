@@ -87,7 +87,10 @@ public class ProgressMonitor
     /// activity confirmation, and stall detection.
     /// Returns true if a critical failure is detected.
     /// </summary>
-    public async Task<bool> CheckProgressAsync(string facilityId, string reportId)
+    public async Task<bool> CheckProgressAsync(
+        string facilityId,
+        string reportId,
+        CancellationToken cancellationToken = default)
     {
         _progressCheckCount++;
         var hasCriticalFailure = false;
@@ -103,17 +106,24 @@ public class ProgressMonitor
             await _progressTracker.UpdateAsync(facilityId, reportId);
         }
 
-        await CheckPipelineActivityAsync(facilityId, reportId);
+        await CheckPipelineActivityAsync(facilityId, reportId, cancellationToken);
 
         return hasCriticalFailure;
     }
 
-    private async Task CheckPipelineActivityAsync(string facilityId, string reportId)
+    /// <summary>
+    /// The shutdown cycle passes <see cref="CancellationToken.None"/>. Skip the scrape then,
+    /// so stop does not wait out an HTTP timeout. A live monitor token is required.
+    /// </summary>
+    internal static bool ShouldScrapeValidationActivity(CancellationToken cancellationToken)
+        => cancellationToken.CanBeCanceled && !cancellationToken.IsCancellationRequested;
+
+    private async Task CheckPipelineActivityAsync(string facilityId, string reportId, CancellationToken cancellationToken)
     {
         if (_lokiScraper == null)
             return;
 
-        await NoteValidationActivityAsync(facilityId, reportId);
+        await NoteValidationActivityAsync(facilityId, reportId, cancellationToken);
 
         if (_progressCheckCount % ActivityCheckInterval != 0)
             return;
@@ -152,12 +162,16 @@ public class ProgressMonitor
 
     }
 
-    private async Task NoteValidationActivityAsync(string facilityId, string reportId)
+    private async Task NoteValidationActivityAsync(string facilityId, string reportId, CancellationToken cancellationToken)
     {
+        if (!ShouldScrapeValidationActivity(cancellationToken))
+            return;
+
         var validationActivity = await _lokiScraper!.GetValidationActivitySummaryAsync(
             AutomationRunPollingPolicy.ValidationActivityLookback,
             facilityId,
-            reportId);
+            reportId,
+            cancellationToken);
         if (!string.IsNullOrWhiteSpace(validationActivity))
         {
             _validationWork.NoteActivity();

@@ -103,7 +103,10 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
 
     public async Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        var critical = await _progressMonitor.CheckProgressAsync(state.CorrelationId1, state.CorrelationId2);
+        var critical = await _progressMonitor.CheckProgressAsync(
+            state.CorrelationId1,
+            state.CorrelationId2,
+            cancellationToken);
 
         var issues = new List<MonitorIssue>();
         if (critical)
