@@ -291,6 +291,7 @@
       "listLabel": "Managing Organizations",
       "placeholder": "Managing Organization",
       "add": "+ Add Managing Organization",
+      "duplicateError": "This Managing Organization has already been added.",
       "tooltip": "Add the identifiers of the FHIR Organization resources that manage your facility's Locations. NHSNLink uses these to determine which Locations belong to your facility."
     },
     "locationType": {
@@ -343,6 +344,7 @@
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
       "duplicateLocationTypes": "Two or more rows have the same Location Type Code and Location Alias. Each combination must be unique.",
       "duplicateLocationIdentifiers": "Two or more rows have the same Location Identifier System and Code. Each combination must be unique.",
+      "duplicateManagingOrganizations": "Two or more rows have the same Managing Organization. Each value must be unique.",
       "invalidFhirPath": "Enter a valid FHIRPath expression (e.g. Location.identifier.where(system = 'urn:oid:1.2.3' and value = 'ABC').exists())."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
