@@ -283,7 +283,9 @@
       "addSelected": "Add",
       "listLabel": "Location Type Code / Location Alias",
       "codeLabel": "Location Type Code",
+      "codePlaceholder": "location.type.code",
       "aliasLabel": "Location Alias",
+      "aliasPlaceholder": "location.alias",
       "add": "+ Add Location Type",
       "columns": {
         "id": "Location Id",

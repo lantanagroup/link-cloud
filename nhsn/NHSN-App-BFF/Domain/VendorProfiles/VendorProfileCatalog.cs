@@ -40,7 +40,7 @@ public static class VendorProfileCatalog
             JwksInstructions = "epic-jwks-instructions",
             LocationOrgResolution = "location-org-resolution"
         },
-        HslocSourceLabel = "location.identifier.value"
+        HslocSourceLabel = "Location.identifier.value"
     };
 
     private static readonly VendorProfile Cerner = new()
@@ -62,7 +62,8 @@ public static class VendorProfileCatalog
             JwksInstructions = "cerner-jwks-instructions",
             LocationOrgResolution = "location-org-resolution"
         },
-        HslocSourceLabel = "location.identifier.alias"
+        // Alias is a plain string array, not part of Location.identifier - no .system/.value split.
+        HslocSourceLabel = "Location.alias"
     };
 
     public static IReadOnlyList<VendorProfile> All { get; } = [Epic, Cerner];
