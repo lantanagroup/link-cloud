@@ -407,6 +407,49 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetFhirAuthenticationConfigurationAsync_CallsExpectedEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{\"tokenUrl\":\"https://v.test/token\",\"clientSecretStored\":true}");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetFhirAuthenticationConfigurationAsync("f1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data-acquisition/facilities/f1/fhir-authentication-configuration", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirAuthenticationConfigurationAsync_CallsExpectedEndpoint()
+    {
+        using var http = new FakeHttpBoundary("{}", 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.UpdateFhirAuthenticationConfigurationAsync("f1", new { tokenUrl = "https://v.test/token" });
+        var request = http.SingleRequest();
+
+        Assert.Equal("PUT", request.Method);
+        Assert.Equal("/api/data-acquisition/facilities/f1/fhir-authentication-configuration", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateFhirAuthenticationConfigurationAsync_DoesNotCaptureTheRequestBody()
+    {
+        const string oauthTestSecret = "cl13nt-secret-must-not-leak";
+        using var http = new FakeHttpBoundary("{}", 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.UpdateFhirAuthenticationConfigurationAsync(
+            "f1",
+            new { tokenUrl = "https://v.test/token", clientId = "c1", clientSecret = oauthTestSecret, scope = "s" });
+        var request = http.SingleRequest();
+
+        // The secret did go to the service, but it must not be kept on the response, which callers display
+        Assert.Contains(oauthTestSecret, request.Body);
+        Assert.Null(result.RequestBody);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task GetOrganizationLocationMappingAsync_GetsMappingById()
     {
         using var http = new FakeHttpBoundary("{\"locationMappingId\":7,\"facilityId\":\"f1\",\"locationName\":\"ICU\"}");
