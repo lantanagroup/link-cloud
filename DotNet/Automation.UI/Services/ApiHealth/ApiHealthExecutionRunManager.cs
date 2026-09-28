@@ -383,7 +383,7 @@ public sealed class ApiHealthExecutionRunManager(
             StringComparison.OrdinalIgnoreCase))
         {
             baseUrl = configuration["ServiceRegistry:TenantService:TenantServiceUrl"];
-            relativePath = "/facility/info";
+            relativePath = "/api/facility/info";
         }
         else if (string.Equals(
             serviceName,
