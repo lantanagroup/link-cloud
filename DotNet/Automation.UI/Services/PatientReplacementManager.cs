@@ -94,7 +94,8 @@ public sealed class PatientReplacementManager : IDisposable
             var replaySucceeded = await loader.UploadBundlesSequentiallyAsync(
                 output,
                 replayBundles,
-                $"[replace:{operation.PatientId}] ");
+                $"[replace:{operation.PatientId}] ",
+                cancellationToken: ct);
 
             if (!replaySucceeded)
             {

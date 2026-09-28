@@ -143,6 +143,10 @@ public sealed class LivePatientEventInjector(
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to generate live pool patient for run {RunId}.", runId);
@@ -184,6 +188,10 @@ public sealed class LivePatientEventInjector(
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to upload live pool patient for run {RunId}.", runId);
@@ -219,6 +227,10 @@ public sealed class LivePatientEventInjector(
                 : new LiveProvisionedPatient(patientId.Trim(), ExpectedInReport: false);
         }
         catch (LiveInjectionException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             throw;
         }
