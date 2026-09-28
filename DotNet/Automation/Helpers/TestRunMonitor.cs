@@ -148,6 +148,12 @@ public sealed class TestRunMonitor
         if (result.AcquisitionInFlight.HasValue)
             State.AcquisitionInFlight = result.AcquisitionInFlight.Value;
 
+        if (result.ValidationOngoing.HasValue)
+            State.ValidationOngoing = result.ValidationOngoing.Value;
+
+        if (result.PendingValidationCount.HasValue)
+            State.PendingValidationCount = result.PendingValidationCount.Value;
+
         if (result.MessageBusErrorCount.HasValue)
             State.MessageBusErrorCount = result.MessageBusErrorCount.Value;
 

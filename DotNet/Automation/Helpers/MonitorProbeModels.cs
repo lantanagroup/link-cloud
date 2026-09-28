@@ -26,6 +26,8 @@ public sealed class MonitorProbeResult
     public DateTime? LastProgressUtc { get; init; }
     public int? AcquisitionResourcesAcquired { get; init; }
     public bool? AcquisitionInFlight { get; init; }
+    public bool? ValidationOngoing { get; init; }
+    public int? PendingValidationCount { get; init; }
     public List<MonitorIssue> Issues { get; init; } = [];
 }
 
@@ -47,6 +49,8 @@ public sealed class TestMonitorState
     public DateTime LastProgressUtc { get; set; }
     public int AcquisitionResourcesAcquired { get; set; }
     public bool AcquisitionInFlight { get; set; }
+    public bool ValidationOngoing { get; set; }
+    public int PendingValidationCount { get; set; }
 
     public IReadOnlyCollection<string> CompletedMilestones => _completedMilestones;
     public IReadOnlyList<MonitorIssue> Issues => _issues;
@@ -65,6 +69,8 @@ public sealed class TestMonitorState
         LastProgressUtc = default;
         AcquisitionResourcesAcquired = 0;
         AcquisitionInFlight = false;
+        ValidationOngoing = false;
+        PendingValidationCount = 0;
         _completedMilestones.Clear();
         _issues.Clear();
     }

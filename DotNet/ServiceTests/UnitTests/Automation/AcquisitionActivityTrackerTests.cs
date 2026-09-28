@@ -110,8 +110,95 @@ public class AcquisitionActivityTrackerTests
     }
 
     [Fact]
-    public void Max_extra_duration_is_six_hours_so_validation_can_outlive_the_hard_timeout()
+    public void Max_extra_duration_still_bounds_keep_alive_when_validation_is_not_running()
     {
         AcquisitionActivityTracker.MaxExtraDuration.Should().Be(TimeSpan.FromHours(6));
+    }
+
+    [Fact]
+    public void Decide_does_not_time_out_while_validation_is_ongoing_past_the_extra_cap()
+    {
+        var start = new DateTime(2026, 9, 25, 17, 58, 14, DateTimeKind.Utc);
+        var hardTimeout = TimeSpan.FromHours(6);
+        var deadline = start + hardTimeout + AcquisitionActivityTracker.MaxExtraDuration + TimeSpan.FromHours(1);
+        var now = deadline.AddSeconds(1);
+
+        var decision = AcquisitionActivityTracker.Decide(
+            now, start, hardTimeout, deadline, validationOngoing: true, hasRecentProgress: false);
+
+        decision.Continue.Should().BeTrue();
+        decision.HeldForValidation.Should().BeTrue();
+        decision.Deadline.Should().Be(now + AcquisitionActivityTracker.DeadlineExtension);
+    }
+
+    [Fact]
+    public void Decide_census_window_miss_does_not_fail_while_validation_work_was_observed()
+    {
+        // 6010-patient run: keep-alive extended every 5 minutes, then the 2-minute
+        // progress window missed the last validation sample and the hard timeout won.
+        var start = new DateTime(2026, 9, 25, 17, 58, 14, DateTimeKind.Utc);
+        var hardTimeout = TimeSpan.FromSeconds(21600);
+        var deadline = start + hardTimeout;
+        var now = deadline;
+
+        for (var extension = 0; extension < 11; extension++)
+        {
+            var decision = AcquisitionActivityTracker.Decide(
+                now, start, hardTimeout, deadline, validationOngoing: true, hasRecentProgress: false);
+
+            decision.Continue.Should().BeTrue($"extension {extension} must not time out");
+            decision.HeldForValidation.Should().BeTrue();
+            deadline = decision.Deadline;
+            now = deadline.AddSeconds(1);
+        }
+
+        now.Should().BeAfter(start + hardTimeout + TimeSpan.FromMinutes(50));
+    }
+
+    [Fact]
+    public void Decide_stops_when_the_pipeline_is_idle()
+    {
+        var start = new DateTime(2026, 9, 25, 17, 58, 14, DateTimeKind.Utc);
+        var hardTimeout = TimeSpan.FromHours(6);
+        var deadline = start + hardTimeout;
+
+        var decision = AcquisitionActivityTracker.Decide(
+            deadline.AddSeconds(1), start, hardTimeout, deadline, validationOngoing: false, hasRecentProgress: false);
+
+        decision.Continue.Should().BeFalse();
+        decision.HeldForValidation.Should().BeFalse();
+        decision.Deadline.Should().Be(deadline);
+    }
+
+    [Fact]
+    public void Validation_queue_stays_open_across_a_sample_gap_after_work_is_seen()
+    {
+        var signal = new ValidationWorkSignal();
+
+        signal.ObserveCounts(pendingValidation: 2636, passedValidation: 662, failedValidation: 2711);
+        signal.IsOngoing.Should().BeFalse();
+
+        signal.ObserveCounts(pendingValidation: 2634, passedValidation: 662, failedValidation: 2713);
+        signal.IsOngoing.Should().BeTrue();
+        signal.PendingValidation.Should().Be(2634);
+
+        signal.ObserveCounts(pendingValidation: 2634, passedValidation: 662, failedValidation: 2713);
+        signal.IsOngoing.Should().BeTrue();
+
+        signal.ObserveCounts(pendingValidation: 0, passedValidation: 3299, failedValidation: 2711);
+        signal.IsOngoing.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validation_activity_holds_a_single_patient_whose_counts_have_not_moved()
+    {
+        var signal = new ValidationWorkSignal();
+        signal.ObserveCounts(pendingValidation: 1, passedValidation: 0, failedValidation: 0);
+        signal.NoteActivity();
+
+        signal.IsOngoing.Should().BeTrue();
+
+        signal.ObserveCounts(pendingValidation: 1, passedValidation: 0, failedValidation: 0);
+        signal.IsOngoing.Should().BeTrue();
     }
 }

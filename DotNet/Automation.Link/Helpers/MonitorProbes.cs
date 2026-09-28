@@ -126,6 +126,8 @@ public sealed class ProgressProbe : IBackgroundMonitorProbe
                 : _progressMonitor.LastAcquisitionProgressUtc,
             AcquisitionResourcesAcquired = _progressMonitor.LastResourcesAcquired,
             AcquisitionInFlight = _progressMonitor.IsAcquisitionInFlight,
+            ValidationOngoing = _progressMonitor.IsValidationOngoing,
+            PendingValidationCount = _progressMonitor.PendingValidationCount,
             Issues = issues
         };
     }

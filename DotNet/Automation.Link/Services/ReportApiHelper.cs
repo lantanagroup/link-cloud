@@ -318,11 +318,8 @@ public class ReportApiHelper
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
-                {
-                    if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
-                        break;
-                }
+                if (!AdvanceDeadline(diagnostics, ref milestonePhaseStart, hardTimeout, ref milestoneDeadline))
+                    break;
                 if (diagnostics.HasCriticalFailure)
                 {
                     _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
@@ -392,11 +389,8 @@ public class ReportApiHelper
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
-            {
-                if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
-                    break;
-            }
+            if (!AdvanceDeadline(diagnostics, ref submissionPhaseStart, hardTimeout, ref submissionDeadline))
+                break;
             if (diagnostics?.HasCriticalFailure == true)
             {
                 _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
@@ -561,29 +555,57 @@ public class ReportApiHelper
             : adaptiveFloor;
     }
 
-    private bool TryKeepAlive(
+    private bool _validationHoldActive;
+
+    /// <summary>
+    /// Keeps the poll alive. Validation that is still working has no timeout.
+    /// When that queue drains, the configured hard timeout starts again for
+    /// whatever work is left. Other in-flight acquisition can still extend a
+    /// deadline, and that path remains capped.
+    /// </summary>
+    private bool AdvanceDeadline(
         BackgroundDiagnosticsMonitor? diagnostics,
-        DateTime phaseStart,
+        ref DateTime phaseStart,
         TimeSpan hardTimeout,
         ref DateTime deadline)
     {
-        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
-        if (!AcquisitionActivityTracker.TryExtendDeadline(
-                DateTime.UtcNow,
-                phaseStart,
-                hardTimeout,
-                hasProgress,
-                ref deadline,
-                out var extendedBy))
+        var validationOngoing = diagnostics?.IsValidationOngoing == true;
+        if (_validationHoldActive && !validationOngoing && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
         {
-            return false;
+            phaseStart = DateTime.UtcNow;
+            deadline = phaseStart + hardTimeout;
+            _validationHoldActive = false;
+            _output.WriteLine("[DIAG] Validation finished. The configured timeout applies to the rest of the run.");
         }
 
-        _output.WriteLine(
-            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
-            $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
-            $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
-        return true;
+        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
+        var decision = AcquisitionActivityTracker.Decide(
+            DateTime.UtcNow,
+            phaseStart,
+            hardTimeout,
+            deadline,
+            validationOngoing,
+            hasProgress);
+
+        deadline = decision.Deadline;
+        if (decision.HeldForValidation)
+        {
+            _validationHoldActive = true;
+            _output.WriteLine(
+                $"[DIAG] Validation is still working ({diagnostics!.PendingValidationCount} patients open). " +
+                "This run will not time out while validation is in progress.");
+            return true;
+        }
+
+        if (decision.ExtendedBy > TimeSpan.Zero)
+        {
+            _output.WriteLine(
+                $"[DIAG] Keep-alive: acquisition still progressing " +
+                $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
+                $"Extending poll deadline by {decision.ExtendedBy.TotalSeconds:F0}s.");
+        }
+
+        return decision.Continue;
     }
 
     public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)

@@ -57,6 +57,10 @@
                 }
             </div>
             <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <div id="validationHoldBanner" class="alert alert-info mt-3 mb-0 py-2 small" style="display:none;" role="status">
+                <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
+                <span id="validationHoldText"></span>
+            </div>
             <span id="finalizingBadge" class="badge rounded-pill bg-secondary text-white mt-2" style="display:none;">
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
                 <span id="finalizingBadgeText">Finalizing…</span>
@@ -395,7 +399,7 @@
             </div>
 
             <div class="au-card">
-                <div class="card-header"><i class="bi bi-shield-check me-2"></i>Validation</div>
+                <div class="card-header"><i class="bi bi-shield-check me-2"></i>Validation <span class="badge text-bg-info ms-2" id="validationOngoingBadge" style="display:none;">In progress</span></div>
                 <div class="card-body">
                     <div class="row g-3 mb-3">
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Patients</div><div class="fs-4 fw-semibold" id="validationPatientCount">0</div></div></div>
@@ -602,6 +606,7 @@
         };
         const charts = {};
         let currentRunStatus = '@Model.Status';
+        let validationPatientsOpen = 0;
         let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
         let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
         let snapshotTimer = null;
@@ -1136,6 +1141,33 @@
             return 'bg-secondary';
         }
 
+        function showValidationHold() {
+            const banner = document.getElementById('validationHoldBanner');
+            const badge = document.getElementById('validationOngoingBadge');
+            const open = !isRunComplete(currentRunStatus) && validationPatientsOpen > 0;
+            if (badge)
+                badge.style.display = open ? '' : 'none';
+            if (!banner)
+                return;
+            banner.style.display = open ? '' : 'none';
+            if (!open)
+                return;
+            const noun = validationPatientsOpen === 1 ? 'patient is' : 'patients are';
+            const text = document.getElementById('validationHoldText');
+            if (text)
+                text.textContent = `${validationPatientsOpen} ${noun} still pending validation. This run stays up while that work is moving. Cancel the run to stop it.`;
+        }
+
+        function countPendingValidation(snapshot) {
+            const counts = (snapshot && snapshot.validation && snapshot.validation.statusCounts) || [];
+            return counts.reduce((sum, item) => {
+                const status = String(item.status || item.Status || '').toLowerCase();
+                if (status !== 'pendingvalidation')
+                    return sum;
+                return sum + Number(item.count || item.Count || 0);
+            }, 0);
+        }
+
         function isRunComplete(status) {
             const value = String(status || '').toLowerCase();
             return value === 'succeeded' || value === 'failed' || value === 'cancelled' || value === '3' || value === '4' || value === '2';
@@ -1542,6 +1574,7 @@
             document.getElementById('scheduleReportName').textContent = reportIdFromStatus;
             document.getElementById('headerReportId').textContent = reportIdFromStatus;
             document.getElementById('status').textContent = displayStatus(run.status);
+            showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
@@ -2048,6 +2081,9 @@
                 const validationTotal = validationFunnel.reduce((acc, item) => acc + (item.count || 0), 0);
                 const validationPassed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'passedvalidation') || {}).count || 0;
                 const validationFailed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'failedvalidation') || {}).count || 0;
+
+                validationPatientsOpen = countPendingValidation(snapshot);
+                showValidationHold();
 
                 document.getElementById('validationPatientCount').textContent = validationTotal;
                 document.getElementById('validationPassedCount').textContent = validationPassed;

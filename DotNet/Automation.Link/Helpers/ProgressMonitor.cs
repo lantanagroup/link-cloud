@@ -25,6 +25,7 @@ public class ProgressMonitor
     private int _lastCompletedAcqCount;
     private string? _lastAcqBreakdown;
     private readonly AcquisitionActivityTracker _acquisitionActivity = new();
+    private readonly ValidationWorkSignal _validationWork = new();
     private int _progressCheckCount;
     private string? _lastMeasureEvalActivity;
     private string? _lastValidationActivity;
@@ -39,6 +40,15 @@ public class ProgressMonitor
 
     /// <summary>True when at least one DA log is currently Processing.</summary>
     public bool IsAcquisitionInFlight => _acquisitionActivity.InFlight;
+
+    /// <summary>
+    /// True once validation has moved or reported activity and patients are still pending.
+    /// Stays true across quiet samples. Pending patients with no observed work do not count.
+    /// </summary>
+    public bool IsValidationOngoing => _validationWork.IsOngoing;
+
+    /// <summary>Patients whose reporting status is still PendingValidation.</summary>
+    public int PendingValidationCount => _validationWork.PendingValidation;
 
     public bool HasRecentAcquisitionProgress(TimeSpan window, DateTime? utcNow = null)
         => _acquisitionActivity.HasRecentProgress(window, utcNow ?? DateTime.UtcNow);
@@ -144,6 +154,7 @@ public class ProgressMonitor
             reportId);
         if (!string.IsNullOrWhiteSpace(validationActivity))
         {
+            _validationWork.NoteActivity();
             _acquisitionActivity.MarkProgress(DateTime.UtcNow);
             _progressTracker?.NoteActivity();
             if (!string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
@@ -196,12 +207,17 @@ public class ProgressMonitor
                             $"Submission: pending={pending}, submitting={submitting}, " +
                             $"submitted={submitted}, failed={failed}";
 
-            if (total != _lastReportEntryCount || breakdown != _lastReportBreakdown)
+            var breakdownChanged = total != _lastReportEntryCount || breakdown != _lastReportBreakdown;
+            if (breakdownChanged)
             {
                 _output.WriteLine($"[DIAG][Report] Entries: {total} total | Reporting: {breakdown}");
+                if (_lastReportBreakdown != null)
+                    _acquisitionActivity.MarkProgress(DateTime.UtcNow);
                 _lastReportEntryCount = total;
                 _lastReportBreakdown = breakdown;
             }
+
+            _validationWork.ObserveCounts(pendingValidation, passedValidation, failedValidation);
 
             if (failed > 0)
             {
