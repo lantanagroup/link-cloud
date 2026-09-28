@@ -9,11 +9,96 @@ namespace UnitTests.AutomationUI;
 public class NormalizationEvidencePersistenceTests
 {
     [Fact]
-    public void Normalization_evidence_is_externalized_when_it_outgrows_an_inline_document()
+    public void Normalization_evidence_stays_in_the_snapshot_store()
     {
         var settings = new ImportedBundleBlobStorageSettings();
 
-        settings.SnapshotPayloadExternalizedDomains.Should().Contain(NormalizationEvidenceSnapshot.Domain);
+        settings.SnapshotPayloadExternalizedDomains.Should().NotContain(NormalizationEvidenceSnapshot.Domain);
+    }
+
+    [Fact]
+    public void Snapshot_under_the_cap_is_one_document()
+    {
+        var snapshot = new NormalizationEvidenceSnapshot
+        {
+            SuiteName = "System Default",
+            CollectedLineCount = 1,
+            SummaryLines = ["one line"],
+            ParsedSteps = [Step("Observation", "obs-1", 1, "Success")]
+        };
+
+        var plan = NormalizationDiagnosticsWriter.PlanPersistence(snapshot, maxUtf8Bytes: 50_000);
+
+        plan.Chunks.Should().BeEmpty();
+        plan.Header.EvidenceChunkCount.Should().Be(0);
+        plan.Header.SummaryLines.Should().Equal(snapshot.SummaryLines);
+        plan.Header.ParsedSteps.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Oversized_evidence_is_chunked_and_reassembles_without_losing_counts()
+    {
+        var lines = new[] { new string('x', 3_000), new string('y', 3_000), new string('z', 3_000) };
+        var steps = Enumerable.Range(0, 30)
+            .Select(i => Step("Observation", $"obs-{i}", 1, "Success"))
+            .ToList();
+        var snapshot = new NormalizationEvidenceSnapshot
+        {
+            SuiteName = "System Default",
+            CollectedLineCount = lines.Length,
+            SummaryLines = [.. lines],
+            ParsedSteps = steps
+        };
+
+        var plan = NormalizationDiagnosticsWriter.PlanPersistence(snapshot, maxUtf8Bytes: 4_000);
+
+        plan.Chunks.Count.Should().BeGreaterThan(1);
+        plan.Header.EvidenceChunkCount.Should().Be(plan.Chunks.Count);
+        plan.Header.SummaryLines.Should().BeEmpty();
+        plan.Header.RawLinesOmitted.Should().BeFalse();
+        plan.Header.StepsCollapsed.Should().BeTrue();
+        plan.Header.ParsedSteps.Should().ContainSingle();
+        plan.Header.ParsedSteps[0].Count.Should().Be(30);
+        plan.Header.CollectedLineCount.Should().Be(lines.Length);
+        NormalizationDiagnosticsWriter.SerializedUtf8Bytes(plan.Header).Should().BeLessThanOrEqualTo(4_000);
+        foreach (var chunk in plan.Chunks)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetByteCount(System.Text.Json.JsonSerializer.Serialize(chunk));
+            bytes.Should().BeLessThanOrEqualTo(4_000);
+        }
+
+        var assembled = NormalizationDiagnosticsWriter.Assemble(plan.Header, plan.Chunks);
+        assembled.SummaryLines.Should().Equal(lines);
+        assembled.ParsedSteps.Should().HaveCount(30);
+        assembled.StepsCollapsed.Should().BeFalse();
+
+        var partial = NormalizationDiagnosticsWriter.Assemble(plan.Header, plan.Chunks.Take(1).ToList());
+        partial.ParsedSteps.Should().ContainSingle();
+        partial.ParsedSteps[0].Count.Should().Be(30);
+        partial.StepsCollapsed.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Export_distinguishes_omitted_and_chunked_lines_from_an_empty_scrape()
+    {
+        var omitted = NormalizationDiagnosticsWriter.FormatExportAppendix(new NormalizationEvidenceSnapshot
+        {
+            CollectedLineCount = 12,
+            RawLinesOmitted = true
+        });
+        omitted.Should().Contain("12 collected; raw lines omitted");
+        omitted.Should().NotContain("(none collected)");
+
+        var chunked = NormalizationDiagnosticsWriter.FormatExportAppendix(new NormalizationEvidenceSnapshot
+        {
+            CollectedLineCount = 4,
+            EvidenceChunkCount = 3
+        });
+        chunked.Should().Contain("raw lines are stored in 3 snapshot chunk(s)");
+        chunked.Should().NotContain("(none collected)");
+
+        var empty = NormalizationDiagnosticsWriter.FormatExportAppendix(new NormalizationEvidenceSnapshot());
+        empty.Should().Contain("(none collected)");
     }
 
     [Fact]

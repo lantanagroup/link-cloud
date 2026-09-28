@@ -141,10 +141,12 @@ internal static class NormalizationDiagnosticsWriter
 
         sb.AppendLine();
         sb.AppendLine($"-- Raw [NormalizationExecutionSummary] lines ({snapshot.SummaryLines.Count}) --");
-        if (snapshot.SummaryLines.Count == 0)
-        {
+        if (snapshot.SummaryLines.Count == 0 && snapshot.RawLinesOmitted)
+            sb.AppendLine($"  ({snapshot.CollectedLineCount} collected; raw lines omitted from this document)");
+        else if (snapshot.SummaryLines.Count == 0 && snapshot.EvidenceChunkCount > 0)
+            sb.AppendLine($"  (raw lines are stored in {snapshot.EvidenceChunkCount} snapshot chunk(s))");
+        else if (snapshot.SummaryLines.Count == 0)
             sb.AppendLine("  (none collected)");
-        }
         else
         {
             foreach (var line in snapshot.SummaryLines)
@@ -178,8 +180,9 @@ internal static class NormalizationDiagnosticsWriter
     /// <summary>
     /// Cosmos DB for MongoDB rejects documents over about 2 MB with HTTP 413.
     /// A mega-patient evidence snapshot (one Loki line and one step per resource)
-    /// crosses that inline cap. Callers that can externalize to blob should store
-    /// the full snapshot. This copy is what we persist when the full document is rejected.
+    /// crosses that inline cap. <see cref="PlanPersistence"/> keeps operation counts
+    /// on the header and stores the rest as more snapshot documents. This copy is
+    /// the single-document fallback: raw lines dropped, steps rolled up, counts kept.
     /// </summary>
     internal const int CosmosSafeInlineBytes = 1_500_000;
 
@@ -201,12 +204,136 @@ internal static class NormalizationDiagnosticsWriter
 
         fitted.ParsedSteps = Collapse(source.ParsedSteps);
         fitted.StepsCollapsed = true;
-        if (SerializedUtf8Bytes(fitted) <= maxUtf8Bytes)
-            return fitted;
-
-        fitted.ParsedSteps = [];
         return fitted;
     }
+
+    internal sealed record PersistencePlan(
+        NormalizationEvidenceSnapshot Header,
+        IReadOnlyList<NormalizationEvidenceChunk> Chunks);
+
+    /// <summary>
+    /// Keeps the operation counts in the header document. Raw lines and per-resource
+    /// steps that do not fit move into additional snapshot documents in the same store.
+    /// </summary>
+    internal static PersistencePlan PlanPersistence(
+        NormalizationEvidenceSnapshot source,
+        int maxUtf8Bytes = CosmosSafeInlineBytes)
+    {
+        if (maxUtf8Bytes <= 0 || SerializedUtf8Bytes(source) <= maxUtf8Bytes)
+        {
+            var inline = Copy(source);
+            inline.EvidenceChunkCount = 0;
+            return new PersistencePlan(inline, []);
+        }
+
+        var chunks = PackChunks(source.SummaryLines, source.ParsedSteps, maxUtf8Bytes);
+        var header = Copy(source);
+        header.SummaryLines = [];
+        header.RawLinesOmitted = false;
+        header.ParsedSteps = Collapse(source.ParsedSteps);
+        header.StepsCollapsed = source.ParsedSteps.Count > 0;
+        header.EvidenceChunkCount = chunks.Count;
+        return new PersistencePlan(header, chunks);
+    }
+
+    internal static NormalizationEvidenceSnapshot Assemble(
+        NormalizationEvidenceSnapshot header,
+        IReadOnlyList<NormalizationEvidenceChunk> chunks)
+    {
+        if (header.EvidenceChunkCount == 0 || chunks.Count == 0)
+            return header;
+
+        var assembled = Copy(header);
+        var lines = chunks.SelectMany(c => c.SummaryLines).ToList();
+        if (lines.Count > 0)
+            assembled.SummaryLines = lines;
+
+        // A missing chunk would make a partial step list look like the full inventory
+        // and hide the collapsed counts that were stored on the header.
+        var steps = chunks.SelectMany(c => c.ParsedSteps).ToList();
+        if (chunks.Count >= header.EvidenceChunkCount && steps.Count > 0)
+        {
+            assembled.ParsedSteps = steps;
+            assembled.StepsCollapsed = false;
+        }
+
+        return assembled;
+    }
+
+    private static List<NormalizationEvidenceChunk> PackChunks(
+        IReadOnlyList<string> lines,
+        IReadOnlyList<NormalizationEvidenceStep> steps,
+        int maxUtf8Bytes)
+    {
+        var chunks = new List<NormalizationEvidenceChunk>();
+        var current = new NormalizationEvidenceChunk();
+
+        void Flush()
+        {
+            if (current.SummaryLines.Count == 0 && current.ParsedSteps.Count == 0)
+                return;
+            chunks.Add(current);
+            current = new NormalizationEvidenceChunk();
+        }
+
+        foreach (var line in lines)
+        {
+            var stored = line;
+            var candidate = CopyChunk(current);
+            candidate.SummaryLines.Add(stored);
+            if (SerializedChunkBytes(candidate) > maxUtf8Bytes && (current.SummaryLines.Count > 0 || current.ParsedSteps.Count > 0))
+            {
+                Flush();
+                candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+            }
+
+            if (SerializedChunkBytes(candidate) > maxUtf8Bytes)
+                candidate = FitSingleLine(stored, maxUtf8Bytes);
+
+            current = candidate;
+        }
+
+        foreach (var step in steps)
+        {
+            var candidate = CopyChunk(current);
+            candidate.ParsedSteps.Add(step);
+            if (SerializedChunkBytes(candidate) > maxUtf8Bytes && (current.SummaryLines.Count > 0 || current.ParsedSteps.Count > 0))
+            {
+                Flush();
+                candidate = new NormalizationEvidenceChunk { ParsedSteps = [step] };
+            }
+
+            current = candidate;
+        }
+
+        Flush();
+        return chunks;
+    }
+
+    private static NormalizationEvidenceChunk FitSingleLine(string line, int maxUtf8Bytes)
+    {
+        const string suffix = " [truncated: exceeded snapshot chunk budget]";
+        var stored = line;
+        var candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+        while (SerializedChunkBytes(candidate) > maxUtf8Bytes && stored.Length > suffix.Length + 32)
+        {
+            var keepChars = Math.Max(32, (stored.Length - suffix.Length) / 2);
+            stored = stored[..keepChars] + suffix;
+            candidate = new NormalizationEvidenceChunk { SummaryLines = [stored] };
+        }
+
+        return candidate;
+    }
+
+    private static NormalizationEvidenceChunk CopyChunk(NormalizationEvidenceChunk source)
+        => new()
+        {
+            SummaryLines = [.. source.SummaryLines],
+            ParsedSteps = [.. source.ParsedSteps]
+        };
+
+    private static int SerializedChunkBytes(NormalizationEvidenceChunk chunk)
+        => Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(chunk));
 
     internal static bool IsOversizedWrite(Exception ex)
     {
@@ -233,6 +360,7 @@ internal static class NormalizationDiagnosticsWriter
             CollectedLineCount = source.CollectedLineCount,
             RawLinesOmitted = source.RawLinesOmitted,
             StepsCollapsed = source.StepsCollapsed,
+            EvidenceChunkCount = source.EvidenceChunkCount,
             SummaryLines = [.. source.SummaryLines],
             RuntimeSequences = [.. source.RuntimeSequences],
             SuiteSequences = [.. source.SuiteSequences],

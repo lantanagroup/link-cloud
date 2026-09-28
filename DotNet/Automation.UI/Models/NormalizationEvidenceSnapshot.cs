@@ -21,6 +21,14 @@ public sealed class NormalizationEvidenceSnapshot
     /// <summary>Per-resource steps were rolled up by operation so the snapshot could be stored.</summary>
     public bool StepsCollapsed { get; set; }
 
+    /// <summary>
+    /// Additional snapshot documents named <c>normalizationEvidence-chunk-N</c> hold the raw lines
+    /// and per-resource steps that did not fit in this document.
+    /// </summary>
+    public int EvidenceChunkCount { get; set; }
+
+    public static string ChunkDomain(int oneBasedIndex) => $"{Domain}-chunk-{oneBasedIndex}";
+
     public List<string> SummaryLines { get; set; } = [];
     public List<NormalizationRuntimeSequenceStep> RuntimeSequences { get; set; } = [];
     public List<NormalizationSuiteSequenceStep> SuiteSequences { get; set; } = [];
@@ -73,4 +81,11 @@ public sealed class NormalizationEvidenceStep
     /// How many resources this row represents. Zero means one resource, so older snapshots still count.
     /// </summary>
     public int Count { get; set; }
+}
+
+/// <summary>One Cosmos-sized piece of a normalization evidence snapshot.</summary>
+public sealed class NormalizationEvidenceChunk
+{
+    public List<string> SummaryLines { get; set; } = [];
+    public List<NormalizationEvidenceStep> ParsedSteps { get; set; } = [];
 }

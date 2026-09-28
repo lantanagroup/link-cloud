@@ -1183,50 +1183,44 @@ internal sealed class RunExecutor
 
             async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
             {
+                var plan = NormalizationDiagnosticsWriter.PlanPersistence(evidence);
                 try
                 {
                     await _snapshotStore.SetDomainAsync(
                         state.RunId,
                         NormalizationEvidenceSnapshot.Domain,
-                        evidence,
+                        plan.Header,
                         ct);
-                    return;
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-                    if (!NormalizationDiagnosticsWriter.IsOversizedWrite(ex)
-                        && NormalizationDiagnosticsWriter.SerializedUtf8Bytes(evidence) <= NormalizationDiagnosticsWriter.CosmosSafeInlineBytes)
-                    {
-                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
-                        return;
-                    }
-                }
-
-                var fitted = NormalizationDiagnosticsWriter.FitToCosmosInlineLimit(evidence);
-                if (ReferenceEquals(fitted, evidence))
-                {
                     output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
                     return;
                 }
 
-                output.WriteLine(fitted.StepsCollapsed
-                    ? "[Normalization Suite] Persisting a smaller evidence snapshot. Raw log lines are omitted and per-resource steps are rolled up so Cosmos can store it."
-                    : "[Normalization Suite] Persisting a smaller evidence snapshot without the raw log lines so Cosmos can store it.");
+                if (plan.Chunks.Count == 0)
+                    return;
 
-                try
+                output.WriteLine(
+                    $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
+
+                for (var index = 0; index < plan.Chunks.Count; index++)
                 {
-                    await _snapshotStore.SetDomainAsync(
-                        state.RunId,
-                        NormalizationEvidenceSnapshot.Domain,
-                        fitted,
-                        ct);
-                    output.WriteLine("[Normalization Suite] Reduced evidence snapshot persisted. Suite validation uses the collected Loki lines.");
-                }
-                catch (Exception retryEx) when (!ct.IsCancellationRequested)
-                {
-                    output.WriteLine($"[Normalization Suite] Reduced evidence snapshot was also rejected: {retryEx.Message}");
-                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await _snapshotStore.SetDomainAsync(
+                            state.RunId,
+                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
+                            plan.Chunks[index],
+                            ct);
+                    }
+                    catch (Exception ex) when (!ct.IsCancellationRequested)
+                    {
+                        output.WriteLine(
+                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}. Suite validation continues with the collected Loki lines.");
+                    }
                 }
             }
 
