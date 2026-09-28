@@ -1,4 +1,5 @@
 import React, {useMemo, useState} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ImportedFields} from '../../../api/contracts';
@@ -23,6 +24,7 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const {saving, savingDirection, patch, user, setErrorStepIds} = useOnboarding();
   const api = useApiClient();
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string[]>();
   const [importSummary, setImportSummary] = useState<{fileName: string; imported: number; total: number}>();
@@ -50,6 +52,11 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
     }
     if (fields.hsloc?.mappings) {
       patch('hsloc', {mappings: fields.hsloc.mappings});
+      // Unlike the other steps, HslocStep renders from the saved mappings query rather than the
+      // draft, and caches it for the session - so a re-upload would keep showing the previous
+      // sheet's rows until a reload. Removed rather than invalidated: HslocStep hydrates its rows
+      // once, so it must mount into a loading state and read the fresh list, not the stale cache.
+      queryClient.removeQueries({queryKey: ['hslocMappings']});
     }
     if (fields.encounter?.mappings) {
       // encounter.codeSystems is a separate list driving which "Encounter.type Code System"

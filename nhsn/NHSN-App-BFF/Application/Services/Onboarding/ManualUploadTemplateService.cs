@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Onboarding;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 
@@ -23,13 +25,17 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 {
     private readonly IOnboardingWriteService _writeService;
     private readonly IReferenceDataService _referenceDataService;
+    private readonly Dictionary<string, string> _encounterCodeSystemUrls;
 
     public ManualUploadTemplateService(
         IOnboardingWriteService writeService,
-        IReferenceDataService referenceDataService)
+        IReferenceDataService referenceDataService,
+        IOptions<EncounterCodeSettings> encounterCodeSettings)
     {
         _writeService = writeService;
         _referenceDataService = referenceDataService;
+        _encounterCodeSystemUrls = new Dictionary<string, string>(
+            encounterCodeSettings.Value.CodeSystemUrls, StringComparer.OrdinalIgnoreCase);
     }
 
     private const string SheetName = "FHIR Import";
@@ -991,7 +997,14 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         {
             var system = row.GetValueOrDefault("A", "").Trim();
             var code = row.GetValueOrDefault("B", "").Trim();
+            // The sheet's Reference Code System is normally the short label ("cpt", "snomed"), but
+            // the reference table is keyed by canonical CodeSystem url - translate the label via
+            // EncounterCodeSettings, and accept a url typed directly as-is.
             var referenceSystem = row.GetValueOrDefault("C", "").Trim();
+            if (_encounterCodeSystemUrls.TryGetValue(referenceSystem, out var referenceSystemUrl))
+            {
+                referenceSystem = referenceSystemUrl;
+            }
             var referenceCode = row.GetValueOrDefault("D", "").Trim();
             if (system.Length == 0 && code.Length == 0 && referenceSystem.Length == 0 && referenceCode.Length == 0)
             {

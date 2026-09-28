@@ -72,10 +72,15 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     return true;
   }
 
+  // The acknowledgement PUT runs before the navigation's own save, which savingDirection doesn't
+  // cover - without this the Continue spinner would only start once it returns.
+  const [acknowledging, setAcknowledging] = useState(false);
+
   async function handleNext() {
     if (!validateStep()) {
       return;
     }
+    setAcknowledging(true);
     try {
       await api.acknowledgeReport(latestReportId!, {
         kind: 'ReportAccuracy',
@@ -89,6 +94,8 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
           : t('onboarding:reportResults.messages.ackError'),
       );
       return;
+    } finally {
+      setAcknowledging(false);
     }
     onNext();
   }
@@ -103,6 +110,7 @@ export function ReportResultsStep({ onNext, onBack }: StepProps) {
     <ReportListView
       onBack={onBack}
       onNext={handleNext}
+      acknowledging={acknowledging}
       validationMessage={validationMessage}
       clearValidationMessage={() => setValidationMessage(null)}
     />
