@@ -96,7 +96,6 @@
       "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
-      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 59 days.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
       "invalidFhirPath": "Enter a valid FHIRPath expression.",

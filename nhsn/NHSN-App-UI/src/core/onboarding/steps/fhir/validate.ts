@@ -44,8 +44,9 @@ const PULL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const MAX_CONCURRENT_REQUESTS_CAP = 8;
 
-// Mirrors the BFF's FieldValidationRules.LagDurationCapMinutes (59 days), shared with the
-// manual-upload import path - keep the two in sync, they've drifted apart before.
+// Mirrors the BFF's FieldValidationRules.LagDaysMax/LagHoursMax/LagMinutesMax, shared with the
+// manual-upload import path - keep the two in sync, they've drifted apart before. Each of
+// Days/Hours/Minutes is capped independently; there is no combined/total duration limit.
 const LAG_DAYS_CAP = 59;
 
 function toMinutesSinceMidnight(pullTime: string): number {
