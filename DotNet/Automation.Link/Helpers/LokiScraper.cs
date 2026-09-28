@@ -173,7 +173,8 @@ public class LokiScraper
         TimeSpan lookback,
         IReadOnlyCollection<string>? additionalContainsFilters = null,
         int limit = 2000,
-        int maxPages = 10)
+        int maxPages = 10,
+        CancellationToken cancellationToken = default)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -210,7 +211,9 @@ public class LokiScraper
 
             while (pageCount < Math.Max(1, maxPages))
             {
-                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, currentEndUnix, pageSize, "backward");
+                cancellationToken.ThrowIfCancellationRequested();
+                var (statusCode, content) = await ExecuteQueryRangeAsync(
+                    query, startUnix, currentEndUnix, pageSize, "backward", cancellationToken);
                 if (statusCode != HttpStatusCode.OK || content == null)
                     return lines;
 
@@ -293,6 +296,10 @@ public class LokiScraper
 
                 currentEndUnix = nextEndUnix;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -808,7 +815,8 @@ public class LokiScraper
         long startUnix,
         long endUnix,
         int? limit = null,
-        string? direction = null)
+        string? direction = null,
+        CancellationToken cancellationToken = default)
     {
         var queryString =
             $"query={Uri.EscapeDataString(query)}&start={startUnix}&end={endUnix}";
@@ -819,8 +827,8 @@ public class LokiScraper
         if (!string.IsNullOrWhiteSpace(direction))
             queryString += $"&direction={Uri.EscapeDataString(direction)}";
 
-        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}");
-        var content = await response.Content.ReadAsStringAsync();
+        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}", cancellationToken);
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
         return (response.StatusCode, string.IsNullOrWhiteSpace(content) ? null : content);
     }
 }

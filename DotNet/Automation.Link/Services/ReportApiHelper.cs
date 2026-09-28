@@ -558,10 +558,18 @@ public class ReportApiHelper
     private bool _validationHoldActive;
 
     /// <summary>
+    /// A drained validation queue starts the configured timeout again.
+    /// A queue that went quiet with patients still pending keeps the deadline it already has.
+    /// </summary>
+    public static bool ShouldRearmTimeoutAfterValidationHold(int pendingValidationCount)
+        => pendingValidationCount == 0;
+
+    /// <summary>
     /// Keeps the poll alive. Validation that is still working has no timeout.
     /// When that queue drains, the configured hard timeout starts again for
-    /// whatever work is left. Other in-flight acquisition can still extend a
-    /// deadline, and that path remains capped.
+    /// whatever work is left. A quiet queue that still has pending patients
+    /// does not get a new full timeout. Other in-flight acquisition can still
+    /// extend a deadline, and that path remains capped.
     /// </summary>
     private bool AdvanceDeadline(
         BackgroundDiagnosticsMonitor? diagnostics,
@@ -576,10 +584,18 @@ public class ReportApiHelper
         }
         else if (_validationHoldActive && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
         {
-            phaseStart = DateTime.UtcNow;
-            deadline = phaseStart + hardTimeout;
             _validationHoldActive = false;
-            _output.WriteLine("[DIAG] Validation finished. The configured timeout applies to the rest of the run.");
+            if (ShouldRearmTimeoutAfterValidationHold(diagnostics?.PendingValidationCount ?? 0))
+            {
+                phaseStart = DateTime.UtcNow;
+                deadline = phaseStart + hardTimeout;
+                _output.WriteLine("[DIAG] Validation finished. The configured timeout applies to the rest of the run.");
+            }
+            else
+            {
+                _output.WriteLine(
+                    $"[DIAG] Validation has been quiet with {diagnostics!.PendingValidationCount} patients still pending. The existing deadline applies.");
+            }
         }
 
         var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;

@@ -1112,7 +1112,7 @@ internal sealed class RunExecutor
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
             var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback)
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
             {
                 var logs = new List<string>();
 
@@ -1120,6 +1120,7 @@ internal sealed class RunExecutor
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
+                        queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
                         var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
@@ -1127,10 +1128,12 @@ internal sealed class RunExecutor
                             lookback,
                             additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
                             limit: 5000,
-                            maxPages: 20);
+                            maxPages: 20,
+                            cancellationToken: queryToken);
 
                         if (logsForResourceType.Count == 0)
                         {
+                            queryToken.ThrowIfCancellationRequested();
                             output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
                             logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
                                 LokiScraper.Components.Normalization,
@@ -1138,7 +1141,8 @@ internal sealed class RunExecutor
                                 lookback,
                                 additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
                                 limit: 500,
-                                maxPages: 40);
+                                maxPages: 40,
+                                cancellationToken: queryToken);
                         }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
@@ -1148,24 +1152,28 @@ internal sealed class RunExecutor
                     if (logs.Count == 0)
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
+                        queryToken.ThrowIfCancellationRequested();
                         logs = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
                             normalizationSummaryMarker,
                             lookback,
                             additionalContainsFilters: runScopeFilters,
                             limit: 5000,
-                            maxPages: 20);
+                            maxPages: 20,
+                            cancellationToken: queryToken);
                     }
                 }
                 else
                 {
+                    queryToken.ThrowIfCancellationRequested();
                     logs = await lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
                         lookback,
                         additionalContainsFilters: runScopeFilters,
                         limit: 5000,
-                        maxPages: 20);
+                        maxPages: 20,
+                        cancellationToken: queryToken);
                 }
 
                 return logs
@@ -1238,7 +1246,7 @@ internal sealed class RunExecutor
                         scenarioConfig.LokiScrapeWindow,
                         evidenceRequiredResourceTypes,
                         acquiredResourceTypesForEvidence,
-                        (lookback, _) => QueryNormalizationSummaryLogsAsync(lookback),
+                        (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
                         cancellationToken);

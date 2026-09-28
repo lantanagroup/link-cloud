@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Services;
 
 namespace UnitTests.Automation;
 
@@ -235,6 +236,13 @@ public class AcquisitionActivityTrackerTests
 
         signal.ObserveCounts(4, 0, 0, t0.AddMinutes(1));
         signal.IsOngoingAt(t0.AddMinutes(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Quiet_pending_queue_does_not_rearm_the_full_timeout()
+    {
+        ReportApiHelper.ShouldRearmTimeoutAfterValidationHold(0).Should().BeTrue();
+        ReportApiHelper.ShouldRearmTimeoutAfterValidationHold(2636).Should().BeFalse();
     }
 
     [Fact]
