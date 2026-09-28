@@ -269,6 +269,7 @@
       "listLabel": "Managing Organizations",
       "placeholder": "Managing Organization",
       "add": "+ Add Managing Organization",
+      "duplicateError": "This Managing Organization has already been added.",
       "tooltip": "Add the identifiers of the FHIR Organization resources that manage your facility's Locations. NHSNLink uses these to determine which Locations belong to your facility."
     },
     "locationType": {
@@ -320,7 +321,8 @@
       "duplicateManagingOrg": "This Managing Organization has already been added.",
       "duplicateLocationType": "This Location Type has already been added.",
       "duplicateLocationIdentifier": "This Location Identifier has already been added.",
-      "duplicateRows": "Each entry must be unique - remove or change any repeated entries before continuing."
+      "duplicateRows": "Each entry must be unique - remove or change any repeated entries before continuing.",
+      "duplicateManagingOrganizations": "Two or more rows have the same Managing Organization. Each value must be unique."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },
