@@ -489,8 +489,10 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             "minPullTime" or "maxPullTime" => (ValidatePullTime(value), null),
             "sftpHost" => (ValidateSftpHost(value), null),
             "sftpPort" => ValidateIntRange(value, FieldValidationRules.SftpPortMin, FieldValidationRules.SftpPortMax),
-            "censusFreqHours" or "censusFreqMinutes"
-                or "patientLagDays" or "patientLagHours" or "patientLagMinutes" => (ValidateNonNegativeInteger(value), null),
+            "censusFreqHours" or "censusFreqMinutes" => (ValidateNonNegativeInteger(value), null),
+            "patientLagDays" => ValidateIntRange(value, FieldValidationRules.LagDaysMin, FieldValidationRules.LagDaysMax),
+            "patientLagHours" => ValidateIntRange(value, FieldValidationRules.LagHoursMin, FieldValidationRules.LagHoursMax),
+            "patientLagMinutes" => ValidateIntRange(value, FieldValidationRules.LagMinutesMin, FieldValidationRules.LagMinutesMax),
             "locOrgMethod" => (ValidateLocationMethod(value), null),
             "customFhirPath" => (ValidateFhirPath(value), null),
             _ => (null, null)
@@ -550,7 +552,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 
     // Rules that span more than one field, so they can't be checked cell-by-cell in ReadScalarFields.
     // Nothing here fires just because a field is blank - only when the values actually present
-    // don't add up (e.g. a lag duration that's too long).
+    // don't add up (e.g. a lag duration left entirely at zero).
     private static void ValidateCrossFields(
         Dictionary<string, string> values,
         Dictionary<string, int> rowNumberByKey,
@@ -561,21 +563,11 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         var lagHours = ParseInt(values, "patientLagHours");
         var lagMinutes = ParseInt(values, "patientLagMinutes");
         var totalLagMinutes = FieldValidationRules.LagTotalMinutes(lagDays ?? 0, lagHours ?? 0, lagMinutes ?? 0);
-        if (totalLagMinutes > FieldValidationRules.LagDurationCapMinutes && rowNumberByKey.TryGetValue("patientLagDays", out var lagRow))
-        {
-            errors.Add(new ImportCellError
-            {
-                Sheet = SheetName,
-                Cell = $"C{lagRow}",
-                MessageKey = "onboarding:manualUpload.errors.lagDurationTooLong",
-                Section = "fhir",
-                Label = LabelForRow(rows, lagRow)
-            });
-        }
         // Required, not merely "must total > 0 once touched": leaving all three blank is exactly as
         // much an error as filling them in with zeros - a facility must actually set a lag, not skip
-        // the group entirely.
-        else if (totalLagMinutes <= 0 && rowNumberByKey.TryGetValue("patientLagDays", out var lagZeroRow))
+        // the group entirely. Days/Hours/Minutes each have their own independent valid range
+        // (checked in ValidateScalar) - there is no combined/total cap across the three.
+        if (totalLagMinutes <= 0 && rowNumberByKey.TryGetValue("patientLagDays", out var lagZeroRow))
         {
             errors.Add(new ImportCellError
             {
