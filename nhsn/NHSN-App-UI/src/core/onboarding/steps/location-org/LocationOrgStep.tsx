@@ -326,8 +326,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               addLabel={t('onboarding:locationOrg.locationType.add')}
               removeLabel={t('common:actions.remove')}
               columnHeadings={[
-                t('onboarding:locationOrg.locationIdentifier.systemPlaceholder'),
-                t('onboarding:locationOrg.locationIdentifier.codePlaceholder')
+                t('onboarding:locationOrg.locationType.codePlaceholder'),
+                t('onboarding:locationOrg.locationType.aliasPlaceholder')
               ]}
               renderItem={(row, index, onRowChange) => {
                 // Blank fields are only flagged once Continue has been tried with this row present - not

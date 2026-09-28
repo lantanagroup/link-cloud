@@ -903,6 +903,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var mappings = new List<ImportedHslocMapping>();
+        var errorCountBeforeRows = errors.Count;
         foreach (var (rowNumber, row) in rawRows)
         {
             var sourceCode = row.GetValueOrDefault("B", "").Trim();
@@ -943,7 +944,15 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
 
         if (mappings.Count == 0)
         {
-            RequireErrorAtHeader(rows, errors, sectionHeader, "hsloc", "onboarding:manualUpload.errors.requiredHslocMapping");
+            // A row-level error (partial or duplicate) already explains why nothing was kept -
+            // piling the generic "at least one mapping is required" on top of it would tell the
+            // facility both that a row is wrong AND that no rows exist, when only the former is
+            // true. Only genuinely empty rows fall through with no error of their own, so this
+            // only fires when that's *every* row.
+            if (errors.Count == errorCountBeforeRows)
+            {
+                RequireErrorAtHeader(rows, errors, sectionHeader, "hsloc", "onboarding:manualUpload.errors.requiredHslocMapping");
+            }
             return null;
         }
 
