@@ -23,6 +23,7 @@ import type {LocationIdentifierEntry, LocationOrgDraft, LocationTypeEntry} from 
 import {
   findDuplicateLocationIdentifierIndexes,
   findDuplicateLocationTypeIndexes,
+  findDuplicateManagingOrganizationIndexes,
   findIncompleteLocationIdentifierIndexes,
   findIncompleteLocationTypeIndexes,
   isPlausibleFhirPath
@@ -112,9 +113,11 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         ? findDuplicateLocationTypeIndexes(locationTypes, edited)
         : activeMethod === 'location-identifier'
           ? findDuplicateLocationIdentifierIndexes(locationIdentifiers, edited)
-          : []
+          : activeMethod === 'managing-org'
+            ? findDuplicateManagingOrganizationIndexes(managingOrganizations, edited)
+            : []
     );
-  }, [activeMethod, locationTypes, locationIdentifiers, editedRowIndex]);
+  }, [activeMethod, locationTypes, locationIdentifiers, managingOrganizations, editedRowIndex]);
   const hasDuplicateRows = duplicateRowIndexes.size > 0;
 
   // Only the Custom FHIRPath tab has a free-form expression to check; Data Acquisition compiles it
@@ -399,9 +402,14 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 error={
                   isRowFlagged(index) && !row.trim()
                     ? requiredError(t('onboarding:locationOrg.managingOrg.placeholder'))
-                    : undefined
+                    : duplicateRowIndexes.has(index)
+                      ? t('onboarding:locationOrg.managingOrg.duplicateError')
+                      : undefined
                 }
-                onChange={onRowChange}
+                onChange={value => {
+                  setEditedRowIndex(index);
+                  onRowChange(value);
+                }}
               />
             )}
           />
@@ -535,7 +543,9 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               ? t('onboarding:locationOrg.errors.incompleteRows')
               : activeMethod === 'location-type'
                 ? t('onboarding:locationOrg.errors.duplicateLocationTypes')
-                : t('onboarding:locationOrg.errors.duplicateLocationIdentifiers')}
+                : activeMethod === 'managing-org'
+                  ? t('onboarding:locationOrg.errors.duplicateManagingOrganizations')
+                  : t('onboarding:locationOrg.errors.duplicateLocationIdentifiers')}
           </p>
         </div>
       )}

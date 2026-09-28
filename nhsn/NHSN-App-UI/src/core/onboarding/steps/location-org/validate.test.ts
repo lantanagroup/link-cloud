@@ -1,5 +1,10 @@
 import {describe, expect, it} from 'vitest';
-import {findDuplicateLocationIdentifierIndexes, findDuplicateLocationTypeIndexes, isPlausibleFhirPath} from './validate';
+import {
+  findDuplicateLocationIdentifierIndexes,
+  findDuplicateLocationTypeIndexes,
+  findDuplicateManagingOrganizationIndexes,
+  isPlausibleFhirPath
+} from './validate';
 
 describe('isPlausibleFhirPath', () => {
   it.each([
@@ -68,5 +73,22 @@ describe('findDuplicateLocationTypeIndexes', () => {
       {code: '1', alias: '2'}
     ];
     expect(findDuplicateLocationTypeIndexes(rows)).toEqual([1]);
+  });
+});
+
+describe('findDuplicateManagingOrganizationIndexes', () => {
+  it('flags every repeat of a value after the first, ignoring case and whitespace', () => {
+    const rows = ['Org/123', 'Org/456', ' org/123 ', 'Org/123'];
+    expect(findDuplicateManagingOrganizationIndexes(rows)).toEqual([2, 3]);
+  });
+
+  it('puts the error on the row being edited rather than the one already there', () => {
+    const rows = ['Org/123', 'Org/123'];
+    expect(findDuplicateManagingOrganizationIndexes(rows, 0)).toEqual([0]);
+  });
+
+  it('skips blank rows', () => {
+    const rows = ['', '', 'Org/123'];
+    expect(findDuplicateManagingOrganizationIndexes(rows)).toEqual([]);
   });
 });
