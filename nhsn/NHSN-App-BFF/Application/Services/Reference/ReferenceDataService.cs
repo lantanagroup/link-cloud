@@ -105,6 +105,7 @@ public sealed class ReferenceDataService : IReferenceDataService
             }
 
             var pageNumber = 1;
+            var maxPages = 10;
             long totalPages;
             do
             {
@@ -134,8 +135,13 @@ public sealed class ReferenceDataService : IReferenceDataService
                 }
 
                 totalPages = page.Metadata.TotalPages;
+
+                //TODO: Temporary log. Remove after test
+                _logger.LogInformation(
+                        "Completed {system} terminology code request for page {pageNumber}", system, pageNumber);
+
                 pageNumber++;
-            } while (pageNumber <= totalPages);
+            } while (pageNumber <= maxPages);
         }
 
         return codes;
