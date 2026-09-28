@@ -174,31 +174,74 @@ public class AcquisitionActivityTrackerTests
     public void Validation_queue_stays_open_across_a_sample_gap_after_work_is_seen()
     {
         var signal = new ValidationWorkSignal();
+        var t0 = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
 
-        signal.ObserveCounts(pendingValidation: 2636, passedValidation: 662, failedValidation: 2711);
-        signal.IsOngoing.Should().BeFalse();
+        signal.ObserveCounts(2636, 662, 2711, t0);
+        signal.IsOngoingAt(t0).Should().BeFalse();
 
-        signal.ObserveCounts(pendingValidation: 2634, passedValidation: 662, failedValidation: 2713);
-        signal.IsOngoing.Should().BeTrue();
+        signal.ObserveCounts(2634, 662, 2713, t0.AddSeconds(20));
+        signal.IsOngoingAt(t0.AddMinutes(10)).Should().BeTrue();
         signal.PendingValidation.Should().Be(2634);
 
-        signal.ObserveCounts(pendingValidation: 2634, passedValidation: 662, failedValidation: 2713);
-        signal.IsOngoing.Should().BeTrue();
+        signal.ObserveCounts(2634, 662, 2713, t0.AddMinutes(10));
+        signal.IsOngoingAt(t0.AddMinutes(10)).Should().BeTrue();
 
-        signal.ObserveCounts(pendingValidation: 0, passedValidation: 3299, failedValidation: 2711);
-        signal.IsOngoing.Should().BeFalse();
+        signal.ObserveCounts(0, 3299, 2711, t0.AddMinutes(11));
+        signal.IsOngoingAt(t0.AddMinutes(11)).Should().BeFalse();
     }
 
     [Fact]
     public void Validation_activity_holds_a_single_patient_whose_counts_have_not_moved()
     {
         var signal = new ValidationWorkSignal();
-        signal.ObserveCounts(pendingValidation: 1, passedValidation: 0, failedValidation: 0);
-        signal.NoteActivity();
+        var t0 = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(1, 0, 0, t0);
+        signal.NoteActivity(t0);
 
-        signal.IsOngoing.Should().BeTrue();
+        signal.IsOngoingAt(t0.AddMinutes(10)).Should().BeTrue();
 
-        signal.ObserveCounts(pendingValidation: 1, passedValidation: 0, failedValidation: 0);
-        signal.IsOngoing.Should().BeTrue();
+        signal.ObserveCounts(1, 0, 0, t0.AddMinutes(10));
+        signal.IsOngoingAt(t0.AddMinutes(20)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Wedged_validation_queue_stops_holding_after_the_quiet_limit()
+    {
+        var signal = new ValidationWorkSignal();
+        var t0 = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(2636, 662, 2711, t0);
+        signal.ObserveCounts(2634, 662, 2713, t0.AddSeconds(20));
+
+        var wedgedAt = t0.AddSeconds(20).Add(ValidationWorkSignal.QuietLimit).AddSeconds(1);
+        signal.IsOngoingAt(wedgedAt).Should().BeFalse();
+
+        var start = new DateTime(2026, 9, 25, 17, 58, 14, DateTimeKind.Utc);
+        var hardTimeout = TimeSpan.FromHours(6);
+        var deadline = start + hardTimeout + AcquisitionActivityTracker.MaxExtraDuration;
+        var decision = AcquisitionActivityTracker.Decide(
+            deadline.AddSeconds(1), start, hardTimeout, deadline, validationOngoing: false, hasRecentProgress: false);
+
+        decision.Continue.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Drained_queue_does_not_carry_the_hold_into_the_next_wave()
+    {
+        var signal = new ValidationWorkSignal();
+        var t0 = new DateTime(2026, 9, 26, 1, 0, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(2, 0, 0, t0);
+        signal.ObserveCounts(1, 1, 0, t0.AddSeconds(5));
+        signal.ObserveCounts(0, 2, 0, t0.AddSeconds(10));
+
+        signal.ObserveCounts(4, 0, 0, t0.AddMinutes(1));
+        signal.IsOngoingAt(t0.AddMinutes(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Empty_entry_read_after_entries_were_seen_is_not_the_queue_draining()
+    {
+        ValidationWorkSignal.IsTransientEmptyEntryRead(0, 6010).Should().BeTrue();
+        ValidationWorkSignal.IsTransientEmptyEntryRead(0, 0).Should().BeFalse();
+        ValidationWorkSignal.IsTransientEmptyEntryRead(6010, 6010).Should().BeFalse();
     }
 }

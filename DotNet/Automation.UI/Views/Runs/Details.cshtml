@@ -607,6 +607,10 @@
         const charts = {};
         let currentRunStatus = '@Model.Status';
         let validationPatientsOpen = 0;
+        let validationCountsSeen = false;
+        let validationCountKey = '';
+        let validationMovedAt = 0;
+        const validationQuietMs = 30 * 60 * 1000;
         let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
         let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
         let snapshotTimer = null;
@@ -1141,31 +1145,58 @@
             return 'bg-secondary';
         }
 
-        function showValidationHold() {
-            const banner = document.getElementById('validationHoldBanner');
-            const badge = document.getElementById('validationOngoingBadge');
-            const open = !isRunComplete(currentRunStatus) && validationPatientsOpen > 0;
-            if (badge)
-                badge.style.display = open ? '' : 'none';
-            if (!banner)
-                return;
-            banner.style.display = open ? '' : 'none';
-            if (!open)
-                return;
-            const noun = validationPatientsOpen === 1 ? 'patient is' : 'patients are';
-            const text = document.getElementById('validationHoldText');
-            if (text)
-                text.textContent = `${validationPatientsOpen} ${noun} still pending validation. This run stays up while that work is moving. Cancel the run to stop it.`;
-        }
-
-        function countPendingValidation(snapshot) {
+        function validationStatusCount(snapshot, name) {
             const counts = (snapshot && snapshot.validation && snapshot.validation.statusCounts) || [];
             return counts.reduce((sum, item) => {
                 const status = String(item.status || item.Status || '').toLowerCase();
-                if (status !== 'pendingvalidation')
+                if (status !== name)
                     return sum;
                 return sum + Number(item.count || item.Count || 0);
             }, 0);
+        }
+
+        function noteValidationSnapshot(snapshot) {
+            const pending = validationStatusCount(snapshot, 'pendingvalidation');
+            const passed = validationStatusCount(snapshot, 'passedvalidation');
+            const failed = validationStatusCount(snapshot, 'failedvalidation');
+            const key = `${pending}|${passed}|${failed}`;
+            validationPatientsOpen = pending;
+            if (!validationCountsSeen) {
+                validationCountsSeen = true;
+                validationCountKey = key;
+                return;
+            }
+            if (key !== validationCountKey) {
+                validationCountKey = key;
+                validationMovedAt = Date.now();
+            }
+        }
+
+        function validationWorkIsMoving() {
+            return validationPatientsOpen > 0
+                && validationMovedAt > 0
+                && (Date.now() - validationMovedAt) <= validationQuietMs;
+        }
+
+        function showValidationHold() {
+            const banner = document.getElementById('validationHoldBanner');
+            const badge = document.getElementById('validationOngoingBadge');
+            const pending = !isRunComplete(currentRunStatus) && validationPatientsOpen > 0;
+            const moving = pending && validationWorkIsMoving();
+            if (badge)
+                badge.style.display = moving ? '' : 'none';
+            if (!banner)
+                return;
+            banner.style.display = pending ? '' : 'none';
+            if (!pending)
+                return;
+            const noun = validationPatientsOpen === 1 ? 'patient is' : 'patients are';
+            const text = document.getElementById('validationHoldText');
+            if (!text)
+                return;
+            text.textContent = moving
+                ? `${validationPatientsOpen} ${noun} still pending validation. This run stays up while that work is moving. Cancel the run to stop it.`
+                : `${validationPatientsOpen} ${noun} still pending validation.`;
         }
 
         function isRunComplete(status) {
@@ -2082,7 +2113,7 @@
                 const validationPassed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'passedvalidation') || {}).count || 0;
                 const validationFailed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'failedvalidation') || {}).count || 0;
 
-                validationPatientsOpen = countPendingValidation(snapshot);
+                noteValidationSnapshot(snapshot);
                 showValidationHold();
 
                 document.getElementById('validationPatientCount').textContent = validationTotal;

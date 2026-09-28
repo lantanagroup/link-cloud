@@ -191,6 +191,9 @@ public class ProgressMonitor
 
             var entries = await _reader.GetReportEntriesAsync(scheduleId);
 
+            if (ValidationWorkSignal.IsTransientEmptyEntryRead(entries.Count, _lastReportEntryCount))
+                return false;
+
             var total = entries.Count;
             var submitted = entries.Count(e => string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase));
             var pending = entries.Count(e => string.Equals(e.SubmissionStatus, "PendingValidation", StringComparison.OrdinalIgnoreCase));
@@ -211,8 +214,6 @@ public class ProgressMonitor
             if (breakdownChanged)
             {
                 _output.WriteLine($"[DIAG][Report] Entries: {total} total | Reporting: {breakdown}");
-                if (_lastReportBreakdown != null)
-                    _acquisitionActivity.MarkProgress(DateTime.UtcNow);
                 _lastReportEntryCount = total;
                 _lastReportBreakdown = breakdown;
             }

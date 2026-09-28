@@ -570,7 +570,11 @@ public class ReportApiHelper
         ref DateTime deadline)
     {
         var validationOngoing = diagnostics?.IsValidationOngoing == true;
-        if (_validationHoldActive && !validationOngoing && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
+        if (validationOngoing)
+        {
+            _validationHoldActive = true;
+        }
+        else if (_validationHoldActive && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
         {
             phaseStart = DateTime.UtcNow;
             deadline = phaseStart + hardTimeout;
