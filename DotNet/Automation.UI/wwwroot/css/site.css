@@ -500,14 +500,24 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 /* ===================================================================
    Responsive helpers
    =================================================================== */
-.au-cleanup-section {
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
+.au-cleanup-section,
+.au-cleanup-phase {
+  padding-bottom: 1.15rem;
+  margin-bottom: 1.15rem;
   border-bottom: 1px solid #eceff3;
 }
-.au-cleanup-section:last-of-type {
+.au-cleanup-section:last-of-type,
+.au-cleanup-phase-last {
   border-bottom: none;
   margin-bottom: .75rem;
+  padding-bottom: .5rem;
+}
+.au-cleanup-page .au-cleanup-activity .card-body {
+  padding: 1.1rem 1.15rem;
+}
+.au-cleanup-reports th {
+  font-weight: 600;
+  white-space: nowrap;
 }
 .au-cleanup-activity.is-running .progress-bar {
   background: var(--au-accent);
