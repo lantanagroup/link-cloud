@@ -652,7 +652,7 @@ public class ApiHealthExecutionRunManagerTests
         return new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ServiceRegistry:TenantServiceApiUrl"] = "http://tenant.test/api",
+                ["ServiceRegistry:TenantService:TenantServiceUrl"] = "http://tenant.test/api",
                 ["ServiceRegistry:AdminBffServiceUrl"] = "http://adminbff.test"
             })
             .Build();
