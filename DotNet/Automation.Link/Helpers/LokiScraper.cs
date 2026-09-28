@@ -297,7 +297,7 @@ public class LokiScraper
                 currentEndUnix = nextEndUnix;
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
