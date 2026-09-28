@@ -210,10 +210,10 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             if (fields.LocationOrg is { } locationOrg)
             {
-                // With the custom-fhir-path method the imported expression is the only condition
-                // sent, so a 400 from Data Acquisition means it couldn't compile that expression.
-                // Its parser output ("Parsing failure: unexpected 'c'...") isn't something to show a
-                // facility, so that case gets its own message instead of saveFailed + raw detail.
+                // The Custom FHIR Path is never validated on manual upload - whatever the facility's
+                // sheet has is saved as-is and surfaces no import error, even if Data Acquisition
+                // would reject it as uncompilable. A facility can still fix it later online, where
+                // LocationOrgStep's own live FHIRPath check applies.
                 var customFhirPathRejected = false;
                 var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", async () =>
                 {
@@ -240,16 +240,7 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     }
                     return true;
                 });
-                if (customFhirPathRejected && locationOrgDetail is not null)
-                {
-                    sectionErrors.Add(new ImportSectionSaveError
-                    {
-                        Section = "location-org",
-                        Detail = locationOrgDetail,
-                        MessageKey = "onboarding:manualUpload.errors.invalidCustomFhirPath"
-                    });
-                }
-                else
+                if (!customFhirPathRejected)
                 {
                     RecordFailure("location-org", locationOrgDetail);
                 }
