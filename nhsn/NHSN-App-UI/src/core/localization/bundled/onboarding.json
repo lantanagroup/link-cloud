@@ -98,7 +98,7 @@
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
-      "invalidFhirPath": "Enter a valid FHIRPath expression.",
+      "invalidCustomFhirPath": "The Custom FHIR Path provided is not valid. Please check the syntax and try again.",
       "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
       "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
       "invalidSftpHost": "Enter a valid SFTP hostname or IP address.",
@@ -342,8 +342,7 @@
       "fieldRequiredError": "{{field}} is required.",
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
       "duplicateLocationTypes": "Two or more rows have the same Location Type Code and Location Alias. Each combination must be unique.",
-      "duplicateLocationIdentifiers": "Two or more rows have the same Location Identifier System and Code. Each combination must be unique.",
-      "invalidFhirPath": "Enter a valid FHIRPath expression (e.g. Location.identifier.where(system = 'urn:oid:1.2.3' and value = 'ABC').exists())."
+      "duplicateLocationIdentifiers": "Two or more rows have the same Location Identifier System and Code. Each combination must be unique."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
   },
@@ -743,7 +742,7 @@
     "userFacing": {
       "question": "From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)",
       "noOptionsHint": "Select at least one identifier in the question above to choose from here.",
-      "isCalledMrnQuestion": "Is this the identifier staff use as the MRN?",
+      "isCalledMrnQuestion": "Is this the identifier that staff use as the MRN?",
       "otherTermLabel": "If no, what term is used?",
       "canSearchQuestion": "Can staff search for patients using this identifier?"
     },

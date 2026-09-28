@@ -95,8 +95,11 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
       const errorLines = result.cellErrors.length
         ? result.cellErrors.map(cellError => {
             const location = cellError.label ? `${cellError.cell} (${cellError.label})` : cellError.cell;
-            const message = t(cellError.messageKey, {detail: cellError.detail});
-            return t('onboarding:manualUpload.errors.lineFormat', {sheet: cellError.sheet, location, message});
+            // React escapes these lines when it renders them as text, so i18next escaping them too
+            // would double-encode - a quote in a sheet label or save detail showing up as &#39;.
+            const interpolation = {escapeValue: false};
+            const message = t(cellError.messageKey, {detail: cellError.detail, interpolation});
+            return t('onboarding:manualUpload.errors.lineFormat', {sheet: cellError.sheet, location, message, interpolation});
           })
         : undefined;
 

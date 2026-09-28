@@ -30,12 +30,6 @@ public static class FieldValidationRules
     // 24-hour HH:MM.
     public static readonly Regex PullTimePattern = new("^([01]\\d|2[0-3]):[0-5]\\d$", RegexOptions.Compiled);
 
-    // Not a real FHIRPath grammar check (that needs a real parser) - just the characters a
-    // FHIRPath expression is ever built from, so obvious garbage (free text, stray punctuation)
-    // is rejected without risking a false positive on a real expression this doesn't fully
-    // understand.
-    public static readonly Regex FhirPathCharacterPattern = new("^[\\w\\s.()\\[\\]'\"=!<>,:%$*/+&|-]+$", RegexOptions.Compiled);
-
     // Just an absolute http(s) URL - "https://fhir.com" is a valid value on its own, same as
     // "https://fhir.com/r4". A path is common (the template's own example is
     // "https://FHIR-HOSTNAME/fhir") but not required - a bare origin is still a real, reachable
@@ -76,37 +70,4 @@ public static class FieldValidationRules
 
     public static bool IsValidCensusFrequency(int hours, int minutes) =>
         IsIntInRange(CensusFrequencyTotalMinutes(hours, minutes), CensusFrequencyMinMinutes, CensusFrequencyMaxMinutes);
-
-    // A basic sanity check, not a FHIRPath parser: rejects free text and unbalanced
-    // parens/brackets/quotes, which is the class of mistake a facility typing this by hand
-    // actually makes - it does not confirm the expression resolves to anything real.
-    public static bool IsPlausibleFhirPath(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value) || !FhirPathCharacterPattern.IsMatch(value))
-        {
-            return false;
-        }
-        return IsBalanced(value, '(', ')') && IsBalanced(value, '[', ']') && value.Count(c => c == '\'') % 2 == 0;
-    }
-
-    private static bool IsBalanced(string value, char open, char close)
-    {
-        var depth = 0;
-        foreach (var c in value)
-        {
-            if (c == open)
-            {
-                depth++;
-            }
-            else if (c == close)
-            {
-                depth--;
-                if (depth < 0)
-                {
-                    return false;
-                }
-            }
-        }
-        return depth == 0;
-    }
 }

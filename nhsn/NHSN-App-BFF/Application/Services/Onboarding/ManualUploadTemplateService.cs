@@ -140,9 +140,11 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             {
                 Sheet = SheetName,
                 Cell = SectionHeaderCell(sectionError.Section),
-                MessageKey = "onboarding:manualUpload.errors.saveFailed",
+                MessageKey = sectionError.MessageKey ?? "onboarding:manualUpload.errors.saveFailed",
                 Section = sectionError.Section,
-                Detail = sectionError.Detail
+                // A section error with its own message key has nothing to interpolate - its raw
+                // downstream detail stays server-side (it's already logged by TrySectionAsync).
+                Detail = sectionError.MessageKey is null ? sectionError.Detail : null
             }));
         }
 
@@ -494,7 +496,8 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             "patientLagHours" => ValidateIntRange(value, FieldValidationRules.LagHoursMin, FieldValidationRules.LagHoursMax),
             "patientLagMinutes" => ValidateIntRange(value, FieldValidationRules.LagMinutesMin, FieldValidationRules.LagMinutesMax),
             "locOrgMethod" => (ValidateLocationMethod(value), null),
-            "customFhirPath" => (ValidateFhirPath(value), null),
+            // customFhirPath is deliberately unchecked here - Data Acquisition compiles it on save
+            // and has the final word (see OnboardingWriteService.SaveImportedFieldsAsync).
             _ => (null, null)
         };
     }
@@ -511,9 +514,6 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
     // method go unnoticed before this check existed.
     private static string? ValidateLocationMethod(string value) =>
         NormalizeLocationMethod(value) is not null ? null : "onboarding:manualUpload.errors.invalidLocationMethod";
-
-    private static string? ValidateFhirPath(string value) =>
-        FieldValidationRules.IsPlausibleFhirPath(value) ? null : "onboarding:manualUpload.errors.invalidFhirPath";
 
     private static string? ValidateNonNegativeInteger(string value) =>
         FieldValidationRules.IsNonNegativeInteger(value) ? null : "onboarding:manualUpload.errors.invalidNumber";

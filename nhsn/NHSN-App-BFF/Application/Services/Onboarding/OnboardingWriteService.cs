@@ -210,23 +210,49 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             if (fields.LocationOrg is { } locationOrg)
             {
+                // With the custom-fhir-path method the imported expression is the only condition
+                // sent, so a 400 from Data Acquisition means it couldn't compile that expression.
+                // Its parser output ("Parsing failure: unexpected 'c'...") isn't something to show a
+                // facility, so that case gets its own message instead of saveFailed + raw detail.
+                var customFhirPathRejected = false;
                 var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", async () =>
                 {
-                    await WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                    try
                     {
-                        Method = locationOrg.Method,
-                        ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
-                        LocationTypes = locationOrg.LocationTypes?
-                            .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
-                            .ToList() ?? [],
-                        LocationIdentifiers = locationOrg.LocationIdentifiers?
-                            .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
-                            .ToList() ?? [],
-                        CustomFhirPath = locationOrg.CustomFhirPath
-                    }, cancellationToken);
+                        await WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                        {
+                            Method = locationOrg.Method,
+                            ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
+                            LocationTypes = locationOrg.LocationTypes?
+                                .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
+                                .ToList() ?? [],
+                            LocationIdentifiers = locationOrg.LocationIdentifiers?
+                                .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
+                                .ToList() ?? [],
+                            CustomFhirPath = locationOrg.CustomFhirPath
+                        }, cancellationToken);
+                    }
+                    catch (LinkServiceException ex) when (
+                        ex.StatusCode == StatusCodes.Status400BadRequest && locationOrg.Method == "custom-fhir-path")
+                    {
+                        customFhirPathRejected = true;
+                        throw;
+                    }
                     return true;
                 });
-                RecordFailure("location-org", locationOrgDetail);
+                if (customFhirPathRejected && locationOrgDetail is not null)
+                {
+                    sectionErrors.Add(new ImportSectionSaveError
+                    {
+                        Section = "location-org",
+                        Detail = locationOrgDetail,
+                        MessageKey = "onboarding:manualUpload.errors.invalidCustomFhirPath"
+                    });
+                }
+                else
+                {
+                    RecordFailure("location-org", locationOrgDetail);
+                }
             }
 
             if (fields.Hsloc?.Mappings is { Count: > 0 } hslocMappings)
