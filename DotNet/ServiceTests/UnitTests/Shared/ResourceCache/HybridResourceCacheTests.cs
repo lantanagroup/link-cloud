@@ -1,438 +1,175 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Hl7.Fhir.Model;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Time.Testing;
 using Moq;
-using StackExchange.Redis;
-using StackExchange.Redis.Extensions.Core.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Shared.ResourceCache;
 
-/// <summary>
-/// Covers <see cref="HybridResourceCache"/>'s Redis-vs-ABS selection, which since LEGLINK-770
-/// derives the max-memory denominator from configuration (<see cref="ResourceCacheRedisSettings.MaxMemoryBytes"/>)
-/// rather than Redis <c>INFO maxmemory</c> (Azure Managed Redis does not return it).
-/// </summary>
 [Trait("Category", "UnitTests")]
 public class HybridResourceCacheTests
 {
-    private readonly Mock<IResourceCache> _redisCache = new();
-    private readonly Mock<IResourceCache> _absCache = new();
-    private readonly Mock<IRedisDatabase> _redisDatabase = new();
-    private readonly Mock<IDatabase> _database = new();
-    private readonly Mock<IConnectionMultiplexer> _multiplexer = new();
-    private readonly Mock<ILogger<HybridResourceCache>> _logger = new();
+    private const string CacheKey = "corr-1:Patient";
 
-    public HybridResourceCacheTests()
-    {
-        _redisDatabase.SetupGet(database => database.Database).Returns(_database.Object);
-        _database.SetupGet(database => database.Multiplexer).Returns(_multiplexer.Object);
-        _database
-            .Setup(database => database.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisValue.Null);
-        _database
-            .Setup(database => database.StringSetAsync(
-                It.IsAny<RedisKey>(),
-                It.IsAny<RedisValue>(),
-                It.IsAny<TimeSpan?>(),
-                It.IsAny<When>()))
-            .ReturnsAsync(true);
-    }
+    private readonly Mock<IResourceCache> _redis = new();
+    private readonly Mock<IResourceCache> _abs = new();
+    private readonly Mock<IBackgroundAbsCacheWriter> _writer = new();
 
-    private HybridResourceCache CreateSut(ResourceCacheRedisSettings redisSettings, TimeProvider? timeProvider = null)
-    {
-        var settings = new ResourceCacheSettings { Redis = redisSettings };
-        return timeProvider is null
-            ? new HybridResourceCache(
-                _redisCache.Object,
-                _absCache.Object,
-                _redisDatabase.Object,
-                Options.Create(settings),
-                _logger.Object)
-            : new HybridResourceCache(
-                _redisCache.Object,
-                _absCache.Object,
-                _redisDatabase.Object,
-                Options.Create(settings),
-                _logger.Object,
-                timeProvider);
-    }
+    private HybridResourceCache CreateSut() =>
+        new(_redis.Object, _abs.Object, _writer.Object, Mock.Of<ILogger<HybridResourceCache>>());
 
-    /// <summary>Configures a connected Redis server whose INFO memory section returns the given used_memory.</summary>
-    private void SetupRedisUsedMemory(long usedMemory)
-    {
-        SetupRedisInfo(new[] { new KeyValuePair<string, string>("used_memory", usedMemory.ToString()) });
-    }
+    private static List<DomainResource> Resources() => [new Patient { Id = "1" }];
 
-    private void SetupRedisInfo(IEnumerable<KeyValuePair<string, string>> memoryPairs)
+    [Fact]
+    public async Task UpdateCorrelationCacheAsync_writes_the_cache_inline_and_queues_the_durable_write()
     {
-        var grouping = memoryPairs.GroupBy(_ => "memory").First();
-        var server = new Mock<IServer>();
-        server.SetupGet(s => s.IsConnected).Returns(true);
-        server.Setup(s => s.InfoAsync(It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new[] { grouping });
-        _multiplexer.Setup(m => m.GetServers()).Returns(new[] { server.Object });
-    }
+        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
 
-    private void SetupNoConnectedServer()
-    {
-        _multiplexer.Setup(m => m.GetServers()).Returns(Array.Empty<IServer>());
-    }
+        _redis.Verify(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
+        _writer.Verify(w => w.EnqueueAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
 
-    /// <summary>Configures a connected Redis server whose INFO memory section omits used_memory.</summary>
-    private Mock<IServer> SetupServerWithoutUsedMemory()
-    {
-        var server = new Mock<IServer>();
-        server.SetupGet(s => s.IsConnected).Returns(true);
-        server.Setup(s => s.InfoAsync(It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new[] { new[] { new KeyValuePair<string, string>("some_other_stat", "123") }.GroupBy(_ => "memory").First() });
-        _multiplexer.Setup(m => m.GetServers()).Returns(new[] { server.Object });
-        return server;
-    }
-
-    private static void SetupMemoryStats(Mock<IServer> server, long totalAllocated)
-    {
-        server.Setup(s => s.MemoryStatsAsync(It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisResult.Create(new RedisValue[] { "total.allocated", totalAllocated.ToString() }));
-    }
-
-    private Task Write(HybridResourceCache sut, string correlationId)
-    {
-        return sut.UpdateCorrelationCacheAsync(correlationId, new List<DomainResource>(), ResourceType.Patient);
-    }
-
-    private void VerifyWroteTo(Mock<IResourceCache> expected, Mock<IResourceCache> notExpected)
-    {
-        expected.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Once);
-        notExpected.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    private void VerifyWarningLogged(Times times)
-    {
-        VerifyLogged(LogLevel.Warning, times);
-    }
-
-    private void VerifyLogged(LogLevel level, Times times)
-    {
-        _logger.Verify(
-            log => log.Log(
-                level,
-                It.IsAny<EventId>(),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-            times);
+        // The durable write is queued and never awaited here; that is the point of the design.
+        _abs.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task UsedMemory_below_threshold_of_configured_max_uses_Redis()
+    public async Task UpdateCorrelationCacheAsync_with_no_resources_does_nothing()
     {
-        // 100 MB used of 1000 MB max = 10%, threshold 80% => Redis
-        SetupRedisUsedMemory(100L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, [], ResourceType.Patient);
 
-        await Write(sut, "corr-below");
-
-        VerifyWroteTo(_redisCache, _absCache);
+        _redis.VerifyNoOtherCalls();
+        _writer.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task UsedMemory_at_or_above_threshold_of_configured_max_uses_ABS()
+    public async Task UpdateCorrelationCacheAsync_drops_the_entry_when_the_cache_write_fails()
     {
-        // 900 MB used of 1000 MB max = 90%, threshold 80% => ABS
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+        _redis
+            .Setup(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
 
-        await Write(sut, "corr-above");
+        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
 
-        VerifyWroteTo(_absCache, _redisCache);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0L)]
-    [InlineData(-1L)]
-    public async Task MaxMemoryBytes_missing_or_invalid_uses_Redis_and_logs_warning(long? maxMemoryBytes)
-    {
-        SetupRedisUsedMemory(900L * 1024 * 1024); // would be ABS if a valid max were configured
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = maxMemoryBytes, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-nomax");
-
-        VerifyWroteTo(_redisCache, _absCache);
-        VerifyWarningLogged(Times.Once());
-    }
-
-    /// <summary>
-    /// Azure Managed Redis proxies Redis Enterprise and may not expose used_memory via INFO memory,
-    /// the same restriction that hides maxmemory and drove LEGLINK-770. Deciding the cache on the
-    /// first miss would be deciding on no evidence, so MEMORY STATS is consulted before giving up.
-    /// </summary>
-    [Fact]
-    public async Task UsedMemory_missing_from_info_falls_back_to_MEMORY_STATS()
-    {
-        var server = SetupServerWithoutUsedMemory();
-        SetupMemoryStats(server, 100L * 1024 * 1024); // 100 MB of 1000 MB = 10%, under the 80% threshold
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-memorystats-under");
-
-        VerifyWroteTo(_redisCache, _absCache);
+        // A half-written entry would win over the complete durable copy, because reads prefer the
+        // cache. The durable write still has to be queued.
+        _redis.Verify(c => c.DeleteAsync(It.Is<List<string>>(k => k.Contains(CacheKey)), It.IsAny<CancellationToken>()), Times.Once);
+        _writer.Verify(w => w.EnqueueAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task MEMORY_STATS_total_allocated_is_measured_against_the_configured_max()
+    public async Task GetAsync_serves_a_cache_hit_without_touching_durable_storage()
     {
-        var server = SetupServerWithoutUsedMemory();
-        SetupMemoryStats(server, 900L * 1024 * 1024); // 900 MB of 1000 MB = 90%, over the 80% threshold
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
 
-        await Write(sut, "corr-memorystats-over");
+        var result = await CreateSut().GetAsync(CacheKey);
 
-        VerifyWroteTo(_absCache, _redisCache);
-    }
-
-    /// <summary>
-    /// When INFO memory, MEMORY STATS and a full INFO dump all fail to yield a used-memory figure
-    /// there is no numerator to measure against the configured limit, so the pressure-safe choice
-    /// is ABS.
-    /// </summary>
-    [Fact]
-    public async Task UsedMemory_unavailable_from_every_source_uses_ABS()
-    {
-        SetupServerWithoutUsedMemory(); // MEMORY STATS left unconfigured, so it yields nothing
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-nousedmem");
-
-        VerifyWroteTo(_absCache, _redisCache);
+        result.Should().HaveCount(1);
+        _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task DeleteAsync_does_not_forget_cache_type_for_remaining_keys_of_the_same_correlation()
+    public async Task GetAsync_falls_back_to_durable_storage_and_repopulates_the_cache()
     {
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _abs.Setup(c => c.GetResourceTypeByCacheKey(CacheKey)).Returns(ResourceType.Patient);
 
-        await sut.UpdateCorrelationCacheAsync("corr-1:Patient", new List<DomainResource>(), ResourceType.Patient);
+        var result = await CreateSut().GetAsync(CacheKey);
 
-        _absCache
-            .Setup(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
+        result.Should().HaveCount(1);
+        _redis.Verify(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAsync_falls_back_to_durable_storage_when_the_cache_is_unreachable()
+    {
+        _redis
+            .Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _abs.Setup(c => c.GetResourceTypeByCacheKey(CacheKey)).Returns(ResourceType.Patient);
+
+        // An unreachable cache is a slower read, never a failure.
+        var result = await CreateSut().GetAsync(CacheKey);
+
+        result.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task GetAsync_returns_empty_without_repopulating_when_neither_store_holds_the_key()
+    {
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        var result = await CreateSut().GetAsync(CacheKey);
+
+        result.Should().BeEmpty();
+        _redis.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HasResourcesAsync_checks_durable_storage_when_the_cache_has_nothing()
+    {
+        _redis.Setup(c => c.HasResourcesAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _abs.Setup(c => c.HasResourcesAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        (await CreateSut().HasResourcesAsync(CacheKey)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task HasResourcesAsync_checks_durable_storage_when_the_cache_is_unreachable()
+    {
+        _redis
+            .Setup(c => c.HasResourcesAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+        _abs.Setup(c => c.HasResourcesAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        (await CreateSut().HasResourcesAsync(CacheKey)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_cancels_queued_writes_before_deleting_from_both_stores()
+    {
+        var order = new List<string>();
+        var keys = new List<string> { CacheKey };
+
+        _writer.Setup(w => w.Cancel(keys)).Callback(() => order.Add("cancel"));
+        _redis
+            .Setup(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("cache"))
             .Returns(Task.CompletedTask);
-        _absCache
-            .Setup(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<DomainResource>());
+        _abs
+            .Setup(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("durable"))
+            .Returns(Task.CompletedTask);
 
-        await sut.DeleteAsync(new List<string> { "corr-1:Encounter" });
+        await CreateSut().DeleteAsync(keys);
 
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-1")).Should().Be(ResourceCacheType.ABS);
-
-        await sut.GetAsync("corr-1:Patient");
-
-        _absCache.Verify(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()), Times.Once);
-        _redisCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        // Cancel has to come first, or a write still on the queue recreates what was just removed.
+        order.Should().Equal("cancel", "cache", "durable");
     }
 
     [Fact]
-    public async Task Cache_type_memo_expires_after_configured_ttl_without_access()
+    public async Task DeleteAsync_still_deletes_from_durable_storage_when_the_cache_delete_fails()
     {
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        var clock = new FakeTimeProvider();
-        var sut = CreateSut(
-            new ResourceCacheRedisSettings
-            {
-                MaxMemoryBytes = 1000L * 1024 * 1024,
-                MemoryThresholdPercent = 80.0,
-                CacheEntryTtlDays = 7
-            },
-            clock);
+        var keys = new List<string> { CacheKey };
 
-        await Write(sut, "corr-ttl");
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-ttl")).Should().Be(ResourceCacheType.ABS);
+        _redis
+            .Setup(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
 
-        clock.Advance(TimeSpan.FromDays(7));
+        await CreateSut().DeleteAsync(keys);
 
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-ttl")).Should().Be(ResourceCacheType.Redis);
+        _abs.Verify(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Cache_type_memo_slides_on_access()
+    public async Task WaitForDurableAsync_waits_on_the_correlations_queued_writes()
     {
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        var clock = new FakeTimeProvider();
-        var sut = CreateSut(
-            new ResourceCacheRedisSettings
-            {
-                MaxMemoryBytes = 1000L * 1024 * 1024,
-                MemoryThresholdPercent = 80.0,
-                CacheEntryTtlDays = 7
-            },
-            clock);
+        await CreateSut().WaitForDurableAsync("corr-1");
 
-        await Write(sut, "corr-slide");
-
-        clock.Advance(TimeSpan.FromDays(6));
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.ABS);
-
-        clock.Advance(TimeSpan.FromDays(6));
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.ABS);
-
-        clock.Advance(TimeSpan.FromDays(7));
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.Redis);
-    }
-
-    [Fact]
-    public async Task Cache_type_persisted_to_Redis_is_visible_to_another_instance()
-    {
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        RedisValue stored = RedisValue.Null;
-        _database
-            .Setup(database => database.StringSetAsync(
-                It.IsAny<RedisKey>(),
-                It.IsAny<RedisValue>(),
-                It.IsAny<TimeSpan?>(),
-                It.IsAny<When>()))
-            .Callback<RedisKey, RedisValue, TimeSpan?, When>((_, value, _, _) => stored = value)
-            .ReturnsAsync(true);
-        _database
-            .Setup(database => database.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .Returns(() => Task.FromResult(stored));
-
-        var settings = new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 };
-        var writer = CreateSut(settings);
-        await Write(writer, "corr-shared");
-
-        var reader = CreateSut(settings);
-        (await reader.GetCacheTypeForCorrelationIdAsync("corr-shared")).Should().Be(ResourceCacheType.ABS);
-    }
-
-    [Fact]
-    public async Task GetAsync_falls_back_to_ABS_when_no_memo_exists()
-    {
-        SetupRedisUsedMemory(100L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        _redisCache
-            .Setup(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<DomainResource>());
-        _absCache
-            .Setup(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<DomainResource> { new Patient { Id = "p1" } });
-
-        var resources = await sut.GetAsync("corr-miss:Patient");
-
-        resources.Should().ContainSingle();
-        (await sut.GetCacheTypeForCorrelationIdAsync("corr-miss")).Should().Be(ResourceCacheType.ABS);
-        _absCache.Verify(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task No_connected_server_uses_ABS()
-    {
-        SetupNoConnectedServer();
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-noserver");
-
-        VerifyWroteTo(_absCache, _redisCache);
-    }
-
-    [Fact]
-    public async Task Exception_reading_memory_uses_ABS()
-    {
-        _multiplexer.Setup(m => m.GetServers()).Throws(new RedisException("boom"));
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-throws");
-
-        VerifyWroteTo(_absCache, _redisCache);
-    }
-
-    /// <summary>
-    /// A rejected INFO means the command is restricted, not that Redis is under pressure. It must
-    /// not short-circuit the probe before MEMORY STATS has been consulted.
-    /// </summary>
-    [Fact]
-    public async Task Rejected_INFO_still_falls_back_to_MEMORY_STATS()
-    {
-        var server = new Mock<IServer>();
-        server.SetupGet(s => s.IsConnected).Returns(true);
-        server.Setup(s => s.InfoAsync(It.IsAny<RedisValue>(), It.IsAny<CommandFlags>()))
-            .ThrowsAsync(new RedisCommandException("This operation is not available unless admin mode is enabled: INFO"));
-        SetupMemoryStats(server, 100L * 1024 * 1024);
-        _multiplexer.Setup(m => m.GetServers()).Returns(new[] { server.Object });
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-info-rejected");
-
-        VerifyWroteTo(_redisCache, _absCache);
-    }
-
-    /// <summary>
-    /// The selection decision must be visible in deployed environments, which run at Information.
-    /// Logging it at Debug left LEGLINK-948 undiagnosable: an ABS result could not be distinguished
-    /// from a failed probe without redeploying at a different log level.
-    /// </summary>
-    [Fact]
-    public async Task Selection_decision_is_logged_at_Information()
-    {
-        SetupRedisUsedMemory(100L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-logged");
-
-        VerifyLogged(LogLevel.Information, Times.AtLeastOnce());
-    }
-
-    [Fact]
-    public async Task No_connected_server_logs_a_warning()
-    {
-        SetupNoConnectedServer();
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-noserver-warn");
-
-        VerifyWarningLogged(Times.Once());
-    }
-
-    /// <summary>
-    /// Azure Managed Redis proxies Redis Enterprise and is not guaranteed to return the unique-key
-    /// INFO shape that open-source Redis does. A duplicate key previously threw out of
-    /// <c>ToDictionary</c> and was swallowed by the catch-all into a silent ABS fallback.
-    /// </summary>
-    [Fact]
-    public async Task Duplicate_keys_in_info_memory_do_not_force_the_ABS_fallback()
-    {
-        var usedMemory = (100L * 1024 * 1024).ToString();
-        SetupRedisInfo(new[]
-        {
-            new KeyValuePair<string, string>("used_memory", usedMemory),
-            new KeyValuePair<string, string>("used_memory", usedMemory)
-        });
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-duplicate-keys");
-
-        VerifyWroteTo(_redisCache, _absCache);
-    }
-
-    [Fact]
-    public async Task Decision_is_memoized_per_correlationId()
-    {
-        SetupRedisUsedMemory(100L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-memo");
-        await Write(sut, "corr-memo");
-
-        // The memory pressure check (GetServers) should only happen once for the same correlationId.
-        _multiplexer.Verify(m => m.GetServers(), Times.Once);
-        _redisCache.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        _writer.Verify(w => w.WaitForCorrelationAsync("corr-1", It.IsAny<CancellationToken>()), Times.Once);
     }
 }

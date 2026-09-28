@@ -156,6 +156,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
+        public Task WaitForCorrelationAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(correlationId))
+            {
+                return Task.CompletedTask;
+            }
+
+            var prefix = correlationId + ":";
+            var keys = _keys.Keys
+                .Where(key => key == correlationId || key.StartsWith(prefix, StringComparison.Ordinal))
+                .ToList();
+
+            return WaitForDurableAsync(keys, cancellationToken);
+        }
+
+        /// <inheritdoc/>
         public void Cancel(IEnumerable<string> cacheKeys)
         {
             if (cacheKeys == null)

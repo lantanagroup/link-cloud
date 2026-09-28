@@ -415,10 +415,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey) => ResourceType.Patient;
 
-        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(
-            string correlationId,
-            CancellationToken cancellationToken = default) => Task.FromResult(ResourceCacheType.ABS);
-
-        public IResourceCache GetImplementation(ResourceCacheType cacheType) => this;
+        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

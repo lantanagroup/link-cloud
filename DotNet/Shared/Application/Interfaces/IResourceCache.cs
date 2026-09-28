@@ -77,36 +77,25 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         ResourceType GetResourceTypeByCacheKey(string cacheKey);
 
         /// <summary>
-        /// The store holding <paramref name="correlationId"/>, consulting the shared Redis memo when
-        /// this process has none of its own.
+        /// Waits until everything written for <paramref name="correlationId"/> has reached durable
+        /// storage.
         /// </summary>
         /// <remarks>
-        /// Removed by LEGLINK-1276 once the Hybrid cache writes every correlation to both stores:
-        /// with nothing to choose between, there is nothing to report. It survives for now only
-        /// because it still stamps the <c>CacheType</c> field that the current Hybrid's exclusive
-        /// store selection makes meaningful.
+        /// The barrier that makes a correlation's cache keys safe to advertise. Call it before marking
+        /// work terminal, and before producing an event that names those keys: writes reach the cache
+        /// immediately but durable storage on a background queue, so without it a reader can arrive
+        /// after the cached copy is evicted and before the durable copy exists.
+        /// <para>
+        /// Waits only on the calling process's queue. Implementations that write durably in-line
+        /// complete immediately.
+        /// </para>
         /// </remarks>
-        /// <param name="correlationId">The correlation, or any cache key beginning with it.</param>
-        /// <param name="cancellationToken">Cancels the memo lookup.</param>
-        /// <returns>
-        /// The recorded store, or <see cref="ResourceCacheType.Redis"/> when no memo exists anywhere.
-        /// </returns>
-        Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// The concrete single-store cache behind <paramref name="cacheType"/>.
-        /// </summary>
-        /// <remarks>
-        /// Removed by LEGLINK-1276. Callers use it to pin every operation for one message to the store
-        /// named by its <c>CacheType</c> field; once reads fall back automatically there is no reason
-        /// to reach past the configured cache.
-        /// </remarks>
-        /// <param name="cacheType">The store to resolve.</param>
-        /// <returns>The implementation for that store.</returns>
-        /// <exception cref="NotSupportedException">
-        /// A single-store implementation was asked for a store other than its own.
+        /// <param name="correlationId">The correlation to wait on.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <exception cref="ResourceCacheDurabilityException">
+        /// A durable write for this correlation failed permanently, so its keys must not be advertised.
         /// </exception>
-        IResourceCache GetImplementation(ResourceCacheType cacheType);
+        Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// True when the backing store has at least one resource for <paramref name="cacheKey"/>,

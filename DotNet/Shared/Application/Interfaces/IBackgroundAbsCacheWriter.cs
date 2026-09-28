@@ -47,6 +47,22 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Waits until every queued write for <paramref name="correlationId"/> and its per-resource-type
+        /// keys has been persisted.
+        /// </summary>
+        /// <remarks>
+        /// The form the pipeline actually uses, because a caller knows its correlation but not which
+        /// cache keys its own work happened to touch. Waiting on the whole correlation is a superset of
+        /// that, which is what makes it a safe barrier.
+        /// </remarks>
+        /// <param name="correlationId">The correlation to wait on.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <exception cref="ResourceCacheDurabilityException">
+        /// A write for one of the correlation's keys failed permanently.
+        /// </exception>
+        Task WaitForCorrelationAsync(string correlationId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Discards queued writes for <paramref name="cacheKeys"/> and clears any recorded failure.
         /// </summary>
         /// <remarks>

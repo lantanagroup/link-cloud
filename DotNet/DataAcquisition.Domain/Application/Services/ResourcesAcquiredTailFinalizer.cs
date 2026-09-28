@@ -1,5 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -57,21 +56,15 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         }
 
         var kept = new List<string>(listed.Count);
-        var sawAbs = false;
-        var sawRedis = false;
 
         foreach (var key in listed)
         {
-            var inAbs = await KeyHasResourcesAsync(ResourceCacheType.ABS, key, cancellationToken);
-            var inRedis = await KeyHasResourcesAsync(ResourceCacheType.Redis, key, cancellationToken);
-            if (!inAbs && !inRedis)
+            // One probe, not two. Every correlation now lives in durable storage with the cache in
+            // front of it, so a key that holds nothing here holds nothing anywhere.
+            if (await _resourceCache.HasResourcesAsync(key, cancellationToken))
             {
-                continue;
+                kept.Add(key);
             }
-
-            kept.Add(key);
-            sawAbs |= inAbs;
-            sawRedis |= inRedis;
         }
 
         if (kept.Count != listed.Count)
@@ -85,97 +78,8 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
                 kept.Count);
         }
 
-        if (sawAbs && sawRedis)
-        {
-            await ConsolidateIntoAbsAsync(kept, cancellationToken);
-            _logger.LogWarning(
-                "Replica split for CorrelationId={CorrelationId}: copied Redis-only keys into ABS so ResourcesAcquired can advertise a single CacheType.",
-                tail.CorrelationId.SanitizeForLog());
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
-        }
-        else if (sawAbs)
-        {
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
-        }
-        else if (sawRedis)
-        {
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.Redis;
-        }
-
         tail.ResourcesAcquired.CacheKeys = kept;
 
         return locationOrgOutcome;
-    }
-
-    private async Task ConsolidateIntoAbsAsync(List<string> kept, CancellationToken cancellationToken)
-    {
-        var redis = TryGetImplementation(ResourceCacheType.Redis);
-        var abs = TryGetImplementation(ResourceCacheType.ABS);
-        if (redis == null || abs == null)
-        {
-            return;
-        }
-
-        var redisOnly = new List<string>();
-        foreach (var key in kept)
-        {
-            if (await redis.HasResourcesAsync(key, cancellationToken)
-                && !await abs.HasResourcesAsync(key, cancellationToken))
-            {
-                redisOnly.Add(key);
-            }
-        }
-
-        foreach (var key in redisOnly)
-        {
-            var resources = await redis.GetAsync(key, cancellationToken);
-            if (resources.Count == 0)
-            {
-                continue;
-            }
-
-            var resourceType = abs.GetResourceTypeByCacheKey(key);
-            await abs.UpdateCorrelationCacheAsync(key, resources, resourceType, cancellationToken);
-        }
-
-        var redisCopies = new List<string>();
-        foreach (var key in kept)
-        {
-            if (await redis.HasResourcesAsync(key, cancellationToken))
-            {
-                redisCopies.Add(key);
-            }
-        }
-
-        if (redisCopies.Count > 0)
-        {
-            await redis.DeleteAsync(redisCopies, cancellationToken);
-        }
-    }
-
-    private async Task<bool> KeyHasResourcesAsync(
-        ResourceCacheType cacheType,
-        string cacheKey,
-        CancellationToken cancellationToken)
-    {
-        var implementation = TryGetImplementation(cacheType);
-        if (implementation == null)
-        {
-            return false;
-        }
-
-        return await implementation.HasResourcesAsync(cacheKey, cancellationToken);
-    }
-
-    private IResourceCache? TryGetImplementation(ResourceCacheType cacheType)
-    {
-        try
-        {
-            return _resourceCache.GetImplementation(cacheType);
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
     }
 }

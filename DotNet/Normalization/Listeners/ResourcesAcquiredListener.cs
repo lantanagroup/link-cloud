@@ -12,6 +12,7 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -268,7 +269,7 @@ public class ResourcesAcquiredListener : BackgroundService
             result.Message.Value.ScheduledReports = remaining;
         }
 
-        IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
+        IResourceCache resourceCache = _resourceCache;
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
@@ -426,6 +427,11 @@ public class ResourcesAcquiredListener : BackgroundService
                 correlationId.SanitizeForLog());
         }
 
+        // The durability barrier. ResourcesNormalized names this correlation's cache key, and the
+        // durable write for it is still on a background queue -- produce first and a reader can
+        // arrive after the cache entry is evicted but before the durable copy exists.
+        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
+
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
         // Deliberately after ResourcesNormalized. A ResourcesNormalized failure throws, so the whole
@@ -562,7 +568,10 @@ public class ResourcesAcquiredListener : BackgroundService
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent,
-            CacheType = message.Message.Value.CacheType,
+            // Constant since the cache stopped choosing between stores: every correlation is now
+            // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
+            // removes it from the contract in both runtimes.
+            CacheType = ResourceCacheType.ABS,
             CacheKey = correlationId
         };
         Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>

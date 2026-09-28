@@ -22,6 +22,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
@@ -74,6 +75,7 @@ public class PatientDataService : IPatientDataService
     private readonly IScheduledReportManager _scheduledReportManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
+    private readonly IResourceCache _resourceCache;
 
     public PatientDataService(
         IDatabase database,
@@ -92,9 +94,11 @@ public class PatientDataService : IPatientDataService
         IPatientCensusService patientCensusService,
         IScheduledReportManager scheduledReportManager,
         IDataAcquisitionServiceMetrics metrics,
-        IOptionsMonitor<TelemetrySettings> telemetrySettings)
+        IOptionsMonitor<TelemetrySettings> telemetrySettings,
+        IResourceCache resourceCache)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _fhirQueryQueries = fhirQueryQueries;
         _queryPlanQueries = queryPlanQueries;
@@ -753,6 +757,13 @@ public class PatientDataService : IPatientDataService
                 {
                     newNotes.AddRange(log.Notes);
                 }
+
+                // The durability barrier, and it has to precede the status write rather than follow
+                // it: once this log is terminal any pod can complete the tail and advertise the keys
+                // below, and the durable writes for them are still on this pod's background queue.
+                // Only this path persists ResourceAcquiredIds, so only this path can newly advertise
+                // a key -- the failure paths carry ids a previous successful pass already made durable.
+                await _resourceCache.WaitForDurableAsync(log.CorrelationId, cancellationToken);
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {

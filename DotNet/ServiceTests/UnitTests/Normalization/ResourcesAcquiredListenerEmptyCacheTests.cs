@@ -47,9 +47,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     {
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
-        resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
         resourceCache
@@ -87,9 +84,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     {
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
         resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
@@ -145,9 +139,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
-        resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
         resourceCache
@@ -184,9 +175,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     public async Task ProcessMessageAsync_NoCacheKeys_ProducesWithoutRetry()
     {
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
         resourceCache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);

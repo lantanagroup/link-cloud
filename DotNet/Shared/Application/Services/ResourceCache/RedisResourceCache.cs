@@ -102,16 +102,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
-        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Completes immediately: this cache has no separate durable tier to wait for.
+        /// </summary>
+        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(ResourceCacheType.Redis);
-        }
-
-        public IResourceCache GetImplementation(ResourceCacheType cacheType)
-        {
-            if (cacheType != ResourceCacheType.Redis)
-                throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
-            return this;
+            return Task.CompletedTask;
         }
 
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)

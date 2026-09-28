@@ -130,6 +130,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 return resources;
             }
 
+            // The payload blob can legitimately contain the same reference twice: a crash between the
+            // payload append and the ids append leaves a resource the retry's diff will not skip, and
+            // two processes appending to one key can interleave. Collapsing on read makes both
+            // harmless -- wasted bytes rather than duplicate resources.
+            var seenReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var duplicateCount = 0;
+
             await using (Stream readStream = await readBlobClient.OpenReadAsync(true, cancellationToken: cancellationToken))
             using (StreamReader reader = new StreamReader(readStream))
             {
@@ -148,6 +155,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                         break;
                     }
 
+                    if (!seenReferences.Add(resourceReference))
+                    {
+                        duplicateCount++;
+                        continue;
+                    }
+
                     try
                     {
                         DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
@@ -159,6 +172,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                         _logger.LogError("Failed to deserialize FHIR DomainResource for the following ABS entry: {reference}", resourceReference);
                     }
                 }
+            }
+
+            if (duplicateCount > 0)
+            {
+                _logger.LogWarning(
+                    "Collapsed {DuplicateCount} duplicate reference(s) reading {CacheKey}. Expected after an interrupted or concurrent write; persistent growth here means writes to one key are not being serialized.",
+                    duplicateCount,
+                    cacheKey.SanitizeForLog());
             }
 
             return resources;
@@ -183,16 +204,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Completes immediately: this cache writes durably in-line, so there is never a queued write
+        /// outstanding.
+        /// </summary>
+        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(ResourceCacheType.ABS);
-        }
-
-        public IResourceCache GetImplementation(ResourceCacheType cacheType)
-        {
-            if (cacheType != ResourceCacheType.ABS)
-                throw new NotSupportedException($"{nameof(ABSResourceCache)} does not support cache type '{cacheType}'.");
-            return this;
+            return Task.CompletedTask;
         }
 
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
