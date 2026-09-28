@@ -297,16 +297,43 @@ public class LokiScraper
                 currentEndUnix = nextEndUnix;
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception ex)
         {
-            throw;
-        }
-        catch
-        {
-            return lines;
+            switch (ClassifyScrapeFailure(ex, cancellationToken))
+            {
+                case ScrapeFailure.Rethrow:
+                    throw;
+                case ScrapeFailure.MissedScrape:
+                    return [];
+                default:
+                    return lines;
+            }
         }
 
         return lines;
+    }
+
+    internal enum ScrapeFailure
+    {
+        Rethrow,
+        MissedScrape,
+        KeepPartial
+    }
+
+    /// <summary>
+    /// A caller cancel stops the scrape. An HTTP timeout is a <see cref="TaskCanceledException"/>
+    /// whose token is still active. That is a missed scrape: a partial page list would look
+    /// complete to the evidence retry. Other failures keep the pages already read.
+    /// </summary>
+    internal static ScrapeFailure ClassifyScrapeFailure(Exception ex, CancellationToken cancellationToken)
+    {
+        if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+            return ScrapeFailure.Rethrow;
+
+        if (ex is OperationCanceledException)
+            return ScrapeFailure.MissedScrape;
+
+        return ScrapeFailure.KeepPartial;
     }
 
     /// <summary>

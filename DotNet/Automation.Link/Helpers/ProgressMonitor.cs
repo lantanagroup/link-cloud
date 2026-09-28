@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// </summary>
 public class ProgressMonitor
 {
-    private const int ActivityCheckInterval = 6; // ~30s with 5s polling
+    private const int ActivityCheckInterval = AutomationRunPollingPolicy.PipelineActivitySampleEvery;
 
     private readonly IAutomationOutput _output;
     private readonly PipelineProgressTracker? _progressTracker;
@@ -113,6 +113,8 @@ public class ProgressMonitor
         if (_lokiScraper == null)
             return;
 
+        await NoteValidationActivityAsync(facilityId, reportId);
+
         if (_progressCheckCount % ActivityCheckInterval != 0)
             return;
 
@@ -148,8 +150,12 @@ public class ProgressMonitor
             }
         }
 
-        var validationActivity = await _lokiScraper.GetValidationActivitySummaryAsync(
-            TimeSpan.FromSeconds(60),
+    }
+
+    private async Task NoteValidationActivityAsync(string facilityId, string reportId)
+    {
+        var validationActivity = await _lokiScraper!.GetValidationActivitySummaryAsync(
+            AutomationRunPollingPolicy.ValidationActivityLookback,
             facilityId,
             reportId);
         if (!string.IsNullOrWhiteSpace(validationActivity))
