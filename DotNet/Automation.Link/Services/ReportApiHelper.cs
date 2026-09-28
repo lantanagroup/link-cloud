@@ -577,7 +577,10 @@ public class ReportApiHelper
         TimeSpan hardTimeout,
         ref DateTime deadline)
     {
-        var validationOngoing = diagnostics?.IsValidationOngoing == true;
+        var validationProgress = diagnostics?.GetValidationProgress()
+            ?? new LantanaGroup.Automation.Helpers.ValidationProgressSnapshot(false, 0);
+        var validationOngoing = validationProgress.Ongoing;
+        var pendingValidationCount = validationProgress.Pending;
         if (validationOngoing)
         {
             _validationHoldActive = true;
@@ -585,7 +588,7 @@ public class ReportApiHelper
         else if (_validationHoldActive && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
         {
             _validationHoldActive = false;
-            if (ShouldRearmTimeoutAfterValidationHold(diagnostics?.PendingValidationCount ?? 0))
+            if (ShouldRearmTimeoutAfterValidationHold(pendingValidationCount))
             {
                 phaseStart = DateTime.UtcNow;
                 deadline = phaseStart + hardTimeout;
@@ -594,7 +597,7 @@ public class ReportApiHelper
             else
             {
                 _output.WriteLine(
-                    $"[DIAG] Validation has been quiet with {diagnostics!.PendingValidationCount} patients still pending. The existing deadline applies.");
+                    $"[DIAG] Validation has been quiet with {pendingValidationCount} patients still pending. The existing deadline applies.");
             }
         }
 
@@ -612,7 +615,7 @@ public class ReportApiHelper
         {
             _validationHoldActive = true;
             _output.WriteLine(
-                $"[DIAG] Validation is still working ({diagnostics!.PendingValidationCount} patients open). " +
+                $"[DIAG] Validation is still working ({pendingValidationCount} patients open). " +
                 "This run will not time out while validation is in progress.");
             return true;
         }

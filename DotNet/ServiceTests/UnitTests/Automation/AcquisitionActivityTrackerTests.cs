@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 
@@ -236,6 +237,20 @@ public class AcquisitionActivityTrackerTests
 
         signal.ObserveCounts(4, 0, 0, t0.AddMinutes(1));
         signal.IsOngoingAt(t0.AddMinutes(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Validation_progress_publishes_ongoing_and_pending_together()
+    {
+        var state = new TestMonitorState();
+        state.UpdateValidationProgress(true, 2636);
+
+        var progress = state.ValidationProgress;
+        progress.Ongoing.Should().BeTrue();
+        progress.Pending.Should().Be(2636);
+
+        state.UpdateValidationProgress(false, 0);
+        state.ValidationProgress.Should().Be(new ValidationProgressSnapshot(false, 0));
     }
 
     [Fact]

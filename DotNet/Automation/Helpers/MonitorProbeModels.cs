@@ -31,6 +31,8 @@ public sealed class MonitorProbeResult
     public List<MonitorIssue> Issues { get; init; } = [];
 }
 
+public sealed record ValidationProgressSnapshot(bool Ongoing, int Pending);
+
 public sealed class TestMonitorState
 {
     private readonly HashSet<string> _completedMilestones = [];
@@ -49,8 +51,10 @@ public sealed class TestMonitorState
     public DateTime LastProgressUtc { get; set; }
     public int AcquisitionResourcesAcquired { get; set; }
     public bool AcquisitionInFlight { get; set; }
-    public bool ValidationOngoing { get; set; }
-    public int PendingValidationCount { get; set; }
+
+    private ValidationProgressSnapshot _validationProgress = new(false, 0);
+
+    public ValidationProgressSnapshot ValidationProgress => Volatile.Read(ref _validationProgress);
 
     public IReadOnlyCollection<string> CompletedMilestones => _completedMilestones;
     public IReadOnlyList<MonitorIssue> Issues => _issues;
@@ -69,13 +73,22 @@ public sealed class TestMonitorState
         LastProgressUtc = default;
         AcquisitionResourcesAcquired = 0;
         AcquisitionInFlight = false;
-        ValidationOngoing = false;
-        PendingValidationCount = 0;
+        Volatile.Write(ref _validationProgress, new ValidationProgressSnapshot(false, 0));
         _completedMilestones.Clear();
         _issues.Clear();
     }
 
     public void IncrementCycle() => CycleCount++;
+
+    public void UpdateValidationProgress(bool? ongoing, int? pending)
+    {
+        var current = ValidationProgress;
+        Volatile.Write(
+            ref _validationProgress,
+            new ValidationProgressSnapshot(
+                ongoing ?? current.Ongoing,
+                pending ?? current.Pending));
+    }
 
     public void MergeMilestones(IReadOnlyCollection<string> milestones)
     {

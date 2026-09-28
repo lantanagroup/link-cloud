@@ -56,13 +56,11 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
     }
 
     /// <summary>
-    /// True when validation has been seen working and patients are still pending.
-    /// The submission poll does not apply a timeout while this is true.
+    /// Ongoing flag and pending count from the same published snapshot.
+    /// Readers must not sample those two fields separately.
     /// </summary>
-    public bool IsValidationOngoing => _monitor.State.ValidationOngoing;
-
-    /// <summary>Patients still in PendingValidation on the latest report snapshot.</summary>
-    public int PendingValidationCount => _monitor.State.PendingValidationCount;
+    public LantanaGroup.Automation.Helpers.ValidationProgressSnapshot GetValidationProgress()
+        => _monitor.State.ValidationProgress;
 
     /// <summary>
     /// Returns true if the named milestone has been reached.

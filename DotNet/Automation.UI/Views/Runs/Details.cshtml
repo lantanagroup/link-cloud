@@ -1184,7 +1184,7 @@
             const pending = !isRunComplete(currentRunStatus) && validationPatientsOpen > 0;
             const moving = pending && validationWorkIsMoving();
             if (badge)
-                badge.style.display = moving ? '' : 'none';
+                badge.style.display = pending ? '' : 'none';
             if (!banner)
                 return;
             banner.style.display = pending ? '' : 'none';
