@@ -155,7 +155,6 @@ public class ProgressMonitor
         if (!string.IsNullOrWhiteSpace(validationActivity))
         {
             _validationWork.NoteActivity();
-            _acquisitionActivity.MarkProgress(DateTime.UtcNow);
             _progressTracker?.NoteActivity();
             if (!string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
             {
