@@ -127,6 +127,432 @@ public class AbsSubmissionPredictorTests
     }
 
     [Fact]
+    public async Task Pk_hsloc_01a0cfc5_includes_encounter_location_omitted_by_everything()
+    {
+        // Run a3756e88 / patient 01a0cfc5 on ehr-test. Patient/$everything returned the
+        // 195 resources the manifest counted and omitted Location/15eeb878, which the
+        // Encounter still references and which GET Location/{id} returns. ABS then had
+        // Encounter 8 and Location 7, including that Location. The org condition is the
+        // identifier system carried by every location in this graph, including the
+        // unmapped root that has no partOf parent, so it matches the raw resource
+        // before normalization.
+        const string patientId = "01a0cfc5-e9f7-762b-a544-debb1c474a5b";
+        const string missingLocationId = "15eeb878-9317-4033-9fbd-ce59258c2f6f";
+        const string encounterId = "3c95b03a-b4fc-4a44-82c1-61df9d8fe7e3";
+        const string brokenParentId = "b222be8d-0142-4e12-8ea0-c33bec179876";
+        var periodStart = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodEnd = new DateTime(2026, 9, 30, 23, 59, 59, DateTimeKind.Utc);
+        string[] orgPaths =
+        [
+            "identifier.where(system = 'http://hospital.example.org/locations').exists()"
+        ];
+
+        var entries = ImportedPatientLoader.ParseBundleEntries(
+            ReadEmbedded("pk-hsloc-01a0cfc5.everything.json"), patientId);
+        var omitted = JsonSerializer.Deserialize<Location>(
+            ReadEmbedded("pk-hsloc-01a0cfc5.location-15eeb878.json"),
+            FhirSerializerOptions.ForFhirWithoutValidation());
+        omitted.Should().NotBeNull();
+
+        var reads = new List<string>();
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                if (string.Equals(id, missingLocationId, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult(omitted);
+                if (string.Equals(id, brokenParentId, StringComparison.OrdinalIgnoreCase))
+                    return Task.FromResult<Location?>(null);
+                throw new InvalidOperationException($"Unexpected Location read: {id}");
+            },
+            output: null,
+            CancellationToken.None);
+
+        added.Should().Be(1);
+        reads.Should().BeEquivalentTo(new[] { missingLocationId, brokenParentId });
+
+        var manifest = AbsSubmissionPredictor.PredictImportedBundle(
+            SerializeEntries(entries),
+            patientId,
+            periodStart,
+            periodEnd,
+            organizationLocationConditionFhirPaths: orgPaths);
+        var predicted = ClinicalCounts(manifest, patientId);
+
+        AssertCount(predicted, "Encounter", 8);
+        AssertCount(predicted, "Location", 7);
+        AssertCount(predicted, "Condition", 2);
+        AssertCount(predicted, "Coverage", 1);
+        AssertCount(predicted, "DiagnosticReport", 7);
+        AssertCount(predicted, "Medication", 2);
+        AssertCount(predicted, "MedicationRequest", 2);
+        AssertCount(predicted, "Observation", 129);
+        AssertCount(predicted, "ServiceRequest", 7);
+        AssertCount(predicted, "Specimen", 7);
+        AssertCount(predicted, "Patient", 1);
+        predicted.Should().NotContainKey("MedicationAdministration");
+
+        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+        keys.Should().Contain($"Location/{missingLocationId}");
+        keys.Should().Contain($"Encounter/{encounterId}");
+        manifest.ResourceKeysByPatient[patientId].Should().Contain($"Location/{missingLocationId}");
+    }
+
+    [Fact]
+    public async Task Referenced_location_read_cap_fails_the_import_when_targets_remain()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-cap",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        for (var i = 0; i < ReferencedLocationExpander.MaxLocationReads + 25; i++)
+        {
+            encounter.Location.Add(new Encounter.LocationComponent
+            {
+                Location = new ResourceReference($"Location/missing-{i:D4}")
+            });
+        }
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent
+                {
+                    Method = Bundle.HTTPVerb.PUT,
+                    Url = "Encounter/enc-cap"
+                }
+            }
+        };
+
+        var reads = 0;
+        var act = async () => await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (_, _) =>
+            {
+                reads++;
+                return Task.FromResult<Location?>(null);
+            },
+            output: null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{ReferencedLocationExpander.MaxLocationReads}-read cap*");
+        reads.Should().Be(ReferencedLocationExpander.MaxLocationReads);
+        entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Referenced_location_read_cap_fails_when_the_last_read_enqueues_partOf()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-chain",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/loc-0000")
+        });
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent
+                {
+                    Method = Bundle.HTTPVerb.PUT,
+                    Url = "Encounter/enc-chain"
+                }
+            }
+        };
+
+        var reads = new List<string>();
+        var act = async () => await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                var index = int.Parse(id["loc-".Length..], System.Globalization.CultureInfo.InvariantCulture);
+                return Task.FromResult<Location?>(new Location
+                {
+                    Id = id,
+                    PartOf = new ResourceReference($"Location/loc-{(index + 1):D4}")
+                });
+            },
+            output: null,
+            CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*still unread*");
+        var unread = $"loc-{ReferencedLocationExpander.MaxLocationReads:D4}";
+        reads.Should().HaveCount(ReferencedLocationExpander.MaxLocationReads);
+        reads.Should().NotContain(unread);
+        entries.Select(e => e.Resource).OfType<Location>().Select(location => location.Id)
+            .Should().NotContain(unread);
+    }
+
+    [Theory]
+    [InlineData("Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("//ehr-test.nhsnlink.org/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("//other.example/fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("foo/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("/other/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("https://ehr-test.nhsnlink.org/another-fhir/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/extra/Location/abc", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/ab-c.d", "https://ehr-test.nhsnlink.org/fhir", true, "ab-c.d")]
+    [InlineData("Location/%2e%2e%2fPatient%2f123", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/has space", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/..", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/.", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/id_underscore", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/caf\u00e9", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/2", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("https://ehr-test.nhsnlink.org/fhir/Location/abc/_history/2", "https://ehr-test.nhsnlink.org/fhir", true, "abc")]
+    [InlineData("Location/abc/_history", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/2/extra", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    [InlineData("Location/abc/_history/..", "https://ehr-test.nhsnlink.org/fhir", false, "")]
+    public void Location_reference_id_stays_on_the_configured_server(
+        string reference,
+        string fhirBase,
+        bool expected,
+        string expectedId)
+    {
+        var parsed = ReferencedLocationExpander.TryParseLocationId(
+            reference,
+            new Uri(fhirBase),
+            out var locationId);
+
+        parsed.Should().Be(expected);
+        locationId.Should().Be(expectedId);
+    }
+
+    [Fact]
+    public async Task Preloaded_import_stops_when_already_canceled()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var manifest = new GenerationManifest();
+        var imported = new ImportedPatientInput
+        {
+            Source = ImportedPatientSource.ExistingId,
+            PatientId = "p-cancel",
+            PreLoadedEntries =
+            [
+                new Bundle.EntryComponent
+                {
+                    Resource = new Patient { Id = "p-cancel" },
+                    Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Patient/p-cancel" }
+                }
+            ]
+        };
+
+        var act = async () => await FhirGenerationPipeline.ImportAndAppendPatientAsync(
+            new ConsoleAutomationOutput(),
+            new LantanaGroup.Automation.FhirDataLoader("https://ehr-test.nhsnlink.org/fhir"),
+            manifest,
+            imported,
+            [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        manifest.PatientIds.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Versioned_location_reference_is_read_as_the_logical_id()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-ver",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/stay/_history/3")
+        });
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Encounter/enc-ver" }
+            }
+        };
+
+        var reads = new List<string>();
+        await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                return Task.FromResult<Location?>(new Location { Id = id });
+            },
+            output: null,
+            CancellationToken.None);
+
+        reads.Should().Equal("stay");
+        encounter.Location.Single().Location.Reference.Should().Be("Location/stay");
+    }
+
+    [Fact]
+    public async Task Location_ids_that_differ_only_by_case_are_both_kept()
+    {
+        var encounter = new Encounter
+        {
+            Id = "enc-case",
+            Status = Encounter.EncounterStatus.Finished
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("Location/abc")
+        });
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = new Location { Id = "ABC" },
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Location/ABC" }
+            },
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Encounter/enc-case" }
+            }
+        };
+
+        var reads = new List<string>();
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                reads.Add(id);
+                return Task.FromResult<Location?>(new Location { Id = id });
+            },
+            output: null,
+            CancellationToken.None);
+
+        reads.Should().Equal("abc");
+        added.Should().Be(1);
+        entries.Select(e => e.Resource).OfType<Location>().Select(location => location.Id)
+            .Should().BeEquivalentTo("ABC", "abc");
+    }
+
+    [Fact]
+    public async Task Absolute_same_base_location_reference_is_predicted()
+    {
+        const string patientId = "p-abs";
+        var fhirBase = new Uri("https://ehr-test.nhsnlink.org/fhir");
+        var encounter = new Encounter
+        {
+            Id = "enc-abs",
+            Status = Encounter.EncounterStatus.Finished,
+            Class = new Coding("http://terminology.hl7.org/CodeSystem/v3-ActCode", "IMP"),
+            Subject = new ResourceReference($"Patient/{patientId}"),
+            Period = new Period
+            {
+                Start = "2026-09-10T00:00:00Z",
+                End = "2026-09-12T00:00:00Z"
+            }
+        };
+        encounter.Location.Add(new Encounter.LocationComponent
+        {
+            Location = new ResourceReference("https://ehr-test.nhsnlink.org/fhir/Location/stay")
+        });
+
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = new Patient { Id = patientId },
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = $"Patient/{patientId}" }
+            },
+            new()
+            {
+                Resource = encounter,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Encounter/enc-abs" }
+            }
+        };
+
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                if (id == "stay")
+                {
+                    return Task.FromResult<Location?>(new Location
+                    {
+                        Id = "stay",
+                        PartOf = new ResourceReference("//ehr-test.nhsnlink.org/fhir/Location/hospital")
+                    });
+                }
+
+                if (id == "hospital")
+                    return Task.FromResult<Location?>(new Location { Id = "hospital" });
+
+                throw new InvalidOperationException($"Unexpected Location read: {id}");
+            },
+            output: null,
+            CancellationToken.None,
+            fhirBase);
+
+        added.Should().Be(2);
+        encounter.Location.Single().Location.Reference.Should().Be("Location/stay");
+        var stay = entries.Select(e => e.Resource).OfType<Location>().Single(location => location.Id == "stay");
+        stay.PartOf.Reference.Should().Be("Location/hospital");
+
+        var acquired = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysForPatient(
+            patientId,
+            AbsSubmissionPredictor.IndexEntries(entries),
+            sharedResourceEntries: null,
+            QueryPlanDefaults.GetDefaultAsInput(),
+            "2026-09-01T00:00:00Z",
+            "2026-09-30T23:59:59Z");
+        acquired.Should().Contain("Location/stay");
+        acquired.Should().Contain("Location/hospital");
+
+        var periodStart = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+        var periodEnd = new DateTime(2026, 9, 30, 23, 59, 59, DateTimeKind.Utc);
+        var manifest = AbsSubmissionPredictor.PredictImportedBundle(
+            SerializeEntries(entries),
+            patientId,
+            periodStart,
+            periodEnd);
+        var keys = manifest.GetExpectedAbsKeysForPatient(patientId);
+        keys.Should().Contain("Location/stay");
+        keys.Should().Contain("Encounter/enc-abs");
+    }
+
+    [Fact]
+    public void Returned_location_id_must_match_the_requested_id()
+    {
+        var same = ImportedPatientLoader.RequireMatchingLocationId(new Location { Id = "abc" }, "abc");
+        same.Id.Should().Be("abc");
+
+        var missing = ImportedPatientLoader.RequireMatchingLocationId(new Location(), "abc");
+        missing.Id.Should().Be("abc");
+
+        var mismatch = () => ImportedPatientLoader.RequireMatchingLocationId(new Location { Id = "ABC" }, "abc");
+        mismatch.Should().Throw<InvalidOperationException>().WithMessage("*Location/ABC*Location/abc*");
+    }
+
+    [Fact]
+    public void Deleted_location_read_is_treated_as_missing()
+    {
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.NotFound).Should().BeTrue();
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.Gone).Should().BeTrue();
+        LantanaGroup.Automation.FhirDataLoader.IsAbsentResource(System.Net.HttpStatusCode.InternalServerError).Should().BeFalse();
+    }
+
+    [Fact]
     public void Imported_patient_predictor_excludes_diagnostic_reports_outside_ip_window()
     {
         // Run df6f9b8e: mega AddById patient. DA acquired 360 DiagnosticReports;
@@ -524,6 +950,16 @@ public class AbsSubmissionPredictorTests
         return counts
             .Where(kv => !PipelineDerivedTypes.Contains(kv.Key))
             .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string SerializeEntries(List<Bundle.EntryComponent> entries)
+    {
+        var bundle = new Bundle
+        {
+            Type = Bundle.BundleType.Collection,
+            Entry = entries
+        };
+        return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 
     private static string WrapClinicalNdjsonAsBundle(string ndjson)

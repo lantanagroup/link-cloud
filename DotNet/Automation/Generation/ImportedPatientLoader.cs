@@ -54,6 +54,18 @@ public static class ImportedPatientLoader
             }
 
             imp.PreLoadedEntries = ParseBundleEntries(bundleJson, imp.PatientId);
+            // Existing-id imports are already on the server, so a Location read here is
+            // only for the manifest. Bundle imports upload these same entries; a fetched
+            // Location would be PUT and later expunged.
+            if (imp.Source == ImportedPatientSource.ExistingId)
+            {
+                await ReferencedLocationExpander.AppendMissingAsync(
+                    imp.PreLoadedEntries,
+                    (id, token) => ReadLocationAsync(fhirDataLoader, id, token),
+                    output,
+                    ct,
+                    fhirDataLoader.FhirServerBase).ConfigureAwait(false);
+            }
 
             // Backfill PatientId from the bundle when the user didn't specify one.
             if (string.IsNullOrWhiteSpace(imp.PatientId))
@@ -157,6 +169,63 @@ public static class ImportedPatientLoader
                 $"FHIR bundle does not contain Patient/{expectedPatientId}. Bundle imports must include a Patient resource whose id matches the configured value.");
 
         return result;
+    }
+
+    /// <summary>
+    /// Reads Location/{id}. A 404 or 410 is a missing reference and returns null.
+    /// </summary>
+    public static async Task<Location?> ReadLocationAsync(
+        FhirDataLoader fhirDataLoader,
+        string locationId,
+        CancellationToken cancellationToken)
+    {
+        if (!ReferencedLocationExpander.IsLogicalId(locationId))
+        {
+            throw new ArgumentException($"Location ID '{locationId}' is not a FHIR logical id.", nameof(locationId));
+        }
+
+        var json = await fhirDataLoader.TryReadResourceJsonAsync($"Location/{locationId}", cancellationToken)
+            .ConfigureAwait(false);
+        if (json == null)
+            return null;
+
+        Location? location;
+        try
+        {
+            location = JsonSerializer.Deserialize<Location>(json, FhirSerializerOptions.ForFhirWithoutValidation());
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"FHIR server returned an unparseable body for Location/{locationId}.", ex);
+        }
+
+        if (location == null)
+            throw new InvalidOperationException($"FHIR server returned an empty Location for Location/{locationId}.");
+
+        return RequireMatchingLocationId(location, locationId);
+    }
+
+    /// <summary>
+    /// A successful read must be the Location that was requested. FHIR ids are
+    /// case-sensitive. An empty id is filled from the request. A different id
+    /// fails the import so the manifest is not built from the wrong resource.
+    /// </summary>
+    internal static Location RequireMatchingLocationId(Location location, string locationId)
+    {
+        if (string.IsNullOrWhiteSpace(location.Id))
+        {
+            location.Id = locationId;
+            return location;
+        }
+
+        if (!string.Equals(location.Id, locationId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"FHIR server returned Location/{location.Id} for a request for Location/{locationId}.");
+        }
+
+        return location;
     }
 
     private static DateTime? ParseFhirDateTime(string? s)
