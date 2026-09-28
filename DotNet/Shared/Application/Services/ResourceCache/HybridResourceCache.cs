@@ -160,14 +160,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
-        {
-            return TryGetInProcessCacheType(ExtractCorrelationId(correlationId), out var cacheType)
-                ? cacheType
-                : ResourceCacheType.Redis;
-        }
-
-        /// <inheritdoc/>
         public async Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
         {
             return await TryGetRecordedCacheTypeAsync(ExtractCorrelationId(correlationId), cancellationToken)
@@ -205,17 +197,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
 
             return false;
-        }
-
-        /// <inheritdoc/>
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
-        {
-            if (string.IsNullOrEmpty(correlationId))
-            {
-                return;
-            }
-
-            _correlationCacheTypes.TryRemove(ExtractCorrelationId(correlationId), out _);
         }
 
         // -------------------------------------------------------------------------

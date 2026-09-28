@@ -77,28 +77,14 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         ResourceType GetResourceTypeByCacheKey(string cacheKey);
 
         /// <summary>
-        /// The store holding <paramref name="correlationId"/>, from this process's memo only.
-        /// </summary>
-        /// <remarks>
-        /// Removed by LEGLINK-1276. It exists because Hybrid caching currently sends a correlation to
-        /// Redis or to ABS exclusively and has to report which; once every correlation is written to
-        /// both, there is nothing to report.
-        /// </remarks>
-        /// <param name="correlationId">The correlation, or any cache key beginning with it.</param>
-        /// <returns>
-        /// The memoized store, or <see cref="ResourceCacheType.Redis"/> when this process has no memo.
-        /// </returns>
-        ResourceCacheType GetCacheTypeForCorrelationId(string correlationId);
-
-        /// <summary>
         /// The store holding <paramref name="correlationId"/>, consulting the shared Redis memo when
         /// this process has none of its own.
         /// </summary>
         /// <remarks>
-        /// Removed by LEGLINK-1276, for the same reason as
-        /// <see cref="GetCacheTypeForCorrelationId"/>. Prefer this overload over the synchronous one
-        /// while it survives: another replica may have made the decision, and only the shared memo
-        /// knows.
+        /// Removed by LEGLINK-1276 once the Hybrid cache writes every correlation to both stores:
+        /// with nothing to choose between, there is nothing to report. It survives for now only
+        /// because it still stamps the <c>CacheType</c> field that the current Hybrid's exclusive
+        /// store selection makes meaningful.
         /// </remarks>
         /// <param name="correlationId">The correlation, or any cache key beginning with it.</param>
         /// <param name="cancellationToken">Cancels the memo lookup.</param>
@@ -130,16 +116,5 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// <param name="cancellationToken">Cancels the check.</param>
         /// <returns>True when the key holds at least one resource.</returns>
         Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Drops any in-process Redis-vs-ABS memo for <paramref name="correlationId"/>.
-        /// No-op for implementations that do not memoize a per-correlation cache type.
-        /// Shared Redis memos are left in place so other processes can still resolve the type.
-        /// </summary>
-        /// <remarks>
-        /// Removed by LEGLINK-1276 along with the memo it clears.
-        /// </remarks>
-        /// <param name="correlationId">The correlation whose memo should be forgotten.</param>
-        void ForgetCacheTypeForCorrelationId(string correlationId);
     }
 }

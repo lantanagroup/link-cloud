@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -231,37 +231,12 @@ public class HybridResourceCacheTests
 
         await sut.DeleteAsync(new List<string> { "corr-1:Encounter" });
 
-        sut.GetCacheTypeForCorrelationId("corr-1").Should().Be(ResourceCacheType.ABS);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-1")).Should().Be(ResourceCacheType.ABS);
 
         await sut.GetAsync("corr-1:Patient");
 
         _absCache.Verify(c => c.GetAsync("corr-1:Patient", It.IsAny<CancellationToken>()), Times.Once);
         _redisCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task ForgetCacheType_allows_subsequent_reads_to_fall_back_to_Redis()
-    {
-        SetupRedisUsedMemory(900L * 1024 * 1024);
-        var sut = CreateSut(new ResourceCacheRedisSettings { MaxMemoryBytes = 1000L * 1024 * 1024, MemoryThresholdPercent = 80.0 });
-
-        await Write(sut, "corr-forget");
-        sut.GetCacheTypeForCorrelationId("corr-forget").Should().Be(ResourceCacheType.ABS);
-
-        sut.ForgetCacheTypeForCorrelationId("corr-forget");
-
-        sut.GetCacheTypeForCorrelationId("corr-forget").Should().Be(ResourceCacheType.Redis);
-
-        _redisCache
-            .Setup(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<DomainResource>());
-        _absCache
-            .Setup(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<DomainResource>());
-
-        await sut.GetAsync("corr-forget:Patient");
-
-        _redisCache.Verify(c => c.GetAsync("corr-forget:Patient", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -279,11 +254,11 @@ public class HybridResourceCacheTests
             clock);
 
         await Write(sut, "corr-ttl");
-        sut.GetCacheTypeForCorrelationId("corr-ttl").Should().Be(ResourceCacheType.ABS);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-ttl")).Should().Be(ResourceCacheType.ABS);
 
         clock.Advance(TimeSpan.FromDays(7));
 
-        sut.GetCacheTypeForCorrelationId("corr-ttl").Should().Be(ResourceCacheType.Redis);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-ttl")).Should().Be(ResourceCacheType.Redis);
     }
 
     [Fact]
@@ -303,13 +278,13 @@ public class HybridResourceCacheTests
         await Write(sut, "corr-slide");
 
         clock.Advance(TimeSpan.FromDays(6));
-        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.ABS);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.ABS);
 
         clock.Advance(TimeSpan.FromDays(6));
-        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.ABS);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.ABS);
 
         clock.Advance(TimeSpan.FromDays(7));
-        sut.GetCacheTypeForCorrelationId("corr-slide").Should().Be(ResourceCacheType.Redis);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-slide")).Should().Be(ResourceCacheType.Redis);
     }
 
     [Fact]
@@ -353,7 +328,7 @@ public class HybridResourceCacheTests
         var resources = await sut.GetAsync("corr-miss:Patient");
 
         resources.Should().ContainSingle();
-        sut.GetCacheTypeForCorrelationId("corr-miss").Should().Be(ResourceCacheType.ABS);
+        (await sut.GetCacheTypeForCorrelationIdAsync("corr-miss")).Should().Be(ResourceCacheType.ABS);
         _absCache.Verify(c => c.GetAsync("corr-miss:Patient", It.IsAny<CancellationToken>()), Times.Once);
     }
 

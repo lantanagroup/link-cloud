@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -415,16 +415,10 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey) => ResourceType.Patient;
 
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId) => ResourceCacheType.ABS;
-
         public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(
             string correlationId,
             CancellationToken cancellationToken = default) => Task.FromResult(ResourceCacheType.ABS);
 
         public IResourceCache GetImplementation(ResourceCacheType cacheType) => this;
-
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
-        {
-        }
     }
 }

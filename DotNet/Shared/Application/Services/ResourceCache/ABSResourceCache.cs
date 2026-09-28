@@ -183,11 +183,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
-        {
-            return ResourceCacheType.ABS;
-        }
-
         public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(ResourceCacheType.ABS);
@@ -204,10 +199,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             // The ids append blob is only created when at least one resource was written.
             return (await _containerClient.GetBlobClient(GetBlobIdsKey(cacheKey)).ExistsAsync(cancellationToken)).Value;
-        }
-
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
-        {
         }
 
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)

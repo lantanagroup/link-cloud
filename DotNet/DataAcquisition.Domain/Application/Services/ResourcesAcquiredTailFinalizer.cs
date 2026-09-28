@@ -53,8 +53,6 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         var listed = tail.ResourcesAcquired.CacheKeys ?? [];
         if (listed.Count == 0)
         {
-            // CacheType is already stamped on the tail; Hybrid no longer needs the in-process memo.
-            _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
             return locationOrgOutcome;
         }
 
@@ -105,10 +103,6 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
         }
 
         tail.ResourcesAcquired.CacheKeys = kept;
-
-        // Drop the in-process Hybrid memo. The Redis {correlation}:__cacheType memo stays
-        // so a later retry or replica can still resolve ABS vs Redis.
-        _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
 
         return locationOrgOutcome;
     }

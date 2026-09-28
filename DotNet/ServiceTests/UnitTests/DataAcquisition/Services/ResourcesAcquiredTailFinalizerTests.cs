@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -50,7 +50,6 @@ public class ResourcesAcquiredTailFinalizerTests
         locationMapping.Verify(
             s => s.StripNonOrgEncountersFromCacheAsync(FacilityId, CorrelationId, "patient-1", It.IsAny<CancellationToken>()),
             Times.Once);
-        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
     }
 
     [Fact]
@@ -78,7 +77,6 @@ public class ResourcesAcquiredTailFinalizerTests
         await sut.FinalizeAsync(tail, CancellationToken.None);
 
         Assert.Equal([PatientKey, EncounterKey], tail.ResourcesAcquired.CacheKeys);
-        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
     }
 
     [Fact]
@@ -99,7 +97,6 @@ public class ResourcesAcquiredTailFinalizerTests
 
         await sut.FinalizeAsync(tail, CancellationToken.None);
 
-        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
         cache.Verify(c => c.GetImplementation(It.IsAny<ResourceCacheType>()), Times.Never);
     }
 
@@ -120,7 +117,6 @@ public class ResourcesAcquiredTailFinalizerTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.FinalizeAsync(BuildTail([PatientKey]), CancellationToken.None));
 
-        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -220,7 +216,6 @@ public class ResourcesAcquiredTailFinalizerTests
                 It.Is<List<string>>(keys => keys.SequenceEqual(new[] { PatientKey })),
                 It.IsAny<CancellationToken>()),
             Times.Once);
-        cache.Verify(c => c.ForgetCacheTypeForCorrelationId(CorrelationId), Times.Once);
     }
 
     private static TailCompletionResult BuildTail(List<string> cacheKeys) => new()

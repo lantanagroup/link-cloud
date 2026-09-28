@@ -102,11 +102,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
-        {
-            return ResourceCacheType.Redis;
-        }
-
         public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(ResourceCacheType.Redis);
@@ -123,10 +118,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
             return length > 0;
-        }
-
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
-        {
         }
     }
 }
