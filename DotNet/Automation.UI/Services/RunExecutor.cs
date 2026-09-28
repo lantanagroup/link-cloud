@@ -1129,6 +1129,18 @@ internal sealed class RunExecutor
                             limit: 5000,
                             maxPages: 20);
 
+                        if (logsForResourceType.Count == 0)
+                        {
+                            output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
+                            logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                                LokiScraper.Components.Normalization,
+                                normalizationSummaryMarker,
+                                lookback,
+                                additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
+                                limit: 500,
+                                maxPages: 40);
+                        }
+
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
                     }
@@ -1161,6 +1173,55 @@ internal sealed class RunExecutor
                     .ToList();
             }
 
+            async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
+            {
+                try
+                {
+                    await _snapshotStore.SetDomainAsync(
+                        state.RunId,
+                        NormalizationEvidenceSnapshot.Domain,
+                        evidence,
+                        ct);
+                    return;
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    if (!NormalizationDiagnosticsWriter.IsOversizedWrite(ex)
+                        && NormalizationDiagnosticsWriter.SerializedUtf8Bytes(evidence) <= NormalizationDiagnosticsWriter.CosmosSafeInlineBytes)
+                    {
+                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                        return;
+                    }
+                }
+
+                var fitted = NormalizationDiagnosticsWriter.FitToCosmosInlineLimit(evidence);
+                if (ReferenceEquals(fitted, evidence))
+                {
+                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                    return;
+                }
+
+                output.WriteLine(fitted.StepsCollapsed
+                    ? "[Normalization Suite] Persisting a smaller evidence snapshot. Raw log lines are omitted and per-resource steps are rolled up so Cosmos can store it."
+                    : "[Normalization Suite] Persisting a smaller evidence snapshot without the raw log lines so Cosmos can store it.");
+
+                try
+                {
+                    await _snapshotStore.SetDomainAsync(
+                        state.RunId,
+                        NormalizationEvidenceSnapshot.Domain,
+                        fitted,
+                        ct);
+                    output.WriteLine("[Normalization Suite] Reduced evidence snapshot persisted. Suite validation uses the collected Loki lines.");
+                }
+                catch (Exception retryEx) when (!ct.IsCancellationRequested)
+                {
+                    output.WriteLine($"[Normalization Suite] Reduced evidence snapshot was also rejected: {retryEx.Message}");
+                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                }
+            }
+
             var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
                 string.Equals(s.OperationType, HslocMappingDefaults.OperationType, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(s.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
@@ -1173,7 +1234,14 @@ internal sealed class RunExecutor
                     : DateTimeOffset.UtcNow;
                 while (true)
                 {
-                    var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync(scenarioConfig.LokiScrapeWindow);
+                    var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
+                        scenarioConfig.LokiScrapeWindow,
+                        evidenceRequiredResourceTypes,
+                        acquiredResourceTypesForEvidence,
+                        (lookback, _) => QueryNormalizationSummaryLogsAsync(lookback),
+                        (delay, ct) => Task.Delay(delay, ct),
+                        output,
+                        cancellationToken);
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -1181,18 +1249,7 @@ internal sealed class RunExecutor
                         runtimeNormalizationSequences,
                         normalizationSummaryLogs);
                     NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.Domain,
-                            normalizationEvidence,
-                            cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-                    }
+                    await PersistNormalizationEvidenceAsync(normalizationEvidence, cancellationToken);
 
                     try
                     {

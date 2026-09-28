@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using Automation.UI.Models;
 
 namespace Automation.UI.Services;
@@ -128,6 +129,16 @@ internal static class NormalizationDiagnosticsWriter
                 sb.AppendLine($"  {line}");
         }
 
+        if (snapshot.RawLinesOmitted || snapshot.StepsCollapsed)
+        {
+            sb.AppendLine();
+            sb.AppendLine("-- Snapshot size --");
+            if (snapshot.RawLinesOmitted)
+                sb.AppendLine($"  Raw log lines omitted ({snapshot.CollectedLineCount} collected). The Cosmos document cap cannot hold them.");
+            if (snapshot.StepsCollapsed)
+                sb.AppendLine("  Per-resource steps rolled up by operation so the snapshot could be stored.");
+        }
+
         sb.AppendLine();
         sb.AppendLine($"-- Raw [NormalizationExecutionSummary] lines ({snapshot.SummaryLines.Count}) --");
         if (snapshot.SummaryLines.Count == 0)
@@ -154,13 +165,101 @@ internal static class NormalizationDiagnosticsWriter
                         group
                             .GroupBy(g => g.Outcome, StringComparer.OrdinalIgnoreCase)
                             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-                            .Select(g => $"{g.Key}={g.Count()}"));
+                            .Select(g => $"{g.Key}={g.Sum(StepWeight)}"));
                     return (key.ResourceType, key.Sequence, Line:
                         $"{key.ResourceType}#{key.Sequence} {key.OperationType} '{key.OperationName}': {outcomes}");
                 })
             .OrderBy(x => x.ResourceType, StringComparer.OrdinalIgnoreCase)
             .ThenBy(x => x.Sequence)
             .Select(x => x.Line)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Cosmos DB for MongoDB rejects documents over about 2 MB with HTTP 413.
+    /// A mega-patient evidence snapshot (one Loki line and one step per resource)
+    /// crosses that inline cap. Callers that can externalize to blob should store
+    /// the full snapshot. This copy is what we persist when the full document is rejected.
+    /// </summary>
+    internal const int CosmosSafeInlineBytes = 1_500_000;
+
+    internal static int SerializedUtf8Bytes(NormalizationEvidenceSnapshot snapshot)
+        => Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(snapshot));
+
+    internal static NormalizationEvidenceSnapshot FitToCosmosInlineLimit(
+        NormalizationEvidenceSnapshot source,
+        int maxUtf8Bytes = CosmosSafeInlineBytes)
+    {
+        if (maxUtf8Bytes <= 0 || SerializedUtf8Bytes(source) <= maxUtf8Bytes)
+            return source;
+
+        var fitted = Copy(source);
+        fitted.SummaryLines = [];
+        fitted.RawLinesOmitted = true;
+        if (SerializedUtf8Bytes(fitted) <= maxUtf8Bytes)
+            return fitted;
+
+        fitted.ParsedSteps = Collapse(source.ParsedSteps);
+        fitted.StepsCollapsed = true;
+        if (SerializedUtf8Bytes(fitted) <= maxUtf8Bytes)
+            return fitted;
+
+        fitted.ParsedSteps = [];
+        return fitted;
+    }
+
+    internal static bool IsOversizedWrite(Exception ex)
+    {
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            var text = current.Message;
+            if (text.Contains("RequestEntityTooLarge", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("Request size is too large", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("413", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int StepWeight(NormalizationEvidenceStep step) => step.Count > 0 ? step.Count : 1;
+
+    private static NormalizationEvidenceSnapshot Copy(NormalizationEvidenceSnapshot source)
+        => new()
+        {
+            SuiteName = source.SuiteName,
+            CollectedLineCount = source.CollectedLineCount,
+            RawLinesOmitted = source.RawLinesOmitted,
+            StepsCollapsed = source.StepsCollapsed,
+            SummaryLines = [.. source.SummaryLines],
+            RuntimeSequences = [.. source.RuntimeSequences],
+            SuiteSequences = [.. source.SuiteSequences],
+            OperationConfigs = [.. source.OperationConfigs],
+            ParsedSteps = [.. source.ParsedSteps]
+        };
+
+    private static List<NormalizationEvidenceStep> Collapse(IReadOnlyList<NormalizationEvidenceStep> steps)
+    {
+        return steps
+            .GroupBy(
+                s => $"{s.ResourceType}\u001f{s.Sequence}\u001f{s.OperationType}\u001f{s.OperationName}\u001f{s.Outcome}",
+                StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var first = g.First();
+                return new NormalizationEvidenceStep
+                {
+                    ResourceType = first.ResourceType,
+                    ResourceId = string.Empty,
+                    Sequence = first.Sequence,
+                    OperationType = first.OperationType,
+                    OperationName = first.OperationName,
+                    Outcome = first.Outcome,
+                    Count = g.Sum(StepWeight)
+                };
+            })
             .ToList();
     }
 

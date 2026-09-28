@@ -1,4 +1,6 @@
-﻿namespace Automation.UI.Services.Persistence;
+﻿using Automation.UI.Models;
+
+namespace Automation.UI.Services.Persistence;
 
 public sealed class ImportedBundleBlobStorageSettings
 {
@@ -18,6 +20,7 @@ public sealed class ImportedBundleBlobStorageSettings
         "generationManifest",
         "entries",
         "measureResources",
-        "absUpload"
+        "absUpload",
+        NormalizationEvidenceSnapshot.Domain
     ];
 }
