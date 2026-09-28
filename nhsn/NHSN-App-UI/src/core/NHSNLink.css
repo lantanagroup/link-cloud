@@ -2338,6 +2338,10 @@
   text-decoration: none;
 }
 
+a.nhsn-link__report-results-link {
+  display: inline-block;
+}
+
 .nhsn-link__report-results-measures {
   display: flex;
   flex-wrap: wrap;
