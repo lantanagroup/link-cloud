@@ -1,14 +1,16 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading.Channels;
 using Task = System.Threading.Tasks.Task;
 
@@ -25,6 +27,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly IResourceCache _absCache;
         private readonly ResourceCacheAbsWriterSettings _settings;
+        private readonly IResourceCacheMetrics _metrics;
         private readonly ILogger<BackgroundAbsCacheWriter> _logger;
         private readonly Channel<PendingWrite> _queue;
         private readonly ConcurrentDictionary<string, KeyState> _keys = new();
@@ -32,9 +35,11 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public BackgroundAbsCacheWriter(
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
             IOptions<ResourceCacheSettings> settings,
+            IResourceCacheMetrics metrics,
             ILogger<BackgroundAbsCacheWriter> logger)
         {
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _settings = settings?.Value?.AbsWriter ?? throw new ArgumentNullException(nameof(settings));
 
@@ -51,6 +56,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     nameof(settings),
                     "ResourceCache:AbsWriter:MaxConcurrency must be greater than zero.");
             }
+
+            _metrics.TrackQueueDepth(() => QueueDepth);
 
             _queue = Channel.CreateBounded<PendingWrite>(new BoundedChannelOptions(_settings.QueueCapacity)
             {
@@ -109,7 +116,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             try
             {
                 await _queue.Writer.WriteAsync(
-                    new PendingWrite(cacheKey, state, resources, resourceType, generation),
+                    new PendingWrite(cacheKey, state, resources, resourceType, generation, Stopwatch.GetTimestamp()),
                     cancellationToken);
             }
             catch (Exception)
@@ -254,6 +261,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         // -------------------------------------------------------------------------
 
+        private static double Elapsed(long startTimestamp) =>
+            Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+
         private async Task ConsumeAsync(CancellationToken stoppingToken)
         {
             try
@@ -290,13 +300,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             Exception? failure = null;
 
             await state.WriteLock.WaitAsync(CancellationToken.None);
+
+            // Measured from enqueue to the start of the write, so a backlog is distinguishable from
+            // storage having slowed down.
+            _metrics.RecordQueueWait(Stopwatch.GetElapsedTime(pending.QueuedAtTimestamp).TotalMilliseconds);
+            var writeStart = Stopwatch.GetTimestamp();
+
             try
             {
                 await WriteWithRetryAsync(pending, stoppingToken);
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
             }
             catch (Exception ex)
             {
                 failure = ex;
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+                _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Exhausted);
                 _logger.LogError(
                     ex,
                     "Failed to persist resource cache key {CacheKey} to blob storage after {AttemptCount} attempt(s). " +
@@ -328,6 +347,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 }
                 catch (Exception ex) when (attempt < _settings.MaxRetryAttempts)
                 {
+                    _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Retried);
                     _logger.LogDebug(
                         ex,
                         "Retrying blob write for resource cache key {CacheKey}, attempt {Attempt} of {MaxAttempts}.",
@@ -407,7 +427,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             KeyState State,
             List<DomainResource> Resources,
             ResourceType ResourceType,
-            int Generation);
+            int Generation,
+            long QueuedAtTimestamp);
 
         private sealed class KeyState
         {

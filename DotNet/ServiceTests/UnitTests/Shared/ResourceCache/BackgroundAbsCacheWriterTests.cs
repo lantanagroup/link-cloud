@@ -256,6 +256,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         return new BackgroundAbsCacheWriter(
             _abs,
             Options.Create(settings),
+            Mock.Of<IResourceCacheMetrics>(),
             Mock.Of<ILogger<BackgroundAbsCacheWriter>>());
     }
 

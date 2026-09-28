@@ -1,4 +1,4 @@
-# Resource cache: ABS as the durable source, Redis as the read cache
+﻿# Resource cache: ABS as the durable source, Redis as the read cache
 
 FHIR resource bodies do not travel on Kafka. They are written to a shared resource cache and the
 events carry cache pointers. This document describes how that cache behaves end to end, from the
@@ -227,12 +227,16 @@ memory threshold, and the deployed `maxmemory-policy` must evict rather than rej
 
 | Instrument | Type | Tags | Answers |
 |---|---|---|---|
-| `link_resource_cache_read_duration` | histogram, ms | `cache.store`, `cache.outcome` | how often Redis serves the read, and what a fallback costs |
-| `link_resource_cache_write_duration` | histogram, ms | `cache.store`, `cache.outcome` | inline Redis cost versus background ABS cost |
-| `link_resource_cache_queue_depth` | observable gauge | `service` | whether ABS is keeping up |
-| `link_resource_cache_queue_wait_duration` | histogram, ms | `service` | queue backlog versus slow blob writes |
-| `link_resource_cache_drain_wait_duration` | histogram, ms | `barrier.scope` | **what the durability barrier actually costs** |
-| `link_resource_cache_write_retry_count` | counter | `cache.store`, `outcome` | ABS instability |
+| `link_resource_cache_read_duration` | histogram, ms | `cache.outcome` = hit \| fallback \| empty | how often the cache serves the read, and what a fallback costs |
+| `link_resource_cache_write_duration` | histogram, ms | `cache.store` = redis \| blob, `cache.outcome` = ok \| failed | inline cache cost against background durable cost |
+| `link_resource_cache_queue_depth` | observable gauge | — | whether durable storage is keeping up |
+| `link_resource_cache_queue_wait_duration` | histogram, ms | — | a backlog, as distinct from storage having slowed down |
+| `link_resource_cache_drain_wait_duration` | histogram, ms | — | **what the durability barrier actually costs** |
+| `link_resource_cache_write_retry_count` | counter | `cache.outcome` = retried \| exhausted | storage instability |
+
+The service each series came from is already on every metric as `service.name`, so the two barriers
+-- per log in the Acquisition Worker, per correlation in Normalization -- are separable without a tag
+of their own.
 
 `link_resource_cache_drain_wait_duration` is the one to watch after a change: it is the only part of
 the ABS write that is not overlapped with other work, so it is the honest measure of what durability

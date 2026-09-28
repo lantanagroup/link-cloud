@@ -1,6 +1,8 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -16,9 +18,10 @@ public class HybridResourceCacheTests
     private readonly Mock<IResourceCache> _redis = new();
     private readonly Mock<IResourceCache> _abs = new();
     private readonly Mock<IBackgroundAbsCacheWriter> _writer = new();
+    private readonly Mock<IResourceCacheMetrics> _metrics = new();
 
     private HybridResourceCache CreateSut() =>
-        new(_redis.Object, _abs.Object, _writer.Object, Mock.Of<ILogger<HybridResourceCache>>());
+        new(_redis.Object, _abs.Object, _writer.Object, _metrics.Object, Mock.Of<ILogger<HybridResourceCache>>());
 
     private static List<DomainResource> Resources() => [new Patient { Id = "1" }];
 
@@ -171,5 +174,61 @@ public class HybridResourceCacheTests
         await CreateSut().WaitForDurableAsync("corr-1");
 
         _writer.Verify(w => w.WaitForCorrelationAsync("corr-1", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_cache_hit_and_a_fallback_are_reported_as_different_outcomes()
+    {
+        // The ratio between these two is the number that says whether Redis is earning its place,
+        // so recording both as the same outcome would make the whole dashboard meaningless.
+        _redis.Setup(c => c.GetAsync("hit-key", It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _redis.Setup(c => c.GetAsync("miss-key", It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync("miss-key", It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _abs.Setup(c => c.GetResourceTypeByCacheKey("miss-key")).Returns(ResourceType.Patient);
+
+        var sut = CreateSut();
+        await sut.GetAsync("hit-key");
+        await sut.GetAsync("miss-key");
+
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<double>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_read_that_finds_nothing_anywhere_is_reported_as_empty()
+    {
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+
+        await CreateSut().GetAsync(CacheKey);
+
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Empty, It.IsAny<double>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_failed_cache_write_is_reported_as_a_failed_write()
+    {
+        _redis
+            .Setup(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+
+        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
+
+        _metrics.Verify(m => m.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Failed, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, It.IsAny<double>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task The_barrier_is_timed_even_when_it_fails()
+    {
+        // A caller that waited and then failed still paid the time; not recording it would flatter
+        // the one measurement this change is judged on.
+        _writer
+            .Setup(w => w.WaitForCorrelationAsync("corr-1", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ResourceCacheDurabilityException("not durable"));
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(() => CreateSut().WaitForDurableAsync("corr-1"));
+
+        _metrics.Verify(m => m.RecordDrainWait(It.IsAny<double>()), Times.Once);
     }
 }

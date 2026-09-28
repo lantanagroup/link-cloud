@@ -1,9 +1,11 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
@@ -22,17 +24,20 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly IResourceCache _redisCache;
         private readonly IResourceCache _absCache;
         private readonly IBackgroundAbsCacheWriter _absWriter;
+        private readonly IResourceCacheMetrics _metrics;
         private readonly ILogger<HybridResourceCache> _logger;
 
         public HybridResourceCache(
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
             IBackgroundAbsCacheWriter absWriter,
+            IResourceCacheMetrics metrics,
             ILogger<HybridResourceCache> logger)
         {
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
             _absWriter = absWriter ?? throw new ArgumentNullException(nameof(absWriter));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -44,12 +49,16 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 return;
             }
 
+            var writeStart = Stopwatch.GetTimestamp();
             try
             {
                 await _redisCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+                _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+
                 // A half-written key would silently win over the complete durable copy, because reads
                 // prefer the cache. Drop it instead, so a present entry always holds the whole set.
                 _logger.LogWarning(
@@ -64,27 +73,42 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
+        public async Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
         {
-            return _absWriter.WaitForCorrelationAsync(correlationId, cancellationToken);
+            var start = Stopwatch.GetTimestamp();
+            try
+            {
+                await _absWriter.WaitForCorrelationAsync(correlationId, cancellationToken);
+            }
+            finally
+            {
+                // Recorded even when the barrier throws: a caller that waited and then failed still
+                // paid the time, and hiding it would flatter the measurement.
+                _metrics.RecordDrainWait(Elapsed(start));
+            }
         }
 
         /// <inheritdoc/>
         public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
+            var readStart = Stopwatch.GetTimestamp();
+
             var cached = await TryReadCacheAsync(cacheKey, cancellationToken);
             if (cached.Count > 0)
             {
+                _metrics.RecordRead(ResourceCacheOutcomes.Hit, Elapsed(readStart));
                 return cached;
             }
 
             var durable = await _absCache.GetAsync(cacheKey, cancellationToken) ?? [];
             if (durable.Count == 0)
             {
+                _metrics.RecordRead(ResourceCacheOutcomes.Empty, Elapsed(readStart));
                 return durable;
             }
 
             await TryRepopulateCacheAsync(cacheKey, durable, cancellationToken);
+            _metrics.RecordRead(ResourceCacheOutcomes.Fallback, Elapsed(readStart));
             return durable;
         }
 
@@ -138,6 +162,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         // -------------------------------------------------------------------------
+
+        private static double Elapsed(long startTimestamp) =>
+            Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
 
         private async Task<List<DomainResource>> TryReadCacheAsync(string cacheKey, CancellationToken cancellationToken)
         {
