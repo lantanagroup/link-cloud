@@ -4,6 +4,7 @@ using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Enums;
+using LantanaGroup.Link.Nhsn.App.Bff.Domain.Exceptions;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Reporting;
 
@@ -89,14 +90,27 @@ public sealed class ReportingService : IReportingService
         return _reportGateway.ListReportsAsync(facilityId, page, pageSize, cancellationToken);
     }
 
-    public Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default) =>
-        _reportGateway.GetReportAsync(reportId, cancellationToken);
+    public async Task<ReportDetail?> GetReportAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        if (!await IsReportOwnedByCurrentFacilityAsync(reportId, cancellationToken))
+        {
+            return null;
+        }
 
-    public Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default) =>
-        _reportGateway.GetReportPatientsAsync(reportId, cancellationToken);
+        return await _reportGateway.GetReportAsync(reportId, cancellationToken);
+    }
 
-    public Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default) =>
-        _reportGateway.GetPatientMappingEvidenceAsync(reportId, patientId, cancellationToken);
+    public async Task<List<ReportPatientEntry>> GetReportPatientsAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
+        return await _reportGateway.GetReportPatientsAsync(reportId, cancellationToken);
+    }
+
+    public async Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
+    {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
+        return await _reportGateway.GetPatientMappingEvidenceAsync(reportId, patientId, cancellationToken);
+    }
 
     // DataAcquisition scopes one query plan per facility+Frequency (Discharge/Daily/Weekly/
     // Monthly/Adhoc) -- not per EHR vendor; there is no vendor lookup to make here.
@@ -112,23 +126,29 @@ public sealed class ReportingService : IReportingService
     // Frequency.Adhoc is a plan-type option nothing ever searches for.
     private const string OperationalQueryPlanType = "Discharge";
 
-    public Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default)
+    public async Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default)
     {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
         var facilityId = _userContext.RequireFacilityId();
-        return _dataAcquisitionGateway.GetQueryPlanAsync(facilityId, OperationalQueryPlanType, cancellationToken);
+        return await _dataAcquisitionGateway.GetQueryPlanAsync(facilityId, OperationalQueryPlanType, cancellationToken);
     }
 
-    public Task<List<AcquisitionLogEntry>> GetAcquisitionLogsAsync(string reportId, CancellationToken cancellationToken = default)
+    public async Task<List<AcquisitionLogEntry>> GetAcquisitionLogsAsync(string reportId, CancellationToken cancellationToken = default)
     {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
         var facilityId = _userContext.RequireFacilityId();
-        return _dataAcquisitionGateway.GetAcquisitionLogsAsync(facilityId, reportId, cancellationToken);
+        return await _dataAcquisitionGateway.GetAcquisitionLogsAsync(facilityId, reportId, cancellationToken);
     }
 
-    public Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default) =>
-        _dataAcquisitionGateway.GetReportSummaryAsync(reportId, cancellationToken);
+    public async Task<AcquisitionReportSummary?> GetAcquisitionSummaryAsync(string reportId, CancellationToken cancellationToken = default)
+    {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
+        return await _dataAcquisitionGateway.GetReportSummaryAsync(reportId, cancellationToken);
+    }
 
     public async Task<PatientReportDownload?> GetPatientReportDownloadAsync(string reportId, string patientId, string reportType, CancellationToken cancellationToken = default)
     {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
         var reference = await _reportGateway.GetPatientReportBlobReferenceAsync(reportId, patientId, reportType, cancellationToken);
         if (reference is null)
         {
@@ -149,23 +169,43 @@ public sealed class ReportingService : IReportingService
         };
     }
 
-    public Task<bool?> GetReportAccuracyAcknowledgementAsync(string reportId, CancellationToken cancellationToken = default)
+    public async Task<bool?> GetReportAccuracyAcknowledgementAsync(string reportId, CancellationToken cancellationToken = default)
     {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
         var facilityId = _userContext.RequireFacilityId();
-        return _acknowledgementService.GetLatestAsync(facilityId, AcknowledgementKind.ReportAccuracy, reportId, cancellationToken);
+        return await _acknowledgementService.GetLatestAsync(facilityId, AcknowledgementKind.ReportAccuracy, reportId, cancellationToken);
     }
 
-    public Task RecordReportAccuracyAcknowledgementAsync(string reportId, bool accepted, string statementKey, CancellationToken cancellationToken = default)
+    public async Task RecordReportAccuracyAcknowledgementAsync(string reportId, bool accepted, string statementKey, CancellationToken cancellationToken = default)
     {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
         var facilityId = _userContext.RequireFacilityId();
-        return _acknowledgementService.RecordAsync(
+        await _acknowledgementService.RecordAsync(
             facilityId, AcknowledgementKind.ReportAccuracy, reportId, accepted, statementKey, _userContext.ExternalUserId, cancellationToken);
     }
 
-    public Task<IReadOnlyList<PreQualIssue>> GetPatientPreQualResultsAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PreQualIssue>> GetPatientPreQualResultsAsync(string reportId, string patientId, CancellationToken cancellationToken = default)
+    {
+        await EnsureReportOwnedByCurrentFacilityAsync(reportId, cancellationToken);
+        var facilityId = _userContext.RequireFacilityId();
+        return await _validationGateway.GetPatientResultsAsync(facilityId, reportId, patientId, cancellationToken);
+    }
+
+    private async Task EnsureReportOwnedByCurrentFacilityAsync(string reportId, CancellationToken cancellationToken)
+    {
+        if (!await IsReportOwnedByCurrentFacilityAsync(reportId, cancellationToken))
+        {
+            throw new ReportNotFoundException();
+        }
+    }
+
+    private async Task<bool> IsReportOwnedByCurrentFacilityAsync(string reportId, CancellationToken cancellationToken)
     {
         var facilityId = _userContext.RequireFacilityId();
-        return _validationGateway.GetPatientResultsAsync(facilityId, reportId, patientId, cancellationToken);
+        var reportFacilityId = await _reportGateway.GetReportFacilityIdAsync(reportId, cancellationToken);
+
+        return reportFacilityId is not null
+               && string.Equals(reportFacilityId, facilityId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static DateTime ParseDate(string? value) =>

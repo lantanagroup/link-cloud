@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.VendorProfiles;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -11,7 +12,7 @@ public class ReferenceEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/reference")
             .WithTags("Reference")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/vendors", (IReferenceDataService referenceData) =>
                 Results.Ok(referenceData.GetVendorProfiles()))
