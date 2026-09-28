@@ -24,10 +24,22 @@ function hasRealDomain(hostname: string): boolean {
 // RFC 3986 requires percent-encoding for these characters; .NET's Uri.IsWellFormedUriString -
 // what Data Acquisition validates the saved value against server-side - rejects any of them
 // appearing unescaped, even though the URL constructor below happily accepts and re-encodes them.
-const UNSAFE_URL_CHARACTERS = /[\x00-\x1F\x7F <>"{}|\\^`[\]]/;
+// Control characters (U+0000-U+001F, U+007F) are checked by char code rather than in the regex,
+// which lint rejects (no-control-regex).
+const UNSAFE_URL_CHARACTERS = /[ <>"{}|\\^`[\]]/;
+
+function hasUnsafeUrlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+  return UNSAFE_URL_CHARACTERS.test(value);
+}
 
 export function isValidHttpUrl(value: string): boolean {
-  if (UNSAFE_URL_CHARACTERS.test(value)) {
+  if (hasUnsafeUrlCharacter(value)) {
     return false;
   }
   try {
