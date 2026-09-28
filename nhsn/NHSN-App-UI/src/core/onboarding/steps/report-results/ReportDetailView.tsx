@@ -35,7 +35,7 @@ import { useNotifications } from '../../../notifications/NotificationProvider';
 import { useOnboarding } from '../../OnboardingProvider';
 import { useStableCallback, useStepChrome } from '../../StepChrome';
 import { decodeTarget } from '../encounter/EncounterStep';
-import { formatDate, formatDateTime } from './format';
+import { formatDate, formatDateTime, toRequestDate } from './format';
 import { ChartIcon, DownloadIcon, RefreshIcon } from './icons';
 import { buildPieSlices } from './pieChart';
 import {
@@ -418,8 +418,8 @@ export function ReportDetailView() {
     try {
       const operation = await api.requestReport({
         measures: detail.measures,
-        startDate: formatDate(detail.startDate),
-        endDate: formatDate(detail.endDate),
+        startDate: toRequestDate(detail.startDate),
+        endDate: toRequestDate(detail.endDate),
         patientIds: patients.map((patient) => patient.patientId),
       });
       const summary = await operation.result();

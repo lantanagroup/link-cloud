@@ -24,8 +24,7 @@ import {
   findDuplicateLocationIdentifierIndexes,
   findDuplicateLocationTypeIndexes,
   findIncompleteLocationIdentifierIndexes,
-  findIncompleteLocationTypeIndexes,
-  isPlausibleFhirPath
+  findIncompleteLocationTypeIndexes
 } from './validate';
 
 /** Organization Identification. Methods and instructions PDF both come from `vendorProfile` - no vendor name here. */
@@ -117,11 +116,9 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   }, [activeMethod, locationTypes, locationIdentifiers, editedRowIndex]);
   const hasDuplicateRows = duplicateRowIndexes.size > 0;
 
-  // Only the Custom FHIRPath tab has a free-form expression to check; Data Acquisition compiles it
-  // on save, and without this a typo only surfaces as a bare "DataAcquisition returned 400".
+  // Custom FHIRPath is free-form and deliberately unchecked here - Data Acquisition compiles it on
+  // save and has the final word on whether it's valid.
   const customFhirPath = locationOrg.customFhirPath ?? '';
-  const hasInvalidFhirPath = activeMethod === 'custom-fhir-path' && !isPlausibleFhirPath(customFhirPath);
-  const [fhirPathBlurred, setFhirPathBlurred] = useState(false);
 
   // No error is worth showing before the facility has actually tried to move on - an untouched,
   // still-blank list isn't wrong yet, just not started. Once shown, though, it tracks the live state
@@ -136,14 +133,12 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const flaggedRowCount = (activeMethod && flaggedRowCounts[activeMethod]) ?? 0;
   const isRowFlagged = (index: number) => index < flaggedRowCount;
   const hasFlaggedIncompleteRows = hasIncompleteRows && incompleteRowIndexes.some(isRowFlagged);
-  const showFhirPathError = hasInvalidFhirPath && (fhirPathBlurred || continueAttempted);
 
   function validateStep(): boolean {
     if (activeMethod) {
       setFlaggedRowCounts(counts => ({...counts, [activeMethod]: activeRowCount}));
     }
-    setFhirPathBlurred(true);
-    return !hasIncompleteRows && !hasDuplicateRows && !hasInvalidFhirPath;
+    return !hasIncompleteRows && !hasDuplicateRows;
   }
 
   /** Keeps the active method's flagged count pointing at the same rows when one of them is removed. */
@@ -288,9 +283,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         label={t('onboarding:locationOrg.customFhirPath.label')}
         placeholder={t('onboarding:locationOrg.customFhirPath.placeholder')}
         value={customFhirPath}
-        error={showFhirPathError ? t('onboarding:locationOrg.errors.invalidFhirPath') : undefined}
         onChange={value => patch('locationOrg', {customFhirPath: value})}
-        onBlur={() => setFhirPathBlurred(true)}
       />
     </div>
   );
