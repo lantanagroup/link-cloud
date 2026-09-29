@@ -715,7 +715,12 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
       }
       setHighlightedIndex(current => (matches.length === 0 ? -1 : (current - 1 + matches.length) % matches.length));
     } else if (event.key === 'Enter') {
-      if (open && highlightedIndex >= 0 && highlightedIndex < matches.length) {
+      if (!open) {
+        event.preventDefault();
+        setOpen(true);
+        return;
+      }
+      if (highlightedIndex >= 0 && highlightedIndex < matches.length) {
         event.preventDefault();
         selectMatch(matches[highlightedIndex]);
       }
@@ -764,7 +769,6 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
             value={query}
             onFocus={event => {
               event.target.select();
-              setOpen(true);
             }}
             onChange={event => {
               setQuery(event.target.value);
