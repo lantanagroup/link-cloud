@@ -680,7 +680,11 @@
         "localValue": "Local Value",
         "standardSystem": "Standard System",
         "standardCode": "Standard Code",
-        "codeSystem": "Code System"
+        "codeSystem": "Code System",
+        "discoveryLocationId": "Location Id",
+        "discoveryRawValue": "Raw Value",
+        "discoveryNotAvailable": "Not available in this report",
+        "notReportableHint": "This patient was not reportable for this measure, so no acquired report exists to check raw Location values against. The table below shows the last evidence Report recorded for this patient."
       },
       "notApplicable": "N/A",
       "preQual": {
@@ -702,6 +706,7 @@
       },
       "downloadUnavailable": "Export isn't available yet.",
       "downloadPatientReport": "Download Patient Report",
+      "downloadPatientReportUnavailable": "Not available — this patient was not reportable for this measure",
       "patientDetail": {
         "title": "Patient Reporting Detail",
         "measure": "Measure",

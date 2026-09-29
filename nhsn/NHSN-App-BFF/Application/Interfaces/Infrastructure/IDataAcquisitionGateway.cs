@@ -31,4 +31,10 @@ public interface IDataAcquisitionGateway
 
     /// <summary>Replaces an existing facility's QueryPlan for the request's Type.</summary>
     Task UpdateQueryPlanAsync(string facilityId, object request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads every Location Org mapping DataAcquisition has recorded for the facility -- found and
+    /// missing/unmatched alike. Empty when the facility has none yet, not an error.
+    /// </summary>
+    Task<List<LocationOrgMapping>> GetFacilityLocationOrgMappingsAsync(string facilityId, CancellationToken cancellationToken = default);
 }

@@ -98,6 +98,12 @@ public sealed class ReportingService : IReportingService
     public Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default) =>
         _reportGateway.GetPatientMappingEvidenceAsync(reportId, patientId, cancellationToken);
 
+    public Task<List<LocationOrgMapping>> GetFacilityLocationOrgMappingsAsync(CancellationToken cancellationToken = default)
+    {
+        var facilityId = _userContext.RequireFacilityId();
+        return _dataAcquisitionGateway.GetFacilityLocationOrgMappingsAsync(facilityId, cancellationToken);
+    }
+
     // DataAcquisition scopes one query plan per facility+Frequency (Discharge/Daily/Weekly/
     // Monthly/Adhoc) -- not per EHR vendor; there is no vendor lookup to make here.
     //

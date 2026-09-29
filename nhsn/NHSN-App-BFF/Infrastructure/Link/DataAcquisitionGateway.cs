@@ -140,4 +140,24 @@ internal sealed class DataAcquisitionGateway : IDataAcquisitionGateway
             ResourceTypeCounts = summary.ResourceTypeCounts.Select(r => new AcquisitionResourceTypeCount {ResourceType = r.ResourceType, Count = r.Count}).ToList()
         };
     }
+
+    public async Task<List<LocationOrgMapping>> GetFacilityLocationOrgMappingsAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var response = await _dataAcquisitionClient.GetOrganizationLocationMappingsAsync(facilityId, cancellationToken);
+        var mappings = LinkResponseHandler.Optional(response, ServiceName, nameof(GetFacilityLocationOrgMappingsAsync));
+
+        return (mappings ?? [])
+            .Where(m => !string.IsNullOrWhiteSpace(m.LocationId))
+            .Select(m => new LocationOrgMapping
+            {
+                LocationId = m.LocationId!,
+                LocationName = m.LocationName,
+                LocationAlias = m.LocationAlias,
+                PartOfValue = m.PartOfValue,
+                PartOfId = m.PartOfId,
+                IsOrgLocation = m.IsOrgLocation,
+                IsActive = m.IsActive
+            })
+            .ToList();
+    }
 }

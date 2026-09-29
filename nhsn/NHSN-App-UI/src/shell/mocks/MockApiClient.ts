@@ -510,6 +510,14 @@ export class MockApiClient implements ApiClient {
     };
   }
 
+  async getFacilityLocationOrgMappings(): Promise<C.LocationOrgMapping[]> {
+    await tick();
+    return [
+      {locationId: '783', locationName: 'UI Health', locationAlias: 'UI Health', isOrgLocation: true, isActive: true},
+      {locationId: '784', locationName: 'Endeavor Health', locationAlias: 'Endeavor Health', isOrgLocation: false, isActive: true}
+    ];
+  }
+
   async getPatientPreQualResults(): Promise<C.PreQualIssue[]> {
     await tick();
     return [];

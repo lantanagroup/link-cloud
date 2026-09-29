@@ -31,6 +31,7 @@ import type {
   ReportDetail,
   ReportPatientEntry,
   PatientMappingEvidence,
+  LocationOrgMapping,
   ReportRequest,
   ReportSummary,
   ReportingPlan,
@@ -288,6 +289,11 @@ export class BffApiClient implements ApiClient {
     const {data} = await this.http.get<PatientMappingEvidence>(
       `/reports/${encodeURIComponent(reportId)}/patients/${encodeURIComponent(patientId)}/mapping-evidence`
     );
+    return data;
+  }
+
+  async getFacilityLocationOrgMappings(): Promise<LocationOrgMapping[]> {
+    const {data} = await this.http.get<LocationOrgMapping[]>('/reports/location-org-mappings');
     return data;
   }
 

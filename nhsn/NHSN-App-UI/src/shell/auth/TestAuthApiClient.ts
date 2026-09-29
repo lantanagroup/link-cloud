@@ -65,6 +65,8 @@ export class TestAuthApiClient implements ApiClient {
   getReportPatients: ApiClient['getReportPatients'] = id => this.inner.getReportPatients(id);
   getPatientMappingEvidence: ApiClient['getPatientMappingEvidence'] = (reportId, patientId) =>
     this.inner.getPatientMappingEvidence(reportId, patientId);
+  getFacilityLocationOrgMappings: ApiClient['getFacilityLocationOrgMappings'] = () =>
+    this.inner.getFacilityLocationOrgMappings();
   getPatientPreQualResults: ApiClient['getPatientPreQualResults'] = (reportId, patientId) =>
     this.inner.getPatientPreQualResults(reportId, patientId);
   getPatientStatuses: ApiClient['getPatientStatuses'] = id => this.inner.getPatientStatuses(id);

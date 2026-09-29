@@ -1,11 +1,65 @@
 import React, { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PatientMappingEvidence } from '../../../api/contracts';
+import type { LocationMethod, PatientMappingEvidence } from '../../../api/contracts';
 import { acronymTitle, Button, HeadingPause, Modal, MessageContainer } from '../../../fields';
 import { useOnboarding } from '../../OnboardingProvider';
 import { METHOD_LABEL_KEYS } from '../location-org/LocationOrgStep';
 import { AsyncStatus } from './AsyncStatus';
+import type { LocationDiscoveryRow, LocationRawValues } from './locationOrgDiscovery';
 import { locationOrgConfigInfo, type PatientStatusRow } from './patientRows';
+
+function formatRawValue(
+  method: LocationMethod | undefined,
+  raw: LocationRawValues | null,
+): string | null {
+  if (!raw) {
+    return null;
+  }
+  if (method === 'location-type') {
+    const codes = raw.locationTypeCodes.join(', ');
+    return [codes, raw.alias].filter(Boolean).join(' / ') || null;
+  }
+  if (method === 'location-identifier') {
+    return raw.identifiers.length > 0
+      ? raw.identifiers.map((identifier) => `${identifier.system ?? ''}: ${identifier.value ?? ''}`).join('; ')
+      : null;
+  }
+  if (method === 'managing-org') {
+    return raw.managingOrganizationId ?? null;
+  }
+  return null;
+}
+
+interface EvidenceRow {
+  key: string;
+  locationId: string;
+  rawValue: string | null;
+  found: boolean;
+}
+
+function evidenceRows(
+  discoveryRows: LocationDiscoveryRow[] | null,
+  evidence: PatientMappingEvidence | null,
+  method: LocationMethod | undefined,
+): EvidenceRow[] | null {
+  if (discoveryRows) {
+    return discoveryRows.map((row) => ({
+      key: row.locationId,
+      locationId: row.locationId,
+      rawValue: formatRawValue(method, row.raw),
+      found: row.found,
+    }));
+  }
+  if (evidence === null) {
+    return null;
+  }
+  return (evidence.locationOrg?.matches ?? []).map((match, index) => ({
+    key: `${match.locationId}-${index}`,
+    locationId: match.locationId,
+    rawValue: match.locationAlias ?? match.locationName ?? null,
+    found: match.isOrgLocation,
+  }));
+}
 
 export interface LocationOrgEvidenceModalProps {
   open: boolean;
@@ -15,6 +69,8 @@ export interface LocationOrgEvidenceModalProps {
   loading: boolean;
   error: string | null;
   evidence: PatientMappingEvidence | null;
+  discoveryRows: LocationDiscoveryRow[] | null;
+  notReportable: boolean;
 }
 
 export function LocationOrgEvidenceModal({
@@ -25,11 +81,14 @@ export function LocationOrgEvidenceModal({
   loading,
   error,
   evidence,
+  discoveryRows,
+  notReportable,
 }: LocationOrgEvidenceModalProps) {
   const { t } = useTranslation(['onboarding', 'common']);
   const { draft, goTo } = useOnboarding();
   const locationOrgConfig = locationOrgConfigInfo(draft.locationOrg, t);
   const notFoundHintId = useId();
+  const rows = evidenceRows(discoveryRows, evidence, draft.locationOrg.method);
 
   return (
   <Modal
@@ -122,11 +181,17 @@ export function LocationOrgEvidenceModal({
       )}
     </h3>
     <AsyncStatus loading={loading} error={error} />
-    {!loading &&
-      !error &&
-      evidence &&
-      (evidence.locationOrg &&
-      evidence.locationOrg.matches.length > 0 ? (
+    {notReportable && (
+      <MessageContainer type="info" showIcon>
+        <p>
+          {t(
+            'onboarding:reportResults.detail.mappingEvidence.notReportableHint',
+          )}
+        </p>
+      </MessageContainer>
+    )}
+    {!loading && !error && rows && (
+      rows.length > 0 ? (
         <div className="nhsn-link__report-results-table-scroll" tabIndex={-1}>
           <table className="nhsn-link__report-results-table">
             <caption className="nhsn-link__visually-hidden">
@@ -138,12 +203,12 @@ export function LocationOrgEvidenceModal({
               <tr>
                 <th scope="col">
                   {t(
-                    'onboarding:reportResults.detail.mappingEvidence.locationId',
+                    'onboarding:reportResults.detail.mappingEvidence.discoveryLocationId',
                   )}
                 </th>
                 <th scope="col">
                   {t(
-                    'onboarding:reportResults.detail.mappingEvidence.locationAlias',
+                    'onboarding:reportResults.detail.mappingEvidence.discoveryRawValue',
                   )}
                 </th>
                 <th scope="col">
@@ -154,19 +219,20 @@ export function LocationOrgEvidenceModal({
               </tr>
             </thead>
             <tbody>
-              {evidence.locationOrg.matches.map((match, index) => (
-                <tr key={`${match.locationId}-${index}`}>
-                  <td>{match.locationId}</td>
+              {rows.map((row) => (
+                <tr key={row.key}>
+                  <td>{row.locationId}</td>
                   <td>
-                    {match.locationAlias ?? match.locationName ?? '—'}
+                    {row.rawValue ??
+                      t(
+                        'onboarding:reportResults.detail.mappingEvidence.discoveryNotAvailable',
+                      )}
                   </td>
                   <td>
                     <span
-                      className={`nhsn-link__mapping-pill ${match.isOrgLocation ? 'nhsn-link__mapping-pill--found' : 'nhsn-link__mapping-pill--not-found'}`}>
-                      {match.isOrgLocation
-                        ? t(
-                            'onboarding:reportResults.detail.mapping.found',
-                          )
+                      className={`nhsn-link__mapping-pill ${row.found ? 'nhsn-link__mapping-pill--found' : 'nhsn-link__mapping-pill--not-found'}`}>
+                      {row.found
+                        ? t('onboarding:reportResults.detail.mapping.found')
                         : t(
                             'onboarding:reportResults.detail.mapping.notFound',
                           )}
@@ -179,11 +245,10 @@ export function LocationOrgEvidenceModal({
         </div>
       ) : (
         <p>
-          {t(
-            'onboarding:reportResults.detail.mappingEvidence.noEvidence',
-          )}
+          {t('onboarding:reportResults.detail.mappingEvidence.noEvidence')}
         </p>
-      ))}
+      )
+    )}
   
     {patientRow &&
       !patientRow.locationOrgFound && (
