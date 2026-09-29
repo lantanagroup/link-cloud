@@ -511,7 +511,7 @@
         "placeholder": "FHIR Patient ID",
         "add": "+ Add Patient ID",
         "empty": "None added yet.",
-        "requiredError": "This FHIR Patient ID field cannot be blank.",
+        "requiredError": "FHIR Patient ID is required.",
         "duplicateError": "This FHIR Patient ID has already been added."
       },
       "csv": {
