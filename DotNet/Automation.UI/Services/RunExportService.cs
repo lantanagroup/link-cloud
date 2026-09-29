@@ -490,8 +490,21 @@ public sealed class RunExportService : IRunExportService
     {
         try
         {
-            return (await _snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
+            var header = (await _snapshotStore.GetDomainAsync<NormalizationEvidenceSnapshot>(
                 runId, NormalizationEvidenceSnapshot.Domain, ct))?.Data;
+            if (header == null || header.EvidenceChunkCount <= 0)
+                return header;
+
+            var chunks = new List<NormalizationEvidenceChunk>();
+            for (var index = 1; index <= header.EvidenceChunkCount; index++)
+            {
+                var chunk = (await _snapshotStore.GetDomainAsync<NormalizationEvidenceChunk>(
+                    runId, NormalizationEvidenceSnapshot.ChunkDomain(index), ct))?.Data;
+                if (chunk != null)
+                    chunks.Add(chunk);
+            }
+
+            return NormalizationDiagnosticsWriter.Assemble(header, chunks);
         }
         catch (Exception ex)
         {
