@@ -6,6 +6,7 @@ namespace LantanaGroup.Link.Shared.Application.Health;
 public sealed class DatabaseHealthCheck<TContext> : IHealthCheck
     where TContext : DbContext
 {
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
     private readonly TContext _dbContext;
 
     public DatabaseHealthCheck(TContext dbContext)
@@ -17,20 +18,23 @@ public sealed class DatabaseHealthCheck<TContext> : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var canConnect = await _dbContext.Database.CanConnectAsync(cancellationToken);
+            timeoutCancellation.CancelAfter(ProbeTimeout);
+            var canConnect = await _dbContext.Database.CanConnectAsync(timeoutCancellation.Token);
+            timeoutCancellation.Token.ThrowIfCancellationRequested();
             cancellationToken.ThrowIfCancellationRequested();
-            return canConnect ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy();
+            return canConnect ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy("Database connection failed.");
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
         {
-            throw;
+            return HealthCheckResult.Unhealthy($"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(exception: ex);
+            return HealthCheckResult.Unhealthy(description: $"Health check failed with an error: {ex.Message}", exception: ex);
         }
     }
 }
