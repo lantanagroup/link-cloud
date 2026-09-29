@@ -32,4 +32,13 @@ public class AutomationRunPollingPolicyTests
         AutomationRunPollingPolicy.DiagnosticsInterval(isMetricsRun: true, patientCount: 500).Should().Be(TimeSpan.FromSeconds(15));
         AutomationRunPollingPolicy.DiagnosticsInterval(isMetricsRun: true, patientCount: 499).Should().Be(TimeSpan.FromSeconds(5));
     }
+
+    [Fact]
+    public void Validation_activity_lookback_covers_the_slow_sampling_gap()
+    {
+        var slowestGap = AutomationRunPollingPolicy.LargeRunDiagnosticsInterval
+            * AutomationRunPollingPolicy.PipelineActivitySampleEvery;
+
+        AutomationRunPollingPolicy.ValidationActivityLookback.Should().BeGreaterThan(slowestGap);
+    }
 }

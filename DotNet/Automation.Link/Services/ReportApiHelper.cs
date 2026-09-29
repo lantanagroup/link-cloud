@@ -318,11 +318,8 @@ public class ReportApiHelper
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= milestoneDeadline)
-                {
-                    if (!TryKeepAlive(diagnostics, milestonePhaseStart, hardTimeout, ref milestoneDeadline))
-                        break;
-                }
+                if (!AdvanceDeadline(diagnostics, ref milestonePhaseStart, hardTimeout, ref milestoneDeadline))
+                    break;
                 if (diagnostics.HasCriticalFailure)
                 {
                     _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure before submission polling.");
@@ -392,11 +389,8 @@ public class ReportApiHelper
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (hardTimeout != TimeSpan.MaxValue && DateTime.UtcNow >= submissionDeadline)
-            {
-                if (!TryKeepAlive(diagnostics, submissionPhaseStart, hardTimeout, ref submissionDeadline))
-                    break;
-            }
+            if (!AdvanceDeadline(diagnostics, ref submissionPhaseStart, hardTimeout, ref submissionDeadline))
+                break;
             if (diagnostics?.HasCriticalFailure == true)
             {
                 _output.WriteLine("[EARLY EXIT] Background diagnostics detected a critical failure — aborting poll loop.");
@@ -561,29 +555,80 @@ public class ReportApiHelper
             : adaptiveFloor;
     }
 
-    private bool TryKeepAlive(
+    private bool _validationHoldActive;
+
+    /// <summary>
+    /// A drained validation queue starts the configured timeout again.
+    /// A queue that went quiet with patients still pending keeps the deadline it already has.
+    /// </summary>
+    public static bool ShouldRearmTimeoutAfterValidationHold(int pendingValidationCount)
+        => pendingValidationCount == 0;
+
+    /// <summary>
+    /// Keeps the poll alive. Validation that is still working has no timeout.
+    /// When that queue drains, the configured hard timeout starts again for
+    /// whatever work is left. A quiet queue that still has pending patients
+    /// does not get a new full timeout. Other in-flight acquisition can still
+    /// extend a deadline, and that path remains capped.
+    /// </summary>
+    private bool AdvanceDeadline(
         BackgroundDiagnosticsMonitor? diagnostics,
-        DateTime phaseStart,
+        ref DateTime phaseStart,
         TimeSpan hardTimeout,
         ref DateTime deadline)
     {
-        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
-        if (!AcquisitionActivityTracker.TryExtendDeadline(
-                DateTime.UtcNow,
-                phaseStart,
-                hardTimeout,
-                hasProgress,
-                ref deadline,
-                out var extendedBy))
+        var validationProgress = diagnostics?.GetValidationProgress()
+            ?? new LantanaGroup.Automation.Helpers.ValidationProgressSnapshot(false, 0);
+        var validationOngoing = validationProgress.Ongoing;
+        var pendingValidationCount = validationProgress.Pending;
+        if (validationOngoing)
         {
-            return false;
+            _validationHoldActive = true;
+        }
+        else if (_validationHoldActive && hardTimeout != TimeSpan.MaxValue && hardTimeout > TimeSpan.Zero)
+        {
+            _validationHoldActive = false;
+            if (ShouldRearmTimeoutAfterValidationHold(pendingValidationCount))
+            {
+                phaseStart = DateTime.UtcNow;
+                deadline = phaseStart + hardTimeout;
+                _output.WriteLine("[DIAG] Validation finished. The configured timeout applies to the rest of the run.");
+            }
+            else
+            {
+                _output.WriteLine(
+                    $"[DIAG] Validation has been quiet with {pendingValidationCount} patients still pending. The existing deadline applies.");
+            }
         }
 
-        _output.WriteLine(
-            $"[DIAG] Keep-alive: DA paging or Validation still progressing " +
-            $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
-            $"Extending poll deadline by {extendedBy.TotalSeconds:F0}s.");
-        return true;
+        var hasProgress = diagnostics?.HasRecentAcquisitionProgress(AcquisitionActivityTracker.ProgressWindow) == true;
+        var decision = AcquisitionActivityTracker.Decide(
+            DateTime.UtcNow,
+            phaseStart,
+            hardTimeout,
+            deadline,
+            validationOngoing,
+            hasProgress);
+
+        deadline = decision.Deadline;
+        if (decision.HeldForValidation)
+        {
+            _validationHoldActive = true;
+            _output.WriteLine(
+                $"[DIAG] Validation is still working ({pendingValidationCount} patients open). " +
+                "This run will not time out while validation is in progress.");
+            return true;
+        }
+
+        if (decision.ExtendedBy > TimeSpan.Zero)
+        {
+            _output.WriteLine(
+                $"[DIAG] Keep-alive: acquisition still progressing " +
+                $"({diagnostics!.AcquisitionResourcesAcquired} resources acquired). " +
+                $"Extending poll deadline by {decision.ExtendedBy.TotalSeconds:F0}s.");
+        }
+
+        return decision.Continue;
     }
 
     public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)

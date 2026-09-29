@@ -173,7 +173,8 @@ public class LokiScraper
         TimeSpan lookback,
         IReadOnlyCollection<string>? additionalContainsFilters = null,
         int limit = 2000,
-        int maxPages = 10)
+        int maxPages = 10,
+        CancellationToken cancellationToken = default)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -210,7 +211,9 @@ public class LokiScraper
 
             while (pageCount < Math.Max(1, maxPages))
             {
-                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, currentEndUnix, pageSize, "backward");
+                cancellationToken.ThrowIfCancellationRequested();
+                var (statusCode, content) = await ExecuteQueryRangeAsync(
+                    query, startUnix, currentEndUnix, pageSize, "backward", cancellationToken);
                 if (statusCode != HttpStatusCode.OK || content == null)
                     return lines;
 
@@ -294,12 +297,43 @@ public class LokiScraper
                 currentEndUnix = nextEndUnix;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            return lines;
+            switch (ClassifyScrapeFailure(ex, cancellationToken))
+            {
+                case ScrapeFailure.Rethrow:
+                    throw;
+                case ScrapeFailure.MissedScrape:
+                    return [];
+                default:
+                    return lines;
+            }
         }
 
         return lines;
+    }
+
+    internal enum ScrapeFailure
+    {
+        Rethrow,
+        MissedScrape,
+        KeepPartial
+    }
+
+    /// <summary>
+    /// A caller cancel stops the scrape. An HTTP timeout is a <see cref="TaskCanceledException"/>
+    /// whose token is still active. That is a missed scrape: a partial page list would look
+    /// complete to the evidence retry. Other failures keep the pages already read.
+    /// </summary>
+    internal static ScrapeFailure ClassifyScrapeFailure(Exception ex, CancellationToken cancellationToken)
+    {
+        if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+            return ScrapeFailure.Rethrow;
+
+        if (ex is OperationCanceledException)
+            return ScrapeFailure.MissedScrape;
+
+        return ScrapeFailure.KeepPartial;
     }
 
     /// <summary>
@@ -539,10 +573,26 @@ public class LokiScraper
         return lines;
     }
 
-    public async Task<string?> GetValidationActivitySummaryAsync(
+    private static DateTime ToUtc(long lokiNanoseconds)
+    {
+        if (lokiNanoseconds <= 0)
+            return default;
+
+        try
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(lokiNanoseconds / 1_000_000L).UtcDateTime;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return default;
+        }
+    }
+
+    public async Task<ValidationActivitySample?> GetValidationActivitySummaryAsync(
         TimeSpan lookback,
         string? facilityId = null,
-        string? reportId = null)
+        string? reportId = null,
+        CancellationToken cancellationToken = default)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -557,7 +607,8 @@ public class LokiScraper
             query += $" |= \"{reportId}\"";
         try
         {
-            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            var (statusCode, content) = await ExecuteQueryRangeAsync(
+                query, startUnix, endUnix, limit: 200, cancellationToken: cancellationToken);
             if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
@@ -569,6 +620,7 @@ public class LokiScraper
             var logCount = 0;
             var logLines = new List<string>();
             var patientIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            long newestNanos = 0;
 
             foreach (var result in results)
             {
@@ -583,6 +635,8 @@ public class LokiScraper
                         continue;
                     logCount++;
                     logLines.Add(logLine);
+                    if (long.TryParse(value[0]?.ToString(), out var nanos) && nanos > newestNanos)
+                        newestNanos = nanos;
 
                     var patientMarker = "patient";
                     var idx = logLine.IndexOf(patientMarker, StringComparison.OrdinalIgnoreCase);
@@ -601,17 +655,21 @@ public class LokiScraper
                 return null;
 
             var heartbeat = ValidationActivity.Summarize(logLines, lookback);
+            string summary;
             if (!string.IsNullOrWhiteSpace(heartbeat))
-                return heartbeat;
-
-            if (patientIds.Count > 0)
+                summary = heartbeat;
+            else if (patientIds.Count > 0)
             {
                 var sample = string.Join(", ", patientIds.Take(3));
                 var suffix = patientIds.Count > 3 ? $" (+{patientIds.Count - 3} more)" : "";
-                return $"processing validation activity for {sample}{suffix} ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+                summary = $"processing validation activity for {sample}{suffix} ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+            }
+            else
+            {
+                summary = $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
             }
 
-            return $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+            return new ValidationActivitySample(summary, ToUtc(newestNanos));
         }
         catch
         {
@@ -808,7 +866,8 @@ public class LokiScraper
         long startUnix,
         long endUnix,
         int? limit = null,
-        string? direction = null)
+        string? direction = null,
+        CancellationToken cancellationToken = default)
     {
         var queryString =
             $"query={Uri.EscapeDataString(query)}&start={startUnix}&end={endUnix}";
@@ -819,8 +878,8 @@ public class LokiScraper
         if (!string.IsNullOrWhiteSpace(direction))
             queryString += $"&direction={Uri.EscapeDataString(direction)}";
 
-        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}");
-        var content = await response.Content.ReadAsStringAsync();
+        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}", cancellationToken);
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
         return (response.StatusCode, string.IsNullOrWhiteSpace(content) ? null : content);
     }
 }
