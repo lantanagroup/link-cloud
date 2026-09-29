@@ -1,4 +1,4 @@
-import type {HslocMapping} from '../../../api/contracts';
+import type {HslocMapping, UserInfoResponse} from '../../../api/contracts';
 import type {FacilityDraft} from '../../types';
 
 export interface MappingRowValues {
@@ -11,14 +11,16 @@ export function isRowBlank(row: MappingRowValues): boolean {
   return !row.sourceDisplay.trim() && !row.sourceCode.trim() && !row.hslocCode.trim();
 }
 
-export function isRowComplete(row: MappingRowValues): boolean {
-  return Boolean(row.sourceDisplay.trim() && row.sourceCode.trim() && row.hslocCode.trim());
+// requireSourceDisplay is false while HslocLocationDisplayUpdate is off (see LinkCapabilitiesSettings)
+// -- Normalization has no way to persist that field yet, so it isn't collected and can't be required.
+export function isRowComplete(row: MappingRowValues, requireSourceDisplay = true): boolean {
+  return Boolean((!requireSourceDisplay || row.sourceDisplay.trim()) && row.sourceCode.trim() && row.hslocCode.trim());
 }
 
-export function findIncompleteRowIndexes(rows: MappingRowValues[]): number[] {
+export function findIncompleteRowIndexes(rows: MappingRowValues[], requireSourceDisplay = true): number[] {
   const incomplete: number[] = [];
   rows.forEach((row, index) => {
-    const hasSourceDisplay = row.sourceDisplay.trim().length > 0;
+    const hasSourceDisplay = !requireSourceDisplay || row.sourceDisplay.trim().length > 0;
     const hasSourceCode = row.sourceCode.trim().length > 0;
     const hasHslocCode = row.hslocCode.trim().length > 0;
     if (!(hasSourceDisplay && hasSourceCode && hasHslocCode)) {
@@ -81,10 +83,14 @@ function toRowValues(mapping: HslocMapping): MappingRowValues {
  * facility types anything, and that alone shouldn't relock the steps after this one. Continue
  * still refuses it through validateStep.
  */
-export function isHslocComplete(draft: FacilityDraft): boolean {
+export function isHslocComplete(draft: FacilityDraft, user?: UserInfoResponse): boolean {
+  const requireSourceDisplay = Boolean(user?.capabilities?.hslocLocationDisplayUpdate);
   const rows = (draft.hsloc.mappings ?? []).map(toRowValues).filter(row => !isRowBlank(row));
   if (rows.length === 0) {
     return false;
   }
-  return rows.every(isRowComplete) && findDuplicateSourceCodeIndexes(rows).length === 0;
+  return (
+    rows.every(row => isRowComplete(row, requireSourceDisplay)) &&
+    findDuplicateSourceCodeIndexes(rows).length === 0
+  );
 }

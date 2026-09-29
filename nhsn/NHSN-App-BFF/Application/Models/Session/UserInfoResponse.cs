@@ -43,4 +43,7 @@ public class CapabilitiesResponse
     // When true, a facility whose onboarding already completed keeps an "Onboarding" item in the
     // main navigation and can freely revisit every step. See LinkCapabilitiesSettings.OnboardingRevisit.
     public bool OnboardingRevisit { get; set; }
+
+    // See LinkCapabilitiesSettings.HslocLocationDisplayUpdate.
+    public bool HslocLocationDisplayUpdate { get; set; }
 }

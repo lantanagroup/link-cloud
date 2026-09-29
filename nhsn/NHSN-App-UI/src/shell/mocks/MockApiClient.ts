@@ -111,7 +111,8 @@ export class MockApiClient implements ApiClient {
       patientListWithNames: false,
       fhirConnectionProbe: false,
       sftpFileListing: false,
-      onboardingRevisit: false
+      onboardingRevisit: false,
+      hslocLocationDisplayUpdate: false
     }
   ) {}
 
@@ -143,7 +144,8 @@ export class MockApiClient implements ApiClient {
         patientListWithNames: false,
         fhirConnectionProbe: false,
         sftpFileListing: false,
-        onboardingRevisit: false
+        onboardingRevisit: false,
+        hslocLocationDisplayUpdate: false
       }
     };
   }
@@ -482,7 +484,14 @@ export class MockApiClient implements ApiClient {
   async getReport(reportId: string): Promise<C.ReportDetail> {
     await tick();
     return {
-      ...this.buildReport({measures: [], startDate: '', endDate: '', patientIds: []}),
+      // Matches getReportPatients()'s measureReports[0].reportType -- a report with no measures
+      // leaves dqmOptions empty and the per-patient tabs/discovery below never activate.
+      ...this.buildReport({
+        measures: ['NHSNGlycemicControlHypoglycemicInitialPopulation'],
+        startDate: '',
+        endDate: '',
+        patientIds: []
+      }),
       reportId,
       measureMapping: []
     };
@@ -638,7 +647,28 @@ export class MockApiClient implements ApiClient {
       extension: [{url: 'urn:nhsn-link:reportingStatus', valueString: 'PassedValidation (simulated)'}]
     };
     const patient = {resourceType: 'Patient', id: patientId};
-    const ndjson = [measureReport, patient].map(resource => JSON.stringify(resource)).join('\n');
+    const location = {
+      resourceType: 'Location',
+      id: 'SIMULATED-LOC-1',
+      physicalType: {
+        coding: [
+          {
+            system: 'https://fhir.cerner.com/e8a84236-c258-4952-98b7-a6ff8a9c587a/codeSet/222',
+            code: '801',
+            display: 'Room(s)'
+          }
+        ]
+      }
+    };
+    const encounter = {
+      resourceType: 'Encounter',
+      id: `${patientId}-enc-1`,
+      subject: {reference: `Patient/${patientId}`},
+      location: [{location: {reference: `Location/${location.id}`}}]
+    };
+    const ndjson = [measureReport, patient, encounter, location]
+      .map(resource => JSON.stringify(resource))
+      .join('\n');
     return new Blob([ndjson], {type: 'application/x-ndjson'});
   }
 

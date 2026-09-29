@@ -30,7 +30,9 @@ export interface MappingEvidence<TCode, TMapping> {
   setSelection: (key: string, value: string) => void;
   resetSelections: () => void;
   load: () => Promise<void>;
-  add: (key: string, mapping: TMapping) => Promise<void>;
+  /** Resolves false (after showing the usual error notification) on a failed save, so a caller
+   *  holding other in-progress input for this key can decide whether to clear it. */
+  add: (key: string, mapping: TMapping) => Promise<boolean>;
 }
 
 export function useMappingEvidence<TCode, TMapping>(
@@ -74,7 +76,7 @@ export function useMappingEvidence<TCode, TMapping>(
     setSelections({});
   }
 
-  async function add(key: string, mapping: TMapping) {
+  async function add(key: string, mapping: TMapping): Promise<boolean> {
     setAddingKey(key);
     try {
       const nextMappings = [...mappings, mapping];
@@ -87,8 +89,10 @@ export function useMappingEvidence<TCode, TMapping>(
         delete next[key];
         return next;
       });
+      return true;
     } catch (cause) {
       notifyError(loadErrorMessage(cause));
+      return false;
     } finally {
       setAddingKey(null);
     }

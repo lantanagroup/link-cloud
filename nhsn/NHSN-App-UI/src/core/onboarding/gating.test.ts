@@ -157,7 +157,8 @@ describe('isUnlocked', () => {
         patientListWithNames: false,
         fhirConnectionProbe: false,
         sftpFileListing: false,
-        onboardingRevisit: true
+        onboardingRevisit: true,
+        hslocLocationDisplayUpdate: false
       }
     };
     // Never unlocked, never observed as complete -- still reachable in revisit mode.
@@ -177,7 +178,8 @@ describe('isUnlocked', () => {
         patientListWithNames: false,
         fhirConnectionProbe: false,
         sftpFileListing: false,
-        onboardingRevisit: true
+        onboardingRevisit: true,
+        hslocLocationDisplayUpdate: false
       }
     };
     expect(isUnlocked('report-results', createEmptyDraft(), flaggedUser)).toBe(false);

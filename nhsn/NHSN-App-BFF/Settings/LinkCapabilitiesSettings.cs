@@ -23,6 +23,16 @@ public class LinkCapabilitiesSettings
     // Patient.identifier array yet. See IPatientIdentifierGateway's doc comment.
     public bool PatientIdentifierLookup { get; set; }
 
+    // Report Details' HSLOC "+ Add Mapping" flow lets a facility type a display name for an
+    // already-acquired Location. Normalization auto-creates that Location's FacilityLocation record
+    // during ordinary data acquisition, independent of HSLOC mapping, so HslocMappingService only
+    // sets its display name on first creation (when no FacilityLocation exists yet) — never on an
+    // update. FacilityLocationsController exposes no PUT/PATCH, and INormalizationServiceClient has
+    // no UpdateFacilityLocationAsync, so there is currently no way to persist a typed display name
+    // for a Location that data acquisition already saw. Off until Normalization/LinkSdk add that
+    // update path — see HslocMappingService.EnsureFacilityLocationAsync.
+    public bool HslocLocationDisplayUpdate { get; set; }
+
     // Not a real-vs-fixture adapter flag like the others above — a UX toggle. When true, a facility
     // whose onboarding already completed keeps an "Onboarding" item in the main navigation and can
     // freely revisit/edit every step; when false (the default), onboarding is a one-way door and

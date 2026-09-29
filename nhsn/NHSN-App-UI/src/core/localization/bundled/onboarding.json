@@ -656,6 +656,7 @@
         "targetSystem": "Target System",
         "unmappedCodes": "Unmapped Codes",
         "noEvidence": "No evidence recorded for this patient yet.",
+        "allResolved": "Every acquired Location value for this patient already resolves to HSLOC vocabulary or a configured mapping.",
         "locationOrgTitle": "Location Org Mapping",
         "hslocTitle": "HSLOC Mapping",
         "encounterTitle": "Encounter Mapping",
@@ -689,6 +690,7 @@
         "discoveryLocationId": "Location Id",
         "discoveryRawValue": "Raw Value",
         "discoveryNotAvailable": "Not available in this report",
+        "status": "Status",
         "notReportableHint": "This patient was not reportable for this measure, so no acquired report exists to check raw Location values against. The table below shows the last evidence Report recorded for this patient."
       },
       "notApplicable": "N/A",
