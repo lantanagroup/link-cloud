@@ -211,7 +211,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
   function handleMethodChange(method: LocationMethod) {
     setEditedRowIndex(null);
-    patch('locationOrg', {method});
+    mirror('locationOrg', {method});
   }
 
   async function handleSearch() {
