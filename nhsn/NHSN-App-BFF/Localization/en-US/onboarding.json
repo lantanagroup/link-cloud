@@ -110,6 +110,7 @@
       "duplicateHslocIdentifier": "This Location.identifier.value is used by more than one row — each mapping's local identifier must be unique.",
       "partialLocationType": "Both columns are required for a Location Type row — remove incomplete rows or fill them in completely.",
       "partialLocationIdentifier": "Both columns are required for a Location Identifier row — remove incomplete rows or fill them in completely.",
+      "requiredEncounterMapping": "At least one Encounter.type Code System is required.",
       "partialEncounterMapping": "All four columns are required for an Encounter Mapping row — remove incomplete rows or fill them in completely.",
       "lineFormat": "{{sheet}} {{location}}: {{- message}}"
     }
