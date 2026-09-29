@@ -73,6 +73,58 @@ public class LokiScraperFailureTests
         (await task).Should().BeNull();
     }
 
+    [Fact]
+    public async Task Validation_sample_uses_the_newest_matching_log_time()
+    {
+        const long olderNs = 1_780_000_000_000_000_000;
+        const long newestNs = 1_780_000_105_000_000_000;
+        const long otherRunNs = 1_780_000_200_000_000_000;
+        var body = $$"""
+            {
+              "status": "success",
+              "data": {
+                "resultType": "streams",
+                "result": [
+                  {
+                    "values": [
+                      ["{{olderNs}}", "facility-1 report-9 validation still in progress: categorize (elapsed 40s)"],
+                      ["{{otherRunNs}}", "elsewhere else-id validation still in progress: ignore (elapsed 1s)"],
+                      ["{{newestNs}}", "facility-1 report-9 validation still in progress: categorize (elapsed 40s)"]
+                    ]
+                  }
+                ]
+              }
+            }
+            """;
+        using var client = new HttpClient(new JsonHandler(body))
+        {
+            BaseAddress = new Uri("http://loki.test")
+        };
+        var scraper = new LokiScraper(
+            client,
+            new NullOutput(),
+            new AutomationConfig { LokiBaseUrl = "http://loki.test", LokiAppLabel = "link" });
+
+        var sample = await scraper.GetValidationActivitySummaryAsync(TimeSpan.FromSeconds(105), "facility-1", "report-9");
+
+        sample.Should().NotBeNull();
+        sample!.NewestUtc.Should().Be(DateTimeOffset.FromUnixTimeMilliseconds(newestNs / 1_000_000).UtcDateTime);
+        sample.Summary.Should().Contain("elapsed 40s");
+    }
+
+    private sealed class JsonHandler : HttpMessageHandler
+    {
+        private readonly string _body;
+
+        public JsonHandler(string body) => _body = body;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(_body)
+            });
+    }
+
     private sealed class HoldUntilCancelHandler : HttpMessageHandler
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

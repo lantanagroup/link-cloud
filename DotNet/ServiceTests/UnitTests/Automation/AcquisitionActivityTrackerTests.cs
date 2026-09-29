@@ -193,6 +193,39 @@ public class AcquisitionActivityTrackerTests
     }
 
     [Fact]
+    public void Repeated_validation_log_does_not_extend_the_quiet_hold()
+    {
+        var signal = new ValidationWorkSignal();
+        var loggedAt = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(1, 0, 0, loggedAt);
+
+        signal.NoteActivity(loggedAt).Should().BeTrue();
+        signal.NoteActivity(loggedAt).Should().BeFalse();
+
+        signal.IsOngoingAt(loggedAt.Add(ValidationWorkSignal.QuietLimit).AddSeconds(-1)).Should().BeTrue();
+        signal.IsOngoingAt(loggedAt.Add(ValidationWorkSignal.QuietLimit).AddSeconds(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Previous_wave_log_does_not_rearm_the_next_queue()
+    {
+        var signal = new ValidationWorkSignal();
+        var loggedAt = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(1, 0, 0, loggedAt);
+        signal.NoteActivity(loggedAt).Should().BeTrue();
+        signal.ObserveCounts(0, 1, 0, loggedAt.AddMinutes(1));
+
+        var nextWave = loggedAt.AddMinutes(2);
+        signal.ObserveCounts(2, 0, 0, nextWave);
+        signal.NoteActivity(loggedAt).Should().BeFalse();
+        signal.IsOngoingAt(nextWave).Should().BeFalse();
+
+        var newLog = nextWave.AddSeconds(30);
+        signal.NoteActivity(newLog).Should().BeTrue();
+        signal.IsOngoingAt(newLog).Should().BeTrue();
+    }
+
+    [Fact]
     public void Validation_activity_holds_a_single_patient_whose_counts_have_not_moved()
     {
         var signal = new ValidationWorkSignal();

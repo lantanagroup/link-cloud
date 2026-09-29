@@ -573,7 +573,22 @@ public class LokiScraper
         return lines;
     }
 
-    public async Task<string?> GetValidationActivitySummaryAsync(
+    private static DateTime ToUtc(long lokiNanoseconds)
+    {
+        if (lokiNanoseconds <= 0)
+            return default;
+
+        try
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(lokiNanoseconds / 1_000_000L).UtcDateTime;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return default;
+        }
+    }
+
+    public async Task<ValidationActivitySample?> GetValidationActivitySummaryAsync(
         TimeSpan lookback,
         string? facilityId = null,
         string? reportId = null,
@@ -605,6 +620,7 @@ public class LokiScraper
             var logCount = 0;
             var logLines = new List<string>();
             var patientIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            long newestNanos = 0;
 
             foreach (var result in results)
             {
@@ -619,6 +635,8 @@ public class LokiScraper
                         continue;
                     logCount++;
                     logLines.Add(logLine);
+                    if (long.TryParse(value[0]?.ToString(), out var nanos) && nanos > newestNanos)
+                        newestNanos = nanos;
 
                     var patientMarker = "patient";
                     var idx = logLine.IndexOf(patientMarker, StringComparison.OrdinalIgnoreCase);
@@ -637,17 +655,21 @@ public class LokiScraper
                 return null;
 
             var heartbeat = ValidationActivity.Summarize(logLines, lookback);
+            string summary;
             if (!string.IsNullOrWhiteSpace(heartbeat))
-                return heartbeat;
-
-            if (patientIds.Count > 0)
+                summary = heartbeat;
+            else if (patientIds.Count > 0)
             {
                 var sample = string.Join(", ", patientIds.Take(3));
                 var suffix = patientIds.Count > 3 ? $" (+{patientIds.Count - 3} more)" : "";
-                return $"processing validation activity for {sample}{suffix} ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+                summary = $"processing validation activity for {sample}{suffix} ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+            }
+            else
+            {
+                summary = $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
             }
 
-            return $"processing validation activity ({logCount} log lines/{lookback.TotalSeconds:F0}s)";
+            return new ValidationActivitySample(summary, ToUtc(newestNanos));
         }
         catch
         {

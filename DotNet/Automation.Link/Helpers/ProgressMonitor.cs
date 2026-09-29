@@ -172,14 +172,16 @@ public class ProgressMonitor
             facilityId,
             reportId,
             cancellationToken);
-        if (!string.IsNullOrWhiteSpace(validationActivity))
+        if (validationActivity != null && !string.IsNullOrWhiteSpace(validationActivity.Summary))
         {
-            _validationWork.NoteActivity();
-            _progressTracker?.NoteActivity();
-            if (!string.Equals(validationActivity, _lastValidationActivity, StringComparison.Ordinal))
+            // Note the log time. A later scrape of the same line returns false and
+            // does not refresh the quiet hold or the stall tracker.
+            if (_validationWork.NoteActivity(validationActivity.NewestUtc))
+                _progressTracker?.NoteActivity();
+            if (!string.Equals(validationActivity.Summary, _lastValidationActivity, StringComparison.Ordinal))
             {
-                _output.WriteLine($"[DIAG][Validation] Active: {validationActivity}");
-                _lastValidationActivity = validationActivity;
+                _output.WriteLine($"[DIAG][Validation] Active: {validationActivity.Summary}");
+                _lastValidationActivity = validationActivity.Summary;
             }
         }
     }

@@ -6,6 +6,9 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// The hold ends when the queue drains, or when counts and activity have both
 /// been quiet longer than <see cref="QuietLimit"/>. That quiet limit is long
 /// enough to cover a missed Loki sample. It still stops a worker that has died.
+/// A Loki line is recorded at its own timestamp, and only when that timestamp
+/// is newer than the last one. Scraping the same line again does not move the
+/// hold, and a line from the previous wave does not start the next one.
 /// </summary>
 public sealed class ValidationWorkSignal
 {
@@ -22,6 +25,12 @@ public sealed class ValidationWorkSignal
     private bool _workObserved;
     private DateTime _lastWorkUtc;
 
+    /// <summary>
+    /// Newest Loki timestamp already applied. Not cleared when the queue drains,
+    /// so a line still inside the lookback cannot re-arm the next wave.
+    /// </summary>
+    private DateTime _newestNotedUtc;
+
     public int PendingValidation { get; private set; }
 
     public bool IsOngoing => IsOngoingAt(DateTime.UtcNow);
@@ -34,10 +43,20 @@ public sealed class ValidationWorkSignal
 
     public void NoteActivity() => NoteActivity(DateTime.UtcNow);
 
-    public void NoteActivity(DateTime utcNow)
+    /// <summary>
+    /// Records one validation log. Returns false when <paramref name="utcNow"/>
+    /// is missing or is not newer than the last noted log.
+    /// </summary>
+    public bool NoteActivity(DateTime utcNow)
     {
+        if (utcNow == default || utcNow <= _newestNotedUtc)
+            return false;
+
+        _newestNotedUtc = utcNow;
         _workObserved = true;
-        _lastWorkUtc = utcNow;
+        if (utcNow > _lastWorkUtc)
+            _lastWorkUtc = utcNow;
+        return true;
     }
 
     public void ObserveCounts(int pendingValidation, int passedValidation, int failedValidation)
