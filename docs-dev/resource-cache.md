@@ -164,6 +164,29 @@ advertises independently**. Nothing waits for both. By the time SUPPLEMENTAL rea
 are durable, because every INITIAL log drained before going terminal and the INITIAL tail could not
 have fired otherwise.
 
+### Restoring the correlation entry before the supplemental append
+
+The two query plans are disjoint — INITIAL fetches Encounter, MedicationRequest, Location and
+Medication; SUPPLEMENTAL fetches Condition, Coverage, DiagnosticReport, Observation and Procedure —
+so the record MeasureEval evaluates exists only as the **accumulation of both passes** in the one
+`{correlationId}` entry. MeasureEval reads that entry whole and runs CQL once over it.
+
+The cache can evict the entry while the supplemental acquisition runs, and the Redis write is a
+merge that recreates a missing key. An append to an evicted entry therefore produces an entry
+holding only the supplemental resources: non-empty, freshly expiring, and indistinguishable from a
+complete one. A read then treats it as a hit and never consults the durable copy that *is* complete,
+so the measure is evaluated without the encounter it depends on — silently.
+
+Eviction on its own is safe, because an absent entry falls through to durable storage. It is the
+**append to an evicted entry** that is not. So Normalization reads the correlation entry once before
+processing a supplemental message: on a miss that read repopulates the cache from durable storage,
+and the appends that follow extend the initial pass instead of replacing it.
+
+This narrows the exposure from the length of the whole supplemental acquisition to the gap between
+that read and the appends. It does not eliminate it — an eviction inside that gap still produces a
+partial entry. Closing it completely needs a completeness marker on the entry, so a reader can tell
+a partial entry from a whole one rather than inferring it from non-emptiness.
+
 ## Durability
 
 The barrier is **per log**, immediately before the log's terminal status is written.

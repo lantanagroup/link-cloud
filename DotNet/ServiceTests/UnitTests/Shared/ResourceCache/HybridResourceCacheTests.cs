@@ -86,6 +86,29 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
+    public async Task GetAsync_falls_back_on_a_correlation_key_and_still_repopulates_the_cache()
+    {
+        const string correlationKey = "corr-1";
+
+        _redis.Setup(c => c.GetAsync(correlationKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync(correlationKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+
+        // What the real implementation does with a key that carries no resource type.
+        _abs.Setup(c => c.GetResourceTypeByCacheKey(correlationKey))
+            .Throws(new Exception("Cache key 'corr-1' does not contain required ':' divider."));
+
+        var result = await CreateSut().GetAsync(correlationKey);
+
+        result.Should().HaveCount(1);
+
+        // Leaving this entry evicted is what lets a supplemental append recreate it holding only
+        // that pass's resources, which then reads as complete and shadows the durable copy.
+        _redis.Verify(
+            c => c.UpdateCorrelationCacheAsync(correlationKey, It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task GetAsync_falls_back_to_durable_storage_when_the_cache_is_unreachable()
     {
         _redis

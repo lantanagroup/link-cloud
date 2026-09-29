@@ -275,6 +275,13 @@ public class ResourcesAcquiredListener : BackgroundService
 
         var mappingOutcomes = new MappingOutcomeAccumulator();
 
+        await RestoreCorrelationEntryAsync(
+            resourceCache,
+            result.Message.Value.QueryType,
+            correlationId,
+            result.Message.Key.FacilityId,
+            cancellationToken);
+
         await RegisterConfiguredCodeMapsAsync(
             scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
 
@@ -610,6 +617,57 @@ public class ResourcesAcquiredListener : BackgroundService
     /// patient-correlation, not one per resource.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Restores the correlation cache entry before a supplemental pass appends to it.
+    /// </summary>
+    /// <remarks>
+    /// The two query plans are disjoint, so the record a measure is evaluated against only exists
+    /// as the accumulation of both passes. The cache can evict the entry while the supplemental
+    /// acquisition runs, and an append to an evicted entry recreates it holding only this pass's
+    /// resources -- non-empty, so it reads as complete and shadows the durable copy that is.
+    /// Reading it first repopulates it from durable storage, so the appends that follow extend the
+    /// initial pass rather than replacing it. See docs-dev/resource-cache.md.
+    /// </remarks>
+    private async Task RestoreCorrelationEntryAsync(
+        IResourceCache resourceCache,
+        string queryType,
+        string correlationId,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(queryType, nameof(QueryType.Supplemental), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            var restored = await resourceCache.GetAsync(correlationId, cancellationToken);
+
+            _logger.LogDebug(
+                "Restored {ResourceCount} resource(s) to the correlation cache entry before the supplemental append "
+                + "for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                restored.Count,
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Best effort, and deliberately not fatal: durable storage still holds both passes, so
+            // the worst case is the entry staying partial until something reads through it.
+            _logger.LogWarning(
+                exception,
+                "Could not restore the correlation cache entry before the supplemental append for "
+                + "FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+    }
+
     private async Task RegisterConfiguredCodeMapsAsync(
         IServiceScope scope,
         string facilityId,

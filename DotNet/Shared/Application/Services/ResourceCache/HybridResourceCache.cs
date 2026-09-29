@@ -183,7 +183,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             try
             {
-                var resourceType = _absCache.GetResourceTypeByCacheKey(cacheKey);
+                // Only the acquisition keys carry a resource type. A correlation key is a bare id,
+                // and GetResourceTypeByCacheKey throws on one -- which the catch below would swallow,
+                // leaving the entry unrestored for exactly the key a two-pass evaluation depends on.
+                // The cache does not use the value: it names each field after the resource it holds.
+                var resourceType = cacheKey.Contains(':')
+                    ? _absCache.GetResourceTypeByCacheKey(cacheKey)
+                    : ResourceType.Bundle;
+
                 await _redisCache.UpdateCorrelationCacheAsync(cacheKey, resources, resourceType, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
