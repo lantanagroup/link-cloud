@@ -545,8 +545,9 @@ function CodeSystemBlock({
   const showMissing = missing && touched;
   const describedBy = [showDuplicate && duplicateHintId, showMissing && missingHintId].filter(Boolean).join(' ') || undefined;
 
+  const mountedAttempt = useRef(validationAttempt);
   useEffect(() => {
-    if (validationAttempt > 0 && (duplicate || missing)) {
+    if (validationAttempt > mountedAttempt.current && (duplicate || missing)) {
       setTouched(true);
     }
   }, [validationAttempt]);
@@ -654,8 +655,9 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
   const localHintId = `${incompleteHintId}-local`;
   const targetHintId = `${incompleteHintId}-target`;
 
+  const mountedAttempt = useRef(validationAttempt);
   useEffect(() => {
-    if (validationAttempt > 0 && incomplete) {
+    if (validationAttempt > mountedAttempt.current && incomplete) {
       setTouched(true);
     }
   }, [validationAttempt]);
@@ -770,6 +772,7 @@ function MappingRow({row, referenceCodes, incomplete, validationAttempt, onChang
             onFocus={event => {
               event.target.select();
             }}
+            onClick={() => setOpen(true)}
             onChange={event => {
               setQuery(event.target.value);
               setOpen(true);

@@ -50,6 +50,9 @@ export function findDuplicateCodeSystemIndexes(groups: CodeSystemGroupValues[]):
 
   groups.forEach(group => {
     const codeSystem = group.codeSystem.trim();
+    if (!codeSystem) {
+      return;
+    }
     if (seen.has(codeSystem)) {
       duplicates.push(group.groupKey);
       return;
