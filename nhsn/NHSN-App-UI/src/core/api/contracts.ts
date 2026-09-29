@@ -563,6 +563,7 @@ export interface ImportedFields {
     mappings?: HslocMapping[];
   };
   encounter?: {
+    codeSystems?: string[];
     mappings?: EncounterMapping[];
   };
 }

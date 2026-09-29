@@ -79,6 +79,9 @@ public sealed record ImportedHslocMapping
 
 public sealed record ImportedEncounter
 {
+    // Every Code System the sheet named, in sheet order - including one with no mapping rows under
+    // it yet, which Mappings alone can't express.
+    public List<string>? CodeSystems { get; init; }
     public List<ImportedEncounterMapping>? Mappings { get; init; }
 }
 

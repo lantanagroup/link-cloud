@@ -58,14 +58,14 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
       // once, so it must mount into a loading state and read the fresh list, not the stale cache.
       queryClient.removeQueries({queryKey: ['hslocMappings']});
     }
-    if (fields.encounter?.mappings) {
+    if (fields.encounter?.codeSystems) {
       // encounter.codeSystems is a separate list driving which "Encounter.type Code System"
       // sections EncounterStep renders (see buildGroups) - it's not derived from mappings there,
       // so patching mappings alone leaves a stale system from a previous session/import rendering
       // as an empty group forever. The sheet is the source of truth for this step on import, so
-      // codeSystems is replaced with exactly the systems the sheet named, same as mappings.
-      const codeSystems = [...new Set(fields.encounter.mappings.map(mapping => mapping.system))];
-      patch('encounter', {codeSystems, mappings: fields.encounter.mappings});
+      // codeSystems is replaced with exactly the systems the sheet named (including one with no
+      // mapping rows under it yet), same as mappings.
+      patch('encounter', {codeSystems: fields.encounter.codeSystems, mappings: fields.encounter.mappings ?? []});
     }
     if (fields.census) {
       const censusPatch: Partial<DraftSections['census']> = fields.census;

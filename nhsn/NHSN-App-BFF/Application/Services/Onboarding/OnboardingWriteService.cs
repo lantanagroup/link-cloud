@@ -283,6 +283,10 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 RecordFailure("hsloc", hslocDetail);
             }
 
+            // A sheet can name a Code System with no mapping rows under it (all three other columns
+            // left blank) - that still updates CodeSystems below, but only a sheet with actual
+            // mapping rows touches Normalization's Code Map operation, since SaveAsync replaces it
+            // wholesale and an empty set would wipe the facility's existing mappings.
             if (fields.Encounter?.Mappings is { Count: > 0 } encounterMappings)
             {
                 // EncounterMappingService.SaveAsync replaces the facility's whole Code Map operation
@@ -319,14 +323,16 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     return true;
                 });
                 RecordFailure("encounter", encounterDetail);
+            }
 
+            if (fields.Encounter?.CodeSystems is { Count: > 0 } sheetCodeSystems)
+            {
                 // CodeSystems is a BFF-only cache (see SaveWorkflowStateAsync's "encounter" case)
                 // that OnboardingReadService.GetAsync always echoes back verbatim, never reconciled
                 // against Normalization's own mappings - so leaving it untouched here would let a
                 // stale system from a previous online session or import survive next to this
                 // sheet's own systems forever. The sheet is the source of truth for this step on
                 // import, same as ManualUploadStep's own client-side patch of codeSystems.
-                var sheetCodeSystems = encounterMappings.Select(m => m.System).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 await UpdateEncounterCodeSystemsAsync(facilityId, sheetCodeSystems, cancellationToken);
             }
 

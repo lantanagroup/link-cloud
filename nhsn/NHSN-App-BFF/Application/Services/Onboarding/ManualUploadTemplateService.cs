@@ -67,13 +67,19 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         return LocationMethodAliases.GetValueOrDefault(normalized);
     }
 
-    // Every repeating-table section header in the sheet. A facility that adds rows to one table by
-    // inserting them in Excel pushes everything after it down, keeping the natural blank-row gap
-    // that normally ends a table - but a row sequence that is NOT properly gapped (e.g. rows typed
-    // in without an insert) must still not run into the next section, so ReadTableRows also stops
-    // the moment it sees any of these, independent of the row-number gap.
+    // Every section header in the sheet - the scalar "Field Key" sections as well as the
+    // repeating-table ones. A facility that adds rows to one table by inserting them in Excel
+    // pushes everything after it down, keeping the natural blank-row gap that normally ends a
+    // table - but a row sequence that is NOT properly gapped (e.g. rows typed in without an
+    // insert) must still not run into the next section, so ReadTableRows also stops the moment it
+    // sees any of these, independent of the row-number gap. The scalar headers matter just as much:
+    // a facility that reorders the sheet so a scalar section (e.g. POI Configuration) follows the
+    // last table would otherwise have that section's rows read as table rows.
     private static readonly HashSet<string> SectionHeaders = new(StringComparer.Ordinal)
     {
+        "FHIR Server Information",
+        "Patients of Interest (POI) Configuration",
+        "Organization Identification",
         "Organization Identification — Location Identifiers",
         "Organization Identification — Location Types",
         "Organization Identification — Managing Organizations",
@@ -111,7 +117,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         };
 
         var hslocImported = fields.Hsloc?.Mappings is {Count: > 0};
-        var encounterImported = fields.Encounter?.Mappings is {Count: > 0};
+        var encounterImported = fields.Encounter?.CodeSystems is {Count: > 0};
         // Location Types, Location Identifiers and Managing Organizations are three separate
         // repeating-row tables backing one method each, but they're one section (Organization
         // Identification) and get one slot here, same as HSLOC and Encounter each get their own -
@@ -226,6 +232,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             },
             Encounter = original.Encounter is null ? null : new ImportedEncounter
             {
+                CodeSystems = original.Encounter.CodeSystems,
                 Mappings = MergeEncounterMappings(original.Encounter.Mappings, saved.Encounter.Mappings)
             }
         };
@@ -973,21 +980,22 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         }
     }
 
-    // At least one complete Encounter Mapping row is required, matching the sheet's own "Required"
+    // At least one Encounter.type Code System is required, matching the sheet's own "Required"
     // note and EncounterStep's "at least one Encounter.type Code System" rule - Report Results relies
     // on a code system being configured to surface unmapped encounter codes. Same shape as
     // BuildHslocAsync: an absent or all-invalid table is flagged at the section header. A row that IS
-    // present must have its local half complete: system AND code, not just one of them. The reference half
-    // (Reference Code System/Code) is a different story - it's only ever something a facility
-    // copied off the reference table, so a value that's blank or doesn't resolve there (typo'd,
-    // stale, or never filled in) is left blank rather than raising a cell error. EncounterType comes
-    // back "" either way, which EncounterStep's own target-code picker already renders as an empty
-    // combobox ready for a manual pick (the same state a freshly added row starts in online) - the
-    // facility sees every local code they entered and just has to pick the right target for the ones
-    // that didn't resolve, instead of the whole import being rejected over it. The resolved
-    // System/Code/Display come from the reference row rather than the sheet's own text so a
-    // facility's casing/whitespace on the reference columns never diverges from what Link's
-    // reference table holds.
+    // present must name its Code System (column A). The other three columns (Local Encounter.type
+    // Code, Reference Code System, Reference Code) are all-or-nothing: all blank registers the code
+    // system on its own - the same state as a code system added online with no mapping rows yet -
+    // and all filled in adds a mapping under it; only one or two of them is flagged as incomplete.
+    // A complete row whose reference System/Code doesn't resolve in the reference table (typo'd or
+    // stale) is still left blank rather than raising a cell error. EncounterType comes back "" in
+    // that case, which EncounterStep's own target-code picker already renders as an empty combobox
+    // ready for a manual pick - the facility sees every local code they entered and just has to pick
+    // the right target for the ones that didn't resolve, instead of the whole import being rejected
+    // over it. The resolved System/Code/Display come from the reference row rather than the sheet's
+    // own text so a facility's casing/whitespace on the reference columns never diverges from what
+    // Link's reference table holds.
     private async Task<ImportedEncounter?> BuildEncounterAsync(
         Dictionary<int, Dictionary<string, string>> rows,
         List<ImportCellError> errors,
@@ -1005,6 +1013,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         var referenceByKey = referenceCodes.ToDictionary(
             c => (System: c.System.ToUpperInvariant(), Code: c.Code.ToUpperInvariant()));
 
+        var codeSystems = new List<string>();
         var mappings = new List<ImportedEncounterMapping>();
         foreach (var (rowNumber, row) in rawRows)
         {
@@ -1019,13 +1028,34 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
                 referenceSystem = referenceSystemUrl;
             }
             var referenceCode = row.GetValueOrDefault("D", "").Trim();
-            if (system.Length == 0 && code.Length == 0 && referenceSystem.Length == 0 && referenceCode.Length == 0)
+
+            // Column letter of each of the three columns after the Code System that is filled in.
+            var filledColumns = new[] { ("B", code), ("C", referenceSystem), ("D", referenceCode) }
+                .Where(column => column.Item2.Length > 0)
+                .Select(column => column.Item1)
+                .ToList();
+
+            if (system.Length == 0)
             {
+                if (filledColumns.Count > 0)
+                {
+                    errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"A{rowNumber}", MessageKey = "onboarding:manualUpload.errors.requiredEncounterCodeSystem", Section = "encounter"});
+                }
                 continue;
             }
-            if (system.Length == 0 || code.Length == 0)
+            if (filledColumns.Count is 1 or 2)
             {
-                errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"{(system.Length == 0 ? "A" : "B")}{rowNumber}", MessageKey = "onboarding:manualUpload.errors.partialEncounterMapping", Section = "encounter"});
+                var firstBlankColumn = new[] { "B", "C", "D" }.First(column => !filledColumns.Contains(column));
+                errors.Add(new ImportCellError {Sheet = SheetName, Cell = $"{firstBlankColumn}{rowNumber}", MessageKey = "onboarding:manualUpload.errors.partialEncounterMapping", Section = "encounter"});
+                continue;
+            }
+
+            if (!codeSystems.Contains(system, StringComparer.OrdinalIgnoreCase))
+            {
+                codeSystems.Add(system);
+            }
+            if (filledColumns.Count == 0)
+            {
                 continue;
             }
 
@@ -1035,8 +1065,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             // and MergeEncounterMappings (below) are what keep this from also deleting an existing,
             // previously-resolved mapping for the same local system/code - this method only decides
             // what the facility SEES, not what stays protected in Normalization.
-            var resolved = referenceSystem.Length > 0 && referenceCode.Length > 0 &&
-                referenceByKey.TryGetValue((referenceSystem.ToUpperInvariant(), referenceCode.ToUpperInvariant()), out var reference)
+            var resolved = referenceByKey.TryGetValue((referenceSystem.ToUpperInvariant(), referenceCode.ToUpperInvariant()), out var reference)
                 ? reference
                 : null;
 
@@ -1049,13 +1078,13 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             });
         }
 
-        if (mappings.Count == 0)
+        if (codeSystems.Count == 0)
         {
             RequireErrorAtHeader(rows, errors, sectionHeader, "encounter", "onboarding:manualUpload.errors.requiredEncounterMapping");
             return null;
         }
 
-        return new ImportedEncounter { Mappings = mappings };
+        return new ImportedEncounter { CodeSystems = codeSystems, Mappings = mappings };
     }
 
     private static string? BuildDuration(
@@ -1106,6 +1135,21 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             .Select(kv => (int?)kv.Key)
             .FirstOrDefault();
 
+    // A row that starts another section: any section header, or - in case a scalar section's own
+    // header row was edited or deleted - its "Field Key" column-label row or one of its field-key
+    // rows, none of which can ever be a legitimate table row.
+    private static bool IsSectionBoundary(Dictionary<string, string> row)
+    {
+        if (!row.TryGetValue("A", out var rawText))
+        {
+            return false;
+        }
+        var text = rawText.Trim();
+        return SectionHeaders.Contains(text)
+            || string.Equals(text, "Field Key", StringComparison.OrdinalIgnoreCase)
+            || ScalarFieldKeys.Contains(text);
+    }
+
     private static List<(int RowNumber, Dictionary<string, string> Row)> ReadTableRows(
         Dictionary<int, Dictionary<string, string>> rows,
         string sectionHeader)
@@ -1118,7 +1162,7 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         }
 
         var nextSectionRow = rows
-            .Where(kv => kv.Key > headerRow.Value && kv.Value.TryGetValue("A", out var text) && SectionHeaders.Contains(text))
+            .Where(kv => kv.Key > headerRow.Value && IsSectionBoundary(kv.Value))
             .Select(kv => kv.Key)
             .DefaultIfEmpty(int.MaxValue)
             .Min();

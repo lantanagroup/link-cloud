@@ -111,7 +111,8 @@
       "partialLocationType": "Both columns are required for a Location Type row — remove incomplete rows or fill them in completely.",
       "partialLocationIdentifier": "Both columns are required for a Location Identifier row — remove incomplete rows or fill them in completely.",
       "requiredEncounterMapping": "At least one Encounter.type Code System is required.",
-      "partialEncounterMapping": "All four columns are required for an Encounter Mapping row — remove incomplete rows or fill them in completely.",
+      "requiredEncounterCodeSystem": "Encounter.type Code System is required for an Encounter Mapping row — fill it in or remove the row.",
+      "partialEncounterMapping": "This Encounter Mapping row is incomplete — Local Encounter.type Code, Reference Code System and Reference Code must either all be filled in or all be removed.",
       "lineFormat": "{{sheet}} {{location}}: {{- message}}"
     }
   },
@@ -355,7 +356,7 @@
       }
     },
     "reference": {
-      "searchPlaceholder": "Search category, type, mnemonic, description, code, definition…",
+      "searchPlaceholder": "Search code,description",
       "allCategories": "All Categories",
       "allTypes": "All Types",
       "resultCount": "{{count}} of {{total}} HSLOC codes",
