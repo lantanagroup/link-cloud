@@ -48,6 +48,13 @@ export interface Capabilities {
    * freely revisit/edit every step; when false, onboarding is a one-way door once complete.
    */
   onboardingRevisit: boolean;
+  /**
+   * Report Details' HSLOC "+ Add Mapping" flow lets a facility type a display name for an
+   * already-acquired Location. Normalization has no endpoint to update that Location's display
+   * name once acquisition has already created it (which discovery-sourced codes always have) --
+   * see HslocMappingService.EnsureFacilityLocationAsync (BFF). Off until that update path exists.
+   */
+  hslocLocationDisplayUpdate: boolean;
 }
 
 export interface UserInfoResponse {

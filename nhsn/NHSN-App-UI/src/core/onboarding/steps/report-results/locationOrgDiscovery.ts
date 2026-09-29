@@ -1,6 +1,6 @@
 import type { LocationOrgMapping } from '../../../api/contracts';
 
-interface FhirResourceLike {
+export interface FhirResourceLike {
   resourceType: string;
   id: string;
   [key: string]: unknown;
@@ -30,6 +30,18 @@ export function parseNdjsonResources(text: string): FhirResourceLike[] {
   return resources;
 }
 
+export interface FhirCoding {
+  system?: string;
+  code?: string;
+  display?: string;
+}
+
+export function typeCodingsOf(resource: FhirResourceLike): FhirCoding[] {
+  return ((resource.type as Array<{ coding?: FhirCoding[] }> | undefined) ?? []).flatMap(
+    (entry) => entry.coding ?? [],
+  );
+}
+
 export interface LocationRawValues {
   locationTypeCodes: string[];
   alias?: string;
@@ -43,7 +55,7 @@ export interface LocationDiscoveryRow {
   raw: LocationRawValues | null;
 }
 
-function splitReference(reference: string | undefined): string | undefined {
+export function splitReference(reference: string | undefined): string | undefined {
   if (!reference) {
     return undefined;
   }
@@ -52,9 +64,7 @@ function splitReference(reference: string | undefined): string | undefined {
 }
 
 function extractRawValues(location: FhirResourceLike): LocationRawValues {
-  const typeCodings = ((location.type as Array<{ coding?: Array<{ code?: string }> }>) ?? []).flatMap(
-    (entry) => entry.coding ?? [],
-  );
+  const typeCodings = typeCodingsOf(location);
   const identifiers = (location.identifier as Array<{ system?: string; value?: string }> | undefined) ?? [];
   const managingOrganizationId = splitReference(
     (location.managingOrganization as { reference?: string } | undefined)?.reference,
@@ -69,24 +79,17 @@ function extractRawValues(location: FhirResourceLike): LocationRawValues {
 }
 
 /**
- * Every Location id referenced by the patient's encounters (direct + `partOf` ancestors), joined
- * against the facility's own mapping list for found/missing. Raw field values are only available
- * for a Location that is actually present as a resource in `resources` -- an ancestor reached only
- * through a `partOf` reference is often not, since the exported report only bundles what CQL
- * touched during evaluation, not the full Location ancestry chain.
+ * Every Location id referenced by the patient's encounters, plus `partOf` ancestors -- shared by
+ * every per-patient Location discovery (Location Org, HSLOC), so a bundle that happens to carry
+ * Location resources unrelated to this patient's own encounters never leaks into either.
  */
-export function discoverLocationOrgRows(
-  resources: FhirResourceLike[],
-  mappings: LocationOrgMapping[],
-): LocationDiscoveryRow[] {
+export function resolveReferencedLocationIds(resources: FhirResourceLike[]): Set<string> {
   const locationsById = new Map<string, FhirResourceLike>();
   for (const resource of resources) {
     if (resource.resourceType === 'Location') {
       locationsById.set(resource.id, resource);
     }
   }
-
-  const mappingsByLocationId = new Map(mappings.map((mapping) => [mapping.locationId, mapping]));
 
   const referencedIds = new Set<string>();
   for (const resource of resources) {
@@ -114,6 +117,29 @@ export function discoverLocationOrgRows(
       queue.push(parentId);
     }
   }
+
+  return allIds;
+}
+
+/**
+ * Raw field values are only available for a Location that is actually present as a resource in
+ * `resources` -- an ancestor reached only through a `partOf` reference is often not, since the
+ * exported report only bundles what CQL touched during evaluation, not the full Location ancestry
+ * chain.
+ */
+export function discoverLocationOrgRows(
+  resources: FhirResourceLike[],
+  mappings: LocationOrgMapping[],
+): LocationDiscoveryRow[] {
+  const locationsById = new Map<string, FhirResourceLike>();
+  for (const resource of resources) {
+    if (resource.resourceType === 'Location') {
+      locationsById.set(resource.id, resource);
+    }
+  }
+
+  const mappingsByLocationId = new Map(mappings.map((mapping) => [mapping.locationId, mapping]));
+  const allIds = resolveReferencedLocationIds(resources);
 
   return [...allIds].map((locationId) => {
     const location = locationsById.get(locationId);

@@ -68,7 +68,8 @@ public class UserInfoService : IUserInfoService
                 FhirConnectionProbe = _capabilities.FhirConnectionProbe,
                 PatientListWithNames = _capabilities.PatientListWithNames,
                 SftpFileListing = _capabilities.SftpFileListing,
-                OnboardingRevisit = _capabilities.OnboardingRevisit
+                OnboardingRevisit = _capabilities.OnboardingRevisit,
+                HslocLocationDisplayUpdate = _capabilities.HslocLocationDisplayUpdate
             }
         };
     }

@@ -84,7 +84,8 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError} = useNotifications();
-  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile, user} = useOnboarding();
+  const localCodeEnabled = Boolean(user.capabilities?.hslocLocationDisplayUpdate);
   const queryClient = useQueryClient();
 
   const [submitting, setSubmitting] = useState(false);
@@ -190,7 +191,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
   // text for assistive tech but is visually hidden (see .nhsn-link__repeatable-fields .k-label),
   // so the required marker has to go on the heading for sighted users to see it.
   const mappingColumnHeadings = [
-    <>{yourCodeLabel}<RequiredAsterisk /></>,
+    ...(localCodeEnabled ? [<>{yourCodeLabel}<RequiredAsterisk /></>] : []),
     <>{locationValueLabel}<RequiredAsterisk /></>,
     <>{hslocCodeHeading}<RequiredAsterisk /></>
   ];
@@ -199,7 +200,10 @@ export function HslocStep({onNext, onBack}: StepProps) {
     return rows.some(row => row.hslocCode === code && row.sourceCode.trim());
   }
 
-  const completeRows = useMemo(() => rows.filter(isRowComplete), [rows]);
+  const completeRows = useMemo(
+    () => rows.filter(row => isRowComplete(row, localCodeEnabled)),
+    [rows, localCodeEnabled]
+  );
   const duplicateRowIndexes = useMemo(
     () => new Set(findDuplicateSourceCodeIndexes(rows, editedRowIndex ?? undefined)),
     [rows, editedRowIndex]
@@ -255,7 +259,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
     if (current.every(isRowBlank)) {
       return t('onboarding:hsloc.messages.empty');
     }
-    if (findIncompleteRowIndexes(current).length > 0) {
+    if (findIncompleteRowIndexes(current, localCodeEnabled).length > 0) {
       return t('onboarding:hsloc.messages.incomplete');
     }
     if (findDuplicateSourceCodeIndexes(current).length > 0) {
@@ -271,7 +275,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
     if (validationError === null) {
       return;
     }
-    const tracked = rows.filter(row => hasFlaggedField(row) || isRowComplete(row));
+    const tracked = rows.filter(row => hasFlaggedField(row) || isRowComplete(row, localCodeEnabled));
     const message =
       tracked.length > 0
         ? validationMessageFor(tracked)
@@ -281,7 +285,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
     if (message !== validationError) {
       setValidationError(message);
     }
-  }, [rows]);
+  }, [rows, localCodeEnabled]);
 
   function validateStep(): boolean {
     const message = validationMessageFor(rows);
@@ -291,7 +295,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
     }
     const incompleteRowIndexes = rows.every(isRowBlank)
       ? rows.map((_row, index) => index)
-      : findIncompleteRowIndexes(rows);
+      : findIncompleteRowIndexes(rows, localCodeEnabled);
     if (incompleteRowIndexes.length > 0) {
       setRows(prev =>
         prev.map((row, index) => (incompleteRowIndexes.includes(index) ? {...row, dirty: ALL_DIRTY} : row))
@@ -397,16 +401,18 @@ export function HslocStep({onNext, onBack}: StepProps) {
               const hslocCodeInvalid = row.dirty.hslocCode && !row.hslocCode.trim();
               return (
                 <>
-                  <TextField
-                    id={`hsloc-your-code-${index}`}
-                    label={yourCodeLabel}
-                    required
-                    value={row.sourceDisplay}
-                    error={sourceDisplayInvalid ? yourCodeRequiredError : undefined}
-                    onChange={sourceDisplay =>
-                      onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: true}})
-                    }
-                  />
+                  {localCodeEnabled && (
+                    <TextField
+                      id={`hsloc-your-code-${index}`}
+                      label={yourCodeLabel}
+                      required
+                      value={row.sourceDisplay}
+                      error={sourceDisplayInvalid ? yourCodeRequiredError : undefined}
+                      onChange={sourceDisplay =>
+                        onRowChange({...row, sourceDisplay, dirty: {...row.dirty, sourceDisplay: true}})
+                      }
+                    />
+                  )}
                   <TextField
                     id={`hsloc-location-value-${index}`}
                     label={locationValueLabel}
@@ -504,7 +510,9 @@ export function HslocStep({onNext, onBack}: StepProps) {
                     {mappedRowsForSelected.map((row, index) => (
                       <li key={index}>
                         <span>{row.sourceCode}</span>
-                        <span>{row.sourceDisplay || t('onboarding:hsloc.reference.detail.noCode')}</span>
+                        {localCodeEnabled && (
+                          <span>{row.sourceDisplay || t('onboarding:hsloc.reference.detail.noCode')}</span>
+                        )}
                       </li>
                     ))}
                   </ul>

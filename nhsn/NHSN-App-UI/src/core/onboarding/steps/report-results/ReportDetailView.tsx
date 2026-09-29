@@ -16,6 +16,12 @@ import { HttpError } from '../../../api/http';
 import { AcquisitionLogModal } from './AcquisitionLogModal';
 import { EncounterEvidenceModal } from './EncounterEvidenceModal';
 import { HslocEvidenceModal } from './HslocEvidenceModal';
+import {
+  discoverHslocCodings,
+  isHslocDiscoveryFullyMapped,
+  resolveHslocDiscoveryRows,
+  type HslocDiscoveredCoding,
+} from './hslocDiscovery';
 import { discoverLocationOrgRows, parseNdjsonResources, type LocationDiscoveryRow } from './locationOrgDiscovery';
 import { LocationOrgEvidenceModal } from './LocationOrgEvidenceModal';
 import { PatientDetailModal } from './PatientDetailModal';
@@ -72,7 +78,8 @@ export function ReportDetailView() {
   const { t } = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const { notifySuccess, notifyError } = useNotifications();
-  const { draft, mirror, patch, saving, closeView, openView } = useOnboarding();
+  const { draft, mirror, patch, saving, closeView, openView, user } = useOnboarding();
+  const hslocLocalCodeEnabled = Boolean(user.capabilities?.hslocLocationDisplayUpdate);
   const reportResults = draft.reportResults;
   const queryClient = useQueryClient();
 
@@ -153,6 +160,11 @@ export function ReportDetailView() {
   >(null);
   const [locationOrgNotReportable, setLocationOrgNotReportable] =
     useState(false);
+  const [hslocDiscoveryCodingsByPatientId, setHslocDiscoveryCodingsByPatientId] = useState<
+    Record<string, HslocDiscoveredCoding[]>
+  >({});
+  const [hslocNotReportable, setHslocNotReportable] = useState(false);
+  const [hslocDisplayInputs, setHslocDisplayInputs] = useState<Record<string, string>>({});
 
   // HSLOC reference codes, the facility's live configured mappings, and in-progress "+ Add Mapping"
   // selections for the HSLOC mapping modal's unmapped values, keyed by the unmapped source code.
@@ -371,6 +383,8 @@ export function ReportDetailView() {
     setMappingEvidenceError(null);
     setLocationOrgDiscoveryRows(null);
     setLocationOrgNotReportable(false);
+    setHslocNotReportable(false);
+    setHslocDisplayInputs({});
     hslocEvidence.resetSelections();
     encounterEvidence.resetSelections();
 
@@ -395,6 +409,8 @@ export function ReportDetailView() {
     setLocationOrgNotReportable(
       column === 'locationOrg' && Boolean(draft.locationOrg.method) && isNotReportable,
     );
+    const wantsHslocDiscovery = column === 'hsloc' && Boolean(currentDqm) && !isNotReportable;
+    setHslocNotReportable(column === 'hsloc' && isNotReportable);
 
     const discoveryPromise: Promise<LocationDiscoveryRow[] | null> = wantsDiscovery
       ? api
@@ -407,11 +423,18 @@ export function ReportDetailView() {
           )
       : Promise.resolve(null);
 
+    const hslocDiscoveryPromise: Promise<HslocDiscoveredCoding[] | null> = wantsHslocDiscovery
+      ? api
+          .exportPatientReport(detail.reportId, patientId, currentDqm!)
+          .then(async (blob) => discoverHslocCodings(parseNdjsonResources(await blob.text())))
+      : Promise.resolve(null);
+
     setMappingEvidence(cachedEvidence ?? null);
     setMappingEvidenceLoading(true);
-    const [evidenceResult, discoveryResult] = await Promise.allSettled([
+    const [evidenceResult, discoveryResult, hslocDiscoveryResult] = await Promise.allSettled([
       evidencePromise,
       discoveryPromise,
+      hslocDiscoveryPromise,
     ]);
     setMappingEvidenceLoading(false);
 
@@ -431,6 +454,10 @@ export function ReportDetailView() {
     if (discoveryResult.status === 'fulfilled' && discoveryResult.value) {
       setLocationOrgDiscoveryRows(discoveryResult.value);
     }
+    if (hslocDiscoveryResult.status === 'fulfilled' && hslocDiscoveryResult.value) {
+      const codings = hslocDiscoveryResult.value;
+      setHslocDiscoveryCodingsByPatientId((prev) => ({ ...prev, [patientId]: codings }));
+    }
 
     if (column === 'hsloc') {
       await hslocEvidence.load();
@@ -440,12 +467,26 @@ export function ReportDetailView() {
     }
   }
 
-  async function handleAddHslocMapping(unmappedCode: string) {
+  async function handleAddHslocMapping(unmappedCode: string, sourceDisplay?: string) {
     const hslocCode = hslocEvidence.selections[unmappedCode];
     if (!hslocCode) {
       return;
     }
-    await hslocEvidence.add(unmappedCode, { sourceCode: unmappedCode, hslocCode });
+    if (hslocLocalCodeEnabled && !sourceDisplay?.trim()) {
+      return;
+    }
+    const succeeded = await hslocEvidence.add(unmappedCode, {
+      sourceCode: unmappedCode,
+      ...(hslocLocalCodeEnabled ? { sourceDisplay } : {}),
+      hslocCode,
+    });
+    if (succeeded) {
+      setHslocDisplayInputs((prev) => {
+        const next = { ...prev };
+        delete next[unmappedCode];
+        return next;
+      });
+    }
   }
 
   async function handleAddEncounterMapping(sourceSystem: string, unmappedCode: string) {
@@ -590,12 +631,16 @@ export function ReportDetailView() {
     for (const [patientId, evidence] of Object.entries(
       patientMappingEvidenceByPatientId ?? {},
     )) {
-      if (isHslocMappingResolved(evidence, hslocEvidence.mappings)) {
+      const discoveryCodings = hslocDiscoveryCodingsByPatientId[patientId];
+      const discoveryResolved = discoveryCodings
+        ? isHslocDiscoveryFullyMapped(discoveryCodings, hslocEvidence.mappings)
+        : false;
+      if (discoveryResolved || isHslocMappingResolved(evidence, hslocEvidence.mappings)) {
         map[patientId] = true;
       }
     }
     return map;
-  }, [patientMappingEvidenceByPatientId, hslocEvidence.mappings]);
+  }, [patientMappingEvidenceByPatientId, hslocEvidence.mappings, hslocDiscoveryCodingsByPatientId]);
   const patientRows = toPatientRows(dqmScopedPatients, currentDqm).map((row) => ({
     ...row,
     encounterFound:
@@ -605,6 +650,12 @@ export function ReportDetailView() {
   const mappingEvidencePatientRow =
     patientRows.find((row) => row.patientId === mappingEvidencePatientId) ??
     null;
+  const hslocDiscoveryCodings = mappingEvidencePatientId
+    ? hslocDiscoveryCodingsByPatientId[mappingEvidencePatientId]
+    : undefined;
+  const hslocDiscoveryRows = hslocDiscoveryCodings
+    ? resolveHslocDiscoveryRows(hslocDiscoveryCodings, hslocEvidence.mappings)
+    : null;
   const pieSlices = buildPieSlices(statusBreakdown, 60);
 
   return (
@@ -1066,6 +1117,12 @@ export function ReportDetailView() {
         onSelectionChange={hslocEvidence.setSelection}
         addingCode={hslocEvidence.addingKey}
         onAddMapping={handleAddHslocMapping}
+        displayInputs={hslocDisplayInputs}
+        onDisplayInputChange={(code, value) =>
+          setHslocDisplayInputs((prev) => ({ ...prev, [code]: value }))
+        }
+        discoveryRows={hslocDiscoveryRows}
+        notReportable={hslocNotReportable}
       />
 
       <EncounterEvidenceModal

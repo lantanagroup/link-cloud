@@ -38,16 +38,19 @@ export function isEncounterMappingResolved(
     );
 }
 
+// No HSLOC-type codeMap means HSLOC was never evaluated -- not vacuously resolved.
 export function isHslocMappingResolved(
   evidence: PatientMappingEvidence,
   mappings: HslocMapping[],
 ): boolean {
   const mappedCodes = new Set(mappings.map((mapping) => mapping.sourceCode));
-  return evidence.codeMaps
-    .filter(isHslocCodeMap)
-    .every((codeMap) =>
-      codeMap.unmappedCodes.every((code) => mappedCodes.has(code)),
-    );
+  const hslocCodeMaps = evidence.codeMaps.filter(isHslocCodeMap);
+  if (hslocCodeMaps.length === 0) {
+    return false;
+  }
+  return hslocCodeMaps.every((codeMap) =>
+    codeMap.unmappedCodes.every((code) => mappedCodes.has(code)),
+  );
 }
 
 /** A field's `t` narrowed to the plain-string-key shape the sheet builders below need. */

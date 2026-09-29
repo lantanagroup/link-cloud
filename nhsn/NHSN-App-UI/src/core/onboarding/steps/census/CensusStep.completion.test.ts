@@ -22,6 +22,7 @@ function userWith(capabilities: Partial<Capabilities>): UserInfoResponse {
       fhirConnectionProbe: false,
       sftpFileListing: false,
       onboardingRevisit: false,
+      hslocLocationDisplayUpdate: false,
       ...capabilities
     }
   };
