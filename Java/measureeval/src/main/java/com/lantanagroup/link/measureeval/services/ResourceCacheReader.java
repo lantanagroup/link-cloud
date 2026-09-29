@@ -34,6 +34,19 @@ public class ResourceCacheReader {
         this.absResourceService = absResourceService;
     }
 
+    /**
+     * Reads straight from ABS, bypassing Redis. Used for the terminal (SUPPLEMENTAL) evaluation:
+     * that read produces the submitted report, and its correlation hash has idled through the
+     * whole initial→supplemental gap — the prime eviction window. A key evicted there and then
+     * recreated by the supplemental append reads as present-but-partial, which Redis-first would
+     * trust; ABS is complete by construction. Once Normalization deletes the Redis key on the
+     * supplemental pass (proposed on LEGLINK-1276), the Redis read would always miss here anyway,
+     * so this also saves a guaranteed-miss round trip.
+     */
+    public List<Resource> readResourcesDurable(String facilityId, String correlationId, String patientId, String cacheKey) {
+        return absResourceService.readResources(facilityId, correlationId, patientId, cacheKey);
+    }
+
     public List<Resource> readResources(String facilityId, String correlationId, String patientId, String cacheKey) {
         try {
             List<Resource> resources = redisResourceService.readResources(facilityId, cacheKey, patientId);
