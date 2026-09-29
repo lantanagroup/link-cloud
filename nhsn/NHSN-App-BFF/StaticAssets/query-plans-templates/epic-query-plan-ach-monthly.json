@@ -1,5 +1,5 @@
 {
-  "PlanName": "Epic-ACHMonthly",
+  "PlanName": "Epic-ACHMonthly-NoInclude",
   "FacilityId": "{FacilityId}",
   "EHRDescription": "Epic",
   "LookBack": "P0D",
@@ -24,11 +24,6 @@
           "name": "date",
           "variable": 3,
           "format": "le{0}"
-        },
-        {
-          "parameterType": "Literal",
-          "name": "_include",
-          "literal": "Encounter:location"
         }
       ]
     },
@@ -93,11 +88,6 @@
           "parameterType": "Literal",
           "name": "category",
           "literal": "imaging,laboratory,social-history,vital-signs"
-        },
-        {
-          "parameterType": "Literal",
-          "name": "_include",
-          "literal": "Observation:specimen"
         }
       ]
     },
@@ -155,11 +145,6 @@
           "name": "authored",
           "variable": 3,
           "format": "le{0}"
-        },
-        {
-          "parameterType": "Literal",
-          "name": "_include",
-          "literal": "ServiceRequest:specimen"
         }
       ]
     },
@@ -216,11 +201,6 @@
           "parameterType": "Literal",
           "name": "intent",
           "literal": "order"
-        },
-        {
-          "parameterType": "Literal",
-          "name": "_include",
-          "literal": "MedicationRequest:medication"
         }
       ]
     },
@@ -229,6 +209,18 @@
       "resourceType": "Device",
       "operationType": 2,
       "paged": 150
+    },
+    "8": {
+      "queryConfigType": "Reference",
+      "resourceType": "Specimen",
+      "operationType": 2,
+      "paged": 100
+    },
+    "9": {
+      "queryConfigType": "Reference",
+      "resourceType": "Medication",
+      "operationType": 2,
+      "paged": 100
     }
   },
   "Type": "Discharge"
