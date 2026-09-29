@@ -143,14 +143,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
             if (perf) taskStopWatch.start("readResources");
             long readStart = perf ? System.nanoTime() : 0;
-            // The terminal (SUPPLEMENTAL) read is served from the durable source directly: its
-            // correlation hash idled through the initial→supplemental gap (the prime eviction
-            // window), and an evicted key recreated by the supplemental append would read as
-            // present-but-partial in Redis. The INITIAL read stays Redis-first — its
-            // write-to-read window is seconds on an actively written key.
-            List<Resource> resources = value.getQueryType() == QueryType.SUPPLEMENTAL
-                    ? cacheReader.readResourcesDurable(facilityId, correlationId, patientId, correlationId)
-                    : cacheReader.readResources(facilityId, correlationId, patientId, correlationId);
+            List<Resource> resources = cacheReader.readResources(facilityId, correlationId, patientId, correlationId);
             long readMs = perf ? (System.nanoTime() - readStart) / 1_000_000 : 0;
             if (perf) taskStopWatch.stop();
             if (logger.isDebugEnabled()) {

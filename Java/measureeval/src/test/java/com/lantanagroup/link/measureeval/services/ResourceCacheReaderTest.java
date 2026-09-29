@@ -104,18 +104,6 @@ class ResourceCacheReaderTest {
     }
 
     @Test
-    void readResourcesDurable_bypassesRedisEntirely() {
-        // The terminal evaluation must never trust a present-but-partial Redis hash (evicted
-        // between passes, recreated by the supplemental append): it reads the durable source.
-        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p9")));
-
-        List<Resource> result = reader.readResourcesDurable(FACILITY, CORRELATION, PATIENT, CORRELATION);
-
-        assertEquals("p9", result.get(0).getResourceId());
-        verifyNoInteractions(redis);
-    }
-
-    @Test
     void redisHit_usesTheCacheKey_notTheCorrelationId() {
         // For today's consumers cacheKey == correlationId, but the reader must key Redis on the
         // cacheKey argument so it stays correct if a record ever advertises a different key.

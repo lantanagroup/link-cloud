@@ -308,31 +308,6 @@ class AbstractResourceConsumerTest {
     }
 
     @Test
-    void process_supplemental_readsTheDurableSourceDirectly() {
-        // The terminal read produces the submitted report and its corr hash idled through the
-        // initial→supplemental gap (the prime eviction window); a key evicted there and recreated
-        // by the supplemental append would read as present-but-partial in Redis. SUPPLEMENTAL
-        // therefore bypasses Redis and reads ABS, which is complete by construction.
-        String facilityId = "facility-1";
-        String patientId = "patient-1";
-        String cacheKey = "cache-key-supp";
-
-        ResourcesNormalized value = buildValue(cacheKey);
-        value.setQueryType(QueryType.SUPPLEMENTAL);
-
-        when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
-
-        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
-        stubMongoBulkWrite();
-
-        consumer.process(buildConsumerRecord(facilityId, patientId, value));
-
-        verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
-        verify(redisResourceService, never()).readResources(anyString(), anyString(), anyString());
-    }
-
-    @Test
     void process_evaluationThrows_leavesCacheForRetry() {
         String facilityId = "facility-1";
         String patientId = "patient-1";
