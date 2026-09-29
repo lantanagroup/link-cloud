@@ -49,6 +49,17 @@ public class LokiScraperFailureTests
     }
 
     [Fact]
+    public void Cancelled_token_does_not_start_the_later_activity_scrapes()
+    {
+        using var cts = new CancellationTokenSource();
+        ProgressMonitor.ShouldContinueActivityScrapes(cts.Token).Should().BeTrue();
+        ProgressMonitor.ShouldContinueActivityScrapes(CancellationToken.None).Should().BeTrue();
+
+        cts.Cancel();
+        ProgressMonitor.ShouldContinueActivityScrapes(cts.Token).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Cancelled_validation_scrape_returns_without_waiting_for_http_timeout()
     {
         var handler = new HoldUntilCancelHandler();

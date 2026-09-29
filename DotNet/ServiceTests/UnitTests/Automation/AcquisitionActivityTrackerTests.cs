@@ -197,7 +197,7 @@ public class AcquisitionActivityTrackerTests
     {
         var signal = new ValidationWorkSignal();
         var loggedAt = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
-        signal.ObserveCounts(1, 0, 0, loggedAt);
+        signal.ObserveCounts(1, 0, 0, loggedAt.AddSeconds(-1));
 
         signal.NoteActivity(loggedAt).Should().BeTrue();
         signal.NoteActivity(loggedAt).Should().BeFalse();
@@ -212,7 +212,7 @@ public class AcquisitionActivityTrackerTests
         var signal = new ValidationWorkSignal();
         var loggedAt = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
         signal.ObserveCounts(1, 0, 0, loggedAt);
-        signal.NoteActivity(loggedAt).Should().BeTrue();
+        signal.NoteActivity(loggedAt.AddSeconds(1)).Should().BeTrue();
         signal.ObserveCounts(0, 1, 0, loggedAt.AddMinutes(1));
 
         var nextWave = loggedAt.AddMinutes(2);
@@ -226,12 +226,31 @@ public class AcquisitionActivityTrackerTests
     }
 
     [Fact]
+    public void Delayed_log_from_the_previous_wave_does_not_start_the_next_queue()
+    {
+        var signal = new ValidationWorkSignal();
+        var t0 = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
+        signal.ObserveCounts(1, 0, 0, t0);
+        signal.NoteActivity(t0.AddSeconds(10)).Should().BeTrue();
+        signal.ObserveCounts(0, 1, 0, t0.AddMinutes(5));
+
+        var nextBaseline = t0.AddMinutes(6);
+        signal.ObserveCounts(4, 0, 0, nextBaseline);
+        signal.NoteActivity(t0.AddMinutes(4)).Should().BeFalse();
+        signal.NoteActivity(nextBaseline).Should().BeFalse();
+        signal.IsOngoingAt(nextBaseline.AddMinutes(1)).Should().BeFalse();
+
+        signal.NoteActivity(nextBaseline.AddSeconds(1)).Should().BeTrue();
+        signal.IsOngoingAt(nextBaseline.AddSeconds(1)).Should().BeTrue();
+    }
+
+    [Fact]
     public void Validation_activity_holds_a_single_patient_whose_counts_have_not_moved()
     {
         var signal = new ValidationWorkSignal();
         var t0 = new DateTime(2026, 9, 26, 0, 40, 0, DateTimeKind.Utc);
         signal.ObserveCounts(1, 0, 0, t0);
-        signal.NoteActivity(t0);
+        signal.NoteActivity(t0.AddSeconds(1));
 
         signal.IsOngoingAt(t0.AddMinutes(10)).Should().BeTrue();
 

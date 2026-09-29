@@ -118,6 +118,14 @@ public class ProgressMonitor
     internal static bool ShouldScrapeValidationActivity(CancellationToken cancellationToken)
         => cancellationToken.CanBeCanceled && !cancellationToken.IsCancellationRequested;
 
+    /// <summary>
+    /// The validation scrape swallows cancellation and returns null. Do not start the
+    /// later Loki calls after that. <see cref="CancellationToken.None"/> is the shutdown
+    /// cycle and still runs them.
+    /// </summary>
+    internal static bool ShouldContinueActivityScrapes(CancellationToken cancellationToken)
+        => !cancellationToken.IsCancellationRequested;
+
     private async Task CheckPipelineActivityAsync(string facilityId, string reportId, CancellationToken cancellationToken)
     {
         if (_lokiScraper == null)
@@ -128,12 +136,18 @@ public class ProgressMonitor
         if (_progressCheckCount % ActivityCheckInterval != 0)
             return;
 
+        if (!ShouldContinueActivityScrapes(cancellationToken))
+            return;
+
         var measureEvalActivity = await _lokiScraper.GetMeasureEvalActivitySummaryAsync(TimeSpan.FromSeconds(60));
         if (!string.IsNullOrWhiteSpace(measureEvalActivity) && !string.Equals(measureEvalActivity, _lastMeasureEvalActivity, StringComparison.Ordinal))
         {
             _output.WriteLine($"[DIAG][MeasureEval] Active: {measureEvalActivity}");
             _lastMeasureEvalActivity = measureEvalActivity;
         }
+
+        if (!ShouldContinueActivityScrapes(cancellationToken))
+            return;
 
         var dataAcquisitionActivity = await _lokiScraper.GetDataAcquisitionActivitySummaryAsync(
             TimeSpan.FromSeconds(60),
@@ -150,7 +164,7 @@ public class ProgressMonitor
             }
         }
 
-        if (_scrapeNormalizationResourceTypes)
+        if (_scrapeNormalizationResourceTypes && ShouldContinueActivityScrapes(cancellationToken))
         {
             var normalizationActivity = await _lokiScraper.GetNormalizationActivitySummaryAsync(TimeSpan.FromSeconds(60));
             if (!string.IsNullOrWhiteSpace(normalizationActivity) && !string.Equals(normalizationActivity, _lastNormalizationActivity, StringComparison.Ordinal))

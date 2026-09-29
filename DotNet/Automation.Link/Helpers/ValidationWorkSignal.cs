@@ -7,8 +7,9 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// been quiet longer than <see cref="QuietLimit"/>. That quiet limit is long
 /// enough to cover a missed Loki sample. It still stops a worker that has died.
 /// A Loki line is recorded at its own timestamp, and only when that timestamp
-/// is newer than the last one. Scraping the same line again does not move the
-/// hold, and a line from the previous wave does not start the next one.
+/// is newer than the last one and after the current wave's baseline. Scraping
+/// the same line again does not move the hold. A line from the previous wave,
+/// including one Loki delivers after the next baseline, does not start that wave.
 /// </summary>
 public sealed class ValidationWorkSignal
 {
@@ -31,6 +32,12 @@ public sealed class ValidationWorkSignal
     /// </summary>
     private DateTime _newestNotedUtc;
 
+    /// <summary>
+    /// When the current pending queue was first observed. Activity at or before
+    /// this time belongs to an earlier wave.
+    /// </summary>
+    private DateTime _waveStartedUtc;
+
     public int PendingValidation { get; private set; }
 
     public bool IsOngoing => IsOngoingAt(DateTime.UtcNow);
@@ -45,7 +52,8 @@ public sealed class ValidationWorkSignal
 
     /// <summary>
     /// Records one validation log. Returns false when <paramref name="utcNow"/>
-    /// is missing or is not newer than the last noted log.
+    /// is missing, is not newer than the last noted log, or is at or before the
+    /// current wave's baseline.
     /// </summary>
     public bool NoteActivity(DateTime utcNow)
     {
@@ -53,6 +61,9 @@ public sealed class ValidationWorkSignal
             return false;
 
         _newestNotedUtc = utcNow;
+        if (_waveStartedUtc != default && utcNow <= _waveStartedUtc)
+            return false;
+
         _workObserved = true;
         if (utcNow > _lastWorkUtc)
             _lastWorkUtc = utcNow;
@@ -69,6 +80,7 @@ public sealed class ValidationWorkSignal
             _workObserved = false;
             _lastWorkUtc = default;
             _baselineSet = false;
+            _waveStartedUtc = default;
             _lastPending = -1;
             _lastResolved = -1;
             PendingValidation = 0;
@@ -79,6 +91,7 @@ public sealed class ValidationWorkSignal
         {
             _workObserved = false;
             _lastWorkUtc = default;
+            _waveStartedUtc = utcNow;
         }
 
         var resolved = passedValidation + failedValidation;
