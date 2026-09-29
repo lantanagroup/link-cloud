@@ -25,10 +25,15 @@ namespace LantanaGroup.Link.Tenant.Services
                 return HealthCheckResult.Healthy("DMRP is disabled.");
             }
 
+            if (string.IsNullOrWhiteSpace(settings.Api.BaseUrl))
+            {
+                return HealthCheckResult.Healthy("DMRP API is not configured; health check skipped.");
+            }
+
             if (!Uri.TryCreate(settings.Api.BaseUrl?.TrimEnd('/') + "/msc?nhsnorgid=0", UriKind.Absolute,
                     out var healthUri) || (healthUri.Scheme != Uri.UriSchemeHttp && healthUri.Scheme != Uri.UriSchemeHttps))
             {
-                return HealthCheckResult.Unhealthy("DMRP API base URL is missing or invalid.");
+                return HealthCheckResult.Unhealthy("DMRP API base URL is invalid.");
             }
 
             try

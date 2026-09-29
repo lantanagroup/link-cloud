@@ -29,6 +29,20 @@ namespace UnitTests.Tenant
         [Theory]
         [InlineData(null)]
         [InlineData("")]
+        [InlineData("   ")]
+        public async Task EnabledWithoutApiUrl_ReturnsHealthyWithoutCreatingClient(string? baseUrl)
+        {
+            var factory = new Mock<IHttpClientFactory>(MockBehavior.Strict);
+            var check = CreateCheck(factory.Object, true, baseUrl);
+
+            var result = await check.CheckHealthAsync(new HealthCheckContext());
+
+            Assert.Equal(HealthStatus.Healthy, result.Status);
+            Assert.Equal("DMRP API is not configured; health check skipped.", result.Description);
+            factory.VerifyNoOtherCalls();
+        }
+
+        [Theory]
         [InlineData("invalid")]
         [InlineData("file:///local")]
         public async Task EnabledWithInvalidUrl_ReturnsUnhealthyWithoutCreatingClient(string? baseUrl)

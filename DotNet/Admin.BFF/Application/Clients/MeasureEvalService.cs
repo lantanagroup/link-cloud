@@ -49,9 +49,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
             try
             {
-                var response = await _client.GetAsync($"health", timeoutCts.Token);
+                using var response = await _client.GetAsync($"health", timeoutCts.Token);
 
-                var content = await response.Content.ReadAsStringAsync();
+                var content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
 
                 HealthResponse? health = null;
 
@@ -84,17 +84,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
-                        // MeasureEval's ResourceCacheHealthIndicator reports the combined Redis + ABS
-                        // resource-cache status under the "resourceCache" component; map it to the
-                        // "Cache" entry the UI's Cache column expects.
-                        var key = component.Key.Equals("resourceCache", StringComparison.OrdinalIgnoreCase)
-                            ? "Cache"
-                            : ToPascalCase(component.Key);
-
-                        report.Entries[key] = new LinkServiceHealthReportEntry
+                        report.Entries[component.Key] = new LinkServiceHealthReportEntry
                         {
                             Status = componentStatus,
-                            Duration = TimeSpan.Zero
+                            Duration = TimeSpan.Zero,
+                            Description = component.Value?.Details is { Count: > 0 } details
+                                ? JsonSerializer.Serialize(details)
+                                : null
                         };
                     }
                 }

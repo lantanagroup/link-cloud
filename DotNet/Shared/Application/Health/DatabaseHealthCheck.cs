@@ -28,6 +28,10 @@ public sealed class DatabaseHealthCheck<TContext> : IHealthCheck
             cancellationToken.ThrowIfCancellationRequested();
             return canConnect ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy("Database connection failed.");
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
         {
             return HealthCheckResult.Unhealthy($"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
