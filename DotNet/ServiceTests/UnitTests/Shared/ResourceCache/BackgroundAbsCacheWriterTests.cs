@@ -192,6 +192,48 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Cancel_WriteHeldBehindAnotherWriteToTheSameKey_IsNotWritten()
+    {
+        // The window the queued-item check alone does not cover. Writes to one key are serialized,
+        // so a second write can be past that check and parked on the key's write lock while Cancel
+        // and the delete that follows it both run. Writing after that puts the deleted key back in
+        // blob storage, where nothing expires it.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 3);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            // Dequeued by a second worker, which then parks on the write lock the first one holds.
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            // Enqueued after it, and not gated. The channel is FIFO, so this one being written
+            // proves the one before it was handed to a worker - otherwise the test would pass on
+            // the queued-item check and never reach the one being fixed here.
+            await writer.EnqueueAsync("probe:Patient", Resources("Patient/3"), ResourceType.Patient);
+            await writer.WaitForDurableAsync(["probe:Patient"]).WaitAsync(Timeout);
+
+            // What HybridResourceCache.DeleteAsync does immediately before deleting both stores.
+            writer.Cancel(["corr:Patient"]);
+
+            _abs.ReleaseBlockedWrite();
+            await writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+            // The in-flight write is allowed to land; the delete that follows Cancel removes it.
+            // The parked one must not run at all, because it would land after that delete.
+            Assert.Single(_abs.Writes.Where(write => write.CacheKey == "corr:Patient"));
+        }
+        finally
+        {
+            // DisposeAsync releases the fake's gates; doing it here too over-releases its semaphore.
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task Cancel_RecordedFailure_IsCleared()
     {
         _abs.FailKey("corr:Patient");
@@ -284,6 +326,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         private readonly SemaphoreSlim _writeEntered = new(0);
         private readonly SemaphoreSlim _writeRelease = new(0);
         private volatile bool _gateWrites;
+        private volatile string? _gatedKey;
 
         private TaskCompletionSource? _holdRelease;
         private TaskCompletionSource? _concurrencyReached;
@@ -323,12 +366,19 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         /// </summary>
         public void BlockNextWrite() => _gateWrites = true;
 
+        /// <summary>
+        /// Parks writes for one key only, leaving every other key free to complete. Lets a test
+        /// hold a key's write in flight and still observe the queue moving past it.
+        /// </summary>
+        public void BlockWritesFor(string cacheKey) => _gatedKey = cacheKey;
+
         /// <summary>Completes once a write has entered and parked.</summary>
         public Task WaitUntilBlocked() => _writeEntered.WaitAsync();
 
         public void ReleaseBlockedWrite()
         {
             _gateWrites = false;
+            _gatedKey = null;
             _writeRelease.Release(int.MaxValue / 2);
         }
 
@@ -377,7 +427,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
                     await _holdRelease.Task;
                 }
 
-                if (_gateWrites)
+                if (_gateWrites || _gatedKey == correlationId)
                 {
                     _writeEntered.Release();
                     await _writeRelease.WaitAsync();

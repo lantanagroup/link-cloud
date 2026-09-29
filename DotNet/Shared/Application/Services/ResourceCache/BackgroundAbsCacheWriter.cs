@@ -301,6 +301,20 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             await state.WriteLock.WaitAsync(CancellationToken.None);
 
+            // Checked again, because the wait above can be long: another worker may hold the lock for
+            // this key while Cancel and the delete that follows it run to completion. Writing now
+            // would put the deleted key back in blob storage, where nothing expires it.
+            lock (state.Gate)
+            {
+                if (pending.Generation != state.Generation)
+                {
+                    state.WriteLock.Release();
+                    state.Outstanding--;
+                    SignalIfDrained(pending.CacheKey, state);
+                    return;
+                }
+            }
+
             // Measured from enqueue to the start of the write, so a backlog is distinguishable from
             // storage having slowed down.
             _metrics.RecordQueueWait(Stopwatch.GetElapsedTime(pending.QueuedAtTimestamp).TotalMilliseconds);
