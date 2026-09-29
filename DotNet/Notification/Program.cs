@@ -21,6 +21,7 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
@@ -202,7 +203,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddCheck<DatabaseHealthCheck<NotificationDbContext>>("Database")
         .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services
