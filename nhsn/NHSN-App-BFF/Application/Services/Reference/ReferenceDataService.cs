@@ -105,6 +105,8 @@ public sealed class ReferenceDataService : IReferenceDataService
             }
 
             var pageNumber = 1;
+            //TODO: Daniel - The Encounter mapping page was not loading due to the large amount of codes being returned back for CPT and Snomed. Setting a max page count like this is needed. But we also must update the UI to support paged searching.
+            var maxPages = 10;
             long totalPages;
             do
             {
@@ -134,8 +136,13 @@ public sealed class ReferenceDataService : IReferenceDataService
                 }
 
                 totalPages = page.Metadata.TotalPages;
+
+                //TODO: Temporary log. Remove after test
+                _logger.LogInformation(
+                        "Completed {system} terminology code request for page {pageNumber}", system, pageNumber);
+
                 pageNumber++;
-            } while (pageNumber <= totalPages);
+            } while (pageNumber <= maxPages);
         }
 
         return codes;

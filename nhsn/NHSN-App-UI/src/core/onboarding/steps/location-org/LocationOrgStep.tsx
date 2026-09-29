@@ -23,9 +23,9 @@ import type {LocationIdentifierEntry, LocationOrgDraft, LocationTypeEntry} from 
 import {
   findDuplicateLocationIdentifierIndexes,
   findDuplicateLocationTypeIndexes,
+  findDuplicateManagingOrganizationIndexes,
   findIncompleteLocationIdentifierIndexes,
-  findIncompleteLocationTypeIndexes,
-  isPlausibleFhirPath
+  findIncompleteLocationTypeIndexes
 } from './validate';
 
 /** Organization Identification. Methods and instructions PDF both come from `vendorProfile` - no vendor name here. */
@@ -112,16 +112,16 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         ? findDuplicateLocationTypeIndexes(locationTypes, edited)
         : activeMethod === 'location-identifier'
           ? findDuplicateLocationIdentifierIndexes(locationIdentifiers, edited)
-          : []
+          : activeMethod === 'managing-org'
+            ? findDuplicateManagingOrganizationIndexes(managingOrganizations, edited)
+            : []
     );
-  }, [activeMethod, locationTypes, locationIdentifiers, editedRowIndex]);
+  }, [activeMethod, locationTypes, locationIdentifiers, managingOrganizations, editedRowIndex]);
   const hasDuplicateRows = duplicateRowIndexes.size > 0;
 
-  // Only the Custom FHIRPath tab has a free-form expression to check; Data Acquisition compiles it
-  // on save, and without this a typo only surfaces as a bare "DataAcquisition returned 400".
+  // Custom FHIRPath is free-form and deliberately unchecked here - Data Acquisition compiles it on
+  // save and has the final word on whether it's valid.
   const customFhirPath = locationOrg.customFhirPath ?? '';
-  const hasInvalidFhirPath = activeMethod === 'custom-fhir-path' && !isPlausibleFhirPath(customFhirPath);
-  const [fhirPathBlurred, setFhirPathBlurred] = useState(false);
 
   // No error is worth showing before the facility has actually tried to move on - an untouched,
   // still-blank list isn't wrong yet, just not started. Once shown, though, it tracks the live state
@@ -136,14 +136,12 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
   const flaggedRowCount = (activeMethod && flaggedRowCounts[activeMethod]) ?? 0;
   const isRowFlagged = (index: number) => index < flaggedRowCount;
   const hasFlaggedIncompleteRows = hasIncompleteRows && incompleteRowIndexes.some(isRowFlagged);
-  const showFhirPathError = hasInvalidFhirPath && (fhirPathBlurred || continueAttempted);
 
   function validateStep(): boolean {
     if (activeMethod) {
       setFlaggedRowCounts(counts => ({...counts, [activeMethod]: activeRowCount}));
     }
-    setFhirPathBlurred(true);
-    return !hasIncompleteRows && !hasDuplicateRows && !hasInvalidFhirPath;
+    return !hasIncompleteRows && !hasDuplicateRows;
   }
 
   /** Keeps the active method's flagged count pointing at the same rows when one of them is removed. */
@@ -213,7 +211,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
 
   function handleMethodChange(method: LocationMethod) {
     setEditedRowIndex(null);
-    patch('locationOrg', {method});
+    mirror('locationOrg', {method});
   }
 
   async function handleSearch() {
@@ -288,9 +286,7 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
         label={t('onboarding:locationOrg.customFhirPath.label')}
         placeholder={t('onboarding:locationOrg.customFhirPath.placeholder')}
         value={customFhirPath}
-        error={showFhirPathError ? t('onboarding:locationOrg.errors.invalidFhirPath') : undefined}
         onChange={value => patch('locationOrg', {customFhirPath: value})}
-        onBlur={() => setFhirPathBlurred(true)}
       />
     </div>
   );
@@ -330,8 +326,8 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               addLabel={t('onboarding:locationOrg.locationType.add')}
               removeLabel={t('common:actions.remove')}
               columnHeadings={[
-                t('onboarding:locationOrg.locationIdentifier.systemPlaceholder'),
-                t('onboarding:locationOrg.locationIdentifier.codePlaceholder')
+                t('onboarding:locationOrg.locationType.codePlaceholder'),
+                t('onboarding:locationOrg.locationType.aliasPlaceholder')
               ]}
               renderItem={(row, index, onRowChange) => {
                 // Blank fields are only flagged once Continue has been tried with this row present - not
@@ -399,9 +395,14 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
                 error={
                   isRowFlagged(index) && !row.trim()
                     ? requiredError(t('onboarding:locationOrg.managingOrg.placeholder'))
-                    : undefined
+                    : duplicateRowIndexes.has(index)
+                      ? t('onboarding:locationOrg.managingOrg.duplicateError')
+                      : undefined
                 }
-                onChange={onRowChange}
+                onChange={value => {
+                  setEditedRowIndex(index);
+                  onRowChange(value);
+                }}
               />
             )}
           />
@@ -535,7 +536,9 @@ export function LocationOrgStep({onNext, onBack}: StepProps) {
               ? t('onboarding:locationOrg.errors.incompleteRows')
               : activeMethod === 'location-type'
                 ? t('onboarding:locationOrg.errors.duplicateLocationTypes')
-                : t('onboarding:locationOrg.errors.duplicateLocationIdentifiers')}
+                : activeMethod === 'managing-org'
+                  ? t('onboarding:locationOrg.errors.duplicateManagingOrganizations')
+                  : t('onboarding:locationOrg.errors.duplicateLocationIdentifiers')}
           </p>
         </div>
       )}

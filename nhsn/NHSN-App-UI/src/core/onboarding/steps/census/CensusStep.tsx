@@ -545,6 +545,9 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
   // failing with "test the connection" - and keeps the step's save from racing the test's own
   // write of the same sFTP configuration.
   const [continueAfterTest, setContinueAfterTest] = useState(false);
+  // The accuracy acknowledgement runs before the navigation's own save, which savingDirection
+  // doesn't cover - without this the Continue spinner would only start once it returns.
+  const [acknowledging, setAcknowledging] = useState(false);
 
   async function handleNext() {
     if (testingConnection) {
@@ -556,6 +559,7 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
     }
 
     if (validationLive) {
+      setAcknowledging(true);
       try {
         await api.acknowledgeCensus({
           kind: "CensusAccuracy",
@@ -569,6 +573,8 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             : t("onboarding:census.messages.ackError"),
         );
         return;
+      } finally {
+        setAcknowledging(false);
       }
     }
 
@@ -604,14 +610,14 @@ announceValidationMessage(t("onboarding:census.messages.incomplete"));
             </Button>
             <Button
               onClick={stableHandleNext}
-              disabled={saving}
-              loading={savingDirection === "next" || continueAfterTest}>
+              disabled={saving || acknowledging}
+              loading={savingDirection === "next" || continueAfterTest || acknowledging}>
               {t("common:actions.continue")}
             </Button>
           </StepActions>
         )
       }),
-      [t, vendorProfile, stableOnBack, saving, savingDirection, continueAfterTest, stableHandleNext]
+      [t, vendorProfile, stableOnBack, saving, savingDirection, continueAfterTest, acknowledging, stableHandleNext]
     )
   );
 

@@ -1,5 +1,13 @@
 import {describe, expect, it} from 'vitest';
-import {findDuplicateSourceCodeIndexes, findIncompleteRowIndexes, isRowBlank, isRowComplete} from './validate';
+import type {HslocMapping} from '../../../api/contracts';
+import {createEmptyDraft} from '../../types';
+import {
+  findDuplicateSourceCodeIndexes,
+  findIncompleteRowIndexes,
+  isHslocComplete,
+  isRowBlank,
+  isRowComplete
+} from './validate';
 
 describe('isRowBlank', () => {
   it('is true when every field is empty or whitespace', () => {
@@ -84,5 +92,33 @@ describe('findDuplicateSourceCodeIndexes', () => {
       {sourceDisplay: 'ED', sourceCode: 'ED-1', hslocCode: '1002'}
     ];
     expect(findDuplicateSourceCodeIndexes(rows)).toEqual([]);
+  });
+});
+
+describe('isHslocComplete', () => {
+  function draftWith(mappings: HslocMapping[]) {
+    const draft = createEmptyDraft();
+    draft.hsloc = {mappings};
+    return draft;
+  }
+
+  it('stays complete when "+ Add Mapping" appends a blank row', () => {
+    const draft = draftWith([
+      {sourceDisplay: 'ICU', sourceCode: 'ICU-1', hslocCode: '1030'},
+      {sourceDisplay: '', sourceCode: '', hslocCode: ''}
+    ]);
+    expect(isHslocComplete(draft)).toBe(true);
+  });
+
+  it('is incomplete when only blank rows exist', () => {
+    expect(isHslocComplete(draftWith([{sourceDisplay: '', sourceCode: '', hslocCode: ''}]))).toBe(false);
+  });
+
+  it('is incomplete once a row is partially filled', () => {
+    const draft = draftWith([
+      {sourceDisplay: 'ICU', sourceCode: 'ICU-1', hslocCode: '1030'},
+      {sourceDisplay: 'ED', sourceCode: '', hslocCode: ''}
+    ]);
+    expect(isHslocComplete(draft)).toBe(false);
   });
 });

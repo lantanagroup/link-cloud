@@ -34,6 +34,13 @@ export function CompleteStep(_props: StepProps) {
     queryKey: ['completeStepReportsCount'],
     queryFn: () => api.listReports({page: 1, pageSize: 1})
   });
+  // Same query (and cache entry) as FacilityInfoStep's picker, so the time zone reads with its UTC
+  // offset exactly as it was chosen. Falls back to the bare IANA id while loading or on failure.
+  const {data: timezones} = useQuery({
+    queryKey: ['timezones'],
+    queryFn: () => api.getTimezones(),
+    staleTime: Infinity
+  });
   const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : undefined;
 
   const draft = useMemo(() => migrateDraft(envelope?.draft ?? null), [envelope]);
@@ -44,11 +51,13 @@ export function CompleteStep(_props: StepProps) {
       vendorProfile?.censusAcquisition === 'Sftp'
         ? draft.census.sftpHost ?? t('onboarding:complete.notAvailable')
         : vendorProfile?.displayName ?? draft.facilityInfo.vendor ?? t('onboarding:complete.notAvailable');
+    const timeZoneId = draft.facilityInfo.timeZone;
+    const timeZone = timezones?.find(zone => zone.id === timeZoneId)?.displayName ?? timeZoneId;
 
     return [
       {label: t('onboarding:complete.summary.facilityId'), value: commitState?.facilityId ?? user.facilityId ?? t('onboarding:complete.notAvailable')},
       {label: t('onboarding:complete.summary.vendor'), value: vendorProfile?.displayName ?? draft.facilityInfo.vendor ?? t('onboarding:complete.notAvailable')},
-      {label: t('onboarding:complete.summary.timeZone'), value: draft.facilityInfo.timeZone ?? t('onboarding:complete.notAvailable')},
+      {label: t('onboarding:complete.summary.timeZone'), value: timeZone ?? t('onboarding:complete.notAvailable')},
       {label: t('onboarding:complete.summary.fhirBaseUrl'), value: draft.fhir.fhirServerBaseUrl ?? t('onboarding:complete.notAvailable')},
       {
         label: t('onboarding:complete.summary.connectionTest'),
@@ -63,7 +72,7 @@ export function CompleteStep(_props: StepProps) {
         value: draft.report.lastRequestedReportId ?? t('onboarding:complete.notAvailable')
       }
     ];
-  }, [draft, user, vendorProfile, commitState, reportsPage, t]);
+  }, [draft, user, vendorProfile, commitState, reportsPage, timezones, t]);
 
   const loading = !envelope && !error;
 

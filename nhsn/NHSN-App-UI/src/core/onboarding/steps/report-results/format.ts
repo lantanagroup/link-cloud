@@ -22,6 +22,15 @@ export function formatDate(iso: string): string {
   return `${month}-${day}-${year}`;
 }
 
+// The BFF only accepts yyyy-MM-dd on a report request, but report dates come back as full ISO
+// timestamps ("2026-09-30T23:59:59..."). The calendar date is read off the string rather than
+// through `new Date()`, which would shift it a day across time zones.
+const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
+
+export function toRequestDate(iso: string): string {
+  return iso.match(ISO_DATE_PREFIX)?.[0] ?? iso;
+}
+
 export function formatDateTime(iso: string): string {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) {

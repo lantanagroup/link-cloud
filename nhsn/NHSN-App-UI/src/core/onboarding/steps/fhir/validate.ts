@@ -24,10 +24,22 @@ function hasRealDomain(hostname: string): boolean {
 // RFC 3986 requires percent-encoding for these characters; .NET's Uri.IsWellFormedUriString -
 // what Data Acquisition validates the saved value against server-side - rejects any of them
 // appearing unescaped, even though the URL constructor below happily accepts and re-encodes them.
-const UNSAFE_URL_CHARACTERS = /[\x00-\x1F\x7F <>"{}|\\^`[\]]/;
+// Control characters (U+0000-U+001F, U+007F) are checked by char code rather than in the regex,
+// which lint rejects (no-control-regex).
+const UNSAFE_URL_CHARACTERS = /[ <>"{}|\\^`[\]]/;
+
+function hasUnsafeUrlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) {
+      return true;
+    }
+  }
+  return UNSAFE_URL_CHARACTERS.test(value);
+}
 
 export function isValidHttpUrl(value: string): boolean {
-  if (UNSAFE_URL_CHARACTERS.test(value)) {
+  if (hasUnsafeUrlCharacter(value)) {
     return false;
   }
   try {
@@ -44,8 +56,9 @@ const PULL_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const MAX_CONCURRENT_REQUESTS_CAP = 8;
 
-// Mirrors the BFF's FieldValidationRules.LagDurationCapMinutes (59 days), shared with the
-// manual-upload import path - keep the two in sync, they've drifted apart before.
+// Mirrors the BFF's FieldValidationRules.LagDaysMax/LagHoursMax/LagMinutesMax, shared with the
+// manual-upload import path - keep the two in sync, they've drifted apart before. Each of
+// Days/Hours/Minutes is capped independently; there is no combined/total duration limit.
 const LAG_DAYS_CAP = 59;
 
 function toMinutesSinceMidnight(pullTime: string): number {

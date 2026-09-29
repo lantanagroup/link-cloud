@@ -77,6 +77,12 @@ export function FhirStep({onNext, onBack}: StepProps) {
     }
   }, [readyToAdvance, onNext]);
 
+  useEffect(() => {
+    if (!minPullTime.trim() && !maxPullTime.trim()) {
+      setTouched(prev => ({...prev, minAcquisitionPullTime: false, maxAcquisitionPullTime: false}));
+    }
+  }, [minPullTime, maxPullTime]);
+
   // Any field on this page invalidates a prior Test Connection - not just the base URL. The
   // reachability check itself only depends on the URL, but the whole point of testing is "this
   // configuration is good to save," so touching anything means that promise needs re-confirming.
@@ -145,14 +151,12 @@ export function FhirStep({onNext, onBack}: StepProps) {
   };
 
   /**
-   * Like fieldError, but two keys come from live checks instead of the touched/blur-gated errors
-   * state, so blanking or filling either field shows/clears its error immediately, the same as
-   * HslocStep's mapping rows, without waiting for blur: the range conflict (pullTimeRangeConflictField)
-   * and now "required" - only once the other pull time is filled in, since the pair is optional -
-   * (checked directly against the current values rather than errors[field], which can still hold a
-   * stale required error from an earlier blur even after a later edit fills the field). Format
-   * errors (not empty, not a valid HH:MM) still wait for blur - normalizePullTime builds the value up
-   * digit by digit, so validating every keystroke would flag a still-incomplete entry as invalid.
+   * Like fieldError, but two keys come from checks against the live value instead of the stored
+   * errors state, so a fix clears its own error immediately rather than waiting for another
+   * blur. The range conflict (pullTimeRangeConflictField) is wrong the moment the second time is
+   * entered, so it never waits for blur. The "required" pairing - only once the other pull time
+   * is filled in, since the pair is optional - waits for touched[field], set on this field's own
+   * blur (handlePullTimeBlur), not on every keystroke
    */
   function pullTimeFieldError(field: 'minAcquisitionPullTime' | 'maxAcquisitionPullTime', value: string): string | undefined {
     if (pullTimeRangeConflictField === field) {
@@ -177,6 +181,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
     const normalized = normalizePullTime(value);
     setter(normalized);
     markTouched(field);
+    if (field === 'maxAcquisitionPullTime' && normalized) {
+      markTouched('minAcquisitionPullTime');
+    }
     refreshErrors({[field]: normalized}, field);
     patch('fhir', {[field]: normalized});
   }
@@ -427,7 +434,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 const normalized = normalizePullTime(value);
                 setMinPullTime(normalized);
                 setEditedPullTimeField('minAcquisitionPullTime');
-                markTouched('minAcquisitionPullTime');
+                if (!maxPullTime.trim()) {
+                  setTouched(prev => ({...prev, maxAcquisitionPullTime: false}));
+                }
                 resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
               }}
@@ -444,7 +453,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 const normalized = normalizePullTime(value);
                 setMaxPullTime(normalized);
                 setEditedPullTimeField('maxAcquisitionPullTime');
-                markTouched('maxAcquisitionPullTime');
+                if (!minPullTime.trim()) {
+                  setTouched(prev => ({...prev, minAcquisitionPullTime: false}));
+                }
                 resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
               }}

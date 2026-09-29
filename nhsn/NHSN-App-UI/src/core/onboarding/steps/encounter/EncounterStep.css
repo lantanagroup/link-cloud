@@ -202,7 +202,7 @@
   border: 1px solid var(--encounter-gray-200);
   border-radius: var(--encounter-radius);
   box-shadow: 0 4px 14px rgba(20, 30, 50, 0.14);
-  z-index: 5;
+  z-index: 10;
 }
 
 .encounter-mapping .encounter-code-option {

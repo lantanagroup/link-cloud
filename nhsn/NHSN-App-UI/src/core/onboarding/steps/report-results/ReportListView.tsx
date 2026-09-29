@@ -23,6 +23,8 @@ import { STATUS_PILL_CLASS } from './reportStatus';
 interface ReportListViewProps {
   onBack: () => void;
   onNext: () => void | Promise<void>;
+  /** ReportResultsStep's acknowledgement PUT is in flight ahead of the navigation save. */
+  acknowledging: boolean;
   validationMessage: string | null;
   clearValidationMessage: () => void;
 }
@@ -36,6 +38,7 @@ interface ReportListViewProps {
 export function ReportListView({
   onBack,
   onNext,
+  acknowledging,
   validationMessage,
   clearValidationMessage,
 }: ReportListViewProps) {
@@ -134,13 +137,13 @@ export function ReportListView({
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving} loading={savingDirection === 'next'}>
+            <Button onClick={stableOnNext} disabled={saving || acknowledging} loading={acknowledging || savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         ),
       }),
-      [t, saving, savingDirection, stableOnBack, stableOnNext],
+      [t, saving, savingDirection, acknowledging, stableOnBack, stableOnNext],
     ),
   );
 
