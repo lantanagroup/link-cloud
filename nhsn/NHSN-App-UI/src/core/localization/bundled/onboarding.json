@@ -113,6 +113,7 @@
       "duplicateHslocIdentifier": "This Location.identifier.value is used by more than one row — each mapping's local identifier must be unique.",
       "partialLocationType": "Both columns are required for a Location Type row — remove incomplete rows or fill them in completely.",
       "partialLocationIdentifier": "Both columns are required for a Location Identifier row — remove incomplete rows or fill them in completely.",
+      "requiredEncounterMapping": "At least one Encounter.type Code System is required.",
       "partialEncounterMapping": "All four columns are required for an Encounter Mapping row — remove incomplete rows or fill them in completely.",
       "lineFormat": "{{sheet}} {{location}}: {{- message}}"
     }
@@ -412,7 +413,6 @@
       "codeSystemsHint": "Add each source code system your facility's local Encounter.type codes come from. Within each code system, map its local codes to the corresponding CPT or SNOMED reference code.",
       "codeSystemLabel": "Encounter.type Code System",
       "codeSystemPlaceholder": "e.g. http://mysite.org/fhir/encounter-type",
-      "noCodeSystems": "No code systems added yet.",
       "addCodeSystem": "+ Add Code System",
       "removeCodeSystem": "Remove System",
       "removeCodeSystemAriaLabel": "Remove code system {{system}}",
@@ -451,6 +451,7 @@
       "loadError": "Unable to load encounter mapping data.",
       "saveError": "Unable to save encounter mappings.",
       "incomplete": "Please complete each mapping row's fields, or remove the row, before continuing.",
+      "requiredCodeSystem": "At least one Encounter.type Code System is required.",
       "missingCodeSystemHint": "Encounter.type Code System is required.",
       "missingCodeSystem": "Fill in each Encounter.type Code System, or remove it, before continuing.",
       "duplicateCodeSystem": "Two or more Encounter.type Code Systems are the same (or both blank). Fix or remove one of them before continuing."

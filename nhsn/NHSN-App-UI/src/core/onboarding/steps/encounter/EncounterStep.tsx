@@ -3,12 +3,12 @@ import {useQuery} from '@tanstack/react-query';
 import {Trans, useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {EncounterCode, EncounterMapping} from '../../../api/contracts';
-import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, Select, StepActions, Tabs, TextField} from '../../../fields';
+import {acronymTitle, Button, HeadingPause, NewTabAnnouncement, NHSNLoadingIndicator, RequiredAsterisk, Select, StepActions, Tabs, TextField} from '../../../fields';
 import {useNotifications} from '../../../notifications/NotificationProvider';
 import type {StepProps} from '../../flow';
 import {useOnboarding, useStepValidator} from '../../OnboardingProvider';
 import {useStableCallback, useStepChrome} from '../../StepChrome';
-import {findDuplicateCodeSystemIndexes, findIncompleteRowKeys, findMissingCodeSystemGroupKeys, pruneEmptyGroups} from './validate';
+import {findDuplicateCodeSystemIndexes, findIncompleteRowKeys, findMissingCodeSystemGroupKeys} from './validate';
 import './EncounterStep.css';
 
 /**
@@ -40,9 +40,12 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   const {notifyError} = useNotifications();
   const {draft, patch, saving, savingDirection} = useOnboarding();
 
-  const [groups, setGroups] = useState<CodeSystemGroupState[]>(() =>
-    buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? [])
-  );
+  // At least one Code System is required, so a block is always on screen (the last one left has no
+  // Remove control) - a facility with none saved yet starts from a blank one to fill in.
+  const [groups, setGroups] = useState<CodeSystemGroupState[]>(() => {
+    const loaded = buildGroups(draft.encounter.codeSystems ?? [], draft.encounter.mappings ?? []);
+    return loaded.length > 0 ? loaded : [{groupKey: makeKey(), codeSystem: '', mappings: []}];
+  });
   const {
     data: referenceCodes = [],
     isLoading: loading,
@@ -202,23 +205,25 @@ export function EncounterStep({onNext, onBack}: StepProps) {
   }
 
   /**
-   * Diverges from the POC (which sets encounterMappingAcknowledged unconditionally): a blank
-   * Encounter.type Code System, two Code Systems sharing a value (including both blank), or a
-   * mapping row with only one side filled in, all block Continue - see
-   * findMissingCodeSystemGroupKeys/findDuplicateCodeSystemIndexes/findIncompleteRowKeys. The
-   * first two run against the raw, unpruned groups - a blank Code System block stays on screen
-   * with its own "Remove System" control, so leaving it blank is a choice to hold the user to, not
-   * scaffolding to discard for them. A blank mapping row IS discarded for them - see
-   * pruneEmptyGroups, used only for that, right before the incomplete-row check.
+   * Diverges from the POC (which sets encounterMappingAcknowledged unconditionally): no Code
+   * System filled in at all (Report Results relies on at least one to surface unmapped encounter
+   * codes - local mappings under it stay optional), a blank Encounter.type Code System, two Code
+   * Systems sharing a value (including both blank), or a mapping row that isn't fully filled in
+   * (blank or one-sided) all block Continue - see findMissingCodeSystemGroupKeys/
+   * findDuplicateCodeSystemIndexes/findIncompleteRowKeys. Nothing is silently discarded: an
+   * unwanted block or row has its own Remove control.
    */
   function validationMessageFor(current: CodeSystemGroupState[]): string | null {
+    if (!current.some(group => group.codeSystem.trim())) {
+      return t('onboarding:encounter.messages.requiredCodeSystem');
+    }
     if (findDuplicateCodeSystemIndexes(current).length > 0) {
       return t('onboarding:encounter.messages.duplicateCodeSystem');
     }
     if (findMissingCodeSystemGroupKeys(current).length > 0) {
       return t('onboarding:encounter.messages.incomplete');
     }
-    if (findIncompleteRowKeys(pruneEmptyGroups(current)).length > 0) {
+    if (findIncompleteRowKeys(current).length > 0) {
       return t('onboarding:encounter.messages.incomplete');
     }
     return null;
@@ -254,9 +259,7 @@ export function EncounterStep({onNext, onBack}: StepProps) {
     if (!validateStep()) {
       return;
     }
-    const pruned = pruneEmptyGroups(groups);
-    setGroups(pruned);
-    const {codeSystems, mappings} = flattenGroups(pruned);
+    const {codeSystems, mappings} = flattenGroups(groups);
     patch('encounter', {codeSystems, mappings});
     setReadyToAdvance(true);
   }
@@ -348,14 +351,12 @@ export function EncounterStep({onNext, onBack}: StepProps) {
                 <p className="form-hint">{t('onboarding:encounter.fields.codeSystemsHint')}</p>
               </div>
 
-              {groups.length === 0 && (
-                <p className="form-hint form-hint--spaced">{t('onboarding:encounter.fields.noCodeSystems')}</p>
-              )}
-
-              {groups.map(group => (
+              {groups.map((group, index) => (
                 <CodeSystemBlock
                   key={group.groupKey}
                   group={group}
+                  required={index === 0}
+                  removable={groups.length > 1}
                   referenceCodes={referenceCodes}
                   incompleteRowKeys={incompleteRowKeys}
                   duplicate={duplicateCodeSystemGroupKeys.has(group.groupKey)}
@@ -504,6 +505,10 @@ export default EncounterStep;
 
 interface CodeSystemBlockProps {
   group: CodeSystemGroupState;
+  /** The first block carries the required marker - at least one Code System is required. */
+  required: boolean;
+  /** False when this is the only block left, for the same reason. */
+  removable: boolean;
   referenceCodes: EncounterCode[];
   incompleteRowKeys: Set<string>;
   duplicate: boolean;
@@ -518,6 +523,8 @@ interface CodeSystemBlockProps {
 
 function CodeSystemBlock({
   group,
+  required,
+  removable,
   referenceCodes,
   incompleteRowKeys,
   duplicate,
@@ -553,7 +560,10 @@ function CodeSystemBlock({
   return (
     <div className="codesystem-block">
       <div className="form-group">
-        <label htmlFor={codeSystemInputId}>{t('encounter.fields.codeSystemLabel')}</label>
+        <label htmlFor={codeSystemInputId}>
+          {t('encounter.fields.codeSystemLabel')}
+          {required && <RequiredAsterisk />}
+        </label>
         <div className="codesystem-row">
           <input
             id={codeSystemInputId}
@@ -564,17 +574,19 @@ function CodeSystemBlock({
             value={group.codeSystem}
             onChange={event => onCodeSystemChange(event.target.value)}
             onBlur={handleCodeSystemBlur} />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onRemoveGroup}
-            aria-label={
-              group.codeSystem
-                ? t('encounter.fields.removeCodeSystemAriaLabel', {system: group.codeSystem})
-                : t('encounter.fields.removeCodeSystem')
-            }>
-            {t('encounter.fields.removeCodeSystem')}
-          </Button>
+          {removable && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onRemoveGroup}
+              aria-label={
+                group.codeSystem
+                  ? t('encounter.fields.removeCodeSystemAriaLabel', {system: group.codeSystem})
+                  : t('encounter.fields.removeCodeSystem')
+              }>
+              {t('encounter.fields.removeCodeSystem')}
+            </Button>
+          )}
         </div>
         {showDuplicate && (
           <span id={duplicateHintId} className="encounter-row-hint" role="alert">

@@ -973,9 +973,11 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         }
     }
 
-    // Encounter Mapping as a whole stays optional - zero rows is fine, matching the sheet's own
-    // "Required" column (no "at least one" note on this table, unlike HSLOC). A row that IS present
-    // must have its local half complete: system AND code, not just one of them. The reference half
+    // At least one complete Encounter Mapping row is required, matching the sheet's own "Required"
+    // note and EncounterStep's "at least one Encounter.type Code System" rule - Report Results relies
+    // on a code system being configured to surface unmapped encounter codes. Same shape as
+    // BuildHslocAsync: an absent or all-invalid table is flagged at the section header. A row that IS
+    // present must have its local half complete: system AND code, not just one of them. The reference half
     // (Reference Code System/Code) is a different story - it's only ever something a facility
     // copied off the reference table, so a value that's blank or doesn't resolve there (typo'd,
     // stale, or never filled in) is left blank rather than raising a cell error. EncounterType comes
@@ -991,9 +993,11 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
         List<ImportCellError> errors,
         CancellationToken cancellationToken)
     {
-        var rawRows = ReadTableRows(rows, "Encounter Mapping");
+        const string sectionHeader = "Encounter Mapping";
+        var rawRows = ReadTableRows(rows, sectionHeader);
         if (rawRows.Count == 0)
         {
+            RequireErrorAtHeader(rows, errors, sectionHeader, "encounter", "onboarding:manualUpload.errors.requiredEncounterMapping");
             return null;
         }
 
@@ -1045,7 +1049,13 @@ public sealed class ManualUploadTemplateService : IManualUploadTemplateService
             });
         }
 
-        return mappings.Count > 0 ? new ImportedEncounter { Mappings = mappings } : null;
+        if (mappings.Count == 0)
+        {
+            RequireErrorAtHeader(rows, errors, sectionHeader, "encounter", "onboarding:manualUpload.errors.requiredEncounterMapping");
+            return null;
+        }
+
+        return new ImportedEncounter { Mappings = mappings };
     }
 
     private static string? BuildDuration(
