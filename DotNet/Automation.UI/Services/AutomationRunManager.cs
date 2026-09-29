@@ -108,7 +108,8 @@ public class AutomationRunManager : IAutomationRunManager
                 var callbacks = new RunExecutor.ExecutorCallbacks(
                     Output: output,
                     BroadcastStatus: () => BroadcastStatus(state),
-                    PersistRunSummary: () => PersistRunSummaryAsync(state));
+                    PersistRunSummary: () => PersistRunSummaryAsync(state),
+                    PersistOwnership: () => PersistOwnershipAsync(state));
 
                 await _runExecutor.ExecuteAsync(state, callbacks, state.RunCancellation.Token);
             }
@@ -574,19 +575,9 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
-        try
-        {
-            return await _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken);
-        }
-        catch (LiveInjectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Live generate failed for run {RunId}.", runId);
-            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
-        }
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.GeneratePoolPatientAsync(runId, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live generate failed for run {RunId}.", runId));
     }
 
     public async Task<LivePatientPoolEntry> UploadLivePoolPatientAsync(
@@ -598,19 +589,9 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
-        try
-        {
-            return await _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken);
-        }
-        catch (LiveInjectionException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Live upload failed for run {RunId}.", runId);
-            throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
-        }
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.UploadPoolPatientAsync(runId, content, fileName, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live upload failed for run {RunId}.", runId));
     }
 
     public async Task<LivePatientPoolEntry> ReferenceLivePoolPatientAsync(
@@ -621,17 +602,32 @@ public class AutomationRunManager : IAutomationRunManager
     {
         _ = source;
         EnsureLiveWindowOpen(runId);
+        return await InvokeLivePoolAsync(
+            () => _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken),
+            ex => _logger.LogError(ex, "Live reference failed for run {RunId}.", runId));
+    }
+
+    /// <summary>
+    /// Live pool calls keep <see cref="LiveInjectionException"/> and cancellation.
+    /// Any other exception becomes a 500 <see cref="LiveInjectionException"/>.
+    /// </summary>
+    internal static async Task<T> InvokeLivePoolAsync<T>(Func<Task<T>> action, Action<Exception> logFault)
+    {
         try
         {
-            return await _liveInjector.ReferencePoolPatientAsync(runId, patientId, source, cancellationToken);
+            return await action().ConfigureAwait(false);
         }
         catch (LiveInjectionException)
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Live reference failed for run {RunId}.", runId);
+            logFault(ex);
             throw new LiveInjectionException(ex.Message, StatusCodes.Status500InternalServerError);
         }
     }
@@ -672,23 +668,43 @@ public class AutomationRunManager : IAutomationRunManager
         await PersistRunSummaryAsync(state);
     }
 
+    private async Task PersistOwnershipAsync(MutableRunState state)
+    {
+        // Independent of run cancellation. CancelRunAsync persists a summary before it
+        // cancels the run token, and that write must not abort this marker.
+        using var budget = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        const int attempts = 3;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                var summary = ToSummary(state);
+                if (!summary.AutomationCreatedFacility)
+                    return;
+
+                await _snapshotStore.MarkAutomationCreatedFacilityAsync(
+                    summary, summary.FacilityId ?? string.Empty, budget.Token);
+                return;
+            }
+            catch (OperationCanceledException) when (budget.IsCancellationRequested)
+            {
+                throw new InvalidOperationException(
+                    $"Ownership summary persist timed out for {state.RunId}.");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && attempt < attempts)
+            {
+                _logger.LogWarning(ex,
+                    "Ownership summary persist failed for {RunId}; retrying.", state.RunId);
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt), budget.Token);
+            }
+        }
+    }
+
     private async Task PersistRunSummaryAsync(MutableRunState state)
     {
         try
         {
-            AutomationRunSummary summary;
-            string? facilityId;
-            string? reportId;
-
-            lock (state.Sync)
-            {
-                summary = ToSummary(state);
-                facilityId = state.FacilityId;
-                reportId = state.ReportId;
-            }
-
-            summary.RunConfigurationJson = null;
-            await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
+            await WriteRunSummaryAsync(state, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -702,6 +718,23 @@ public class AutomationRunManager : IAutomationRunManager
                 "in the Recent Runs table until a successful upsert lands.",
                 state.RunId);
         }
+    }
+
+    private async Task WriteRunSummaryAsync(MutableRunState state, CancellationToken cancellationToken)
+    {
+        AutomationRunSummary summary;
+        string? facilityId;
+        string? reportId;
+
+        lock (state.Sync)
+        {
+            summary = ToSummary(state);
+            facilityId = state.FacilityId;
+            reportId = state.ReportId;
+        }
+
+        summary.RunConfigurationJson = null;
+        await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
     }
 
     /// <summary>
@@ -757,6 +790,7 @@ public class AutomationRunManager : IAutomationRunManager
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
                 FacilityId = state.FacilityId,
+                AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,
                 GeneratedTemplateCacheVersionId = state.GeneratedTemplateCacheVersionId,
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
