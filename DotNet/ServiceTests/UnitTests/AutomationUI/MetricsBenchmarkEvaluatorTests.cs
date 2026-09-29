@@ -164,7 +164,7 @@ public class MetricsBenchmarkEvaluatorTests
     }
 
     [Fact]
-    public void A_write_that_exhausted_its_retries_is_flagged_on_its_own()
+    public void A_write_that_exhausted_its_retries_is_a_violation_not_a_slowdown()
     {
         var previous = Doc(100);
         previous.ResourceCache = Cache();
@@ -173,7 +173,24 @@ public class MetricsBenchmarkEvaluatorTests
 
         var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
 
-        Assert.Contains(result.RegressionFlags, f => f.Contains("no durable copy", StringComparison.OrdinalIgnoreCase));
+        // The UI files every regression flag under "Slower than last successful run", and a
+        // durability failure listed there reads as a performance nitpick.
+        Assert.Contains(result.Violations, v => v.Contains("exhausted their retries", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result.RegressionFlags, f => f.Contains("exhausted", StringComparison.OrdinalIgnoreCase));
+        Assert.False(result.Pass);
+    }
+
+    [Fact]
+    public void A_write_that_exhausted_its_retries_is_reported_without_a_previous_run()
+    {
+        var current = Doc(100);
+        current.ResourceCache = Cache(exhausted: 2);
+
+        // The drift comparisons need a previous run; this does not, and a first run is exactly
+        // when a durability failure must not go unreported.
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, null);
+
+        Assert.Contains(result.Violations, v => v.Contains("exhausted their retries", StringComparison.OrdinalIgnoreCase));
     }
 
     private static ResourceCacheSnapshot Cache(

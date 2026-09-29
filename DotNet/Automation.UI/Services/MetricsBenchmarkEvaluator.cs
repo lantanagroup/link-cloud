@@ -45,6 +45,13 @@ public static class MetricsBenchmarkEvaluator
                 violations.Add($"{FriendlyName(key)} was {Format(value.Value)}; it needs to be at least {Format(min)}.");
         }
 
+        // Not a drift comparison and not a slowdown, so it belongs with the limits rather than the
+        // regression flags: the retry limit was reached and the work waiting on those keys was
+        // failed. Checked outside the previous-run block too, or a first run never reports it.
+        var exhausted = document.ResourceCache is { Unavailable: false } cache ? cache.WriteExhaustedCount : 0;
+        if (exhausted > 0)
+            violations.Add($"{Format(exhausted)} durable cache write(s) exhausted their retries; the work waiting on those keys was failed.");
+
         var flags = new List<string>();
         var percent = benchmark?.RegressionPercent > 0 ? benchmark.RegressionPercent : 10;
         if (previous != null)
@@ -206,10 +213,5 @@ public static class MetricsBenchmarkEvaluator
             if (current.ReadP95Ms > limit)
                 flags.Add($"Resource cache read slow time ({Format(current.ReadP95Ms)} ms) was more than {percent}% slower than the last successful run ({Format(prior.ReadP95Ms)} ms).");
         }
-
-        // Not a drift comparison: a write that exhausted its retries left a cache key with no
-        // durable copy behind it, which is worth surfacing on its own.
-        if (current.WriteExhaustedCount > 0)
-            flags.Add($"{Format(current.WriteExhaustedCount)} durable cache write(s) exhausted their retries; those correlations have no durable copy.");
     }
 }
