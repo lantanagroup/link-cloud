@@ -21,11 +21,12 @@ public class JavaServiceHealthTests
     public async Task HealthCheck_PreservesAllDetailsInDescription(
         bool measureEval, string status, HttpStatusCode statusCode, HealthStatus expectedStatus)
     {
+                var componentName = measureEval ? "Resource Cache" : "Redis";
         var payload = $$"""
             {
               "status": "{{status}}",
               "components": {
-                "resourceCache": {
+                                "{{componentName}}": {
                   "status": "{{status}}",
                   "details": {
                     "Redis": "Available",
@@ -45,7 +46,7 @@ public class JavaServiceHealthTests
         Assert.Equal(measureEval ? "Measure Evaluation" : "Validation", report.Service);
         Assert.Equal(expectedStatus, report.Status);
         var entry = Assert.Single(report.Entries);
-        Assert.Equal(measureEval ? "Cache" : "resourceCache", entry.Key);
+        Assert.Equal(componentName, entry.Key);
         Assert.Equal(expectedStatus, entry.Value.Status);
         Assert.Equal(TimeSpan.Zero, entry.Value.Duration);
         using var description = JsonDocument.Parse(entry.Value.Description!);

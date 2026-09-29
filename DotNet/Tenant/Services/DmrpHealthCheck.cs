@@ -7,6 +7,7 @@ namespace LantanaGroup.Link.Tenant.Services
 {
     public sealed class DmrpHealthCheck : IHealthCheck
     {
+        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<DmrpSettings> _settings;
 
@@ -36,10 +37,13 @@ namespace LantanaGroup.Link.Tenant.Services
                 return HealthCheckResult.Unhealthy("DMRP API base URL is invalid.");
             }
 
+            using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCancellation.CancelAfter(ProbeTimeout);
             try
             {
                 using var client = _httpClientFactory.CreateClient(DmrpApiClient.HttpClientName);
-                using var response = await client.GetAsync(healthUri, cancellationToken);
+                using var response = await client.GetAsync(healthUri, timeoutCancellation.Token);
+                timeoutCancellation.Token.ThrowIfCancellationRequested();
                 return response.IsSuccessStatusCode || 
                         response.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
                         response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
@@ -50,6 +54,10 @@ namespace LantanaGroup.Link.Tenant.Services
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+            {
+                return HealthCheckResult.Unhealthy($"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
             }
             catch (Exception)
             {

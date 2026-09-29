@@ -38,7 +38,7 @@ public sealed class DatabaseHealthCheck<TContext> : IHealthCheck
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy(description: $"Health check failed with an error: {ex.Message}", exception: ex);
+            return HealthCheckResult.Unhealthy(description: $"Exception occurred while checking database health.", exception: ex);
         }
     }
 }

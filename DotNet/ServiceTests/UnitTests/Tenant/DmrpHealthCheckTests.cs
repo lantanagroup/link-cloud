@@ -107,6 +107,30 @@ namespace UnitTests.Tenant
         }
 
         [Fact]
+        public async Task StalledRequest_ReturnsUnhealthyWithinProbeTimeout()
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            CancellationToken requestToken = default;
+            using var handler = new StubHandler(async (request, token) =>
+            {
+                requestToken = token;
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            });
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(600) };
+            var factory = new Mock<IHttpClientFactory>();
+            factory.Setup(instance => instance.CreateClient(DmrpApiClient.HttpClientName)).Returns(client);
+
+            var result = await CreateCheck(factory.Object, true, "https://dmrp.example")
+                .CheckHealthAsync(new HealthCheckContext(), cancellation.Token);
+
+            Assert.Equal(HealthStatus.Unhealthy, result.Status);
+            Assert.Equal("Health check did not complete within 5 seconds.", result.Description);
+            Assert.True(requestToken.IsCancellationRequested);
+            Assert.False(cancellation.IsCancellationRequested);
+        }
+
+        [Fact]
         public async Task CallerCancellation_IsPropagated()
         {
             using var cancellation = new CancellationTokenSource();
