@@ -409,6 +409,11 @@ public sealed class ApiHealthExecutionRunManager(
 
         baseUrl = baseUrl.TrimEnd('/');
 
+        if (baseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = baseUrl[..^4];
+        }
+
         try
         {
             var client = httpClientFactory.CreateClient("ApiHealthTest");

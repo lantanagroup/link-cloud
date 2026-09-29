@@ -923,9 +923,18 @@
 
             let html = '<div class="table-responsive"><table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th><th>Commit #</th><th>Build</th><th>Version</th><th>Product Version</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
-                const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
+                const badge = r.skipped
+                    ? '<span class="badge au-badge-skip">SKIP</span>'
+                    : r.passed
+                        ? '<span class="badge au-badge-success">PASS</span>'
+                        : '<span class="badge au-badge-danger">FAIL</span>';
                 const normalizedError = normalizeText(r.errorMessage);
-                const error = normalizedError ? `<small class="text-danger">${escapeHtml(normalizedError)}</small>` : 'N/A';
+                const normalizedSkipReason = normalizeText(r.skipReason);
+                const error = r.skipped && normalizedSkipReason
+                    ? `<small class="text-muted">${escapeHtml(normalizedSkipReason)}</small>`
+                    : normalizedError
+                        ? `<small class="text-danger">${escapeHtml(normalizedError)}</small>`
+                        : '<span class="text-muted">N/A</span>';
                 const commit = r.commit ? `<code class="text-break">${escapeHtml(r.commit)}</code>` : '<span class="text-muted">N/A</span>';
                 const build = r.build ? `<code class="text-break">${escapeHtml(r.build)}</code>` : '<span class="text-muted">N/A</span>';
                 const version = r.version ? `<code class="text-break">${escapeHtml(r.version)}</code>` : '<span class="text-muted">N/A</span>';
