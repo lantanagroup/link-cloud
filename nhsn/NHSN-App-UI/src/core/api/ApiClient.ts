@@ -29,6 +29,7 @@ import type {
   ReportDetail,
   ReportPatientEntry,
   PatientMappingEvidence,
+  LocationOrgMapping,
   ReportRequest,
   ReportSummary,
   ReportingPlan,
@@ -124,6 +125,8 @@ export interface ApiClient {
   getReport(reportId: string): Promise<ReportDetail>;
   getReportPatients(reportId: string): Promise<ReportPatientEntry[]>;
   getPatientMappingEvidence(reportId: string, patientId: string): Promise<PatientMappingEvidence>;
+  /** Every Location Org mapping DataAcquisition has recorded for the current facility -- found and missing/unmatched alike. */
+  getFacilityLocationOrgMappings(): Promise<LocationOrgMapping[]>;
   getPatientPreQualResults(reportId: string, patientId: string): Promise<PreQualIssue[]>;
   getPatientStatuses(reportId: string): Promise<PatientPipeline[]>;
   getQueryPlan(reportId: string): Promise<QueryPlan>;

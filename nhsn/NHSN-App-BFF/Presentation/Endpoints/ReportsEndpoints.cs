@@ -119,6 +119,24 @@ public class ReportsEndpoints : IApi
                 return operation;
             });
 
+        group.MapGet("/location-org-mappings", async (
+                IReportingService service,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await service.GetFacilityLocationOrgMappingsAsync(cancellationToken)))
+            .WithName("GetFacilityLocationOrgMappings")
+            .Produces<List<LocationOrgMapping>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .WithOpenApi(operation =>
+            {
+                operation.Summary = "Reads every Location Org mapping DataAcquisition has recorded for the current facility.";
+                operation.Description =
+                    "Facility-scoped, not report-scoped -- found and missing/unmatched Locations alike. " +
+                    "The Location Org evidence modal fetches this once per report-detail view and joins " +
+                    "it against the Locations parsed from each patient's report, rather than one call per " +
+                    "Location. Empty list when the facility has no mappings yet.";
+                return operation;
+            });
+
         group.MapGet("/{reportId}/query-plan", async (
                 string reportId,
                 IReportingService service,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ReportingStatus } from '../../../api/contracts';
 import { acronymTitle, Button, HeadingPause, Modal } from '../../../fields';
 import { DownloadIcon } from './icons';
 import { buildPieSlices } from './pieChart';
@@ -14,7 +15,11 @@ export interface PatientDetailModalProps {
   currentDqmLabel: string | undefined;
   currentDqm: string | undefined;
   downloadingPatientId: string | null;
-  onDownloadReport: (patientId: string, dqmId: string | undefined) => void;
+  onDownloadReport: (
+    patientId: string,
+    dqmId: string | undefined,
+    reportingStatus: ReportingStatus,
+  ) => void;
 }
 
 export function PatientDetailModal({
@@ -130,12 +135,24 @@ export function PatientDetailModal({
         <div className="nhsn-link__report-results-patient-detail-actions">
           <Button
             variant="secondary"
-            onClick={() => onDownloadReport(patientRow.patientId, currentDqm)}
-            disabled={!currentDqm || downloadingPatientId === patientRow.patientId}
+            onClick={() =>
+              onDownloadReport(
+                patientRow.patientId,
+                currentDqm,
+                patientRow.reportingStatus,
+              )
+            }
+            disabled={
+              !currentDqm ||
+              downloadingPatientId === patientRow.patientId ||
+              patientRow.reportingStatus === 'NotReportable'
+            }
             loading={downloadingPatientId === patientRow.patientId}>
             <DownloadIcon />
             {t(
-              'onboarding:reportResults.detail.patientDetail.downloadReport',
+              patientRow.reportingStatus === 'NotReportable'
+                ? 'onboarding:reportResults.detail.downloadPatientReportUnavailable'
+                : 'onboarding:reportResults.detail.patientDetail.downloadReport',
             )}
           </Button>
         </div>

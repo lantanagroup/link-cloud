@@ -10,11 +10,13 @@ import type {
   HslocMapping,
   PatientMappingEvidence,
   QueryPlan,
+  ReportingStatus,
 } from '../../../api/contracts';
 import { HttpError } from '../../../api/http';
 import { AcquisitionLogModal } from './AcquisitionLogModal';
 import { EncounterEvidenceModal } from './EncounterEvidenceModal';
 import { HslocEvidenceModal } from './HslocEvidenceModal';
+import { discoverLocationOrgRows, parseNdjsonResources, type LocationDiscoveryRow } from './locationOrgDiscovery';
 import { LocationOrgEvidenceModal } from './LocationOrgEvidenceModal';
 import { PatientDetailModal } from './PatientDetailModal';
 import { PatientStatusTimelineModal } from './PatientStatusTimeline';
@@ -116,6 +118,11 @@ export function ReportDetailView() {
     },
     enabled: Boolean(viewingReportId) && patientIds.length > 0,
   });
+  const { data: facilityLocationOrgMappings } = useQuery({
+    queryKey: ['facilityLocationOrgMappings'],
+    queryFn: () => api.getFacilityLocationOrgMappings(),
+    enabled: Boolean(viewingReportId),
+  });
   const detailError = detailQueryError
     ? detailQueryError instanceof Error
       ? detailQueryError.message
@@ -141,6 +148,11 @@ export function ReportDetailView() {
   const [mappingEvidenceError, setMappingEvidenceError] = useState<
     string | null
   >(null);
+  const [locationOrgDiscoveryRows, setLocationOrgDiscoveryRows] = useState<
+    LocationDiscoveryRow[] | null
+  >(null);
+  const [locationOrgNotReportable, setLocationOrgNotReportable] =
+    useState(false);
 
   // HSLOC reference codes, the facility's live configured mappings, and in-progress "+ Add Mapping"
   // selections for the HSLOC mapping modal's unmapped values, keyed by the unmapped source code.
@@ -311,8 +323,14 @@ export function ReportDetailView() {
   async function handleDownloadPatientReport(
     patientId: string,
     dqmId: string | undefined,
+    reportingStatus: ReportingStatus,
   ) {
-    if (!detail || !dqmId || downloadingPatientId === patientId) {
+    if (
+      !detail ||
+      !dqmId ||
+      downloadingPatientId === patientId ||
+      reportingStatus === 'NotReportable'
+    ) {
       return;
     }
     setDownloadingPatientId(patientId);
@@ -351,31 +369,69 @@ export function ReportDetailView() {
     setMappingEvidenceColumn(column);
     setMappingEvidencePatientId(patientId);
     setMappingEvidenceError(null);
+    setLocationOrgDiscoveryRows(null);
+    setLocationOrgNotReportable(false);
     hslocEvidence.resetSelections();
     encounterEvidence.resetSelections();
+
     const cachedEvidence = patientMappingEvidenceByPatientId?.[patientId];
-    if (cachedEvidence) {
-      setMappingEvidence(cachedEvidence);
-      setMappingEvidenceLoading(false);
+    const evidencePromise: Promise<PatientMappingEvidence> = cachedEvidence
+      ? Promise.resolve(cachedEvidence)
+      : api.getPatientMappingEvidence(detail.reportId, patientId);
+
+    const reportingStatus = patients.find(
+      (patient) => patient.patientId === patientId,
+    )?.reportingStatus;
+    // NotReportable means Report never generated a measure report blob for this patient --
+    // exportPatientReport would 404. The evidence fetched above (Report's own recorded
+    // outcome) is still shown; there's just no fresh bundle to parse for raw values.
+    const isNotReportable = reportingStatus === 'NotReportable';
+    const wantsDiscovery =
+      column === 'locationOrg' &&
+      draft.locationOrg.method &&
+      draft.locationOrg.method !== 'custom-fhir-path' &&
+      Boolean(currentDqm) &&
+      !isNotReportable;
+    setLocationOrgNotReportable(
+      column === 'locationOrg' && Boolean(draft.locationOrg.method) && isNotReportable,
+    );
+
+    const discoveryPromise: Promise<LocationDiscoveryRow[] | null> = wantsDiscovery
+      ? api
+          .exportPatientReport(detail.reportId, patientId, currentDqm!)
+          .then(async (blob) =>
+            discoverLocationOrgRows(
+              parseNdjsonResources(await blob.text()),
+              facilityLocationOrgMappings ?? [],
+            ),
+          )
+      : Promise.resolve(null);
+
+    setMappingEvidence(cachedEvidence ?? null);
+    setMappingEvidenceLoading(true);
+    const [evidenceResult, discoveryResult] = await Promise.allSettled([
+      evidencePromise,
+      discoveryPromise,
+    ]);
+    setMappingEvidenceLoading(false);
+
+    if (evidenceResult.status === 'fulfilled') {
+      setMappingEvidence(evidenceResult.value);
     } else {
-      setMappingEvidence(null);
-      setMappingEvidenceLoading(true);
-      try {
-        const evidence = await api.getPatientMappingEvidence(
-          detail.reportId,
-          patientId,
-        );
-        setMappingEvidence(evidence);
-      } catch (cause) {
-        setMappingEvidenceError(
-          cause instanceof Error
-            ? cause.message
-            : t('onboarding:reportResults.messages.loadError'),
-        );
-      } finally {
-        setMappingEvidenceLoading(false);
-      }
+      setMappingEvidenceError(
+        evidenceResult.reason instanceof Error
+          ? evidenceResult.reason.message
+          : t('onboarding:reportResults.messages.loadError'),
+      );
     }
+
+    // Discovery is a best-effort enhancement over the evidence above, not a hard requirement --
+    // a rejected or null discoveryResult leaves discoveryRows unset so the modal falls back to
+    // that evidence instead of blocking the whole section on a failed export.
+    if (discoveryResult.status === 'fulfilled' && discoveryResult.value) {
+      setLocationOrgDiscoveryRows(discoveryResult.value);
+    }
+
     if (column === 'hsloc') {
       await hslocEvidence.load();
     }
@@ -894,18 +950,24 @@ export function ReportDetailView() {
                         <td>
                           <button
                             type="button"
+                            disabled={row.reportingStatus === 'NotReportable'}
                             className={`nhsn-link__report-results-icon-button${downloadingPatientId === row.patientId ? ' nhsn-link__report-results-icon-button--busy' : ''}`}
                             onClick={() =>
                               handleDownloadPatientReport(
                                 row.patientId,
                                 currentDqm,
+                                row.reportingStatus,
                               )
                             }
                             aria-label={t(
-                              'onboarding:reportResults.detail.downloadPatientReport',
+                              row.reportingStatus === 'NotReportable'
+                                ? 'onboarding:reportResults.detail.downloadPatientReportUnavailable'
+                                : 'onboarding:reportResults.detail.downloadPatientReport',
                             )}
                             title={t(
-                              'onboarding:reportResults.detail.downloadPatientReport',
+                              row.reportingStatus === 'NotReportable'
+                                ? 'onboarding:reportResults.detail.downloadPatientReportUnavailable'
+                                : 'onboarding:reportResults.detail.downloadPatientReport',
                             )}>
                             <DownloadIcon />
                           </button>
@@ -982,6 +1044,8 @@ export function ReportDetailView() {
         loading={mappingEvidenceLoading}
         error={mappingEvidenceError}
         evidence={mappingEvidence}
+        discoveryRows={locationOrgDiscoveryRows}
+        notReportable={locationOrgNotReportable}
       />
 
       {/* HSLOC Mapping -- the one mapping type this screen can actually fix: saveHslocMappings is

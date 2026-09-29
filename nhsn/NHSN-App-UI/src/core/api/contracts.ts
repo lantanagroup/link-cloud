@@ -460,6 +460,16 @@ export interface PatientMappingEvidence {
   codeMaps: CodeMapEvidence[];
 }
 
+export interface LocationOrgMapping {
+  locationId: string;
+  locationName?: string;
+  locationAlias?: string;
+  partOfValue?: string;
+  partOfId?: number;
+  isOrgLocation: boolean;
+  isActive: boolean;
+}
+
 /**
  * One FHIR query DataAcquisition ran while acquiring a report -- one row per query, matching the
  * granularity of the onboarding POC's acquisition log table. There is no timeline/timestamp here:

@@ -32,6 +32,13 @@ public interface IReportingService
     /// <summary>Reads the real evidence behind one patient's mapping indicators.</summary>
     Task<PatientMappingEvidence?> GetPatientMappingEvidenceAsync(string reportId, string patientId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reads every Location Org mapping DataAcquisition has recorded for the current facility --
+    /// found and missing/unmatched alike -- for the Location Org evidence modal's client-side
+    /// found/missing join against the Locations parsed from a patient's report.
+    /// </summary>
+    Task<List<LocationOrgMapping>> GetFacilityLocationOrgMappingsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Reads the facility's configured query plan for the report's vendor.</summary>
     Task<QueryPlan?> GetQueryPlanAsync(string reportId, CancellationToken cancellationToken = default);
 
