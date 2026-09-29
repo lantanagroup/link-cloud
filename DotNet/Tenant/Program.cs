@@ -189,6 +189,7 @@ namespace Tenant
 
             builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
+                .AddCheck<DmrpHealthCheck>("DMRP")
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

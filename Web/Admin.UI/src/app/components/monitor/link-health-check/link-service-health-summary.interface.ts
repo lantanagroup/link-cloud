@@ -1,7 +1,12 @@
 export interface ILinkServiceHealthSummary {
     service: string;
     status: string;
-    kafkaConnection: string;
-    databaseConnection: string;
-    cacheConnection: string;
+    totalDuration: string;
+    entries: Record<string, ILinkServiceHealthReportEntry>;
+}
+
+export interface ILinkServiceHealthReportEntry {
+    status: string;
+    duration: string;
+    description: string | null;
 }
