@@ -23,6 +23,13 @@ public abstract class AbstractResourceRecord {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
+    /**
+     * @deprecated Ignored since LEGLINK-1279: the store is no longer chosen by the message — reads
+     * are Redis-first with ABS fallback, and cleanup covers both stores. Kept only so records from
+     * producers that still stamp it deserialize unchanged; remove from the contract in both
+     * runtimes once LEGLINK-1276 is merged everywhere.
+     */
+    @Deprecated
     private CacheType cacheType;
 
     private String cacheKey;
