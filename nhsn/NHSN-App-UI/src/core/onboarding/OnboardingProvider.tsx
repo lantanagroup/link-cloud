@@ -397,13 +397,17 @@ export function OnboardingProvider({
 
   const goTo = useCallback(
     (stepId: StepId) => {
+      // Re-selecting the step the user is already on (not inside a sub-view) is a no-op
+      if (stepId === draft.currentStepId && !draft.currentView) {
+        return;
+      }
       if (dirtyRef.current || Boolean(stepUnsavedRef.current?.isDirty())) {
         setPendingStepId(stepId);
         return;
       }
       completeGoTo(stepId);
     },
-    [completeGoTo]
+    [completeGoTo, draft.currentStepId, draft.currentView]
   );
 
   const confirmSaveAndContinue = useCallback(() => {
