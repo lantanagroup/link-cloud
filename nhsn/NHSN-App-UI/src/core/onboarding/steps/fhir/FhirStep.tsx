@@ -181,6 +181,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
     const normalized = normalizePullTime(value);
     setter(normalized);
     markTouched(field);
+    if (field === 'maxAcquisitionPullTime' && normalized) {
+      markTouched('minAcquisitionPullTime');
+    }
     refreshErrors({[field]: normalized}, field);
     patch('fhir', {[field]: normalized});
   }
@@ -431,6 +434,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 const normalized = normalizePullTime(value);
                 setMinPullTime(normalized);
                 setEditedPullTimeField('minAcquisitionPullTime');
+                if (!maxPullTime.trim()) {
+                  setTouched(prev => ({...prev, maxAcquisitionPullTime: false}));
+                }
                 resetConnectionTest();
                 patch('fhir', {minAcquisitionPullTime: normalized});
               }}
@@ -447,6 +453,9 @@ export function FhirStep({onNext, onBack}: StepProps) {
                 const normalized = normalizePullTime(value);
                 setMaxPullTime(normalized);
                 setEditedPullTimeField('maxAcquisitionPullTime');
+                if (!minPullTime.trim()) {
+                  setTouched(prev => ({...prev, minAcquisitionPullTime: false}));
+                }
                 resetConnectionTest();
                 patch('fhir', {maxAcquisitionPullTime: normalized});
               }}
