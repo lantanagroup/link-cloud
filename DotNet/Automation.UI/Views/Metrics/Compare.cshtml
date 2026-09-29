@@ -78,6 +78,15 @@
         if (Math.Abs(change) < 1) return "about the same";
         return change > 0 ? $"{change:0}% more throughput" : $"{Math.Abs(change):0}% less throughput";
     }
+    string DeltaHitRatioText(double? left, double? right)
+    {
+        if (left is null || right is null || left == 0) return "";
+        var change = (right.Value - left.Value) / left.Value * 100;
+        if (Math.Abs(change) < 1) return "about the same";
+        return change > 0 ? $"{change:0}% higher" : $"{Math.Abs(change):0}% lower";
+    }
+    string HitRatioText(bool unavailable, double? value) =>
+        unavailable || value is null ? "—" : value.Value.ToString("0.0") + "%";
     bool BothMissing(bool leftMissing, bool rightMissing) => leftMissing && rightMissing;
 }
 
@@ -171,11 +180,11 @@
                         {
                             <tr>
                                 <td>Cache: served from cache</td>
-                                <td>@(leftCache.Unavailable ? "—" : (leftCache.HitRatioPercent?.ToString("0.0") ?? "—") + "%")</td>
-                                <td>@(rightCache.Unavailable ? "—" : (rightCache.HitRatioPercent?.ToString("0.0") ?? "—") + "%")</td>
+                                <td>@HitRatioText(leftCache.Unavailable, leftCache.HitRatioPercent)</td>
+                                <td>@HitRatioText(rightCache.Unavailable, rightCache.HitRatioPercent)</td>
                                 @* Higher is better here, unlike every other row in this table. *@
                                 <td class="@DeltaThroughputClass(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)">
-                                    @DeltaThroughputText(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)
+                                    @DeltaHitRatioText(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)
                                 </td>
                             </tr>
                             <tr>
