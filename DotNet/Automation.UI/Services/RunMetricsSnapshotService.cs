@@ -448,7 +448,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     // No facility filter: the resource cache is shared across facilities within a service and its
     // instruments carry no facility tag, so the run window is the scope.
     internal static string CacheReadCountQuery(string outcome, int windowSeconds) =>
-        $"sum(increase(link_resource_cache_read_duration_count{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
+        $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
 
     internal static string CacheQuantileQuery(string histogramBase, string labels, int windowSeconds, string quantile) =>
         $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{labels}[{windowSeconds}s])))";
@@ -681,11 +681,11 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             FallbackCount = fallbacks,
             EmptyCount = empties,
             HitRatio = served > 0 ? hits / served : 0,
-            ReadP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_read_duration", string.Empty, windowSeconds, "0.95")),
-            DurableWriteP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_write_duration", "{cache_store=\"blob\"}", windowSeconds, "0.95")),
-            QueueWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_queue_wait_duration", string.Empty, windowSeconds, "0.95")),
-            DrainWaitP50Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration", string.Empty, windowSeconds, "0.50")),
-            DrainWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration", string.Empty, windowSeconds, "0.95")),
+            ReadP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_read_duration_milliseconds", string.Empty, windowSeconds, "0.95")),
+            DurableWriteP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_write_duration_milliseconds", "{cache_store=\"blob\"}", windowSeconds, "0.95")),
+            QueueWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_queue_wait_duration_milliseconds", string.Empty, windowSeconds, "0.95")),
+            DrainWaitP50Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration_milliseconds", string.Empty, windowSeconds, "0.50")),
+            DrainWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration_milliseconds", string.Empty, windowSeconds, "0.95")),
             PeakQueueDepth = await Scalar(CachePeakQueueDepthQuery(windowSeconds)),
             WriteRetryCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "retried", windowSeconds)),
             WriteExhaustedCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "exhausted", windowSeconds))
