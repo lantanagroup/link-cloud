@@ -8,6 +8,8 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services.Onboarding;
 public sealed class PackageZipDownloadService : IPackageZipDownloadService
 {
     private const string StaticAssetsDirectory = "StaticAssets";
+    private const string HslocReferenceSheet = "HSLOC Reference";
+    private const string EncounterReferenceSheet = "Encounter Reference";
 
     // Paths relative to StaticAssets, case-exact because the deployment target is case-sensitive.
     //
@@ -37,6 +39,7 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
     private readonly IFacilityGateway _facilityGateway;
     private readonly INhsnUserContext _userContext;
     private readonly IWebHostEnvironment _environment;
+    private readonly IReferenceDataService _referenceDataService;
     private readonly ILogger<PackageZipDownloadService> _logger;
 
     public PackageZipDownloadService(
@@ -44,12 +47,14 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
         IFacilityGateway facilityGateway,
         INhsnUserContext userContext,
         IWebHostEnvironment environment,
+        IReferenceDataService referenceDataService,
         ILogger<PackageZipDownloadService> logger)
     {
         _readService = readService;
         _facilityGateway = facilityGateway;
         _userContext = userContext;
         _environment = environment;
+        _referenceDataService = referenceDataService;
         _logger = logger;
     }
 
@@ -102,6 +107,21 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
         var facilityLine = $"Facility: {facility?.FacilityName ?? facilityId} ({facilityId})";
         var vendorLine = $"Vendor: {vendor.Value}";
 
+        // The sheet's reference tabs are filled from the same vocabulary ManualUploadTemplateService
+        // validates an upload against, so a code picked off the sheet always resolves on import. An
+        // empty result (service down, nothing loaded) keeps the template's own baked-in rows.
+        var hslocRows = await LoadReferenceRowsAsync("HSLOC", async () =>
+            (await _referenceDataService.GetHslocCodesAsync(cancellationToken))
+                .OrderBy(code => code.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(code => (IReadOnlyList<string>)[code.Code, code.Display])
+                .ToList());
+        var encounterRows = await LoadReferenceRowsAsync("encounter", async () =>
+            (await _referenceDataService.GetEncounterCodesAsync(cancellationToken))
+                .OrderBy(code => code.System, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(code => code.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(code => (IReadOnlyList<string>)[code.System, code.Code, code.Display])
+                .ToList());
+
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
@@ -119,6 +139,8 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
                 {
                     var templateBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
                     var personalized = ManualUploadTemplatePersonalizer.Personalize(templateBytes, facilityLine, vendorLine);
+                    personalized = ManualUploadTemplatePersonalizer.ReplaceReferenceSheet(personalized, HslocReferenceSheet, hslocRows);
+                    personalized = ManualUploadTemplatePersonalizer.ReplaceReferenceSheet(personalized, EncounterReferenceSheet, encounterRows);
                     await entryStream.WriteAsync(personalized, cancellationToken);
                 }
                 else
@@ -135,5 +157,26 @@ public sealed class PackageZipDownloadService : IPackageZipDownloadService
             PackageZipDownloadStatus.Ok,
             stream.ToArray(),
             $"{facilityId}_import_sheet.zip");
+    }
+
+    // A reference lookup failing must not fail the download - the template's baked-in rows are a
+    // usable (if possibly stale) fallback, so log and return nothing to keep them.
+    private async Task<IReadOnlyList<IReadOnlyList<string>>> LoadReferenceRowsAsync(
+        string vocabulary, Func<Task<List<IReadOnlyList<string>>>> load)
+    {
+        try
+        {
+            var rows = await load();
+            if (rows.Count == 0)
+            {
+                _logger.LogWarning("No {Vocabulary} reference codes returned; the import sheet keeps its built-in reference rows.", vocabulary);
+            }
+            return rows;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Failed to load {Vocabulary} reference codes; the import sheet keeps its built-in reference rows.", vocabulary);
+            return [];
+        }
     }
 }
