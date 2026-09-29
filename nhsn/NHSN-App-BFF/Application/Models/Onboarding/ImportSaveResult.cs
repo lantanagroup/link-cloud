@@ -33,4 +33,9 @@ public sealed record ImportSectionSaveError
 
     // The downstream service's own explanation, extracted from its response where possible.
     public required string Detail { get; init; }
+
+    // Set when the failure is one the facility can act on and has its own translated message
+    // (e.g. a Custom FHIR Path Data Acquisition couldn't compile). The cell error then uses this
+    // key instead of saveFailed, and Detail - raw downstream text - is not sent to the browser.
+    public string? MessageKey { get; init; }
 }

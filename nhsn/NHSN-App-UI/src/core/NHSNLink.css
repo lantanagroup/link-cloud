@@ -2338,6 +2338,10 @@
   text-decoration: none;
 }
 
+a.nhsn-link__report-results-link {
+  display: inline-block;
+}
+
 .nhsn-link__report-results-measures {
   display: flex;
   flex-wrap: wrap;
@@ -2630,8 +2634,11 @@
 
 /* The package's .k-form-field reserves right padding and bottom margin for the next field in a
    form - the grid's own gap already spaces these, so without resetting both the filters don't
-   start and end on the same lines as the table below. */
-.nhsn-link__report-results-filters > * {
+   start and end on the same lines as the table below. The `.k-form-field` selector is the one that
+   matters: a bare `> *` ties the package's own `.k-form-field` rule on specificity, so whichever
+   stylesheet the host loads last would decide it. */
+.nhsn-link__report-results-filters > *,
+.nhsn-link__report-results-filters > .k-form-field {
   min-width: 0;
   margin: 0;
   padding-right: 0;

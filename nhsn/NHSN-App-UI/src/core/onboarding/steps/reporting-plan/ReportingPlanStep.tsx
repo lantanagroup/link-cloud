@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {acronymTitle, Button, HeadingPause, MessageContainer, StepActions} from '../../../fields';
 import type {StepProps} from '../../flow';
@@ -81,12 +81,16 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
   const hasSchedule = rows.length > 0;
 
   // No editable fields means patch() never fires, so advanceTo() would skip the save that
-  // enrolls the facility server-side -- force it directly instead.
+  // enrolls the facility server-side -- force it directly instead. `continuing` keeps the Continue
+  // spinner up through that save; it resets in the same tick onNext() takes over, so there's no gap.
+  const [continuing, setContinuing] = useState(false);
   const handleNext = useCallback(async () => {
+    setContinuing(true);
     const saved = await save();
     if (saved) {
       onNext();
     }
+    setContinuing(false);
   }, [save, onNext]);
 
   const stableOnBack = useStableCallback(onBack);
@@ -101,13 +105,13 @@ export function ReportingPlanStep({onNext, onBack}: StepProps) {
             <Button variant="secondary" onClick={stableOnBack} disabled={saving} loading={savingDirection === 'back'}>
               {t('common:actions.back')}
             </Button>
-            <Button onClick={stableOnNext} disabled={saving || !hasSchedule} loading={savingDirection === 'next'}>
+            <Button onClick={stableOnNext} disabled={saving || !hasSchedule} loading={continuing || savingDirection === 'next'}>
               {t('common:actions.continue')}
             </Button>
           </StepActions>
         )
       }),
-      [t, saving, savingDirection, stableOnBack, stableOnNext, hasSchedule]
+      [t, saving, savingDirection, continuing, stableOnBack, stableOnNext, hasSchedule]
     )
   );
 

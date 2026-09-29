@@ -42,6 +42,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  padding-left: var(--nhsn-focus-ring-width, 2px);
 }
 
 /* ---------------------------------------------------------- mapping tab */

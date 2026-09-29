@@ -1,4 +1,5 @@
 import React, {useMemo, useState} from 'react';
+import {useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {useApiClient} from '../../../api/ApiClientContext';
 import type {ImportedFields} from '../../../api/contracts';
@@ -23,6 +24,7 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const {saving, savingDirection, patch, user, setErrorStepIds} = useOnboarding();
   const api = useApiClient();
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string[]>();
   const [importSummary, setImportSummary] = useState<{fileName: string; imported: number; total: number}>();
@@ -50,15 +52,20 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
     }
     if (fields.hsloc?.mappings) {
       patch('hsloc', {mappings: fields.hsloc.mappings});
+      // Unlike the other steps, HslocStep renders from the saved mappings query rather than the
+      // draft, and caches it for the session - so a re-upload would keep showing the previous
+      // sheet's rows until a reload. Removed rather than invalidated: HslocStep hydrates its rows
+      // once, so it must mount into a loading state and read the fresh list, not the stale cache.
+      queryClient.removeQueries({queryKey: ['hslocMappings']});
     }
-    if (fields.encounter?.mappings) {
+    if (fields.encounter?.codeSystems) {
       // encounter.codeSystems is a separate list driving which "Encounter.type Code System"
       // sections EncounterStep renders (see buildGroups) - it's not derived from mappings there,
       // so patching mappings alone leaves a stale system from a previous session/import rendering
       // as an empty group forever. The sheet is the source of truth for this step on import, so
-      // codeSystems is replaced with exactly the systems the sheet named, same as mappings.
-      const codeSystems = [...new Set(fields.encounter.mappings.map(mapping => mapping.system))];
-      patch('encounter', {codeSystems, mappings: fields.encounter.mappings});
+      // codeSystems is replaced with exactly the systems the sheet named (including one with no
+      // mapping rows under it yet), same as mappings.
+      patch('encounter', {codeSystems: fields.encounter.codeSystems, mappings: fields.encounter.mappings ?? []});
     }
     if (fields.census) {
       const censusPatch: Partial<DraftSections['census']> = fields.census;
@@ -95,8 +102,11 @@ export function ManualUploadStep({onNext, onBack}: StepProps) {
       const errorLines = result.cellErrors.length
         ? result.cellErrors.map(cellError => {
             const location = cellError.label ? `${cellError.cell} (${cellError.label})` : cellError.cell;
-            const message = t(cellError.messageKey, {detail: cellError.detail});
-            return t('onboarding:manualUpload.errors.lineFormat', {sheet: cellError.sheet, location, message});
+            // React escapes these lines when it renders them as text, so i18next escaping them too
+            // would double-encode - a quote in a sheet label or save detail showing up as &#39;.
+            const interpolation = {escapeValue: false};
+            const message = t(cellError.messageKey, {detail: cellError.detail, interpolation});
+            return t('onboarding:manualUpload.errors.lineFormat', {sheet: cellError.sheet, location, message, interpolation});
           })
         : undefined;
 

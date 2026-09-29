@@ -84,7 +84,7 @@ export function HslocStep({onNext, onBack}: StepProps) {
   const {t} = useTranslation(['onboarding', 'common']);
   const api = useApiClient();
   const {notifyError} = useNotifications();
-  const {draft, patch, saving, vendorProfile} = useOnboarding();
+  const {draft, patch, saving, savingDirection, vendorProfile} = useOnboarding();
   const queryClient = useQueryClient();
 
   const [submitting, setSubmitting] = useState(false);
@@ -339,16 +339,16 @@ export function HslocStep({onNext, onBack}: StepProps) {
               title: acronymTitle(<HeadingPause><AcronymText>{t('onboarding:hsloc.title')}</AcronymText></HeadingPause>),
               footer: (
                 <StepActions saving={busy}>
-                  <Button variant="secondary" onClick={stableOnBack} disabled={busy}>
+                  <Button variant="secondary" onClick={stableOnBack} disabled={busy} loading={savingDirection === 'back'}>
                     {t('common:actions.back')}
                   </Button>
-                  <Button onClick={stableHandleNext} disabled={busy}>
+                  <Button onClick={stableHandleNext} disabled={busy} loading={submitting || savingDirection === 'next'}>
                     {t('common:actions.continue')}
                   </Button>
                 </StepActions>
               )
             },
-      [t, loading, busy, stableOnBack, stableHandleNext]
+      [t, loading, busy, savingDirection, submitting, stableOnBack, stableHandleNext]
     )
   );
 

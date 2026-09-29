@@ -210,23 +210,40 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
 
             if (fields.LocationOrg is { } locationOrg)
             {
+                // The Custom FHIR Path is never validated on manual upload - whatever the facility's
+                // sheet has is saved as-is and surfaces no import error, even if Data Acquisition
+                // would reject it as uncompilable. A facility can still fix it later online, where
+                // LocationOrgStep's own live FHIRPath check applies.
+                var customFhirPathRejected = false;
                 var (_, locationOrgDetail) = await TrySectionAsync(facilityId, "location-org", async () =>
                 {
-                    await WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                    try
                     {
-                        Method = locationOrg.Method,
-                        ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
-                        LocationTypes = locationOrg.LocationTypes?
-                            .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
-                            .ToList() ?? [],
-                        LocationIdentifiers = locationOrg.LocationIdentifiers?
-                            .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
-                            .ToList() ?? [],
-                        CustomFhirPath = locationOrg.CustomFhirPath
-                    }, cancellationToken);
+                        await WriteLocationOrgSectionAsync(facilityId, new LocationOrgSection
+                        {
+                            Method = locationOrg.Method,
+                            ManagingOrganizationIds = locationOrg.ManagingOrganizationIds ?? [],
+                            LocationTypes = locationOrg.LocationTypes?
+                                .Select(t => new LocationTypeEntry { Code = t.Code, Alias = t.Alias })
+                                .ToList() ?? [],
+                            LocationIdentifiers = locationOrg.LocationIdentifiers?
+                                .Select(i => new LocationIdentifierEntry { System = i.System, Code = i.Code })
+                                .ToList() ?? [],
+                            CustomFhirPath = locationOrg.CustomFhirPath
+                        }, cancellationToken);
+                    }
+                    catch (LinkServiceException ex) when (
+                        ex.StatusCode == StatusCodes.Status400BadRequest && locationOrg.Method == "custom-fhir-path")
+                    {
+                        customFhirPathRejected = true;
+                        throw;
+                    }
                     return true;
                 });
-                RecordFailure("location-org", locationOrgDetail);
+                if (!customFhirPathRejected)
+                {
+                    RecordFailure("location-org", locationOrgDetail);
+                }
             }
 
             if (fields.Hsloc?.Mappings is { Count: > 0 } hslocMappings)
@@ -266,6 +283,10 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                 RecordFailure("hsloc", hslocDetail);
             }
 
+            // A sheet can name a Code System with no mapping rows under it (all three other columns
+            // left blank) - that still updates CodeSystems below, but only a sheet with actual
+            // mapping rows touches Normalization's Code Map operation, since SaveAsync replaces it
+            // wholesale and an empty set would wipe the facility's existing mappings.
             if (fields.Encounter?.Mappings is { Count: > 0 } encounterMappings)
             {
                 // EncounterMappingService.SaveAsync replaces the facility's whole Code Map operation
@@ -302,14 +323,16 @@ public sealed class OnboardingWriteService : IOnboardingWriteService
                     return true;
                 });
                 RecordFailure("encounter", encounterDetail);
+            }
 
+            if (fields.Encounter?.CodeSystems is { Count: > 0 } sheetCodeSystems)
+            {
                 // CodeSystems is a BFF-only cache (see SaveWorkflowStateAsync's "encounter" case)
                 // that OnboardingReadService.GetAsync always echoes back verbatim, never reconciled
                 // against Normalization's own mappings - so leaving it untouched here would let a
                 // stale system from a previous online session or import survive next to this
                 // sheet's own systems forever. The sheet is the source of truth for this step on
                 // import, same as ManualUploadStep's own client-side patch of codeSystems.
-                var sheetCodeSystems = encounterMappings.Select(m => m.System).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 await UpdateEncounterCodeSystemsAsync(facilityId, sheetCodeSystems, cancellationToken);
             }
 

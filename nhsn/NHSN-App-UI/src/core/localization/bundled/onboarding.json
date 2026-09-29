@@ -96,10 +96,9 @@
       "invalidNumberRange": "Enter a whole number between {{detail}}.",
       "invalidLocationMethod": "Enter a valid organization identification method.",
       "invalidPullTime": "Enter a time in 24-hour HH:MM format.",
-      "lagDurationTooLong": "Patient resource acquisition lag duration cannot exceed 59 days.",
       "invalidCensusFrequency": "Census Acquisition Frequency must be between 5 minutes and 24 hours.",
       "invalidFhirId": "Enter a valid FHIR id.",
-      "invalidFhirPath": "Enter a valid FHIRPath expression.",
+      "invalidCustomFhirPath": "The Custom FHIR Path provided is not valid. Please check the syntax and try again.",
       "invalidHslocCode": "This HSLOC Reference Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
       "invalidEncounterReference": "This reference System/Code was not found in the reference table. Correct it, or leave the mapping blank to select one online.",
       "invalidSftpHost": "Enter a valid SFTP hostname or IP address.",
@@ -114,7 +113,9 @@
       "duplicateHslocIdentifier": "This Location.identifier.value is used by more than one row — each mapping's local identifier must be unique.",
       "partialLocationType": "Both columns are required for a Location Type row — remove incomplete rows or fill them in completely.",
       "partialLocationIdentifier": "Both columns are required for a Location Identifier row — remove incomplete rows or fill them in completely.",
-      "partialEncounterMapping": "All four columns are required for an Encounter Mapping row — remove incomplete rows or fill them in completely.",
+      "requiredEncounterMapping": "At least one Encounter.type Code System is required.",
+      "requiredEncounterCodeSystem": "Encounter.type Code System is required for an Encounter Mapping row — fill it in or remove the row.",
+      "partialEncounterMapping": "This Encounter Mapping row is incomplete — Local Encounter.type Code, Reference Code System and Reference Code must either all be filled in or all be removed.",
       "lineFormat": "{{sheet}} {{location}}: {{- message}}"
     }
   },
@@ -292,6 +293,7 @@
       "listLabel": "Managing Organizations",
       "placeholder": "Managing Organization",
       "add": "+ Add Managing Organization",
+      "duplicateError": "This Managing Organization has already been added.",
       "tooltip": "Add the identifiers of the FHIR Organization resources that manage your facility's Locations. NHSNLink uses these to determine which Locations belong to your facility."
     },
     "locationType": {
@@ -305,7 +307,9 @@
       "addSelected": "Add",
       "listLabel": "Location Type Code / Location Alias",
       "codeLabel": "Location Type Code",
+      "codePlaceholder": "location.type.code",
       "aliasLabel": "Location Alias",
+      "aliasPlaceholder": "location.alias",
       "duplicateError": "This Location Type Code and Location Alias combination is already used in another row.",
       "add": "+ Add Location Type",
       "columns": {
@@ -344,6 +348,7 @@
       "incompleteRows": "Every row needs both fields filled in - remove or finish any partial rows before continuing.",
       "duplicateLocationTypes": "Two or more rows have the same Location Type Code and Location Alias. Each combination must be unique.",
       "duplicateLocationIdentifiers": "Two or more rows have the same Location Identifier System and Code. Each combination must be unique.",
+      "duplicateManagingOrganizations": "Two or more rows have the same Managing Organization. Each value must be unique.",
       "invalidFhirPath": "Enter a valid FHIRPath expression (e.g. Location.identifier.where(system = 'urn:oid:1.2.3' and value = 'ABC').exists())."
     },
     "methodTooltip": "Choose how NHSNLink identifies which FHIR Location resources belong to your reporting facility, when your health system's FHIR endpoint serves more than one facility."
@@ -374,7 +379,7 @@
       }
     },
     "reference": {
-      "searchPlaceholder": "Search category, type, mnemonic, description, code, definition…",
+      "searchPlaceholder": "Search code,description",
       "allCategories": "All Categories",
       "resultCount": "{{count}} of {{total}} HSLOC codes",
       "noResults": "No matching HSLOC codes.",
@@ -409,7 +414,6 @@
       "codeSystemsHint": "Add each source code system your facility's local Encounter.type codes come from. Within each code system, map its local codes to the corresponding CPT or SNOMED reference code.",
       "codeSystemLabel": "Encounter.type Code System",
       "codeSystemPlaceholder": "e.g. http://mysite.org/fhir/encounter-type",
-      "noCodeSystems": "No code systems added yet.",
       "addCodeSystem": "+ Add Code System",
       "removeCodeSystem": "Remove System",
       "removeCodeSystemAriaLabel": "Remove code system {{system}}",
@@ -448,6 +452,7 @@
       "loadError": "Unable to load encounter mapping data.",
       "saveError": "Unable to save encounter mappings.",
       "incomplete": "Please complete each mapping row's fields, or remove the row, before continuing.",
+      "requiredCodeSystem": "At least one Encounter.type Code System is required.",
       "missingCodeSystemHint": "Encounter.type Code System is required.",
       "missingCodeSystem": "Fill in each Encounter.type Code System, or remove it, before continuing.",
       "duplicateCodeSystem": "Two or more Encounter.type Code Systems are the same (or both blank). Fix or remove one of them before continuing."
@@ -506,7 +511,7 @@
         "placeholder": "FHIR Patient ID",
         "add": "+ Add Patient ID",
         "empty": "None added yet.",
-        "requiredError": "This field cannot be empty.",
+        "requiredError": "This FHIR Patient ID field cannot be blank.",
         "duplicateError": "This FHIR Patient ID has already been added."
       },
       "csv": {
@@ -749,7 +754,7 @@
     "userFacing": {
       "question": "From the identifiers above, what patient identifier do frontline users typically use to look up a patient? Identifier name shown to users (exactly as it appears in the EHR)",
       "noOptionsHint": "Select at least one identifier in the question above to choose from here.",
-      "isCalledMrnQuestion": "Is this the identifier staff use as the MRN?",
+      "isCalledMrnQuestion": "Is this the identifier that staff use as the MRN?",
       "otherTermLabel": "If no, what term is used?",
       "canSearchQuestion": "Can staff search for patients using this identifier?"
     },

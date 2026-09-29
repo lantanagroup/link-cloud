@@ -77,13 +77,14 @@ function toRowValues(mapping: HslocMapping): MappingRowValues {
 /**
  * Mirrors HslocStep.validateStep: at least one mapping, none left incomplete (a manual-upload
  * import can land a row with an unresolved hslocCode - see ManualUploadStep), and no source code
- * mapped twice.
+ * mapped twice. A wholly blank row is ignored: "+ Add Mapping" lands one in the draft before the
+ * facility types anything, and that alone shouldn't relock the steps after this one. Continue
+ * still refuses it through validateStep.
  */
 export function isHslocComplete(draft: FacilityDraft): boolean {
-  const mappings = draft.hsloc.mappings ?? [];
-  if (mappings.length === 0) {
+  const rows = (draft.hsloc.mappings ?? []).map(toRowValues).filter(row => !isRowBlank(row));
+  if (rows.length === 0) {
     return false;
   }
-  const rows = mappings.map(toRowValues);
   return rows.every(isRowComplete) && findDuplicateSourceCodeIndexes(rows).length === 0;
 }
