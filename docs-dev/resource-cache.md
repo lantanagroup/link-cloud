@@ -213,7 +213,12 @@ storage lifecycle rule removes them, so each environment needs one.
 | `ResourceCache:AbsWriter:QueueCapacity` | bounded queue size; a full queue makes writers await |
 | `ResourceCache:AbsWriter:MaxConcurrency` | concurrent blob writes, across distinct keys |
 | `ResourceCache:AbsWriter:MaxRetryAttempts` | retries before a write is a permanent failure |
-| `ResourceCache:AbsWriter:DrainTimeoutSeconds` | how long a barrier waits before failing the caller |
+| `ResourceCache:AbsWriter:RetryBaseDelayMilliseconds` | delay before the first retry, doubling on each attempt |
+| `ResourceCache:AbsWriter:DrainTimeoutSeconds` | how long shutdown waits for queued writes to finish |
+
+`DrainTimeoutSeconds` bounds graceful shutdown only. The durability barrier itself has no timeout:
+`WaitForDurableAsync` waits until the key is durable, the write is abandoned as permanently failed,
+or the caller's own token is cancelled. Tuning this value to cap barrier latency has no effect.
 
 `Hybrid` requires both stores. Redis eviction is Redis's concern: there is no application-level
 memory threshold, and the deployed `maxmemory-policy` must evict rather than reject writes.
