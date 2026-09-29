@@ -1,4 +1,4 @@
-@model MetricsCompareViewModel
+﻿@model MetricsCompareViewModel
 @{
     ViewData["Title"] = "Compare runs";
     var stages = new[] { "acquisition", "normalization", "measureeval", "validation", "submission" };
@@ -162,6 +162,55 @@
                                 </td>
                             </tr>
                         }
+                        @{
+                            var leftCache = Model.Left.ResourceCache;
+                            var rightCache = Model.Right.ResourceCache;
+                            var cacheShown = !BothMissing(leftCache.Unavailable, rightCache.Unavailable);
+                        }
+                        @if (cacheShown)
+                        {
+                            <tr>
+                                <td>Cache: served from cache</td>
+                                <td>@(leftCache.Unavailable ? "—" : (leftCache.HitRatioPercent?.ToString("0.0") ?? "—") + "%")</td>
+                                <td>@(rightCache.Unavailable ? "—" : (rightCache.HitRatioPercent?.ToString("0.0") ?? "—") + "%")</td>
+                                @* Higher is better here, unlike every other row in this table. *@
+                                <td class="@DeltaThroughputClass(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)">
+                                    @DeltaThroughputText(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Cache: durability wait (slow)</td>
+                                <td>@(leftCache.Unavailable ? "—" : FormatMs(leftCache.DrainWaitP95Ms))</td>
+                                <td>@(rightCache.Unavailable ? "—" : FormatMs(rightCache.DrainWaitP95Ms))</td>
+                                <td class="@DeltaClass(leftCache.Unavailable ? null : leftCache.DrainWaitP95Ms, rightCache.Unavailable ? null : rightCache.DrainWaitP95Ms)">
+                                    @DeltaText(leftCache.Unavailable ? null : leftCache.DrainWaitP95Ms, rightCache.Unavailable ? null : rightCache.DrainWaitP95Ms)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Cache: read (slow)</td>
+                                <td>@(leftCache.Unavailable ? "—" : FormatMs(leftCache.ReadP95Ms))</td>
+                                <td>@(rightCache.Unavailable ? "—" : FormatMs(rightCache.ReadP95Ms))</td>
+                                <td class="@DeltaClass(leftCache.Unavailable ? null : leftCache.ReadP95Ms, rightCache.Unavailable ? null : rightCache.ReadP95Ms)">
+                                    @DeltaText(leftCache.Unavailable ? null : leftCache.ReadP95Ms, rightCache.Unavailable ? null : rightCache.ReadP95Ms)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Cache: durable write (slow)</td>
+                                <td>@(leftCache.Unavailable ? "—" : FormatMs(leftCache.DurableWriteP95Ms))</td>
+                                <td>@(rightCache.Unavailable ? "—" : FormatMs(rightCache.DurableWriteP95Ms))</td>
+                                <td class="@DeltaClass(leftCache.Unavailable ? null : leftCache.DurableWriteP95Ms, rightCache.Unavailable ? null : rightCache.DurableWriteP95Ms)">
+                                    @DeltaText(leftCache.Unavailable ? null : leftCache.DurableWriteP95Ms, rightCache.Unavailable ? null : rightCache.DurableWriteP95Ms)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Cache: peak queue depth</td>
+                                <td>@(leftCache.Unavailable ? "—" : (leftCache.PeakQueueDepth?.ToString("0") ?? "—"))</td>
+                                <td>@(rightCache.Unavailable ? "—" : (rightCache.PeakQueueDepth?.ToString("0") ?? "—"))</td>
+                                <td class="@DeltaClass(leftCache.Unavailable ? null : leftCache.PeakQueueDepth, rightCache.Unavailable ? null : rightCache.PeakQueueDepth)">
+                                    @DeltaText(leftCache.Unavailable ? null : leftCache.PeakQueueDepth, rightCache.Unavailable ? null : rightCache.PeakQueueDepth)
+                                </td>
+                            </tr>
+                        }
                         @foreach (var key in (Model.Left.ProcessUtilization.Select(p => p.Key).Concat(Model.Right.ProcessUtilization.Select(p => p.Key))).Distinct())
                         {
                             var leftProc = Model.Left.ProcessUtilization.FirstOrDefault(p => p.Key == key)
@@ -208,6 +257,14 @@
                         }
                     </tbody>
                 </table>
+                @if (cacheShown)
+                {
+                    <p class="small text-muted mt-2 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>Cache rows cover each run&#8217;s time window across the whole
+                        service, not just its facility &#8212; the cache is shared between facilities and its measurements
+                        carry no facility label. Comparing two runs that overlapped on the same stack will not be meaningful.
+                    </p>
+                }
             </div>
         </div>
     </div>

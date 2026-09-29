@@ -1,4 +1,4 @@
-using Automation.UI.Services.Persistence;
+﻿using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
@@ -121,6 +121,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         var wait = ResolvePrometheusWait();
         var endpoint = _telemetry.PrometheusQueryEndpoint?.Trim();
         var stagesUnavailable = string.IsNullOrWhiteSpace(endpoint);
+        var resourceCache = new ResourceCacheSnapshot();
         var stages = StageHistograms.ToDictionary(
             s => s.Stage,
             _ => new StageLatencySnapshot { Unavailable = true },
@@ -180,6 +181,8 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
                             input.RunId,
                             input.FacilityId);
                     }
+
+                    resourceCache = await QueryResourceCacheAsync(lookbackSeconds, evaluationTime, cancellationToken);
 
                     // Query at now (after the wait) with a lookback that still covers the run.
                     // Evaluating at FinishedAt misses OTEL samples that have not been scraped yet;
@@ -249,6 +252,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             },
             PrometheusWaitMs = (long)wait.TotalMilliseconds,
             Stages = stages,
+            ResourceCache = resourceCache,
             ProcessUtilization = utilization,
             ApiLatency = apiLatency,
             SlowestApiRoutes = slowestRoutes,
@@ -441,6 +445,20 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     internal static string StageErrorQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
         $"sum(increase({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
 
+    // No facility filter: the resource cache is shared across facilities within a service and its
+    // instruments carry no facility tag, so the run window is the scope.
+    internal static string CacheReadCountQuery(string outcome, int windowSeconds) =>
+        $"sum(increase(link_resource_cache_read_duration_count{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
+
+    internal static string CacheQuantileQuery(string histogramBase, string labels, int windowSeconds, string quantile) =>
+        $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{labels}[{windowSeconds}s])))";
+
+    internal static string CacheCounterQuery(string counter, string outcome, int windowSeconds) =>
+        $"sum(increase({counter}{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
+
+    internal static string CachePeakQueueDepthQuery(int windowSeconds) =>
+        $"max(max_over_time(link_resource_cache_queue_depth[{windowSeconds}s]))";
+
     internal static string DotNetPeakMemoryQuery(string exportedJob, int windowSeconds) =>
         $"max(max_over_time(process_memory_usage_bytes{{exported_job=\"{EscapePromLabel(exportedJob)}\"}}[{windowSeconds}s]))";
 
@@ -632,6 +650,45 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             PeakCpuPercent = LiveProcessUtilizationService.ToTaskManagerPercent(peakCores, cpuCount ?? 0),
             AvgMemoryBytes = Math.Max(0, avgMemory ?? 0),
             PeakMemoryBytes = Math.Max(0, peakMemory ?? avgMemory ?? 0)
+        };
+    }
+
+    private async Task<ResourceCacheSnapshot> QueryResourceCacheAsync(
+        int windowSeconds,
+        DateTimeOffset evaluationTime,
+        CancellationToken cancellationToken)
+    {
+        async Task<double> Scalar(string query) =>
+            await _prometheus.QueryScalarAsync(query, evaluationTime, cancellationToken) ?? 0;
+
+        var hits = await Scalar(CacheReadCountQuery("hit", windowSeconds));
+        var fallbacks = await Scalar(CacheReadCountQuery("fallback", windowSeconds));
+        var empties = await Scalar(CacheReadCountQuery("empty", windowSeconds));
+
+        if (hits + fallbacks + empties <= 0)
+        {
+            // Either the run did not touch the cache, or telemetry export is off. Both look the
+            // same from here, so say unavailable rather than report a confident zero.
+            return new ResourceCacheSnapshot { Unavailable = true };
+        }
+
+        var served = hits + fallbacks;
+
+        return new ResourceCacheSnapshot
+        {
+            Unavailable = false,
+            HitCount = hits,
+            FallbackCount = fallbacks,
+            EmptyCount = empties,
+            HitRatio = served > 0 ? hits / served : 0,
+            ReadP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_read_duration", string.Empty, windowSeconds, "0.95")),
+            DurableWriteP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_write_duration", "{cache_store=\"blob\"}", windowSeconds, "0.95")),
+            QueueWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_queue_wait_duration", string.Empty, windowSeconds, "0.95")),
+            DrainWaitP50Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration", string.Empty, windowSeconds, "0.50")),
+            DrainWaitP95Ms = await Scalar(CacheQuantileQuery("link_resource_cache_drain_wait_duration", string.Empty, windowSeconds, "0.95")),
+            PeakQueueDepth = await Scalar(CachePeakQueueDepthQuery(windowSeconds)),
+            WriteRetryCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "retried", windowSeconds)),
+            WriteExhaustedCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "exhausted", windowSeconds))
         };
     }
 

@@ -1,4 +1,4 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 
@@ -108,4 +108,86 @@ public class MetricsBenchmarkEvaluatorTests
             }
         };
     }
+
+    [Fact]
+    public void A_drop_in_cache_hit_ratio_is_flagged()
+    {
+        var previous = Doc(100);
+        previous.ResourceCache = Cache(hitRatio: 0.90);
+        var current = Doc(100);
+        current.ResourceCache = Cache(hitRatio: 0.50);
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
+
+        Assert.Contains(result.RegressionFlags, f => f.Contains("hit ratio", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void A_rise_in_barrier_wait_is_flagged()
+    {
+        var previous = Doc(100);
+        previous.ResourceCache = Cache(drainP95: 10);
+        var current = Doc(100);
+        current.ResourceCache = Cache(drainP95: 100);
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
+
+        Assert.Contains(result.RegressionFlags, f => f.Contains("barrier", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void A_barrier_appearing_for_the_first_time_is_not_flagged()
+    {
+        // The first Hybrid run after an ABS baseline: the baseline had no barrier at all, so
+        // comparing against zero would report the design working as a regression.
+        var previous = Doc(100);
+        previous.ResourceCache = Cache(drainP95: 0);
+        var current = Doc(100);
+        current.ResourceCache = Cache(drainP95: 250);
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
+
+        Assert.DoesNotContain(result.RegressionFlags, f => f.Contains("barrier", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void An_unavailable_cache_snapshot_is_not_compared()
+    {
+        var previous = Doc(100);
+        previous.ResourceCache = Cache(hitRatio: 0.90);
+        var current = Doc(100);
+        current.ResourceCache = new ResourceCacheSnapshot { Unavailable = true };
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
+
+        Assert.DoesNotContain(result.RegressionFlags, f => f.Contains("cache", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void A_write_that_exhausted_its_retries_is_flagged_on_its_own()
+    {
+        var previous = Doc(100);
+        previous.ResourceCache = Cache();
+        var current = Doc(100);
+        current.ResourceCache = Cache(exhausted: 3);
+
+        var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
+
+        Assert.Contains(result.RegressionFlags, f => f.Contains("no durable copy", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static ResourceCacheSnapshot Cache(
+        double hitRatio = 0.8,
+        double drainP95 = 5,
+        double readP95 = 5,
+        double exhausted = 0) => new()
+    {
+        Unavailable = false,
+        HitCount = 80,
+        FallbackCount = 20,
+        HitRatio = hitRatio,
+        ReadP95Ms = readP95,
+        DrainWaitP95Ms = drainP95,
+        WriteExhaustedCount = exhausted
+    };
 }
