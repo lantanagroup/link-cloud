@@ -234,6 +234,46 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ExhaustedWrite_IsNotMaskedByALaterWriteToTheSameKey()
+    {
+        // Normalization writes this key once per resource type, so several writes for one key in a
+        // single pass is the normal case, not an edge one. Each carries different resources, which
+        // is why a later one landing says nothing about an earlier one that never did.
+        //
+        // Exactly MaxRetryAttempts failures, so the first write exhausts and the second succeeds.
+        // Writes to one key are serialized, so the Patient batch consumes all three.
+        _abs.FailKeyTimes("corr:Patient", 3);
+
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+        await _writer.EnqueueAsync("corr:Patient", Resources("Encounter/1"), ResourceType.Encounter);
+
+        // Both are in the same cycle and the caller waits once, after both. The Encounter batch is
+        // durable and the Patient batch is not, so the key is not durable.
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout));
+
+        Assert.Single(_abs.Writes.Where(write => write.CacheKey == "corr:Patient"));
+    }
+
+    [Fact]
+    public async Task ExhaustedWrite_ReportedOnce_ThenTheKeyCanRecover()
+    {
+        // The caller fails its work and the message is redelivered, which rewrites the key from
+        // the start. A failure that outlived its report would fail that attempt too, and the
+        // message could never recover from a transient outage.
+        _abs.FailKey("corr:Patient");
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout));
+
+        _abs.ClearFailures();
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+
+        await _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
     public async Task Cancel_RecordedFailure_IsCleared()
     {
         _abs.FailKey("corr:Patient");

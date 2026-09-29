@@ -122,7 +122,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             catch (Exception)
             {
                 // The write never made it onto the queue, so nothing will ever decrement for it.
-                CompleteOne(cacheKey, state, failure: null, clearsFailure: false);
+                CompleteOne(cacheKey, state, failure: null);
                 throw;
             }
         }
@@ -340,7 +340,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             finally
             {
                 state.WriteLock.Release();
-                CompleteOne(pending.CacheKey, state, failure, clearsFailure: true);
+                CompleteOne(pending.CacheKey, state, failure);
             }
         }
 
@@ -377,7 +377,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        private void CompleteOne(string cacheKey, KeyState state, Exception? failure, bool clearsFailure)
+        private void CompleteOne(string cacheKey, KeyState state, Exception? failure)
         {
             lock (state.Gate)
             {
@@ -387,12 +387,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 {
                     state.Failure = failure;
                 }
-                else if (clearsFailure)
-                {
-                    // A later write landing clears an earlier failure: the key is durable again.
-                    state.Failure = null;
-                }
 
+                // A success never clears a recorded failure. Writes to one key append *different*
+                // resources, so a later batch landing says nothing about an earlier one that never
+                // did -- and Normalization writes this key once per resource type, so clearing here
+                // would let any later type mask a whole type that never reached durable storage.
+                // The failure is cleared where it is reported instead, in ThrowIfFailed.
                 SignalIfDrained(cacheKey, state);
             }
         }
@@ -424,16 +424,32 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <remarks>Callers hold <see cref="KeyState.Gate"/>.</remarks>
-        private static void ThrowIfFailed(string cacheKey, KeyState state)
+        private void ThrowIfFailed(string cacheKey, KeyState state)
         {
-            if (state.Failure == null)
+            var failure = state.Failure;
+
+            if (failure == null)
             {
                 return;
             }
 
+            // Consumed as it is reported. The caller is being told this key is not durable and will
+            // fail its work; the redelivery that follows rewrites the key from the start, so a
+            // failure that outlived its report would fail that attempt too and the message could
+            // never recover. Reported once, to the caller that has to act on it.
+            state.Failure = null;
+
+            if (state.Outstanding == 0)
+            {
+                // SignalIfDrained leaves a failed key in place so its waiter can still see the
+                // failure. That waiter is here, so the state has no one left to inform.
+                state.Retired = true;
+                _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+            }
+
             throw new ResourceCacheDurabilityException(
                 $"Resource cache key '{cacheKey}' could not be written to durable storage.",
-                state.Failure);
+                failure);
         }
 
         private sealed record PendingWrite(
