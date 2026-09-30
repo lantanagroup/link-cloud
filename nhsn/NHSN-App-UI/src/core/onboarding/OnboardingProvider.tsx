@@ -119,6 +119,11 @@ export function useStepUnsavedChanges(handler: StepUnsavedChanges) {
   }, [registerStepUnsavedChanges, stableIsDirty, stableSave, stableDiscard]);
 }
 
+function draftContent(draft: FacilityDraft): string {
+  const {currentStepId: _s, currentView: _v, unlockedStepIds: _u, mrnIntake: _m, ...content} = draft;
+  return JSON.stringify(content);
+}
+
 export function OnboardingProvider({
   user,
   baseUrl,
@@ -180,6 +185,18 @@ export function OnboardingProvider({
   const registerStepUnsavedChanges = useCallback((handler: StepUnsavedChanges | null) => {
     stepUnsavedRef.current = handler;
   }, []);
+
+  const hasDraftChanges = useCallback(() => {
+    if (!dirtyRef.current) {
+      return false;
+    }
+    const saved = lastSavedDraftRef.current;
+    if (saved && draftContent(draft) === draftContent(saved)) {
+      dirtyRef.current = false;
+      return false;
+    }
+    return true;
+  }, [draft]);
 
   const applyEnvelope = useCallback((envelope: DraftEnvelope) => {
     setCommitState(envelope.commitState);
@@ -401,13 +418,13 @@ export function OnboardingProvider({
       if (stepId === draft.currentStepId && !draft.currentView) {
         return;
       }
-      if (dirtyRef.current || Boolean(stepUnsavedRef.current?.isDirty())) {
+      if (hasDraftChanges() || Boolean(stepUnsavedRef.current?.isDirty())) {
         setPendingStepId(stepId);
         return;
       }
       completeGoTo(stepId);
     },
-    [completeGoTo, draft.currentStepId, draft.currentView]
+    [completeGoTo, hasDraftChanges, draft.currentStepId, draft.currentView]
   );
 
   const confirmSaveAndContinue = useCallback(() => {
@@ -475,7 +492,7 @@ export function OnboardingProvider({
   const advanceTo = useCallback(
     (stepId: StepId, direction: 'next' | 'back') => {
       setNavDirection(direction);
-      if (!dirtyRef.current) {
+      if (!hasDraftChanges()) {
         completeGoTo(stepId);
         return;
       }
@@ -487,7 +504,7 @@ export function OnboardingProvider({
         }
       });
     },
-    [draft, persistDraft, completeGoTo]
+    [draft, persistDraft, completeGoTo, hasDraftChanges]
   );
 
   const goNext = useCallback(() => {
@@ -507,12 +524,12 @@ export function OnboardingProvider({
     if (previous) {
       // A dirty step routes through the unsaved-changes prompt instead, so only a direct move
       // marks Back as the button in progress.
-      if (!dirtyRef.current && !stepUnsavedRef.current?.isDirty()) {
+      if (!hasDraftChanges() && !stepUnsavedRef.current?.isDirty()) {
         setNavDirection('back');
       }
       goTo(previous);
     }
-  }, [target, draft, user, goTo]);
+  }, [target, draft, user, goTo, hasDraftChanges]);
 
   const openView = useCallback((view: StepView) => {
     setUrlTarget(undefined);
