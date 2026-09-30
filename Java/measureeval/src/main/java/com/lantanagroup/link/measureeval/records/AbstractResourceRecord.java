@@ -2,7 +2,6 @@ package com.lantanagroup.link.measureeval.records;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
-import com.lantanagroup.link.measureeval.entities.CacheType;
 import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.entities.ReportableEvent;
 import lombok.Getter;
@@ -23,14 +22,10 @@ public abstract class AbstractResourceRecord {
     @JsonSetter(nulls = Nulls.AS_EMPTY)
     private List<ScheduledReport> scheduledReports = new ArrayList<>();
 
-    /**
-     * @deprecated Ignored since LEGLINK-1279: the store is no longer chosen by the message — reads
-     * are Redis-first with ABS fallback, and cleanup covers both stores. Kept only so records from
-     * producers that still stamp it deserialize unchanged; remove from the contract in both
-     * runtimes once LEGLINK-1276 is merged everywhere.
-     */
-    @Deprecated
-    private CacheType cacheType;
+    // cacheType was removed from the contract (LEGLINK-1279): the store is no longer chosen by
+    // the message — reads are Redis-first with ABS fallback, and cleanup covers both stores.
+    // Records from producers that still stamp it deserialize fine: FAIL_ON_UNKNOWN_PROPERTIES is
+    // off (Spring Boot default, not overridden), so replayed and retry-topic messages are safe.
 
     private String cacheKey;
 

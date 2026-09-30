@@ -6,7 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.List;
@@ -26,11 +28,12 @@ class RedisResourceServiceTest {
 
     @SuppressWarnings("rawtypes")
     private HashOperations hashOps;
+    private StringRedisTemplate redisTemplate;
     private RedisResourceService service;
 
     @BeforeEach
     void setUp() {
-        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        redisTemplate = mock(StringRedisTemplate.class);
         hashOps = mock(HashOperations.class);
         when(redisTemplate.opsForHash()).thenReturn(hashOps);
         service = new RedisResourceService(redisTemplate);
@@ -78,5 +81,39 @@ class RedisResourceServiceTest {
 
         assertEquals(1, resources.size());
         assertEquals("p1", resources.get(0).getResourceId());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cleanup_sweepsTheCorrelationAndItsAcquisitionKeys() {
+        // ABS cleanup sweeps everything under the correlation prefix; the Redis side must forget
+        // the correlation just as completely — the bare key plus any surviving
+        // {correlationId}:{ResourceType} acquisition keys a dead-lettered correlation left behind.
+        Cursor<String> cursor = mock(Cursor.class);
+        // forEachRemaining is a default method, which Mockito intercepts like any other — stub it
+        // directly rather than hasNext/next, since it is what cleanup() actually calls.
+        doAnswer(invocation -> {
+            java.util.function.Consumer<String> action = invocation.getArgument(0);
+            action.accept("corr-1:Patient");
+            action.accept("corr-1:Encounter");
+            return null;
+        }).when(cursor).forEachRemaining(any());
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+
+        service.cleanup("corr-1");
+
+        verify(redisTemplate).unlink(List.of("corr-1", "corr-1:Patient", "corr-1:Encounter"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cleanup_unlinksTheBareKey_whenNoAcquisitionKeysSurvive() {
+        Cursor<String> cursor = mock(Cursor.class);
+        when(cursor.hasNext()).thenReturn(false);
+        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+
+        service.cleanup("corr-1");
+
+        verify(redisTemplate).unlink(List.of("corr-1"));
     }
 }

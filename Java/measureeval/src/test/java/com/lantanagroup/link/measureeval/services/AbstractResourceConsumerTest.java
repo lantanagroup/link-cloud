@@ -288,23 +288,19 @@ class AbstractResourceConsumerTest {
     }
 
     @Test
-    void process_nullCacheType_isTolerated() {
-        // The CacheType field is ignored since LEGLINK-1279 and will leave the contract; a record
-        // without it must process normally (deployment-order safety for the producer-side removal).
-        String facilityId = "facility-1";
-        String patientId = "patient-1";
-        String cacheKey = "cache-key-no-type";
+    void records_carryingTheRemovedCacheTypeField_stillDeserialize() throws Exception {
+        // Producers stamp cacheType until .NET's removal deploys, and replayed/retry-topic
+        // messages carry it forever. The Kafka value deserializer uses the Spring-configured
+        // ObjectMapper, which leaves FAIL_ON_UNKNOWN_PROPERTIES off — the removed field must be
+        // silently ignored, never a deserialization failure.
+        var mapper = org.springframework.http.converter.json.Jackson2ObjectMapperBuilder.json().build();
 
-        ResourcesNormalized value = buildValue(cacheKey);
-        assertNull(value.getCacheType());
+        ResourcesNormalized value = mapper.readValue(
+                "{\"queryType\":\"INITIAL\",\"cacheType\":\"REDIS\",\"cacheKey\":\"corr-legacy\"}",
+                ResourcesNormalized.class);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
-
-        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
-        stubMongoBulkWrite();
-
-        assertDoesNotThrow(() -> consumer.process(buildConsumerRecord(facilityId, patientId, value)));
+        assertEquals("corr-legacy", value.getCacheKey());
+        assertEquals(QueryType.INITIAL, value.getQueryType());
     }
 
     @Test

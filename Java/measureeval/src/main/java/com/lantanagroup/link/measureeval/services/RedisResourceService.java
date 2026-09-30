@@ -7,7 +7,9 @@ import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -98,7 +100,18 @@ public class RedisResourceService {
 
 
     public void cleanup(String correlationId) {
-        redisTemplate.unlink(correlationId);
-        logger.debug("Cleaned up Redis key '{}'", correlationId);
+        // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
+        // keys. Normalization normally deletes the acquisition keys after each pass, but a
+        // dead-lettered correlation can leave them behind — and the ABS side sweeps its whole
+        // prefix, so the two stores should forget a correlation symmetrically instead of leaving
+        // Redis keys to age out at the TTL.
+        List<String> keys = new ArrayList<>();
+        keys.add(correlationId);
+        try (Cursor<String> cursor = redisTemplate.scan(
+                ScanOptions.scanOptions().match(correlationId + ":*").count(100).build())) {
+            cursor.forEachRemaining(keys::add);
+        }
+        redisTemplate.unlink(keys);
+        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'", keys.size(), LogUtils.sanitize(correlationId));
     }
 }

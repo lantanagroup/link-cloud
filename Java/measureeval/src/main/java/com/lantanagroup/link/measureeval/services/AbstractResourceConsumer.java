@@ -114,10 +114,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getReportableEvent() == null) {
                 throw new ValidationException("Reportable Event is null or empty.");
             }
-            // CacheType is deliberately NOT validated or read: since LEGLINK-1279 the store is not
-            // chosen by the message — reads are Redis-first with ABS fallback (LEGLINK-1118). The
-            // field stays on the record only until LEGLINK-1276 merges and it is removed from the
-            // contract in both runtimes.
+            // No CacheType here anymore: since LEGLINK-1279 the store is not chosen by the
+            // message — reads are Redis-first with ABS fallback (LEGLINK-1118), and the field was
+            // removed from the contract in both runtimes.
             correlationId = value.getCacheKey();
             if (correlationId == null || correlationId.isEmpty()) {
                 throw new ValidationException("Cache Key is null or empty.");
