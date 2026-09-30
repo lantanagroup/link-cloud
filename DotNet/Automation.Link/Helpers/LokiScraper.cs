@@ -524,7 +524,13 @@ public class LokiScraper
         }
     }
 
-    public async Task<List<string>> GetServiceExceptionLinesAsync(string componentName, TimeSpan lookback, int limit = 20, string? facilityId = null, string? reportId = null)
+    public async Task<List<string>> GetServiceExceptionLinesAsync(
+        string componentName,
+        TimeSpan lookback,
+        int limit = 20,
+        string? facilityId = null,
+        string? reportId = null,
+        CancellationToken cancellationToken = default)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -540,7 +546,8 @@ public class LokiScraper
 
         try
         {
-            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit);
+            var (statusCode, content) = await ExecuteQueryRangeAsync(
+                query, startUnix, endUnix, limit, cancellationToken: cancellationToken);
             if (statusCode != HttpStatusCode.OK || content == null)
                 return lines;
 
@@ -565,9 +572,10 @@ public class LokiScraper
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ClassifyScrapeFailure(ex, cancellationToken) != ScrapeFailure.Rethrow)
         {
             // Intentionally silent: callers treat empty result as no detected exceptions.
+            // A caller cancel is rethrown so a cancelled run is not stuck until the HTTP timeout.
         }
 
         return lines;

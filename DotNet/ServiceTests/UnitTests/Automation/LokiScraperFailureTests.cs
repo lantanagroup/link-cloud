@@ -85,6 +85,37 @@ public class LokiScraperFailureTests
     }
 
     [Fact]
+    public async Task Cancelled_exception_line_query_rethrows_without_waiting_for_http_timeout()
+    {
+        var handler = new HoldUntilCancelHandler();
+        using var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://loki.test"),
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+        var scraper = new LokiScraper(
+            client,
+            new NullOutput(),
+            new AutomationConfig { LokiBaseUrl = "http://loki.test", LokiAppLabel = "link" });
+        using var cts = new CancellationTokenSource();
+
+        var task = scraper.GetServiceExceptionLinesAsync(
+            LokiScraper.Components.Validation,
+            TimeSpan.FromMinutes(5),
+            facilityId: "facility",
+            reportId: "report",
+            cancellationToken: cts.Token);
+        var started = await Task.WhenAny(handler.Started.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+        started.Should().Be(handler.Started.Task);
+
+        cts.Cancel();
+        var finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(2)));
+        finished.Should().Be(task);
+        var act = async () => await task;
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task Validation_sample_uses_the_newest_matching_log_time()
     {
         const long olderNs = 1_780_000_000_000_000_000;
