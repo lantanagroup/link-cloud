@@ -44,5 +44,5 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
         SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<string>> GetValidationResultSummaryAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
-        SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}/summary").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));
+        SendStringAsync(() => Request($"validation/result-summaries/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));
 }

@@ -1,4 +1,6 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
 
@@ -34,8 +36,13 @@ public class ValidationResultsValidator
         {
             var result = await _validationClient.GetValidationResultSummaryAsync(
                 facilityId, reportId, "WARNING", cancellationToken);
+            // Flurl turns a caller cancel into FlurlHttpException, and SendStringAsync reports that as HTTP 0.
+            cancellationToken.ThrowIfCancellationRequested();
+            var body = result.Body ?? result.RawBody;
             if (!result.IsSuccessStatusCode)
-                errors.Add($"Validation API returned HTTP {result.StatusCode}: {result.RawBody ?? "(no body)"}");
+                errors.Add($"Validation API returned HTTP {result.StatusCode}: {body ?? "(no body)"}");
+            else if (!IsResultSummary(body))
+                errors.Add($"Validation API returned HTTP {result.StatusCode} but the body was not a result summary: {Snippet(body)}");
         }
         catch (OperationCanceledException)
         {
@@ -81,5 +88,39 @@ public class ValidationResultsValidator
         }
 
         throw new InvalidOperationException($"VALIDATION RESULTS (API) failed with {errors.Count} issue(s).");
+    }
+
+    /// <summary>
+    /// An older validation service has no result-summaries route. A 200 whose body is a JSON array
+    /// is some other resource, not this count.
+    /// </summary>
+    private static bool IsResultSummary(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return false;
+
+        try
+        {
+            if (JToken.Parse(body) is not JObject obj)
+                return false;
+
+            var count = obj["count"];
+            var countIsNumber = count is { Type: JTokenType.Integer or JTokenType.Float };
+            return countIsNumber && obj["severity"]?.Type == JTokenType.String;
+        }
+        catch (JsonReaderException)
+        {
+            return false;
+        }
+    }
+
+    private static string Snippet(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return "(no body)";
+
+        const int max = 180;
+        var trimmed = body.Trim();
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
     }
 }

@@ -96,6 +96,56 @@ public class ValidationResultsValidatorTests
         output.Lines.Should().NotContain(line => line.Contains("OutOfMemoryException", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task AvailabilityCheck_WhenBodyIsAJsonArray_FailsInsteadOfPassing()
+    {
+        var client = new Mock<IValidationServiceClient>(MockBehavior.Strict);
+        client.Setup(c => c.GetValidationResultSummaryAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                "WARNING",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<string> { StatusCode = 200, Body = "[]" });
+
+        var output = new CapturingOutput();
+        var sut = new ValidationResultsValidator(client.Object, output);
+
+        var act = () => sut.ValidateAllAsync("facility-1", "report-1", []);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        output.Lines.Should().Contain(line => line.Contains("not a result summary", StringComparison.Ordinal));
+        output.Lines.Should().Contain(line => line.Contains("[]", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(0)]
+    public async Task AvailabilityCheck_WhenTheRunIsCancelled_ThrowsInsteadOfFailingTheCheck(int statusCode)
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var client = new Mock<IValidationServiceClient>(MockBehavior.Strict);
+        client.Setup(c => c.GetValidationResultSummaryAsync(
+                "facility-1",
+                "report-1",
+                "WARNING",
+                cts.Token))
+            .ReturnsAsync(new LinkApiResponse<string>
+            {
+                StatusCode = statusCode,
+                Body = statusCode == 200 ? """{"count":1,"severity":"WARNING"}""" : null,
+                RawBody = statusCode == 200 ? null : ""
+            });
+
+        var output = new CapturingOutput();
+        var sut = new ValidationResultsValidator(client.Object, output);
+
+        var act = () => sut.ValidateAllAsync("facility-1", "report-1", [], cancellationToken: cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        output.Lines.Should().NotContain(line => line.Contains("VALIDATION RESULTS (API): Failed", StringComparison.Ordinal));
+    }
+
     private sealed class CapturingOutput : IAutomationOutput
     {
         public List<string> Lines { get; } = [];
