@@ -35,6 +35,7 @@ using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Debugging;
@@ -189,7 +190,7 @@ namespace Tenant
 
             builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
-                .AddCheck<DmrpHealthCheck>("DMRP")
+                .AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded)
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

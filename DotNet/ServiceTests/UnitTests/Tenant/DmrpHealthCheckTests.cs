@@ -20,7 +20,7 @@ namespace UnitTests.Tenant
             var factory = new Mock<IHttpClientFactory>(MockBehavior.Strict);
             var check = CreateCheck(factory.Object, false, baseUrl);
 
-            var result = await check.CheckHealthAsync(new HealthCheckContext());
+            var result = await check.CheckHealthAsync(CreateContext());
 
             Assert.Equal(HealthStatus.Healthy, result.Status);
             factory.VerifyNoOtherCalls();
@@ -35,7 +35,7 @@ namespace UnitTests.Tenant
             var factory = new Mock<IHttpClientFactory>(MockBehavior.Strict);
             var check = CreateCheck(factory.Object, true, baseUrl);
 
-            var result = await check.CheckHealthAsync(new HealthCheckContext());
+            var result = await check.CheckHealthAsync(CreateContext());
 
             Assert.Equal(HealthStatus.Healthy, result.Status);
             Assert.Equal("DMRP API is not configured; health check skipped.", result.Description);
@@ -45,24 +45,24 @@ namespace UnitTests.Tenant
         [Theory]
         [InlineData("invalid")]
         [InlineData("file:///local")]
-        public async Task EnabledWithInvalidUrl_ReturnsUnhealthyWithoutCreatingClient(string? baseUrl)
+        public async Task EnabledWithInvalidUrl_ReturnsDegradedWithoutCreatingClient(string? baseUrl)
         {
             var factory = new Mock<IHttpClientFactory>(MockBehavior.Strict);
             var check = CreateCheck(factory.Object, true, baseUrl);
 
-            var result = await check.CheckHealthAsync(new HealthCheckContext());
+            var result = await check.CheckHealthAsync(CreateContext());
 
-            Assert.Equal(HealthStatus.Unhealthy, result.Status);
+            Assert.Equal(HealthStatus.Degraded, result.Status);
             factory.VerifyNoOtherCalls();
         }
 
         [Theory]
         [InlineData("https://dmrp.example", HttpStatusCode.OK, HealthStatus.Healthy)]
-        [InlineData("https://dmrp.example/", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
+        [InlineData("https://dmrp.example/", HttpStatusCode.ServiceUnavailable, HealthStatus.Degraded)]
         [InlineData("https://dmrp.example", HttpStatusCode.Unauthorized, HealthStatus.Healthy)]
         [InlineData("https://dmrp.example", HttpStatusCode.BadRequest, HealthStatus.Healthy)]
         [InlineData("https://dmrp.example", HttpStatusCode.NotFound, HealthStatus.Healthy)]
-        [InlineData("https://dmrp.example", HttpStatusCode.InternalServerError, HealthStatus.Unhealthy)]
+        [InlineData("https://dmrp.example", HttpStatusCode.InternalServerError, HealthStatus.Degraded)]
         public async Task Enabled_ReportsEndpointStatus(string baseUrl, HttpStatusCode status, HealthStatus expected)
         {
             Uri? requestedUri = null;
@@ -79,7 +79,7 @@ namespace UnitTests.Tenant
             var factory = new Mock<IHttpClientFactory>(MockBehavior.Strict);
             factory.Setup(instance => instance.CreateClient(DmrpApiClient.HttpClientName)).Returns(client);
 
-            var result = await CreateCheck(factory.Object, true, baseUrl).CheckHealthAsync(new HealthCheckContext());
+            var result = await CreateCheck(factory.Object, true, baseUrl).CheckHealthAsync(CreateContext());
 
             Assert.Equal("https://dmrp.example/msc?nhsnorgid=0", requestedUri?.AbsoluteUri);
             Assert.Equal(HttpMethod.Get, requestedMethod);
@@ -91,7 +91,7 @@ namespace UnitTests.Tenant
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public async Task RequestFailure_ReturnsUnhealthy(bool timeout)
+        public async Task RequestFailure_ReturnsDegraded(bool timeout)
         {
             using var handler = new StubHandler((request, token) => throw (timeout
                 ? new TaskCanceledException("timeout")
@@ -101,13 +101,13 @@ namespace UnitTests.Tenant
             factory.Setup(instance => instance.CreateClient(DmrpApiClient.HttpClientName)).Returns(client);
 
             var result = await CreateCheck(factory.Object, true, "https://dmrp.example")
-                .CheckHealthAsync(new HealthCheckContext());
+                .CheckHealthAsync(CreateContext());
 
-            Assert.Equal(HealthStatus.Unhealthy, result.Status);
+            Assert.Equal(HealthStatus.Degraded, result.Status);
         }
 
         [Fact]
-        public async Task StalledRequest_ReturnsUnhealthyWithinProbeTimeout()
+        public async Task StalledRequest_ReturnsDegradedWithinProbeTimeout()
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             CancellationToken requestToken = default;
@@ -122,9 +122,9 @@ namespace UnitTests.Tenant
             factory.Setup(instance => instance.CreateClient(DmrpApiClient.HttpClientName)).Returns(client);
 
             var result = await CreateCheck(factory.Object, true, "https://dmrp.example")
-                .CheckHealthAsync(new HealthCheckContext(), cancellation.Token);
+                .CheckHealthAsync(CreateContext(), cancellation.Token);
 
-            Assert.Equal(HealthStatus.Unhealthy, result.Status);
+            Assert.Equal(HealthStatus.Degraded, result.Status);
             Assert.Equal("Health check did not complete within 5 seconds.", result.Description);
             Assert.True(requestToken.IsCancellationRequested);
             Assert.False(cancellation.IsCancellationRequested);
@@ -146,8 +146,14 @@ namespace UnitTests.Tenant
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 CreateCheck(factory.Object, true, "https://dmrp.example")
-                    .CheckHealthAsync(new HealthCheckContext(), cancellation.Token));
+                    .CheckHealthAsync(CreateContext(), cancellation.Token));
         }
+
+        private static HealthCheckContext CreateContext() => new()
+        {
+            Registration = new HealthCheckRegistration("DMRP",
+                provider => CreateCheck(Mock.Of<IHttpClientFactory>(), false, null), HealthStatus.Degraded, null)
+        };
 
         private static DmrpHealthCheck CreateCheck(IHttpClientFactory factory, bool enabled, string? baseUrl) =>
             new(factory, Options.Create(new DmrpSettings

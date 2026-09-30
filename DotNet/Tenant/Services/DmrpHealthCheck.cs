@@ -34,7 +34,7 @@ namespace LantanaGroup.Link.Tenant.Services
             if (!Uri.TryCreate(settings.Api.BaseUrl?.TrimEnd('/') + "/msc?nhsnorgid=0", UriKind.Absolute,
                     out var healthUri) || (healthUri.Scheme != Uri.UriSchemeHttp && healthUri.Scheme != Uri.UriSchemeHttps))
             {
-                return HealthCheckResult.Unhealthy("DMRP API base URL is invalid.");
+                return new HealthCheckResult(context.Registration.FailureStatus, "DMRP API base URL is invalid.");
             }
 
             using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -49,7 +49,7 @@ namespace LantanaGroup.Link.Tenant.Services
                         response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
                         response.StatusCode == System.Net.HttpStatusCode.NotFound
                     ? HealthCheckResult.Healthy()
-                    : HealthCheckResult.Unhealthy($"DMRP health endpoint answered {(int)response.StatusCode}.");
+                    : new HealthCheckResult(context.Registration.FailureStatus, $"DMRP health endpoint answered {(int)response.StatusCode}.");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -57,11 +57,11 @@ namespace LantanaGroup.Link.Tenant.Services
             }
             catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
             {
-                return HealthCheckResult.Unhealthy($"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
+                return new HealthCheckResult(context.Registration.FailureStatus, $"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
             }
             catch (Exception)
             {
-                return HealthCheckResult.Unhealthy("DMRP health endpoint could not be reached.");
+                return new HealthCheckResult(context.Registration.FailureStatus, "DMRP health endpoint could not be reached.");
             }
         }
     }
