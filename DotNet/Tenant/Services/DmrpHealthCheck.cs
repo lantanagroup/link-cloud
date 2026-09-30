@@ -1,0 +1,68 @@
+using LantanaGroup.Link.DMRP.Api;
+using LantanaGroup.Link.DMRP.Config;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
+
+namespace LantanaGroup.Link.Tenant.Services
+{
+    public sealed class DmrpHealthCheck : IHealthCheck
+    {
+        private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IOptions<DmrpSettings> _settings;
+
+        public DmrpHealthCheck(IHttpClientFactory httpClientFactory, IOptions<DmrpSettings> settings)
+        {
+            _httpClientFactory = httpClientFactory;
+            _settings = settings;
+        }
+
+        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context,
+            CancellationToken cancellationToken = default)
+        {
+            var settings = _settings.Value;
+            if (!settings.Enabled)
+            {
+                return HealthCheckResult.Healthy("DMRP is disabled.");
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.Api.BaseUrl))
+            {
+                return HealthCheckResult.Healthy("DMRP API is not configured; health check skipped.");
+            }
+
+            if (!Uri.TryCreate(settings.Api.BaseUrl?.TrimEnd('/') + "/msc?nhsnorgid=0", UriKind.Absolute,
+                    out var healthUri) || (healthUri.Scheme != Uri.UriSchemeHttp && healthUri.Scheme != Uri.UriSchemeHttps))
+            {
+                return new HealthCheckResult(context.Registration.FailureStatus, "DMRP API base URL is invalid.");
+            }
+
+            using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCancellation.CancelAfter(ProbeTimeout);
+            try
+            {
+                using var client = _httpClientFactory.CreateClient(DmrpApiClient.HttpClientName);
+                using var response = await client.GetAsync(healthUri, timeoutCancellation.Token);
+                timeoutCancellation.Token.ThrowIfCancellationRequested();
+                return response.IsSuccessStatusCode || 
+                        response.StatusCode == System.Net.HttpStatusCode.Unauthorized || 
+                        response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
+                        response.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? HealthCheckResult.Healthy()
+                    : new HealthCheckResult(context.Registration.FailureStatus, $"DMRP health endpoint answered {(int)response.StatusCode}.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+            {
+                return new HealthCheckResult(context.Registration.FailureStatus, $"Health check did not complete within {ProbeTimeout.TotalSeconds} seconds.");
+            }
+            catch (Exception)
+            {
+                return new HealthCheckResult(context.Registration.FailureStatus, "DMRP health endpoint could not be reached.");
+            }
+        }
+    }
+}

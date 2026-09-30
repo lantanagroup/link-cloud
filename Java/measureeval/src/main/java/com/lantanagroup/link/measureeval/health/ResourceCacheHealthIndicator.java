@@ -36,7 +36,7 @@ import java.util.concurrent.TimeoutException;
  * a backend is unreachable. The backstop is kept below the BFF's 5s health-check timeout so the BFF
  * still receives a real DOWN rather than timing out to N/A.
  */
-@Component("resourceCache")
+@Component("Resource Cache")
 public class ResourceCacheHealthIndicator implements HealthIndicator {
 
     private static final Logger logger = LoggerFactory.getLogger(ResourceCacheHealthIndicator.class);
