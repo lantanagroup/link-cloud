@@ -1,10 +1,12 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
-/// Validates that validation pipeline produced results for each expected patient and
-/// no unhandled exceptions are present in Validation logs.
+/// Checks that the validation result summary endpoint succeeds and that Validation logs
+/// have no unhandled exceptions for the run.
 /// </summary>
 public class ValidationResultsValidator
 {
@@ -23,16 +25,28 @@ public class ValidationResultsValidator
         string facilityId,
         string reportId,
         List<string> expectedPatientIds,
-        TimeSpan? lookback = null)
+        TimeSpan? lookback = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = new List<string>();
 
-        // Lightweight API availability check.
+        // Count only. The result list for a census or mega-patient is large enough that buffering
+        // it as a string throws OutOfMemoryException in this process.
         try
         {
-            var result = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
+            var result = await _validationClient.GetValidationResultSummaryAsync(
+                facilityId, reportId, "WARNING", cancellationToken);
+            // Flurl turns a caller cancel into FlurlHttpException, and SendStringAsync reports that as HTTP 0.
+            cancellationToken.ThrowIfCancellationRequested();
+            var body = result.Body ?? result.RawBody;
             if (!result.IsSuccessStatusCode)
-                errors.Add($"Validation API returned HTTP {result.StatusCode}: {result.RawBody ?? "(no body)"}");
+                errors.Add($"Validation API returned HTTP {result.StatusCode}: {body ?? "(no body)"}");
+            else if (!IsResultSummary(body))
+                errors.Add($"Validation API returned HTTP {result.StatusCode} but the body was not a result summary: {Snippet(body)}");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -48,7 +62,8 @@ public class ValidationResultsValidator
                 window,
                 20,
                 facilityId,
-                reportId);
+                reportId,
+                cancellationToken);
 
             if (exceptionLines.Count > 0)
             {
@@ -73,5 +88,39 @@ public class ValidationResultsValidator
         }
 
         throw new InvalidOperationException($"VALIDATION RESULTS (API) failed with {errors.Count} issue(s).");
+    }
+
+    /// <summary>
+    /// An older validation service has no result-summaries route. A 200 whose body is a JSON array
+    /// is some other resource, not this count.
+    /// </summary>
+    private static bool IsResultSummary(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return false;
+
+        try
+        {
+            if (JToken.Parse(body) is not JObject obj)
+                return false;
+
+            var count = obj["count"];
+            var countIsNumber = count is { Type: JTokenType.Integer or JTokenType.Float };
+            return countIsNumber && obj["severity"]?.Type == JTokenType.String;
+        }
+        catch (JsonReaderException)
+        {
+            return false;
+        }
+    }
+
+    private static string Snippet(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return "(no body)";
+
+        const int max = 180;
+        var trimmed = body.Trim();
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
     }
 }

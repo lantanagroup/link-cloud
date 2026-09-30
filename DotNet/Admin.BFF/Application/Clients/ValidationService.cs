@@ -55,9 +55,9 @@ public class ValidationService
 
         try
         {
-            var response = await _client.GetAsync($"health", timeoutCts.Token);
+            using var response = await _client.GetAsync($"health", timeoutCts.Token);
 
-            var content = await response.Content.ReadAsStringAsync();
+            var content = await response.Content.ReadAsStringAsync(timeoutCts.Token);
 
             HealthResponse? health = null;
 
@@ -86,23 +86,17 @@ public class ValidationService
             {
                 foreach (var component in health.Components)
                 {
-                    // Spring names the Mongo component "db" and the auto-configured Redis
-                    // component "redis"; map them to the Database/Cache entries the UI expects.
-                    var key = component.Key switch
-                    {
-                        var k when k.Equals("db", StringComparison.OrdinalIgnoreCase) => "Database",
-                        var k when k.Equals("redis", StringComparison.OrdinalIgnoreCase) => "Cache",
-                        _ => ToPascalCase(component.Key)
-                    };
-
                     var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
                         ? HealthStatus.Healthy
                         : HealthStatus.Unhealthy;
 
-                    report.Entries[key] = new LinkServiceHealthReportEntry
+                    report.Entries[component.Key] = new LinkServiceHealthReportEntry
                     {
                         Status = componentStatus,
-                        Duration = TimeSpan.Zero
+                        Duration = TimeSpan.Zero,
+                        Description = component.Value?.Details is { Count: > 0 } details
+                            ? JsonSerializer.Serialize(details)
+                            : null
                     };
                 }
             }

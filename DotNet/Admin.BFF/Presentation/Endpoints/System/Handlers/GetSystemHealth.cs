@@ -48,7 +48,8 @@ public static class GetSystemHealth
                 x => new LinkServiceHealthReportEntry
                 {
                     Status = x.Value.Status,
-                    Duration = x.Value.Duration
+                    Duration = x.Value.Duration,
+                    Description = x.Value.Description
                 })
         };
 
@@ -57,12 +58,12 @@ public static class GetSystemHealth
 
         //TODO: improve integration with java services
         var measureEvalHealthCheckResult = await measureEvalService.LinkServiceHealthCheck(context.RequestAborted);
-        var measureEvalHealthSummary = LinkServiceHealthReportExtensions.FromDomain(measureEvalHealthCheckResult);
+        var measureEvalHealthSummary = measureEvalHealthCheckResult;
         var validationHealthCheckResult = await validationService.LinkServiceHealthCheck(context.RequestAborted);
-        var validationHealthSummary = LinkServiceHealthReportExtensions.FromDomain(validationHealthCheckResult);
+        var validationHealthSummary = validationHealthCheckResult;
 
-        var healthSummary = results.Select(LinkServiceHealthReportExtensions.FromDomain).ToList();
-        healthSummary.Add(LinkServiceHealthReportExtensions.FromDomain(bffLinkReport));
+        var healthSummary = results.ToList();
+        healthSummary.Add(bffLinkReport);
         healthSummary.Add(measureEvalHealthSummary);
         healthSummary.Add(validationHealthSummary);
 
