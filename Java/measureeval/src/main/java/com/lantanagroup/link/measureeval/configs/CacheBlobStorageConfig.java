@@ -47,7 +47,7 @@ public class CacheBlobStorageConfig {
             // without blob storage cannot read what eviction removed.
             throw new IllegalStateException(
                     "resource-cache.blob-storage.connection-string and .blob-container-name must be configured: "
-                            + "ABS is the durable source for the resource cache (LEGLINK-1118/1279).");
+                            + "ABS is the durable source for the resource cache.");
         }
         logger.info("Creating AbsResourceService: container={}, blobRoot={}, maxTries={}, tryTimeout={}s",
                 LogUtils.sanitize(blobContainerName), LogUtils.sanitize(blobRoot),
