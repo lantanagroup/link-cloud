@@ -913,7 +913,7 @@
         const searchInput = document.getElementById('compPatientSearch');
         if (searchInput) {
             searchInput.addEventListener('input', function () {
-                const q = this.value.toLowerCase();
+                    const q = this.value.trim().toLowerCase();
                 document.querySelectorAll('.comp-patient-row').forEach(row => {
                     const pid = row.dataset.pid?.toLowerCase() || '';
                     const match = pid.includes(q);
