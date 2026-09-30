@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Linq.Expressions;
 
 namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
@@ -32,8 +31,6 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Interfaces
         void Update(T entity);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber);
         Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken);
-        Task<HealthCheckResult> HealthCheck(int eventId);
-        Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken);
         Task StartTransactionAsync();
         Task StartTransactionAsync(CancellationToken cancellationToken);
         Task CommitTransactionAsync();
