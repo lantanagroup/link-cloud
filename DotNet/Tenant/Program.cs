@@ -188,10 +188,14 @@ namespace Tenant
             //Add health checks
             var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, TenantConstants.ServiceName).GetHealthCheckOptions();
 
-            builder.Services.AddHealthChecks()
+            var healthChecks = builder.Services.AddHealthChecks()
                 .AddCheck<DatabaseHealthCheck<TenantDbContext>>(HealthCheckType.Database.ToString())
-                .AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded)
                 .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
+
+            if (dmrpEnabled)
+            {
+                healthChecks.AddCheck<DmrpHealthCheck>("DMRP", failureStatus: HealthStatus.Degraded);
+            }
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
