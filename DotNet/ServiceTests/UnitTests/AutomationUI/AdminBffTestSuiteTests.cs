@@ -99,10 +99,14 @@ public class AdminBffTestSuiteTests
                 RequestUrl = "http://host:8063/api/monitor/health"
             });
 
+        string? createdFacilityId = null;
+
         adminBffClient
             .Setup(x => x.CreateFacilityAsync(
                 It.IsAny<FacilityModel>(),
                 It.IsAny<CancellationToken>()))
+            .Callback<FacilityModel, CancellationToken>((facility, _) =>
+                createdFacilityId = facility.FacilityId)
             .ReturnsAsync(new LinkApiResponse<FacilityModel>
             {
                 StatusCode = 500
@@ -204,6 +208,11 @@ public class AdminBffTestSuiteTests
         var results = await suite.ExecuteAsync();
 
         // Assert
+        createdFacilityId.Should().NotBeNullOrWhiteSpace();
+
+        var expectedFacilityUrl =
+            $"http://host:8063/api/aggregate/facility/{createdFacilityId}";
+
         var deleteResult = results.Single(
             r => r.EndpointName == ApiEndPointLibrary.AdminBffSteps.FacilityDelete200);
 
@@ -211,10 +220,7 @@ public class AdminBffTestSuiteTests
         deleteResult.RequestMethod.Should().Be("DELETE");
         deleteResult.ExpectedStatusCode.Should().Be(200);
         deleteResult.ActualStatusCode.Should().BeNull();
-        deleteResult.RequestUrl.Should()
-            .StartWith("http://host:8063/api/aggregate/facility/");
-        deleteResult.RequestUrl.Should().NotContain("/api/api/");
-        deleteResult.RequestUrl.Should().NotContain("{facilityId}");
+        deleteResult.RequestUrl.Should().Be(expectedFacilityUrl);
 
         var restoreResult = results.Single(
             r => r.EndpointName == ApiEndPointLibrary.AdminBffSteps.FacilityRestorePatch200);
@@ -223,10 +229,24 @@ public class AdminBffTestSuiteTests
         restoreResult.RequestMethod.Should().Be("PATCH");
         restoreResult.ExpectedStatusCode.Should().Be(200);
         restoreResult.ActualStatusCode.Should().BeNull();
-        restoreResult.RequestUrl.Should()
-            .StartWith("http://host:8063/api/aggregate/facility/");
-        restoreResult.RequestUrl.Should().EndWith("/restore");
-        restoreResult.RequestUrl.Should().NotContain("/api/api/");
-        restoreResult.RequestUrl.Should().NotContain("{facilityId}");
+        restoreResult.RequestUrl.Should().Be($"{expectedFacilityUrl}/restore");
+
+        var reportDeleteResult = results.Single(
+            r => r.EndpointName == ApiEndPointLibrary.AdminBffSteps.ReportDelete204);
+
+        reportDeleteResult.Passed.Should().BeFalse();
+        reportDeleteResult.RequestMethod.Should().Be("DELETE");
+        reportDeleteResult.ExpectedStatusCode.Should().Be(204);
+        reportDeleteResult.ActualStatusCode.Should().BeNull();
+        reportDeleteResult.RequestUrl.Should().Be("http://host:8063/api/aggregate/reports/{reportScheduleId}");
+
+        var reportRestoreResult = results.Single(
+            r => r.EndpointName == ApiEndPointLibrary.AdminBffSteps.ReportRestorePatch204);
+
+        reportRestoreResult.Passed.Should().BeFalse();
+        reportRestoreResult.RequestMethod.Should().Be("PATCH");
+        reportRestoreResult.ExpectedStatusCode.Should().Be(204);
+        reportRestoreResult.ActualStatusCode.Should().BeNull();
+        reportRestoreResult.RequestUrl.Should().Be("http://host:8063/api/aggregate/reports/{reportScheduleId}/restore");
     }
 }
