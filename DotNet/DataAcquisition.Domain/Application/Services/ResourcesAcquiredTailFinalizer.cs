@@ -49,6 +49,19 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
             tail.PatientId.SplitReference(),
             cancellationToken);
 
+        // The strip is the one write on this path with no barrier of its own, and it needs one. An
+        // additive cache write cannot remove entries, so the strip deletes the Encounter key from both
+        // stores and rewrites it with the org encounters only -- leaving the rewrite on a background
+        // queue while durable storage holds nothing for that key. Producing the tail here would
+        // advertise the key with its only copies in the cache and in this pod's memory, and losing the
+        // pod would take the encounters with it: durable storage empty, the tail already produced, and
+        // every acquisition log already terminal, so nothing would retry.
+        //
+        // The reverse case needs no barrier here. A queued append landing after the delete would undo
+        // the strip, but the per-log barrier runs before each log goes terminal and the tail fires only
+        // once every sibling log is terminal, so acquisition's writes are durable before this runs.
+        await _resourceCache.WaitForDurableAsync(tail.CorrelationId, cancellationToken);
+
         var listed = tail.ResourcesAcquired.CacheKeys ?? [];
         if (listed.Count == 0)
         {
