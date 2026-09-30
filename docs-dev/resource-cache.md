@@ -182,10 +182,48 @@ Eviction on its own is safe, because an absent entry falls through to durable st
 processing a supplemental message: on a miss that read repopulates the cache from durable storage,
 and the appends that follow extend the initial pass instead of replacing it.
 
-This narrows the exposure from the length of the whole supplemental acquisition to the gap between
-that read and the appends. It does not eliminate it — an eviction inside that gap still produces a
-partial entry. Closing it completely needs a completeness marker on the entry, so a reader can tell
-a partial entry from a whole one rather than inferring it from non-emptiness.
+That read narrows the exposure, but it cannot close it: an eviction between the read and the appends
+milliseconds later still produces a partial entry, and the same shape exists within a single pass,
+where several writes land for one key back to back. A lock does not help — the party that destroys
+the entry is the cache's own eviction, which takes no application locks.
+
+### Telling a partial entry from a whole one
+
+So the entry carries the count durable storage holds for it, in a `__durableResourceCount` hash
+field. The field name has no `/`, so it cannot collide with a resource field, which is always
+`<type>/<id>`.
+
+The `__` prefix is reserved for metadata about an entry rather than a resource in it. Resource
+fields are always `<type>/<id>`, so the two cannot collide, and **both runtimes skip `__` fields when
+they read an entry** — MeasureEval quietly, because warning about them would fire once per
+correlation read. The metadata lives in the entry's own hash rather than beside it so that one
+lifetime covers both and deleting the entry clears its metadata with it. That is what makes the
+encounter strip safe: its delete drops the count with the entry, so the rewritten entry reads as
+"no count recorded" and is trusted until the rewrite's durable write publishes a matching one.
+
+`BackgroundAbsCacheWriter` records it once a durable write has landed — only a landed write gives a
+count a reader can rely on, and the cost belongs on that thread rather than the caller's. The count
+comes from the durable store's ids listing, which is a small blob of references rather than the
+resource payloads. A read compares the entry's resource count against it: fewer means the entry was
+recreated by a partial append, so durable storage is read instead and the entry restored from it.
+
+An entry with no recorded count is trusted rather than rejected. No count means no durable write has
+landed for that key, so durable storage has nothing more to offer and falling back would turn a
+usable entry into an empty read. An entry holding *more* than the recorded count is also trusted:
+the cache is ahead of a durable write still in flight, which is the ordinary state between the two
+writes and not a partial entry.
+
+### Deleting a key while a write is running
+
+`Cancel` bumps a generation that queued writes check when they are dequeued and again after taking
+the key's write lock. Neither covers a write already executing: it has passed both, and the delete
+that follows the cancel can complete underneath it. Durable storage has no expiry, and the purge
+that triggers such a delete exists to remove clinical data after a terminal failure or a pipeline
+abort, so a write landing afterwards leaves that data behind permanently.
+
+Rather than hold the delete up until the write finishes, the write undoes itself: on success it
+re-checks the generation and, if the key was cancelled, deletes it from durable storage. Both orders
+reach the same end state, and the delete path stays non-blocking.
 
 ## Durability
 

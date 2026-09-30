@@ -26,6 +26,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     public class BackgroundAbsCacheWriter : BackgroundService, IBackgroundAbsCacheWriter
     {
         private readonly IResourceCache _absCache;
+        private readonly IResourceCache _redisCache;
         private readonly ResourceCacheAbsWriterSettings _settings;
         private readonly IResourceCacheMetrics _metrics;
         private readonly ILogger<BackgroundAbsCacheWriter> _logger;
@@ -34,11 +35,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         public BackgroundAbsCacheWriter(
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
+            [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             IOptions<ResourceCacheSettings> settings,
             IResourceCacheMetrics metrics,
             ILogger<BackgroundAbsCacheWriter> logger)
         {
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
+            _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _settings = settings?.Value?.AbsWriter ?? throw new ArgumentNullException(nameof(settings));
@@ -324,6 +327,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 await WriteWithRetryAsync(pending, stoppingToken);
                 _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
+
+                // Still holding the write lock, so nothing else for this key can interleave.
+                await CompensateIfCancelledAsync(pending, state);
+                await PublishDurableCountAsync(pending.CacheKey);
             }
             catch (Exception ex)
             {
@@ -341,6 +348,83 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 state.WriteLock.Release();
                 CompleteOne(pending.CacheKey, state, failure);
+            }
+        }
+
+        /// <summary>
+        /// Records against the cache entry how many resources durable storage now holds for the key.
+        /// </summary>
+        /// <remarks>
+        /// This is what lets a reader tell a cache entry recreated by a partial append from a whole one.
+        /// It runs here rather than on the write path because only a landed durable write gives a count a
+        /// reader can rely on, and because the cost belongs on this thread rather than the caller's.
+        /// Best effort: a missing count is read as "unknown" and simply costs the detection, not
+        /// correctness of the data itself.
+        /// </remarks>
+        private async Task PublishDurableCountAsync(string cacheKey)
+        {
+            try
+            {
+                var durableCount = await _absCache.GetResourceCountAsync(cacheKey, CancellationToken.None);
+
+                if (durableCount > 0)
+                {
+                    await _redisCache.SetDurableResourceCountAsync(cacheKey, durableCount, CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not record the durable resource count for {CacheKey}. A partial cache entry for "
+                    + "this key would not be detected until the next durable write records one.",
+                    cacheKey.SanitizeForLog());
+            }
+        }
+
+        /// <summary>
+        /// Undoes a durable write that finished after its key was cancelled.
+        /// </summary>
+        /// <remarks>
+        /// A write already executing has passed both generation checks, so <see cref="Cancel"/> and the
+        /// delete that follows it can complete underneath it. Blob storage has no expiry, so a write
+        /// landing after that delete leaves resources behind permanently -- and the purge that triggered
+        /// it exists to remove clinical data after a terminal failure or a pipeline abort. Fencing the
+        /// delete would mean blocking it on this write; undoing the write afterwards reaches the same
+        /// end state from either order without holding the delete up.
+        /// </remarks>
+        private async Task CompensateIfCancelledAsync(PendingWrite pending, KeyState state)
+        {
+            lock (state.Gate)
+            {
+                if (pending.Generation == state.Generation)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                // Deliberately not the host's token. This runs to remove data the system decided to
+                // discard, so shutdown must not be the reason it is skipped.
+                await _absCache.DeleteAsync([pending.CacheKey], CancellationToken.None);
+
+                _logger.LogWarning(
+                    "Removed resource cache key {CacheKey} from blob storage: its durable write finished "
+                    + "after the key was cancelled, so the delete that followed the cancel could not have "
+                    + "covered it.",
+                    pending.CacheKey.SanitizeForLog());
+            }
+            catch (Exception ex)
+            {
+                // Nothing else will retry this. Surfaced loudly because the residue is clinical data
+                // that a purge already decided to remove.
+                _logger.LogError(
+                    ex,
+                    "Could not remove resource cache key {CacheKey} from blob storage after its durable "
+                    + "write finished past a cancel. The key may still hold resources that were purged "
+                    + "from the cache.",
+                    pending.CacheKey.SanitizeForLog());
             }
         }
 

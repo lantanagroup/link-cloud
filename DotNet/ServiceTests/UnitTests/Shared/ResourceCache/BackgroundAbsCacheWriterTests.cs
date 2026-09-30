@@ -18,6 +18,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
     private readonly RecordingAbsCache _abs = new();
+    private readonly RecordingAbsCache _redis = new();
     private BackgroundAbsCacheWriter _writer = null!;
 
     public async Task InitializeAsync()
@@ -274,6 +275,50 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Cancel_WriteAlreadyExecuting_IsUndoneInDurableStorage()
+    {
+        // The case neither generation check covers: the write is already inside durable storage when
+        // Cancel runs, so it has passed both. Blob storage has no expiry and the purge that triggers
+        // the cancel exists to remove clinical data, so the write must not be allowed to stand.
+        _abs.BlockWritesFor("corr:Patient");
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+        _writer.Cancel(["corr:Patient"]);
+
+        _abs.ReleaseBlockedWrite();
+        await _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+        // The write landed -- it was already in flight -- and was then undone.
+        Assert.Single(_abs.Writes.Where(write => write.CacheKey == "corr:Patient"));
+        Assert.Contains("corr:Patient", _abs.Deletes);
+    }
+
+    [Fact]
+    public async Task SuccessfulWrite_RecordsTheDurableCountAgainstTheCacheEntry()
+    {
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1", "Patient/2"), ResourceType.Patient);
+        await _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+        // Recorded from durable storage once the write landed, because only a landed write gives a
+        // count a reader can rely on.
+        Assert.Equal(2, _redis.DurableCountsSet["corr:Patient"]);
+    }
+
+    [Fact]
+    public async Task FailedWrite_RecordsNoDurableCount()
+    {
+        _abs.FailKey("corr:Patient");
+        await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout));
+
+        // Recording one here would claim durable storage holds resources it does not.
+        Assert.False(_redis.DurableCountsSet.ContainsKey("corr:Patient"));
+    }
+
+    [Fact]
     public async Task Cancel_RecordedFailure_IsCleared()
     {
         _abs.FailKey("corr:Patient");
@@ -337,6 +382,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         return new BackgroundAbsCacheWriter(
             _abs,
+            _redis,
             Options.Create(settings),
             Mock.Of<IResourceCacheMetrics>(),
             Mock.Of<ILogger<BackgroundAbsCacheWriter>>());
@@ -373,7 +419,11 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         private int _holdTarget;
         private int _holdArrived;
 
+        private readonly ConcurrentQueue<string> _deletes = new();
+
         public IReadOnlyList<(string CacheKey, int Count)> Writes => _writes.ToList();
+
+        public IReadOnlyList<string> Deletes => _deletes.ToList();
 
         public int AttemptsFor(string cacheKey) => _attempts.TryGetValue(cacheKey, out var n) ? n : 0;
 
@@ -498,11 +548,32 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         public Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(new List<DomainResource>());
 
-        public Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+        public Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
+        {
+            foreach (var cacheKey in cacheKeys ?? [])
+            {
+                _deletes.Enqueue(cacheKey);
+            }
+
+            return Task.CompletedTask;
+        }
 
         public Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
+
+        public ConcurrentDictionary<string, int> DurableCountsSet { get; } = new();
+
+        public Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_writes.Where(write => write.CacheKey == cacheKey).Sum(write => write.Count));
+
+        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DurableCountsSet.TryGetValue(cacheKey, out var count) ? count : (int?)null);
+
+        public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default)
+        {
+            DurableCountsSet[cacheKey] = count;
+            return Task.CompletedTask;
+        }
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey) => ResourceType.Patient;
 

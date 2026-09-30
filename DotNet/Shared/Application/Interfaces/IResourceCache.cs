@@ -105,5 +105,41 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// <param name="cancellationToken">Cancels the check.</param>
         /// <returns>True when the key holds at least one resource.</returns>
         Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// How many resources this store holds for <paramref name="cacheKey"/>, without deserializing
+        /// FHIR payloads.
+        /// </summary>
+        /// <param name="cacheKey">The key to count.</param>
+        /// <param name="cancellationToken">Cancels the count.</param>
+        /// <returns>The number of resources held, or zero when the key is absent.</returns>
+        Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The resource count the durable store is known to hold for <paramref name="cacheKey"/>.
+        /// </summary>
+        /// <remarks>
+        /// A cache write is a merge that recreates a key the cache has evicted, so an entry holding only
+        /// the most recent batch is non-empty and otherwise indistinguishable from a whole one. Comparing
+        /// the count this returns against <see cref="GetResourceCountAsync"/> is what tells them apart.
+        /// Null when nothing has recorded a count, which a reader must treat as unknown rather than as
+        /// agreement. See docs-dev/resource-cache.md.
+        /// </remarks>
+        /// <param name="cacheKey">The key to read the recorded count for.</param>
+        /// <param name="cancellationToken">Cancels the read.</param>
+        /// <returns>The recorded durable count, or null when none has been recorded.</returns>
+        Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Records how many resources durable storage holds for <paramref name="cacheKey"/>.
+        /// </summary>
+        /// <remarks>
+        /// Called once a durable write has landed, so the value describes storage that a reader can rely
+        /// on. Stores that are themselves durable have nothing to record and ignore it.
+        /// </remarks>
+        /// <param name="cacheKey">The key the count belongs to.</param>
+        /// <param name="count">The number of resources durable storage holds.</param>
+        /// <param name="cancellationToken">Cancels the write.</param>
+        Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default);
     }
 }

@@ -185,6 +185,54 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return resources;
         }
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Read from the ids blob rather than the payload, so the cost is one small listing of resource
+        /// references instead of deserializing every resource.
+        /// </remarks>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var idsBlobClient = _containerClient.GetBlobClient(GetBlobIdsKey(cacheKey));
+
+            if (!(await idsBlobClient.ExistsAsync(cancellationToken)).Value)
+            {
+                return 0;
+            }
+
+            var count = 0;
+
+            await using var stream = await idsBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// This store is the durable one, so its own count is the answer and there is nothing recorded.
+        /// </remarks>
+        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            GetResourceCountAsync(cacheKey, cancellationToken).ContinueWith(
+                task => (int?)task.Result,
+                cancellationToken,
+                TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Ignored. Nothing shadows this store, so it has no partial-entry problem to detect.
+        /// </remarks>
+        public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             string[] splitKey = cacheKey.Split(":");

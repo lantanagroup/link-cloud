@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             var readStart = Stopwatch.GetTimestamp();
 
             var cached = await TryReadCacheAsync(cacheKey, cancellationToken);
-            if (cached.Count > 0)
+            if (cached.Count > 0 && await IsCacheEntryWholeAsync(cacheKey, cached.Count, cancellationToken))
             {
                 _metrics.RecordRead(ResourceCacheOutcomes.Hit, Elapsed(readStart));
                 return cached;
@@ -166,6 +166,75 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private static double Elapsed(long startTimestamp) =>
             Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
 
+        /// <inheritdoc/>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var cached = await _redisCache.GetResourceCountAsync(cacheKey, cancellationToken);
+                if (cached > 0)
+                {
+                    return cached;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Cache unavailable counting {CacheKey}; falling back to durable storage.", cacheKey.SanitizeForLog());
+            }
+
+            return await _absCache.GetResourceCountAsync(cacheKey, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            _redisCache.GetDurableResourceCountAsync(cacheKey, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
+            _redisCache.SetDurableResourceCountAsync(cacheKey, count, cancellationToken);
+
+        /// <summary>
+        /// Whether a non-empty cache entry can be trusted as the whole record.
+        /// </summary>
+        /// <remarks>
+        /// A cache write is a merge that recreates an evicted key, so an entry holding only the most
+        /// recent batch looks exactly like a whole one. The count recorded once a durable write landed is
+        /// what tells them apart. An entry with no recorded count is trusted: nothing has completed a
+        /// durable write for that key, so durable storage has no more to offer and falling back would
+        /// turn a usable entry into an empty read.
+        /// </remarks>
+        private async Task<bool> IsCacheEntryWholeAsync(string cacheKey, int cachedCount, CancellationToken cancellationToken)
+        {
+            int? durableCount;
+
+            try
+            {
+                durableCount = await _redisCache.GetDurableResourceCountAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not read the durable resource count for {CacheKey}; treating the cache entry as whole.",
+                    cacheKey.SanitizeForLog());
+                return true;
+            }
+
+            if (durableCount is null || cachedCount >= durableCount.Value)
+            {
+                return true;
+            }
+
+            _logger.LogWarning(
+                "Cache entry for {CacheKey} holds {CachedCount} of {DurableCount} resources, so it was "
+                + "recreated after an eviction and is not the whole record. Reading durable storage instead.",
+                cacheKey.SanitizeForLog(),
+                cachedCount,
+                durableCount.Value);
+
+            return false;
+        }
+
         private async Task<List<DomainResource>> TryReadCacheAsync(string cacheKey, CancellationToken cancellationToken)
         {
             try
@@ -192,6 +261,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     : ResourceType.Bundle;
 
                 await _redisCache.UpdateCorrelationCacheAsync(cacheKey, resources, resourceType, cancellationToken);
+
+                // Recorded with the entry it describes. Without this the restored entry has no count,
+                // and a later partial recreation of it could not be detected.
+                await _redisCache.SetDurableResourceCountAsync(cacheKey, resources.Count, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

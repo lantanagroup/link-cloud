@@ -136,6 +136,66 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
+    public async Task GetAsync_cache_entry_holding_less_than_durable_storage_is_not_served()
+    {
+        // The entry an eviction plus a partial append leaves behind: non-empty, freshly expiring, and
+        // otherwise indistinguishable from the whole record. Only the recorded durable count separates
+        // them, which is the whole reason it is recorded.
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(9);
+
+        var whole = Enumerable.Range(0, 9).Select(i => (DomainResource)new Patient { Id = i.ToString() }).ToList();
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(whole);
+        _abs.Setup(c => c.GetResourceTypeByCacheKey(CacheKey)).Returns(ResourceType.Patient);
+
+        var result = await CreateSut().GetAsync(CacheKey);
+
+        result.Should().HaveCount(9);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAsync_cache_entry_matching_durable_storage_is_served_from_the_cache()
+    {
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+
+        await CreateSut().GetAsync(CacheKey);
+
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
+        _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAsync_cache_entry_with_no_recorded_count_is_trusted()
+    {
+        // No count means no durable write has landed for this key, so durable storage has nothing more
+        // to offer. Falling back would turn a usable entry into an empty read.
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync((int?)null);
+
+        await CreateSut().GetAsync(CacheKey);
+
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
+        _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetAsync_repopulating_the_cache_records_the_durable_count()
+    {
+        // Without this the restored entry has no count, and the next partial recreation of it would be
+        // indistinguishable from whole all over again.
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
+        _abs.Setup(c => c.GetResourceTypeByCacheKey(CacheKey)).Returns(ResourceType.Patient);
+
+        await CreateSut().GetAsync(CacheKey);
+
+        _redis.Verify(c => c.SetDurableResourceCountAsync(CacheKey, 1, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task HasResourcesAsync_checks_durable_storage_when_the_cache_has_nothing()
     {
         _redis.Setup(c => c.HasResourcesAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(false);

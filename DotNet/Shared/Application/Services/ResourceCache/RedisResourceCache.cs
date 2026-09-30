@@ -89,6 +89,23 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
+        /// <summary>
+        /// Field-name prefix reserved for metadata describing the entry rather than a resource in it.
+        /// </summary>
+        /// <remarks>
+        /// Shared with MeasureEval, which skips these fields when it reads an entry
+        /// (<c>RedisResourceService.METADATA_FIELD_PREFIX</c>). Resource fields are always
+        /// <c>resourceType/resourceId</c>, so the two cannot collide. Metadata lives in the entry's own
+        /// hash so that one lifetime covers both and deleting the entry clears its metadata with it.
+        /// See docs-dev/resource-cache.md.
+        /// </remarks>
+        private const string MetadataFieldPrefix = "__";
+
+        /// <summary>
+        /// Hash field holding the count durable storage is known to hold for the entry.
+        /// </summary>
+        private const string DurableResourceCountField = MetadataFieldPrefix + "durableResourceCount";
+
         public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
@@ -114,6 +131,47 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
             return length > 0;
+        }
+
+        /// <inheritdoc/>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
+
+            if (length == 0)
+            {
+                return 0;
+            }
+
+            // The durable-count field shares the hash with the resources, so it must not be counted as
+            // one. It cannot collide with a resource field, which is always "<type>/<id>".
+            var hasCount = await _redisDatabase.Database
+                .HashExistsAsync(cacheKey, DurableResourceCountField)
+                .WaitAsync(cancellationToken);
+
+            return (int)(hasCount ? length - 1 : length);
+        }
+
+        /// <inheritdoc/>
+        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var value = await _redisDatabase.Database
+                .HashGetAsync(cacheKey, DurableResourceCountField)
+                .WaitAsync(cancellationToken);
+
+            return value.HasValue && int.TryParse(value.ToString(), out var count) ? count : null;
+        }
+
+        /// <inheritdoc/>
+        public async Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default)
+        {
+            await _redisDatabase.Database
+                .HashSetAsync(cacheKey, DurableResourceCountField, count)
+                .WaitAsync(cancellationToken);
+
+            // The field is written after the entry, so refresh the lifetime with it rather than leaving
+            // the entry expiring on the clock of its last resource write.
+            await _redisDatabase.Database.KeyExpireAsync(cacheKey, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
     }
 }
