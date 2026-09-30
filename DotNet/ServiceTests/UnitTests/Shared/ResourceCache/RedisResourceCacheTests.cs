@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+﻿using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -31,6 +31,43 @@ public class RedisResourceCacheTests
         await cache.DeleteAsync(new List<string> { "second" });
 
         redisDatabase.VerifyGet(item => item.Database, Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task GetAsync_SkipsMetadataFieldsWithoutLoggingAnError()
+    {
+        // The durable resource count shares the entry's hash with its resources. Deserializing it as
+        // FHIR fails, and the catch logs an error -- once per read, on every entry that has had a
+        // durable write, which is all of them.
+        var redisDatabase = new Mock<IRedisDatabase>();
+        var database = new Mock<IDatabase>();
+        database
+            .Setup(item => item.HashGetAllAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(
+            [
+                new HashEntry("Patient/1", "{\"resourceType\":\"Patient\",\"id\":\"1\"}"),
+                new HashEntry("__durableResourceCount", "753")
+            ]);
+        redisDatabase.SetupGet(item => item.Database).Returns(database.Object);
+
+        var logger = new Mock<ILogger<RedisResourceCache>>();
+
+        var cache = new RedisResourceCache(
+            redisDatabase.Object,
+            Options.Create(new ResourceCacheSettings()),
+            logger.Object);
+
+        var resources = await cache.GetAsync("corr-1");
+
+        Assert.Single(resources);
+        logger.Verify(
+            item => item.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
+            Times.Never);
     }
 
     [Fact]

@@ -55,6 +55,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             List<DomainResource> resources = new List<DomainResource>();
 
             foreach (var entry in hashEntries) {
+                // Metadata about the entry, not a resource in it. Without this the deserialize below
+                // throws and logs an error for it on every read -- and the count that describes the
+                // entry is present on every entry that has had a durable write.
+                if (entry.Name.ToString().StartsWith(MetadataFieldPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 try
                 {
                     DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
