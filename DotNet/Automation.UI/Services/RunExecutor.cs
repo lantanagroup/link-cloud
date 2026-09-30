@@ -1291,7 +1291,8 @@ internal sealed class RunExecutor
             }
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
-                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+                validationResultsValidator.ValidateAllAsync(
+                    facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow, cancellationToken));
 
             validatorResults = validatorRunner.Results;
 
