@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.repositories;
 
 import com.lantanagroup.link.validation.entities.Result;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -25,4 +26,9 @@ public interface ResultRepository extends JpaRepository<Result, Long> {
     List<Result> findAllByFacilityIdAndReportId(String facilityId, String reportId);
 
     List<Result> findAllByFacilityIdAndReportIdAndPatientId(String facilityId, String reportId, String patientId);
+
+    long countByFacilityIdAndReportIdAndSeverityIn(
+            String facilityId,
+            String reportId,
+            Collection<OperationOutcome.IssueSeverity> severities);
 }
