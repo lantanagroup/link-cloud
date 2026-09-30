@@ -3,8 +3,8 @@
 namespace LantanaGroup.Link.Automation.Link.Validation;
 
 /// <summary>
-/// Validates that validation pipeline produced results for each expected patient and
-/// no unhandled exceptions are present in Validation logs.
+/// Checks that the validation result summary endpoint succeeds and that Validation logs
+/// have no unhandled exceptions for the run.
 /// </summary>
 public class ValidationResultsValidator
 {
@@ -23,16 +23,23 @@ public class ValidationResultsValidator
         string facilityId,
         string reportId,
         List<string> expectedPatientIds,
-        TimeSpan? lookback = null)
+        TimeSpan? lookback = null,
+        CancellationToken cancellationToken = default)
     {
         var errors = new List<string>();
 
-        // Lightweight API availability check.
+        // Count only. The result list for a census or mega-patient is large enough that buffering
+        // it as a string throws OutOfMemoryException in this process.
         try
         {
-            var result = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
+            var result = await _validationClient.GetValidationResultSummaryAsync(
+                facilityId, reportId, "WARNING", cancellationToken);
             if (!result.IsSuccessStatusCode)
                 errors.Add($"Validation API returned HTTP {result.StatusCode}: {result.RawBody ?? "(no body)"}");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.controllers;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.models.CategoryIssueModel;
 import com.lantanagroup.link.validation.models.CategorySummaryModel;
+import com.lantanagroup.link.validation.models.ResultSummaryModel;
 import com.lantanagroup.link.validation.services.ResultService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +29,15 @@ public class ResultController {
             @PathVariable String reportId,
             @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity) {
         return resultService.getReportResults(facilityId, reportId, severity);
+    }
+
+    @Operation(summary = "Counts results for a facility and report at or above a minimum severity, without result bodies")
+    @GetMapping("/{facilityId}/{reportId}/summary")
+    public ResultSummaryModel summarizeReportResults(
+            @PathVariable String facilityId,
+            @PathVariable String reportId,
+            @RequestParam(name = "severity", defaultValue = "INFORMATION") OperationOutcome.IssueSeverity severity) {
+        return resultService.summarizeReportResults(facilityId, reportId, severity);
     }
 
     @Operation(summary = "Gets results for a facility, report, and patient; optionally filters by a minimum severity")
