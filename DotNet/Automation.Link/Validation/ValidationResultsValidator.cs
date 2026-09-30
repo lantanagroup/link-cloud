@@ -55,7 +55,8 @@ public class ValidationResultsValidator
                 window,
                 20,
                 facilityId,
-                reportId);
+                reportId,
+                cancellationToken);
 
             if (exceptionLines.Count > 0)
             {
