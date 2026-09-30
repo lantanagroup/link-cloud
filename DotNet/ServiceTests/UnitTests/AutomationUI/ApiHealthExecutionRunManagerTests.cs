@@ -307,8 +307,10 @@ public class ApiHealthExecutionRunManagerTests
         result.ProductVersion.Should().Be("dev");
     }
 
-    [Fact]
-    public async Task DmrpOnlyRun_FetchesTenantMetadataFromHostService()
+    [Theory]
+    [InlineData("http://tenant.test/api")]
+    [InlineData("http://tenant.test/api/")]
+    public async Task DmrpOnlyRun_FetchesTenantMetadataFromHostService(string tenantServiceUrl)
     {
         var suite = new TestServiceSuite(
             ApiEndPointLibrary.ServiceNames.Dmrp,
@@ -324,7 +326,7 @@ public class ApiHealthExecutionRunManagerTests
             new ApiHealthSeedContextAccessor(),
             store,
             CreateHostMetadataHttpClientFactory(),
-            CreateConfiguration(),
+            CreateConfiguration(tenantServiceUrl: tenantServiceUrl),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(
@@ -340,8 +342,10 @@ public class ApiHealthExecutionRunManagerTests
         result.ProductVersion.Should().Be("tenant-dev");
     }
 
-    [Fact]
-    public async Task AdminBffAuthOnlyRun_FetchesAdminBffMetadataFromHostService()
+    [Theory]
+    [InlineData("http://adminbff.test/api")]
+    [InlineData("http://adminbff.test/api/")]
+    public async Task AdminBffAuthOnlyRun_FetchesAdminBffMetadataFromHostService(string adminBffServiceUrl)
     {
         var suite = new TestServiceSuite(
             ApiEndPointLibrary.ServiceNames.AdminBffAuth,
@@ -357,7 +361,7 @@ public class ApiHealthExecutionRunManagerTests
             new ApiHealthSeedContextAccessor(),
             store,
             CreateHostMetadataHttpClientFactory(),
-            CreateConfiguration(),
+            CreateConfiguration(adminBffServiceUrl: adminBffServiceUrl),
             NullLogger<ApiHealthExecutionRunManager>.Instance);
 
         var runId = await manager.StartServiceAsync(
@@ -647,13 +651,13 @@ public class ApiHealthExecutionRunManagerTests
         }
     }
 
-    private static IConfiguration CreateConfiguration()
+    private static IConfiguration CreateConfiguration(string tenantServiceUrl = "http://tenant.test", string adminBffServiceUrl = "http://adminbff.test")
     {
         return new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ServiceRegistry:TenantService:TenantServiceUrl"] = "http://tenant.test",
-                ["ServiceRegistry:AdminBffServiceUrl"] = "http://adminbff.test"
+                ["ServiceRegistry:TenantService:TenantServiceUrl"] = tenantServiceUrl,
+                ["ServiceRegistry:AdminBffServiceUrl"] = adminBffServiceUrl
             })
             .Build();
     }

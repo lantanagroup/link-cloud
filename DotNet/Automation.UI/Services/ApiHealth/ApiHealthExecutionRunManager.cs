@@ -409,9 +409,10 @@ public sealed class ApiHealthExecutionRunManager(
 
         baseUrl = baseUrl.TrimEnd('/');
 
-        if (baseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+        if (baseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase) 
+            && relativePath.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
         {
-            baseUrl = baseUrl[..^4];
+            relativePath = relativePath[4..];
         }
 
         try
