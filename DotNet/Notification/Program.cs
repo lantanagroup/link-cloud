@@ -10,7 +10,6 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Comma
 using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
-using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Notification.Listeners;
@@ -21,6 +20,7 @@ using LantanaGroup.Link.Notification.Presentation.Clients;
 using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
@@ -38,7 +38,6 @@ using System.Text;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
-using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -202,7 +201,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddCheck<DatabaseHealthCheck<NotificationDbContext>>("Database")
         .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services
