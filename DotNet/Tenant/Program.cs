@@ -219,7 +219,7 @@ namespace Tenant
             var loggerOptions = new ConfigurationReaderOptions { SectionName = TenantConstants.AppSettingsSectionNames.Serilog };
             Log.Logger = new LoggerConfiguration()
                 .ReadFrom.Configuration(builder.Configuration, loggerOptions)
-                .Filter.ByExcluding("RequestPath like '/health%'")
+                .Filter.ByExcluding("RequestPath like '/health%' and @l in ['Verbose', 'Debug', 'Information']")
                 .Filter.ByExcluding("RequestPath like '/swagger%'")
                 .Enrich.WithExceptionDetails()
                 .Enrich.FromLogContext()
