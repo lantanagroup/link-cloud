@@ -1112,7 +1112,7 @@ internal sealed class RunExecutor
             var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
             var acquiredResourceTypesForEvidence = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
 
-            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback)
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync(TimeSpan lookback, CancellationToken queryToken)
             {
                 var logs = new List<string>();
 
@@ -1120,6 +1120,7 @@ internal sealed class RunExecutor
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
+                        queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
                         var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
@@ -1127,7 +1128,22 @@ internal sealed class RunExecutor
                             lookback,
                             additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
                             limit: 5000,
-                            maxPages: 20);
+                            maxPages: 20,
+                            cancellationToken: queryToken);
+
+                        if (logsForResourceType.Count == 0)
+                        {
+                            queryToken.ThrowIfCancellationRequested();
+                            output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
+                            logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                                LokiScraper.Components.Normalization,
+                                normalizationSummaryMarker,
+                                lookback,
+                                additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
+                                limit: 500,
+                                maxPages: 40,
+                                cancellationToken: queryToken);
+                        }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
                         logs.AddRange(logsForResourceType);
@@ -1136,29 +1152,78 @@ internal sealed class RunExecutor
                     if (logs.Count == 0)
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
+                        queryToken.ThrowIfCancellationRequested();
                         logs = await lokiScraper.QueryServiceLogsAsync(
                             LokiScraper.Components.Normalization,
                             normalizationSummaryMarker,
                             lookback,
                             additionalContainsFilters: runScopeFilters,
                             limit: 5000,
-                            maxPages: 20);
+                            maxPages: 20,
+                            cancellationToken: queryToken);
                     }
                 }
                 else
                 {
+                    queryToken.ThrowIfCancellationRequested();
                     logs = await lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
                         lookback,
                         additionalContainsFilters: runScopeFilters,
                         limit: 5000,
-                        maxPages: 20);
+                        maxPages: 20,
+                        cancellationToken: queryToken);
                 }
 
                 return logs
                     .Distinct(StringComparer.Ordinal)
                     .ToList();
+            }
+
+            async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
+            {
+                var plan = NormalizationDiagnosticsWriter.PlanPersistence(evidence);
+                for (var index = 0; index < plan.Chunks.Count; index++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await _snapshotStore.SetDomainAsync(
+                            state.RunId,
+                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
+                            plan.Chunks[index],
+                            ct);
+                    }
+                    catch (Exception ex) when (!ct.IsCancellationRequested)
+                    {
+                        output.WriteLine(
+                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}");
+                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                        return;
+                    }
+                }
+
+                try
+                {
+                    await _snapshotStore.SetDomainAsync(
+                        state.RunId,
+                        NormalizationEvidenceSnapshot.Domain,
+                        plan.Header,
+                        ct);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
+                    output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
+                    return;
+                }
+
+                if (plan.Chunks.Count > 0)
+                {
+                    output.WriteLine(
+                        $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
+                }
             }
 
             var hslocMapEnabled = runtimeNormalizationSequences.Any(s =>
@@ -1173,7 +1238,14 @@ internal sealed class RunExecutor
                     : DateTimeOffset.UtcNow;
                 while (true)
                 {
-                    var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync(scenarioConfig.LokiScrapeWindow);
+                    var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
+                        scenarioConfig.LokiScrapeWindow,
+                        evidenceRequiredResourceTypes,
+                        acquiredResourceTypesForEvidence,
+                        (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
+                        (delay, ct) => Task.Delay(delay, ct),
+                        output,
+                        cancellationToken);
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -1181,18 +1253,7 @@ internal sealed class RunExecutor
                         runtimeNormalizationSequences,
                         normalizationSummaryLogs);
                     NormalizationDiagnosticsWriter.WriteInventory(output, normalizationEvidence);
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.Domain,
-                            normalizationEvidence,
-                            cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
-                    }
+                    await PersistNormalizationEvidenceAsync(normalizationEvidence, cancellationToken);
 
                     try
                     {
@@ -1230,7 +1291,8 @@ internal sealed class RunExecutor
             }
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
-                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+                validationResultsValidator.ValidateAllAsync(
+                    facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow, cancellationToken));
 
             validatorResults = validatorRunner.Results;
 

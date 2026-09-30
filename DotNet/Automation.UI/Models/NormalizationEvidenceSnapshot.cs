@@ -11,6 +11,29 @@ public sealed class NormalizationEvidenceSnapshot
 
     public string SuiteName { get; set; } = string.Empty;
     public int CollectedLineCount { get; set; }
+
+    /// <summary>
+    /// Raw Loki lines were left out so the snapshot stays under the Cosmos document cap.
+    /// <see cref="CollectedLineCount"/> is still the number of lines validation used.
+    /// </summary>
+    public bool RawLinesOmitted { get; set; }
+
+    /// <summary>Per-resource steps were rolled up by operation so the snapshot could be stored.</summary>
+    public bool StepsCollapsed { get; set; }
+
+    /// <summary>
+    /// Additional snapshot documents named <c>normalizationEvidence-chunk-N</c> hold the raw lines
+    /// and per-resource steps that did not fit in this document.
+    /// </summary>
+    public int EvidenceChunkCount { get; set; }
+
+    /// <summary>
+    /// Identifies one persistence attempt. Chunks from another attempt are ignored on export.
+    /// </summary>
+    public string EvidenceAttemptId { get; set; } = string.Empty;
+
+    public static string ChunkDomain(int oneBasedIndex) => $"{Domain}-chunk-{oneBasedIndex}";
+
     public List<string> SummaryLines { get; set; } = [];
     public List<NormalizationRuntimeSequenceStep> RuntimeSequences { get; set; } = [];
     public List<NormalizationSuiteSequenceStep> SuiteSequences { get; set; } = [];
@@ -58,4 +81,17 @@ public sealed class NormalizationEvidenceStep
     public string OperationType { get; set; } = string.Empty;
     public string OperationName { get; set; } = string.Empty;
     public string Outcome { get; set; } = string.Empty;
+
+    /// <summary>
+    /// How many resources this row represents. Zero means one resource, so older snapshots still count.
+    /// </summary>
+    public int Count { get; set; }
+}
+
+/// <summary>One Cosmos-sized piece of a normalization evidence snapshot.</summary>
+public sealed class NormalizationEvidenceChunk
+{
+    public string EvidenceAttemptId { get; set; } = string.Empty;
+    public List<string> SummaryLines { get; set; } = [];
+    public List<NormalizationEvidenceStep> ParsedSteps { get; set; } = [];
 }
