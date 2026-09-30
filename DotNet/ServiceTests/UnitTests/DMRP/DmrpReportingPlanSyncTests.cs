@@ -126,8 +126,6 @@ namespace UnitTests.DMRP
             public Task<int> ExecuteDeleteAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber) => throw new NotSupportedException();
             public Task<(List<T>, PaginationMetadata)> SearchAsync(Expression<Func<T, bool>> predicate, string? sortBy, SortOrder? sortOrder, int pageSize, int pageNumber, CancellationToken cancellationToken) => throw new NotSupportedException();
-            public Task<HealthCheckResult> HealthCheck(int eventId) => throw new NotSupportedException();
-            public Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task StartTransactionAsync() => throw new NotSupportedException();
             public Task StartTransactionAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
             public Task CommitTransactionAsync() => throw new NotSupportedException();
