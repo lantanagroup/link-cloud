@@ -116,4 +116,41 @@ class RedisResourceServiceTest {
 
         verify(redisTemplate).unlink(List.of("corr-1"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readDurableResourceCount_returnsTheRecordedCount() {
+        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn("12");
+
+        assertEquals(12, service.readDurableResourceCount("corr"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readDurableResourceCount_returnsNull_whenNoneRecorded() {
+        // No durable write has landed for the key yet (or the entry predates the field).
+        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn(null);
+
+        assertNull(service.readDurableResourceCount("corr"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readDurableResourceCount_returnsNull_whenTheValueIsNotANumber() {
+        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn("not-a-number");
+
+        assertNull(service.readDurableResourceCount("corr"),
+                "a malformed count must read as unrecorded so the entry is trusted rather than rejected");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readDurableResourceCount_wrapsAsCacheUnavailable_whenRedisDown() {
+        RedisConnectionFailureException cause = new RedisConnectionFailureException("redis unavailable");
+        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenThrow(cause);
+
+        ResourceCacheUnavailableException ex = assertThrows(ResourceCacheUnavailableException.class,
+                () -> service.readDurableResourceCount("corr"));
+        assertSame(cause, ex.getCause());
+    }
 }

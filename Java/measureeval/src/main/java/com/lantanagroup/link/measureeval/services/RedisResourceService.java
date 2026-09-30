@@ -98,6 +98,44 @@ public class RedisResourceService {
         return resources;
     }
 
+    /**
+     * Hash field the .NET durable writer records once a blob write for the entry has landed: the
+     * number of resources the durable store holds for it (LEGLINK-1276). It shares the entry's hash
+     * so one TTL covers both and deleting the entry clears it. The "__" prefix is reserved for
+     * metadata; a resource field is always {@code resourceType/resourceId}, so the two cannot
+     * collide. See docs-dev/resource-cache.md.
+     */
+    static final String DURABLE_RESOURCE_COUNT_FIELD = "__durableResourceCount";
+
+    /**
+     * The durable resource count recorded on the entry, or {@code null} when none is recorded or
+     * the recorded value is not a number. A Redis outage surfaces as
+     * {@link ResourceCacheUnavailableException}, as in {@link #readResources}.
+     */
+    public Integer readDurableResourceCount(String correlationId) {
+        HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
+
+        String value;
+        try {
+            value = hashOps.get(correlationId, DURABLE_RESOURCE_COUNT_FIELD);
+        } catch (DataAccessException e) {
+            throw new ResourceCacheUnavailableException(
+                    "Resource cache (Redis) unavailable while reading the durable resource count for correlationId=" + correlationId, e);
+        }
+
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            logger.warn("Unparseable durable resource count '{}' on Redis key '{}'. Treating the count as unrecorded.",
+                    LogUtils.sanitize(value), LogUtils.sanitize(correlationId));
+            return null;
+        }
+    }
+
 
     public void cleanup(String correlationId) {
         // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition

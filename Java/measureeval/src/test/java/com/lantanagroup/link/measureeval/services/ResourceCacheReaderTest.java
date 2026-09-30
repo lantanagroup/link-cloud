@@ -115,4 +115,60 @@ class ResourceCacheReaderTest {
         verify(redis).readResources(FACILITY, "other-key", PATIENT);
         verify(abs, never()).readResources(anyString(), anyString(), anyString(), anyString());
     }
+
+    @Test
+    void redisHit_holdingFewerThanTheDurableCount_fallsBackToAbs() {
+        // A cache write is a merge that recreates an evicted key, so an entry rebuilt by the
+        // supplemental append alone is non-empty yet missing the initial pass. The durable count
+        // the .NET writer records is what exposes it; ABS is the whole record.
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
+                .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
+
+        List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        assertEquals(3, result.size());
+        verify(abs).readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+    }
+
+    @Test
+    void redisHit_withNoRecordedDurableCount_isTrusted() {
+        // No count means no durable write has landed for the key, so ABS has nothing more to
+        // offer; falling back would turn a usable entry into an empty read.
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(null);
+
+        List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        assertEquals("p1", result.get(0).getResourceId());
+        verifyNoInteractions(abs);
+    }
+
+    @Test
+    void redisHit_meetingOrExceedingTheDurableCount_isTrusted() {
+        // Holding more than the recorded count is the cache running ahead of a durable write
+        // still in flight — the ordinary state between the two writes, not a partial entry.
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1"), resource("p2")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(1);
+
+        List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        assertEquals(2, result.size());
+        verifyNoInteractions(abs);
+    }
+
+    @Test
+    void redisHit_whenTheDurableCountCannotBeRead_isTrusted() {
+        // Failing to read the count must not demote a usable hit to an ABS read: the entry is
+        // treated as whole, as the .NET reader does.
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION))
+                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+
+        List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        assertEquals("p1", result.get(0).getResourceId());
+        verifyNoInteractions(abs);
+    }
 }
