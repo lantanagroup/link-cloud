@@ -50,6 +50,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     {
         var results = new List<ApiTestRunResult>();
         var baseUrl = _serviceRegistry.Value.AdminBffServiceUrl?.TrimEnd('/');
+        var apiBaseUrl = _serviceRegistry.Value.AdminBffServiceApiUrl?.TrimEnd('/');
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -108,8 +109,8 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             }
             else
             {
-                results.Add(MakeFailedResult(StepNames.FacilityDelete200, "Prerequisite: facility creation via BFF failed.", "DELETE", 200, $"{baseUrl}/api/aggregate/facility/{{facilityId}}"));
-                results.Add(MakeFailedResult(StepNames.FacilityRestorePatch200, "Prerequisite: facility creation via BFF failed.", "PATCH", 200, $"{baseUrl}/api/aggregate/facility/{{facilityId}}/restore"));
+                results.Add(MakeFailedResult(StepNames.FacilityDelete200, "Prerequisite: facility creation via BFF failed.", "DELETE", 200, $"{apiBaseUrl}/aggregate/facility/{facilityId}"));
+                results.Add(MakeFailedResult(StepNames.FacilityRestorePatch200, "Prerequisite: facility creation via BFF failed.", "PATCH", 200, $"{apiBaseUrl}/aggregate/facility/{facilityId}/restore"));
             }
         }
         finally
@@ -166,8 +167,8 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         }
         else
         {
-            results.Add(MakeFailedResult(StepNames.ReportDelete204, reportSeedMissing, "DELETE", 204, $"{baseUrl}/api/aggregate/reports/{{reportId}}"));
-            results.Add(MakeFailedResult(StepNames.ReportRestorePatch204, reportSeedMissing, "PATCH", 204, $"{baseUrl}/api/aggregate/reports/{{reportId}}/restore"));
+            results.Add(MakeFailedResult(StepNames.ReportDelete204, reportSeedMissing, "DELETE", 204, $"{apiBaseUrl}/aggregate/reports/{{reportScheduleId}}"));
+            results.Add(MakeFailedResult(StepNames.ReportRestorePatch204, reportSeedMissing, "PATCH", 204, $"{apiBaseUrl}/aggregate/reports/{{reportScheduleId}}/restore"));
         }
 
         var fakeScheduleId = Guid.NewGuid().ToString();
