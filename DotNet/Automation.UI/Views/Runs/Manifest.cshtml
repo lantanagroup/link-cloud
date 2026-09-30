@@ -831,17 +831,17 @@
                 <span><i class="bi bi-people me-2"></i>Per-Patient Prediction vs ABS</span>
                 <input type="text" class="form-control form-control-sm" id="compPatientSearch" placeholder="Search patients…" style="width:200px;">
             </div><div class="card-body p-0">
-            <div style="max-height:600px;overflow-y:auto;">
-            <table class="au-table table table-sm small mb-0" id="compPatientTable">
+                <div style="max-height:600px;overflow:auto;">
+            <table class="au-table table small mb-0" id="compPatientTable" style="table-layout:fixed;min-width:900px;">
                 <colgroup>
-                    <col style="width:33%">
+                    <col style="width:34%">
                     <col style="width:13%">
                     <col style="width:13%">
                     <col style="width:13%">
                     <col style="width:7%">
-                    <col style="width:13%">
-                    <col style="width:5%">
-                    <col style="width:3%">
+                    <col style="width:12%">
+                    <col style="width:64px">
+                    <col style="width:52px">
                 </colgroup>
             <thead><tr>
                 <th>Patient</th>
@@ -872,7 +872,32 @@
 
                 // Build per-type detail for expand row
                 const patientTypes = [...new Set([...Object.keys(gCounts), ...Object.keys(eCounts), ...Object.keys(aCounts)])].sort();
-                let detailHtml = '<table class="table table-sm table-borderless small mb-0" style="background:#f8fafc;"><thead><tr><th>Type</th><th class="text-end">Gen</th><th class="text-end" style="color:var(--au-accent);">Pred</th><th class="text-end">ABS</th><th class="text-end">Δ</th><th>Status</th></tr></thead><tbody>';
+                let detailHtml = `
+                    <table class="au-table table table-borderless small mb-0"
+                            style="background:#f8fafc;table-layout:fixed;min-width:900px;">
+                        <colgroup>
+                            <col style="width:34%">
+                            <col style="width:13%">
+                            <col style="width:13%">
+                            <col style="width:13%">
+                            <col style="width:7%">
+                            <col style="width:12%">
+                            <col style="width:64px">
+                            <col style="width:52px">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th class="text-end">Gen</th>
+                                <th class="text-end" style="color:var(--au-accent);">Pred</th>
+                                <th class="text-end">ABS</th>
+                                <th class="text-end">Δ</th>
+                                <th>Status</th>
+                                <th></th>   <!-- Bundle column -->
+                                <th></th>   <!-- Chevron column -->
+                            </tr>
+                        </thead>
+                        <tbody>`;
                 patientTypes.forEach(t => {
                     const pg = gCounts[t] || 0;
                     const pe = eCounts[t] || 0;
@@ -887,7 +912,17 @@
                     else if (pg > 0 && pe === 0) pv = '<span class="text-muted">Filtered</span>';
                     else pv = '&ndash;';
                     const prc = pe > 0 && pa === 0 ? 'table-danger' : pa < pe ? 'table-warning' : '';
-                    detailHtml += `<tr class="${prc}"><td>${escapeHtml(t)}</td><td class="text-end">${pg || '&ndash;'}</td><td class="text-end">${pe || '&ndash;'}</td><td class="text-end">${pa || '&ndash;'}</td><td class="text-end">${pd !== 0 ? pds + pd : '&ndash;'}</td><td>${pv}</td></tr>`;
+                    detailHtml += `
+                        <tr class="${prc}">
+                            <td>${escapeHtml(t)}</td>
+                            <td class="text-end">${pg || '&ndash;'}</td>
+                            <td class="text-end">${pe || '&ndash;'}</td>
+                            <td class="text-end">${pa || '&ndash;'}</td>
+                            <td class="text-end">${pd !== 0 ? pds + pd : '&ndash;'}</td>
+                            <td>${pv}</td>
+                            <td></td>   <!-- Bundle column -->
+                            <td></td>   <!-- Chevron column -->
+                        </tr>`;
                 });
                 detailHtml += '</tbody></table>';
 
