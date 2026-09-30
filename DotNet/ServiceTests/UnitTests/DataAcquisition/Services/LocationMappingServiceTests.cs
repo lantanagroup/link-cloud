@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using System.Text.Json;
 using DataAcquisition.Domain.Application.Models;
@@ -1064,6 +1065,52 @@ public class LocationMappingServiceTests
         var match = Assert.Single(outcome.Matches);
         Assert.Equal("loc-other", match.LocationId);
         Assert.False(match.IsOrgLocation);
+    }
+
+    [Fact]
+    public async Task StripNonOrgEncountersFromCacheAsync_CacheDeleteDidNotTake_FailsWithoutRewriting()
+    {
+        // HybridResourceCache.DeleteAsync tolerates a failed cache delete, which is right for an
+        // ordinary delete. Here the rewrite merges into whatever survived, so tolerating it would
+        // leave the non-org encounters in place and reads prefer the cache -- the filtering silently
+        // not happening. The entry still holding resources after the delete is how that is detected.
+        const string correlationId = "corr-1";
+        const string patientId = "patient-1";
+        var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+
+        _mockConfigQueries
+            .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockResourceCache
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource>
+            {
+                new Encounter { Id = "enc-org" },
+                new Encounter { Id = "enc-nonorg" }
+            });
+
+        _mockEncounterMappingQueries
+            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { EncounterId = "enc-org", MappedToOrg = true, EncounterLocations = [] },
+                new() { EncounterId = "enc-nonorg", MappedToOrg = false, EncounterLocations = [] }
+            });
+
+        // The delete reported success but the entry is still there.
+        _mockResourceCache
+            .Setup(c => c.HasResourcesAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await Assert.ThrowsAsync<TransientException>(
+            () => _service.StripNonOrgEncountersFromCacheAsync(
+                FacilityId, correlationId, patientId, CancellationToken.None));
+
+        // Rewriting would have merged the org encounters in beside the non-org ones still present.
+        _mockResourceCache.Verify(
+            c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

@@ -135,6 +135,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Completes immediately: this cache has no separate durable tier to wait for.
+        /// </summary>
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);

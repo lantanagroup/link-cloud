@@ -98,6 +98,22 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Blocks until every durable write for <paramref name="cacheKeys"/> has landed.
+        /// </summary>
+        /// <remarks>
+        /// Prefer this over the correlation-wide overload when the caller owns only part of a
+        /// correlation. A failure is reported once, to the waiter that sees it, so a caller waiting on
+        /// keys it does not own can consume a failure meant for the caller that does -- which then
+        /// finds nothing to wait on and reports an undurable key as durable.
+        /// </remarks>
+        /// <param name="cacheKeys">The keys to wait on.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <exception cref="ResourceCacheDurabilityException">
+        /// A durable write for one of these keys failed permanently, so they must not be advertised.
+        /// </exception>
+        Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// True when the backing store has at least one resource for <paramref name="cacheKey"/>,
         /// without deserializing FHIR payloads.
         /// </summary>

@@ -875,9 +875,14 @@ public class PatientDataServiceTests
         // complete the tail and advertise this correlation's cache keys, so the durable write has to
         // have landed first. Inverting these two lines is silent in every other test in this file.
         var order = new List<string>();
+        var waitedOn = new List<string>();
         _mockResourceCache
-            .Setup(c => c.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback(() => order.Add("durable"))
+            .Setup(c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, CancellationToken>((keys, _) =>
+            {
+                order.Add("durable");
+                waitedOn.AddRange(keys);
+            })
             .Returns(Task.CompletedTask);
         _mockLogManager
             .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
@@ -890,6 +895,14 @@ public class PatientDataServiceTests
         // Assert
         Assert.NotEmpty(order);
         Assert.Equal("durable", order[0]);
+
+        // Scoped to the keys this log wrote, never the whole correlation. A correlation-wide wait
+        // consumes a sibling log's durability failure and retires its state, and that sibling then
+        // finds nothing to wait on and advertises a key that never reached durable storage.
+        Assert.Equal(["corr-1:Patient"], waitedOn);
+        _mockResourceCache.Verify(
+            c => c.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

@@ -319,6 +319,42 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WaitingOnOneKey_DoesNotConsumeAnotherKeysFailure()
+    {
+        // Two sibling acquisition logs write different keys of one correlation. A failure is reported
+        // once, to the waiter that sees it, so a waiter scoped to the whole correlation would consume
+        // the other log's failure and retire its state -- and that log's own barrier would then find
+        // nothing to wait on and report a key as durable that never reached durable storage.
+        _abs.FailKey("corr:Condition");
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/1"), ResourceType.Observation);
+        await _writer.EnqueueAsync("corr:Condition", Resources("Condition/1"), ResourceType.Condition);
+
+        // The sibling waits on its own key only and is unaffected.
+        await _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout);
+
+        // The owner still gets told, which is the whole point.
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Condition"]).WaitAsync(Timeout));
+    }
+
+    [Fact]
+    public async Task WaitingOnTheCorrelation_ConsumesEveryKeysFailure()
+    {
+        // The behaviour the per-key wait exists to avoid, pinned so the difference is not accidental.
+        _abs.FailKey("corr:Condition");
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/1"), ResourceType.Observation);
+        await _writer.EnqueueAsync("corr:Condition", Resources("Condition/1"), ResourceType.Condition);
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForCorrelationAsync("corr").WaitAsync(Timeout));
+
+        // Consumed by the correlation-wide waiter, so the owner is no longer told.
+        await _writer.WaitForDurableAsync(["corr:Condition"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
     public async Task Cancel_RecordedFailure_IsCleared()
     {
         _abs.FailKey("corr:Patient");
@@ -576,6 +612,9 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         }
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey) => ResourceType.Patient;
+
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
 
         public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;

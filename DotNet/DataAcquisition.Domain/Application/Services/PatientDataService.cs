@@ -763,7 +763,21 @@ public class PatientDataService : IPatientDataService
                 // below, and the durable writes for them are still on this pod's background queue.
                 // Only this path persists ResourceAcquiredIds, so only this path can newly advertise
                 // a key -- the failure paths carry ids a previous successful pass already made durable.
-                await _resourceCache.WaitForDurableAsync(log.CorrelationId, cancellationToken);
+                //
+                // Scoped to the keys this log wrote, not the whole correlation. A durability failure is
+                // reported once, to the waiter that sees it, so waiting on a sibling log's keys would
+                // consume that sibling's failure and retire its state -- and the sibling's own barrier
+                // would then find nothing to wait on and advertise a key that never reached durable
+                // storage. Acquired ids are "ResourceType/resourceId", which is exactly what the cache
+                // key is built from.
+                var logCacheKeys = resourceIds
+                    .Select(acquiredId => acquiredId.Split('/')[0])
+                    .Where(resourceTypeName => !string.IsNullOrWhiteSpace(resourceTypeName))
+                    .Distinct(StringComparer.Ordinal)
+                    .Select(resourceTypeName => $"{log.CorrelationId}:{resourceTypeName}")
+                    .ToList();
+
+                await _resourceCache.WaitForDurableAsync(logCacheKeys, cancellationToken);
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {

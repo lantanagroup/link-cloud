@@ -7,6 +7,7 @@ using Hl7.FhirPath;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -564,6 +565,20 @@ public class LocationMappingService(
         // and rewriting it with only the org encounters. When none remain the key is left empty, so
         // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
         await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
+
+        // DeleteAsync tolerates a failed cache delete -- for an ordinary delete the entry expires on
+        // its own and the durable delete is what matters. Here it is not tolerable: the rewrite below
+        // merges the org encounters into whatever survived, so a swallowed cache failure leaves the
+        // non-org encounters in place and reads prefer the cache. They would stay served until the
+        // entry expires, which is the filtering this method exists to apply silently not happening.
+        // Failing here reverts the tail claim and the recovery poller runs the strip again.
+        if (await _resourceCache.HasResourcesAsync(cacheKey, cancellationToken))
+        {
+            throw new TransientException(
+                $"Could not clear cache key '{cacheKey.SanitizeForLog()}' before rewriting it with org encounters only. "
+                + "Rewriting now would leave the non-org encounters in place, so the strip has not been applied.");
+        }
+
         if (orgEncounters.Count > 0)
         {
             await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);

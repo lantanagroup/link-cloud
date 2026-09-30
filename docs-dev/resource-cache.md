@@ -164,6 +164,18 @@ advertises independently**. Nothing waits for both. By the time SUPPLEMENTAL rea
 are durable, because every INITIAL log drained before going terminal and the INITIAL tail could not
 have fired otherwise.
 
+### Who waits on what
+
+A durability failure is reported **once**, to the waiter that sees it, and is cleared as it is
+reported so the redelivery that follows can succeed. That makes the scope of a wait part of its
+correctness, not a detail: a caller that waits on keys it does not own consumes a failure meant for
+the caller that does, and that caller's own barrier then finds nothing to wait on and reports an
+undurable key as durable.
+
+So acquisition waits on the keys its own log wrote — derived from the acquired ids, which are
+already `resourceType/resourceId` — and not on the correlation. Normalization and the tail finalizer
+wait on the whole correlation, which is correct for them: they own all of it.
+
 ### Restoring the correlation entry before the supplemental append
 
 The two query plans are disjoint — INITIAL fetches Encounter, MedicationRequest, Location and
@@ -224,6 +236,12 @@ abort, so a write landing afterwards leaves that data behind permanently.
 Rather than hold the delete up until the write finishes, the write undoes itself: on success it
 re-checks the generation and, if the key was cancelled, deletes it from durable storage. Both orders
 reach the same end state, and the delete path stays non-blocking.
+
+`DeleteAsync` tolerates a failed cache delete, since the entry expires on its own and the durable
+delete is what matters. The encounter strip is the exception: it deletes and then rewrites, so a
+tolerated failure leaves the stripped encounters in place for the rewrite to merge into, and reads
+prefer the cache. The strip therefore checks the entry is actually gone before rewriting and fails
+if it is not, which reverts the tail claim and lets the recovery poller run it again.
 
 ## Durability
 
