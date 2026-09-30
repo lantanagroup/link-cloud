@@ -2,15 +2,17 @@ package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.Resource;
 import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
+import org.hl7.fhir.r4.model.ResourceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -85,36 +87,26 @@ class RedisResourceServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void cleanup_sweepsTheCorrelationAndItsAcquisitionKeys() {
+    void cleanup_unlinksTheCorrelationAndEveryAcquisitionKeyItCouldHave() {
         // ABS cleanup sweeps everything under the correlation prefix; the Redis side must forget
         // the correlation just as completely — the bare key plus any surviving
         // {correlationId}:{ResourceType} acquisition keys a dead-lettered correlation left behind.
-        Cursor<String> cursor = mock(Cursor.class);
-        // forEachRemaining is a default method, which Mockito intercepts like any other — stub it
-        // directly rather than hasNext/next, since it is what cleanup() actually calls.
-        doAnswer(invocation -> {
-            java.util.function.Consumer<String> action = invocation.getArgument(0);
-            action.accept("corr-1:Patient");
-            action.accept("corr-1:Encounter");
-            return null;
-        }).when(cursor).forEachRemaining(any());
-        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
+        // The acquisition keys are enumerable (the FHIR resource types are a closed set), so they
+        // are built and unlinked in one round trip rather than discovered with SCAN, which walks
+        // the whole shared keyspace once per correlation.
+        ArgumentCaptor<Collection<String>> keys = ArgumentCaptor.forClass(Collection.class);
 
         service.cleanup("corr-1");
 
-        verify(redisTemplate).unlink(List.of("corr-1", "corr-1:Patient", "corr-1:Encounter"));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void cleanup_unlinksTheBareKey_whenNoAcquisitionKeysSurvive() {
-        Cursor<String> cursor = mock(Cursor.class);
-        when(cursor.hasNext()).thenReturn(false);
-        when(redisTemplate.scan(any(ScanOptions.class))).thenReturn(cursor);
-
-        service.cleanup("corr-1");
-
-        verify(redisTemplate).unlink(List.of("corr-1"));
+        verify(redisTemplate).unlink(keys.capture());
+        verify(redisTemplate, never()).scan(any(ScanOptions.class));
+        Collection<String> unlinked = keys.getValue();
+        assertTrue(unlinked.contains("corr-1"), "the bare correlation key");
+        assertTrue(unlinked.contains("corr-1:Encounter"), "an acquisition key");
+        assertTrue(unlinked.contains("corr-1:Patient"), "an acquisition key");
+        assertTrue(unlinked.contains("corr-1:__cacheType"), "the Hybrid cache-type memo");
+        assertEquals(ResourceType.values().length + 2, unlinked.size(),
+                "one key per FHIR resource type plus the bare key and the memo, nothing else");
     }
 
     @Test

@@ -7,9 +7,7 @@ import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -137,19 +135,34 @@ public class RedisResourceService {
     }
 
 
+    /**
+     * Suffix of the per-correlation memo the .NET Hybrid cache keeps in Redis to record which store
+     * holds a correlation. Removed with the correlation so it does not outlive the entry it describes.
+     */
+    static final String CACHE_TYPE_MEMO_SUFFIX = ":__cacheType";
+
     public void cleanup(String correlationId) {
         // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
         // keys. Normalization normally deletes the acquisition keys after each pass, but a
         // dead-lettered correlation can leave them behind — and the ABS side sweeps its whole
         // prefix, so the two stores should forget a correlation symmetrically instead of leaving
         // Redis keys to age out at the TTL.
-        List<String> keys = new ArrayList<>();
+        //
+        // The acquisition keys are enumerated, not discovered: FHIR resource types are a closed
+        // set, so every key the correlation could have is built up front and the whole batch goes
+        // in one UNLINK. A SCAN ... MATCH would walk the entire keyspace and filter server-side —
+        // MATCH is not an index — once per correlation on a Redis instance shared with other
+        // caches, which is O(correlations x keyspace) rather than O(keys deleted). UNLINK of a key
+        // that does not exist is a cheap no-op, so over-enumerating costs far less than scanning.
+        ResourceType[] resourceTypes = ResourceType.values();
+        List<String> keys = new ArrayList<>(resourceTypes.length + 2);
         keys.add(correlationId);
-        try (Cursor<String> cursor = redisTemplate.scan(
-                ScanOptions.scanOptions().match(correlationId + ":*").count(100).build())) {
-            cursor.forEachRemaining(keys::add);
+        keys.add(correlationId + CACHE_TYPE_MEMO_SUFFIX);
+        for (ResourceType resourceType : resourceTypes) {
+            keys.add(correlationId + ":" + resourceType.name());
         }
-        redisTemplate.unlink(keys);
-        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'", keys.size(), LogUtils.sanitize(correlationId));
+        Long unlinked = redisTemplate.unlink(keys);
+        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'",
+                unlinked == null ? 0 : unlinked, LogUtils.sanitize(correlationId));
     }
 }
