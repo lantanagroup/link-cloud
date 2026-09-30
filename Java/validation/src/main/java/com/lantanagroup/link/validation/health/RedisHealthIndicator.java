@@ -18,8 +18,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Reports Redis cache reachability under the "redis" component so the Admin BFF can map it to the
- * dashboard's Cache column. Registered only when {@code cache.type=redis} (the same condition that
+ * Reports Redis cache reachability. Registered only when {@code cache.type=redis} (the same condition that
  * creates the Redis connection factory). Spring's auto-configured Redis health indicator is disabled
  * (management.health.redis.enabled=false) in favor of this one: when Redis is unreachable, Lettuce's
  * reconnect / connection-acquisition path is not reliably bounded by the command timeout, so the
@@ -29,7 +28,7 @@ import java.util.concurrent.TimeUnit;
  * The PING runs on a separate thread bounded by {@link #checkTimeoutMs}, so a down cache is reported
  * DOWN within the deadline.
  */
-@Component("redis")
+@Component("Redis")
 @ConditionalOnProperty(name = "cache.type", havingValue = "redis")
 public class RedisHealthIndicator implements HealthIndicator {
 

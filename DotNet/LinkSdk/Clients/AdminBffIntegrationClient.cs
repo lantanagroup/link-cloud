@@ -27,6 +27,9 @@ public sealed class AdminBffIntegrationClient : LinkApiClientBase, IAdminBffInte
     public Task<LinkApiResponse<string>> GetHealthAsync(CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request("/monitor/health").GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<string>> GetServiceHealthAsync(string service, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"/monitor/health/{Uri.EscapeDataString(service)}").GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<FacilityModel>> CreateFacilityAsync(FacilityModel request, CancellationToken cancellationToken = default) =>
         SendAsync<FacilityModel>(() => Request("/Facility").PostJsonAsync(request, cancellationToken: cancellationToken));
 
