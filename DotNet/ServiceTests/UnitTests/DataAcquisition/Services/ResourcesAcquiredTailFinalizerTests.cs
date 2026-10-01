@@ -50,11 +50,9 @@ public class ResourcesAcquiredTailFinalizerTests
     }
 
     [Fact]
-    public async Task FinalizeAsync_WaitsForTheStripToBeDurableBeforeReturning()
+    public async Task FinalizeAsync_StripsBeforeProbingTheListedKeys()
     {
-        // The strip deletes the Encounter key from both stores and rewrites it, leaving the rewrite on
-        // a background queue. Returning here lets the caller produce the tail, so without this barrier
-        // the key is advertised while durable storage holds nothing for it.
+        // The strip can empty a key, so probing first would keep a key the strip is about to clear.
         var order = new List<string>();
 
         var locationMapping = new Mock<ILocationMappingService>();
@@ -64,9 +62,6 @@ public class ResourcesAcquiredTailFinalizerTests
             .ReturnsAsync(Stripped(2));
 
         var cache = new Mock<IResourceCache>();
-        cache.Setup(c => c.WaitForDurableAsync(CorrelationId, It.IsAny<CancellationToken>()))
-            .Callback(() => order.Add("barrier"))
-            .Returns(Task.CompletedTask);
         cache.Setup(c => c.HasResourcesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback(() => order.Add("probe"))
             .ReturnsAsync(true);
@@ -78,15 +73,15 @@ public class ResourcesAcquiredTailFinalizerTests
 
         await sut.FinalizeAsync(BuildTail([PatientKey]), CancellationToken.None);
 
-        // After the strip, or the rewrite it is waiting on has not been queued yet.
-        Assert.Equal(["strip", "barrier", "probe"], order);
+        Assert.Equal(["strip", "probe"], order);
     }
 
     [Fact]
-    public async Task FinalizeAsync_NoListedKeys_StillWaitsForTheStripToBeDurable()
+    public async Task FinalizeAsync_DoesNotWaitOnTheBackgroundWriterAfterTheStrip()
     {
-        // The early return for an empty key list must not skip the barrier: the strip rewrote the
-        // Encounter key regardless of what this message listed.
+        // The strip writes durable storage itself, so there is nothing queued for a barrier to wait
+        // on. Waiting anyway would be a correlation-wide stall per tail, and would surface an
+        // unrelated sibling key's recorded failure as a tail failure.
         var locationMapping = new Mock<ILocationMappingService>();
         locationMapping
             .Setup(s => s.StripNonOrgEncountersFromCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -101,7 +96,10 @@ public class ResourcesAcquiredTailFinalizerTests
 
         await sut.FinalizeAsync(BuildTail([]), CancellationToken.None);
 
-        cache.Verify(c => c.WaitForDurableAsync(CorrelationId, It.IsAny<CancellationToken>()), Times.Once);
+        cache.Verify(c => c.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        cache.Verify(
+            c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
