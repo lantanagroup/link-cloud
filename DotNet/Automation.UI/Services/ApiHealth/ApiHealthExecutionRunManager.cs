@@ -628,19 +628,7 @@ public sealed class ApiHealthExecutionRunManager(
 
     private static string? GetCommit(ServiceInformation? serviceInfo)
     {
-        var commit = NullIfWhiteSpace(serviceInfo?.Commit);
-        if (commit != null)
-            return commit;
-
-        var version = NullIfWhiteSpace(serviceInfo?.Version);
-        if (version == null)
-            return null;
-
-        var separatorIndex = version.IndexOf('+');
-        if (separatorIndex < 0 || separatorIndex == version.Length - 1)
-            return null;
-
-        return NullIfWhiteSpace(version[(separatorIndex + 1)..]);
+        return NullIfWhiteSpace(serviceInfo?.Commit);
     }
 
     private Task AddPhaseAsync(RunState run, string phase, string message, bool isError = false, Guid? seedRunId = null, string? seedRunName = null)

@@ -179,7 +179,7 @@ public class ApiHealthExecutionRunManagerTests
     }
 
     [Fact]
-    public async Task MissingCommit_UsesVersionSuffixAsCommit()
+    public async Task MissingCommit_DoesNotUseVersionSuffixAsCommit()
     {
         var store = await RunServiceAsync(
             CreateResults(
@@ -195,7 +195,7 @@ public class ApiHealthExecutionRunManagerTests
 
         var result = GetTestEndpointResult(store);
 
-        result.Commit.Should().Be("abc123");
+        result.Commit.Should().BeNull();
         result.Build.Should().Be("20260923.1");
         result.Version.Should().Be("0.7.1+abc123");
         result.ProductVersion.Should().Be("dev");
