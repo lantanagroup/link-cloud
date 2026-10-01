@@ -72,5 +72,32 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// </remarks>
         /// <param name="cacheKeys">The keys whose queued writes should be discarded.</param>
         void Cancel(IEnumerable<string> cacheKeys);
+
+        /// <summary>
+        /// Discards queued writes for <paramref name="cacheKeys"/> and waits until nothing is still
+        /// writing them.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// What a caller that is about to <i>write</i> these keys needs, rather than
+        /// <see cref="Cancel"/>, which only suits a caller about to delete them. A write already
+        /// executing has passed every generation check; when it finishes it sees the key was
+        /// cancelled and removes it from durable storage, which would discard whatever the caller
+        /// wrote in the meantime. Waiting for that to happen first makes the caller's write the last
+        /// one.
+        /// </para>
+        /// <para>
+        /// Does not report a failed write. The caller is replacing the key's contents outright, so a
+        /// failure describing the contents being replaced is no longer owed to anyone, and it is
+        /// cleared along with the queued writes.
+        /// </para>
+        /// <para>
+        /// Only covers writes this process enqueued, and only those enqueued before the call. The
+        /// caller is responsible for there being no concurrent producer for these keys.
+        /// </para>
+        /// </remarks>
+        /// <param name="cacheKeys">The keys whose queued and in-progress writes should be settled.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        Task CancelAndDrainAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
     }
 }

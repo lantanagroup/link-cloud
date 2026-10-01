@@ -208,6 +208,62 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
+        public async Task CancelAndDrainAsync(
+            IEnumerable<string> cacheKeys,
+            CancellationToken cancellationToken = default)
+        {
+            if (cacheKeys == null)
+            {
+                return;
+            }
+
+            foreach (var cacheKey in cacheKeys.Where(key => !string.IsNullOrEmpty(key)).Distinct())
+            {
+                if (!_keys.TryGetValue(cacheKey, out var state))
+                {
+                    continue;
+                }
+
+                Task completion;
+
+                lock (state.Gate)
+                {
+                    state.Generation++;
+                    state.Failure = null;
+                    SignalIfDrained(cacheKey, state);
+
+                    if (state.Outstanding == 0)
+                    {
+                        continue;
+                    }
+
+                    // Captured under the lock, because SignalIfDrained replaces the source once it
+                    // completes and the next one belongs to a later batch.
+                    completion = state.Completion.Task;
+                }
+
+                await completion.WaitAsync(cancellationToken);
+
+                lock (state.Gate)
+                {
+                    // A write that failed while draining recorded a failure after the clear above.
+                    // It describes contents the caller is about to replace outright, so reporting it
+                    // to whoever waits on this key next would fail work over a copy that no longer
+                    // exists.
+                    state.Failure = null;
+
+                    if (state.Outstanding == 0 && !state.Retired)
+                    {
+                        // SignalIfDrained keeps a failed key alive so its waiter can still see the
+                        // failure. Nothing is owed one now, so the state goes.
+                        state.Retired = true;
+                        _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+                    }
+                }
+            }
+        }
+
+        /// <inheritdoc/>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             var workers = Enumerable
@@ -331,6 +387,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 // Still holding the write lock, so nothing else for this key can interleave.
                 await CompensateIfCancelledAsync(pending, state);
                 await PublishDurableCountAsync(pending.CacheKey);
+            }
+            catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
+            {
+                // Shutdown cut the backoff short, so the write never got its remaining attempts.
+                // Still a failure -- the key is not durable and whoever waits on it has to be told --
+                // but not an exhausted one, which would report a storage problem on every deployment.
+                failure = ex;
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+                _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Interrupted);
+                _logger.LogWarning(
+                    "Shutdown interrupted the retry backoff for resource cache key {CacheKey} before its "
+                    + "remaining attempts could run. Anything waiting on this key will be told it is not durable.",
+                    pending.CacheKey.SanitizeForLog());
             }
             catch (Exception ex)
             {

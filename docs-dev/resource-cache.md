@@ -251,10 +251,39 @@ re-checks the generation and, if the key was cancelled, deletes it from durable 
 reach the same end state, and the delete path stays non-blocking.
 
 `DeleteAsync` tolerates a failed cache delete, since the entry expires on its own and the durable
-delete is what matters. The encounter strip is the exception: it deletes and then rewrites, so a
-tolerated failure leaves the stripped encounters in place for the rewrite to merge into, and reads
-prefer the cache. The strip therefore checks the entry is actually gone before rewriting and fails
-if it is not, which reverts the tail claim and lets the recovery poller run it again.
+delete is what matters. The encounter strip cannot use it. A cache write merges, so removing
+entries means rewriting the key, and done as a delete and a write the key is briefly empty and a
+tolerated delete failure leaves the stripped encounters in place for the write to merge back in.
+Checking afterwards does not close that either: the check reads through the same cache that just
+failed and is tolerated there too, so an unreachable cache fails the delete, then reports the key as
+clear.
+
+`ReplaceResourcesAsync` is what the strip uses instead. It clears and repopulates the key as one
+Redis `MULTI`/`EXEC` and raises any failure, so the strip either applies or does not happen; failing
+reverts the tail claim and the recovery poller runs it again. An empty survivor list removes the key
+rather than leaving it empty, because an empty entry is served downstream as "this correlation has no
+encounters" while an absent one falls through to durable storage.
+
+#### What exercises the strip
+
+Four suites, and each covers something the others cannot:
+
+| Suite | Covers | Does not cover |
+| --- | --- | --- |
+| `RedisResourceCacheTests` (unit) | that the commands are queued on a transaction | whether Redis accepts it |
+| `LocationMappingServiceTests` (unit) | that the strip replaces rather than deleting and rewriting, and propagates a failure | the cache itself, which is mocked |
+| `RedisResourceCacheReplaceTests` (integration) | the entry a real Redis holds afterwards | atomicity, and the survivor list is hand-picked |
+| `NonOrgEncounterStripIntegrationTests` (integration) | real conditions in SQL deciding the survivors, real Redis holding them | Kafka, and the pipeline around it |
+
+The local E2E stack reaches none of it. The generator emits one `Encounter` per patient, so a
+generated correlation is all-org or all-non-org: all-org returns before touching the cache, and
+all-non-org strips to nothing and takes the key delete. The replace needs a correlation holding both,
+which is a patient with at least two encounters at differently-mapped locations. Generated locations
+*can* be separated — each carries its own `v3-RoleCode` and HSLOC coding, so a condition matching the
+ICU alone leaves the ED and the outpatient clinic outside the organization — but the split then falls
+between patients rather than inside one correlation. Reaching the replace from a generated run means
+teaching the generator to emit a second encounter per patient and teaching the prediction model to
+expect it, since every downstream count is reconciled exactly.
 
 ## Durability
 

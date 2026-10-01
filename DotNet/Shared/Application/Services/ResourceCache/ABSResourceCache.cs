@@ -220,7 +220,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 return 0;
             }
 
-            var count = 0;
+            // Counted as distinct references, exactly as GetAsync returns them. The ids blob can hold
+            // the same reference twice -- a crash between the two appends, or two processes
+            // interleaving on one key -- and counting those again would make the durable count
+            // exceed what any reader can ever see, so every cache entry for the key would be judged
+            // partial and every read would fall back here.
+            var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             await using var stream = await idsBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
             using var reader = new StreamReader(stream);
@@ -229,23 +234,25 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 if (!string.IsNullOrWhiteSpace(line))
                 {
-                    count++;
+                    references.Add(line);
                 }
             }
 
-            return count;
+            return references.Count;
         }
 
         /// <inheritdoc/>
         /// <remarks>
         /// This store is the durable one, so its own count is the answer and there is nothing recorded.
         /// </remarks>
-        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
-            GetResourceCountAsync(cacheKey, cancellationToken).ContinueWith(
-                task => (int?)task.Result,
-                cancellationToken,
-                TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
+        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            // Awaited rather than continued. OnlyOnRanToCompletion turns a faulted read into a
+            // *cancelled* task, so a storage fault reached callers as an OperationCanceledException
+            // -- past every handler written to treat a failed count read as "unknown", and
+            // indistinguishable from the caller cancelling.
+            return await GetResourceCountAsync(cacheKey, cancellationToken);
+        }
 
         /// <inheritdoc/>
         /// <remarks>
@@ -253,6 +260,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// </remarks>
         public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Always true, for the same reason: this store is the record.
+        /// </remarks>
+        public Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
