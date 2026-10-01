@@ -388,6 +388,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 await CompensateIfCancelledAsync(pending, state);
                 await PublishDurableCountAsync(pending.CacheKey);
             }
+            catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
+            {
+                // Shutdown cut the backoff short, so the write never got its remaining attempts.
+                // Still a failure -- the key is not durable and whoever waits on it has to be told --
+                // but not an exhausted one, which would report a storage problem on every deployment.
+                failure = ex;
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+                _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Interrupted);
+                _logger.LogWarning(
+                    "Shutdown interrupted the retry backoff for resource cache key {CacheKey} before its "
+                    + "remaining attempts could run. Anything waiting on this key will be told it is not durable.",
+                    pending.CacheKey.SanitizeForLog());
+            }
             catch (Exception ex)
             {
                 failure = ex;
