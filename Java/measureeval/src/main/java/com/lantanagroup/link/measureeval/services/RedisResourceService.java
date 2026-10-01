@@ -152,12 +152,6 @@ public class RedisResourceService {
     }
 
 
-    /**
-     * Suffix of the per-correlation memo the .NET Hybrid cache keeps in Redis to record which store
-     * holds a correlation. Removed with the correlation so it does not outlive the entry it describes.
-     */
-    static final String CACHE_TYPE_MEMO_SUFFIX = ":__cacheType";
-
     public void cleanup(String correlationId) {
         // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
         // keys. Normalization normally deletes the acquisition keys after each pass, but a
@@ -171,10 +165,12 @@ public class RedisResourceService {
         // MATCH is not an index — once per correlation on a Redis instance shared with other
         // caches, which is O(correlations x keyspace) rather than O(keys deleted). UNLINK of a key
         // that does not exist is a cheap no-op, so over-enumerating costs far less than scanning.
+        //
+        // These are the only key shapes a correlation owns (see the key layout in
+        // docs-dev/resource-cache.md). A new shape under the correlation prefix must be added here.
         ResourceType[] resourceTypes = ResourceType.values();
-        List<String> keys = new ArrayList<>(resourceTypes.length + 2);
+        List<String> keys = new ArrayList<>(resourceTypes.length + 1);
         keys.add(correlationId);
-        keys.add(correlationId + CACHE_TYPE_MEMO_SUFFIX);
         for (ResourceType resourceType : resourceTypes) {
             keys.add(correlationId + ":" + resourceType.name());
         }
