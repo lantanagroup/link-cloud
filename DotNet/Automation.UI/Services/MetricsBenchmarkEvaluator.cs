@@ -1,4 +1,4 @@
-using Automation.UI.Services.Persistence;
+﻿using Automation.UI.Services.Persistence;
 
 namespace Automation.UI.Services;
 
@@ -45,6 +45,13 @@ public static class MetricsBenchmarkEvaluator
                 violations.Add($"{FriendlyName(key)} was {Format(value.Value)}; it needs to be at least {Format(min)}.");
         }
 
+        // Not a drift comparison and not a slowdown, so it belongs with the limits rather than the
+        // regression flags: the retry limit was reached and the work waiting on those keys was
+        // failed. Checked outside the previous-run block too, or a first run never reports it.
+        var exhausted = document.ResourceCache is { Unavailable: false } cache ? cache.WriteExhaustedCount : 0;
+        if (exhausted > 0)
+            violations.Add($"{Format(exhausted)} durable cache write(s) exhausted their retries; the work waiting on those keys was failed.");
+
         var flags = new List<string>();
         var percent = benchmark?.RegressionPercent > 0 ? benchmark.RegressionPercent : 10;
         if (previous != null)
@@ -67,6 +74,8 @@ public static class MetricsBenchmarkEvaluator
                 if (current.P95Ms > limit)
                     flags.Add($"{FriendlyStage(stage)} slow time ({Format(current.P95Ms)} ms) was more than {percent}% slower than the last successful run ({Format(prior.P95Ms)} ms).");
             }
+
+            AddResourceCacheFlags(document, previous, percent, flags);
         }
 
         return new BenchmarkEvaluation(
@@ -164,4 +173,45 @@ public static class MetricsBenchmarkEvaluator
     };
 
     private static string Format(double value) => value.ToString("0.###");
+
+    /// <remarks>
+    /// Each comparison is skipped when the previous run has nothing to compare against, mirroring
+    /// the stage guard. That matters most on the first Hybrid run after an ABS baseline: the
+    /// baseline has no cache reads and no barrier at all, and flagging a drain wait that went from
+    /// nothing to something would be reporting the design working as a regression.
+    /// </remarks>
+    private static void AddResourceCacheFlags(
+        AutomationRunMetricsDocument document,
+        AutomationRunMetricsDocument previous,
+        double percent,
+        List<string> flags)
+    {
+        var current = document.ResourceCache;
+        var prior = previous.ResourceCache;
+
+        if (current is null || prior is null || current.Unavailable || prior.Unavailable)
+            return;
+
+        // Hit ratio is the one metric here where lower is worse.
+        if (prior.HitRatio > 0)
+        {
+            var floor = prior.HitRatio * (1 - percent / 100.0);
+            if (current.HitRatio < floor)
+                flags.Add($"Resource cache hit ratio ({Format(current.HitRatio * 100)}%) was more than {percent}% below the last successful run ({Format(prior.HitRatio * 100)}%).");
+        }
+
+        if (prior.DrainWaitP95Ms > 0)
+        {
+            var limit = prior.DrainWaitP95Ms * (1 + percent / 100.0);
+            if (current.DrainWaitP95Ms > limit)
+                flags.Add($"Durability barrier slow time ({Format(current.DrainWaitP95Ms)} ms) was more than {percent}% slower than the last successful run ({Format(prior.DrainWaitP95Ms)} ms).");
+        }
+
+        if (prior.ReadP95Ms > 0)
+        {
+            var limit = prior.ReadP95Ms * (1 + percent / 100.0);
+            if (current.ReadP95Ms > limit)
+                flags.Add($"Resource cache read slow time ({Format(current.ReadP95Ms)} ms) was more than {percent}% slower than the last successful run ({Format(prior.ReadP95Ms)} ms).");
+        }
+    }
 }

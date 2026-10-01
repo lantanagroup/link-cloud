@@ -1,0 +1,565 @@
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Threading.Channels;
+using Task = System.Threading.Tasks.Task;
+
+namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
+{
+    /// <inheritdoc cref="IBackgroundAbsCacheWriter"/>
+    /// <remarks>
+    /// Writes to one cache key are serialized, because the blob write reads the key's id list before
+    /// appending to it and two concurrent writers would both miss the other's resources. Writes to
+    /// different keys run concurrently, bounded by
+    /// <see cref="ResourceCacheAbsWriterSettings.MaxConcurrency"/>.
+    /// </remarks>
+    public class BackgroundAbsCacheWriter : BackgroundService, IBackgroundAbsCacheWriter
+    {
+        private readonly IResourceCache _absCache;
+        private readonly IResourceCache _redisCache;
+        private readonly ResourceCacheAbsWriterSettings _settings;
+        private readonly IResourceCacheMetrics _metrics;
+        private readonly ILogger<BackgroundAbsCacheWriter> _logger;
+        private readonly Channel<PendingWrite> _queue;
+        private readonly ConcurrentDictionary<string, KeyState> _keys = new();
+
+        public BackgroundAbsCacheWriter(
+            [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
+            [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
+            IOptions<ResourceCacheSettings> settings,
+            IResourceCacheMetrics metrics,
+            ILogger<BackgroundAbsCacheWriter> logger)
+        {
+            _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
+            _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _settings = settings?.Value?.AbsWriter ?? throw new ArgumentNullException(nameof(settings));
+
+            if (_settings.QueueCapacity <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:AbsWriter:QueueCapacity must be greater than zero.");
+            }
+
+            if (_settings.MaxConcurrency <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:AbsWriter:MaxConcurrency must be greater than zero.");
+            }
+
+            _metrics.TrackQueueDepth(() => QueueDepth);
+
+            _queue = Channel.CreateBounded<PendingWrite>(new BoundedChannelOptions(_settings.QueueCapacity)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = false
+            });
+        }
+
+        /// <summary>
+        /// The number of writes queued but not yet persisted. Exposed for health and metrics.
+        /// </summary>
+        public int QueueDepth => _keys.Values.Sum(state => state.Outstanding);
+
+        /// <summary>
+        /// How many cache keys the writer is currently tracking. Non-zero only while writes are
+        /// outstanding or a key's last write failed.
+        /// </summary>
+        public int TrackedKeyCount => _keys.Count;
+
+        /// <inheritdoc/>
+        public async Task EnqueueAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(cacheKey);
+
+            if (resources == null || resources.Count == 0)
+            {
+                return;
+            }
+
+            KeyState state;
+            int generation;
+
+            // A state that drained to nothing is removed, so it can be retired between the GetOrAdd
+            // and the lock. Retry against whatever is there now rather than counting into a corpse.
+            while (true)
+            {
+                state = _keys.GetOrAdd(cacheKey, _ => new KeyState());
+                lock (state.Gate)
+                {
+                    if (state.Retired)
+                    {
+                        continue;
+                    }
+
+                    state.Outstanding++;
+                    generation = state.Generation;
+                    break;
+                }
+            }
+
+            try
+            {
+                await _queue.Writer.WriteAsync(
+                    new PendingWrite(cacheKey, state, resources, resourceType, generation, Stopwatch.GetTimestamp()),
+                    cancellationToken);
+            }
+            catch (Exception)
+            {
+                // The write never made it onto the queue, so nothing will ever decrement for it.
+                CompleteOne(cacheKey, state, failure: null);
+                throw;
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task WaitForDurableAsync(
+            IEnumerable<string> cacheKeys,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(cacheKeys);
+
+            foreach (var cacheKey in cacheKeys.Where(key => !string.IsNullOrEmpty(key)).Distinct())
+            {
+                if (!_keys.TryGetValue(cacheKey, out var state))
+                {
+                    continue;
+                }
+
+                Task completion;
+                lock (state.Gate)
+                {
+                    if (state.Outstanding == 0)
+                    {
+                        ThrowIfFailed(cacheKey, state);
+                        continue;
+                    }
+
+                    completion = state.Completion.Task;
+                }
+
+                await completion.WaitAsync(cancellationToken);
+
+                lock (state.Gate)
+                {
+                    ThrowIfFailed(cacheKey, state);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public Task WaitForCorrelationAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(correlationId))
+            {
+                return Task.CompletedTask;
+            }
+
+            var prefix = correlationId + ":";
+            var keys = _keys.Keys
+                .Where(key => key == correlationId || key.StartsWith(prefix, StringComparison.Ordinal))
+                .ToList();
+
+            return WaitForDurableAsync(keys, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public void Cancel(IEnumerable<string> cacheKeys)
+        {
+            if (cacheKeys == null)
+            {
+                return;
+            }
+
+            foreach (var cacheKey in cacheKeys.Where(key => !string.IsNullOrEmpty(key)))
+            {
+                if (!_keys.TryGetValue(cacheKey, out var state))
+                {
+                    continue;
+                }
+
+                lock (state.Gate)
+                {
+                    // Anything queued under the old generation is skipped when it is dequeued. The
+                    // recorded failure goes too: the key is being removed, so it is no longer owed.
+                    state.Generation++;
+                    state.Failure = null;
+                    SignalIfDrained(cacheKey, state);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            var workers = Enumerable
+                .Range(0, _settings.MaxConcurrency)
+                .Select(_ => Task.Run(() => ConsumeAsync(stoppingToken), CancellationToken.None))
+                .ToArray();
+
+            await Task.WhenAll(workers);
+        }
+
+        /// <summary>
+        /// Stops accepting writes and gives the queue up to
+        /// <see cref="ResourceCacheAbsWriterSettings.DrainTimeoutSeconds"/> to finish.
+        /// </summary>
+        /// <remarks>
+        /// The drain deliberately does not use the stopping token: passing it would cancel the drain
+        /// the moment shutdown began, which is the opposite of what is wanted.
+        /// </remarks>
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+            _queue.Writer.TryComplete();
+
+            using var drainTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            drainTimeout.CancelAfter(TimeSpan.FromSeconds(_settings.DrainTimeoutSeconds));
+
+            try
+            {
+                await _queue.Reader.Completion.WaitAsync(drainTimeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    "Resource cache blob writer shut down with {PendingWriteCount} write(s) still queued after " +
+                    "{DrainTimeoutSeconds}s. Their cache keys were never advertised, so the work that produced " +
+                    "them will be recovered and retried.",
+                    QueueDepth,
+                    _settings.DrainTimeoutSeconds);
+            }
+
+            try
+            {
+                // Bounded deliberately. The base implementation waits for the worker loops, and a
+                // blob call that never returns would otherwise hold shutdown open indefinitely.
+                await base.StopAsync(drainTimeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    "Resource cache blob writer had {PendingWriteCount} write(s) still in progress at shutdown " +
+                    "and stopped without waiting for them.",
+                    QueueDepth);
+            }
+        }
+
+        // -------------------------------------------------------------------------
+
+        private static double Elapsed(long startTimestamp) =>
+            Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+
+        private async Task ConsumeAsync(CancellationToken stoppingToken)
+        {
+            try
+            {
+                await foreach (var pending in _queue.Reader.ReadAllAsync(CancellationToken.None))
+                {
+                    await ProcessAsync(pending, stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                // A worker that dies takes its share of the throughput with it, and nothing restarts
+                // it, so this is worth surfacing rather than swallowing.
+                _logger.LogError(ex, "Resource cache blob writer worker stopped unexpectedly.");
+            }
+        }
+
+        private async Task ProcessAsync(PendingWrite pending, CancellationToken stoppingToken)
+        {
+            // The state travels with the item. Looking it up again could find a different instance,
+            // because a key that drains to nothing is retired and a later write creates a fresh one.
+            var state = pending.State;
+
+            lock (state.Gate)
+            {
+                if (pending.Generation != state.Generation)
+                {
+                    state.Outstanding--;
+                    SignalIfDrained(pending.CacheKey, state);
+                    return;
+                }
+            }
+
+            Exception? failure = null;
+
+            await state.WriteLock.WaitAsync(CancellationToken.None);
+
+            // Checked again, because the wait above can be long: another worker may hold the lock for
+            // this key while Cancel and the delete that follows it run to completion. Writing now
+            // would put the deleted key back in blob storage, where nothing expires it.
+            lock (state.Gate)
+            {
+                if (pending.Generation != state.Generation)
+                {
+                    state.WriteLock.Release();
+                    state.Outstanding--;
+                    SignalIfDrained(pending.CacheKey, state);
+                    return;
+                }
+            }
+
+            // Measured from enqueue to the start of the write, so a backlog is distinguishable from
+            // storage having slowed down.
+            _metrics.RecordQueueWait(Stopwatch.GetElapsedTime(pending.QueuedAtTimestamp).TotalMilliseconds);
+            var writeStart = Stopwatch.GetTimestamp();
+
+            try
+            {
+                await WriteWithRetryAsync(pending, stoppingToken);
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
+
+                // Still holding the write lock, so nothing else for this key can interleave.
+                await CompensateIfCancelledAsync(pending, state);
+                await PublishDurableCountAsync(pending.CacheKey);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+                _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+                _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Exhausted);
+                _logger.LogError(
+                    ex,
+                    "Failed to persist resource cache key {CacheKey} to blob storage after {AttemptCount} attempt(s). " +
+                    "Anything waiting on this key will be told it is not durable.",
+                    pending.CacheKey.SanitizeForLog(),
+                    _settings.MaxRetryAttempts);
+            }
+            finally
+            {
+                state.WriteLock.Release();
+                CompleteOne(pending.CacheKey, state, failure);
+            }
+        }
+
+        /// <summary>
+        /// Records against the cache entry how many resources durable storage now holds for the key.
+        /// </summary>
+        /// <remarks>
+        /// This is what lets a reader tell a cache entry recreated by a partial append from a whole one.
+        /// It runs here rather than on the write path because only a landed durable write gives a count a
+        /// reader can rely on, and because the cost belongs on this thread rather than the caller's.
+        /// Best effort: a missing count is read as "unknown" and simply costs the detection, not
+        /// correctness of the data itself.
+        /// </remarks>
+        private async Task PublishDurableCountAsync(string cacheKey)
+        {
+            try
+            {
+                var durableCount = await _absCache.GetResourceCountAsync(cacheKey, CancellationToken.None);
+
+                if (durableCount > 0)
+                {
+                    await _redisCache.SetDurableResourceCountAsync(cacheKey, durableCount, CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not record the durable resource count for {CacheKey}. A partial cache entry for "
+                    + "this key would not be detected until the next durable write records one.",
+                    cacheKey.SanitizeForLog());
+            }
+        }
+
+        /// <summary>
+        /// Undoes a durable write that finished after its key was cancelled.
+        /// </summary>
+        /// <remarks>
+        /// A write already executing has passed both generation checks, so <see cref="Cancel"/> and the
+        /// delete that follows it can complete underneath it. Blob storage has no expiry, so a write
+        /// landing after that delete leaves resources behind permanently -- and the purge that triggered
+        /// it exists to remove clinical data after a terminal failure or a pipeline abort. Fencing the
+        /// delete would mean blocking it on this write; undoing the write afterwards reaches the same
+        /// end state from either order without holding the delete up.
+        /// </remarks>
+        private async Task CompensateIfCancelledAsync(PendingWrite pending, KeyState state)
+        {
+            lock (state.Gate)
+            {
+                if (pending.Generation == state.Generation)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                // Deliberately not the host's token. This runs to remove data the system decided to
+                // discard, so shutdown must not be the reason it is skipped.
+                await _absCache.DeleteAsync([pending.CacheKey], CancellationToken.None);
+
+                _logger.LogWarning(
+                    "Removed resource cache key {CacheKey} from blob storage: its durable write finished "
+                    + "after the key was cancelled, so the delete that followed the cancel could not have "
+                    + "covered it.",
+                    pending.CacheKey.SanitizeForLog());
+            }
+            catch (Exception ex)
+            {
+                // Nothing else will retry this. Surfaced loudly because the residue is clinical data
+                // that a purge already decided to remove.
+                _logger.LogError(
+                    ex,
+                    "Could not remove resource cache key {CacheKey} from blob storage after its durable "
+                    + "write finished past a cancel. The key may still hold resources that were purged "
+                    + "from the cache.",
+                    pending.CacheKey.SanitizeForLog());
+            }
+        }
+
+        private async Task WriteWithRetryAsync(PendingWrite pending, CancellationToken stoppingToken)
+        {
+            var delay = TimeSpan.FromMilliseconds(Math.Max(1, _settings.RetryBaseDelayMilliseconds));
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await _absCache.AppendResourcesAsync(
+                        pending.CacheKey,
+                        pending.Resources,
+                        pending.ResourceType,
+                        CancellationToken.None);
+                    return;
+                }
+                catch (Exception ex) when (attempt < _settings.MaxRetryAttempts)
+                {
+                    _metrics.IncrementWriteRetry(ResourceCacheOutcomes.Retried);
+                    _logger.LogDebug(
+                        ex,
+                        "Retrying blob write for resource cache key {CacheKey}, attempt {Attempt} of {MaxAttempts}.",
+                        pending.CacheKey.SanitizeForLog(),
+                        attempt,
+                        _settings.MaxRetryAttempts);
+
+                    // Shutdown stops the backoff, not the write: an in-flight attempt is allowed to
+                    // finish so the drain has a chance to complete.
+                    await Task.Delay(delay, stoppingToken);
+                    delay += delay;
+                }
+            }
+        }
+
+        private void CompleteOne(string cacheKey, KeyState state, Exception? failure)
+        {
+            lock (state.Gate)
+            {
+                state.Outstanding--;
+
+                if (failure != null)
+                {
+                    state.Failure = failure;
+                }
+
+                // A success never clears a recorded failure. Writes to one key append *different*
+                // resources, so a later batch landing says nothing about an earlier one that never
+                // did -- and Normalization writes this key once per resource type, so clearing here
+                // would let any later type mask a whole type that never reached durable storage.
+                // The failure is cleared where it is reported instead, in ThrowIfFailed.
+                SignalIfDrained(cacheKey, state);
+            }
+        }
+
+        /// <remarks>
+        /// Callers hold <see cref="KeyState.Gate"/>. A key that drained cleanly is retired from the
+        /// dictionary, or it would grow by one entry per cache key for the life of the process. A key
+        /// holding a failure is kept, because something still has to be told about it.
+        /// </remarks>
+        private void SignalIfDrained(string cacheKey, KeyState state)
+        {
+            if (state.Outstanding > 0)
+            {
+                return;
+            }
+
+            state.Completion.TrySetResult();
+            state.Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            if (state.Failure == null)
+            {
+                state.Retired = true;
+
+                // Remove this instance specifically. A plain TryRemove(key) would drop whichever
+                // state is there now, which may be a fresh one another writer just added and is
+                // already counting into -- and losing that makes its key look durable when it is not.
+                _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+            }
+        }
+
+        /// <remarks>Callers hold <see cref="KeyState.Gate"/>.</remarks>
+        private void ThrowIfFailed(string cacheKey, KeyState state)
+        {
+            var failure = state.Failure;
+
+            if (failure == null)
+            {
+                return;
+            }
+
+            // Consumed as it is reported. The caller is being told this key is not durable and will
+            // fail its work; the redelivery that follows rewrites the key from the start, so a
+            // failure that outlived its report would fail that attempt too and the message could
+            // never recover. Reported once, to the caller that has to act on it.
+            state.Failure = null;
+
+            if (state.Outstanding == 0)
+            {
+                // SignalIfDrained leaves a failed key in place so its waiter can still see the
+                // failure. That waiter is here, so the state has no one left to inform.
+                state.Retired = true;
+                _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+            }
+
+            throw new ResourceCacheDurabilityException(
+                $"Resource cache key '{cacheKey}' could not be written to durable storage.",
+                failure);
+        }
+
+        private sealed record PendingWrite(
+            string CacheKey,
+            KeyState State,
+            List<DomainResource> Resources,
+            ResourceType ResourceType,
+            int Generation,
+            long QueuedAtTimestamp);
+
+        private sealed class KeyState
+        {
+            public readonly object Gate = new();
+            public readonly SemaphoreSlim WriteLock = new(1, 1);
+            public int Outstanding;
+            public int Generation;
+            public Exception? Failure;
+
+            /// <summary>
+            /// Set when this instance has been taken out of the dictionary. A writer that reached it
+            /// through a stale lookup must go round again rather than counting into it.
+            /// </summary>
+            public bool Retired;
+
+            public TaskCompletionSource Completion { get; set; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+    }
+}

@@ -562,7 +562,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach (var (parsedResourceType, typedResources) in resourcesByType)
         {
-            await _resourceCache.UpdateCorrelationCacheAsync(
+            await _resourceCache.AppendResourcesAsync(
                 $"{primaryLog.CorrelationId}:{parsedResourceType}",
                 typedResources,
                 parsedResourceType,

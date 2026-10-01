@@ -55,6 +55,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             List<DomainResource> resources = new List<DomainResource>();
 
             foreach (var entry in hashEntries) {
+                // Metadata about the entry, not a resource in it. Without this the deserialize below
+                // throws and logs an error for it on every read -- and the count that describes the
+                // entry is present on every entry that has had a durable write.
+                if (entry.Name.ToString().StartsWith(MetadataFieldPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
                 try
                 {
                     DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
@@ -89,7 +97,24 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Field-name prefix reserved for metadata describing the entry rather than a resource in it.
+        /// </summary>
+        /// <remarks>
+        /// Shared with MeasureEval, which skips these fields when it reads an entry
+        /// (<c>RedisResourceService.METADATA_FIELD_PREFIX</c>). Resource fields are always
+        /// <c>resourceType/resourceId</c>, so the two cannot collide. Metadata lives in the entry's own
+        /// hash so that one lifetime covers both and deleting the entry clears its metadata with it.
+        /// See docs-dev/resource-cache.md.
+        /// </remarks>
+        private const string MetadataFieldPrefix = "__";
+
+        /// <summary>
+        /// Hash field holding the count durable storage is known to hold for the entry.
+        /// </summary>
+        private const string DurableResourceCountField = MetadataFieldPrefix + "durableResourceCount";
+
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 
@@ -98,25 +123,98 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
             }
 
-            await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
-            await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.HashSetAsync(cacheKey, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.KeyExpireAsync(cacheKey, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Clear and repopulate in one transaction. Done as two commands the key is observably empty in
+        /// between, and a reader landing there would fall through to durable storage for a key that is
+        /// about to be perfectly good.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
         {
-            return ResourceCacheType.Redis;
+            var database = _redisDatabase.Database;
+
+            if (resources == null || resources.Count == 0)
+            {
+                await database.KeyDeleteAsync(cacheKey).WaitAsync(cancellationToken);
+                return;
+            }
+
+            var correlationHash = resources
+                .Select(resource => new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()))
+                .ToArray();
+
+            // One transaction, from the one database instance: a transaction cannot be created on one
+            // connection and executed on another.
+            var transaction = database.CreateTransaction();
+
+            // Held, not awaited here: these only complete once Execute runs, so awaiting one before
+            // that would deadlock. They are observed afterwards instead -- dropping them means a
+            // transaction that is abandoned or declined leaves faulted tasks nobody read, which
+            // resurface later as unobserved task exceptions far from the cause.
+            var queued = new[]
+            {
+                transaction.KeyDeleteAsync(cacheKey),
+                transaction.HashSetAsync(cacheKey, correlationHash),
+                transaction.KeyExpireAsync(cacheKey, _cacheEntryTtl)
+            };
+
+            try
+            {
+                if (!await transaction.ExecuteAsync().WaitAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"Redis declined the transaction replacing resource cache key '{cacheKey}'.");
+                }
+
+                // Completed by the Execute above, so this does not wait on the network again.
+                await Task.WhenAll(queued);
+            }
+            catch
+            {
+                // Read the outcomes so none of them is left unobserved, then let the original failure
+                // stand -- it describes the replace, which is what the caller has to act on.
+                ObserveQueued(queued);
+                throw;
+            }
         }
 
-        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Marks the transaction's queued results as observed without letting their faults escape.
+        /// </summary>
+        private static void ObserveQueued(IEnumerable<Task> queued)
         {
-            return Task.FromResult(ResourceCacheType.Redis);
+            foreach (var task in queued)
+            {
+                _ = task.ContinueWith(
+                    completed => _ = completed.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
         }
 
-        public IResourceCache GetImplementation(ResourceCacheType cacheType)
+        /// <summary>
+        /// Completes immediately: this cache has no separate durable tier to wait for.
+        /// </summary>
+        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
         {
-            if (cacheType != ResourceCacheType.Redis)
-                throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
-            return this;
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Completes immediately: this cache has no separate durable tier to wait for.
+        /// </summary>
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
 
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
@@ -125,8 +223,45 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return length > 0;
         }
 
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        /// <inheritdoc/>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
+            var length = await _redisDatabase.Database.HashLengthAsync(cacheKey).WaitAsync(cancellationToken);
+
+            if (length == 0)
+            {
+                return 0;
+            }
+
+            // The durable-count field shares the hash with the resources, so it must not be counted as
+            // one. It cannot collide with a resource field, which is always "<type>/<id>".
+            var hasCount = await _redisDatabase.Database
+                .HashExistsAsync(cacheKey, DurableResourceCountField)
+                .WaitAsync(cancellationToken);
+
+            return (int)(hasCount ? length - 1 : length);
+        }
+
+        /// <inheritdoc/>
+        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var value = await _redisDatabase.Database
+                .HashGetAsync(cacheKey, DurableResourceCountField)
+                .WaitAsync(cancellationToken);
+
+            return value.HasValue && int.TryParse(value.ToString(), out var count) ? count : null;
+        }
+
+        /// <inheritdoc/>
+        public async Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default)
+        {
+            await _redisDatabase.Database
+                .HashSetAsync(cacheKey, DurableResourceCountField, count)
+                .WaitAsync(cancellationToken);
+
+            // The field is written after the entry, so refresh the lifetime with it rather than leaving
+            // the entry expiring on the clock of its last resource write.
+            await _redisDatabase.Database.KeyExpireAsync(cacheKey, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
     }
 }

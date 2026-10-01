@@ -7,6 +7,7 @@ using Hl7.FhirPath;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -560,14 +561,19 @@ public class LocationMappingService(
             return outcome;
         }
 
-        // UpdateCorrelationCacheAsync is an additive HashSet, so removing entries requires deleting the key
-        // and rewriting it with only the org encounters. When none remain the key is left empty, so
-        // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
-        await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
-        if (orgEncounters.Count > 0)
-        {
-            await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
-        }
+        // A replace, not a delete and a rewrite. The cache write merges, so removing entries means
+        // replacing the key -- and done as two steps the key is briefly empty, and a delete whose
+        // failure is tolerated leaves the non-org encounters in place for the rewrite to merge back
+        // in. Verifying afterwards does not close that either: the check reads through the same cache
+        // that just failed and is tolerated there too, so an unreachable cache fails the delete and
+        // then reports the key as clear.
+        //
+        // The replace clears and repopulates the cache atomically and raises any failure, so this
+        // either applies or does not happen. Failing reverts the tail claim and the recovery poller
+        // runs the strip again. When no org encounters remain the key is removed, so nothing
+        // downstream rehydrates an encounter for this correlation.
+        await _resourceCache.ReplaceResourcesAsync(
+            cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
 
         _logger.LogDebug(
             "Stripped {StrippedCount} non-org encounter(s) from cache key {CacheKey} for facility {FacilityId} (patient {PatientId}); {RemainingCount} org encounter(s) remain.",

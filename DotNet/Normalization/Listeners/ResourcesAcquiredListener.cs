@@ -12,6 +12,7 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -268,11 +269,18 @@ public class ResourcesAcquiredListener : BackgroundService
             result.Message.Value.ScheduledReports = remaining;
         }
 
-        IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
+        IResourceCache resourceCache = _resourceCache;
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
 
         var mappingOutcomes = new MappingOutcomeAccumulator();
+
+        await RestoreCorrelationEntryAsync(
+            resourceCache,
+            result.Message.Value.QueryType,
+            correlationId,
+            result.Message.Key.FacilityId,
+            cancellationToken);
 
         await RegisterConfiguredCodeMapsAsync(
             scope, result.Message.Key.FacilityId, mappingOutcomes, cancellationToken);
@@ -414,7 +422,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                 }
 
-            await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            await resourceCache.AppendResourcesAsync(correlationId, resources, resourceType, cancellationToken);
             copiedKeys.Add(cacheKey);
         }
 
@@ -425,6 +433,11 @@ public class ResourcesAcquiredListener : BackgroundService
                 result.Message.Key.FacilityId.SanitizeForLog(),
                 correlationId.SanitizeForLog());
         }
+
+        // The durability barrier. ResourcesNormalized names this correlation's cache key, and the
+        // durable write for it is still on a background queue -- produce first and a reader can
+        // arrive after the cache entry is evicted but before the durable copy exists.
+        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
 
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
@@ -562,7 +575,10 @@ public class ResourcesAcquiredListener : BackgroundService
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent,
-            CacheType = message.Message.Value.CacheType,
+            // Constant since the cache stopped choosing between stores: every correlation is now
+            // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
+            // removes it from the contract in both runtimes.
+            CacheType = ResourceCacheType.ABS,
             CacheKey = correlationId
         };
         Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>
@@ -601,6 +617,57 @@ public class ResourcesAcquiredListener : BackgroundService
     /// patient-correlation, not one per resource.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Restores the correlation cache entry before a supplemental pass appends to it.
+    /// </summary>
+    /// <remarks>
+    /// The two query plans are disjoint, so the record a measure is evaluated against only exists
+    /// as the accumulation of both passes. The cache can evict the entry while the supplemental
+    /// acquisition runs, and an append to an evicted entry recreates it holding only this pass's
+    /// resources -- non-empty, so it reads as complete and shadows the durable copy that is.
+    /// Reading it first repopulates it from durable storage, so the appends that follow extend the
+    /// initial pass rather than replacing it. See docs-dev/resource-cache.md.
+    /// </remarks>
+    private async Task RestoreCorrelationEntryAsync(
+        IResourceCache resourceCache,
+        string queryType,
+        string correlationId,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(queryType, nameof(QueryType.Supplemental), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            var restored = await resourceCache.GetAsync(correlationId, cancellationToken);
+
+            _logger.LogDebug(
+                "Restored {ResourceCount} resource(s) to the correlation cache entry before the supplemental append "
+                + "for FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                restored.Count,
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Best effort, and deliberately not fatal: durable storage still holds both passes, so
+            // the worst case is the entry staying partial until something reads through it.
+            _logger.LogWarning(
+                exception,
+                "Could not restore the correlation cache entry before the supplemental append for "
+                + "FacilityId={FacilityId}, CorrelationId={CorrelationId}.",
+                facilityId.SanitizeForLog(),
+                correlationId.SanitizeForLog());
+        }
+    }
+
     private async Task RegisterConfiguredCodeMapsAsync(
         IServiceScope scope,
         string facilityId,
