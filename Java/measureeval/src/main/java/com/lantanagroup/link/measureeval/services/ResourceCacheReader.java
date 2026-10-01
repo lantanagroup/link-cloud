@@ -59,7 +59,21 @@ public class ResourceCacheReader {
         this.metrics = metrics;
     }
 
+    /**
+     * Reads without a known pass; the read metric is then recorded without a phase tag.
+     */
     public List<Resource> readResources(String facilityId, String correlationId, String patientId, String cacheKey) {
+        return readResources(facilityId, correlationId, patientId, cacheKey, null);
+    }
+
+    /**
+     * @param phase the pass this read belongs to (Initial or Supplemental, as
+     *              {@code DiagnosticNames.normalizePhase} produces it), used only to tag metrics.
+     *              A bad read in the supplemental pass feeds the submitted report, so it is worth
+     *              alerting on separately.
+     */
+    public List<Resource> readResources(String facilityId, String correlationId, String patientId, String cacheKey,
+                                        String phase) {
         long start = System.nanoTime();
         String fallbackReason;
         try {
@@ -68,10 +82,10 @@ public class ResourceCacheReader {
                 logger.debug("Redis miss for cacheKey='{}' (absent, empty or evicted); reading from ABS",
                         LogUtils.sanitize(cacheKey));
                 fallbackReason = REASON_MISS;
-            } else if (isWholeEntry(cacheKey, resources.size())) {
+            } else if (isWholeEntry(cacheKey, resources.size(), phase)) {
                 logger.debug("Resource cache hit in Redis for cacheKey='{}' ({} resources)",
                         LogUtils.sanitize(cacheKey), resources.size());
-                recordRead(OUTCOME_HIT, null, start);
+                recordRead(OUTCOME_HIT, null, phase, start);
                 return resources;
             } else {
                 fallbackReason = REASON_PARTIAL;
@@ -85,16 +99,16 @@ public class ResourceCacheReader {
         // An ABS error propagates without being recorded: the record is retried, so the read has
         // no outcome yet, and counting it as a fallback or empty would misreport what was served.
         List<Resource> durable = absResourceService.readResources(facilityId, correlationId, patientId, cacheKey);
-        recordRead(durable.isEmpty() ? OUTCOME_EMPTY : OUTCOME_FALLBACK, fallbackReason, start);
+        recordRead(durable.isEmpty() ? OUTCOME_EMPTY : OUTCOME_FALLBACK, fallbackReason, phase, start);
         return durable;
     }
 
     /**
      * Best effort: a metrics failure must never fail the read it describes.
      */
-    private void recordRead(String outcome, String fallbackReason, long startNanos) {
+    private void recordRead(String outcome, String fallbackReason, String phase, long startNanos) {
         try {
-            metrics.recordResourceCacheRead(outcome, fallbackReason, (System.nanoTime() - startNanos) / 1_000_000.0);
+            metrics.recordResourceCacheRead(outcome, fallbackReason, phase, (System.nanoTime() - startNanos) / 1_000_000.0);
         } catch (RuntimeException e) {
             logger.debug("Could not record the resource cache read metric: {}", LogUtils.sanitize(e.getMessage()));
         }
@@ -110,13 +124,21 @@ public class ResourceCacheReader {
      * unknown resource type also lowers it. That can only make the check stricter — a needless ABS
      * read — never let a partial entry through.
      */
-    private boolean isWholeEntry(String cacheKey, int cachedCount) {
+    private boolean isWholeEntry(String cacheKey, int cachedCount, String phase) {
         Integer durableCount;
         try {
             durableCount = redisResourceService.readDurableResourceCount(cacheKey);
         } catch (RuntimeException e) {
             logger.warn("Could not read the durable resource count for cacheKey='{}'; treating the cache entry as whole: {}",
                     LogUtils.sanitize(cacheKey), LogUtils.sanitize(e.getMessage()));
+            // Counted because trusting unchecked is silent: if it happens often, the partial-entry
+            // check is effectively off.
+            try {
+                metrics.incrementDurableCountReadFailure(phase);
+            } catch (RuntimeException metricsFailure) {
+                logger.debug("Could not record the durable-count read failure metric: {}",
+                        LogUtils.sanitize(metricsFailure.getMessage()));
+            }
             return true;
         }
 

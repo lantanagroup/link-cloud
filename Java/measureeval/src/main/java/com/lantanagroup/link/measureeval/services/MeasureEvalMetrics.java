@@ -26,6 +26,7 @@ public class MeasureEvalMetrics {
     private final LongHistogram evaluationDuration;
     private final LongHistogram normalizedToReportGeneratedDuration;
     private final DoubleHistogram resourceCacheReadDuration;
+    private final LongCounter durableCountReadFailureCounter;
 
     /**
      * Same instrument name and {@code cache.outcome} values as the .NET resource cache
@@ -37,6 +38,13 @@ public class MeasureEvalMetrics {
     static final String RESOURCE_CACHE_READ_DURATION = "link_resource_cache_read_duration";
     static final String CACHE_OUTCOME = "cache.outcome";
     static final String CACHE_FALLBACK_REASON = "cache.fallback.reason";
+
+    /**
+     * Counts reads where the durable count could not be read, so the cache entry was trusted
+     * without the partial-entry check. Occasional is expected; a meaningful share of hits means the
+     * check is effectively off.
+     */
+    static final String DURABLE_COUNT_READ_FAILURE_COUNT = "link_resource_cache_durable_count_read_failure_count";
 
     public MeasureEvalMetrics(OpenTelemetry openTelemetry) {
 
@@ -75,6 +83,10 @@ public class MeasureEvalMetrics {
                 .setUnit("ms")
                 .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
                 .build();
+        durableCountReadFailureCounter = meter
+                .counterBuilder(DURABLE_COUNT_READ_FAILURE_COUNT)
+                .setDescription("Reads that trusted the cache entry because its durable count could not be read")
+                .build();
     }
 
     /**
@@ -82,14 +94,34 @@ public class MeasureEvalMetrics {
      *
      * @param outcome        hit, fallback or empty (see {@link ResourceCacheReader})
      * @param fallbackReason why Redis did not serve the read, or {@code null} on a hit
+     * @param phase          the pass the read belongs to (Initial or Supplemental), or {@code null}
+     *                       when the caller does not know it; the tag is then omitted
      * @param milliseconds   elapsed time of the whole read, including any ABS fallback
      */
-    public void recordResourceCacheRead(String outcome, String fallbackReason, double milliseconds) {
+    public void recordResourceCacheRead(String outcome, String fallbackReason, String phase, double milliseconds) {
         AttributesBuilder builder = Attributes.builder().put(stringKey(CACHE_OUTCOME), safe(outcome));
         if (fallbackReason != null) {
             builder.put(stringKey(CACHE_FALLBACK_REASON), fallbackReason);
         }
+        putPhase(builder, phase);
         resourceCacheReadDuration.record(milliseconds, builder.build());
+    }
+
+    /**
+     * Counts one read whose durable count could not be read, so the entry was trusted unchecked.
+     *
+     * @param phase the pass the read belongs to, or {@code null}; the tag is then omitted
+     */
+    public void incrementDurableCountReadFailure(String phase) {
+        AttributesBuilder builder = Attributes.builder();
+        putPhase(builder, phase);
+        durableCountReadFailureCounter.add(1, builder.build());
+    }
+
+    private static void putPhase(AttributesBuilder builder, String phase) {
+        if (phase != null) {
+            builder.put(stringKey(DiagnosticNames.PHASE), phase);
+        }
     }
 
     public void IncrementPatientReportableCounter(Attributes attributes, boolean reportable) {
