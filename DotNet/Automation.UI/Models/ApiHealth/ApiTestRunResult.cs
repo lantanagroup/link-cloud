@@ -40,6 +40,26 @@ public sealed class ApiTestRunResult
     public DateTimeOffset ExecutedAt { get; set; } = DateTimeOffset.UtcNow;
     public long DurationMs { get; set; }
 
+    /// <summary>
+    /// Source commit of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Commit { get; set; }
+
+    /// <summary>
+    /// Build of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Build { get; set; }
+
+    /// <summary>
+    /// Version of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? Version { get; set; }
+
+    /// <summary>
+    /// Product version of the service deployment when this endpoint test was executed.
+    /// </summary>
+    public string? ProductVersion { get; set; }
+
     // --- Diagnostic fields (populated from LinkApiResponse) ---
 
     /// <summary>The full URL that was called (e.g., https://host/api/normalization/operations/facility/xyz).</summary>
