@@ -220,7 +220,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 return 0;
             }
 
-            var count = 0;
+            // Counted as distinct references, exactly as GetAsync returns them. The ids blob can hold
+            // the same reference twice -- a crash between the two appends, or two processes
+            // interleaving on one key -- and counting those again would make the durable count
+            // exceed what any reader can ever see, so every cache entry for the key would be judged
+            // partial and every read would fall back here.
+            var references = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             await using var stream = await idsBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
             using var reader = new StreamReader(stream);
@@ -229,11 +234,11 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 if (!string.IsNullOrWhiteSpace(line))
                 {
-                    count++;
+                    references.Add(line);
                 }
             }
 
-            return count;
+            return references.Count;
         }
 
         /// <inheritdoc/>
