@@ -28,6 +28,12 @@ There are two generations of entry per correlation.
 | Acquisition | `{correlationId}:{ResourceType}` | AcquisitionWorker, one key per resource type | Normalization |
 | Normalized | `{correlationId}` | Normalization, all types accumulated into one key | MeasureEval |
 
+These two shapes are the only keys a correlation owns. MeasureEval's Redis cleanup does not scan for
+them: it builds `{correlationId}` plus `{correlationId}:{ResourceType}` for every FHIR resource type
+and unlinks the batch in one round trip (`RedisResourceService.cleanup`). Adding a new key shape
+under the correlation prefix therefore means adding it there too, or it outlives the correlation
+until its TTL.
+
 `(FacilityId, CorrelationId)` identifies **one patient's acquisition run**, not the patient. The
 patient travels separately as `PatientId`. A re-run, a readmission or a regenerate gets a new
 correlationId and therefore a new set of entries.
@@ -224,6 +230,13 @@ landed for that key, so durable storage has nothing more to offer and falling ba
 usable entry into an empty read. An entry holding *more* than the recorded count is also trusted:
 the cache is ahead of a durable write still in flight, which is the ordinary state between the two
 writes and not a partial entry.
+
+Both runtimes apply the same rule. On the .NET side it is `HybridResourceCache.IsCacheEntryWholeAsync`;
+MeasureEval reads the same hash for its evaluation, so `ResourceCacheReader` reads
+`__durableResourceCount` on every non-empty Redis hit and falls back to ABS when the hit holds fewer,
+with the same leniencies: no recorded count, a count the hit meets or exceeds, or a failure to read
+the count all trust the hit. Without this, the two-pass evaluation is where a partial entry does
+real damage — CQL would run without the initial pass's Encounter.
 
 ### Deleting a key while a write is running
 
