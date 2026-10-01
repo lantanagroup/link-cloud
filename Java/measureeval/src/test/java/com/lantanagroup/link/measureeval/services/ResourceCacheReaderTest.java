@@ -11,6 +11,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,7 +65,7 @@ class ResourceCacheReaderTest {
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
-        verify(metrics).recordResourceCacheRead(eq(ResourceCacheReader.OUTCOME_HIT), isNull(), anyDouble());
+        verify(metrics).recordResourceCacheRead(eq(ResourceCacheReader.OUTCOME_HIT), isNull(), isNull(), anyDouble());
     }
 
     @Test
@@ -75,7 +76,7 @@ class ResourceCacheReaderTest {
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
         verify(metrics).recordResourceCacheRead(
-                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_MISS), anyDouble());
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_MISS), isNull(), anyDouble());
     }
 
     @Test
@@ -88,7 +89,7 @@ class ResourceCacheReaderTest {
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
         verify(metrics).recordResourceCacheRead(
-                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_PARTIAL), anyDouble());
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_PARTIAL), isNull(), anyDouble());
     }
 
     @Test
@@ -100,7 +101,7 @@ class ResourceCacheReaderTest {
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
         verify(metrics).recordResourceCacheRead(
-                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_UNAVAILABLE), anyDouble());
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_UNAVAILABLE), isNull(), anyDouble());
     }
 
     @Test
@@ -111,7 +112,7 @@ class ResourceCacheReaderTest {
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
         verify(metrics).recordResourceCacheRead(
-                eq(ResourceCacheReader.OUTCOME_EMPTY), eq(ResourceCacheReader.REASON_MISS), anyDouble());
+                eq(ResourceCacheReader.OUTCOME_EMPTY), eq(ResourceCacheReader.REASON_MISS), isNull(), anyDouble());
     }
 
     @Test
@@ -125,8 +126,8 @@ class ResourceCacheReaderTest {
         assertThrows(RuntimeException.class,
                 () -> reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION));
 
-        verify(metrics, never()).recordResourceCacheRead(anyString(), anyString(), anyDouble());
-        verify(metrics, never()).recordResourceCacheRead(anyString(), isNull(), anyDouble());
+        verify(metrics, never()).recordResourceCacheRead(anyString(), anyString(), isNull(), anyDouble());
+        verify(metrics, never()).recordResourceCacheRead(anyString(), isNull(), isNull(), anyDouble());
     }
 
     @Test
@@ -136,7 +137,64 @@ class ResourceCacheReaderTest {
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
-        verify(metrics, times(2)).recordResourceCacheRead(anyString(), isNull(), anyDouble());
+        verify(metrics, times(2)).recordResourceCacheRead(anyString(), isNull(), isNull(), anyDouble());
+    }
+
+    // ----- pass (phase) tag -----
+    // A bad read in the supplemental pass feeds the submitted report; in the initial pass it only
+    // feeds the reportability check. The tag is what lets an alert tell the two apart.
+
+    @Test
+    void metrics_recordTheReadsPass_onAHit() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_HIT), isNull(), eq("Supplemental"), anyDouble());
+    }
+
+    @Test
+    void metrics_recordTheReadsPass_onAPartialFallback() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
+                .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Initial");
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_PARTIAL),
+                eq("Initial"), anyDouble());
+    }
+
+    // ----- durable-count read failures -----
+    // A count that cannot be read makes the reader trust the entry. That is the right call for one
+    // read, but if it happens often the partial-entry protection is effectively off without anyone
+    // noticing, so each occurrence is counted.
+
+    @Test
+    void metrics_countReadFailure_isCounted_withThePass_andTheHitIsStillServed() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION))
+                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+
+        List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
+
+        assertEquals("p1", result.get(0).getResourceId());
+        verify(metrics).incrementDurableCountReadFailure("Supplemental");
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_HIT), isNull(), eq("Supplemental"), anyDouble());
+    }
+
+    @Test
+    void metrics_countReadSuccess_isNotCountedAsAFailure() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(1);
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
+
+        verify(metrics, never()).incrementDurableCountReadFailure(any());
     }
 
     @Test

@@ -142,7 +142,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
             if (perf) taskStopWatch.start("readResources");
             long readStart = perf ? System.nanoTime() : 0;
-            List<Resource> resources = cacheReader.readResources(facilityId, correlationId, patientId, correlationId);
+            List<Resource> resources = cacheReader.readResources(facilityId, correlationId, patientId, correlationId,
+                    DiagnosticNames.normalizePhase(value.getQueryType().toString()));
             long readMs = perf ? (System.nanoTime() - readStart) / 1_000_000 : 0;
             if (perf) taskStopWatch.stop();
             if (logger.isDebugEnabled()) {
