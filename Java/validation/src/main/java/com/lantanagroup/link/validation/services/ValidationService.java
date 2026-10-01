@@ -82,6 +82,7 @@ public class ValidationService {
         ValidatorState state = validatorState;
         if (state == null || state.artifactSupport() != artifactSupport) {
             synchronized (this) {
+                artifactSupport = artifactService.getValidationSupport();
                 state = validatorState;
                 if (state == null || state.artifactSupport() != artifactSupport) {
                     state = new ValidatorState(artifactSupport, buildValidator(artifactSupport));
