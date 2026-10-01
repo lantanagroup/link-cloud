@@ -256,6 +256,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// Always true: this store is the record, so there is nothing it could be missing.
+        /// </remarks>
+        public Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+
+        /// <inheritdoc/>
         public async Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default)
         {
             await _redisDatabase.Database

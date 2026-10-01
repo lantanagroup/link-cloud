@@ -266,6 +266,29 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
             _redisCache.SetDurableResourceCountAsync(cacheKey, count, cancellationToken);
 
+        /// <inheritdoc/>
+        public async Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            int cachedCount;
+
+            try
+            {
+                cachedCount = await _redisCache.GetResourceCountAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Cache unavailable counting {CacheKey}; treating the entry as incomplete so the caller reads through.",
+                    cacheKey.SanitizeForLog());
+                return false;
+            }
+
+            // Nothing cached is not the whole record unless durable storage holds nothing either, and
+            // that costs the same read the caller is trying to avoid. Reading through settles it.
+            return cachedCount > 0 && await IsCacheEntryWholeAsync(cacheKey, cachedCount, cancellationToken);
+        }
+
         /// <summary>
         /// Whether a non-empty cache entry can be trusted as the whole record.
         /// </summary>

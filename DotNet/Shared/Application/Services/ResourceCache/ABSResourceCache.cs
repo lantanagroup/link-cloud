@@ -261,6 +261,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Always true, for the same reason: this store is the record.
+        /// </remarks>
+        public Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             string[] splitKey = cacheKey.Split(":");

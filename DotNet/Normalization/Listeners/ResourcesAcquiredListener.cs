@@ -642,6 +642,14 @@ public class ResourcesAcquiredListener : BackgroundService
 
         try
         {
+            // Asked before reading, because the usual answer is that nothing needs restoring and the
+            // read would deserialize every resource in the correlation to discover that. The check
+            // compares two counts.
+            if (await resourceCache.IsEntryCompleteAsync(correlationId, cancellationToken))
+            {
+                return;
+            }
+
             var restored = await resourceCache.GetAsync(correlationId, cancellationToken);
 
             _logger.LogDebug(
