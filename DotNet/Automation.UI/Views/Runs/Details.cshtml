@@ -965,7 +965,12 @@
                 const label = labels[k] || toLabel(k);
                 const col = document.createElement('div');
                 col.className = 'col-md-3';
-                col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="au-value">${display}</span></div>`;
+
+                const valueClass = k === 'importedPatientIds'
+                    ? 'au-value text-break'
+                    : 'au-value';
+
+                col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="${valueClass}">${display}</span></div>`;
                 container.appendChild(col);
             });
 
