@@ -36,4 +36,16 @@ class CacheBlobStorageConfigTest {
         assertEquals(1, options.getMaxTries());
         assertEquals(5, options.getTryTimeoutDuration().toSeconds());
     }
+
+    @Test
+    void absResourceService_unconfigured_failsAtBoot() {
+        // Since LEGLINK-1279 ABS is the durable source for the resource cache: a MeasureEval
+        // without blob storage cannot read what eviction removed, so the bean must fail at
+        // startup, not degrade to a null service that breaks at the first unlucky message.
+        CacheBlobStorageConfig config = new CacheBlobStorageConfig();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, config::absResourceService);
+        assertTrue(ex.getMessage().contains("resource-cache.blob-storage"),
+                "the boot failure must name the missing configuration");
+    }
 }

@@ -87,4 +87,26 @@ class AbsResourceServiceTest {
         assertEquals(1, resources.size());
         assertEquals("p1", resources.get(0).getResourceId());
     }
+
+    @Test
+    void readResources_collapsesDuplicateReferences_keepingTheFirst() {
+        // A torn append (payload written, process dying before the _ids diff blob) leaves a
+        // resource a retry re-appends, and two pods appending to one key can interleave — so the
+        // payload can carry the same reference twice. The read collapses duplicates keep-first,
+        // case-insensitively, matching the .NET reader (LEGLINK-1276).
+        String content =
+                "Patient/p1\n{\"resourceType\":\"Patient\",\"id\":\"p1\",\"gender\":\"female\"}\n" +
+                "Observation/o1\n{\"resourceType\":\"Observation\",\"id\":\"o1\"}\n" +
+                "Patient/P1\n{\"resourceType\":\"Patient\",\"id\":\"P1\",\"gender\":\"male\"}\n";
+        when(blobClient.downloadContent())
+                .thenReturn(BinaryData.fromBytes(content.getBytes(StandardCharsets.UTF_8)));
+
+        List<Resource> resources = service.readResources("fac", "corr", "pat", "corr");
+
+        assertEquals(2, resources.size(), "the case-varied duplicate Patient must collapse");
+        assertEquals("p1", resources.get(0).getResourceId());
+        assertTrue(resources.get(0).getResource().contains("female"),
+                "keep-first: the earliest occurrence of a duplicated reference wins");
+        assertEquals("o1", resources.get(1).getResourceId());
+    }
 }

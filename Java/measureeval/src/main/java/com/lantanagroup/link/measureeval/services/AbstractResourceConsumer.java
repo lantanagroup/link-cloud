@@ -1,6 +1,5 @@
 package com.lantanagroup.link.measureeval.services;
 
-import com.lantanagroup.link.measureeval.entities.CacheType;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.entities.Resource;
@@ -52,8 +51,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final PatientStatusBundler patientStatusBundler;
     private final BlobStorageService blobStorageService;
     private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
-    private final RedisResourceService redisResourceService;
-    private final AbsResourceService absResourceService;
+    private final ResourceCacheReader cacheReader;
     private final ResourceCacheCleanup cacheCleanup;
     private final MongoOperations mongoOperations;
 
@@ -79,8 +77,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
         this.blobStorageService = blobStorageService;
-        this.redisResourceService = redisResourceService;
-        this.absResourceService = absResourceService;
+        this.cacheReader = new ResourceCacheReader(redisResourceService, absResourceService);
         this.cacheCleanup = new ResourceCacheCleanup(redisResourceService, absResourceService);
         this.mongoOperations = mongoOperations;
     }
@@ -93,7 +90,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         if (perf) totalStopWatch.start();
 
         String correlationId = null;
-        CacheType cacheType = null;
         boolean keepCacheForSupplemental = false;
 
         try {
@@ -118,10 +114,9 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getReportableEvent() == null) {
                 throw new ValidationException("Reportable Event is null or empty.");
             }
-            if (value.getCacheType() == null) {
-                throw new ValidationException("Cache Type is null.");
-            }
-            cacheType = value.getCacheType();
+            // No CacheType here anymore: since LEGLINK-1279 the store is not chosen by the
+            // message — reads are Redis-first with ABS fallback (LEGLINK-1118), and the field was
+            // removed from the contract in both runtimes.
             correlationId = value.getCacheKey();
             if (correlationId == null || correlationId.isEmpty()) {
                 throw new ValidationException("Cache Key is null or empty.");
@@ -137,42 +132,33 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (perf) taskStopWatch.stop();
 
             logger.debug(
-                    "MESSAGE RECEIVED {}: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] CACHE=[{}] QUERY_TYPE=[{}] REPORTS={}",
+                    "MESSAGE RECEIVED {}: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORTS={}",
                     KafkaUtils.format(record),
                     facilityId,
                     patientId,
                     correlationId,
-                    value.getCacheType(),
                     value.getQueryType(),
                     value.getScheduledReports() != null ? value.getScheduledReports().size() : 0);
 
             if (perf) taskStopWatch.start("readResources");
             long readStart = perf ? System.nanoTime() : 0;
-            List<Resource> resources;
-            switch (cacheType) {
-                case REDIS -> resources = redisResourceService.readResources(
-                        facilityId, correlationId, patientId);
-                case ABS -> {
-                    if (absResourceService == null) {
-                        throw new IllegalStateException("ABS cache type requested but cache-blob-storage is not configured");
-                    }
-                    resources = absResourceService.readResources(facilityId, correlationId, patientId, correlationId);
-                }
-                default -> throw new IllegalStateException("Unexpected cache type: " + cacheType);
-            }
+            List<Resource> resources = cacheReader.readResources(facilityId, correlationId, patientId, correlationId);
             long readMs = perf ? (System.nanoTime() - readStart) / 1_000_000 : 0;
             if (perf) taskStopWatch.stop();
             if (logger.isDebugEnabled()) {
                 Map<String, Long> resourceTypeCounts = resources.stream()
                         .collect(Collectors.groupingBy(r -> r.getResourceType() != null ? r.getResourceType().name() : "Unknown", Collectors.counting()));
-                logger.debug("Read {} resources from {} in {} ms for correlationId={}, resourceTypes={}",
-                        resources.size(), cacheType, readMs, correlationId, resourceTypeCounts);
+                logger.debug("Read {} resources from the cache in {} ms for correlationId={}, resourceTypes={}",
+                        resources.size(), readMs, correlationId, resourceTypeCounts);
             }
 
             if (resources.isEmpty()) {
+                // Both stores are genuinely empty: the fallback already consulted ABS, the durable
+                // source, so this is not an eviction — either nothing was acquired or the producer
+                // advertised a key it never wrote.
                 logger.warn(
-                        "Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report. " +
-                        "If this patient had acquired resources, the resource-cache write/copy path failed.",
+                        "Cache empty in BOTH Redis and ABS for correlationId={}; evaluating with empty bundle to produce a not-reportable report. " +
+                        "If this patient had acquired resources, the resource-cache write path failed.",
                         LogUtils.sanitize(correlationId));
             }
 
@@ -239,7 +225,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             } else {
                 if (perf) taskStopWatch.start("cleanupCache");
                 try {
-                    cacheCleanup.cleanup(correlationId, cacheType);
+                    cacheCleanup.cleanup(correlationId);
                 } finally {
                     if (perf) taskStopWatch.stop();
                 }

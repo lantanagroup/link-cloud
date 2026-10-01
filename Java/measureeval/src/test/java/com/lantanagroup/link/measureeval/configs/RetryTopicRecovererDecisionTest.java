@@ -319,7 +319,7 @@ class RetryTopicRecovererDecisionTest {
     private static ConsumerRecord<String, Object> resourceRecord(String cacheKey) {
         var value = new com.lantanagroup.link.measureeval.records.ResourcesNormalized();
         value.setCacheKey(cacheKey);
-        value.setCacheType(com.lantanagroup.link.measureeval.entities.CacheType.REDIS);
+        // CacheType deliberately not set: ignored since LEGLINK-1279, cleanup covers both stores.
         return new ConsumerRecord<>("ResourcesNormalized", 0, 0L, "key", value);
     }
 

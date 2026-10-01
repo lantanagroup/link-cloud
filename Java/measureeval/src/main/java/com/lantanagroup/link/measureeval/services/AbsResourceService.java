@@ -14,7 +14,9 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 
 
 public class AbsResourceService {
@@ -45,16 +47,24 @@ public class AbsResourceService {
 
         List<Resource> resources = readBlobResources(blobName, facilityId, correlationId, patientId);
 
-        // int beforeDedup = resources.size();
-        // resources = new ArrayList<>(resources.stream()
-        //         .collect(java.util.LinkedHashMap<String, Resource>::new,
-        //                 (map, r) -> map.putIfAbsent(r.getResourceType().name() + "/" + r.getResourceId(), r),
-        //                 java.util.LinkedHashMap::putAll)
-        //         .values());
-        //
-        // if (resources.size() < beforeDedup) {
-        //     logger.info("Deduplicated ABS resources for correlationId='{}': {} -> {}", correlationId, beforeDedup, resources.size());
-        // }
+        // The payload blob can legitimately contain the same reference twice: a torn append (the
+        // payload line pair written, the process dying before the _ids diff blob) leaves a resource
+        // that a retry's diff re-appends, and two pods appending to one key can interleave.
+        // Collapse on read — keep-first, case-insensitive — to match the .NET reader
+        // (LEGLINK-1276 ABSResourceCache), so duplicates are wasted bytes rather than duplicate
+        // resources in the evaluated bundle.
+        int beforeDedup = resources.size();
+        LinkedHashMap<String, Resource> byReference = new LinkedHashMap<>();
+        for (Resource resource : resources) {
+            String reference = (resource.getResourceType().name() + "/" + resource.getResourceId())
+                    .toLowerCase(Locale.ROOT);
+            byReference.putIfAbsent(reference, resource);
+        }
+        if (byReference.size() < beforeDedup) {
+            resources = new ArrayList<>(byReference.values());
+            logger.info("Collapsed {} duplicate ABS resource(s) for correlationId='{}': {} -> {}",
+                    beforeDedup - resources.size(), LogUtils.sanitize(correlationId), beforeDedup, resources.size());
+        }
 
         logger.debug("Read {} total resources from ABS for correlationId='{}'", resources.size(), correlationId);
         return resources;

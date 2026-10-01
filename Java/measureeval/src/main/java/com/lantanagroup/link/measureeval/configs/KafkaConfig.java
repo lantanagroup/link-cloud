@@ -298,7 +298,7 @@ public class KafkaConfig {
         return RetryTopicRecovererFactory.create(kafkaTemplate, retryTopic, errorTopic, retryConfig, NON_RETRYABLE,
                 (record, exception) -> {
                     if (record.value() instanceof AbstractResourceRecord resourceRecord) {
-                        cacheCleanup.cleanup(resourceRecord.getCacheKey(), resourceRecord.getCacheType());
+                        cacheCleanup.cleanup(resourceRecord.getCacheKey());
                     }
                 });
     }
