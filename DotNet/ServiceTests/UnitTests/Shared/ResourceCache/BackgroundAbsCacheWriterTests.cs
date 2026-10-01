@@ -177,8 +177,250 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         await _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
 
-        Assert.Equal(8, _abs.Writes.Count);
+        var writes = _abs.Writes.Where(write => write.CacheKey == "corr:Patient").ToList();
+
+        // Serialization is the guarantee. The number of blob calls is not: a worker that finds the
+        // key busy hands its batch to the holder, and successive hand-offs merge, so eight enqueues
+        // land in as few as one write.
         Assert.Equal(1, _abs.MaxConcurrentWritesFor("corr:Patient"));
+        Assert.InRange(writes.Count, 1, 8);
+
+        // What merging must never do is lose any of them.
+        Assert.Equal(8, writes.Sum(write => write.Count));
+    }
+
+    [Fact]
+    public async Task BusyKey_DoesNotPinEveryWorker_SoAnotherKeyStillGetsWritten()
+    {
+        // The measured production shape: Normalization writes the correlation key once per acquired
+        // resource type, averaging 4.6 and reaching 11, against a default MaxConcurrency of 8. Every
+        // worker that dequeues one of those parks on the key's write lock, so one patient can hold
+        // the whole pool while other correlations' work sits undispatched.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 2);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("busy:Patient");
+
+            await writer.EnqueueAsync("busy:Patient", Resources("Patient/1"), ResourceType.Patient);
+
+            // Worker one is now inside the blocked write, holding the key.
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            // Worker two dequeues this, finds the key busy, and must not park on it.
+            await writer.EnqueueAsync("busy:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            // Behind it in the channel and not gated. The channel is FIFO, so this can only be
+            // written if worker two moved past the busy key rather than waiting on it.
+            await writer.EnqueueAsync("other:Patient", Resources("Patient/3"), ResourceType.Patient);
+
+            await writer.WaitForDurableAsync(["other:Patient"]).WaitAsync(Timeout);
+
+            Assert.Contains(_abs.Writes, write => write.CacheKey == "other:Patient");
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task BusyKey_AtTheMeasuredShape_DoesNotStopTheQueueDraining()
+    {
+        // The production shape: one correlation writes its key once per acquired resource type,
+        // measured at up to 11 against 8 workers. Every one of those used to take a worker.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 2);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("hot:Patient");
+
+            await writer.EnqueueAsync("hot:Patient", Resources("Patient/0"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            var others = new List<string>();
+            for (var i = 1; i <= 11; i++)
+            {
+                await writer.EnqueueAsync("hot:Patient", Resources($"Patient/{i}"), ResourceType.Patient);
+
+                var other = $"other{i}:Patient";
+                others.Add(other);
+                await writer.EnqueueAsync(other, Resources($"Patient/{i}"), ResourceType.Patient);
+            }
+
+            // Every other key is durable while the hot key is still blocked.
+            await writer.WaitForDurableAsync(others).WaitAsync(Timeout);
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task HandedOffWrites_MergeIntoOneBlobCall_WithoutLosingResources()
+    {
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 4);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/0"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            // Five more while the key is held. They hand off and merge into one follow-up.
+            for (var i = 1; i <= 5; i++)
+            {
+                await writer.EnqueueAsync("corr:Patient", Resources($"Patient/{i}"), ResourceType.Patient);
+            }
+
+            _abs.ReleaseBlockedWrite();
+            await writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+            var writes = _abs.Writes.Where(write => write.CacheKey == "corr:Patient").ToList();
+
+            // The point of the exercise: six enqueues, two blob round trips.
+            Assert.Equal(2, writes.Count);
+            Assert.Equal(6, writes.Sum(write => write.Count));
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task HandedOffWrite_IsStillCoveredByTheDurabilityBarrier()
+    {
+        // The donor returns without decrementing Outstanding, so the barrier has to keep waiting on
+        // work it no longer owns. If it did not, a caller would advertise a key whose second batch
+        // had never reached blob storage.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 2);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            var barrier = writer.WaitForDurableAsync(["corr:Patient"]);
+            Assert.False(barrier.IsCompleted);
+
+            _abs.ReleaseBlockedWrite();
+            await barrier.WaitAsync(Timeout);
+
+            Assert.Equal(2, _abs.Writes.Where(write => write.CacheKey == "corr:Patient").Sum(write => write.Count));
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task CancelAndDrainAsync_WithAHandOffOutstanding_WaitsRatherThanHanging()
+    {
+        // The hang test. A handed-off item stays counted, so the drain must wait for it -- and the
+        // holder must be guaranteed to pick it up, or this never returns.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 2);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            var drain = writer.CancelAndDrainAsync(["corr:Patient"]);
+            Assert.False(drain.IsCompleted);
+
+            _abs.ReleaseBlockedWrite();
+            await drain.WaitAsync(Timeout);
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task CancelledHandOff_IsAccountedForRatherThanStranded()
+    {
+        // A cancel can land while an item sits handed off. Nobody but the holder can account for it
+        // at that point, and losing its decrement would leave the key permanently undrainable.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 2);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            writer.Cancel(["corr:Patient"]);
+            _abs.ReleaseBlockedWrite();
+
+            await writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+            // The cancelled hand-off was discarded, not written.
+            Assert.Single(_abs.Writes.Where(write => write.CacheKey == "corr:Patient"));
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task HandOffCapReached_FallsBackToWaiting_AndStillWritesEverything()
+    {
+        // The cap is what keeps the memory bound: a dequeued batch no longer holds a channel slot,
+        // so merging without limit would grow outside what QueueCapacity bounds. At the ceiling a
+        // worker waits for the key, as every worker used to.
+        var writer = CreateWriter(settings =>
+        {
+            settings.MaxConcurrency = 3;
+            settings.MaxCoalescedResources = 1;
+        });
+
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/3"), ResourceType.Patient);
+
+            _abs.ReleaseBlockedWrite();
+            await writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+            var writes = _abs.Writes.Where(write => write.CacheKey == "corr:Patient").ToList();
+
+            // Exactly three. Two would mean the second and third merged despite the cap, and
+            // "more than one" cannot tell those apart -- it is true either way.
+            Assert.Equal(3, writes.Count);
+            Assert.Equal(3, writes.Sum(write => write.Count));
+            Assert.Equal(1, _abs.MaxConcurrentWritesFor("corr:Patient"));
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
     }
 
     [Fact]
@@ -287,15 +529,22 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         // Writes to one key are serialized, so the Patient batch consumes all three.
         _abs.FailKeyTimes("corr:Patient", 3);
 
+        // Blocked first, so the Patient batch is provably claimed and writing before the Encounter
+        // batch is enqueued. Without that the two can merge into one write, which would burn all
+        // three failures on the merged batch and leave nothing for the second to prove.
+        _abs.BlockWritesFor("corr:Patient");
+
         await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
         await _writer.EnqueueAsync("corr:Patient", Resources("Encounter/1"), ResourceType.Encounter);
+
+        _abs.ReleaseBlockedWrite();
 
         // Both are in the same cycle and the caller waits once, after both. The Encounter batch is
         // durable and the Patient batch is not, so the key is not durable.
         await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
             () => _writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout));
-
-        Assert.Single(_abs.Writes.Where(write => write.CacheKey == "corr:Patient"));
     }
 
     [Fact]
@@ -491,6 +740,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         private readonly SemaphoreSlim _writeRelease = new(0);
         private volatile bool _gateWrites;
         private volatile string? _gatedKey;
+        private bool _released;
 
         private TaskCompletionSource? _holdRelease;
         private TaskCompletionSource? _concurrencyReached;
@@ -547,6 +797,20 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         {
             _gateWrites = false;
             _gatedKey = null;
+
+            // Idempotent. A test that releases in its body is also released by DisposeAsync, and a
+            // third Release would overflow the semaphore and surface as a SemaphoreFullException
+            // from cleanup -- masking whatever the test was actually asserting.
+            lock (_gate)
+            {
+                if (_released)
+                {
+                    return;
+                }
+
+                _released = true;
+            }
+
             _writeRelease.Release(int.MaxValue / 2);
         }
 
