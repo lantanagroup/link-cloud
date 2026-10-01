@@ -14,14 +14,14 @@ public record SftpTestConnectionRequestModel
     /// </summary>
     [JsonPropertyName("hostName")]
     [Required(ErrorMessage = "Host name is required.")]
-    public string HostName { get; set; } = string.Empty;
+    public string? HostName { get; set; } = string.Empty;
 
     /// <summary>
     /// The SFTP host port to connect to. Defaults to 22 if not specified.
     /// </summary>
     [JsonPropertyName("hostUrlPort")]
     [Required(ErrorMessage = "Host port is required.")]
-    public int HostUrlPort { get; set; } = 22;
+    public int? HostUrlPort { get; set; } = 22;
 
     /// <summary>
     /// Username for SFTP authentication.
@@ -33,6 +33,7 @@ public record SftpTestConnectionRequestModel
     /// Password for the SFTP user.
     /// </summary>
     [JsonPropertyName("password")]
+    [DataType(DataType.Password)]
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
