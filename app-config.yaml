@@ -605,7 +605,7 @@ services:
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password. MeasureEval has no mode of its own: it always reads Redis first and falls back to blob storage, so it must run alongside Hybrid or ABS. Hybrid is the intended mode. ABS is correct but costs MeasureEval one Redis lookup per read, and up to its Redis timeout per read while Redis is unreachable. Redis-only gives MeasureEval nothing to fall back to, so an evicted entry evaluates as an empty bundle and the patient drops out of the report silently; do not use it where reported data matters."
       required: false
     - key: "ResourceCache:Redis:CacheEntryTtlDays"
       description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
@@ -668,7 +668,7 @@ services:
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. Redis and Hybrid use ConnectionStrings:Redis and Redis:Password. MeasureEval has no mode of its own: it always reads Redis first and falls back to blob storage, so it must run alongside Hybrid or ABS. Hybrid is the intended mode. ABS is correct but costs MeasureEval one Redis lookup per read, and up to its Redis timeout per read while Redis is unreachable. Redis-only gives MeasureEval nothing to fall back to, so an evicted entry evaluates as an empty bundle and the patient drops out of the report silently; do not use it where reported data matters."
       required: false
     - key: "ResourceCache:Redis:CacheEntryTtlDays"
       description: "The number of days Redis resource-cache entries remain after their most recent write. Defaults to 7."
@@ -811,7 +811,7 @@ services:
       required: false
   Normalization:
     - key: "ResourceCache:CacheImplementation"
-      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS. MeasureEval has no mode of its own: it always reads Redis first and falls back to blob storage, so it must run alongside Hybrid or ABS. Hybrid is the intended mode. ABS is correct but costs MeasureEval one Redis lookup per read, and up to its Redis timeout per read while Redis is unreachable. Redis-only gives MeasureEval nothing to fall back to, so an evicted entry evaluates as an empty bundle and the patient drops out of the report silently; do not use it where reported data matters."
       required: false
     - key: "ResourceCache:Redis:ConnectionString"
       description: "The Redis connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
