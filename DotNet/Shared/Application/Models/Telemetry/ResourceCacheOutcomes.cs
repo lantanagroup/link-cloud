@@ -25,5 +25,15 @@ namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
 
         /// <summary>A write exhausted its retries; its key is not durable.</summary>
         public const string Exhausted = "exhausted";
+
+        /// <summary>
+        /// Shutdown stopped a write before it could finish retrying; its key is not durable.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="Exhausted"/>, which says storage rejected the write every time it
+        /// was offered. This one says the write was never given its remaining attempts, so counting it
+        /// as exhausted would report a storage problem on every deployment.
+        /// </remarks>
+        public const string Interrupted = "interrupted";
     }
 }

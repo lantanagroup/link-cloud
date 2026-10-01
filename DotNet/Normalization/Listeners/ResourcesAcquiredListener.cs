@@ -600,24 +600,6 @@ public class ResourcesAcquiredListener : BackgroundService
     }
 
     /// <summary>
-    /// Declares every code map the facility has configured, before any resource is looked at.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The loop below only visits resource types Data Acquisition actually acquired -- a type it fetched
-    /// nothing for has no cache key, so its operation sequences are never even read. That leaves a facility
-    /// with a configured code map and no matching resource indistinguishable from one with no code map at
-    /// all: both report an empty outcome list. Declaring the configured maps up front separates them, since
-    /// a map nothing exercised then reports zero counts instead of being absent.
-    /// </para>
-    /// <para>
-    /// Searched across every resource type rather than per type, for the same reason. Results are cached
-    /// per facility by <c>OperationSequenceQueries</c>. The cache key includes a database revision that
-    /// configuration writes increment, so an unchanged facility is still one sequence lookup per
-    /// patient-correlation, not one per resource.
-    /// </para>
-    /// </remarks>
-    /// <summary>
     /// Restores the correlation cache entry before a supplemental pass appends to it.
     /// </summary>
     /// <remarks>
@@ -642,6 +624,14 @@ public class ResourcesAcquiredListener : BackgroundService
 
         try
         {
+            // Asked before reading, because the usual answer is that nothing needs restoring and the
+            // read would deserialize every resource in the correlation to discover that. The check
+            // compares two counts.
+            if (await resourceCache.IsEntryCompleteAsync(correlationId, cancellationToken))
+            {
+                return;
+            }
+
             var restored = await resourceCache.GetAsync(correlationId, cancellationToken);
 
             _logger.LogDebug(
@@ -668,6 +658,24 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Declares every code map the facility has configured, before any resource is looked at.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The loop below only visits resource types Data Acquisition actually acquired -- a type it fetched
+    /// nothing for has no cache key, so its operation sequences are never even read. That leaves a facility
+    /// with a configured code map and no matching resource indistinguishable from one with no code map at
+    /// all: both report an empty outcome list. Declaring the configured maps up front separates them, since
+    /// a map nothing exercised then reports zero counts instead of being absent.
+    /// </para>
+    /// <para>
+    /// Searched across every resource type rather than per type, for the same reason. Results are cached
+    /// per facility by <c>OperationSequenceQueries</c>. The cache key includes a database revision that
+    /// configuration writes increment, so an unchanged facility is still one sequence lookup per
+    /// patient-correlation, not one per resource.
+    /// </para>
+    /// </remarks>
     private async Task RegisterConfiguredCodeMapsAsync(
         IServiceScope scope,
         string facilityId,

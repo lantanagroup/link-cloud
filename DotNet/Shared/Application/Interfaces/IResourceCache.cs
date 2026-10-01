@@ -172,6 +172,20 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Whether a read of <paramref name="cacheKey"/> would be served the whole record without
+        /// going to durable storage.
+        /// </summary>
+        /// <remarks>
+        /// The question <see cref="GetAsync"/> answers on the way past, exposed on its own so a caller
+        /// that only wants the entry made whole can skip deserializing an entry that already is. False
+        /// when the answer cannot be determined, so the caller reads through and the uncertainty costs
+        /// a read rather than a wrong answer. Always true for a store that nothing shadows.
+        /// </remarks>
+        /// <param name="cacheKey">The key to test.</param>
+        /// <param name="cancellationToken">Cancels the reads this makes.</param>
+        Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Records how many resources durable storage holds for <paramref name="cacheKey"/>.
         /// </summary>
         /// <remarks>

@@ -238,6 +238,92 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
+    public async Task ReplaceResourcesAsync_drains_in_flight_writes_before_writing_either_store()
+    {
+        var order = new List<string>();
+        var resources = new List<DomainResource> { new Encounter { Id = "enc-org" } };
+
+        _writer
+            .Setup(w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("drain"))
+            .Returns(Task.CompletedTask);
+        _abs
+            .Setup(c => c.ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("durable"))
+            .Returns(Task.CompletedTask);
+        _redis
+            .Setup(c => c.ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("cache"))
+            .Returns(Task.CompletedTask);
+
+        await CreateSut().ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter);
+
+        order.Should().Equal("drain", "durable", "cache");
+    }
+
+    [Fact]
+    public async Task ReplaceResourcesAsync_does_not_merely_cancel_the_key()
+    {
+        var resources = new List<DomainResource> { new Encounter { Id = "enc-org" } };
+
+        _writer
+            .Setup(w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        await CreateSut().ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter);
+
+        // Cancel returns while a write is still executing. That write finishes afterwards, sees the
+        // key was cancelled, and deletes it from durable storage -- taking the replacement with it,
+        // because the replacement was written first. Only a drain orders them correctly.
+        _writer.Verify(w => w.Cancel(It.IsAny<IEnumerable<string>>()), Times.Never);
+        _writer.Verify(
+            w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task IsEntryCompleteAsync_is_false_when_the_entry_holds_fewer_than_durable_storage()
+    {
+        _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(3);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
+
+        (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsEntryCompleteAsync_is_true_when_the_entry_holds_the_whole_record()
+    {
+        _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
+
+        (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeTrue();
+
+        // The point of asking: the caller skips a read that would deserialize the whole entry.
+        _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IsEntryCompleteAsync_is_false_when_nothing_is_cached()
+    {
+        _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(0);
+
+        // An evicted entry is exactly the case a caller asks about, so "nothing cached" must not read
+        // as "nothing missing".
+        (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task IsEntryCompleteAsync_is_false_when_the_cache_cannot_be_reached()
+    {
+        _redis
+            .Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+
+        // Not knowing has to cost a read-through, not a wrong answer.
+        (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task DeleteAsync_still_deletes_from_durable_storage_when_the_cache_delete_fails()
     {
         var keys = new List<string> { CacheKey };

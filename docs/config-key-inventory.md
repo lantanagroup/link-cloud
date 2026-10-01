@@ -49,7 +49,7 @@ value set in a store can never take effect.
 
 ### Account
 
-125 keys.
+123 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -120,8 +120,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `SecretManagement:Manager` | dotnet | - | dev, qa, qa2, test | `DotNet/Account/Program.cs:136` |
@@ -181,7 +179,7 @@ value set in a store can never take effect.
 
 ### AdminBFF
 
-151 keys.
+149 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -277,8 +275,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ReverseProxy` | dotnet | - | - | `DotNet/Admin.BFF/Infrastructure/Extensions/YarpProxyExtensioncs.cs:15` |
@@ -339,7 +335,7 @@ value set in a store can never take effect.
 
 ### Audit
 
-123 keys.
+121 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -411,8 +407,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -469,7 +463,7 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-146 keys.
+144 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -564,8 +558,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -622,7 +614,7 @@ value set in a store can never take effect.
 
 ### Census
 
-120 keys.
+118 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -691,8 +683,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -749,7 +739,7 @@ value set in a store can never take effect.
 
 ### DataAcquisition
 
-154 keys.
+152 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -829,8 +819,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:86` |
@@ -910,7 +898,7 @@ value set in a store can never take effect.
 
 ### DataAcquisitionWorker
 
-155 keys.
+153 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -996,8 +984,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `SecretManagement` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:86` |
@@ -1101,7 +1087,7 @@ value set in a store can never take effect.
 
 ### Normalization
 
-121 keys.
+119 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1171,8 +1157,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -1229,7 +1213,7 @@ value set in a store can never take effect.
 
 ### Notification
 
-133 keys.
+131 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1300,8 +1284,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
@@ -1369,7 +1351,7 @@ value set in a store can never take effect.
 
 ### QueryDispatch
 
-117 keys.
+115 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1435,8 +1417,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -1493,7 +1473,7 @@ value set in a store can never take effect.
 
 ### Report
 
-129 keys.
+127 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1571,8 +1551,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -1629,7 +1607,7 @@ value set in a store can never take effect.
 
 ### Submission
 
-140 keys.
+138 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1712,8 +1690,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -1776,7 +1752,7 @@ value set in a store can never take effect.
 
 ### Tenant
 
-122 keys.
+120 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1847,8 +1823,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
@@ -1905,7 +1879,7 @@ value set in a store can never take effect.
 
 ### Terminology
 
-59 keys.
+57 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -1941,8 +1915,6 @@ value set in a store can never take effect.
 | `ResourceCache:CacheImplementation` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:CacheEntryTtlDays` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MaxMemoryBytes` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
-| `ResourceCache:Redis:MemoryThresholdPercent` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:Password` | dotnet | - | dev, qa, qa2, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ResourceCache:Redis:PoolSize` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:55` |
 | `ServiceInformation` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
