@@ -67,6 +67,40 @@ public class AbsResourceCountTests
         count.Should().Be(2);
     }
 
+    [Fact]
+    public async Task GetDurableResourceCountAsync_SurfacesAStorageFaultAsAFault()
+    {
+        // Port 1 refuses immediately, so the read faults rather than hanging.
+        var unreachable = new ABSResourceCache(
+            Options.Create(new ResourceCacheBlobStorageSettings
+            {
+                ConnectionString = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
+                    + "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;"
+                    + "BlobEndpoint=http://127.0.0.1:1/devstoreaccount1;",
+                BlobContainerName = ContainerName
+            }),
+            Mock.Of<ILogger<ABSResourceCache>>());
+
+        // Reported as a cancellation while this used ContinueWith with OnlyOnRanToCompletion: a
+        // faulted antecedent leaves the continuation cancelled, so the fault reached callers as an
+        // OperationCanceledException -- straight past every handler written to treat a failed count
+        // read as "unknown", and indistinguishable from the caller giving up.
+        Exception? thrown = null;
+        try
+        {
+            await unreachable.GetDurableResourceCountAsync($"{Guid.NewGuid()}:Encounter");
+        }
+        catch (Exception exception)
+        {
+            thrown = exception;
+        }
+
+        thrown.Should().NotBeNull("an unreachable store cannot answer the question");
+        thrown.Should().NotBeAssignableTo<OperationCanceledException>(
+            "nothing cancelled; reporting it that way hides a storage outage behind a handler that "
+            + "exists to let real cancellation through");
+    }
+
     private BlobContainerClient Container =>
         new BlobServiceClient(_fixture.AzuriteConnectionString).GetBlobContainerClient(ContainerName);
 

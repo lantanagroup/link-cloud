@@ -245,12 +245,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <remarks>
         /// This store is the durable one, so its own count is the answer and there is nothing recorded.
         /// </remarks>
-        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
-            GetResourceCountAsync(cacheKey, cancellationToken).ContinueWith(
-                task => (int?)task.Result,
-                cancellationToken,
-                TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
-                TaskScheduler.Default);
+        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            // Awaited rather than continued. OnlyOnRanToCompletion turns a faulted read into a
+            // *cancelled* task, so a storage fault reached callers as an OperationCanceledException
+            // -- past every handler written to treat a failed count read as "unknown", and
+            // indistinguishable from the caller cancelling.
+            return await GetResourceCountAsync(cacheKey, cancellationToken);
+        }
 
         /// <inheritdoc/>
         /// <remarks>
