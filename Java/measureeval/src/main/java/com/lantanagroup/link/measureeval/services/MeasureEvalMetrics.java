@@ -6,6 +6,7 @@ import com.lantanagroup.link.shared.utils.HistogramBuckets;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.api.metrics.DoubleHistogram;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.LongHistogram;
 import io.opentelemetry.api.metrics.Meter;
@@ -24,6 +25,18 @@ public class MeasureEvalMetrics {
     private final LongCounter recordsReceivedCounter;
     private final LongHistogram evaluationDuration;
     private final LongHistogram normalizedToReportGeneratedDuration;
+    private final DoubleHistogram resourceCacheReadDuration;
+
+    /**
+     * Same instrument name and {@code cache.outcome} values as the .NET resource cache
+     * (DiagnosticNames.ResourceCacheReadDuration, ResourceCacheOutcomes), so one panel covers
+     * every service that reads the cache. {@code cache.fallback.reason} is MeasureEval's own
+     * addition: it separates a partial entry rejected by the durable-count check from a plain miss
+     * or a Redis outage, which is the distinction the check exists to make visible.
+     */
+    static final String RESOURCE_CACHE_READ_DURATION = "link_resource_cache_read_duration";
+    static final String CACHE_OUTCOME = "cache.outcome";
+    static final String CACHE_FALLBACK_REASON = "cache.fallback.reason";
 
     public MeasureEvalMetrics(OpenTelemetry openTelemetry) {
 
@@ -57,6 +70,26 @@ public class MeasureEvalMetrics {
                 .setUnit("ms")
                 .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_LONG)
                 .build();
+        resourceCacheReadDuration = meter.histogramBuilder(RESOURCE_CACHE_READ_DURATION)
+                .setDescription("Duration of a resource cache read, tagged by where the resources came from")
+                .setUnit("ms")
+                .setExplicitBucketBoundariesAdvice(HistogramBuckets.DURATION_MS_DOUBLE)
+                .build();
+    }
+
+    /**
+     * Records one resource cache read.
+     *
+     * @param outcome        hit, fallback or empty (see {@link ResourceCacheReader})
+     * @param fallbackReason why Redis did not serve the read, or {@code null} on a hit
+     * @param milliseconds   elapsed time of the whole read, including any ABS fallback
+     */
+    public void recordResourceCacheRead(String outcome, String fallbackReason, double milliseconds) {
+        AttributesBuilder builder = Attributes.builder().put(stringKey(CACHE_OUTCOME), safe(outcome));
+        if (fallbackReason != null) {
+            builder.put(stringKey(CACHE_FALLBACK_REASON), fallbackReason);
+        }
+        resourceCacheReadDuration.record(milliseconds, builder.build());
     }
 
     public void IncrementPatientReportableCounter(Attributes attributes, boolean reportable) {

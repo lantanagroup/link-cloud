@@ -11,9 +11,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -31,6 +35,7 @@ class ResourceCacheReaderTest {
 
     private RedisResourceService redis;
     private AbsResourceService abs;
+    private MeasureEvalMetrics metrics;
     private ResourceCacheReader reader;
 
     private static Resource resource(String id) {
@@ -44,7 +49,94 @@ class ResourceCacheReaderTest {
     void setUp() {
         redis = mock(RedisResourceService.class);
         abs = mock(AbsResourceService.class);
-        reader = new ResourceCacheReader(redis, abs);
+        metrics = mock(MeasureEvalMetrics.class);
+        reader = new ResourceCacheReader(redis, abs, metrics);
+    }
+
+    // ----- read-outcome metrics -----
+    // Same instrument and outcome values as the .NET HybridResourceCache records, so one dashboard
+    // covers both runtimes. MeasureEval's read is the one that feeds CQL, so it is where a rejected
+    // partial entry matters most -- the fallback reason is what makes that visible.
+
+    @Test
+    void metrics_redisHit_recordsHit_withNoFallbackReason() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics).recordResourceCacheRead(eq(ResourceCacheReader.OUTCOME_HIT), isNull(), anyDouble());
+    }
+
+    @Test
+    void metrics_redisMiss_recordsFallback_withMissReason() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p1")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_MISS), anyDouble());
+    }
+
+    @Test
+    void metrics_partialEntry_recordsFallback_withPartialReason() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
+                .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_PARTIAL), anyDouble());
+    }
+
+    @Test
+    void metrics_redisUnavailable_recordsFallback_withUnavailableReason() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT))
+                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p1")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_FALLBACK), eq(ResourceCacheReader.REASON_UNAVAILABLE), anyDouble());
+    }
+
+    @Test
+    void metrics_bothStoresEmpty_recordsEmpty_withTheReasonRedisMissed() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of());
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics).recordResourceCacheRead(
+                eq(ResourceCacheReader.OUTCOME_EMPTY), eq(ResourceCacheReader.REASON_MISS), anyDouble());
+    }
+
+    @Test
+    void metrics_absError_recordsNothing_andStillPropagates() {
+        // The read did not produce an outcome -- the record is retried -- so counting it as a hit,
+        // fallback or empty would misreport what the cache served.
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(abs.readResources(anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new RuntimeException("abs outage"));
+
+        assertThrows(RuntimeException.class,
+                () -> reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION));
+
+        verify(metrics, never()).recordResourceCacheRead(anyString(), anyString(), anyDouble());
+        verify(metrics, never()).recordResourceCacheRead(anyString(), isNull(), anyDouble());
+    }
+
+    @Test
+    void metrics_eachRead_recordsExactlyOnce() {
+        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(metrics, times(2)).recordResourceCacheRead(anyString(), isNull(), anyDouble());
     }
 
     @Test

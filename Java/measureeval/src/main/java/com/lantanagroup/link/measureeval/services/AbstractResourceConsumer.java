@@ -77,7 +77,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
         this.blobStorageService = blobStorageService;
-        this.cacheReader = new ResourceCacheReader(redisResourceService, absResourceService);
+        this.cacheReader = new ResourceCacheReader(redisResourceService, absResourceService, measureEvalMetrics);
         this.cacheCleanup = new ResourceCacheCleanup(redisResourceService, absResourceService);
         this.mongoOperations = mongoOperations;
     }
