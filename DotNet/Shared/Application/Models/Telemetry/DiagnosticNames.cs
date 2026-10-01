@@ -64,6 +64,16 @@
         public const string AutomationPollerHttpCount = "link_automation_poller_http_count";
         public const string AutomationMetricsSnapshotMissing = "link_automation_metrics_snapshot_missing";
 
+        public const string ResourceCacheReadDuration = "link_resource_cache_read_duration";
+        public const string ResourceCacheWriteDuration = "link_resource_cache_write_duration";
+        public const string ResourceCacheQueueWaitDuration = "link_resource_cache_queue_wait_duration";
+        public const string ResourceCacheDrainWaitDuration = "link_resource_cache_drain_wait_duration";
+        public const string ResourceCacheQueueDepth = "link_resource_cache_queue_depth";
+        public const string ResourceCacheWriteRetryCount = "link_resource_cache_write_retry_count";
+
+        public const string CacheStore = "cache.store";
+        public const string CacheOutcome = "cache.outcome";
+
         public static string NormalizePhase(string? phase)
         {
             if (string.IsNullOrEmpty(phase) || phase.Length < 2) return phase;

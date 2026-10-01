@@ -47,6 +47,7 @@ plausible-looking change tends to get wrong:
 * Logging messages in functionality that repeat excessively (such as consumption of ResourceNormalized events - which occurs for every resource the system process, millions of times) should be treated as DEBUG messages or the namespace/package should be ignored by default so that it does not produce excessive persisted log messages.
 * The Scripts directory contains scripts used by developers and admins to help operate the system at runtime. These scripts must always abstract out sensitive variables into arguments. Arguments may default values to environment variables for ease-of use, when appropriate. Do not hard-code credentials or tenant identifiers. Name prefixes: `aca-*` Azure Container Apps, `docker-compose.*` local development, `k8s-*` Kubernetes.
 * Changes to entities that are persisted with EntityFramework must always have a migration created for them, which ideally supports both upgarding *and* downgrading (in the event of failed system updates in other services).
+* Developer documentation goes in `docs-dev/`, not `docs/`. `docs/` is reserved. Use `docs-dev/<topic>.md` for anything explaining how a part of the system works to someone changing it — architecture and flow write-ups, sequence diagrams, design rationale — and link to it from the code rather than repeating the explanation in comments (`// See docs-dev/<topic>.md`). The exception is `docs/config-key-inventory.md`, which is generated and stays where the tooling expects it.
 
 ### Application Configuration
 

@@ -1,714 +1,357 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using StackExchange.Redis;
-using StackExchange.Redis.Extensions.Core.Abstractions;
-using System.Collections.Concurrent;
+using System.Diagnostics;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
     /// <summary>
-    /// Selects Redis or ABS per correlationId based on Redis memory usage at the time of the
-    /// first write. The decision is recorded in a dictionary so that all subsequent operations
-    /// for the same correlationId use the same implementation, and so that message-builders can
-    /// embed the correct <see cref="ResourceCacheType"/> in the Kafka ResourcesAcquired event.
+    /// Writes every correlation to blob storage as the durable source and keeps Redis in front of it
+    /// as a cache, so a Redis miss, eviction or outage is a slower read rather than a failure.
     /// </summary>
+    /// <remarks>
+    /// The Redis write is inline; the blob write is queued and completes in the background, which is
+    /// why callers must await <see cref="WaitForDurableAsync"/> before advertising a correlation's
+    /// cache keys. See docs-dev/resource-cache.md.
+    /// </remarks>
     public class HybridResourceCache : IResourceCache
     {
         private readonly IResourceCache _redisCache;
         private readonly IResourceCache _absCache;
-        private readonly IRedisDatabase _redisDatabase;
-        private readonly ResourceCacheSettings _settings;
+        private readonly IBackgroundAbsCacheWriter _absWriter;
+        private readonly IResourceCacheMetrics _metrics;
         private readonly ILogger<HybridResourceCache> _logger;
 
-        /// <summary>
-        /// In-process Redis-vs-ABS memo. The same decision is also written to Redis at
-        /// <c>{correlationId}:__cacheType</c> so DA recovery and other worker replicas
-        /// do not default to Redis while the payload lives in ABS. Entries are not removed
-        /// by <see cref="DeleteAsync"/> (org-location strip deletes only Encounter).
-        /// In-process eviction is sliding TTL plus <see cref="ForgetCacheTypeForCorrelationId"/>
-        /// after the tail is produced; the Redis memo keeps the Redis resource-entry TTL.
-        /// </summary>
-        private readonly ConcurrentDictionary<string, CacheTypeEntry> _correlationCacheTypes = new();
-        private readonly TimeProvider _timeProvider;
-        private readonly TimeSpan _correlationCacheTypeTtl;
-        private int _accessesSinceSweep;
-
-        private const int SweepInterval = 256;
-        private const string CacheTypeMemoSuffix = ":__cacheType";
-
-        /// <summary>
-        /// Memory statistics pulled out of Redis <c>INFO memory</c> and echoed on every selection
-        /// decision. <c>maxmemory</c> is included deliberately: Azure Managed Redis is not expected
-        /// to report it (the reason LEGLINK-770 moved the limit into configuration), and logging it
-        /// confirms whether that assumption still holds for a given instance.
-        /// </summary>
-        private static readonly string[] DiagnosticMemoryKeys =
-        {
-            "used_memory",
-            "used_memory_human",
-            "used_memory_rss",
-            "used_memory_dataset",
-            "used_memory_peak",
-            "maxmemory",
-            "maxmemory_human",
-            "maxmemory_policy",
-            "total_system_memory"
-        };
-
-        private int _infoSectionLogged;
-
         public HybridResourceCache(
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
-            IRedisDatabase redisDatabase,
-            IOptions<ResourceCacheSettings> settings,
+            IBackgroundAbsCacheWriter absWriter,
+            IResourceCacheMetrics metrics,
             ILogger<HybridResourceCache> logger)
-            : this(redisCache, absCache, redisDatabase, settings, logger, TimeProvider.System)
-        {
-        }
-
-        public HybridResourceCache(
-            [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
-            [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
-            IRedisDatabase redisDatabase,
-            IOptions<ResourceCacheSettings> settings,
-            ILogger<HybridResourceCache> logger,
-            TimeProvider timeProvider)
         {
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
-            _redisDatabase = redisDatabase ?? throw new ArgumentNullException(nameof(redisDatabase));
-            _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
+            _absWriter = absWriter ?? throw new ArgumentNullException(nameof(absWriter));
+            _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
-
-            var ttlDays = _settings.Redis.CacheEntryTtlDays;
-            _correlationCacheTypeTtl = TimeSpan.FromDays(ttlDays > 0 ? ttlDays : 7);
         }
 
         /// <inheritdoc/>
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
-            var cache = await DetermineAndRecordCacheAsync(correlationId, cancellationToken);
-            await cache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            if (resources == null || resources.Count == 0)
+            {
+                return;
+            }
+
+            var writeStart = Stopwatch.GetTimestamp();
+            try
+            {
+                await _redisCache.AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+                _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Failed, Elapsed(writeStart));
+
+                // A half-written key would silently win over the complete durable copy, because reads
+                // prefer the cache. Drop it instead, so a present entry always holds the whole set.
+                _logger.LogWarning(
+                    ex,
+                    "Could not cache resources for {CacheKey}; dropping the cache entry so it cannot serve a partial read. The durable write is unaffected.",
+                    cacheKey.SanitizeForLog());
+
+                await TryDropCacheEntryAsync(cacheKey, cancellationToken);
+            }
+
+            await _absWriter.EnqueueAsync(cacheKey, resources, resourceType, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
+        {
+            var start = Stopwatch.GetTimestamp();
+            try
+            {
+                await _absWriter.WaitForCorrelationAsync(correlationId, cancellationToken);
+            }
+            finally
+            {
+                // Recorded even when the barrier throws: a caller that waited and then failed still
+                // paid the time, and hiding it would flatter the measurement.
+                _metrics.RecordDrainWait(Elapsed(start));
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default)
+        {
+            var start = Stopwatch.GetTimestamp();
+            try
+            {
+                await _absWriter.WaitForDurableAsync(cacheKeys, cancellationToken);
+            }
+            finally
+            {
+                _metrics.RecordDrainWait(Elapsed(start));
+            }
         }
 
         /// <inheritdoc/>
         public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var correlationId = ExtractCorrelationId(cacheKey);
-            var recorded = await TryGetRecordedCacheTypeAsync(correlationId, cancellationToken);
-            var cacheType = recorded ?? ResourceCacheType.Redis;
-            var cache = cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
-            var resources = await cache.GetAsync(cacheKey, cancellationToken) ?? [];
-            if (resources.Count > 0 || recorded.HasValue)
+            var readStart = Stopwatch.GetTimestamp();
+
+            var cached = await TryReadCacheAsync(cacheKey, cancellationToken);
+            if (cached.Count > 0 && await IsCacheEntryWholeAsync(cacheKey, cached.Count, cancellationToken))
             {
-                return resources;
+                _metrics.RecordRead(ResourceCacheOutcomes.Hit, Elapsed(readStart));
+                return cached;
             }
 
-            var other = cacheType == ResourceCacheType.ABS ? _redisCache : _absCache;
-            var otherResources = await other.GetAsync(cacheKey, cancellationToken) ?? [];
-            if (otherResources.Count > 0)
+            var durable = await _absCache.GetAsync(cacheKey, cancellationToken) ?? [];
+            if (durable.Count == 0)
             {
-                RememberCacheType(correlationId, cacheType == ResourceCacheType.ABS ? ResourceCacheType.Redis : ResourceCacheType.ABS);
+                _metrics.RecordRead(ResourceCacheOutcomes.Empty, Elapsed(readStart));
+                return durable;
             }
 
-            return otherResources;
-        }
-
-        /// <inheritdoc/>
-        public ResourceType GetResourceTypeByCacheKey(string cacheKey)
-        {
-            var cache = ResolveFromKey(cacheKey);
-            return cache.GetResourceTypeByCacheKey(cacheKey);
-        }
-
-        /// <inheritdoc/>
-        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
-        {
-            var groups = new Dictionary<ResourceCacheType, List<string>>();
-            foreach (var key in cacheKeys)
-            {
-                var cacheType = await TryGetRecordedCacheTypeAsync(ExtractCorrelationId(key), cancellationToken)
-                    ?? ResourceCacheType.Redis;
-                if (!groups.TryGetValue(cacheType, out var list))
-                {
-                    list = [];
-                    groups[cacheType] = list;
-                }
-
-                list.Add(key);
-            }
-
-            foreach (var group in groups)
-            {
-                var cache = group.Key == ResourceCacheType.ABS ? _absCache : _redisCache;
-                await cache.DeleteAsync(group.Value, cancellationToken);
-            }
-
-            // Keep the Redis-vs-ABS decision for the correlation. Deleting one resource-type
-            // key (org-location Encounter strip) must not make later Patient/Location reads
-            // fall back to Redis while the remaining blobs still live in ABS. Patient/Location
-            // keys are later deleted by Normalization through GetImplementation, so last-key
-            // tracking here would never see a complete eviction.
-        }
-
-        /// <inheritdoc/>
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
-        {
-            return TryGetInProcessCacheType(ExtractCorrelationId(correlationId), out var cacheType)
-                ? cacheType
-                : ResourceCacheType.Redis;
-        }
-
-        /// <inheritdoc/>
-        public async Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
-        {
-            return await TryGetRecordedCacheTypeAsync(ExtractCorrelationId(correlationId), cancellationToken)
-                ?? ResourceCacheType.Redis;
-        }
-
-        /// <inheritdoc/>
-        public IResourceCache GetImplementation(ResourceCacheType cacheType)
-        {
-            return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
+            await TryRepopulateCacheAsync(cacheKey, durable, cancellationToken);
+            _metrics.RecordRead(ResourceCacheOutcomes.Fallback, Elapsed(readStart));
+            return durable;
         }
 
         /// <inheritdoc/>
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var correlationId = ExtractCorrelationId(cacheKey);
-            var recorded = await TryGetRecordedCacheTypeAsync(correlationId, cancellationToken);
-            var cacheType = recorded ?? ResourceCacheType.Redis;
-            var cache = cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
-            if (await cache.HasResourcesAsync(cacheKey, cancellationToken))
+            try
             {
-                return true;
+                if (await _redisCache.HasResourcesAsync(cacheKey, cancellationToken))
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Cache unavailable while testing {CacheKey}; falling back to durable storage.", cacheKey.SanitizeForLog());
             }
 
-            if (recorded.HasValue)
-            {
-                return false;
-            }
-
-            var other = cacheType == ResourceCacheType.ABS ? _redisCache : _absCache;
-            if (await other.HasResourcesAsync(cacheKey, cancellationToken))
-            {
-                RememberCacheType(correlationId, cacheType == ResourceCacheType.ABS ? ResourceCacheType.Redis : ResourceCacheType.ABS);
-                return true;
-            }
-
-            return false;
+            return await _absCache.HasResourcesAsync(cacheKey, cancellationToken);
         }
 
         /// <inheritdoc/>
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(correlationId))
+            if (cacheKeys == null || cacheKeys.Count == 0)
             {
                 return;
             }
 
-            _correlationCacheTypes.TryRemove(ExtractCorrelationId(correlationId), out _);
+            // Ahead of both deletes: a write still on the queue would otherwise recreate what is
+            // being removed.
+            _absWriter.Cancel(cacheKeys);
+
+            try
+            {
+                await _redisCache.DeleteAsync(cacheKeys, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The cache entry expires on its own, and the durable delete below is what matters.
+                _logger.LogWarning(ex, "Could not clear cache entries for [{CacheKeys}]; they will expire.", string.Join(", ", cacheKeys).SanitizeForLog());
+            }
+
+            await _absCache.DeleteAsync(cacheKeys, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Ordering is the whole design here, so it is spelled out.
+        /// <list type="number">
+        ///   <item><description>
+        ///     Cancel queued writes for the key first, or one of them lands afterwards and merges back
+        ///     the content this call exists to remove.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Replace durably and wait for it, rather than queueing it. Queued, a failure between
+        ///     clearing and rewriting would leave the durable copy empty with nothing to retry from, and
+        ///     the caller is about to cross a barrier for this key anyway.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Replace the cache entry last, atomically. A failure here leaves the cache holding the
+        ///     pre-replace content, which is what the retry reads to work out what to do -- the reverse
+        ///     order would leave the cache already replaced and the durable copy stale, and the retry
+        ///     would see nothing left to remove and stop.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Record the new durable count, so the entry does not read as partial against the count
+        ///     from before the replace.
+        ///   </description></item>
+        /// </list>
+        /// Nothing here is tolerated: a replace that cannot clear is not a replace, and the callers that
+        /// need one are the ones where leaving the old content in place is the failure.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(cacheKey);
+
+            _absWriter.Cancel([cacheKey]);
+
+            // Both stores are written, so both are counted. Recording one and not the other would
+            // break the pairing the write metrics exist to assert.
+            var durableStart = Stopwatch.GetTimestamp();
+            await _absCache.ReplaceResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(durableStart));
+
+            var cacheStart = Stopwatch.GetTimestamp();
+            await _redisCache.ReplaceResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, Elapsed(cacheStart));
+
+            var replacedCount = resources?.Count ?? 0;
+            if (replacedCount > 0)
+            {
+                await _redisCache.SetDurableResourceCountAsync(cacheKey, replacedCount, cancellationToken);
+            }
+        }
+
+        /// <inheritdoc/>
+        public ResourceType GetResourceTypeByCacheKey(string cacheKey)
+        {
+            return _absCache.GetResourceTypeByCacheKey(cacheKey);
         }
 
         // -------------------------------------------------------------------------
 
-        private async Task<IResourceCache> DetermineAndRecordCacheAsync(string correlationId, CancellationToken cancellationToken)
+        private static double Elapsed(long startTimestamp) =>
+            Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+
+        /// <inheritdoc/>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var key = ExtractCorrelationId(correlationId);
-            var recorded = await TryGetRecordedCacheTypeAsync(key, cancellationToken);
-            if (recorded.HasValue)
+            try
             {
-                return recorded.Value == ResourceCacheType.ABS ? _absCache : _redisCache;
-            }
-
-            var selected = await SelectCacheTypeAsync(cancellationToken);
-            selected = await PersistCacheTypeAsync(key, selected, cancellationToken);
-            RememberCacheType(key, selected);
-            return selected == ResourceCacheType.ABS ? _absCache : _redisCache;
-        }
-
-        private IResourceCache ResolveFromKey(string cacheKey)
-        {
-            var correlationId = ExtractCorrelationId(cacheKey);
-            var cacheType = TryGetInProcessCacheType(correlationId, out var recorded)
-                ? recorded
-                : ResourceCacheType.Redis;
-            return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
-        }
-
-        private ResourceCacheType RememberCacheType(string correlationId, ResourceCacheType cacheType)
-        {
-            var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
-            var entry = _correlationCacheTypes.GetOrAdd(
-                correlationId,
-                _ => new CacheTypeEntry(cacheType, nowTicks));
-            entry.LastAccessedUtcTicks = nowTicks;
-            MaybeSweepExpired();
-            return entry.Type;
-        }
-
-        private bool TryGetInProcessCacheType(string correlationId, out ResourceCacheType cacheType)
-        {
-            MaybeSweepExpired();
-
-            if (_correlationCacheTypes.TryGetValue(correlationId, out var entry))
-            {
-                if (!IsExpired(entry))
+                var cached = await _redisCache.GetResourceCountAsync(cacheKey, cancellationToken);
+                if (cached > 0)
                 {
-                    entry.LastAccessedUtcTicks = _timeProvider.GetUtcNow().UtcTicks;
-                    cacheType = entry.Type;
-                    return true;
+                    return cached;
                 }
-
-                _correlationCacheTypes.TryRemove(correlationId, out _);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Cache unavailable counting {CacheKey}; falling back to durable storage.", cacheKey.SanitizeForLog());
             }
 
-            cacheType = default;
+            return await _absCache.GetResourceCountAsync(cacheKey, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            _redisCache.GetDurableResourceCountAsync(cacheKey, cancellationToken);
+
+        /// <inheritdoc/>
+        public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
+            _redisCache.SetDurableResourceCountAsync(cacheKey, count, cancellationToken);
+
+        /// <summary>
+        /// Whether a non-empty cache entry can be trusted as the whole record.
+        /// </summary>
+        /// <remarks>
+        /// A cache write is a merge that recreates an evicted key, so an entry holding only the most
+        /// recent batch looks exactly like a whole one. The count recorded once a durable write landed is
+        /// what tells them apart. An entry with no recorded count is trusted: nothing has completed a
+        /// durable write for that key, so durable storage has no more to offer and falling back would
+        /// turn a usable entry into an empty read.
+        /// </remarks>
+        private async Task<bool> IsCacheEntryWholeAsync(string cacheKey, int cachedCount, CancellationToken cancellationToken)
+        {
+            int? durableCount;
+
+            try
+            {
+                durableCount = await _redisCache.GetDurableResourceCountAsync(cacheKey, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Could not read the durable resource count for {CacheKey}; treating the cache entry as whole.",
+                    cacheKey.SanitizeForLog());
+                return true;
+            }
+
+            if (durableCount is null || cachedCount >= durableCount.Value)
+            {
+                return true;
+            }
+
+            _logger.LogWarning(
+                "Cache entry for {CacheKey} holds {CachedCount} of {DurableCount} resources, so it was "
+                + "recreated after an eviction and is not the whole record. Reading durable storage instead.",
+                cacheKey.SanitizeForLog(),
+                cachedCount,
+                durableCount.Value);
+
             return false;
         }
 
-        private async Task<ResourceCacheType?> TryGetRecordedCacheTypeAsync(string correlationId, CancellationToken cancellationToken)
+        private async Task<List<DomainResource>> TryReadCacheAsync(string cacheKey, CancellationToken cancellationToken)
         {
-            if (TryGetInProcessCacheType(correlationId, out var inProcess))
-            {
-                return inProcess;
-            }
-
-            var fromRedis = await LoadCacheTypeFromRedisAsync(correlationId, cancellationToken);
-            if (fromRedis.HasValue)
-            {
-                RememberCacheType(correlationId, fromRedis.Value);
-            }
-
-            return fromRedis;
-        }
-
-        private async Task<ResourceCacheType> PersistCacheTypeAsync(
-            string correlationId,
-            ResourceCacheType cacheType,
-            CancellationToken cancellationToken)
-        {
-            var memoKey = CacheTypeMemoKey(correlationId);
             try
             {
-                var created = await _redisDatabase.Database.StringSetAsync(
-                    memoKey,
-                    cacheType.ToString(),
-                    _correlationCacheTypeTtl,
-                    When.NotExists).WaitAsync(cancellationToken);
-
-                if (created)
-                {
-                    return cacheType;
-                }
-
-                var winner = await LoadCacheTypeFromRedisAsync(correlationId, cancellationToken);
-                return winner ?? cacheType;
+                return await _redisCache.GetAsync(cacheKey, cancellationToken) ?? [];
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(
-                    ex,
-                    "Failed to persist Hybrid cache type {CacheType} for correlation {CorrelationId}; using the in-process decision.",
-                    cacheType,
-                    correlationId);
-                return cacheType;
+                _logger.LogWarning(ex, "Cache unavailable reading {CacheKey}; falling back to durable storage.", cacheKey.SanitizeForLog());
+                return [];
             }
         }
 
-        private async Task<ResourceCacheType?> LoadCacheTypeFromRedisAsync(string correlationId, CancellationToken cancellationToken)
+        private async Task TryRepopulateCacheAsync(string cacheKey, List<DomainResource> resources, CancellationToken cancellationToken)
         {
             try
             {
-                var value = await _redisDatabase.Database.StringGetAsync(CacheTypeMemoKey(correlationId))
-                    .WaitAsync(cancellationToken);
-                if (value.IsNullOrEmpty)
-                {
-                    return null;
-                }
+                // Only the acquisition keys carry a resource type. A correlation key is a bare id,
+                // and GetResourceTypeByCacheKey throws on one -- which the catch below would swallow,
+                // leaving the entry unrestored for exactly the key a two-pass evaluation depends on.
+                // The cache does not use the value: it names each field after the resource it holds.
+                var resourceType = cacheKey.Contains(':')
+                    ? _absCache.GetResourceTypeByCacheKey(cacheKey)
+                    : ResourceType.Bundle;
 
-                return Enum.TryParse<ResourceCacheType>(value.ToString(), ignoreCase: true, out var parsed)
-                    ? parsed
-                    : null;
+                await _redisCache.AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+
+                // Recorded with the entry it describes. Without this the restored entry has no count,
+                // and a later partial recreation of it could not be detected.
+                await _redisCache.SetDurableResourceCountAsync(cacheKey, resources.Count, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(
-                    ex,
-                    "Failed to load Hybrid cache type for correlation {CorrelationId} from Redis.",
-                    correlationId);
-                return null;
+                // Best effort. The caller already has its resources; the next reader just pays for
+                // another durable read.
+                _logger.LogDebug(ex, "Could not repopulate the cache for {CacheKey} after a durable read.", cacheKey.SanitizeForLog());
             }
         }
 
-        private static string CacheTypeMemoKey(string correlationId) => correlationId + CacheTypeMemoSuffix;
-
-        private bool IsExpired(CacheTypeEntry entry)
+        private async Task TryDropCacheEntryAsync(string cacheKey, CancellationToken cancellationToken)
         {
-            var age = _timeProvider.GetUtcNow().UtcTicks - entry.LastAccessedUtcTicks;
-            return age >= _correlationCacheTypeTtl.Ticks;
-        }
-
-        private void MaybeSweepExpired()
-        {
-            if (Interlocked.Increment(ref _accessesSinceSweep) < SweepInterval)
-            {
-                return;
-            }
-
-            Interlocked.Exchange(ref _accessesSinceSweep, 0);
-
-            var cutoff = _timeProvider.GetUtcNow().UtcTicks - _correlationCacheTypeTtl.Ticks;
-            foreach (var pair in _correlationCacheTypes)
-            {
-                if (pair.Value.LastAccessedUtcTicks < cutoff)
-                {
-                    _correlationCacheTypes.TryRemove(pair.Key, out _);
-                }
-            }
-        }
-
-        private sealed class CacheTypeEntry
-        {
-            public CacheTypeEntry(ResourceCacheType type, long lastAccessedUtcTicks)
-            {
-                Type = type;
-                LastAccessedUtcTicks = lastAccessedUtcTicks;
-            }
-
-            public ResourceCacheType Type { get; }
-            public long LastAccessedUtcTicks;
-        }
-
-        /// <remarks>
-        /// Runs once per correlationId (memoized by <see cref="DetermineAndRecordCacheAsync"/>), not
-        /// per resource, so logging here is roughly once per patient-correlation and is safe at
-        /// Information. Every path is logged at Information or above on purpose: the Redis-vs-ABS
-        /// decision is otherwise invisible in deployed environments, which run at Information and
-        /// therefore cannot distinguish "Redis is genuinely under pressure" from "the memory probe
-        /// failed" (LEGLINK-948).
-        /// </remarks>
-        private async Task<ResourceCacheType> SelectCacheTypeAsync(CancellationToken cancellationToken)
-        {
-            var endpoint = "unknown";
-
             try
             {
-                var multiplexer = _redisDatabase.Database.Multiplexer;
-                var server = multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
-
-                if (server == null)
-                {
-                    _logger.LogWarning(
-                        "Redis memory probe found no connected server; using ABS resource cache. " +
-                        "Configured endpoints: [{ConfiguredEndpoints}]. Server states: [{ServerStates}].",
-                        DescribeConfiguredEndpoints(multiplexer),
-                        DescribeServerStates(multiplexer));
-                    return ResourceCacheType.ABS;
-                }
-
-                endpoint = server.EndPoint?.ToString() ?? "unknown";
-
-                var reading = await ResolveUsedMemoryAsync(server, endpoint, cancellationToken);
-
-                if (reading == null)
-                {
-                    _logger.LogWarning(
-                        "Could not determine Redis used memory on {Endpoint} from INFO memory, MEMORY STATS or a " +
-                        "full INFO dump; memory pressure cannot be evaluated. Using ABS resource cache.",
-                        endpoint);
-                    return ResourceCacheType.ABS;
-                }
-
-                // Azure Managed Redis does not return `maxmemory` via INFO, so the limit is
-                // supplied through configuration instead. Only the numerator comes from the server.
-                var maxMemoryBytes = _settings.Redis.MaxMemoryBytes;
-                if (maxMemoryBytes is null or <= 0)
-                {
-                    _logger.LogWarning(
-                        "ResourceCache:Redis:MaxMemoryBytes is not configured or invalid ({MaxMemoryBytes}); " +
-                        "cannot evaluate Redis memory pressure on {Endpoint}. Using Redis resource cache. " +
-                        "Used memory was {UsedMemoryBytes} bytes via {MemorySource}. Reported memory: [{MemoryDiagnostics}].",
-                        maxMemoryBytes,
-                        endpoint,
-                        reading.UsedMemory,
-                        reading.Source,
-                        FormatDiagnostics(reading.Diagnostics));
-                    return ResourceCacheType.Redis;
-                }
-
-                double usagePercent = (double)reading.UsedMemory / maxMemoryBytes.Value * 100.0;
-                var threshold = _settings.Redis.MemoryThresholdPercent;
-                var selected = usagePercent >= threshold ? ResourceCacheType.ABS : ResourceCacheType.Redis;
-
-                _logger.LogInformation(
-                    "Redis memory probe on {Endpoint}: used memory {UsedMemoryBytes} bytes (via {MemorySource}) of " +
-                    "configured MaxMemoryBytes={MaxMemoryBytes} = {UsagePercent:F1}% against threshold {Threshold}% " +
-                    "=> selected {CacheType} resource cache. Server-reported memory: [{MemoryDiagnostics}].",
-                    endpoint,
-                    reading.UsedMemory,
-                    reading.Source,
-                    maxMemoryBytes.Value,
-                    usagePercent,
-                    threshold,
-                    selected,
-                    FormatDiagnostics(reading.Diagnostics));
-
-                return selected;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Error checking Redis memory on {Endpoint}; falling back to ABS resource cache.",
-                    endpoint);
-                return ResourceCacheType.ABS;
-            }
-        }
-
-        /// <summary>A used-memory figure and the server command it was recovered from.</summary>
-        private sealed record UsedMemoryReading(
-            long UsedMemory,
-            string Source,
-            Dictionary<string, string> Diagnostics);
-
-        /// <summary>
-        /// Recovers a used-memory figure, trying progressively more general commands. Only the
-        /// numerator is sourced from the server — the limit it is measured against comes from
-        /// <c>ResourceCache:Redis:MaxMemoryBytes</c>, because Azure Managed Redis does not report
-        /// <c>maxmemory</c> via INFO (LEGLINK-770). AMR proxies Redis Enterprise, so the same
-        /// restrictions that hide <c>maxmemory</c> may hide <c>used_memory</c> or the whole INFO
-        /// memory section; falling straight through to a cache choice on the first miss would
-        /// decide on no evidence (LEGLINK-948).
-        /// </summary>
-        private async Task<UsedMemoryReading?> ResolveUsedMemoryAsync(
-            IServer server,
-            string endpoint,
-            CancellationToken cancellationToken)
-        {
-            var infoDict = await ReadInfoAsync(server, "memory", cancellationToken);
-
-            if (infoDict != null)
-            {
-                LogRawInfoSectionOnce(endpoint, infoDict);
-
-                if (TryParseUsedMemory(infoDict, out var usedMemory))
-                {
-                    return new UsedMemoryReading(usedMemory, "INFO memory", infoDict);
-                }
-
-                _logger.LogWarning(
-                    "Redis INFO memory from {Endpoint} has no parsable used_memory (raw value '{UsedMemoryRaw}'); " +
-                    "trying MEMORY STATS. Reported memory: [{MemoryDiagnostics}].",
-                    endpoint,
-                    infoDict.GetValueOrDefault("used_memory") ?? "<absent>",
-                    FormatDiagnostics(infoDict));
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Redis INFO memory returned no results from {Endpoint}; trying MEMORY STATS.",
-                    endpoint);
-            }
-
-            var diagnostics = infoDict ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            var totalAllocated = await TryReadTotalAllocatedAsync(server, endpoint, cancellationToken);
-            if (totalAllocated.HasValue)
-            {
-                return new UsedMemoryReading(totalAllocated.Value, "MEMORY STATS total.allocated", diagnostics);
-            }
-
-            var fullInfo = await ReadInfoAsync(server, section: null, cancellationToken);
-            if (fullInfo != null && TryParseUsedMemory(fullInfo, out var fullUsedMemory))
-            {
-                return new UsedMemoryReading(fullUsedMemory, "INFO (full)", fullInfo);
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Reads an INFO section (or the whole of INFO when <paramref name="section"/> is null) into
-        /// a flat lookup. Built with an indexer rather than
-        /// <see cref="Enumerable.ToDictionary{TSource,TKey,TElement}(IEnumerable{TSource},Func{TSource,TKey},Func{TSource,TElement})"/>,
-        /// which throws on duplicate keys: Azure Managed Redis is not guaranteed to return the same
-        /// unique-key INFO shape as open-source Redis, and a duplicate would otherwise surface as an
-        /// opaque exception and silently force the ABS fallback.
-        /// </summary>
-        private async Task<Dictionary<string, string>?> ReadInfoAsync(
-            IServer server,
-            string? section,
-            CancellationToken cancellationToken)
-        {
-            IGrouping<string, KeyValuePair<string, string>>[]? groups;
-
-            try
-            {
-                groups = section == null
-                    ? await server.InfoAsync().WaitAsync(cancellationToken)
-                    : await server.InfoAsync(section).WaitAsync(cancellationToken);
+                await _redisCache.DeleteAsync([cacheKey], cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // A rejected or unsupported INFO is a reason to try another source, not a reason to
-                // abandon the probe: letting this reach the outer catch would decide the cache on a
-                // command restriction rather than on memory pressure.
-                _logger.LogWarning(
-                    ex,
-                    "Redis INFO {Section} failed on {Endpoint}.",
-                    section ?? "(full)",
-                    server.EndPoint?.ToString() ?? "unknown");
-                return null;
+                _logger.LogWarning(ex, "Could not drop the partial cache entry for {CacheKey}; it will expire.", cacheKey.SanitizeForLog());
             }
-
-            if (groups == null)
-            {
-                return null;
-            }
-
-            var infoDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var group in groups)
-            {
-                foreach (var entry in group)
-                {
-                    infoDict[entry.Key] = entry.Value;
-                }
-            }
-
-            return infoDict.Count == 0 ? null : infoDict;
-        }
-
-        private static bool TryParseUsedMemory(Dictionary<string, string> infoDict, out long usedMemory)
-        {
-            usedMemory = 0;
-            return infoDict.TryGetValue("used_memory", out var raw) && long.TryParse(raw, out usedMemory);
-        }
-
-        /// <summary>
-        /// Reads <c>total.allocated</c> from MEMORY STATS as a second opinion when INFO does not
-        /// yield <c>used_memory</c>. MEMORY STATS may itself be restricted, so failure is expected
-        /// and non-fatal.
-        /// </summary>
-        private async Task<long?> TryReadTotalAllocatedAsync(
-            IServer server,
-            string endpoint,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                var stats = await server.MemoryStatsAsync().WaitAsync(cancellationToken);
-                var totalAllocated = ReadTotalAllocated(stats);
-
-                if (totalAllocated == null)
-                {
-                    _logger.LogWarning(
-                        "MEMORY STATS on {Endpoint} did not report total.allocated; trying a full INFO dump.",
-                        endpoint);
-                }
-
-                return totalAllocated;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(
-                    ex,
-                    "MEMORY STATS is unavailable on {Endpoint}; trying a full INFO dump.",
-                    endpoint);
-                return null;
-            }
-        }
-
-        private static long? ReadTotalAllocated(RedisResult? stats)
-        {
-            if (stats == null || stats.IsNull)
-            {
-                return null;
-            }
-
-            RedisResult[]? entries;
-
-            try
-            {
-                entries = (RedisResult[]?)stats;
-            }
-            catch (InvalidCastException)
-            {
-                // MEMORY STATS replies as a flat array; anything else is not something we can read.
-                return null;
-            }
-
-            if (entries == null)
-            {
-                return null;
-            }
-
-            for (var i = 0; i + 1 < entries.Length; i += 2)
-            {
-                if (string.Equals(entries[i].ToString(), "total.allocated", StringComparison.OrdinalIgnoreCase) &&
-                    long.TryParse(entries[i + 1].ToString(), out var totalAllocated))
-                {
-                    return totalAllocated;
-                }
-            }
-
-            return null;
-        }
-
-        private static string FormatDiagnostics(Dictionary<string, string> infoDict)
-        {
-            return string.Join(
-                ", ",
-                DiagnosticMemoryKeys
-                    .Where(infoDict.ContainsKey)
-                    .Select(key => $"{key}={infoDict[key]}"));
-        }
-
-        /// <summary>
-        /// Dumps the complete INFO memory section once per process. The curated
-        /// <see cref="DiagnosticMemoryKeys"/> subset rides every decision; this exists so the raw
-        /// server output can be inspected without shell access to the Redis instance, which is what
-        /// distinguishes a mis-sized denominator from a metric that does not mean what we assume.
-        /// </summary>
-        private void LogRawInfoSectionOnce(string endpoint, Dictionary<string, string> infoDict)
-        {
-            if (Interlocked.Exchange(ref _infoSectionLogged, 1) != 0)
-            {
-                return;
-            }
-
-            _logger.LogInformation(
-                "Redis INFO memory section from {Endpoint} (logged once per process to diagnose Hybrid " +
-                "cache selection): [{InfoSection}].",
-                endpoint,
-                string.Join("; ", infoDict.Select(entry => $"{entry.Key}={entry.Value}")));
-        }
-
-        private static string DescribeConfiguredEndpoints(StackExchange.Redis.IConnectionMultiplexer multiplexer)
-        {
-            return string.Join(", ", multiplexer.GetEndPoints().Select(e => e.ToString()));
-        }
-
-        private static string DescribeServerStates(StackExchange.Redis.IConnectionMultiplexer multiplexer)
-        {
-            return string.Join(
-                ", ",
-                multiplexer.GetServers().Select(s => $"{s.EndPoint}: IsConnected={s.IsConnected}"));
-        }
-
-        private static string ExtractCorrelationId(string cacheKey)
-        {
-            var idx = cacheKey.IndexOf(':');
-            return idx > 0 ? cacheKey[..idx] : cacheKey;
         }
     }
 }

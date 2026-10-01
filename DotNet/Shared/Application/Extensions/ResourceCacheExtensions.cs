@@ -1,7 +1,8 @@
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -75,6 +76,15 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
                     services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
                     services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
+
+                    // One instance serving both roles: the cache enqueues through it, and the host
+                    // runs its consumer loops. Registered twice over the same singleton rather than
+                    // as two objects, or the queue written to would not be the queue being drained.
+                    services.TryAddSingleton<IResourceCacheMetrics, ResourceCacheMetrics>();
+                    services.AddSingleton<BackgroundAbsCacheWriter>();
+                    services.AddSingleton<IBackgroundAbsCacheWriter>(sp => sp.GetRequiredService<BackgroundAbsCacheWriter>());
+                    services.AddHostedService(sp => sp.GetRequiredService<BackgroundAbsCacheWriter>());
+
                     services.AddSingleton<IResourceCache, HybridResourceCache>();
                     break;
             }

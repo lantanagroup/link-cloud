@@ -47,9 +47,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     {
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
-        resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
         resourceCache
@@ -68,7 +65,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
+            item => item.AppendResourcesAsync(
                 It.IsAny<string>(),
                 It.IsAny<List<DomainResource>>(),
                 It.IsAny<FhirResourceType>(),
@@ -88,16 +85,13 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
-        resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
         resourceCache
             .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([patient]);
         resourceCache
-            .Setup(item => item.UpdateCorrelationCacheAsync(
+            .Setup(item => item.AppendResourcesAsync(
                 CorrelationId,
                 It.IsAny<List<DomainResource>>(),
                 FhirResourceType.Patient,
@@ -120,7 +114,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
 
         resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
+            item => item.AppendResourcesAsync(
                 CorrelationId,
                 It.Is<List<DomainResource>>(resources => resources.Count == 1),
                 FhirResourceType.Patient,
@@ -144,9 +138,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     {
         var patient = new Patient { Id = "patient-1" };
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
         resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
             .Returns(FhirResourceType.Patient);
@@ -184,9 +175,6 @@ public class ResourcesAcquiredListenerEmptyCacheTests
     public async Task ProcessMessageAsync_NoCacheKeys_ProducesWithoutRetry()
     {
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(ResourceCacheType.ABS))
-            .Returns(resourceCache.Object);
         resourceCache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);

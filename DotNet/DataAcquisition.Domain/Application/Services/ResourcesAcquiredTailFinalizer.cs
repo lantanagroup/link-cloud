@@ -1,5 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
-using LantanaGroup.Link.Shared.Application.Enums;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -50,30 +49,35 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
             tail.PatientId.SplitReference(),
             cancellationToken);
 
+        // The strip is the one write on this path with no barrier of its own, and it needs one. An
+        // additive cache write cannot remove entries, so the strip deletes the Encounter key from both
+        // stores and rewrites it with the org encounters only -- leaving the rewrite on a background
+        // queue while durable storage holds nothing for that key. Producing the tail here would
+        // advertise the key with its only copies in the cache and in this pod's memory, and losing the
+        // pod would take the encounters with it: durable storage empty, the tail already produced, and
+        // every acquisition log already terminal, so nothing would retry.
+        //
+        // The reverse case needs no barrier here. A queued append landing after the delete would undo
+        // the strip, but the per-log barrier runs before each log goes terminal and the tail fires only
+        // once every sibling log is terminal, so acquisition's writes are durable before this runs.
+        await _resourceCache.WaitForDurableAsync(tail.CorrelationId, cancellationToken);
+
         var listed = tail.ResourcesAcquired.CacheKeys ?? [];
         if (listed.Count == 0)
         {
-            // CacheType is already stamped on the tail; Hybrid no longer needs the in-process memo.
-            _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
             return locationOrgOutcome;
         }
 
         var kept = new List<string>(listed.Count);
-        var sawAbs = false;
-        var sawRedis = false;
 
         foreach (var key in listed)
         {
-            var inAbs = await KeyHasResourcesAsync(ResourceCacheType.ABS, key, cancellationToken);
-            var inRedis = await KeyHasResourcesAsync(ResourceCacheType.Redis, key, cancellationToken);
-            if (!inAbs && !inRedis)
+            // One probe, not two. Every correlation now lives in durable storage with the cache in
+            // front of it, so a key that holds nothing here holds nothing anywhere.
+            if (await _resourceCache.HasResourcesAsync(key, cancellationToken))
             {
-                continue;
+                kept.Add(key);
             }
-
-            kept.Add(key);
-            sawAbs |= inAbs;
-            sawRedis |= inRedis;
         }
 
         if (kept.Count != listed.Count)
@@ -87,101 +91,8 @@ public class ResourcesAcquiredTailFinalizer : IResourcesAcquiredTailFinalizer
                 kept.Count);
         }
 
-        if (sawAbs && sawRedis)
-        {
-            await ConsolidateIntoAbsAsync(kept, cancellationToken);
-            _logger.LogWarning(
-                "Replica split for CorrelationId={CorrelationId}: copied Redis-only keys into ABS so ResourcesAcquired can advertise a single CacheType.",
-                tail.CorrelationId.SanitizeForLog());
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
-        }
-        else if (sawAbs)
-        {
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.ABS;
-        }
-        else if (sawRedis)
-        {
-            tail.ResourcesAcquired.CacheType = ResourceCacheType.Redis;
-        }
-
         tail.ResourcesAcquired.CacheKeys = kept;
 
-        // Drop the in-process Hybrid memo. The Redis {correlation}:__cacheType memo stays
-        // so a later retry or replica can still resolve ABS vs Redis.
-        _resourceCache.ForgetCacheTypeForCorrelationId(tail.CorrelationId);
-
         return locationOrgOutcome;
-    }
-
-    private async Task ConsolidateIntoAbsAsync(List<string> kept, CancellationToken cancellationToken)
-    {
-        var redis = TryGetImplementation(ResourceCacheType.Redis);
-        var abs = TryGetImplementation(ResourceCacheType.ABS);
-        if (redis == null || abs == null)
-        {
-            return;
-        }
-
-        var redisOnly = new List<string>();
-        foreach (var key in kept)
-        {
-            if (await redis.HasResourcesAsync(key, cancellationToken)
-                && !await abs.HasResourcesAsync(key, cancellationToken))
-            {
-                redisOnly.Add(key);
-            }
-        }
-
-        foreach (var key in redisOnly)
-        {
-            var resources = await redis.GetAsync(key, cancellationToken);
-            if (resources.Count == 0)
-            {
-                continue;
-            }
-
-            var resourceType = abs.GetResourceTypeByCacheKey(key);
-            await abs.UpdateCorrelationCacheAsync(key, resources, resourceType, cancellationToken);
-        }
-
-        var redisCopies = new List<string>();
-        foreach (var key in kept)
-        {
-            if (await redis.HasResourcesAsync(key, cancellationToken))
-            {
-                redisCopies.Add(key);
-            }
-        }
-
-        if (redisCopies.Count > 0)
-        {
-            await redis.DeleteAsync(redisCopies, cancellationToken);
-        }
-    }
-
-    private async Task<bool> KeyHasResourcesAsync(
-        ResourceCacheType cacheType,
-        string cacheKey,
-        CancellationToken cancellationToken)
-    {
-        var implementation = TryGetImplementation(cacheType);
-        if (implementation == null)
-        {
-            return false;
-        }
-
-        return await implementation.HasResourcesAsync(cacheKey, cancellationToken);
-    }
-
-    private IResourceCache? TryGetImplementation(ResourceCacheType cacheType)
-    {
-        try
-        {
-            return _resourceCache.GetImplementation(cacheType);
-        }
-        catch (NotSupportedException)
-        {
-            return null;
-        }
     }
 }

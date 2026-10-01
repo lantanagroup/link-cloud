@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
 {
     /// <summary>
     /// Explicit histogram buckets for stage-duration instruments (milliseconds).
@@ -24,7 +24,11 @@ namespace LantanaGroup.Link.Shared.Application.Models.Telemetry
             DiagnosticNames.ReportPersistDuration,
             DiagnosticNames.TerminologyLookupDuration,
             "link_submission_upload_duration",
-            "link_querydispatch_dispatch_duration"
+            "link_querydispatch_dispatch_duration",
+            DiagnosticNames.ResourceCacheReadDuration,
+            DiagnosticNames.ResourceCacheWriteDuration,
+            DiagnosticNames.ResourceCacheQueueWaitDuration,
+            DiagnosticNames.ResourceCacheDrainWaitDuration
         ];
     }
 }

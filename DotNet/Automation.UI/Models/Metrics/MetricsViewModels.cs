@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Models.Responses;
+﻿using LantanaGroup.Link.Shared.Application.Models.Responses;
 
 namespace Automation.UI.Models.Metrics;
 
@@ -40,6 +40,7 @@ public sealed class MetricsRunDetailViewModel : MetricsRunListItem
     public IReadOnlyList<string> BenchmarkViolations { get; set; } = [];
     public IReadOnlyList<string> RegressionFlags { get; set; } = [];
     public Guid? PreviousRunId { get; set; }
+    public ResourceCacheView ResourceCache { get; set; } = new();
     public IReadOnlyList<ValidatorOutcomeSnapshotView> Validators { get; set; } = [];
 }
 
@@ -167,4 +168,34 @@ public sealed class MetricsCompareViewModel
 {
     public MetricsRunDetailViewModel Left { get; set; } = new();
     public MetricsRunDetailViewModel Right { get; set; } = new();
+}
+
+/// <summary>
+/// What the resource cache did during a run. Scoped by the run window rather than by facility,
+/// because the cache is shared across facilities within a service.
+/// </summary>
+public sealed class ResourceCacheView
+{
+    public bool Unavailable { get; set; } = true;
+
+    /// <summary>
+    /// Hits as a percentage of reads that found something. The number that says whether the cache
+    /// is earning its place.
+    /// </summary>
+    public double? HitRatioPercent { get; set; }
+
+    public double? HitCount { get; set; }
+    public double? FallbackCount { get; set; }
+    public double? ReadP95Ms { get; set; }
+
+    /// <summary>
+    /// How long callers blocked on the durability barrier: the only part of the durable write that
+    /// is not overlapped with other work.
+    /// </summary>
+    public double? DrainWaitP95Ms { get; set; }
+
+    public double? DurableWriteP95Ms { get; set; }
+    public double? QueueWaitP95Ms { get; set; }
+    public double? PeakQueueDepth { get; set; }
+    public double? WriteExhaustedCount { get; set; }
 }
