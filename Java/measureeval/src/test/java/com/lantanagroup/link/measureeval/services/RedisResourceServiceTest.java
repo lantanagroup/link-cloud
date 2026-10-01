@@ -104,9 +104,10 @@ class RedisResourceServiceTest {
         assertTrue(unlinked.contains("corr-1"), "the bare correlation key");
         assertTrue(unlinked.contains("corr-1:Encounter"), "an acquisition key");
         assertTrue(unlinked.contains("corr-1:Patient"), "an acquisition key");
-        assertTrue(unlinked.contains("corr-1:__cacheType"), "the Hybrid cache-type memo");
-        assertEquals(ResourceType.values().length + 2, unlinked.size(),
-                "one key per FHIR resource type plus the bare key and the memo, nothing else");
+        assertFalse(unlinked.contains("corr-1:__cacheType"),
+                "the Hybrid cache-type memo was removed in LEGLINK-1276; nothing writes it any more");
+        assertEquals(ResourceType.values().length + 1, unlinked.size(),
+                "one key per FHIR resource type plus the bare key, nothing else");
     }
 
     @Test
