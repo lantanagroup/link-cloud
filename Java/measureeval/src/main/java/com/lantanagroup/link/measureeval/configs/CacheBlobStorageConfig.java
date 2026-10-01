@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.Nullable;
 
 import java.time.Duration;
 
@@ -41,11 +40,14 @@ public class CacheBlobStorageConfig {
     private int tryTimeoutSeconds = 10;
 
     @Bean
-    @Nullable
     public AbsResourceService absResourceService() {
         if (StringUtils.isAnyEmpty(connectionString, blobContainerName)) {
-            logger.info("cache-blob-storage not configured, AbsResourceService disabled");
-            return null;
+            // Fail at boot, not at the first unlucky message: since LEGLINK-1279 ABS is the durable
+            // source for the resource cache (Redis is only a cache in front of it), so a MeasureEval
+            // without blob storage cannot read what eviction removed.
+            throw new IllegalStateException(
+                    "resource-cache.blob-storage.connection-string and .blob-container-name must be configured: "
+                            + "ABS is the durable source for the resource cache.");
         }
         logger.info("Creating AbsResourceService: container={}, blobRoot={}, maxTries={}, tryTimeout={}s",
                 LogUtils.sanitize(blobContainerName), LogUtils.sanitize(blobRoot),

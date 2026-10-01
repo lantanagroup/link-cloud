@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.*;
+import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
@@ -45,25 +46,13 @@ class AbstractResourceConsumerTest {
 
     private AutoCloseable mocks;
     private ResourcesNormalizedConsumer consumer;
-    private ResourcesNormalizedConsumer consumerWithAbs;
 
     @BeforeEach
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
+        // Since LEGLINK-1279 ABS is the durable source and its bean is required at boot, so the
+        // consumer is always wired with both stores.
         consumer = new ResourcesNormalizedConsumer(
-                patientStatusRepository,
-                reportabilityPredicate,
-                measureEvalMetrics,
-                dataAcquisitionRequestedTemplate,
-                evaluateMeasureService,
-                patientStatusBundler,
-                blobStorageService,
-                recoverer,
-                measureReportGeneratedProducer,
-                redisResourceService,
-                null,
-                mongoOperations);
-        consumerWithAbs = new ResourcesNormalizedConsumer(
                 patientStatusRepository,
                 reportabilityPredicate,
                 measureEvalMetrics,
@@ -232,132 +221,86 @@ class AbstractResourceConsumerTest {
     }
 
     @Test
-    void process_absCacheType_readsFromAbsAndEvaluates() throws Exception {
+    void process_redisEmpty_fallsBackToAbsAndEvaluates() {
+        // An absent or evicted Redis key is not a failure: ABS is the durable source, so the read
+        // falls back and evaluation proceeds against the complete set (LEGLINK-1279).
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-1";
 
-        ResourcesNormalized value = buildAbsValue(cacheKey);
+        ResourcesNormalized value = buildValue(cacheKey);
 
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
-
+        when(redisResourceService.readResources(facilityId, cacheKey, patientId)).thenReturn(List.of());
         when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
-                .thenReturn(List.of(resource));
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
-        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
-                .thenReturn(Optional.of(patientStatus));
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
+        stubMongoBulkWrite();
 
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(nonEmptyPatient());
-        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+        consumer.process(buildConsumerRecord(facilityId, patientId, value));
 
-        MeasureReport measureReport = new MeasureReport();
-        measureReport.setId("mr-1");
-        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
-        when(reportabilityPredicate.test(any())).thenReturn(false);
-        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
-
-        BulkOperations bulkOps = mock(BulkOperations.class);
-        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
-        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
-        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
-        when(bulkResult.getModifiedCount()).thenReturn(1);
-        when(bulkOps.execute()).thenReturn(bulkResult);
-
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        consumerWithAbs.process(record);
-
+        verify(redisResourceService).readResources(facilityId, cacheKey, patientId);
         verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
-        verifyNoInteractions(redisResourceService);
         verify(evaluateMeasureService).evaluateMeasure(anyString(), any(), any(), any());
     }
 
     @Test
-    void process_absCacheType_notConfigured_throwsIllegalStateException() {
+    void process_redisUnavailable_fallsBackToAbsAndEvaluates() {
+        // A Redis outage costs latency, never the record: the reader falls back to ABS instead of
+        // letting the failure reach the retry ladder.
         String facilityId = "facility-1";
         String patientId = "patient-1";
-        String cacheKey = "cache-key-1";
+        String cacheKey = "cache-key-outage";
 
-        ResourcesNormalized value = buildAbsValue(cacheKey);
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+        ResourcesNormalized value = buildValue(cacheKey);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> consumer.process(record));
-        assertEquals("ABS cache type requested but cache-blob-storage is not configured", ex.getMessage());
+        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
+                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+        when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        // The finally-block cleanup must no-op (not NPE) when ABS is the cache type but unconfigured.
-        verify(redisResourceService, never()).cleanup(anyString());
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
+        stubMongoBulkWrite();
+
+        assertDoesNotThrow(() -> consumer.process(buildConsumerRecord(facilityId, patientId, value)));
+
+        verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
+        verify(evaluateMeasureService).evaluateMeasure(anyString(), any(), any(), any());
     }
 
     @Test
-    void process_absCacheType_doesNotCleanupRedis() throws Exception {
+    void process_redisHit_doesNotConsultAbs() {
         String facilityId = "facility-1";
         String patientId = "patient-1";
-        String cacheKey = "cache-key-3";
+        String cacheKey = "cache-key-hit";
 
-        ResourcesNormalized value = buildAbsValue(cacheKey);
+        ResourcesNormalized value = buildValue(cacheKey);
 
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
+        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
-                .thenReturn(List.of(resource));
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
+        stubMongoBulkWrite();
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
-        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
-                .thenReturn(Optional.of(patientStatus));
+        consumer.process(buildConsumerRecord(facilityId, patientId, value));
 
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(nonEmptyPatient());
-        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+        verify(absResourceService, never()).readResources(anyString(), anyString(), anyString(), anyString());
+    }
 
-        MeasureReport measureReport = new MeasureReport();
-        measureReport.setId("mr-1");
-        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
-        when(reportabilityPredicate.test(any())).thenReturn(false);
-        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
+    @Test
+    void records_carryingTheRemovedCacheTypeField_stillDeserialize() throws Exception {
+        // Producers stamp cacheType until .NET's removal deploys, and replayed/retry-topic
+        // messages carry it forever. The Kafka value deserializer uses the Spring-configured
+        // ObjectMapper, which leaves FAIL_ON_UNKNOWN_PROPERTIES off — the removed field must be
+        // silently ignored, never a deserialization failure.
+        var mapper = org.springframework.http.converter.json.Jackson2ObjectMapperBuilder.json().build();
 
-        BulkOperations bulkOps = mock(BulkOperations.class);
-        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
-        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
-        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
-        when(bulkResult.getModifiedCount()).thenReturn(1);
-        when(bulkOps.execute()).thenReturn(bulkResult);
+        ResourcesNormalized value = mapper.readValue(
+                "{\"queryType\":\"INITIAL\",\"cacheType\":\"REDIS\",\"cacheKey\":\"corr-legacy\"}",
+                ResourcesNormalized.class);
 
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        consumerWithAbs.process(record);
-
-        // The ABS branch of the cleanup switch must actually run, not merely leave Redis alone:
-        // without this the assertion below still passes if the ABS cleanup call is removed entirely.
-        verify(absResourceService).cleanup(cacheKey);
-        verify(redisResourceService, never()).cleanup(anyString());
+        assertEquals("corr-legacy", value.getCacheKey());
+        assertEquals(QueryType.INITIAL, value.getQueryType());
     }
 
     @Test
@@ -366,28 +309,12 @@ class AbstractResourceConsumerTest {
         String patientId = "patient-1";
         String cacheKey = "cache-key-fail";
 
-        ResourcesNormalized value = buildRedisValue(cacheKey);
-
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
+        ResourcesNormalized value = buildValue(cacheKey);
 
         when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(resource));
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
+        PatientReportingEvaluationStatus patientStatus = patientStatus(facilityId, cacheKey, patientId);
         when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
                 .thenReturn(Optional.of(patientStatus));
 
@@ -398,15 +325,15 @@ class AbstractResourceConsumerTest {
         when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any()))
                 .thenThrow(new RuntimeException("evaluation failed"));
 
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consumer.process(buildConsumerRecord(facilityId, patientId, value)));
 
         assertEquals("evaluation failed", ex.getMessage());
         // A failure may be routed to -Retry: the redelivered record still needs its cached
-        // resources, so process() must not clean up. Terminal (dead-letter) cleanup happens in
-        // the recoverer, which is the only place that knows the routing decision.
+        // resources, so process() must not clean up EITHER store. Terminal (dead-letter) cleanup
+        // happens in the recoverer, which is the only place that knows the routing decision.
         verify(redisResourceService, never()).cleanup(anyString());
+        verify(absResourceService, never()).cleanup(anyString());
     }
 
     @Test
@@ -415,178 +342,87 @@ class AbstractResourceConsumerTest {
         String patientId = "patient-1";
         String cacheKey = "cache-key-metrics-fail";
 
-        ResourcesNormalized value = buildRedisValue(cacheKey);
+        ResourcesNormalized value = buildValue(cacheKey);
 
         doThrow(new RuntimeException("metrics failed"))
                 .when(measureEvalMetrics).IncrementRecordsReceivedCounter(any());
 
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> consumer.process(record));
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> consumer.process(buildConsumerRecord(facilityId, patientId, value)));
 
         assertEquals("metrics failed", ex.getMessage());
         verify(redisResourceService, never()).cleanup(anyString());
+        verify(absResourceService, never()).cleanup(anyString());
     }
 
     @Test
-    void process_success_cleansUpRedisCache() throws Exception {
+    void process_success_cleansUpBothStores() {
+        // The data lives in ABS and usually also Redis, and nothing says which — cleanup must
+        // clear both or the ABS blobs wait for the storage lifecycle rule.
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-success";
 
-        ResourcesNormalized value = buildRedisValue(cacheKey);
-
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
+        ResourcesNormalized value = buildValue(cacheKey);
 
         when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(resource));
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
-        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
-                .thenReturn(Optional.of(patientStatus));
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
+        stubMongoBulkWrite();
 
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(nonEmptyPatient());
-        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
-
-        MeasureReport measureReport = new MeasureReport();
-        measureReport.setId("mr-1");
-        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
-        when(reportabilityPredicate.test(any())).thenReturn(false);
-        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
-
-        BulkOperations bulkOps = mock(BulkOperations.class);
-        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
-        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
-        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
-        when(bulkResult.getModifiedCount()).thenReturn(1);
-        when(bulkOps.execute()).thenReturn(bulkResult);
-
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        consumer.process(record);
+        consumer.process(buildConsumerRecord(facilityId, patientId, value));
 
         verify(redisResourceService).cleanup(cacheKey);
+        verify(absResourceService).cleanup(cacheKey);
     }
 
     @Test
-    void process_cleanupThrowsOnSuccess_doesNotFailTheRecord() throws Exception {
+    void process_cleanupThrowsOnSuccess_doesNotFailTheRecord() {
         // Cleanup runs after the evaluation has fully succeeded; a cleanup failure must not turn a
-        // processed record into a retry (which would re-evaluate and double-produce downstream).
+        // processed record into a retry (which would re-evaluate and double-produce downstream) —
+        // and a Redis cleanup failure must not skip the ABS cleanup.
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-cleanup-fail";
 
-        ResourcesNormalized value = buildRedisValue(cacheKey);
-
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
+        ResourcesNormalized value = buildValue(cacheKey);
 
         when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(resource));
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
-        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
-                .thenReturn(Optional.of(patientStatus));
-
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(nonEmptyPatient());
-        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
-
-        MeasureReport measureReport = new MeasureReport();
-        measureReport.setId("mr-1");
-        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
-        when(reportabilityPredicate.test(any())).thenReturn(false);
-        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
-
-        BulkOperations bulkOps = mock(BulkOperations.class);
-        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
-        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
-        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
-        when(bulkResult.getModifiedCount()).thenReturn(1);
-        when(bulkOps.execute()).thenReturn(bulkResult);
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
+        stubMongoBulkWrite();
 
         doThrow(new RuntimeException("cleanup failed")).when(redisResourceService).cleanup(cacheKey);
 
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        assertDoesNotThrow(() -> consumer.process(record));
+        assertDoesNotThrow(() -> consumer.process(buildConsumerRecord(facilityId, patientId, value)));
 
         verify(redisResourceService).cleanup(cacheKey);
+        verify(absResourceService).cleanup(cacheKey);
     }
 
     @Test
-    void process_initialReportable_keepsCacheForSupplemental() throws Exception {
+    void process_initialReportable_keepsCacheForSupplemental() {
         String facilityId = "facility-1";
         String patientId = "patient-1";
         String cacheKey = "cache-key-keep";
 
-        ResourcesNormalized value = buildRedisValue(cacheKey);
-
-        Resource resource = new Resource();
-        resource.setFacilityId(facilityId);
-        resource.setCorrelationId(cacheKey);
-        resource.setPatientId(patientId);
-        resource.setResourceType(ResourceType.Patient);
-        resource.setResourceId("p-1");
-        resource.setResource("{}");
+        ResourcesNormalized value = buildValue(cacheKey);
 
         when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(resource));
+                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
-        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
-        patientStatus.setFacilityId(facilityId);
-        patientStatus.setCorrelationId(cacheKey);
-        patientStatus.setPatientId(patientId);
-        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
-        report.setReportType("TestMeasure");
-        report.setReportTrackingId("tracking-1");
-        report.setReportable(null);
-        patientStatus.setReports(Collections.singletonList(report));
-        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
-                .thenReturn(Optional.of(patientStatus));
+        stubHappyPathEvaluation(facilityId, cacheKey, patientId, true);
 
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(nonEmptyPatient());
-        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
-
-        MeasureReport measureReport = new MeasureReport();
-        measureReport.setId("mr-1");
-        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
-        when(reportabilityPredicate.test(any())).thenReturn(true);
-        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
-
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        consumer.process(record);
+        consumer.process(buildConsumerRecord(facilityId, patientId, value));
 
         verify(redisResourceService, never()).cleanup(anyString());
+        verify(absResourceService, never()).cleanup(anyString());
         verifyNoInteractions(mongoOperations);
     }
+
+    // ------------------------------------------------------------------ helpers
 
     private static org.hl7.fhir.r4.model.Patient nonEmptyPatient() {
         org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
@@ -594,16 +430,60 @@ class AbstractResourceConsumerTest {
         return patient;
     }
 
-    private ResourcesNormalized buildRedisValue(String cacheKey) {
-        ResourcesNormalized value = buildAbsValue(cacheKey);
-        value.setCacheType(CacheType.REDIS);
-        return value;
+    private static Resource cachedResource(String facilityId, String cacheKey, String patientId) {
+        Resource resource = new Resource();
+        resource.setFacilityId(facilityId);
+        resource.setCorrelationId(cacheKey);
+        resource.setPatientId(patientId);
+        resource.setResourceType(ResourceType.Patient);
+        resource.setResourceId("p-1");
+        resource.setResource("{}");
+        return resource;
     }
 
-    private ResourcesNormalized buildAbsValue(String cacheKey) {
+    private static PatientReportingEvaluationStatus patientStatus(String facilityId, String cacheKey, String patientId) {
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setFacilityId(facilityId);
+        patientStatus.setCorrelationId(cacheKey);
+        patientStatus.setPatientId(patientId);
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportType("TestMeasure");
+        report.setReportTrackingId("tracking-1");
+        report.setReportable(null);
+        patientStatus.setReports(Collections.singletonList(report));
+        return patientStatus;
+    }
+
+    private void stubHappyPathEvaluation(String facilityId, String cacheKey, String patientId, boolean reportable) {
+        PatientReportingEvaluationStatus patientStatus = patientStatus(facilityId, cacheKey, patientId);
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
+                .thenReturn(Optional.of(patientStatus));
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("mr-1");
+        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
+        when(reportabilityPredicate.test(any())).thenReturn(reportable);
+        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
+    }
+
+    private void stubMongoBulkWrite() {
+        BulkOperations bulkOps = mock(BulkOperations.class);
+        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
+        com.mongodb.bulk.BulkWriteResult bulkResult = mock(com.mongodb.bulk.BulkWriteResult.class);
+        when(bulkResult.getUpserts()).thenReturn(Collections.emptyList());
+        when(bulkResult.getModifiedCount()).thenReturn(1);
+        when(bulkOps.execute()).thenReturn(bulkResult);
+    }
+
+    private ResourcesNormalized buildValue(String cacheKey) {
+        // CacheType is deliberately never set: it is ignored since LEGLINK-1279 and on its way out
+        // of the contract.
         ResourcesNormalized value = new ResourcesNormalized();
         value.setQueryType(QueryType.INITIAL);
-        value.setCacheType(CacheType.ABS);
         value.setCacheKey(cacheKey);
         value.setReportableEvent(ReportableEvent.ADHOC);
         TestScheduledReport sr = new TestScheduledReport();

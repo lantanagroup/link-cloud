@@ -113,9 +113,73 @@ public class RedisResourceService {
         return resources;
     }
 
+    /**
+     * Hash field the .NET durable writer records once a blob write for the entry has landed: the
+     * number of resources the durable store holds for it (LEGLINK-1276). It shares the entry's hash
+     * so one TTL covers both and deleting the entry clears it. The "__" prefix is reserved for
+     * metadata; a resource field is always {@code resourceType/resourceId}, so the two cannot
+     * collide. See docs-dev/resource-cache.md.
+     */
+    static final String DURABLE_RESOURCE_COUNT_FIELD = "__durableResourceCount";
+
+    /**
+     * The durable resource count recorded on the entry, or {@code null} when none is recorded or
+     * the recorded value is not a number. A Redis outage surfaces as
+     * {@link ResourceCacheUnavailableException}, as in {@link #readResources}.
+     */
+    public Integer readDurableResourceCount(String correlationId) {
+        HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
+
+        String value;
+        try {
+            value = hashOps.get(correlationId, DURABLE_RESOURCE_COUNT_FIELD);
+        } catch (DataAccessException e) {
+            throw new ResourceCacheUnavailableException(
+                    "Resource cache (Redis) unavailable while reading the durable resource count for correlationId=" + correlationId, e);
+        }
+
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            logger.warn("Unparseable durable resource count '{}' on Redis key '{}'. Treating the count as unrecorded.",
+                    LogUtils.sanitize(value), LogUtils.sanitize(correlationId));
+            return null;
+        }
+    }
+
+
+    /**
+     * Suffix of the per-correlation memo the .NET Hybrid cache keeps in Redis to record which store
+     * holds a correlation. Removed with the correlation so it does not outlive the entry it describes.
+     */
+    static final String CACHE_TYPE_MEMO_SUFFIX = ":__cacheType";
 
     public void cleanup(String correlationId) {
-        redisTemplate.unlink(correlationId);
-        logger.debug("Cleaned up Redis key '{}'", correlationId);
+        // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
+        // keys. Normalization normally deletes the acquisition keys after each pass, but a
+        // dead-lettered correlation can leave them behind — and the ABS side sweeps its whole
+        // prefix, so the two stores should forget a correlation symmetrically instead of leaving
+        // Redis keys to age out at the TTL.
+        //
+        // The acquisition keys are enumerated, not discovered: FHIR resource types are a closed
+        // set, so every key the correlation could have is built up front and the whole batch goes
+        // in one UNLINK. A SCAN ... MATCH would walk the entire keyspace and filter server-side —
+        // MATCH is not an index — once per correlation on a Redis instance shared with other
+        // caches, which is O(correlations x keyspace) rather than O(keys deleted). UNLINK of a key
+        // that does not exist is a cheap no-op, so over-enumerating costs far less than scanning.
+        ResourceType[] resourceTypes = ResourceType.values();
+        List<String> keys = new ArrayList<>(resourceTypes.length + 2);
+        keys.add(correlationId);
+        keys.add(correlationId + CACHE_TYPE_MEMO_SUFFIX);
+        for (ResourceType resourceType : resourceTypes) {
+            keys.add(correlationId + ":" + resourceType.name());
+        }
+        Long unlinked = redisTemplate.unlink(keys);
+        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'",
+                unlinked == null ? 0 : unlinked, LogUtils.sanitize(correlationId));
     }
 }

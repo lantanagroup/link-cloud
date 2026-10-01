@@ -21,15 +21,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Unified resource-cache health for MeasureEval, mirroring the .NET {@code ResourceCacheHealthCheck}:
- * MeasureEval reads cached resources from either Redis or Azure Blob Storage (ABS) depending on the
- * per-message {@code CacheType}, so this verifies BOTH backends and reports a single combined status
- * under the "resourceCache" component (mapped to the Admin dashboard's Cache column).
+ * Unified resource-cache health for MeasureEval, mirroring the .NET {@code ResourceCacheHealthCheck}.
+ * Since LEGLINK-1279 the stores are asymmetric: ABS is the durable source (reads fall back to it,
+ * so ABS unreachable means resources may be unreadable — DOWN), while Redis is only a cache in
+ * front of it (Redis unreachable degrades reads to ABS speed but loses nothing — still UP, with
+ * the detail showing "Unavailable" so the degradation is visible on the Admin dashboard's Cache
+ * column). Both statuses are always reported as details under the "resourceCache" component.
  * <p>
- * Redis is always wired; ABS is optional ({@link AbsResourceService} is absent when
- * {@code resource-cache.blob-storage} is not configured), in which case ABS is reported "Not
- * configured" and does not fail the check. Spring's auto Redis indicator is disabled
- * (management.health.redis.enabled=false) in favor of this one.
+ * Spring's auto Redis indicator is disabled (management.health.redis.enabled=false) in favor of
+ * this one.
  * <p>
  * The combined probe runs on a separate thread bounded by {@link #checkTimeoutMs}, because both the
  * Lettuce reconnect path and the Azure SDK's retry/backoff can otherwise leave /health hanging when
@@ -76,8 +76,13 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
         try {
             probe = CompletableFuture.supplyAsync(this::runChecks, executor);
             CacheStatus status = probe.get(checkTimeoutMs, TimeUnit.MILLISECONDS);
-            // Healthy only if Redis is up and ABS is up-or-absent; an unreachable configured backend fails.
-            boolean healthy = AVAILABLE.equals(status.redis) && !UNAVAILABLE.equals(status.abs);
+            // ABS is the durable source: unreachable (or missing) ABS is DOWN. Redis is only the
+            // cache in front of it: reads degrade to ABS-speed but nothing is lost, so a Redis
+            // outage stays UP and is surfaced through the detail instead.
+            boolean healthy = AVAILABLE.equals(status.abs);
+            if (healthy && !AVAILABLE.equals(status.redis)) {
+                logger.warn("Redis resource cache unavailable; reads are degraded to ABS until it recovers");
+            }
             Health.Builder builder = healthy ? Health.up() : Health.down();
             return builder.withDetail("Redis", status.redis).withDetail("ABS", status.abs).build();
         } catch (TimeoutException e) {
