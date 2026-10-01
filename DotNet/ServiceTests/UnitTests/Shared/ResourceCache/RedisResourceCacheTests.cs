@@ -35,6 +35,32 @@ public class RedisResourceCacheTests
     }
 
     [Fact]
+    public async Task HasResourcesAsync_CountFieldOnly_IsFalse()
+    {
+        // A durable count published after the entry was evicted recreates the key holding nothing but
+        // that field. A bare hash length then says the key has resources while GetResourceCountAsync,
+        // which discounts the field, says zero -- and the tail keeps a key that reads as empty.
+        var redisDatabase = new Mock<IRedisDatabase>();
+        var database = new Mock<IDatabase>();
+
+        database
+            .Setup(d => d.HashLengthAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
+            .ReturnsAsync(1);
+        database
+            .Setup(d => d.HashExistsAsync(It.IsAny<RedisKey>(), "__durableResourceCount", It.IsAny<CommandFlags>()))
+            .ReturnsAsync(true);
+        redisDatabase.SetupGet(item => item.Database).Returns(database.Object);
+
+        var cache = new RedisResourceCache(
+            redisDatabase.Object,
+            Options.Create(new ResourceCacheSettings()),
+            Mock.Of<ILogger<RedisResourceCache>>());
+
+        Assert.Equal(0, await cache.GetResourceCountAsync("corr-1:Encounter"));
+        Assert.False(await cache.HasResourcesAsync("corr-1:Encounter"));
+    }
+
+    [Fact]
     public async Task ReplaceResourcesAsync_ClearsAndRepopulatesInOneTransaction()
     {
         // Atomicity is the point. Done as a delete and then a write, the key is observably empty in
