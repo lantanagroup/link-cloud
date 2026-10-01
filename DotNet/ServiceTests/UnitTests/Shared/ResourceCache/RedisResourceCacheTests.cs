@@ -71,7 +71,7 @@ public class RedisResourceCacheTests
     }
 
     [Fact]
-    public async Task UpdateCorrelationCacheAsync_SetsConfiguredExpiryAfterWritingEntries()
+    public async Task AppendResourcesAsync_SetsConfiguredExpiryAfterWritingEntries()
     {
         const int cacheEntryTtlDays = 14;
         var redisDatabase = new Mock<IRedisDatabase>();
@@ -99,7 +99,7 @@ public class RedisResourceCacheTests
             }),
             Mock.Of<ILogger<RedisResourceCache>>());
 
-        await cache.UpdateCorrelationCacheAsync("correlation-id", [], ResourceType.Patient);
+        await cache.AppendResourcesAsync("correlation-id", [], ResourceType.Patient);
 
         database.Verify(item => item.HashSetAsync(
             "correlation-id",

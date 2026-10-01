@@ -26,34 +26,34 @@ public class HybridResourceCacheTests
     private static List<DomainResource> Resources() => [new Patient { Id = "1" }];
 
     [Fact]
-    public async Task UpdateCorrelationCacheAsync_writes_the_cache_inline_and_queues_the_durable_write()
+    public async Task AppendResourcesAsync_writes_the_cache_inline_and_queues_the_durable_write()
     {
-        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
+        await CreateSut().AppendResourcesAsync(CacheKey, Resources(), ResourceType.Patient);
 
-        _redis.Verify(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
+        _redis.Verify(c => c.AppendResourcesAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
         _writer.Verify(w => w.EnqueueAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
 
         // The durable write is queued and never awaited here; that is the point of the design.
-        _abs.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
+        _abs.Verify(c => c.AppendResourcesAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task UpdateCorrelationCacheAsync_with_no_resources_does_nothing()
+    public async Task AppendResourcesAsync_with_no_resources_does_nothing()
     {
-        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, [], ResourceType.Patient);
+        await CreateSut().AppendResourcesAsync(CacheKey, [], ResourceType.Patient);
 
         _redis.VerifyNoOtherCalls();
         _writer.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task UpdateCorrelationCacheAsync_drops_the_entry_when_the_cache_write_fails()
+    public async Task AppendResourcesAsync_drops_the_entry_when_the_cache_write_fails()
     {
         _redis
-            .Setup(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
+            .Setup(c => c.AppendResourcesAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("cache down"));
 
-        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
+        await CreateSut().AppendResourcesAsync(CacheKey, Resources(), ResourceType.Patient);
 
         // A half-written entry would win over the complete durable copy, because reads prefer the
         // cache. The durable write still has to be queued.
@@ -82,7 +82,7 @@ public class HybridResourceCacheTests
         var result = await CreateSut().GetAsync(CacheKey);
 
         result.Should().HaveCount(1);
-        _redis.Verify(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
+        _redis.Verify(c => c.AppendResourcesAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class HybridResourceCacheTests
         // Leaving this entry evicted is what lets a supplemental append recreate it holding only
         // that pass's resources, which then reads as complete and shadows the durable copy.
         _redis.Verify(
-            c => c.UpdateCorrelationCacheAsync(correlationKey, It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
+            c => c.AppendResourcesAsync(correlationKey, It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -132,7 +132,7 @@ public class HybridResourceCacheTests
         var result = await CreateSut().GetAsync(CacheKey);
 
         result.Should().BeEmpty();
-        _redis.Verify(c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
+        _redis.Verify(c => c.AppendResourcesAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -292,10 +292,10 @@ public class HybridResourceCacheTests
     public async Task A_failed_cache_write_is_reported_as_a_failed_write()
     {
         _redis
-            .Setup(c => c.UpdateCorrelationCacheAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
+            .Setup(c => c.AppendResourcesAsync(CacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Patient, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("cache down"));
 
-        await CreateSut().UpdateCorrelationCacheAsync(CacheKey, Resources(), ResourceType.Patient);
+        await CreateSut().AppendResourcesAsync(CacheKey, Resources(), ResourceType.Patient);
 
         _metrics.Verify(m => m.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Failed, It.IsAny<double>()), Times.Once);
         _metrics.Verify(m => m.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, It.IsAny<double>()), Times.Never);

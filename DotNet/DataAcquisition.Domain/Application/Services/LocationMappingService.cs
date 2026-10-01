@@ -561,7 +561,7 @@ public class LocationMappingService(
             return outcome;
         }
 
-        // UpdateCorrelationCacheAsync is an additive HashSet, so removing entries requires deleting the key
+        // AppendResourcesAsync is an additive HashSet, so removing entries requires deleting the key
         // and rewriting it with only the org encounters. When none remain the key is left empty, so
         // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
         await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
@@ -581,7 +581,7 @@ public class LocationMappingService(
 
         if (orgEncounters.Count > 0)
         {
-            await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
+            await _resourceCache.AppendResourcesAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
         }
 
         _logger.LogDebug(

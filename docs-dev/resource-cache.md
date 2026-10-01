@@ -65,7 +65,7 @@ sequenceDiagram
     Note over W,A: ---- Acquire, per sibling query log ----
     loop per page of the FHIR search
         W->>W: fetch page, filter to org encounters, discover references
-        W->>H: UpdateCorrelationCache "corr:Type"
+        W->>H: AppendResources "corr:Type"
         H->>R: HSET fields, then EXPIRE
         alt Redis write throws
             H->>R: DEL "corr:Type"
@@ -101,7 +101,7 @@ sequenceDiagram
         end
         H-->>N: resources
         N->>N: apply the facility's operation sequences
-        N->>H: UpdateCorrelationCache "corr"
+        N->>H: AppendResources "corr"
         H->>R: HSET
         H->>QN: Enqueue "corr"
         QN-)A: append

@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// </summary>
         private const string DurableResourceCountField = MetadataFieldPrefix + "durableResourceCount";
 
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 
@@ -123,8 +123,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
             }
 
-            await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
-            await _redisDatabase.Database.KeyExpireAsync(correlationId, _cacheEntryTtl).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.HashSetAsync(cacheKey, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.KeyExpireAsync(cacheKey, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
         /// <summary>

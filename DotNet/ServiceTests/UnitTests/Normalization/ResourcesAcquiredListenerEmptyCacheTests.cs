@@ -65,7 +65,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
+            item => item.AppendResourcesAsync(
                 It.IsAny<string>(),
                 It.IsAny<List<DomainResource>>(),
                 It.IsAny<FhirResourceType>(),
@@ -91,7 +91,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([patient]);
         resourceCache
-            .Setup(item => item.UpdateCorrelationCacheAsync(
+            .Setup(item => item.AppendResourcesAsync(
                 CorrelationId,
                 It.IsAny<List<DomainResource>>(),
                 FhirResourceType.Patient,
@@ -114,7 +114,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
 
         resourceCache.Verify(
-            item => item.UpdateCorrelationCacheAsync(
+            item => item.AppendResourcesAsync(
                 CorrelationId,
                 It.Is<List<DomainResource>>(resources => resources.Count == 1),
                 FhirResourceType.Patient,

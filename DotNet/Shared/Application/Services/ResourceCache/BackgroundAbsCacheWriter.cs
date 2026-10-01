@@ -436,7 +436,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 try
                 {
-                    await _absCache.UpdateCorrelationCacheAsync(
+                    await _absCache.AppendResourcesAsync(
                         pending.CacheKey,
                         pending.Resources,
                         pending.ResourceType,

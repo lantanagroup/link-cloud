@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Adds resources to <paramref name="correlationId"/>, merging with whatever is already there.
+        /// Adds resources to <paramref name="cacheKey"/>, merging with whatever is already there.
         /// </summary>
         /// <remarks>
         /// Additive, never replacing, so a resource type acquired across several sibling query logs
@@ -55,16 +55,15 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// Because it only ever adds, removing entries requires a <see cref="DeleteAsync"/> followed by
         /// a rewrite of the survivors, which is how the non-org encounter strip works.
         /// </remarks>
-        /// <param name="correlationId">
-        /// The cache key to write, despite the name: either <c>{correlationId}</c> or
-        /// <c>{correlationId}:{ResourceType}</c>.
+        /// <param name="cacheKey">
+        /// The key to write: either <c>{correlationId}</c> or <c>{correlationId}:{ResourceType}</c>.
         /// </param>
         /// <param name="resources">The resources to add. An empty list is a no-op.</param>
         /// <param name="resourceType">
         /// The FHIR type shared by every resource in <paramref name="resources"/>.
         /// </param>
         /// <param name="cancellationToken">Cancels the write.</param>
-        Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default);
+        Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Parses the FHIR resource type out of a <c>{correlationId}:{ResourceType}</c> cache key.

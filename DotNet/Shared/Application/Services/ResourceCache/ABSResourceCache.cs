@@ -33,10 +33,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private string GetBlobIdsKey(string key) =>
             GetBlobKey(key) + "_ids";
 
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
-            string blobName = GetBlobKey(correlationId);
-            string idsBlobName = GetBlobIdsKey(correlationId);
+            string blobName = GetBlobKey(cacheKey);
+            string idsBlobName = GetBlobIdsKey(cacheKey);
             
             //First read the existing blob to get the list of resource references that are already in the cache. 
             // This is necessary because we want to append new resources to the existing blob, 

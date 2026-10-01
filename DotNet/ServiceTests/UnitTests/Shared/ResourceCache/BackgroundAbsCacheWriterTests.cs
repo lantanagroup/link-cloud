@@ -530,7 +530,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
             _concurrencyReached?.TrySetResult();
         }
 
-        public async Task UpdateCorrelationCacheAsync(
+        public async Task AppendResourcesAsync(
             string correlationId,
             List<DomainResource> resources,
             ResourceType resourceType,

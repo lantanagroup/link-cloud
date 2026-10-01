@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             if (resources == null || resources.Count == 0)
             {
@@ -52,7 +52,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             var writeStart = Stopwatch.GetTimestamp();
             try
             {
-                await _redisCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+                await _redisCache.AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
                 _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -64,12 +64,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 _logger.LogWarning(
                     ex,
                     "Could not cache resources for {CacheKey}; dropping the cache entry so it cannot serve a partial read. The durable write is unaffected.",
-                    correlationId.SanitizeForLog());
+                    cacheKey.SanitizeForLog());
 
-                await TryDropCacheEntryAsync(correlationId, cancellationToken);
+                await TryDropCacheEntryAsync(cacheKey, cancellationToken);
             }
 
-            await _absWriter.EnqueueAsync(correlationId, resources, resourceType, cancellationToken);
+            await _absWriter.EnqueueAsync(cacheKey, resources, resourceType, cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -274,7 +274,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     ? _absCache.GetResourceTypeByCacheKey(cacheKey)
                     : ResourceType.Bundle;
 
-                await _redisCache.UpdateCorrelationCacheAsync(cacheKey, resources, resourceType, cancellationToken);
+                await _redisCache.AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
 
                 // Recorded with the entry it describes. Without this the restored entry has no count,
                 // and a later partial recreation of it could not be detected.

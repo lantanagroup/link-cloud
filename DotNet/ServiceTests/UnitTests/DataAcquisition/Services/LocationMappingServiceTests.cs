@@ -974,7 +974,7 @@ public class LocationMappingServiceTests
 
         List<DomainResource>? rewritten = null;
         _mockResourceCache
-            .Setup(c => c.UpdateCorrelationCacheAsync(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter, cancellationToken))
+            .Setup(c => c.AppendResourcesAsync(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter, cancellationToken))
             .Callback<string, List<DomainResource>, ResourceType, CancellationToken>((_, resources, _, _) => rewritten = resources)
             .Returns(System.Threading.Tasks.Task.CompletedTask);
 
@@ -1052,7 +1052,7 @@ public class LocationMappingServiceTests
         // Assert — the key is deleted and never rewritten, so MeasureEval rehydrates no qualifying encounter.
         _mockResourceCache.Verify(c => c.DeleteAsync(It.Is<List<string>>(keys => keys.Contains(cacheKey)), It.IsAny<CancellationToken>()), Times.Once);
         _mockResourceCache.Verify(
-            c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
+            c => c.AppendResourcesAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
         // A patient with encounters, none of which resolved, is NotFound -- not NotApplicable, which would
@@ -1109,7 +1109,7 @@ public class LocationMappingServiceTests
 
         // Rewriting would have merged the org encounters in beside the non-org ones still present.
         _mockResourceCache.Verify(
-            c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
+            c => c.AppendResourcesAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

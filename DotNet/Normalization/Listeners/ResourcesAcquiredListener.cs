@@ -422,7 +422,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                 }
 
-            await resourceCache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
+            await resourceCache.AppendResourcesAsync(correlationId, resources, resourceType, cancellationToken);
             copiedKeys.Add(cacheKey);
         }
 
