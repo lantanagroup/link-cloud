@@ -187,6 +187,27 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         /// <inheritdoc/>
         /// <remarks>
+        /// Sequential rather than atomic: this store has no transaction, and it does not need one.
+        /// Nothing shadows it, so a reader arriving between the two steps reads an empty key and gets an
+        /// empty answer rather than a stale one -- and the callers that replace do so before anything
+        /// downstream is told the key exists.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            await DeleteAsync([cacheKey], cancellationToken);
+
+            if (resources != null && resources.Count > 0)
+            {
+                await AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            }
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
         /// Read from the ids blob rather than the payload, so the cost is one small listing of resource
         /// references instead of deserializing every resource.
         /// </remarks>

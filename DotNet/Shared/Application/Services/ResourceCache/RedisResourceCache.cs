@@ -127,6 +127,80 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             await _redisDatabase.Database.KeyExpireAsync(cacheKey, _cacheEntryTtl).WaitAsync(cancellationToken);
         }
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Clear and repopulate in one transaction. Done as two commands the key is observably empty in
+        /// between, and a reader landing there would fall through to durable storage for a key that is
+        /// about to be perfectly good.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            var database = _redisDatabase.Database;
+
+            if (resources == null || resources.Count == 0)
+            {
+                await database.KeyDeleteAsync(cacheKey).WaitAsync(cancellationToken);
+                return;
+            }
+
+            var correlationHash = resources
+                .Select(resource => new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()))
+                .ToArray();
+
+            // One transaction, from the one database instance: a transaction cannot be created on one
+            // connection and executed on another.
+            var transaction = database.CreateTransaction();
+
+            // Held, not awaited here: these only complete once Execute runs, so awaiting one before
+            // that would deadlock. They are observed afterwards instead -- dropping them means a
+            // transaction that is abandoned or declined leaves faulted tasks nobody read, which
+            // resurface later as unobserved task exceptions far from the cause.
+            var queued = new[]
+            {
+                transaction.KeyDeleteAsync(cacheKey),
+                transaction.HashSetAsync(cacheKey, correlationHash),
+                transaction.KeyExpireAsync(cacheKey, _cacheEntryTtl)
+            };
+
+            try
+            {
+                if (!await transaction.ExecuteAsync().WaitAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"Redis declined the transaction replacing resource cache key '{cacheKey}'.");
+                }
+
+                // Completed by the Execute above, so this does not wait on the network again.
+                await Task.WhenAll(queued);
+            }
+            catch
+            {
+                // Read the outcomes so none of them is left unobserved, then let the original failure
+                // stand -- it describes the replace, which is what the caller has to act on.
+                ObserveQueued(queued);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Marks the transaction's queued results as observed without letting their faults escape.
+        /// </summary>
+        private static void ObserveQueued(IEnumerable<Task> queued)
+        {
+            foreach (var task in queued)
+            {
+                _ = task.ContinueWith(
+                    completed => _ = completed.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+        }
+
         /// <summary>
         /// Completes immediately: this cache has no separate durable tier to wait for.
         /// </summary>

@@ -170,6 +170,60 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// Ordering is the whole design here, so it is spelled out.
+        /// <list type="number">
+        ///   <item><description>
+        ///     Cancel queued writes for the key first, or one of them lands afterwards and merges back
+        ///     the content this call exists to remove.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Replace durably and wait for it, rather than queueing it. Queued, a failure between
+        ///     clearing and rewriting would leave the durable copy empty with nothing to retry from, and
+        ///     the caller is about to cross a barrier for this key anyway.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Replace the cache entry last, atomically. A failure here leaves the cache holding the
+        ///     pre-replace content, which is what the retry reads to work out what to do -- the reverse
+        ///     order would leave the cache already replaced and the durable copy stale, and the retry
+        ///     would see nothing left to remove and stop.
+        ///   </description></item>
+        ///   <item><description>
+        ///     Record the new durable count, so the entry does not read as partial against the count
+        ///     from before the replace.
+        ///   </description></item>
+        /// </list>
+        /// Nothing here is tolerated: a replace that cannot clear is not a replace, and the callers that
+        /// need one are the ones where leaving the old content in place is the failure.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(cacheKey);
+
+            _absWriter.Cancel([cacheKey]);
+
+            // Both stores are written, so both are counted. Recording one and not the other would
+            // break the pairing the write metrics exist to assert.
+            var durableStart = Stopwatch.GetTimestamp();
+            await _absCache.ReplaceResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(durableStart));
+
+            var cacheStart = Stopwatch.GetTimestamp();
+            await _redisCache.ReplaceResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            _metrics.RecordWrite(ResourceCacheStores.Redis, ResourceCacheOutcomes.Ok, Elapsed(cacheStart));
+
+            var replacedCount = resources?.Count ?? 0;
+            if (replacedCount > 0)
+            {
+                await _redisCache.SetDurableResourceCountAsync(cacheKey, replacedCount, cancellationToken);
+            }
+        }
+
+        /// <inheritdoc/>
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             return _absCache.GetResourceTypeByCacheKey(cacheKey);

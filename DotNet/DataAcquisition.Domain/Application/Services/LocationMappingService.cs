@@ -561,28 +561,19 @@ public class LocationMappingService(
             return outcome;
         }
 
-        // AppendResourcesAsync is an additive HashSet, so removing entries requires deleting the key
-        // and rewriting it with only the org encounters. When none remain the key is left empty, so
-        // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
-        await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
-
-        // DeleteAsync tolerates a failed cache delete -- for an ordinary delete the entry expires on
-        // its own and the durable delete is what matters. Here it is not tolerable: the rewrite below
-        // merges the org encounters into whatever survived, so a swallowed cache failure leaves the
-        // non-org encounters in place and reads prefer the cache. They would stay served until the
-        // entry expires, which is the filtering this method exists to apply silently not happening.
-        // Failing here reverts the tail claim and the recovery poller runs the strip again.
-        if (await _resourceCache.HasResourcesAsync(cacheKey, cancellationToken))
-        {
-            throw new TransientException(
-                $"Could not clear cache key '{cacheKey.SanitizeForLog()}' before rewriting it with org encounters only. "
-                + "Rewriting now would leave the non-org encounters in place, so the strip has not been applied.");
-        }
-
-        if (orgEncounters.Count > 0)
-        {
-            await _resourceCache.AppendResourcesAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
-        }
+        // A replace, not a delete and a rewrite. The cache write merges, so removing entries means
+        // replacing the key -- and done as two steps the key is briefly empty, and a delete whose
+        // failure is tolerated leaves the non-org encounters in place for the rewrite to merge back
+        // in. Verifying afterwards does not close that either: the check reads through the same cache
+        // that just failed and is tolerated there too, so an unreachable cache fails the delete and
+        // then reports the key as clear.
+        //
+        // The replace clears and repopulates the cache atomically and raises any failure, so this
+        // either applies or does not happen. Failing reverts the tail claim and the recovery poller
+        // runs the strip again. When no org encounters remain the key is removed, so nothing
+        // downstream rehydrates an encounter for this correlation.
+        await _resourceCache.ReplaceResourcesAsync(
+            cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
 
         _logger.LogDebug(
             "Stripped {StrippedCount} non-org encounter(s) from cache key {CacheKey} for facility {FacilityId} (patient {PatientId}); {RemainingCount} org encounter(s) remain.",

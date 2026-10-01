@@ -47,13 +47,39 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Replaces everything stored for <paramref name="cacheKey"/> with <paramref name="resources"/>.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="AppendResourcesAsync"/> merges, so it cannot remove anything. Removing
+        /// requires replacing, and replacing is not a delete followed by a write: between those two
+        /// steps the key holds nothing, and a delete whose failure is tolerated leaves the old content
+        /// for the write to merge back into. So this is one operation. The cache does it atomically, the
+        /// durable store is written before the cache so a failure leaves the cache holding the only copy
+        /// for the retry to work from, and a failure anywhere is raised rather than tolerated -- a
+        /// replace that cannot clear is not a replace.
+        /// <para>
+        /// An empty <paramref name="resources"/> removes the key.
+        /// </para>
+        /// </remarks>
+        /// <param name="cacheKey">The key to replace.</param>
+        /// <param name="resources">The resources the key should hold afterwards.</param>
+        /// <param name="resourceType">The resource type being stored.</param>
+        /// <param name="cancellationToken">Cancels the replace.</param>
+        Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Adds resources to <paramref name="cacheKey"/>, merging with whatever is already there.
         /// </summary>
         /// <remarks>
         /// Additive, never replacing, so a resource type acquired across several sibling query logs
         /// accumulates into one key. Resources already present under the key are not written twice.
-        /// Because it only ever adds, removing entries requires a <see cref="DeleteAsync"/> followed by
-        /// a rewrite of the survivors, which is how the non-org encounter strip works.
+        /// Because it only ever adds, removing entries needs
+        /// <see cref="ReplaceResourcesAsync"/> rather than this, which is what the non-org
+        /// encounter strip uses.
         /// </remarks>
         /// <param name="cacheKey">
         /// The key to write: either <c>{correlationId}</c> or <c>{correlationId}:{ResourceType}</c>.

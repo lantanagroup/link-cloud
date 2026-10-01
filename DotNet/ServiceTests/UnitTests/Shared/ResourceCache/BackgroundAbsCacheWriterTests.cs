@@ -613,6 +613,12 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey) => ResourceType.Patient;
 
+        public Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
         public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
