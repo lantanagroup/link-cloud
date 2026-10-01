@@ -204,7 +204,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             ArgumentException.ThrowIfNullOrEmpty(cacheKey);
 
-            _absWriter.Cancel([cacheKey]);
+            // Drained, not just cancelled. A write already executing has passed every generation
+            // check, and on finishing it sees the key was cancelled and deletes it from durable
+            // storage -- which would take the replacement with it, since the replacement is written
+            // below and lands first. Waiting until nothing is writing this key makes the replace the
+            // last word on it.
+            await _absWriter.CancelAndDrainAsync([cacheKey], cancellationToken);
 
             // Both stores are written, so both are counted. Recording one and not the other would
             // break the pairing the write metrics exist to assert.

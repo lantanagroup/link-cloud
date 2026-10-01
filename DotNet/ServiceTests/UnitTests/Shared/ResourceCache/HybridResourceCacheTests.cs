@@ -238,6 +238,50 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
+    public async Task ReplaceResourcesAsync_drains_in_flight_writes_before_writing_either_store()
+    {
+        var order = new List<string>();
+        var resources = new List<DomainResource> { new Encounter { Id = "enc-org" } };
+
+        _writer
+            .Setup(w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("drain"))
+            .Returns(Task.CompletedTask);
+        _abs
+            .Setup(c => c.ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("durable"))
+            .Returns(Task.CompletedTask);
+        _redis
+            .Setup(c => c.ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("cache"))
+            .Returns(Task.CompletedTask);
+
+        await CreateSut().ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter);
+
+        order.Should().Equal("drain", "durable", "cache");
+    }
+
+    [Fact]
+    public async Task ReplaceResourcesAsync_does_not_merely_cancel_the_key()
+    {
+        var resources = new List<DomainResource> { new Encounter { Id = "enc-org" } };
+
+        _writer
+            .Setup(w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        await CreateSut().ReplaceResourcesAsync(CacheKey, resources, ResourceType.Encounter);
+
+        // Cancel returns while a write is still executing. That write finishes afterwards, sees the
+        // key was cancelled, and deletes it from durable storage -- taking the replacement with it,
+        // because the replacement was written first. Only a drain orders them correctly.
+        _writer.Verify(w => w.Cancel(It.IsAny<IEnumerable<string>>()), Times.Never);
+        _writer.Verify(
+            w => w.CancelAndDrainAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task DeleteAsync_still_deletes_from_durable_storage_when_the_cache_delete_fails()
     {
         var keys = new List<string> { CacheKey };

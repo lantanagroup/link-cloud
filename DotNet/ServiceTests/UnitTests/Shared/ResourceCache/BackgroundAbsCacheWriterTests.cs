@@ -87,6 +87,48 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CancelAndDrainAsync_DoesNotReturnWhileAWriteIsStillExecuting()
+    {
+        // The reason this exists rather than Cancel. A write already executing has passed every
+        // generation check, and on finishing it sees the key was cancelled and deletes it from
+        // durable storage. A caller that is about to *write* the key -- the encounter strip -- would
+        // have its write deleted out from under it. Returning only once nothing is writing makes the
+        // caller's write the last one.
+        _abs.BlockNextWrite();
+
+        await _writer.EnqueueAsync("corr:Encounter", Resources("Encounter/1"), ResourceType.Encounter);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+        var drain = _writer.CancelAndDrainAsync(["corr:Encounter"]);
+
+        Assert.False(drain.IsCompleted);
+
+        _abs.ReleaseBlockedWrite();
+        await drain.WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task CancelAndDrainAsync_UnknownKey_ReturnsImmediately()
+    {
+        await _writer.CancelAndDrainAsync(["never:Seen"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task CancelAndDrainAsync_DrainedWriteFailed_DoesNotReportItToTheNextWaiter()
+    {
+        _abs.FailKey("corr:Encounter");
+
+        await _writer.EnqueueAsync("corr:Encounter", Resources("Encounter/1"), ResourceType.Encounter);
+
+        // The failure describes contents the caller is replacing outright. Leaving it recorded would
+        // fail some later waiter over a copy that no longer exists.
+        await _writer.CancelAndDrainAsync(["corr:Encounter"]).WaitAsync(Timeout);
+
+        _abs.ClearFailures();
+        await _writer.WaitForDurableAsync(["corr:Encounter"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
     public async Task WaitForDurableAsync_WriteFailsEveryAttempt_Throws()
     {
         _abs.FailKey("corr:Patient");
@@ -604,6 +646,9 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
         public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(DurableCountsSet.TryGetValue(cacheKey, out var count) ? count : (int?)null);
+
+        public Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
 
         public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default)
         {
