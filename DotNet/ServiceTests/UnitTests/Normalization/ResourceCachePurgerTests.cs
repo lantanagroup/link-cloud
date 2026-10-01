@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -19,17 +19,16 @@ public class ResourceCachePurgerTests
         // A terminal failure means nothing downstream will ever consume this message's cache
         // entries, so the purge removes the {correlationId}:{ResourceType} acquisition keys AND
         // the {correlationId} key normalization was writing when it failed.
-        var (purger, cache, implementation) = BuildPurger(ResourceCacheType.Redis);
+        var (purger, cache) = BuildPurger();
 
         List<string>? deletedKeys = null;
-        implementation
+        cache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Callback<List<string>, CancellationToken>((keys, _) => deletedKeys = keys)
             .Returns(Task.CompletedTask);
 
         await purger.PurgeAsync(BuildValue(ResourceCacheType.Redis), "test");
 
-        cache.Verify(item => item.GetImplementation(ResourceCacheType.Redis), Times.Once);
         Assert.NotNull(deletedKeys);
         Assert.Equal(
             new List<string> { $"{CorrelationId}:Patient", $"{CorrelationId}:Encounter", CorrelationId },
@@ -39,10 +38,10 @@ public class ResourceCachePurgerTests
     [Fact]
     public async Task PurgeAsync_DoesNotDeleteTwiceWhenTheCorrelationKeyIsAlreadyPresent()
     {
-        var (purger, _, implementation) = BuildPurger(ResourceCacheType.Redis);
+        var (purger, cache) = BuildPurger();
 
         List<string>? deletedKeys = null;
-        implementation
+        cache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Callback<List<string>, CancellationToken>((keys, _) => deletedKeys = keys)
             .Returns(Task.CompletedTask);
@@ -59,15 +58,14 @@ public class ResourceCachePurgerTests
     [Fact]
     public async Task PurgeAsync_UsesTheCacheTypeCarriedOnTheMessage()
     {
-        var (purger, cache, implementation) = BuildPurger(ResourceCacheType.ABS);
+        var (purger, cache) = BuildPurger();
 
-        implementation
+        cache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         await purger.PurgeAsync(BuildValue(ResourceCacheType.ABS), "test");
 
-        cache.Verify(item => item.GetImplementation(ResourceCacheType.ABS), Times.Once);
     }
 
     [Fact]
@@ -78,34 +76,32 @@ public class ResourceCachePurgerTests
 
     private static async Task AssertNoDelete(List<string>? cacheKeys)
     {
-        var (purger, cache, implementation) = BuildPurger(ResourceCacheType.Redis);
+        var (purger, cache) = BuildPurger();
 
         var value = BuildValue(ResourceCacheType.Redis);
         value.CacheKeys = cacheKeys!;
 
         await purger.PurgeAsync(value, "test");
 
-        cache.Verify(item => item.GetImplementation(It.IsAny<ResourceCacheType>()), Times.Never);
-        implementation.Verify(
+        cache.Verify(
             item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task PurgeAsync_WithNullValue_DoesNotThrow()
     {
-        var (purger, cache, _) = BuildPurger(ResourceCacheType.Redis);
+        var (purger, cache) = BuildPurger();
 
         await purger.PurgeAsync(null, "test");
 
-        cache.Verify(item => item.GetImplementation(It.IsAny<ResourceCacheType>()), Times.Never);
     }
 
     [Fact]
     public async Task PurgeAsync_WhenDeleteThrows_SwallowsTheException()
     {
-        var (purger, _, implementation) = BuildPurger(ResourceCacheType.Redis);
+        var (purger, cache) = BuildPurger();
 
-        implementation
+        cache
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("cache unavailable"));
 
@@ -113,15 +109,12 @@ public class ResourceCachePurgerTests
         await purger.PurgeAsync(BuildValue(ResourceCacheType.Redis), "test");
     }
 
-    private static (ResourceCachePurger, Mock<IResourceCache>, Mock<IResourceCache>) BuildPurger(ResourceCacheType cacheType)
+    private static (ResourceCachePurger, Mock<IResourceCache>) BuildPurger()
     {
-        var implementation = new Mock<IResourceCache>();
         var cache = new Mock<IResourceCache>();
-        cache.Setup(item => item.GetImplementation(cacheType)).Returns(implementation.Object);
-
         var purger = new ResourceCachePurger(cache.Object, Mock.Of<ILogger<ResourceCachePurger>>());
 
-        return (purger, cache, implementation);
+        return (purger, cache);
     }
 
     private static ResourcesAcquiredValue BuildValue(ResourceCacheType cacheType) => new()

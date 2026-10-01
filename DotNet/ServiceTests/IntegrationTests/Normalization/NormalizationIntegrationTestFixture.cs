@@ -27,12 +27,14 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -167,6 +169,16 @@ namespace IntegrationTests.Normalization
             });
             builder.Services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
             builder.Services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
+
+            // Mirrors the Hybrid branch of AddResourceCache. One instance serving both roles: the
+            // cache enqueues through it and the host runs its consumer loop, so the durability
+            // barrier these tests cross actually has something draining the queue behind it.
+            builder.Services.AddMetrics();
+            builder.Services.TryAddSingleton<IResourceCacheMetrics, ResourceCacheMetrics>();
+            builder.Services.AddSingleton<BackgroundAbsCacheWriter>();
+            builder.Services.AddSingleton<IBackgroundAbsCacheWriter>(sp => sp.GetRequiredService<BackgroundAbsCacheWriter>());
+            builder.Services.AddHostedService(sp => sp.GetRequiredService<BackgroundAbsCacheWriter>());
+
             builder.Services.AddSingleton<IResourceCache, HybridResourceCache>();
             builder.Services.AddSingleton<IResourceCachePurger, ResourceCachePurger>();
             

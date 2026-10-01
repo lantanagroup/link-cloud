@@ -432,9 +432,6 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
         resourceCache ??= new Mock<IResourceCache>();
 
         resourceCache
-            .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
-            .Returns(resourceCache.Object);
-        resourceCache
             .Setup(item => item.GetResourceTypeByCacheKey(LocationCacheKey))
             .Returns(FhirResourceType.Location);
         resourceCache

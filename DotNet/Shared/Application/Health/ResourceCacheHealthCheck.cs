@@ -37,13 +37,22 @@ namespace LantanaGroup.Link.Shared.Application.Health
                     case ResourceCacheType.ABS:
                         return await CheckCacheAsync(CheckBlobStorageAsync, "Blob storage", timeoutCts.Token);
                     default:
-                        var redisResult = await CheckCacheAsync(CheckRedisAsync, "Redis", timeoutCts.Token);
-                        if (redisResult.Status != HealthStatus.Healthy)
+                        // Blob storage is the durable source, so it decides healthy or not. Redis is
+                        // a cache in front of it: losing it makes every read slower, not broken, and
+                        // reporting Unhealthy for that would have containers restarted over something
+                        // the design is built to absorb.
+                        var blobResult = await CheckCacheAsync(CheckBlobStorageAsync, "Blob storage", timeoutCts.Token);
+                        if (blobResult.Status != HealthStatus.Healthy)
                         {
-                            return redisResult;
+                            return blobResult;
                         }
 
-                        return await CheckCacheAsync(CheckBlobStorageAsync, "Blob storage", timeoutCts.Token);
+                        var redisResult = await CheckCacheAsync(CheckRedisAsync, "Redis", timeoutCts.Token);
+                        return redisResult.Status == HealthStatus.Healthy
+                            ? redisResult
+                            : HealthCheckResult.Degraded(
+                                "Resource cache is serving reads from blob storage; Redis is unavailable.",
+                                redisResult.Exception);
                 }
             }
 

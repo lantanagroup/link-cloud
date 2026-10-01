@@ -28,6 +28,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -60,6 +61,7 @@ public class PatientDataServiceTests
     private readonly Mock<IScheduledReportManager> _mockScheduledReportManager;
     private readonly Mock<IDataAcquisitionServiceMetrics> _mockMetrics;
     private readonly Mock<IOptionsMonitor<TelemetrySettings>> _mockTelemetrySettings;
+    private readonly Mock<IResourceCache> _mockResourceCache = new();
     private readonly Mock<ILocationMappingService> _mockLocationMappingService;
 
     private readonly PatientDataService _service;
@@ -128,7 +130,8 @@ public class PatientDataServiceTests
             _mockPatientCensusService.Object,
             _mockScheduledReportManager.Object,
             _mockMetrics.Object,
-            _mockTelemetrySettings.Object
+            _mockTelemetrySettings.Object,
+            _mockResourceCache.Object
         );
     }
 
@@ -801,6 +804,105 @@ public class PatientDataServiceTests
 
         // Assert
         _mockLogManager.Verify(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ExecuteLogRequest_AwaitsDurabilityBeforeWritingTheTerminalStatus()
+    {
+        // Arrange
+        var request = new AcquisitionRequest(1, "facilityId");
+        var cancellationToken = CancellationToken.None;
+
+        var log = new DataAcquisitionLog
+        {
+            Id = 1,
+            FacilityId = "facilityId",
+            Status = RequestStatus.Queued,
+            FhirQueries = new List<FhirQuery>
+        {
+            new FhirQuery
+            {
+                QueryType = FhirQueryType.Read,
+                FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                {
+                    new FhirQueryResourceType() { ResourceType = ResourceType.Patient }
+                },
+                QueryParameters = new List<string>(),
+                ResourceReferenceTypes = new List<ResourceReferenceType>()
+            }
+        },
+            ScheduledReportEntity = new ScheduledReportEntity(),
+            PatientId = "patient-1",
+            CorrelationId = "corr-1"
+        };
+
+        var model = DataAcquisitionLogModel.FromDomain(log);
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facilityId",
+            FhirServerBaseUrl = "http://example.com"
+        };
+
+        _mockLogQueries
+            .Setup(q => q.GetAsync(1, cancellationToken))
+            .ReturnsAsync(model);
+
+        _mockLogManager
+            .Setup(manager => manager.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), cancellationToken))
+            .Returns(Task.CompletedTask);
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facilityId", cancellationToken))
+            .ReturnsAsync(fhirQueryConfig);
+
+        _mockLogManager
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
+            .ReturnsAsync(true);
+
+        // ADD THIS SETUP - Mock the ExecuteRead method to return a list of IDs
+        _mockFhirApiService
+            .Setup(x => x.ExecuteRead(
+                It.IsAny<DataAcquisitionLogModel>(),
+                It.IsAny<FhirQueryModel>(),
+                It.IsAny<ResourceType>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
+                cancellationToken))
+            .ReturnsAsync(new[] { "Patient/patient-1" });
+
+        // Record the order of the two calls that matter. Once the log is terminal any pod can
+        // complete the tail and advertise this correlation's cache keys, so the durable write has to
+        // have landed first. Inverting these two lines is silent in every other test in this file.
+        var order = new List<string>();
+        var waitedOn = new List<string>();
+        _mockResourceCache
+            .Setup(c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, CancellationToken>((keys, _) =>
+            {
+                order.Add("durable");
+                waitedOn.AddRange(keys);
+            })
+            .Returns(Task.CompletedTask);
+        _mockLogManager
+            .Setup(m => m.UpdateAsync(It.IsAny<UpdateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("status"))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _service.ExecuteLogRequest(request, cancellationToken);
+
+        // Assert
+        Assert.NotEmpty(order);
+        Assert.Equal("durable", order[0]);
+
+        // Scoped to the keys this log wrote, never the whole correlation. A correlation-wide wait
+        // consumes a sibling log's durability failure and retires its state, and that sibling then
+        // finds nothing to wait on and advertises a key that never reached durable storage.
+        Assert.Equal(["corr-1:Patient"], waitedOn);
+        _mockResourceCache.Verify(
+            c => c.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

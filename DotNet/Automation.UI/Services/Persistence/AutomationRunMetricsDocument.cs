@@ -1,4 +1,4 @@
-using MongoDB.Bson;
+﻿using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -42,6 +42,7 @@ public sealed class AutomationRunMetricsDocument
     public List<ApiRouteLatencySnapshot> SlowestApiRoutes { get; set; } = [];
     public ThroughputSnapshot Throughput { get; set; } = new();
     public double E2eDurationSeconds { get; set; }
+    public ResourceCacheSnapshot ResourceCache { get; set; } = new();
     public List<ValidatorOutcomeSnapshot> Validators { get; set; } = [];
     public BenchmarkResultSnapshot Benchmark { get; set; } = new();
     public RegressionResultSnapshot Regression { get; set; } = new();
@@ -108,4 +109,43 @@ public sealed class ValidatorOutcomeSnapshot
     public string Name { get; set; } = string.Empty;
     public string Outcome { get; set; } = string.Empty;
     public int IssueCount { get; set; }
+}
+
+/// <summary>
+/// What the resource cache did during a run, for comparing an ABS baseline against the Hybrid
+/// implementation on the same scenario.
+/// </summary>
+/// <remarks>
+/// Scoped by the run's time window rather than by facility: the cache is shared across facilities
+/// within a service, and its instruments carry no facility tag. That is the right scope for this
+/// comparison, but it does mean a concurrent run on the same stack would contaminate these numbers.
+/// </remarks>
+public sealed class ResourceCacheSnapshot
+{
+    public bool Unavailable { get; set; } = true;
+
+    public double HitCount { get; set; }
+    public double FallbackCount { get; set; }
+    public double EmptyCount { get; set; }
+
+    /// <summary>
+    /// Hits as a fraction of reads that found something. Reads that found nothing in either store
+    /// are excluded: they say nothing about whether the cache is earning its place.
+    /// </summary>
+    public double HitRatio { get; set; }
+
+    public double ReadP95Ms { get; set; }
+    public double DurableWriteP95Ms { get; set; }
+    public double QueueWaitP95Ms { get; set; }
+
+    /// <summary>
+    /// How long callers blocked on the durability barrier. The part of the durable write that is
+    /// not overlapped with other work, and so the cost the design is judged on.
+    /// </summary>
+    public double DrainWaitP50Ms { get; set; }
+    public double DrainWaitP95Ms { get; set; }
+
+    public double PeakQueueDepth { get; set; }
+    public double WriteRetryCount { get; set; }
+    public double WriteExhaustedCount { get; set; }
 }

@@ -28,6 +28,13 @@ public class RedisResourceService {
     }
 
 
+    /**
+     * Field-name prefix reserved for cache metadata rather than FHIR resources. Resource fields are
+     * always {@code resourceType/resourceId}, so the two can never collide. Shared with the .NET
+     * writers; see docs-dev/resource-cache.md.
+     */
+    static final String METADATA_FIELD_PREFIX = "__";
+
     public List<Resource> readResources(String facilityId, String correlationId, String patientId) {
         HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
 
@@ -59,6 +66,16 @@ public class RedisResourceService {
             String field = entry.getKey();
             String json = entry.getValue();
             if (json == null || json.isEmpty()) {
+                continue;
+            }
+
+            // Cache metadata, not a resource. The writers share the entry with fields that describe
+            // it -- the durable resource count the .NET side records so a reader can tell an entry
+            // recreated by a partial append from a whole one -- and they are deliberately in the same
+            // hash so one TTL covers them and deleting the entry clears them with it. Skipped quietly:
+            // warning here would fire once per correlation read, on the hottest path there is.
+            // See docs-dev/resource-cache.md.
+            if (field.startsWith(METADATA_FIELD_PREFIX)) {
                 continue;
             }
 

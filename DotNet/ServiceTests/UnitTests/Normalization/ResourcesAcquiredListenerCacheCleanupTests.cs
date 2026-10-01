@@ -59,9 +59,6 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var purger = new Mock<IResourceCachePurger>();
         var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
-            .Throws(new TransientException("cache is unreachable"));
 
         var listener = BuildListener(purger, transientHandler: transientHandler, resourceCache: resourceCache);
 
@@ -82,9 +79,6 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var purger = new Mock<IResourceCachePurger>();
         var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
-            .Throws(new InvalidOperationException("boom"));
 
         var listener = BuildListener(purger, transientHandler: transientHandler, resourceCache: resourceCache);
 
@@ -106,9 +100,6 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         var purger = new Mock<IResourceCachePurger>();
         var metrics = new Mock<INormalizationServiceMetrics>();
         var resourceCache = new Mock<IResourceCache>();
-        resourceCache
-            .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
-            .Throws(new TransientException("cache is unreachable"));
 
         var listener = BuildListener(purger, resourceCache: resourceCache, metrics: metrics);
 

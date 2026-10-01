@@ -82,16 +82,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
-    private readonly IResourceCache _resourceCache;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider, IResourceCache resourceCache)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
-        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -959,9 +957,10 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     ScheduledReports = representative.ScheduledReport != null
                         ? new List<ScheduledReport> { representative.ScheduledReport }
                         : new List<ScheduledReport>(),
-                    CacheType = await _resourceCache.GetCacheTypeForCorrelationIdAsync(
-                        groupInfo.CorrelationId ?? string.Empty,
-                        cancellationToken),
+                    // Constant since the cache stopped choosing between stores: every correlation is now
+                    // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
+                    // removes it from the contract in both runtimes.
+                    CacheType = ResourceCacheType.ABS,
                     CacheKeys = acquiredResourceTypes
                         .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
                         .Distinct()

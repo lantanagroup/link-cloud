@@ -33,10 +33,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private string GetBlobIdsKey(string key) =>
             GetBlobKey(key) + "_ids";
 
-        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
+        public async Task AppendResourcesAsync(string cacheKey, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
-            string blobName = GetBlobKey(correlationId);
-            string idsBlobName = GetBlobIdsKey(correlationId);
+            string blobName = GetBlobKey(cacheKey);
+            string idsBlobName = GetBlobIdsKey(cacheKey);
             
             //First read the existing blob to get the list of resource references that are already in the cache. 
             // This is necessary because we want to append new resources to the existing blob, 
@@ -130,6 +130,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 return resources;
             }
 
+            // The payload blob can legitimately contain the same reference twice: a crash between the
+            // payload append and the ids append leaves a resource the retry's diff will not skip, and
+            // two processes appending to one key can interleave. Collapsing on read makes both
+            // harmless -- wasted bytes rather than duplicate resources.
+            var seenReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var duplicateCount = 0;
+
             await using (Stream readStream = await readBlobClient.OpenReadAsync(true, cancellationToken: cancellationToken))
             using (StreamReader reader = new StreamReader(readStream))
             {
@@ -148,6 +155,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                         break;
                     }
 
+                    if (!seenReferences.Add(resourceReference))
+                    {
+                        duplicateCount++;
+                        continue;
+                    }
+
                     try
                     {
                         DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
@@ -161,8 +174,85 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 }
             }
 
+            if (duplicateCount > 0)
+            {
+                _logger.LogWarning(
+                    "Collapsed {DuplicateCount} duplicate reference(s) reading {CacheKey}. Expected after an interrupted or concurrent write; persistent growth here means writes to one key are not being serialized.",
+                    duplicateCount,
+                    cacheKey.SanitizeForLog());
+            }
+
             return resources;
         }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Sequential rather than atomic: this store has no transaction, and it does not need one.
+        /// Nothing shadows it, so a reader arriving between the two steps reads an empty key and gets an
+        /// empty answer rather than a stale one -- and the callers that replace do so before anything
+        /// downstream is told the key exists.
+        /// </remarks>
+        public async Task ReplaceResourcesAsync(
+            string cacheKey,
+            List<DomainResource> resources,
+            ResourceType resourceType,
+            CancellationToken cancellationToken = default)
+        {
+            await DeleteAsync([cacheKey], cancellationToken);
+
+            if (resources != null && resources.Count > 0)
+            {
+                await AppendResourcesAsync(cacheKey, resources, resourceType, cancellationToken);
+            }
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Read from the ids blob rather than the payload, so the cost is one small listing of resource
+        /// references instead of deserializing every resource.
+        /// </remarks>
+        public async Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        {
+            var idsBlobClient = _containerClient.GetBlobClient(GetBlobIdsKey(cacheKey));
+
+            if (!(await idsBlobClient.ExistsAsync(cancellationToken)).Value)
+            {
+                return 0;
+            }
+
+            var count = 0;
+
+            await using var stream = await idsBlobClient.OpenReadAsync(cancellationToken: cancellationToken);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// This store is the durable one, so its own count is the answer and there is nothing recorded.
+        /// </remarks>
+        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            GetResourceCountAsync(cacheKey, cancellationToken).ContinueWith(
+                task => (int?)task.Result,
+                cancellationToken,
+                TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// Ignored. Nothing shadows this store, so it has no partial-entry problem to detect.
+        /// </remarks>
+        public Task SetDurableResourceCountAsync(string cacheKey, int count, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
@@ -183,31 +273,27 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
+        /// <summary>
+        /// Completes immediately: this cache writes durably in-line, so there is never a queued write
+        /// outstanding.
+        /// </summary>
+        public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default)
         {
-            return ResourceCacheType.ABS;
+            return Task.CompletedTask;
         }
 
-        public Task<ResourceCacheType> GetCacheTypeForCorrelationIdAsync(string correlationId, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Completes immediately: this store is the durable one, so a write that returned has landed.
+        /// </summary>
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(ResourceCacheType.ABS);
-        }
-
-        public IResourceCache GetImplementation(ResourceCacheType cacheType)
-        {
-            if (cacheType != ResourceCacheType.ABS)
-                throw new NotSupportedException($"{nameof(ABSResourceCache)} does not support cache type '{cacheType}'.");
-            return this;
+            return Task.CompletedTask;
         }
 
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             // The ids append blob is only created when at least one resource was written.
             return (await _containerClient.GetBlobClient(GetBlobIdsKey(cacheKey)).ExistsAsync(cancellationToken)).Value;
-        }
-
-        public void ForgetCacheTypeForCorrelationId(string correlationId)
-        {
         }
 
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)

@@ -602,6 +602,9 @@ services:
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8065:8065"
     build:
@@ -644,6 +647,9 @@ services:
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
        ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
        ResourceCache__BlobStorage__BlobRoot: resource-cache
+       Telemetry__EnableTelemetry: true
+       Telemetry__EnableOtelCollector: true
+       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
      ports:
        - "8078:8078"
      build:
@@ -800,6 +806,9 @@ services:
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
       ResourceCache__CacheImplementation: Hybrid
+      Telemetry__EnableTelemetry: true
+      Telemetry__EnableOtelCollector: true
+      Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
     ports:
       - "8068:8068"
     build:

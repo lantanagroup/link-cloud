@@ -494,7 +494,7 @@ public class FhirApiService : IFhirApiService
 
         foreach (var (resourceType, typedResources) in resourcesByType)
         {
-            await _resourceCache.UpdateCorrelationCacheAsync(
+            await _resourceCache.AppendResourcesAsync(
                 $"{log.CorrelationId}:{resourceType}",
                 typedResources,
                 resourceType,

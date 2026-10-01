@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
@@ -60,15 +60,12 @@ public class ResourceCachePurger : IResourceCachePurger
 
         try
         {
-            await _resourceCache
-                .GetImplementation(value!.CacheType)
-                .DeleteAsync(keysToDelete, cancellationToken);
+            await _resourceCache.DeleteAsync(keysToDelete, cancellationToken);
 
             _logger.LogInformation(
-                "Purged {KeyCount} resource cache entries after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
+                "Purged {KeyCount} resource cache entries after terminal failure ({Reason}). Keys: [{Keys}]",
                 keysToDelete.Count,
                 reason.SanitizeForLog(),
-                value.CacheType,
                 string.Join(", ", keysToDelete).SanitizeForLog());
         }
         catch (Exception ex)
@@ -76,9 +73,8 @@ public class ResourceCachePurger : IResourceCachePurger
             // Never let cleanup failure escape: the caller is already handling a failed message, and
             // the cache expiration policy is the backstop for whatever we could not delete here.
             _logger.LogError(ex,
-                "Failed to purge resource cache after terminal failure ({Reason}). CacheType: {CacheType}, Keys: [{Keys}]",
+                "Failed to purge resource cache after terminal failure ({Reason}). Keys: [{Keys}]",
                 reason.SanitizeForLog(),
-                value!.CacheType,
                 string.Join(", ", keysToDelete).SanitizeForLog());
         }
     }

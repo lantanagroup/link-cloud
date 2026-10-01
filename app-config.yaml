@@ -631,6 +631,30 @@ services:
     - key: "ResourceCache:BlobStorage:BlobRoot"
       description: "Optional blob name prefix used by the resource cache. Defaults to empty."
       required: false
+    # The background blob writer keeps the durable write off the acquisition critical path. Every
+    # value ships a working default, so these are operational knobs rather than rows that have to
+    # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
+    # large-census load; see docs-dev/resource-cache.md.
+    - key: "ResourceCache:AbsWriter:QueueCapacity"
+      description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
+      required: false
+      defaultValue: "1000"
+    - key: "ResourceCache:AbsWriter:MaxConcurrency"
+      description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
+      required: false
+      defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
+      description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
+      required: false
+      defaultValue: "3"
+    - key: "ResourceCache:AbsWriter:RetryBaseDelayMilliseconds"
+      description: "The delay before the first blob-write retry, doubling on each subsequent attempt. Defaults to 200."
+      required: false
+      defaultValue: "200"
+    - key: "ResourceCache:AbsWriter:DrainTimeoutSeconds"
+      description: "How long shutdown waits for queued blob writes to finish. Writes still queued when this elapses are abandoned; their cache keys were never advertised, so the work that produced them is recovered and retried. Defaults to 30."
+      required: false
+      defaultValue: "30"
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
       description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
@@ -672,6 +696,30 @@ services:
     - key: "ResourceCache:BlobStorage:BlobRoot"
       description: "Optional blob name prefix used by the resource cache. Defaults to empty."
       required: false
+    # The background blob writer keeps the durable write off the acquisition critical path. Every
+    # value ships a working default, so these are operational knobs rather than rows that have to
+    # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
+    # large-census load; see docs-dev/resource-cache.md.
+    - key: "ResourceCache:AbsWriter:QueueCapacity"
+      description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
+      required: false
+      defaultValue: "1000"
+    - key: "ResourceCache:AbsWriter:MaxConcurrency"
+      description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
+      required: false
+      defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
+      description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
+      required: false
+      defaultValue: "3"
+    - key: "ResourceCache:AbsWriter:RetryBaseDelayMilliseconds"
+      description: "The delay before the first blob-write retry, doubling on each subsequent attempt. Defaults to 200."
+      required: false
+      defaultValue: "200"
+    - key: "ResourceCache:AbsWriter:DrainTimeoutSeconds"
+      description: "How long shutdown waits for queued blob writes to finish. Writes still queued when this elapses are abandoned; their cache keys were never advertised, so the work that produced them is recovered and retried. Defaults to 30."
+      required: false
+      defaultValue: "30"
   # No service-specific required config: this service reads only global keys. An explicit
   # empty list keeps it paired with its serviceMeta entry.
   Census: []
@@ -804,6 +852,30 @@ services:
     - key: "ResourceCache:BlobStorage:BlobRoot"
       description: "Optional blob name prefix used by the resource cache. Defaults to empty."
       required: false
+    # The background blob writer keeps the durable write off the acquisition critical path. Every
+    # value ships a working default, so these are operational knobs rather than rows that have to
+    # exist in a store. QueueCapacity and MaxConcurrency are the two to tune together under
+    # large-census load; see docs-dev/resource-cache.md.
+    - key: "ResourceCache:AbsWriter:QueueCapacity"
+      description: "The maximum number of resource cache writes waiting to be persisted to blob storage before callers are made to wait for space. A queued write holds its deserialized resources in memory, so this bounds memory as much as throughput. Defaults to 1000."
+      required: false
+      defaultValue: "1000"
+    - key: "ResourceCache:AbsWriter:MaxConcurrency"
+      description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
+      required: false
+      defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
+      description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
+      required: false
+      defaultValue: "3"
+    - key: "ResourceCache:AbsWriter:RetryBaseDelayMilliseconds"
+      description: "The delay before the first blob-write retry, doubling on each subsequent attempt. Defaults to 200."
+      required: false
+      defaultValue: "200"
+    - key: "ResourceCache:AbsWriter:DrainTimeoutSeconds"
+      description: "How long shutdown waits for queued blob writes to finish. Writes still queued when this elapses are abandoned; their cache keys were never advertised, so the work that produced them is recovered and retried. Defaults to 30."
+      required: false
+      defaultValue: "30"
   Notification:
     - key: "SmtpConnection:Host"
       description: "The SMTP server hostname for sending notifications."

@@ -18,6 +18,12 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
 
         public ResourceCacheRedisSettings Redis { get; set; } = new();
         public ResourceCacheBlobStorageSettings BlobStorage { get; set; } = new();
+
+        /// <summary>
+        /// Tuning for the background writer that persists entries to blob storage. Only used by the
+        /// <see cref="ResourceCacheType.Hybrid"/> implementation.
+        /// </summary>
+        public ResourceCacheAbsWriterSettings AbsWriter { get; set; } = new();
     }
 
     public class ResourceCacheRedisSettings

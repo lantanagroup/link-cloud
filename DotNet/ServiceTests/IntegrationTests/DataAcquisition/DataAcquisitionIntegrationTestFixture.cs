@@ -204,14 +204,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
             builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
             ResourceCacheMock
-                .Setup(c => c.GetImplementation(It.IsAny<ResourceCacheType>()))
-                .Returns(ResourceCacheMock.Object);
-            ResourceCacheMock
                 .Setup(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<DomainResource>());
-            ResourceCacheMock
-                .Setup(c => c.GetCacheTypeForCorrelationIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(ResourceCacheType.Redis);
             ResourceCacheMock
                 .Setup(c => c.HasResourcesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(false);

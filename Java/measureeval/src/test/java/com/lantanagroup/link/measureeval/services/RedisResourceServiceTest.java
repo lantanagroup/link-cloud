@@ -79,4 +79,37 @@ class RedisResourceServiceTest {
         assertEquals(1, resources.size());
         assertEquals("p1", resources.get(0).getResourceId());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void readResources_skipsMetadataFields_withoutWarning() {
+        // The writers keep metadata describing the entry in the entry's own hash, so one lifetime
+        // covers both and deleting the entry clears its metadata with it. Such a field is dropped
+        // either way -- it has no '/' -- so the behaviour under test is the absence of the warning:
+        // treating it as malformed would log once per correlation read, on the hottest path there is.
+        ch.qos.logback.classic.Logger serviceLogger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(RedisResourceService.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        serviceLogger.addAppender(appender);
+
+        try {
+            when(hashOps.entries("corr")).thenReturn(Map.of(
+                    "Patient/p1", "{\"resourceType\":\"Patient\",\"id\":\"p1\"}",
+                    RedisResourceService.METADATA_FIELD_PREFIX + "durableResourceCount", "753"));
+
+            List<Resource> resources = service.readResources("fac", "corr", "pat");
+
+            assertEquals(1, resources.size());
+            assertEquals("p1", resources.get(0).getResourceId());
+
+            boolean warned = appender.list.stream()
+                    .anyMatch(event -> event.getLevel() == ch.qos.logback.classic.Level.WARN);
+            org.junit.jupiter.api.Assertions.assertFalse(
+                    warned, "metadata fields must not be reported as malformed");
+        } finally {
+            serviceLogger.detachAppender(appender);
+        }
+    }
 }

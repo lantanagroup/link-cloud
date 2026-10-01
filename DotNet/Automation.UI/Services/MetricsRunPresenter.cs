@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Models.Metrics;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -255,6 +255,7 @@ public sealed class MetricsRunPresenter
             ApiLatency = ToApiLatency(document),
             SlowestApiRoutes = ToSlowestApiRoutes(document),
             BenchmarkViolations = document.Benchmark.Violations,
+            ResourceCache = ToResourceCache(document),
             RegressionFlags = document.Regression.Flags,
             PreviousRunId = document.Regression.PreviousRunId,
             Validators = document.Validators.Select(v => new ValidatorOutcomeSnapshotView
@@ -286,6 +287,7 @@ public sealed class MetricsRunPresenter
             ApiLatency = EmptyUnavailableApiLatency(),
             SlowestApiRoutes = [],
             BenchmarkViolations = [],
+            ResourceCache = new ResourceCacheView { Unavailable = true },
             RegressionFlags = []
         };
     }
@@ -301,6 +303,27 @@ public sealed class MetricsRunPresenter
         public Task<(IReadOnlyList<AutomationMetricsBenchmarkDocument> Records, long TotalCount)> ListPageAsync(
             int pageNumber, int pageSize, CancellationToken cancellationToken = default) =>
             Task.FromResult(((IReadOnlyList<AutomationMetricsBenchmarkDocument>)[], 0L));
+    }
+
+    private static ResourceCacheView ToResourceCache(AutomationRunMetricsDocument document)
+    {
+        var cache = document.ResourceCache;
+        if (cache is null || cache.Unavailable)
+            return new ResourceCacheView { Unavailable = true };
+
+        return new ResourceCacheView
+        {
+            Unavailable = false,
+            HitRatioPercent = cache.HitRatio * 100,
+            HitCount = cache.HitCount,
+            FallbackCount = cache.FallbackCount,
+            ReadP95Ms = cache.ReadP95Ms,
+            DrainWaitP95Ms = cache.DrainWaitP95Ms,
+            DurableWriteP95Ms = cache.DurableWriteP95Ms,
+            QueueWaitP95Ms = cache.QueueWaitP95Ms,
+            PeakQueueDepth = cache.PeakQueueDepth,
+            WriteExhaustedCount = cache.WriteExhaustedCount
+        };
     }
 
     internal static bool AreStagesUnavailable(AutomationRunMetricsDocument document) =>

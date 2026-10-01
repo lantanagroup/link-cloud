@@ -42,8 +42,7 @@ public class DataAcquisitionLogManagerTests
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var semaphoreProvider = CreateSemaphoreProviderMock();
-        var resourceCache = scope.ServiceProvider.GetRequiredService<IResourceCache>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider, resourceCache);
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider);
     }
 
     private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()
