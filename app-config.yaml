@@ -637,6 +637,10 @@ services:
       description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
       required: false
       defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxCoalescedResources"
+      description: "The most resources folded into one blob write when several writes for the same cache key are outstanding. A worker that finds a key already being written hands its batch to the worker holding it rather than waiting, and successive hand-offs merge, which is what stops one patient's writes monopolising the pool. A handed-off batch no longer occupies a queue slot, so this is the ceiling that keeps it inside the memory bound ResourceCache:AbsWriter:QueueCapacity provides; at the ceiling a worker waits for the key instead. Defaults to 2000."
+      required: false
+      defaultValue: "2000"
     - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
       description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
       required: false
@@ -696,6 +700,10 @@ services:
       description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
       required: false
       defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxCoalescedResources"
+      description: "The most resources folded into one blob write when several writes for the same cache key are outstanding. A worker that finds a key already being written hands its batch to the worker holding it rather than waiting, and successive hand-offs merge, which is what stops one patient's writes monopolising the pool. A handed-off batch no longer occupies a queue slot, so this is the ceiling that keeps it inside the memory bound ResourceCache:AbsWriter:QueueCapacity provides; at the ceiling a worker waits for the key instead. Defaults to 2000."
+      required: false
+      defaultValue: "2000"
     - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
       description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
       required: false
@@ -846,6 +854,10 @@ services:
       description: "How many blob writes may run at once, across distinct cache keys. Writes to the same key are always serialized regardless of this value, because the write reads that key's id list before appending to it. Defaults to 8."
       required: false
       defaultValue: "8"
+    - key: "ResourceCache:AbsWriter:MaxCoalescedResources"
+      description: "The most resources folded into one blob write when several writes for the same cache key are outstanding. A worker that finds a key already being written hands its batch to the worker holding it rather than waiting, and successive hand-offs merge, which is what stops one patient's writes monopolising the pool. A handed-off batch no longer occupies a queue slot, so this is the ceiling that keeps it inside the memory bound ResourceCache:AbsWriter:QueueCapacity provides; at the ceiling a worker waits for the key instead. Defaults to 2000."
+      required: false
+      defaultValue: "2000"
     - key: "ResourceCache:AbsWriter:MaxRetryAttempts"
       description: "How many times a failing blob write is retried before its cache key is treated as permanently undurable. That failure is surfaced to whatever is waiting on the key, so the work that produced it fails rather than advertising a key with no durable copy behind it. Defaults to 3."
       required: false
