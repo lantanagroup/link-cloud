@@ -77,12 +77,13 @@ public class ResourceCacheReader {
         long start = System.nanoTime();
         String fallbackReason;
         try {
-            List<Resource> resources = redisResourceService.readResources(facilityId, cacheKey, patientId);
+            RedisCacheEntry entry = redisResourceService.readEntry(facilityId, cacheKey, patientId);
+            List<Resource> resources = entry.resources();
             if (resources.isEmpty()) {
                 logger.debug("Redis miss for cacheKey='{}' (absent, empty or evicted); reading from ABS",
                         LogUtils.sanitize(cacheKey));
                 fallbackReason = REASON_MISS;
-            } else if (isWholeEntry(cacheKey, resources.size(), phase)) {
+            } else if (isWholeEntry(cacheKey, resources.size(), entry, phase)) {
                 logger.debug("Resource cache hit in Redis for cacheKey='{}' ({} resources)",
                         LogUtils.sanitize(cacheKey), resources.size());
                 recordRead(OUTCOME_HIT, null, phase, start);
@@ -117,20 +118,18 @@ public class ResourceCacheReader {
     /**
      * Whether a non-empty cache entry can be trusted as the whole record. Mirrors the .NET
      * {@code HybridResourceCache.IsCacheEntryWholeAsync} rule, including its leniencies: no recorded
-     * count, a count the entry meets or exceeds, or a failure to read the count all trust the entry.
-     * Only an entry holding fewer resources than the durable store is rejected.
+     * count, a count the entry meets or exceeds, or an unusable count all trust the entry. Only an
+     * entry holding fewer resources than the durable store is rejected.
+     * <p>
+     * The count comes from the same HGETALL as the resources ({@link RedisCacheEntry}), so an
+     * eviction cannot fall between reading one and the other.
      * <p>
      * {@code cachedCount} is the number of resources the read parsed, so a field skipped as an
      * unknown resource type also lowers it. That can only make the check stricter — a needless ABS
      * read — never let a partial entry through.
      */
-    private boolean isWholeEntry(String cacheKey, int cachedCount, String phase) {
-        Integer durableCount;
-        try {
-            durableCount = redisResourceService.readDurableResourceCount(cacheKey);
-        } catch (RuntimeException e) {
-            logger.warn("Could not read the durable resource count for cacheKey='{}'; treating the cache entry as whole: {}",
-                    LogUtils.sanitize(cacheKey), LogUtils.sanitize(e.getMessage()));
+    private boolean isWholeEntry(String cacheKey, int cachedCount, RedisCacheEntry entry, String phase) {
+        if (entry.durableCountUnparseable()) {
             // Counted because trusting unchecked is silent: if it happens often, the partial-entry
             // check is effectively off.
             try {
@@ -142,6 +141,7 @@ public class ResourceCacheReader {
             return true;
         }
 
+        Integer durableCount = entry.durableCount();
         if (durableCount == null || cachedCount >= durableCount) {
             return true;
         }

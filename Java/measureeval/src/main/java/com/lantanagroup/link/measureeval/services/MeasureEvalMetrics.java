@@ -40,9 +40,9 @@ public class MeasureEvalMetrics {
     static final String CACHE_FALLBACK_REASON = "cache.fallback.reason";
 
     /**
-     * Counts reads where the durable count could not be read, so the cache entry was trusted
-     * without the partial-entry check. Occasional is expected; a meaningful share of hits means the
-     * check is effectively off.
+     * Counts reads whose recorded durable count did not parse, so the cache entry was trusted
+     * without the partial-entry check. The count is read with the resources in one HGETALL, so an
+     * unparseable value is the only way left for it to be unusable. Should stay at zero.
      */
     static final String DURABLE_COUNT_READ_FAILURE_COUNT = "link_resource_cache_durable_count_read_failure_count";
 
@@ -94,7 +94,7 @@ public class MeasureEvalMetrics {
                 .build();
         durableCountReadFailureCounter = meter
                 .counterBuilder(DURABLE_COUNT_READ_FAILURE_COUNT)
-                .setDescription("Reads that trusted the cache entry because its durable count could not be read")
+                .setDescription("Reads that trusted the cache entry because its recorded durable count did not parse")
                 .build();
     }
 
@@ -117,7 +117,7 @@ public class MeasureEvalMetrics {
     }
 
     /**
-     * Counts one read whose durable count could not be read, so the entry was trusted unchecked.
+     * Counts one read whose recorded durable count did not parse, so the entry was trusted unchecked.
      *
      * @param phase the pass the read belongs to, or {@code null}; the tag is then omitted
      */
