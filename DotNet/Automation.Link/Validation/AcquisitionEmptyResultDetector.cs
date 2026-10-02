@@ -29,6 +29,7 @@ public static class AcquisitionEmptyResultDetector
             .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
             .ToList();
 
+        var countsByPatient = BuildCountLookup(acquiredByPatient);
         var notReportablePatients = BuildNotReportablePatients(logs);
         var findings = new List<EmptyAcquisition>();
 
@@ -46,7 +47,7 @@ public static class AcquisitionEmptyResultDetector
                 if (expectedCount <= 0)
                     continue;
 
-                var actualCount = CountForPatient(acquiredIds, acquiredByPatient, patientId, resourceType);
+                var actualCount = CountForPatient(acquiredIds, countsByPatient, patientId, resourceType);
                 if (actualCount == 0)
                     findings.Add(new EmptyAcquisition(patientId, resourceType, expectedCount, actualCount));
             }
@@ -55,27 +56,49 @@ public static class AcquisitionEmptyResultDetector
         return findings;
     }
 
+    private static Dictionary<string, Dictionary<string, int>>? BuildCountLookup(
+        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient)
+    {
+        if (acquiredByPatient == null)
+            return null;
+
+        var lookup = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+        foreach (var row in acquiredByPatient)
+        {
+            if (string.IsNullOrWhiteSpace(row.PatientId) || string.IsNullOrWhiteSpace(row.ResourceType))
+                continue;
+
+            if (!lookup.TryGetValue(row.PatientId, out var byType))
+            {
+                byType = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                lookup[row.PatientId] = byType;
+            }
+
+            byType[row.ResourceType] = byType.TryGetValue(row.ResourceType, out var current)
+                ? current + row.Count
+                : row.Count;
+        }
+
+        return lookup;
+    }
+
     private static int CountForPatient(
         IReadOnlyList<string> acquiredResourceIds,
-        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient,
+        Dictionary<string, Dictionary<string, int>>? countsByPatient,
         string patientId,
         string resourceType)
     {
         // Log rows already name the patient. Imported resources use their own ids, so a
         // "{patientId}-" prefix on the resource id is not a reliable owner check.
-        if (acquiredByPatient != null)
+        if (countsByPatient != null)
         {
-            var count = 0;
-            foreach (var row in acquiredByPatient)
+            if (countsByPatient.TryGetValue(patientId, out var byType)
+                && byType.TryGetValue(resourceType, out var count))
             {
-                if (string.Equals(row.PatientId, patientId, StringComparison.Ordinal)
-                    && string.Equals(row.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase))
-                {
-                    count += row.Count;
-                }
+                return count;
             }
 
-            return count;
+            return 0;
         }
 
         return CountAcquiredForPatient(acquiredResourceIds, patientId, resourceType);
