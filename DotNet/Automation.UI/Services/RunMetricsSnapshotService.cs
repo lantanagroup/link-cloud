@@ -443,7 +443,18 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{{facility_id=\"{facility}\"}}[{windowSeconds}s])))";
 
     internal static string StageErrorQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
-        $"sum(increase({errorCounter}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
+        $"sum(increase({PromCounter(errorCounter)}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
+
+    /// <summary>
+    /// The name a counter is exported under: the instrument name plus <c>_total</c>.
+    /// </summary>
+    /// <remarks>
+    /// The collector's Prometheus exporter runs with <c>add_metric_suffixes</c> on, the same setting that
+    /// puts <c>_milliseconds</c> on the histograms, and it appends <c>_total</c> to every monotonic sum. A
+    /// query for the bare instrument name matches nothing, and an empty result reads as a confident zero.
+    /// </remarks>
+    internal static string PromCounter(string counter) =>
+        counter.EndsWith("_total", StringComparison.Ordinal) ? counter : counter + "_total";
 
     // No facility filter: the resource cache is shared across facilities within a service and its
     // instruments carry no facility tag, so the run window is the scope.
@@ -454,7 +465,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{labels}[{windowSeconds}s])))";
 
     internal static string CacheCounterQuery(string counter, string outcome, int windowSeconds) =>
-        $"sum(increase({counter}{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
+        $"sum(increase({PromCounter(counter)}{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
 
     internal static string CachePeakQueueDepthQuery(int windowSeconds) =>
         $"max(max_over_time(link_resource_cache_queue_depth[{windowSeconds}s]))";
