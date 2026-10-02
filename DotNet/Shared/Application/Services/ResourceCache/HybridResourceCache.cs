@@ -172,15 +172,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             // being removed.
             _absWriter.Cancel(cacheKeys);
 
-            try
-            {
-                await _redisCache.DeleteAsync(cacheKeys, cancellationToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // The cache entry expires on its own, and the durable delete below is what matters.
-                _logger.LogWarning(ex, "Could not clear cache entries for [{CacheKeys}]; they will expire.", string.Join(", ", cacheKeys).SanitizeForLog());
-            }
+            // A failed cache delete stops before durable storage is touched. A cache entry that outlives
+            // its blob is served whole, so a redelivery could copy one key and find a later evicted one
+            // empty, which reads as a producer defect. See docs-dev/resource-cache.md.
+            await _redisCache.DeleteAsync(cacheKeys, cancellationToken);
 
             await _absCache.DeleteAsync(cacheKeys, cancellationToken);
         }
