@@ -300,9 +300,32 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // DA only lists a key after it has written (and not stripped) resources there.
-                    // An empty listed key is a producer defect, not a not-ready race: retries cannot
-                    // create data that was never cached (org-map filter, Encounter strip, etc.).
+                    // Keys are released only after ResourcesNormalized is produced, so an empty listed
+                    // key next to a populated correlation entry means this message was already
+                    // normalized: a redelivery after the release, or a duplicate. Dead-lettering it
+                    // would purge {correlationId}, which MeasureEval has already been told to read.
+                    if (await resourceCache.HasResourcesAsync(correlationId, cancellationToken))
+                    {
+                        _logger.LogWarning(
+                            "ResourcesAcquired for FacilityId={FacilityId}, CorrelationId={CorrelationId}, QueryType={QueryType} "
+                            + "lists cache key {CacheKey}, which is empty while the correlation entry is populated. Treating "
+                            + "the message as already normalized and acknowledging it without producing again.",
+                            result.Message.Key.FacilityId.SanitizeForLog(),
+                            correlationId.SanitizeForLog(),
+                            result.Message.Value.QueryType.SanitizeForLog(),
+                            cacheKey.SanitizeForLog());
+
+                        // Keys before this one were re-appended on the way here. They duplicate what is
+                        // already durable, but a failed write of them is still recorded, so they get
+                        // the same barrier as a first pass rather than being left in the queue.
+                        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
+                        await TryReleaseAcquisitionKeysAsync(resourceCache, cacheKeys, correlationId, cancellationToken);
+                        return;
+                    }
+
+                    // Otherwise DA listed a key it never wrote (or stripped) resources into. That is a
+                    // producer defect, not a not-ready race: retries cannot create data that was never
+                    // cached (org-map filter, Encounter strip, etc.).
                     throw new DeadLetterException(
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
                         $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
@@ -459,7 +482,42 @@ public class ResourcesAcquiredListener : BackgroundService
             mappingOutcomes,
             cancellationToken);
 
-        await resourceCache.DeleteAsync(copiedKeys, cancellationToken);
+        await TryReleaseAcquisitionKeysAsync(resourceCache, copiedKeys, correlationId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes the acquisition keys once their resources are in the correlation entry, on a best-effort basis.
+    /// </summary>
+    /// <remarks>
+    /// Runs after ResourcesNormalized has gone out, so a failure here must not fail the message. A
+    /// retry would find some keys already gone, and anything that then purges the message would take
+    /// {correlationId} with it -- the entry MeasureEval was just told to read. The keys expire in
+    /// Redis, and the storage lifecycle rule removes the blobs. Cancellation still propagates: the
+    /// offset is then not committed, and the redelivery is recognised as already normalized.
+    /// </remarks>
+    private async Task TryReleaseAcquisitionKeysAsync(
+        IResourceCache resourceCache,
+        List<string> cacheKeys,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await resourceCache.DeleteAsync(cacheKeys, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not release acquisition cache keys for CorrelationId={CorrelationId} after normalizing them. "
+                + "They will be removed by expiry and the storage lifecycle rule. Keys: [{CacheKeys}]",
+                correlationId.SanitizeForLog(),
+                string.Join(", ", cacheKeys).SanitizeForLog());
+        }
     }
 
     private static List<HSLOCMappingResult> BuildHSLOCMappingResults(string facilityId, DomainResource resource, OperationResult? operationResult)
