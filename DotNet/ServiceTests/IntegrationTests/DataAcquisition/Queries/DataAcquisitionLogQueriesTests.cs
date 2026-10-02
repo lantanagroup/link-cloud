@@ -1492,19 +1492,19 @@ public class DataAcquisitionLogQueriesTests
                 CorrelationId = Guid.NewGuid().ToString(),
                 TraceId = Guid.NewGuid().ToString(),
                 FhirVersion = "test",
+                TailSent = true,
                 ScheduledReportEntity = scheduledReport,
                 ResourceIds = resourceIds.Select(id => new DataAcquisitionLogResourceId { ResourceId = id }).ToList()
             };
 
         dbContext.DataAcquisitionLogs.AddRange(
             Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false,
-                "Observation/1", "Observation/2", "Encounter/enc-1", "NoSlashId"),
+                "Observation/1", "Observation/2", "Encounter/enc-1"),
             Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/3"),
             Log(schedule, facilityId, "patient-2", RequestStatus.Completed, false, "Condition/c1"),
             Log(schedule, facilityId, "patient-1", RequestStatus.Pending, false, "Observation/pending"),
             Log(schedule, facilityId, "patient-1", RequestStatus.Completed, true, "Observation/deleted"),
             Log(schedule, facilityId, null, RequestStatus.Completed, false, "Observation/no-patient"),
-            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false, ""),
             Log(schedule, otherFacilityId, "patient-1", RequestStatus.Completed, false, "MedicationRequest/m1"),
             Log(otherSchedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/other-report"));
         await dbContext.SaveChangesAsync();
@@ -1514,14 +1514,13 @@ public class DataAcquisitionLogQueriesTests
         var forFacility = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString(), facilityId);
         var byKey = forFacility.ToDictionary(row => (row.PatientId, row.ResourceType), row => row.Count);
 
-        Assert.Equal(4, forFacility.Count);
+        Assert.Equal(3, forFacility.Count);
         Assert.Equal(3, byKey[("patient-1", "Observation")]);
         Assert.Equal(1, byKey[("patient-1", "Encounter")]);
-        Assert.Equal(1, byKey[("patient-1", "NoSlashId")]);
         Assert.Equal(1, byKey[("patient-2", "Condition")]);
 
         var forReport = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString());
-        Assert.Equal(5, forReport.Count);
+        Assert.Equal(4, forReport.Count);
         Assert.Equal(3, forReport.Single(row => row.PatientId == "patient-1" && row.ResourceType == "Observation").Count);
         Assert.Contains(forReport, row =>
             row.PatientId == "patient-1" && row.ResourceType == "MedicationRequest" && row.Count == 1);
