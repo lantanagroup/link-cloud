@@ -53,6 +53,12 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
+        // An empty correlation entry too, so this is a producer defect rather than a redelivery of a
+        // message that was already normalized (see ResourcesAcquiredListenerRedeliveryTests).
+        resourceCache
+            .Setup(item => item.HasResourcesAsync(CorrelationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
         var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);
 
@@ -150,6 +156,9 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         resourceCache
             .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        resourceCache
+            .Setup(item => item.HasResourcesAsync(CorrelationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);

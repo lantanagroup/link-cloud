@@ -331,7 +331,7 @@ not the stopping token. Anything that does not finish follows the path above.
 
 | Trigger | Removes | Both stores |
 |---|---|---|
-| Normalization success | the acquisition keys, after `ResourcesNormalized` is produced | yes |
+| Normalization success | the acquisition keys, after `ResourcesNormalized` is produced (best effort) | yes |
 | MeasureEval terminal pass | everything under the correlation prefix | yes |
 | Terminal normalization failure | acquisition keys and the correlation key | yes |
 | Redis TTL | Redis entries only | n/a |
@@ -339,6 +339,27 @@ not the stopping token. Anything that does not finish follows the path above.
 A completed correlation leaves nothing behind. What accumulates is **orphans from correlations that
 never complete**. Redis orphans age out at `CacheEntryTtlDays`; ABS orphans are permanent unless a
 storage lifecycle rule removes them, so each environment needs one.
+
+### Releasing the acquisition keys after a success
+
+The success-path release runs after `ResourcesNormalized` has gone out, so it is **best effort**: a
+failure is logged and left to expiry and the lifecycle rule, and it never fails the message. It used
+to throw, and the retry then found the keys it had already deleted empty. An empty listed key is
+treated as a Data Acquisition defect and dead-lettered, and the dead-letter purge removes the
+correlation key too, which is the entry MeasureEval had just been told to read. For an INITIAL pass
+that turned out reportable, that also deleted the resources the SUPPLEMENTAL evaluation needed.
+
+A redelivery can still arrive after the release, from a pod dying before the offset commit or from a
+duplicate. So before dead-lettering an empty listed key, Normalization checks the correlation key:
+
+- **Populated:** the message was already normalized. It crosses the durability barrier for anything it
+  re-appended on the way, finishes the release, and is acknowledged **without producing again and
+  without purging**.
+- **Empty:** a genuine producer defect, dead-lettered as before.
+
+The trade-off: a genuine Data Acquisition defect on a **SUPPLEMENTAL** pass, where the correlation key
+already holds the INITIAL resources, is now acknowledged instead of dead-lettered. That patient stalls
+visibly, logged as a warning naming the empty key, rather than having its data purged.
 
 ## Configuration
 
