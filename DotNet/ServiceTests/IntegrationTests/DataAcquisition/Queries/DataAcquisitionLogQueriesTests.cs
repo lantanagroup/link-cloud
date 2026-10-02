@@ -1451,5 +1451,80 @@ public class DataAcquisitionLogQueriesTests
         Assert.Equal(facilityId, message.FacilityId);
         Assert.Contains(log.Id, message.LogIds);
     }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatientTypeAsync_GroupsByPatientAndType()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var reportId = Guid.NewGuid();
+        var otherReportId = Guid.NewGuid();
+        var facilityId = $"AcqCount_{Guid.NewGuid():N}";
+        var otherFacilityId = $"AcqCountOther_{Guid.NewGuid():N}";
+        var schedule = new ScheduledReportEntity
+        {
+            ReportTrackingId = reportId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+        var otherSchedule = new ScheduledReportEntity
+        {
+            ReportTrackingId = otherReportId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        DataAcquisitionLog Log(
+            ScheduledReportEntity scheduledReport,
+            string facility,
+            string? patientId,
+            RequestStatus status,
+            bool deleted,
+            params string[] resourceIds) =>
+            new()
+            {
+                FacilityId = facility,
+                PatientId = patientId,
+                Status = status,
+                IsDeleted = deleted,
+                ReportTrackingId = scheduledReport.ReportTrackingId,
+                CorrelationId = Guid.NewGuid().ToString(),
+                TraceId = Guid.NewGuid().ToString(),
+                FhirVersion = "test",
+                ScheduledReportEntity = scheduledReport,
+                ResourceIds = resourceIds.Select(id => new DataAcquisitionLogResourceId { ResourceId = id }).ToList()
+            };
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false,
+                "Observation/1", "Observation/2", "Encounter/enc-1", "NoSlashId"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/3"),
+            Log(schedule, facilityId, "patient-2", RequestStatus.Completed, false, "Condition/c1"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Pending, false, "Observation/pending"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, true, "Observation/deleted"),
+            Log(schedule, facilityId, null, RequestStatus.Completed, false, "Observation/no-patient"),
+            Log(schedule, facilityId, "patient-1", RequestStatus.Completed, false, ""),
+            Log(schedule, otherFacilityId, "patient-1", RequestStatus.Completed, false, "MedicationRequest/m1"),
+            Log(otherSchedule, facilityId, "patient-1", RequestStatus.Completed, false, "Observation/other-report"));
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var forFacility = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString(), facilityId);
+        var byKey = forFacility.ToDictionary(row => (row.PatientId, row.ResourceType), row => row.Count);
+
+        Assert.Equal(4, forFacility.Count);
+        Assert.Equal(3, byKey[("patient-1", "Observation")]);
+        Assert.Equal(1, byKey[("patient-1", "Encounter")]);
+        Assert.Equal(1, byKey[("patient-1", "NoSlashId")]);
+        Assert.Equal(1, byKey[("patient-2", "Condition")]);
+
+        var forReport = await queries.GetAcquiredResourceCountsByPatientTypeAsync(reportId.ToString());
+        Assert.Equal(5, forReport.Count);
+        Assert.Equal(3, forReport.Single(row => row.PatientId == "patient-1" && row.ResourceType == "Observation").Count);
+        Assert.Contains(forReport, row =>
+            row.PatientId == "patient-1" && row.ResourceType == "MedicationRequest" && row.Count == 1);
+    }
 }
 

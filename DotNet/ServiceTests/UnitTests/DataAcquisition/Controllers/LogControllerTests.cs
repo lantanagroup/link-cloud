@@ -466,4 +466,23 @@ public class LogControllerTests
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
     }
+
+    [Fact]
+    public async Task GetAcquiredResourceCountsByPatient_QueryThrows_ReturnsProblemWithoutExceptionDetail()
+    {
+        var mocker = new AutoMocker();
+        var reportId = Guid.NewGuid().ToString();
+        mocker.GetMock<IDataAcquisitionLogQueries>()
+            .Setup(q => q.GetAcquiredResourceCountsByPatientTypeAsync(reportId, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("secret-schema-detail"));
+
+        var controller = CreateController(mocker);
+
+        var result = await controller.GetAcquiredResourceCountsByPatient(reportId, null);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, problem.StatusCode);
+        var body = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.DoesNotContain("secret-schema-detail", body.Detail ?? string.Empty);
+    }
 }

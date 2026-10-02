@@ -1098,7 +1098,7 @@ public class LogController : Controller
         {
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAcquiredResourceCountsByPatient"), ex,
                 "An exception occurred while attempting to get acquired resource counts for report {reportId}", reportId.Sanitize());
-            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
 }
