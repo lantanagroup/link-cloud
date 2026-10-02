@@ -350,16 +350,22 @@ correlation key too, which is the entry MeasureEval had just been told to read. 
 that turned out reportable, that also deleted the resources the SUPPLEMENTAL evaluation needed.
 
 A redelivery can still arrive after the release, from a pod dying before the offset commit or from a
-duplicate. So before dead-lettering an empty listed key, Normalization checks the correlation key:
+duplicate. The release deletes blob keys **in listed order** (the Redis half is best effort, and a key
+Redis lost is still read from its blob), so a redelivery always finds a **leading run** of empty keys.
+That is the only shape treated as already normalized:
 
-- **Populated:** the message was already normalized. It crosses the durability barrier for anything it
-  re-appended on the way, finishes the release, and is acknowledged **without producing again and
-  without purging**.
-- **Empty:** a genuine producer defect, dead-lettered as before.
+- **The first listed key is empty, nothing has been copied yet in this pass, and the correlation key
+  is populated:** the message was already normalized. It finishes the release and is acknowledged
+  **without producing again and without purging**.
+- **Any other empty key:** a genuine producer defect, dead-lettered as before. An empty key after a
+  populated one cannot be left by a release, and by then the correlation key holds what this pass just
+  appended, so checking it would prove nothing.
 
-The trade-off: a genuine Data Acquisition defect on a **SUPPLEMENTAL** pass, where the correlation key
-already holds the INITIAL resources, is now acknowledged instead of dead-lettered. That patient stalls
-visibly, logged as a warning naming the empty key, rather than having its data purged.
+The trade-off: a genuine Data Acquisition defect whose **first** listed key is empty, on a
+**SUPPLEMENTAL** pass where the correlation key already holds the INITIAL resources, is acknowledged
+instead of dead-lettered. That patient stalls visibly, logged as a warning naming the empty key, rather
+than having its data purged. Telling the two apart in that one shape needs an explicit
+"already produced" marker.
 
 ## Configuration
 
