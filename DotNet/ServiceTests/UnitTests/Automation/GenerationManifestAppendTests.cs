@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation;
 
 namespace UnitTests.Automation;
@@ -125,6 +126,65 @@ public class GenerationManifestAppendTests
         original.TemplateCacheKeyByPatient["live-1"].Should().Be("key-live");
         original.ToSnapshot().TemplateCacheKeyByPatient["live-1"].Should().Be("key-live");
     }
+
+    [Fact]
+    public void AppendFrom_merges_absent_location_ids_and_drops_one_the_manifest_contains()
+    {
+        var original = new GenerationManifest
+        {
+            PatientIds = ["bundle-parent"],
+            Profiles = [Qualifying("bundle-parent")],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["bundle-parent"] = new(StringComparer.OrdinalIgnoreCase) { "Location/supplied-parent" }
+            },
+            AbsentReferencedLocationIds = new HashSet<string>(StringComparer.Ordinal) { "still-missing" }
+        };
+
+        var slice = new GenerationManifest
+        {
+            PatientIds = ["referencer"],
+            Profiles = [Qualifying("referencer")],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["referencer"] = new(StringComparer.OrdinalIgnoreCase) { "Location/room" }
+            },
+            AbsentReferencedLocationIds = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "supplied-parent",
+                "dangling-parent"
+            }
+        };
+
+        original.AppendFrom(slice).Should().Be(1);
+        original.AbsentReferencedLocationIds.Should().BeEquivalentTo("still-missing", "dangling-parent");
+        original.AbsentReferencedLocationIds.Should().NotContain("supplied-parent");
+    }
+
+    [Fact]
+    public void Build_drops_an_absent_location_that_another_import_supplied()
+    {
+        var builder = new GenerationManifest.IncrementalBuilder();
+        builder.AddEntries("referencer",
+        [
+            Entry("Location/room"),
+            Entry("Patient/referencer")
+        ]);
+        builder.AddEntries("supplier", [Entry("Location/supplied-parent")]);
+        builder.AddAbsentReferencedLocationIds(["supplied-parent", "dangling-parent"]);
+
+        var manifest = builder.Build([Ach]);
+
+        manifest.AbsentReferencedLocationIds.Should().Equal("dangling-parent");
+    }
+
+    private static Bundle.EntryComponent Entry(string url) =>
+        new()
+        {
+            Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = url }
+        };
 
     [Fact]
     public void TryAppendPatient_non_qualifying_import_is_tracked_but_not_submitted()

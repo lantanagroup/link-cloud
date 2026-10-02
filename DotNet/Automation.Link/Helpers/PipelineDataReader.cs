@@ -578,57 +578,13 @@ public class PipelineDataReader
 
     private async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(string facilityId, string reportId)
     {
-        var counts = new Dictionary<(string PatientId, string ResourceType), int>();
+        var response = await _dataAcqClient.GetAcquiredResourceCountsByPatientAsync(facilityId, reportId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
+            return [];
 
-        var pageNumber = 1;
-        const int pageSize = 100;
-        long scanned = 0;
-        long? totalCount = null;
-
-        while (true)
-        {
-            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
-            var page = response.Body;
-            var records = page?.Records ?? [];
-            if (records.Count == 0)
-                break;
-
-            totalCount ??= page?.Metadata?.TotalCount;
-            scanned += records.Count;
-
-            foreach (var record in records)
-            {
-                var detailed = await GetAcquisitionLogByIdAsync(record.Id);
-                if (string.IsNullOrWhiteSpace(detailed?.PatientId))
-                    continue;
-
-                foreach (var resourceId in detailed.ResourceAcquiredIds ?? [])
-                {
-                    if (string.IsNullOrWhiteSpace(resourceId) || !resourceId.Contains('/'))
-                        continue;
-
-                    var resourceType = resourceId.Split('/')[0];
-                    if (string.IsNullOrWhiteSpace(resourceType))
-                        continue;
-
-                    var key = (detailed.PatientId!, resourceType);
-                    counts[key] = counts.TryGetValue(key, out var current)
-                        ? current + 1
-                        : 1;
-                }
-            }
-
-            if (records.Count < pageSize)
-                break;
-
-            if (totalCount.HasValue && scanned >= totalCount.Value)
-                break;
-
-            pageNumber++;
-        }
-
-        return counts
-            .Select(kvp => new PatientResourceTypeCount(kvp.Key.PatientId, kvp.Key.ResourceType, kvp.Value))
+        return response.Body
+            .Where(row => !string.IsNullOrWhiteSpace(row.PatientId) && !string.IsNullOrWhiteSpace(row.ResourceType))
+            .Select(row => new PatientResourceTypeCount(row.PatientId, row.ResourceType, row.Count))
             .ToList();
     }
 
