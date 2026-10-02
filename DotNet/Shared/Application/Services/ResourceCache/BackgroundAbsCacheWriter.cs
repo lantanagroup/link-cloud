@@ -385,6 +385,17 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     // Busy. Hand the work over and go find another key. Waiting here is what lets a
                     // single correlation -- which writes this key once per acquired resource type,
                     // commonly more times than there are workers -- park the entire pool on one key.
+
+                    // A cancel bumps the generation but leaves the hand-off attached until the
+                    // holder collects it. Merging into one of those loses this write: the holder sees
+                    // a stale batch and discards all of it, while the waiter is still told the key is
+                    // durable. Drop it here instead, taking the count it was still owed with it.
+                    if (state.HandedOff is not null && state.HandedOff.Generation != current.Generation)
+                    {
+                        state.HandedOff = null;
+                        state.Outstanding--;
+                    }
+
                     if (state.HandedOff is null)
                     {
                         // Copied, because a later hand-off appends to this list and the original

@@ -353,6 +353,50 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WriteEnqueuedAfterACancel_IsNotDiscardedWithTheCancelledHandOff()
+    {
+        // A cancel bumps the generation but leaves the hand-off attached until the holder collects
+        // it. A write arriving in that window is new work -- it passes the generation check -- but it
+        // was merged into the stale batch and discarded with it, and its waiter was still told the
+        // key was durable. Silent loss reported as success.
+        //
+        // CancelledHandOff_IsAccountedForRatherThanStranded does not reach this: it enqueues nothing
+        // after the cancel, so there is never a new-generation write to lose.
+        var writer = CreateWriter(settings => settings.MaxConcurrency = 3);
+        await writer.StartAsync(CancellationToken.None);
+        try
+        {
+            _abs.BlockWritesFor("corr:Patient");
+
+            // Batch 1 claims the key and parks inside the write.
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
+            await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+            // Batch 2 is handed off to the holder.
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/2"), ResourceType.Patient);
+
+            // The cancel makes batch 2 stale, but it stays attached.
+            writer.Cancel(["corr:Patient"]);
+
+            // Batch 3 is new work, enqueued after the cancel, and must reach storage.
+            await writer.EnqueueAsync("corr:Patient", Resources("Patient/3"), ResourceType.Patient);
+
+            _abs.ReleaseBlockedWrite();
+            await writer.WaitForDurableAsync(["corr:Patient"]).WaitAsync(Timeout);
+
+            var written = _abs.Writes.Where(write => write.CacheKey == "corr:Patient").ToList();
+
+            // Batch 1 and batch 3. Batch 2 is correctly discarded by the cancel; batch 3 is not.
+            Assert.Equal(2, written.Count);
+        }
+        finally
+        {
+            _abs.ReleaseBlockedWrite();
+            await writer.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task CancelledHandOff_IsAccountedForRatherThanStranded()
     {
         // A cancel can land while an item sits handed off. Nobody but the holder can account for it
