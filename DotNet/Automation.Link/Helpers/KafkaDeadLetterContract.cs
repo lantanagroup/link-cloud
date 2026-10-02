@@ -218,7 +218,6 @@ public static class KafkaDeadLetterContract
 
             var queryType = json["QueryType"]?.ToString() ?? json["queryType"]?.ToString();
             var reportableEvent = json["ReportableEvent"]?.ToString() ?? json["reportableEvent"]?.ToString();
-            var cacheType = json["CacheType"]?.ToString() ?? json["cacheType"]?.ToString();
             var cacheKey = json["CacheKey"]?.ToString() ?? json["cacheKey"]?.ToString();
 
             var resourceToken = json["Resource"] ?? json["resource"];
@@ -228,7 +227,7 @@ public static class KafkaDeadLetterContract
             var scheduledReports = json["ScheduledReports"] ?? json["scheduledReports"];
             var scheduledCount = scheduledReports is JArray reports ? reports.Count : 0;
 
-            return $"facilityId={facilityId ?? "(null)"}, patientId={patientId ?? "(null)"}, queryType={queryType ?? "(null)"}, reportableEvent={reportableEvent ?? "(null)"}, cacheType={cacheType ?? "(null)"}, cacheKey={cacheKey ?? "(null)"}, resourceType={resourceType ?? "(null)"}, resourceId={resourceId ?? "(null)"}, scheduledReports={scheduledCount}";
+            return $"facilityId={facilityId ?? "(null)"}, patientId={patientId ?? "(null)"}, queryType={queryType ?? "(null)"}, reportableEvent={reportableEvent ?? "(null)"}, cacheKey={cacheKey ?? "(null)"}, resourceType={resourceType ?? "(null)"}, resourceId={resourceId ?? "(null)"}, scheduledReports={scheduledCount}";
         }
         catch
         {

@@ -12,7 +12,6 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -328,7 +327,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     // cached (org-map filter, Encounter strip, etc.).
                     throw new DeadLetterException(
                         $"Resource cache key '{cacheKey.SanitizeForLog()}' was listed on ResourcesAcquired but contained no resources. " +
-                        $"CacheType={result.Message.Value.CacheType}, FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
+                        $"FacilityId={result.Message.Key.FacilityId.SanitizeForLog()}.");
                 }
 
                 if (sequences == null || sequences.Count == 0)
@@ -636,7 +635,6 @@ public class ResourcesAcquiredListener : BackgroundService
             // Constant since the cache stopped choosing between stores: every correlation is now
             // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
             // removes it from the contract in both runtimes.
-            CacheType = ResourceCacheType.ABS,
             CacheKey = correlationId
         };
         Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>

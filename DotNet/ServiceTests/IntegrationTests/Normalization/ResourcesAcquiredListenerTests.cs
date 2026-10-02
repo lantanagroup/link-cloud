@@ -12,7 +12,6 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,7 +56,6 @@ namespace IntegrationTests.Normalization
             var value = new ResourcesAcquiredValue()
             {
                 QueryType = QueryType.Initial.ToString(),
-                CacheType = ResourceCacheType.Redis,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
                 ReportableEvent = ReportableEvent.Discharge.ToString(),
                 ScheduledReports = new List<ScheduledReport>() { 
@@ -110,7 +108,6 @@ namespace IntegrationTests.Normalization
             var value = new ResourcesAcquiredValue()
             {
                 QueryType = QueryType.Initial.ToString(),
-                CacheType = ResourceCacheType.ABS,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
                 ReportableEvent = ReportableEvent.Discharge.ToString(),
                 ScheduledReports = new List<ScheduledReport>() {
@@ -163,7 +160,6 @@ namespace IntegrationTests.Normalization
                     Value = new ResourcesAcquiredValue
                     {
                         QueryType = QueryType.Initial.ToString(),
-                        CacheType = ResourceCacheType.ABS,
                         CacheKeys = new List<string> { correlationId + ":Location" },
                         ReportableEvent = ReportableEvent.Discharge.ToString(),
                         ScheduledReports = new List<ScheduledReport>
