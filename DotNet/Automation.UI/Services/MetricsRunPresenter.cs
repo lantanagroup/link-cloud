@@ -305,7 +305,7 @@ public sealed class MetricsRunPresenter
             Task.FromResult(((IReadOnlyList<AutomationMetricsBenchmarkDocument>)[], 0L));
     }
 
-    private static ResourceCacheView ToResourceCache(AutomationRunMetricsDocument document)
+    internal static ResourceCacheView ToResourceCache(AutomationRunMetricsDocument document)
     {
         var cache = document.ResourceCache;
         if (cache is null || cache.Unavailable)
@@ -322,7 +322,15 @@ public sealed class MetricsRunPresenter
             DurableWriteP95Ms = cache.DurableWriteP95Ms,
             QueueWaitP95Ms = cache.QueueWaitP95Ms,
             PeakQueueDepth = cache.PeakQueueDepth,
-            WriteExhaustedCount = cache.WriteExhaustedCount
+            WriteExhaustedCount = cache.WriteExhaustedCount,
+            EvaluationUnavailable = cache.EvaluationHitRatio is null,
+            EvaluationHitRatioPercent = cache.EvaluationHitRatio * 100,
+            EvaluationHitCount = cache.EvaluationHitCount,
+            EvaluationFallbackCount = cache.EvaluationFallbackCount,
+            EvaluationEmptyCount = cache.EvaluationEmptyCount,
+            EvaluationMissCount = cache.EvaluationMissCount,
+            EvaluationPartialCount = cache.EvaluationPartialCount,
+            EvaluationUnavailableCount = cache.EvaluationUnavailableCount
         };
     }
 

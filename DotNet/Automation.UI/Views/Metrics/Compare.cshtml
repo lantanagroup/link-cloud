@@ -179,7 +179,7 @@
                         @if (cacheShown)
                         {
                             <tr>
-                                <td>Cache: served from cache</td>
+                                <td>Cache: served from cache (all services)</td>
                                 <td>@HitRatioText(leftCache.Unavailable, leftCache.HitRatioPercent)</td>
                                 <td>@HitRatioText(rightCache.Unavailable, rightCache.HitRatioPercent)</td>
                                 @* Higher is better here, unlike every other row in this table. *@
@@ -187,6 +187,18 @@
                                     @DeltaHitRatioText(leftCache.Unavailable ? null : leftCache.HitRatioPercent, rightCache.Unavailable ? null : rightCache.HitRatioPercent)
                                 </td>
                             </tr>
+                            @if (!BothMissing(leftCache.EvaluationUnavailable, rightCache.EvaluationUnavailable))
+                            {
+                                <tr>
+                                    @* Measure Evaluation's reads alone; Normalization's near-certain hits dominate the row above. *@
+                                    <td>Cache: served from cache (measure evaluation)</td>
+                                    <td>@HitRatioText(leftCache.EvaluationUnavailable, leftCache.EvaluationHitRatioPercent)</td>
+                                    <td>@HitRatioText(rightCache.EvaluationUnavailable, rightCache.EvaluationHitRatioPercent)</td>
+                                    <td class="@DeltaThroughputClass(leftCache.EvaluationUnavailable ? null : leftCache.EvaluationHitRatioPercent, rightCache.EvaluationUnavailable ? null : rightCache.EvaluationHitRatioPercent)">
+                                        @DeltaHitRatioText(leftCache.EvaluationUnavailable ? null : leftCache.EvaluationHitRatioPercent, rightCache.EvaluationUnavailable ? null : rightCache.EvaluationHitRatioPercent)
+                                    </td>
+                                </tr>
+                            }
                             <tr>
                                 <td>Cache: durability wait (slow)</td>
                                 <td>@(leftCache.Unavailable ? "—" : FormatMs(leftCache.DrainWaitP95Ms))</td>
