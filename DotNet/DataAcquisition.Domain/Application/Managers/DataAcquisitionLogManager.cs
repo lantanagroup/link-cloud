@@ -20,7 +20,6 @@ using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -960,7 +959,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     // Constant since the cache stopped choosing between stores: every correlation is now
                     // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
                     // removes it from the contract in both runtimes.
-                    CacheType = ResourceCacheType.ABS,
                     CacheKeys = acquiredResourceTypes
                         .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
                         .Distinct()

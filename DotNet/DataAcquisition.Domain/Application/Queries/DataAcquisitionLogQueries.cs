@@ -474,7 +474,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         // Constant since the cache stopped choosing between stores: every correlation is now
                         // written to blob storage, so ABS is simply true. The field itself goes when LEGLINK-1279
                         // removes it from the contract in both runtimes.
-                        CacheType = ResourceCacheType.ABS,
                         CacheKeys = acquiredResourceTypes
                             .Select(rt => $"{group.CorrelationId}:{rt}")
                             .Distinct()

@@ -2,7 +2,6 @@ using Confluent.Kafka;
 using LantanaGroup.Link.Normalization.Application.Error;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -35,7 +34,6 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
             QueryType = "Initial",
             ReportableEvent = "Adhoc",
             ScheduledReports = new List<ScheduledReport> { new() { ReportTrackingId = "tracking-1" } },
-            CacheType = ResourceCacheType.ABS,
             CacheKeys = new List<string> { $"{CorrelationId}:Patient", $"{CorrelationId}:Encounter" }
         };
 
@@ -49,7 +47,6 @@ public class ResourcesAcquiredRetryDeadLetterHandlerTests
 
         Assert.NotNull(purged);
         Assert.Equal(value.CacheKeys, purged!.CacheKeys);
-        Assert.Equal(ResourceCacheType.ABS, purged.CacheType);
 
         // The dead letter is still produced: the durable record of the failure comes first.
         producer.Verify(

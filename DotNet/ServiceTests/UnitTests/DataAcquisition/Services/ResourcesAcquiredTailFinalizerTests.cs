@@ -2,7 +2,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Mapping;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -178,7 +177,6 @@ public class ResourcesAcquiredTailFinalizerTests
         PatientId = PatientId,
         ResourcesAcquired = new ResourcesAcquired
         {
-            CacheType = ResourceCacheType.ABS,
             CacheKeys = cacheKeys
         }
     };

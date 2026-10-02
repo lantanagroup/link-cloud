@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -27,7 +26,7 @@ public class ResourceCachePurgerTests
             .Callback<List<string>, CancellationToken>((keys, _) => deletedKeys = keys)
             .Returns(Task.CompletedTask);
 
-        await purger.PurgeAsync(BuildValue(ResourceCacheType.Redis), "test");
+        await purger.PurgeAsync(BuildValue(), "test");
 
         Assert.NotNull(deletedKeys);
         Assert.Equal(
@@ -46,26 +45,13 @@ public class ResourceCachePurgerTests
             .Callback<List<string>, CancellationToken>((keys, _) => deletedKeys = keys)
             .Returns(Task.CompletedTask);
 
-        var value = BuildValue(ResourceCacheType.Redis);
+        var value = BuildValue();
         value.CacheKeys.Add(CorrelationId);
 
         await purger.PurgeAsync(value, "test");
 
         Assert.NotNull(deletedKeys);
         Assert.Equal(deletedKeys!.Count, deletedKeys.Distinct().Count());
-    }
-
-    [Fact]
-    public async Task PurgeAsync_UsesTheCacheTypeCarriedOnTheMessage()
-    {
-        var (purger, cache) = BuildPurger();
-
-        cache
-            .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
-        await purger.PurgeAsync(BuildValue(ResourceCacheType.ABS), "test");
-
     }
 
     [Fact]
@@ -78,7 +64,7 @@ public class ResourceCachePurgerTests
     {
         var (purger, cache) = BuildPurger();
 
-        var value = BuildValue(ResourceCacheType.Redis);
+        var value = BuildValue();
         value.CacheKeys = cacheKeys!;
 
         await purger.PurgeAsync(value, "test");
@@ -106,7 +92,7 @@ public class ResourceCachePurgerTests
             .ThrowsAsync(new InvalidOperationException("cache unavailable"));
 
         // The caller is already handling a failed message; cleanup failure must not add another.
-        await purger.PurgeAsync(BuildValue(ResourceCacheType.Redis), "test");
+        await purger.PurgeAsync(BuildValue(), "test");
     }
 
     private static (ResourceCachePurger, Mock<IResourceCache>) BuildPurger()
@@ -117,12 +103,11 @@ public class ResourceCachePurgerTests
         return (purger, cache);
     }
 
-    private static ResourcesAcquiredValue BuildValue(ResourceCacheType cacheType) => new()
+    private static ResourcesAcquiredValue BuildValue() => new()
     {
         QueryType = "Initial",
         ReportableEvent = "Adhoc",
         ScheduledReports = new List<LantanaGroup.Link.Shared.Application.Models.ScheduledReport>(),
-        CacheType = cacheType,
         CacheKeys = new List<string> { $"{CorrelationId}:Patient", $"{CorrelationId}:Encounter" }
     };
 }
