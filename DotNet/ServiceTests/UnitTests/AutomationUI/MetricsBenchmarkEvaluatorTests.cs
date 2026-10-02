@@ -164,7 +164,7 @@ public class MetricsBenchmarkEvaluatorTests
     }
 
     [Fact]
-    public void A_write_that_exhausted_its_retries_is_a_violation_not_a_slowdown()
+    public void A_write_that_exhausted_its_retries_does_not_fail_the_run()
     {
         var previous = Doc(100);
         previous.ResourceCache = Cache();
@@ -173,24 +173,25 @@ public class MetricsBenchmarkEvaluatorTests
 
         var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, previous);
 
-        // The UI files every regression flag under "Slower than last successful run", and a
-        // durability failure listed there reads as a performance nitpick.
-        Assert.Contains(result.Violations, v => v.Contains("exhausted their retries", StringComparison.OrdinalIgnoreCase));
+        // The counter is stack-wide, so as a violation it failed this run for another facility's
+        // blob trouble. Nor is it a slowdown: the UI files every regression flag under "Slower than
+        // last successful run". The cache card reports it on its own.
+        Assert.True(result.Pass);
+        Assert.Empty(result.Violations);
         Assert.DoesNotContain(result.RegressionFlags, f => f.Contains("exhausted", StringComparison.OrdinalIgnoreCase));
-        Assert.False(result.Pass);
     }
 
     [Fact]
-    public void A_write_that_exhausted_its_retries_is_reported_without_a_previous_run()
+    public void A_write_that_exhausted_its_retries_does_not_fail_a_first_run_with_no_benchmark()
     {
         var current = Doc(100);
         current.ResourceCache = Cache(exhausted: 2);
 
-        // The drift comparisons need a previous run; this does not, and a first run is exactly
-        // when a durability failure must not go unreported.
+        // With no benchmark and no previous run there is nothing to judge, so the run passes.
         var result = MetricsBenchmarkEvaluator.Evaluate(current, null, null, null);
 
-        Assert.Contains(result.Violations, v => v.Contains("exhausted their retries", StringComparison.OrdinalIgnoreCase));
+        Assert.True(result.Pass);
+        Assert.Empty(result.Violations);
     }
 
     private static ResourceCacheSnapshot Cache(

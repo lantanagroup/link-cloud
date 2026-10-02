@@ -189,7 +189,9 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
             {
                 <div class="mt-3 small text-danger">
                     @Model.ResourceCache.WriteExhaustedCount?.ToString("0") durable write(s) gave up after retrying.
-                    Those correlations have no durable copy behind their cache keys.
+                    This counts every service on the stack during the run window, not only this run's
+                    facility. The work waiting on those writes was failed and retried rather than
+                    advertised, so it points at blob storage trouble, not at missing data in this run.
                 </div>
             }
         }
