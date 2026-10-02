@@ -18,6 +18,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services;
 /// Eval to read — a terminal failure also removes the correlation key, because nothing downstream
 /// will ever consume it.
 /// </para>
+/// <para>
+/// That makes it the wrong response to a redelivery of a message that was already normalized, whose
+/// correlation key MeasureEval has been told to read. <c>ResourcesAcquiredListener</c> recognises that
+/// case (listed keys empty, correlation key populated) and acknowledges it rather than dead-lettering.
+/// </para>
 /// </remarks>
 public interface IResourceCachePurger
 {
