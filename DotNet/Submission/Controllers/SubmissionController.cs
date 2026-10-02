@@ -1,5 +1,4 @@
-﻿using System.IO.Compression;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -34,13 +33,15 @@ public class SubmissionController(
      * <param name="facilityId">The ID of the facility</param>
      * <param name="reportId">The ID of the report to download</param>
      * <param name="external">Whether to download from external or internal (default) storage</param>
+     * <param name="cancellationToken">Token that cancels the metadata read and the ZIP write.</param>
      * <remarks>Gets information about the report from the report service in order to construct the directory/path for the report.</remarks>
      */
     [HttpGet("{facilityId}/{reportId}")]
     public async Task<IActionResult> DownloadReport(
         [FromRoute] string facilityId,
         [FromRoute] string reportId,
-        [FromQuery] bool external = false)
+        [FromQuery] bool external = false,
+        CancellationToken cancellationToken = default)
     {
         string sanitizedFacilityId = facilityId.SanitizeAndRemove();
 
@@ -75,7 +76,7 @@ public class SubmissionController(
         }
 
         string reportUrl = $"{serviceRegistry.Value.ReportServiceApiUrl.TrimEnd('/')}/schedules/{sanitizedReportId.SanitizeAndRemove()}";
-        var reportResponse = await client.GetAsync(reportUrl);
+        using var reportResponse = await client.GetAsync(reportUrl, cancellationToken);
 
         if (!reportResponse.IsSuccessStatusCode)
         {
@@ -83,8 +84,8 @@ public class SubmissionController(
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
 
-        var jsonResponse = JsonDocument.Parse(
-            await reportResponse.Content.ReadAsStringAsync());
+        using var jsonResponse = JsonDocument.Parse(
+            await reportResponse.Content.ReadAsStringAsync(cancellationToken));
 
         if (!jsonResponse.RootElement.TryGetProperty("payloadRootUri", out var payloadRootUri) ||
             payloadRootUri.GetString() == null)
@@ -93,6 +94,7 @@ public class SubmissionController(
             throw new Exception("Missing 'payloadRootUri' in the response.");
         }
 
+        var payloadRoot = payloadRootUri.GetString()!;
         var reportTypes = new List<string>();
         if (jsonResponse.RootElement.TryGetProperty("reportTypes", out var reportTypesElement))
         {
@@ -106,36 +108,49 @@ public class SubmissionController(
             }
         }
 
-        IDictionary<string, byte[]> files = external
-            ? await blobStorageService.DownloadFromExternalAsync(reportTypes, payloadRootUri.GetString())
-            : await blobStorageService.DownloadFromInternalAsync(payloadRootUri.GetString());
-
-        var compressedData = this.CompressFiles(files);
-
-        return File(compressedData, "application/zip", $"{sanitizedReportId}.zip");
-    }
-
-    /**
-     * Compresses the contents of the specified files into a ZIP archive (in memory) and returns it as a byte array.
-     * <returns>A byte array containing the compressed data of the specified files as a ZIP archive.</returns>
-     */
-    private byte[] CompressFiles(IDictionary<string, byte[]> files)
-    {
-        using var memoryStream = new MemoryStream();
-        using (var zipArchive =
-               new ZipArchive(memoryStream, ZipArchiveMode.Create,
-                   true))
+        // Metadata is loaded before the body starts, so a missing container still
+        // returns an error status. The ZIP itself is written one blob at a time.
+        if (external)
         {
-            foreach (var file in files)
-            {
-                // Add each file to the zip archive
-                var zipEntry = zipArchive.CreateEntry(file.Key, CompressionLevel.Optimal);
-                using var zipEntryStream = zipEntry.Open();
-                new MemoryStream(file.Value).CopyTo(zipEntryStream);
-            }
+            if (!blobStorageService.HasExternalClient())
+                throw new InvalidOperationException("Not configured for external blob storage.");
+        }
+        else if (!blobStorageService.HasInternalClient())
+        {
+            throw new InvalidOperationException("Not configured for internal blob storage.");
         }
 
-        // Return the ZIP archive as a byte array
-        return memoryStream.ToArray();
+        return new ZipAttachmentResult($"{sanitizedReportId}.zip", (body, token) =>
+            external
+                ? blobStorageService.WriteExternalAsZipAsync(reportTypes, payloadRoot, body, token)
+                : blobStorageService.WriteInternalAsZipAsync(payloadRoot, body, token));
+    }
+
+    /// <summary>
+    /// Sends a ZIP attachment by writing it straight to the response body.
+    /// </summary>
+    private sealed class ZipAttachmentResult : IActionResult
+    {
+        private readonly string _fileName;
+        private readonly Func<Stream, CancellationToken, Task> _write;
+
+        public ZipAttachmentResult(string fileName, Func<Stream, CancellationToken, Task> write)
+        {
+            _fileName = fileName;
+            _write = write;
+        }
+
+        public async Task ExecuteResultAsync(ActionContext context)
+        {
+            var response = context.HttpContext.Response;
+            response.StatusCode = StatusCodes.Status200OK;
+            response.ContentType = "application/zip";
+            response.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
+            {
+                FileName = _fileName
+            }.ToString();
+
+            await _write(response.Body, context.HttpContext.RequestAborted);
+        }
     }
 }

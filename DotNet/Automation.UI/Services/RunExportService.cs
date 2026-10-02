@@ -537,13 +537,13 @@ public sealed class RunExportService : IRunExportService
             return sb.ToString();
         }
 
-        // Preferred path: re-download internal ABS at export time.
-        var downloaded = await TryDownloadInternalAbsAsync(run, ct);
-        if (downloaded is { Count: > 0 })
+        // Preferred path: re-download internal ABS at export time, one entry at a time.
+        var listing = new StringBuilder();
+        if (await TryCopyInternalAbsIntoArchiveAsync(archive, run, listing, ct))
         {
             sb.AppendLine("Source: live download from Submission Service (external=false).\n");
             AppendAbsLocatorDetails(sb, locator, run);
-            WriteAbsFilesToArchive(archive, downloaded, sb);
+            sb.Append(listing);
             return sb.ToString();
         }
 
@@ -573,47 +573,70 @@ public sealed class RunExportService : IRunExportService
         return sb.ToString();
     }
 
-    private async Task<Dictionary<string, string>?> TryDownloadInternalAbsAsync(AutomationRunSummary run, CancellationToken ct)
+    private async Task<bool> TryCopyInternalAbsIntoArchiveAsync(
+        ZipArchive archive,
+        AutomationRunSummary run,
+        StringBuilder listing,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(run.FacilityId) || string.IsNullOrWhiteSpace(run.ReportId))
-            return null;
+            return false;
 
+        var tempPath = ReportPackage.CreateTempPath();
         try
         {
-            var response = await _submissionClient.DownloadSubmissionAsync(run.FacilityId, run.ReportId, external: false, cancellationToken: ct);
-            if (!response.IsSuccessStatusCode || response.Body == null || response.Body.Length < 4)
-                return null;
-
-            var bytes = response.Body;
-            var isZipPayload = bytes[0] == 0x50
-                               && bytes[1] == 0x4B
-                               && bytes[2] == 0x03
-                               && bytes[3] == 0x04;
-            if (!isZipPayload)
-                return null;
-
-            using var zipStream = new MemoryStream(bytes);
-            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-
-            var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in archive.Entries)
+            await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
             {
-                if (entry.Length == 0)
-                    continue;
-
-                using var entryStream = entry.Open();
-                using var reader = new StreamReader(entryStream);
-                files[entry.FullName] = await reader.ReadToEndAsync(ct);
+                var result = await _submissionClient.CopySubmissionAsync(
+                    run.FacilityId, run.ReportId, file, external: false, cancellationToken: ct);
+                if (!result.IsSuccess)
+                    return false;
             }
 
-            return files;
+            if (!ReportPackage.HasZipHeader(tempPath))
+                return false;
+
+            using var package = ReportPackage.Open(tempPath, deleteOnDispose: true);
+            var names = package.EntryNames
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (names.Count == 0)
+                return false;
+
+            listing.AppendLine($"Total files: {names.Count:N0}");
+            listing.AppendLine();
+            foreach (var name in names)
+            {
+                ct.ThrowIfCancellationRequested();
+                var text = package.ReadEntryText(name) ?? string.Empty;
+                listing.AppendLine($"  {name}  ({text.Length:N0} chars)");
+
+                var entry = archive.CreateEntry($"abs/{name}", CompressionLevel.Optimal);
+                await using var target = entry.Open();
+                var bytes = Encoding.UTF8.GetBytes(text);
+                await target.WriteAsync(bytes, ct);
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
                 "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
                 run.RunId, run.FacilityId, run.ReportId);
-            return null;
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch (IOException)
+            {
+                // The package dispose already tries to delete this file.
+            }
         }
     }
 

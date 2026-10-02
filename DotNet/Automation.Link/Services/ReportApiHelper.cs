@@ -1,5 +1,4 @@
-﻿using Hl7.Fhir.Model;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
@@ -15,7 +14,6 @@ using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
-using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Automation.Link.Services;
@@ -631,62 +629,61 @@ public class ReportApiHelper
         return decision.Continue;
     }
 
-    public async Task<Dictionary<string, object>> DownloadReportAsync(string facilityId, string reportId, TestScenarioConfig config, bool external = true)
+    /// <summary>
+    /// Streams the submission ZIP to a temp file. The returned package reads
+    /// one entry at a time. Dispose it before downloading another package so
+    /// the two censuses are not in memory together.
+    /// </summary>
+    public async Task<ReportPackage> DownloadReportAsync(
+        string facilityId,
+        string reportId,
+        TestScenarioConfig config,
+        bool external = true,
+        CancellationToken cancellationToken = default)
     {
         _output.WriteLine($"Downloading report {reportId}...");
 
-        var response = await _submissionClient.DownloadSubmissionAsync(facilityId, reportId, external);
-
-        AutomationInvariant.Require(response.IsSuccessStatusCode && response.Body != null,
-            $"Download failed with status {response.StatusCode}");
-
-        var bytes = response.Body!;
-
-        var isZipPayload = bytes.Length >= 4
-            && bytes[0] == 0x50
-            && bytes[1] == 0x4B
-            && bytes[2] == 0x03
-            && bytes[3] == 0x04;
-
-        AutomationInvariant.Require(isZipPayload,
-            $"Download payload was not a ZIP (status {response.StatusCode}).");
-
-        var responseDictionary = new Dictionary<string, object>();
-
-        if (!string.IsNullOrEmpty(_automationConfig.DownloadPath) && bytes != null)
+        var tempPath = ReportPackage.CreateTempPath();
+        try
         {
-            if (!Directory.Exists(_automationConfig.DownloadPath))
-                Directory.CreateDirectory(_automationConfig.DownloadPath);
+            int statusCode;
+            await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            {
+                var result = await _submissionClient.CopySubmissionAsync(
+                    facilityId, reportId, file, external, cancellationToken);
+                statusCode = result.StatusCode;
+                AutomationInvariant.Require(result.IsSuccess, $"Download failed with status {statusCode}");
+            }
 
-            var downloadPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
-            await File.WriteAllBytesAsync(downloadPath, bytes);
-            _output.WriteLine($"Report downloaded to {downloadPath}");
+            AutomationInvariant.Require(
+                ReportPackage.HasZipHeader(tempPath),
+                $"Download payload was not a ZIP (status {statusCode}).");
+
+            if (!string.IsNullOrEmpty(_automationConfig.DownloadPath))
+            {
+                if (!Directory.Exists(_automationConfig.DownloadPath))
+                    Directory.CreateDirectory(_automationConfig.DownloadPath);
+
+                var downloadPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
+                File.Copy(tempPath, downloadPath, overwrite: true);
+                _output.WriteLine($"Report downloaded to {downloadPath}");
+            }
+
+            return ReportPackage.Open(tempPath, deleteOnDispose: true);
         }
-
-        using var zipStream = new MemoryStream(bytes ?? []);
-        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
-        var jsonParser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
-
-        foreach (var entry in archive.Entries)
+        catch
         {
-            if (entry.Length == 0)
-                continue;
-
-            using var entryStream = entry.Open();
-            using var reader = new StreamReader(entryStream);
-            var fileContent = reader.ReadToEnd();
-
-            if (entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                var resource = jsonParser.Parse<Resource>(fileContent);
-                responseDictionary[entry.FullName] = resource;
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
             }
-            else
+            catch (IOException)
             {
-                responseDictionary[entry.FullName] = fileContent;
+                // The caller's exception is the one that matters.
             }
+
+            throw;
         }
-
-        return responseDictionary;
     }
 }
