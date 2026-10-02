@@ -85,16 +85,17 @@ public class ResourcesAcquiredListenerRedeliveryTests
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_ListedKeyEmptyAndCorrelationEntryPresent_AcknowledgesWithoutProducing()
+    public async Task ProcessMessageAsync_FirstListedKeyEmptyAndCorrelationEntryPresent_AcknowledgesWithoutProducing()
     {
-        // The release got as far as the Encounter key before failing or the pod died: Patient is still
-        // there, Encounter is gone, and the correlation entry holds the normalized output.
-        var resourceCache = PopulatedCache(PatientCacheKey, FhirResourceType.Patient, new Patient { Id = PatientId });
+        // The release deletes keys in listed order and got past the Patient key before failing or the
+        // pod died: Patient is gone, Encounter is still there, and the correlation entry holds the
+        // normalized output.
+        var resourceCache = PopulatedCache(EncounterCacheKey, FhirResourceType.Encounter, new Encounter { Id = "encounter-1" });
         resourceCache
-            .Setup(item => item.GetResourceTypeByCacheKey(EncounterCacheKey))
-            .Returns(FhirResourceType.Encounter);
+            .Setup(item => item.GetResourceTypeByCacheKey(PatientCacheKey))
+            .Returns(FhirResourceType.Patient);
         resourceCache
-            .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
+            .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         resourceCache
             .Setup(item => item.HasResourcesAsync(CorrelationId, It.IsAny<CancellationToken>()))
@@ -115,10 +116,14 @@ public class ResourcesAcquiredListenerRedeliveryTests
                 It.IsAny<CancellationToken>()),
             Times.Never);
 
-        // The re-appended Patient key crosses the barrier, and the release is finished.
+        // Nothing is copied again, and the release is finished.
         resourceCache.Verify(
-            item => item.WaitForDurableAsync(CorrelationId, It.IsAny<CancellationToken>()),
-            Times.Once);
+            item => item.AppendResourcesAsync(
+                It.IsAny<string>(),
+                It.IsAny<List<DomainResource>>(),
+                It.IsAny<FhirResourceType>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
         resourceCache.Verify(
             item => item.DeleteAsync(
                 It.Is<List<string>>(keys => keys.SequenceEqual(new[] { PatientCacheKey, EncounterCacheKey })),
@@ -130,6 +135,42 @@ public class ResourcesAcquiredListenerRedeliveryTests
             item => item.DeleteAsync(
                 It.Is<List<string>>(keys => keys.Contains(CorrelationId)),
                 It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_EmptyKeyAfterAPopulatedOne_DeadLetters()
+    {
+        // A release deletes in listed order, so it can never leave an empty key after a populated one.
+        // This shape is Data Acquisition listing a key it never wrote. The correlation entry is
+        // populated only because this pass just appended Patient to it, which must not be read as
+        // proof the message was already normalized.
+        var resourceCache = PopulatedCache(PatientCacheKey, FhirResourceType.Patient, new Patient { Id = PatientId });
+        resourceCache
+            .Setup(item => item.GetResourceTypeByCacheKey(EncounterCacheKey))
+            .Returns(FhirResourceType.Encounter);
+        resourceCache
+            .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        resourceCache
+            .Setup(item => item.HasResourcesAsync(CorrelationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var producer = ProducingProducer();
+        var listener = BuildListener(resourceCache, producer);
+
+        var thrown = await Assert.ThrowsAsync<DeadLetterException>(() =>
+            listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey, EncounterCacheKey]), CancellationToken.None));
+
+        Assert.Contains(EncounterCacheKey, thrown.Message);
+        producer.Verify(
+            item => item.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        resourceCache.Verify(
+            item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
