@@ -47,6 +47,25 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Waits until every queued write for <paramref name="cacheKeys"/> has been persisted, and fails
+        /// only if one of <paramref name="references"/> was not.
+        /// </summary>
+        /// <remarks>
+        /// Failures are recorded per resource and kept until those resources are written again, so
+        /// every waiter on a key can be told. This overload tells only the waiter whose resources were
+        /// in a failed write.
+        /// </remarks>
+        /// <param name="cacheKeys">The keys to wait on.</param>
+        /// <param name="references">The caller's resources, as <c>{ResourceType}/{id}</c>.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <exception cref="ResourceCacheDurabilityException">
+        /// A write holding one of <paramref name="references"/> failed permanently.
+        /// </exception>
+        Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                 IReadOnlyCollection<string> references,
+                                 CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Waits until every queued write for <paramref name="correlationId"/> and its per-resource-type
         /// keys has been persisted.
         /// </summary>

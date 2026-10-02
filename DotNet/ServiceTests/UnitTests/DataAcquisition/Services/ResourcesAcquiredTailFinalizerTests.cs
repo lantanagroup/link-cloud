@@ -100,6 +100,12 @@ public class ResourcesAcquiredTailFinalizerTests
         cache.Verify(
             c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        cache.Verify(
+            c => c.WaitForDurableAsync(
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<IReadOnlyCollection<string>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

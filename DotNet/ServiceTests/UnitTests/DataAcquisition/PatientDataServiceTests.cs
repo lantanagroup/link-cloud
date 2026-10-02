@@ -876,12 +876,17 @@ public class PatientDataServiceTests
         // have landed first. Inverting these two lines is silent in every other test in this file.
         var order = new List<string>();
         var waitedOn = new List<string>();
+        var waitedFor = new List<string>();
         _mockResourceCache
-            .Setup(c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<IEnumerable<string>, CancellationToken>((keys, _) =>
+            .Setup(c => c.WaitForDurableAsync(
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<IReadOnlyCollection<string>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, IReadOnlyCollection<string>, CancellationToken>((keys, references, _) =>
             {
                 order.Add("durable");
                 waitedOn.AddRange(keys);
+                waitedFor.AddRange(references);
             })
             .Returns(Task.CompletedTask);
         _mockLogManager
@@ -896,12 +901,16 @@ public class PatientDataServiceTests
         Assert.NotEmpty(order);
         Assert.Equal("durable", order[0]);
 
-        // Scoped to the keys this log wrote, never the whole correlation. A correlation-wide wait
-        // consumes a sibling log's durability failure and retires its state, and that sibling then
-        // finds nothing to wait on and advertises a key that never reached durable storage.
+        // Scoped to the keys this log wrote, never the whole correlation, and to the resources it
+        // wrote into them. Sibling logs share a key, so only the resources say whether a failure on
+        // it is this log's to answer for.
         Assert.Equal(["corr-1:Patient"], waitedOn);
+        Assert.Equal(["Patient/patient-1"], waitedFor);
         _mockResourceCache.Verify(
             c => c.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _mockResourceCache.Verify(
+            c => c.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
