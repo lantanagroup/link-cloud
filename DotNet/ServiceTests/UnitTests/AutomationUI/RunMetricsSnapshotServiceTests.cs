@@ -160,8 +160,15 @@ public class RunMetricsSnapshotServiceTests
     [InlineData("link_submission_upload_count")]
     public void StageErrorQuery_UsesTheExportedTotalName(string errorCounter)
     {
-        RunMetricsSnapshotService.StageErrorQuery(errorCounter, "fac-1", "failure", 90)
+        RunMetricsSnapshotService.StageErrorQuery(errorCounter, "outcome", "fac-1", "failure", 90)
             .Should().Contain($"increase({errorCounter}_total{{");
+    }
+
+    [Fact]
+    public void StageErrorQuery_FiltersOnTheStagesOwnOutcomeLabel()
+    {
+        RunMetricsSnapshotService.StageErrorQuery("link_validation_counter", "validation_outcome", "fac-1", "Failed", 90)
+            .Should().Be("sum(increase(link_validation_counter_total{facility_id=\"fac-1\",validation_outcome=\"Failed\"}[90s]))");
     }
 
     [Fact]
@@ -170,9 +177,26 @@ public class RunMetricsSnapshotServiceTests
         // Pins every configured error counter, so one added later without the suffix fails here.
         foreach (var stage in RunMetricsSnapshotService.StageHistograms.Where(stage => stage.ErrorCounter != null))
         {
-            RunMetricsSnapshotService.StageErrorQuery(stage.ErrorCounter!, "fac-1", stage.ErrorOutcome!, 90)
+            RunMetricsSnapshotService.StageErrorQuery(stage.ErrorCounter!, stage.ErrorLabel!, "fac-1", stage.ErrorOutcome!, 90)
                 .Should().Contain(stage.ErrorCounter + "_total{");
         }
+    }
+
+    [Theory]
+    [InlineData("measureeval", "outcome", "failure")]
+    [InlineData("validation", "validation_outcome", "Failed")]
+    [InlineData("submission", "outcome", "failure")]
+    public void StageHistograms_ErrorFilter_MatchesTheLabelTheServiceExports(string stage,
+                                                                            string label,
+                                                                            string outcome)
+    {
+        // Each pair is what the service actually emits: MeasureEvalMetrics tags outcome=failure,
+        // ReadyForValidationConsumer tags validation.outcome=Failed, Submission tags outcome=failure.
+        // A filter on any other label matches nothing and the stage's error count reads zero.
+        var query = RunMetricsSnapshotService.StageHistograms.Single(candidate => candidate.Stage == stage);
+
+        query.ErrorLabel.Should().Be(label);
+        query.ErrorOutcome.Should().Be(outcome);
     }
 
     [Fact]

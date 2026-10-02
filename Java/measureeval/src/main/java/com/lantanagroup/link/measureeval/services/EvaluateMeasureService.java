@@ -58,6 +58,11 @@ public class EvaluateMeasureService {
             return measureReport;
 
         } catch (Exception ex) {
+            if (queryType != null) {
+                measureEvalMetrics.recordEvaluationFailure(
+                        MeasureEvalMetrics.buildAttributes(queryType, patientStatus, report.getReportType()));
+            }
+
             logger.error("Measure evaluation failed [measure={}, patient={}, facility={}, correlationId={}]: {}",
                     report.getReportType(),
                     StringUtils.safe(patientStatus.getPatientId()),

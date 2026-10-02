@@ -163,6 +163,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Provides InMemoryMetricReader, so metric tests assert on what is actually exported -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Provides @EmbeddedKafka / org.springframework.kafka.test.* for retry-topic tests -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>

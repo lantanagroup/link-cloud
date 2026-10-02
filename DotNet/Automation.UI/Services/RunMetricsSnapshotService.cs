@@ -46,17 +46,26 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     // for Grafana; do not show an always-empty step here.
     internal static readonly StageQuery[] StageHistograms =
     [
-        new("acquisition", "link_data_acq_query_duration_milliseconds", null, null),
-        new("normalization", "link_normalization_duration_milliseconds", null, null),
-        new("measureeval", "link_measureeval_eval_duration_milliseconds", "link_measureeval_eval_count", "failure"),
-        new("validation", "link_validation_validate_duration_milliseconds", "link_validation_counter", "Failed"),
-        new("submission", "link_submission_upload_duration_milliseconds", "link_submission_upload_count", "failure")
+        new("acquisition", "link_data_acq_query_duration_milliseconds", null, null, null),
+        new("normalization", "link_normalization_duration_milliseconds", null, null, null),
+        new("measureeval", "link_measureeval_eval_duration_milliseconds", "link_measureeval_eval_count", "outcome", "failure"),
+        new("validation", "link_validation_validate_duration_milliseconds", "link_validation_counter", "validation_outcome", "Failed"),
+        new("submission", "link_submission_upload_duration_milliseconds", "link_submission_upload_count", "outcome", "failure")
     ];
 
+    /// <param name="Stage">The stage's key in the run document.</param>
+    /// <param name="HistogramBase">The exported duration histogram, without its _bucket/_count suffix.</param>
+    /// <param name="ErrorCounter">The counter that also counts failures, or null when the stage has none.</param>
+    /// <param name="ErrorLabel">
+    /// The exported label that carries the outcome. Not every service names it "outcome": Validation
+    /// tags its counter validation.outcome, and a filter on the wrong label matches nothing.
+    /// </param>
+    /// <param name="ErrorOutcome">The label value that marks a failure.</param>
     internal readonly record struct StageQuery(
         string Stage,
         string HistogramBase,
         string? ErrorCounter,
+        string? ErrorLabel,
         string? ErrorOutcome);
 
     internal enum ProcessRuntimeKind
@@ -442,8 +451,12 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     internal static string StageQuantileQuery(string histogramBase, string facility, int windowSeconds, string quantile) =>
         $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{{facility_id=\"{facility}\"}}[{windowSeconds}s])))";
 
-    internal static string StageErrorQuery(string errorCounter, string facility, string errorOutcome, int windowSeconds) =>
-        $"sum(increase({PromCounter(errorCounter)}{{facility_id=\"{facility}\",outcome=\"{errorOutcome}\"}}[{windowSeconds}s]))";
+    internal static string StageErrorQuery(string errorCounter,
+                                           string errorLabel,
+                                           string facility,
+                                           string errorOutcome,
+                                           int windowSeconds) =>
+        $"sum(increase({PromCounter(errorCounter)}{{facility_id=\"{facility}\",{errorLabel}=\"{errorOutcome}\"}}[{windowSeconds}s]))";
 
     /// <summary>
     /// The name a counter is exported under: the instrument name plus <c>_total</c>.
@@ -725,10 +738,12 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             StageQuantileQuery(stage.HistogramBase, facility, windowSeconds, "0.99"), evaluationTime, cancellationToken);
 
         double errorCount = 0;
-        if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) && !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
+        if (!string.IsNullOrWhiteSpace(stage.ErrorCounter) &&
+            !string.IsNullOrWhiteSpace(stage.ErrorLabel) &&
+            !string.IsNullOrWhiteSpace(stage.ErrorOutcome))
         {
             var errorSelector = StageErrorQuery(
-                stage.ErrorCounter, facility, EscapePromLabel(stage.ErrorOutcome), windowSeconds);
+                stage.ErrorCounter, stage.ErrorLabel, facility, EscapePromLabel(stage.ErrorOutcome), windowSeconds);
             errorCount = await _prometheus.QueryScalarAsync(errorSelector, evaluationTime, cancellationToken) ?? 0;
         }
 
