@@ -272,6 +272,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IResourceCache resourceCache = _resourceCache;
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
+        var appendedReferences = new HashSet<string>(StringComparer.Ordinal);
 
         var mappingOutcomes = new MappingOutcomeAccumulator();
 
@@ -446,6 +447,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
             await resourceCache.AppendResourcesAsync(correlationId, resources, resourceType, cancellationToken);
             copiedKeys.Add(cacheKey);
+            appendedReferences.UnionWith(resources.Select(resource => resource.TypeName + "/" + resource.Id));
         }
 
         if (cacheKeys.Count == 0)
@@ -459,7 +461,12 @@ public class ResourcesAcquiredListener : BackgroundService
         // The durability barrier. ResourcesNormalized names this correlation's cache key, and the
         // durable write for it is still on a background queue -- produce first and a reader can
         // arrive after the cache entry is evicted but before the durable copy exists.
-        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
+        //
+        // Scoped to the resources this message appended. A failure is kept until its resources are
+        // written again, and the redelivery that does that may land on another pod -- so a wait on
+        // the whole key here would keep failing on a failure this pod still remembers, for data
+        // durable storage already holds.
+        await resourceCache.WaitForDurableAsync([correlationId], appendedReferences, cancellationToken);
 
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
