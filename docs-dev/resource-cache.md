@@ -307,6 +307,16 @@ torn append — the payload is written before `_ids`, so dying between them leav
 retry's diff will not skip. `ABSResourceCache.GetAsync` therefore **dedupes by reference id on
 read**, which also covers concurrent appends to one key from different pods.
 
+Dedupe only works if the line pairs stay aligned, so **every append block ends on a record boundary**.
+`AbsPayloadFormat.BuildBlocks` packs whole records (a reference/JSON pair in the payload, one
+reference in `_ids`) into blocks of up to 4 MiB, and each block goes up in its own `AppendBlock`
+call, which the service commits whole or not at all. A failure partway through a batch can therefore
+leave some whole pairs behind, which the retry repeats and the read collapses, but never a torn line.
+The write stream this replaced committed a block whenever its buffer filled, mid-line: the retry
+then appended straight onto the partial JSON, and every pair after it was read back with references
+and JSON swapped. The same alignment makes two pods' blocks interleave safely on one key. A single
+record larger than the service's append-block limit is rejected rather than split.
+
 **On graceful shutdown**, the writer drains within the host shutdown timeout, using a token that is
 not the stopping token. Anything that does not finish follows the path above.
 

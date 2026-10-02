@@ -83,27 +83,36 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             await writeBlobClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             await writeIdsBlobClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
             
-            await using (Stream writeStream = await writeBlobClient.OpenWriteAsync(false, cancellationToken: cancellationToken))
-            await using (StreamWriter writer = new StreamWriter(writeStream))
+            await AppendBlocksAsync(
+                writeBlobClient,
+                resourcesToWrite.Select(resource =>
+                    (resource.Key, AbsPayloadFormat.PayloadRecord(resource.Key, resource.Value.ToJson()))),
+                cancellationToken);
+
+            await AppendBlocksAsync(
+                writeIdsBlobClient,
+                resourcesToWrite.Keys.Select(reference => (reference, AbsPayloadFormat.IdRecord(reference))),
+                cancellationToken);
+        }
+
+        /// <remarks>
+        /// One AppendBlock call per block, never a write stream. The stream commits a block whenever its
+        /// buffer fills, mid-line, so a failure after the first block left a torn line that the retry then
+        /// appended onto, and every pair after it was read back misaligned.
+        /// </remarks>
+        private static async Task AppendBlocksAsync(AppendBlobClient blobClient,
+                                                    IEnumerable<(string Reference, string Record)> records,
+                                                    CancellationToken cancellationToken)
+        {
+            var blocks = AbsPayloadFormat.BuildBlocks(
+                records,
+                AbsPayloadFormat.TargetBlockBytes,
+                blobClient.AppendBlobMaxAppendBlockBytes);
+
+            foreach (var block in blocks)
             {
-                foreach (var resourceToWrite in resourcesToWrite)
-                {
-                    await writer.WriteLineAsync(resourceToWrite.Key.AsMemory(), cancellationToken);
-                    await writer.WriteLineAsync(resourceToWrite.Value.ToJson().AsMemory(), cancellationToken);
-                }
-
-                await writer.FlushAsync(cancellationToken);
-            }
-
-            await using (Stream idsWriteStream = await writeIdsBlobClient.OpenWriteAsync(false, cancellationToken: cancellationToken))
-            await using (StreamWriter idsWriter = new StreamWriter(idsWriteStream))
-            {
-                foreach(var id in resourcesToWrite.Keys)
-                {
-                    await idsWriter.WriteLineAsync(id.AsMemory(), cancellationToken);
-                }
-
-                await idsWriter.FlushAsync(cancellationToken);
+                using var content = new MemoryStream(block, writable: false);
+                await blobClient.AppendBlockAsync(content, cancellationToken: cancellationToken);
             }
         }
 
@@ -131,47 +140,30 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
 
             // The payload blob can legitimately contain the same reference twice: a crash between the
-            // payload append and the ids append leaves a resource the retry's diff will not skip, and
-            // two processes appending to one key can interleave. Collapsing on read makes both
-            // harmless -- wasted bytes rather than duplicate resources.
-            var seenReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var duplicateCount = 0;
+            // payload append and the ids append leaves a resource the retry's diff will not skip, a
+            // retried append repeats whole blocks, and two processes appending to one key can
+            // interleave. ReadPairsAsync collapses them -- wasted bytes rather than duplicate resources.
+            int duplicateCount;
 
             await using (Stream readStream = await readBlobClient.OpenReadAsync(true, cancellationToken: cancellationToken))
             using (StreamReader reader = new StreamReader(readStream))
             {
-                while (true)
-                {
-                    //Skip first line. It's the reference of the resource, not the resource itself
-                    string? resourceReference = await reader.ReadLineAsync(cancellationToken);
-                    if (resourceReference == null)
+                duplicateCount = await AbsPayloadFormat.ReadPairsAsync(
+                    reader,
+                    (resourceReference, resourceString) =>
                     {
-                        break;
-                    }
-
-                    string? resourceString = await reader.ReadLineAsync(cancellationToken);
-                    if (resourceString == null)
-                    {
-                        break;
-                    }
-
-                    if (!seenReferences.Add(resourceReference))
-                    {
-                        duplicateCount++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-                        resources.Add(resource);
-                    }
-                    catch (Exception ex)
-                    {
-                        //We aren't going to dead letter the event if we have issues deserializing the resource, but will log it. 
-                        _logger.LogError("Failed to deserialize FHIR DomainResource for the following ABS entry: {reference}", resourceReference);
-                    }
-                }
+                        try
+                        {
+                            DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                            resources.Add(resource);
+                        }
+                        catch (Exception)
+                        {
+                            //We aren't going to dead letter the event if we have issues deserializing the resource, but will log it.
+                            _logger.LogError("Failed to deserialize FHIR DomainResource for the following ABS entry: {reference}", resourceReference.SanitizeForLog());
+                        }
+                    },
+                    cancellationToken);
             }
 
             if (duplicateCount > 0)
