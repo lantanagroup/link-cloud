@@ -89,6 +89,28 @@ public class SubmissionZipWriterTests
         Assert.Equal(1, opened);
     }
 
+    [Fact]
+    public async Task CopyToAsync_WritesTheResponseAsynchronously()
+    {
+        await using var destination = new SyncWriteForbiddenStream();
+
+        await SubmissionZipResponse.CopyToAsync(
+            destination,
+            (file, token) => SubmissionZipWriter.WriteAsync(file, OneEntry(), token),
+            CancellationToken.None);
+
+        using var zip = new ZipArchive(new MemoryStream(destination.ToArray()), ZipArchiveMode.Read);
+        Assert.Equal("a.ndjson", Assert.Single(zip.Entries).Name);
+        Assert.Equal("{\"resourceType\":\"Patient\"}\n", await ReadAsync(zip, "a.ndjson"));
+    }
+
+    private static async IAsyncEnumerable<SubmissionZipWriter.Entry> OneEntry()
+    {
+        yield return new SubmissionZipWriter.Entry(
+            "a.ndjson",
+            _ => Task.FromResult<Stream>(new MemoryStream("{\"resourceType\":\"Patient\"}\n"u8.ToArray())));
+    }
+
     private static async Task<string> ReadAsync(ZipArchive zip, string name)
     {
         var entry = zip.GetEntry(name);
@@ -112,5 +134,34 @@ public class SubmissionZipWriterTests
                 _onDispose();
             base.Dispose(disposing);
         }
+    }
+
+    private sealed class SyncWriteForbiddenStream : Stream
+    {
+        private readonly MemoryStream _inner = new();
+
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => _inner.Length;
+        public override long Position
+        {
+            get => _inner.Position;
+            set => throw new NotSupportedException();
+        }
+
+        public byte[] ToArray() => _inner.ToArray();
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) =>
+            throw new InvalidOperationException("Synchronous operations are disallowed.");
+        public override void Write(ReadOnlySpan<byte> buffer) =>
+            throw new InvalidOperationException("Synchronous operations are disallowed.");
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
+            _inner.WriteAsync(buffer, cancellationToken);
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            _inner.WriteAsync(buffer, offset, count, cancellationToken);
     }
 }

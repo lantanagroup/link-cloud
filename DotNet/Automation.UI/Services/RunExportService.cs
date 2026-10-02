@@ -48,8 +48,11 @@ public sealed class RunExportService : IRunExportService
         if (run == null)
             return null;
 
-        using var ms = new MemoryStream();
-        using (var archive = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        var path = Path.Combine(Path.GetTempPath(), "link-export-" + Guid.NewGuid().ToString("N") + ".zip");
+        try
+        {
+        await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
         {
             await SafeWriteAsync(archive, "RunDetails.txt",
                 () => Task.FromResult(BuildRunDetails(run)));
@@ -94,7 +97,21 @@ public sealed class RunExportService : IRunExportService
 
         return new RunExportPackage(
             FileName: $"TestRunDiagnostics-{runId:D}.zip",
-            Content: ms.ToArray());
+            FilePath: path);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch (IOException)
+            {
+            }
+
+            throw;
+        }
     }
 
     // --- Section builders ---

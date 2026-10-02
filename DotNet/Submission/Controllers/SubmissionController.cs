@@ -150,7 +150,9 @@ public class SubmissionController(
                 FileName = _fileName
             }.ToString();
 
-            await _write(response.Body, context.HttpContext.RequestAborted);
+            // ZipArchive finalizes with a synchronous write. Build the file first,
+            // then copy it to the response so Kestrel never sees that write.
+            await SubmissionZipResponse.CopyToAsync(response.Body, _write, context.HttpContext.RequestAborted);
         }
     }
 }
