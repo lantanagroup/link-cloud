@@ -65,6 +65,35 @@ public class ResourcesAcquiredListenerRedeliveryTests
     }
 
     [Fact]
+    public async Task ProcessMessageAsync_Barrier_WaitsOnlyOnTheResourcesThisMessageAppended()
+    {
+        // A failure on the correlation key is kept until its resources are written again, and that
+        // rewrite may happen on another pod. Waiting on the whole key here would keep failing on a
+        // failure this pod still remembers, for data durable storage already holds.
+        var resourceCache = PopulatedCache(PatientCacheKey, FhirResourceType.Patient, new Patient { Id = PatientId });
+        IReadOnlyCollection<string>? waitedFor = null;
+        resourceCache
+            .Setup(item => item.WaitForDurableAsync(
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<IReadOnlyCollection<string>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<string>, IReadOnlyCollection<string>, CancellationToken>((_, references, _) => waitedFor = references)
+            .Returns(Task.CompletedTask);
+
+        var listener = BuildListener(resourceCache, ProducingProducer());
+
+        await listener.ProcessMessageAsync(BuildConsumeResult([PatientCacheKey]), CancellationToken.None);
+
+        Assert.Equal(new[] { $"Patient/{PatientId}" }, waitedFor);
+        resourceCache.Verify(
+            item => item.WaitForDurableAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        resourceCache.Verify(
+            item => item.WaitForDurableAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task ProcessMessageAsync_DeleteAfterProduceCancelled_Propagates()
     {
         using var cancellation = new CancellationTokenSource();

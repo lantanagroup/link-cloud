@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using System.Collections.Concurrent;
 using Task = System.Threading.Tasks.Task;
@@ -19,6 +20,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
 
     private readonly RecordingAbsCache _abs = new();
     private readonly RecordingAbsCache _redis = new();
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.Zero));
     private BackgroundAbsCacheWriter _writer = null!;
 
     public async Task InitializeAsync()
@@ -800,6 +802,69 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WaitForDurableAsync_FailureWithinRetention_IsStillReported()
+    {
+        // The owning log only waits at the end of its execution, which can be hours after the write.
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await WaitUntilAsync(() => _writer.QueueDepth == 0);
+
+        _time.Advance(TimeSpan.FromHours(5));
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1"]).WaitAsync(Timeout));
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_FailureOlderThanRetention_IsNoLongerReported()
+    {
+        // The redelivery that made this good can land on another pod, so this pod may never see the
+        // rewrite that would clear it. Kept forever, it failed every later key-wide wait here for data
+        // durable storage already held.
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout));
+
+        _time.Advance(TimeSpan.FromHours(7));
+
+        await _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout);
+        await _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task Sweep_ExpiredFailureOnAKeyNobodyTouchesAgain_ReleasesTheKey()
+    {
+        // Nothing writes or waits on this key again -- the retry went to another pod -- so only the
+        // sweep can let it go. Without it the key was tracked for the life of the process.
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await WaitUntilAsync(() => _writer.QueueDepth == 0);
+        Assert.Equal(1, _writer.TrackedKeyCount);
+
+        _time.Advance(TimeSpan.FromHours(7));
+
+        await WaitUntilAsync(() => _writer.TrackedKeyCount == 0);
+    }
+
+    [Fact]
+    public async Task Sweep_FailureWithinRetention_KeepsTheKey()
+    {
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await WaitUntilAsync(() => _writer.QueueDepth == 0);
+
+        // Several sweeps run, none of them past the retention.
+        for (var i = 0; i < 6; i++)
+        {
+            _time.Advance(TimeSpan.FromMinutes(30));
+        }
+
+        await Task.Delay(100);
+        Assert.Equal(1, _writer.TrackedKeyCount);
+    }
+
+    [Fact]
     public async Task Cancel_RecordedFailure_IsCleared()
     {
         _abs.FailKey("corr:Patient");
@@ -866,6 +931,7 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
             _redis,
             Options.Create(settings),
             Mock.Of<IResourceCacheMetrics>(),
+            _time,
             Mock.Of<ILogger<BackgroundAbsCacheWriter>>());
     }
 
