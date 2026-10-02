@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reference;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -10,7 +11,7 @@ public class EncounterEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/encounter")
             .WithTags("Encounter")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/encounter-codes", async (IReferenceDataService referenceData, CancellationToken cancellationToken) =>
                 Results.Ok(await referenceData.GetEncounterCodesAsync(cancellationToken)))

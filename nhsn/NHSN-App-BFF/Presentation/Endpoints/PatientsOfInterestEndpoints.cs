@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.PatientsOfInterest;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -11,7 +12,7 @@ public class PatientsOfInterestEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/patients-of-interest")
             .WithTags("PatientsOfInterest")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapPost("/sftp-connection-tests", async (
                 SftpConfig config,

@@ -1,5 +1,6 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.FacilityAdministration;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -9,7 +10,7 @@ public class FacilityAdministrationEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/facilities")
             .WithTags("NHSN App BFF")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapPut("/{facilityId}/onboarding", async (string facilityId, UpdateFacilityOnboardingRequest request, INhsnUserContext userContext, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
             {

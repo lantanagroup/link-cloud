@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.OrganizationIdentification;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
@@ -10,7 +11,7 @@ public sealed class OrganizationIdentificationEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/organization-identification")
             .WithTags("Organization Identification")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapGet("/location-candidates", (string method, IOrganizationIdentificationService service) =>
                 Results.Ok(service.GetLocationCandidates(method.Sanitize())))

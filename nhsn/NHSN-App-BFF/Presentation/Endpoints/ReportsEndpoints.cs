@@ -3,6 +3,7 @@ using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models.Reporting;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
@@ -19,7 +20,7 @@ public class ReportsEndpoints : IApi
     {
         var group = app.MapGroup("/api/nhsn-app-bff/reports")
             .WithTags("Reports")
-            .RequireAuthorization("AuthenticatedUser");
+            .RequireAuthorization(NhsnAuthorizationPolicies.FacilityAdministrator);
 
         group.MapPost("/", async (
                 ReportRequest request,
