@@ -45,13 +45,11 @@ public static class MetricsBenchmarkEvaluator
                 violations.Add($"{FriendlyName(key)} was {Format(value.Value)}; it needs to be at least {Format(min)}.");
         }
 
-        // Not a drift comparison and not a slowdown, so it belongs with the limits rather than the
-        // regression flags: the retry limit was reached and the work waiting on those keys was
-        // failed. Checked outside the previous-run block too, or a first run never reports it.
-        var exhausted = document.ResourceCache is { Unavailable: false } cache ? cache.WriteExhaustedCount : 0;
-        if (exhausted > 0)
-            violations.Add($"{Format(exhausted)} durable cache write(s) exhausted their retries; the work waiting on those keys was failed.");
-
+        // Exhausted durable cache writes are deliberately not judged here. The counter has no facility
+        // tag, so it counts the whole stack's failures in the run window, and a violation would fail
+        // this run for another facility's blob trouble. Nor are they this run's data loss: the barrier
+        // fails and the work is retried, and reconciliation catches anything that does go missing.
+        // The cache card reports them on their own instead.
         var flags = new List<string>();
         var percent = benchmark?.RegressionPercent > 0 ? benchmark.RegressionPercent : 10;
         if (previous != null)
