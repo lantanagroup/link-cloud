@@ -178,5 +178,57 @@ class EvaluateMeasureServiceTest {
         assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TRACKING_ID)));
         assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.CORRELATION_ID)));
         assertNull(attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.RESOURCE_COUNT)));
+        verify(measureEvalMetrics, never()).recordEvaluationFailure(any());
+    }
+
+    @Test
+    void evaluateMeasure_evaluationThrowsWithQueryType_recordsFailureAndRethrows() throws Exception {
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setPatientId("patient-1");
+        patientStatus.setFacilityId("facility-1");
+
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setStartDate(sdf.parse("2025-01-01"));
+        report.setEndDate(sdf.parse("2025-01-31"));
+        report.setReportType("measure-1");
+
+        Bundle bundle = new Bundle();
+        RuntimeException failure = new RuntimeException("CQL blew up");
+
+        when(measureEvaluatorCache.get("measure-1")).thenReturn(measureEvaluator);
+        when(measureEvaluator.evaluate(any(Date.class), any(Date.class), eq("patient-1"), eq(bundle)))
+                .thenThrow(failure);
+
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> evaluateMeasureService.evaluateMeasure("Initial", patientStatus, report, bundle));
+        assertSame(failure, thrown);
+
+        // Counted as a failure, with the same attributes a success carries, and never as a success.
+        ArgumentCaptor<io.opentelemetry.api.common.Attributes> attributesCaptor =
+                ArgumentCaptor.forClass(io.opentelemetry.api.common.Attributes.class);
+        verify(measureEvalMetrics).recordEvaluationFailure(attributesCaptor.capture());
+        verify(measureEvalMetrics, never()).MeasureEvalDuration(anyLong(), any());
+
+        io.opentelemetry.api.common.Attributes attributes = attributesCaptor.getValue();
+        assertEquals("facility-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.FACILITY_ID)));
+        assertEquals("Initial", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PHASE)));
+        assertEquals("measure-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey("report.type")));
+    }
+
+    @Test
+    void evaluateMeasure_evaluationThrowsWithoutQueryType_recordsNothing() throws Exception {
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setPatientId("patient-1");
+
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportType("unknown-measure");
+
+        when(measureEvaluatorCache.get("unknown-measure")).thenReturn(null);
+
+        assertThrows(IllegalStateException.class,
+                () -> evaluateMeasureService.evaluateMeasure(patientStatus, report, new Bundle()));
+
+        // Matches the success path, which records nothing without a query type.
+        verifyNoInteractions(measureEvalMetrics);
     }
 }
