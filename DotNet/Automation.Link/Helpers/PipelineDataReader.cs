@@ -123,7 +123,8 @@ public class PipelineDataReader
         DateTime? ExecutionDate = null,
         DateTime? CreateDate = null,
         DateTime? CompletionDate = null,
-        long? CompletionTimeMilliseconds = null);
+        long? CompletionTimeMilliseconds = null,
+        List<string>? ResourceTypes = null);
 
     public record StatusCountInfo(string Status, int Count);
     public record ResourceTypeCountInfo(string ResourceType, int Count);
@@ -347,7 +348,8 @@ public class PipelineDataReader
                 log.ExecutionDate,
                 log.CreateDate,
                 log.CompletionDate,
-                log.CompletionTimeMilliseconds)));
+                log.CompletionTimeMilliseconds,
+                log.ResourceTypes?.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [])));
 
             if (records.Count < pageSize)
                 break;
@@ -566,6 +568,15 @@ public class PipelineDataReader
     }
 
     public async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeAsync(string facilityId, string reportId)
+    {
+        var counts = await GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(facilityId, reportId);
+        if (counts.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
+            return counts;
+
+        return await GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(string.Empty, reportId);
+    }
+
+    private async Task<List<PatientResourceTypeCount>> GetDataAcquisitionResourceCountsByPatientTypeCoreAsync(string facilityId, string reportId)
     {
         var counts = new Dictionary<(string PatientId, string ResourceType), int>();
 

@@ -344,9 +344,14 @@ public class QueryPlanConfigController : Controller
         {
             var exists = await _queryPlanQueries.ExistsAsync(facilityId, parameters.Type.Value, cancellationToken);
 
+            // Setup replaces a plan by deleting it first. A new facility has nothing to delete,
+            // so this 404 is the normal result. Return it without an error log.
             if (!exists)
             {
-                throw new NotFoundException($"A QueryPlan or Query component was not found for facilityId: {facilityId}.");
+                return Problem(
+                    title: "Not Found",
+                    detail: $"A QueryPlan or Query component was not found for facilityId: {facilityId}.",
+                    statusCode: (int)HttpStatusCode.NotFound);
             }
 
             await _queryPlanManager.DeleteAsync(facilityId, parameters.Type.Value, cancellationToken);

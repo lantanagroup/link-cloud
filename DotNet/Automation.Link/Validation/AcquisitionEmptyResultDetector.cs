@@ -22,7 +22,8 @@ public static class AcquisitionEmptyResultDetector
     public static IReadOnlyList<EmptyAcquisition> Find(
         GenerationManifest manifest,
         IEnumerable<string> acquiredResourceIds,
-        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo>? logs = null)
+        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo>? logs = null,
+        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient = null)
     {
         var acquiredIds = acquiredResourceIds
             .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
@@ -45,13 +46,39 @@ public static class AcquisitionEmptyResultDetector
                 if (expectedCount <= 0)
                     continue;
 
-                var actualCount = CountAcquiredForPatient(acquiredIds, patientId, resourceType);
+                var actualCount = CountForPatient(acquiredIds, acquiredByPatient, patientId, resourceType);
                 if (actualCount == 0)
                     findings.Add(new EmptyAcquisition(patientId, resourceType, expectedCount, actualCount));
             }
         }
 
         return findings;
+    }
+
+    private static int CountForPatient(
+        IReadOnlyList<string> acquiredResourceIds,
+        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient,
+        string patientId,
+        string resourceType)
+    {
+        // Log rows already name the patient. Imported resources use their own ids, so a
+        // "{patientId}-" prefix on the resource id is not a reliable owner check.
+        if (acquiredByPatient != null)
+        {
+            var count = 0;
+            foreach (var row in acquiredByPatient)
+            {
+                if (string.Equals(row.PatientId, patientId, StringComparison.Ordinal)
+                    && string.Equals(row.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase))
+                {
+                    count += row.Count;
+                }
+            }
+
+            return count;
+        }
+
+        return CountAcquiredForPatient(acquiredResourceIds, patientId, resourceType);
     }
 
     public static bool ResourceIdBelongsToPatient(string resourceId, string patientId)

@@ -160,6 +160,15 @@ public sealed class GenerationManifest
     public IReadOnlySet<string> PreExistingPatientIds { get; set; }
         = new HashSet<string>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Location logical ids referenced by an import and proven absent (HTTP 404 or 410).
+    /// An organization-location mapping whose parent id is in this set is a dangling
+    /// <c>partOf</c>, not a hierarchy gap. Empty for generated patients and for manifests
+    /// saved before this set existed.
+    /// </summary>
+    public IReadOnlySet<string> AbsentReferencedLocationIds { get; set; }
+        = new HashSet<string>(StringComparer.Ordinal);
+
     // ----- Acquired / Expected-in-ABS resource type filters -----
 
     /// <summary>
@@ -696,6 +705,7 @@ public sealed class GenerationManifest
         private readonly Dictionary<string, int> _totalsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _simulatedAcquiredKeys = new(StringComparer.Ordinal);
         private readonly HashSet<string> _preExistingPatientIds = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _absentReferencedLocationIds = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _templateCacheKeys = new(StringComparer.Ordinal);
         private int _totalCount;
 
@@ -806,6 +816,22 @@ public sealed class GenerationManifest
         }
 
         /// <summary>
+        /// Records location ids that import proved are not on the FHIR server.
+        /// </summary>
+        public void AddAbsentReferencedLocationIds(IEnumerable<string>? locationIds)
+        {
+            if (locationIds == null) return;
+            lock (_lock)
+            {
+                foreach (var id in locationIds)
+                {
+                    if (!string.IsNullOrWhiteSpace(id))
+                        _absentReferencedLocationIds.Add(id);
+                }
+            }
+        }
+
+        /// <summary>
         /// Records the ABS template-cache key used to generate this patient's FHIR
         /// so later downloads can replay the same template without a per-run copy.
         /// </summary>
@@ -840,6 +866,7 @@ public sealed class GenerationManifest
                     SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal),
                     CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal),
                     PreExistingPatientIds = new HashSet<string>(_preExistingPatientIds, StringComparer.Ordinal),
+                    AbsentReferencedLocationIds = new HashSet<string>(_absentReferencedLocationIds, StringComparer.Ordinal),
                     TemplateCacheKeyByPatient = new Dictionary<string, string>(_templateCacheKeys, StringComparer.Ordinal)
                 };
             }

@@ -155,6 +155,7 @@ public class AbsSubmissionPredictorTests
         omitted.Should().NotBeNull();
 
         var reads = new List<string>();
+        var absent = new HashSet<string>(StringComparer.Ordinal);
         var added = await ReferencedLocationExpander.AppendMissingAsync(
             entries,
             (id, _) =>
@@ -167,10 +168,15 @@ public class AbsSubmissionPredictorTests
                 throw new InvalidOperationException($"Unexpected Location read: {id}");
             },
             output: null,
-            CancellationToken.None);
+            CancellationToken.None,
+            absentLocationIds: absent);
 
         added.Should().Be(1);
         reads.Should().BeEquivalentTo(new[] { missingLocationId, brokenParentId });
+        absent.Should().Equal(brokenParentId);
+        var builder = new GenerationManifest.IncrementalBuilder();
+        builder.AddAbsentReferencedLocationIds(absent);
+        builder.Build([]).AbsentReferencedLocationIds.Should().Equal(brokenParentId);
 
         var manifest = AbsSubmissionPredictor.PredictImportedBundle(
             SerializeEntries(entries),
@@ -197,6 +203,56 @@ public class AbsSubmissionPredictorTests
         keys.Should().Contain($"Location/{missingLocationId}");
         keys.Should().Contain($"Encounter/{encounterId}");
         manifest.ResourceKeysByPatient[patientId].Should().Contain($"Location/{missingLocationId}");
+    }
+
+    [Fact]
+    public async Task Record_only_expansion_records_a_dangling_ancestor_without_adding_found_locations()
+    {
+        var fhirBase = new Uri("https://ehr.example/fhir");
+        var room = new Location
+        {
+            Id = "room",
+            PartOf = new ResourceReference("https://ehr.example/fhir/Location/present-parent")
+        };
+        var entries = new List<Bundle.EntryComponent>
+        {
+            new()
+            {
+                Resource = room,
+                Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = "Location/room" }
+            }
+        };
+
+        var absent = new HashSet<string>(StringComparer.Ordinal);
+        var added = await ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, _) =>
+            {
+                if (id == "present-parent")
+                {
+                    return Task.FromResult<Location?>(new Location
+                    {
+                        Id = "present-parent",
+                        PartOf = new ResourceReference("Location/missing-parent")
+                    });
+                }
+
+                if (id == "missing-parent")
+                    return Task.FromResult<Location?>(null);
+
+                throw new InvalidOperationException($"Unexpected Location read: {id}");
+            },
+            output: null,
+            CancellationToken.None,
+            fhirBase,
+            absent,
+            appendFoundLocations: false);
+
+        added.Should().Be(0);
+        entries.Should().ContainSingle();
+        entries[0].Resource.Should().BeSameAs(room);
+        absent.Should().Equal("missing-parent");
+        room.PartOf.Reference.Should().Be("https://ehr.example/fhir/Location/present-parent");
     }
 
     [Fact]
