@@ -134,6 +134,36 @@ public sealed class ResourceCacheSnapshot
     /// </summary>
     public double HitRatio { get; set; }
 
+    // Measure evaluation's reads on their own. The counts above sum every service, and
+    // Normalization reads keys moments after writing them, so its hits swamp the combined ratio:
+    // only these say whether Redis is serving evaluation. Null when MeasureEval recorded no reads
+    // in the window -- an image without the metric, or telemetry export off -- and on runs
+    // captured before these were added.
+
+    public double? EvaluationHitCount { get; set; }
+    public double? EvaluationFallbackCount { get; set; }
+
+    /// <summary>
+    /// Reads that found nothing in either store. MeasureEval then evaluates an empty bundle and
+    /// reports the patient not reportable, so anything above zero is a patient evaluated on no data.
+    /// </summary>
+    public double? EvaluationEmptyCount { get; set; }
+
+    /// <summary>Evaluation hits as a fraction of evaluation reads that found something.</summary>
+    public double? EvaluationHitRatio { get; set; }
+
+    /// <summary>Fallbacks because Redis did not hold the entry: ordinary eviction.</summary>
+    public double? EvaluationMissCount { get; set; }
+
+    /// <summary>
+    /// Fallbacks because Redis held fewer resources than durable storage recorded: an entry evicted
+    /// and recreated part-way. Each one would have been a partial bundle without the check.
+    /// </summary>
+    public double? EvaluationPartialCount { get; set; }
+
+    /// <summary>Fallbacks because Redis could not be reached; each read waited out its timeout first.</summary>
+    public double? EvaluationUnavailableCount { get; set; }
+
     public double ReadP95Ms { get; set; }
     public double DurableWriteP95Ms { get; set; }
     public double QueueWaitP95Ms { get; set; }

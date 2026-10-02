@@ -176,7 +176,7 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                 facility label. Another run against the same stack at the same time would be counted in here too.
             </p>
             <div class="row g-3">
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Served from cache</span><span class="au-value">@(Model.ResourceCache.HitRatioPercent?.ToString("0.0") ?? "-")%</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Served from cache (all services)</span><span class="au-value">@(Model.ResourceCache.HitRatioPercent?.ToString("0.0") ?? "-")%</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Durability wait (slow)</span><span class="au-value">@FormatMs(Model.ResourceCache.DrainWaitP95Ms)</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Cache read (slow)</span><span class="au-value">@FormatMs(Model.ResourceCache.ReadP95Ms)</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Durable write (slow)</span><span class="au-value">@FormatMs(Model.ResourceCache.DurableWriteP95Ms)</span></div></div>
@@ -193,6 +193,48 @@ else if (Model.Stages.Values.Count(s => !s.Unavailable) is > 0 and < 5)
                     facility. The work waiting on those writes was failed and retried rather than
                     advertised, so it points at blob storage trouble, not at missing data in this run.
                 </div>
+            }
+
+            <h6 class="mt-4 mb-2">Measure evaluation reads</h6>
+            @if (Model.ResourceCache.EvaluationUnavailable)
+            {
+                <div class="small text-warning">
+                    Not recorded for this run. Either Measure Evaluation read nothing, its image predates these
+                    measurements, or its telemetry export was off.
+                </div>
+            }
+            else
+            {
+                <p class="small text-muted mb-3">
+                    The figures above add up every service. Normalization reads each key moments after writing it,
+                    so its reads are almost always served from cache and dominate the total. These are Measure
+                    Evaluation&#8217;s reads alone: the number that says whether Redis is doing anything for evaluation.
+                </p>
+                <div class="row g-3">
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Served from cache</span><span class="au-value">@(Model.ResourceCache.EvaluationHitRatioPercent?.ToString("0.0") ?? "-")%</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Reads served by cache</span><span class="au-value">@(Model.ResourceCache.EvaluationHitCount?.ToString("0") ?? "-")</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Reads that fell back</span><span class="au-value">@(Model.ResourceCache.EvaluationFallbackCount?.ToString("0") ?? "-")</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Reads that found nothing</span><span class="au-value">@(Model.ResourceCache.EvaluationEmptyCount?.ToString("0") ?? "-")</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Fell back: not in cache</span><span class="au-value">@(Model.ResourceCache.EvaluationMissCount?.ToString("0") ?? "-")</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Fell back: incomplete in cache</span><span class="au-value">@(Model.ResourceCache.EvaluationPartialCount?.ToString("0") ?? "-")</span></div></div>
+                    <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Fell back: cache unreachable</span><span class="au-value">@(Model.ResourceCache.EvaluationUnavailableCount?.ToString("0") ?? "-")</span></div></div>
+                </div>
+                @if (Model.ResourceCache.EvaluationEmptyCount is > 0)
+                {
+                    <div class="mt-3 small text-danger">
+                        @Model.ResourceCache.EvaluationEmptyCount?.ToString("0") evaluation read(s) found nothing in either
+                        Redis or blob storage. Each of those patients was evaluated on an empty bundle and reported as not
+                        reportable. This counts the whole service during the run window.
+                    </div>
+                }
+                @if (Model.ResourceCache.EvaluationPartialCount is > 0)
+                {
+                    <div class="mt-3 small text-warning">
+                        @Model.ResourceCache.EvaluationPartialCount?.ToString("0") evaluation read(s) found an incomplete entry in
+                        Redis and read blob storage instead. The check worked, but it means entries are being evicted and
+                        recreated part-way, which points at Redis memory pressure.
+                    </div>
+                }
             }
         }
     </div>
