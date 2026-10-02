@@ -172,15 +172,22 @@ have fired otherwise.
 
 ### Who waits on what
 
-A durability failure is reported **once**, to the waiter that sees it, and is cleared as it is
-reported so the redelivery that follows can succeed. That makes the scope of a wait part of its
-correctness, not a detail: a caller that waits on keys it does not own consumes a failure meant for
-the caller that does, and that caller's own barrier then finds nothing to wait on and reports an
-undurable key as durable.
+A durability failure is recorded **per resource**, against the key it was written to, and it is
+**not consumed** when reported. Every waiter whose scope covers a failed resource is told, for as
+long as the failure stands. It is cleared only when those same resources are written again and land,
+which is what a redelivery does before it reaches its own barrier, or when the key is cancelled for
+deletion or replacement.
 
-So acquisition waits on the keys its own log wrote — derived from the acquired ids, which are
-already `resourceType/resourceId` — and not on the correlation. Normalization and the tail finalizer
-wait on the whole correlation, which is correct for them: they own all of it.
+It used to be the other way round: one failure per key, cleared by the first waiter to see it.
+Sibling acquisition logs that return the same type share a key and wait on it together, and a
+hand-off can merge their batches into one blob write. So the first waiter could be a sibling whose
+own resources had landed, and the log that owned the failure was then told the key was durable,
+marked Completed, and advertised data that existed only in Redis.
+
+So acquisition waits on the keys its own log wrote, and passes the ids it acquired (already
+`resourceType/resourceId`, the same form the writer records) so that it is failed exactly when its
+own resources did not land, never for a sibling's. Normalization and the tail finalizer wait on the
+whole correlation, which is correct for them: they own all of it.
 
 ### Restoring the correlation entry before the supplemental append
 

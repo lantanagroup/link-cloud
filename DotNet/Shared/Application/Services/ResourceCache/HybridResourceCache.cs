@@ -103,6 +103,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
+        public async Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                              IReadOnlyCollection<string> references,
+                                              CancellationToken cancellationToken = default)
+        {
+            var start = Stopwatch.GetTimestamp();
+            try
+            {
+                await _absWriter.WaitForDurableAsync(cacheKeys, references, cancellationToken);
+            }
+            finally
+            {
+                _metrics.RecordDrainWait(Elapsed(start));
+            }
+        }
+
+        /// <inheritdoc/>
         public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             var readStart = Stopwatch.GetTimestamp();

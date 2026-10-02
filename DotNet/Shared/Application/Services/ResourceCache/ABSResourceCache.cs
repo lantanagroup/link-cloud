@@ -296,6 +296,16 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Completes immediately, for the same reason.
+        /// </summary>
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                        IReadOnlyCollection<string> references,
+                                        CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             // The ids append blob is only created when at least one resource was written.

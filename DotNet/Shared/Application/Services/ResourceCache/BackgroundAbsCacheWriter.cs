@@ -138,15 +138,34 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             catch (Exception)
             {
                 // The write never made it onto the queue, so nothing will ever decrement for it.
-                CompleteOne(cacheKey, state, failure: null);
+                CompleteOne(cacheKey, state, written: null, failure: null);
                 throw;
             }
         }
 
         /// <inheritdoc/>
-        public async Task WaitForDurableAsync(
+        public Task WaitForDurableAsync(
             IEnumerable<string> cacheKeys,
             CancellationToken cancellationToken = default)
+        {
+            return WaitForDurableCoreAsync(cacheKeys, references: null, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public Task WaitForDurableAsync(
+            IEnumerable<string> cacheKeys,
+            IReadOnlyCollection<string> references,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(references);
+
+            return WaitForDurableCoreAsync(cacheKeys, references, cancellationToken);
+        }
+
+        private async Task WaitForDurableCoreAsync(
+            IEnumerable<string> cacheKeys,
+            IReadOnlyCollection<string>? references,
+            CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(cacheKeys);
 
@@ -162,7 +181,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 {
                     if (state.Outstanding == 0)
                     {
-                        ThrowIfFailed(cacheKey, state);
+                        ThrowIfFailed(cacheKey, state, references);
                         continue;
                     }
 
@@ -173,7 +192,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 lock (state.Gate)
                 {
-                    ThrowIfFailed(cacheKey, state);
+                    ThrowIfFailed(cacheKey, state, references);
                 }
             }
         }
@@ -191,7 +210,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 .Where(key => key == correlationId || key.StartsWith(prefix, StringComparison.Ordinal))
                 .ToList();
 
-            return WaitForDurableAsync(keys, cancellationToken);
+            return WaitForDurableCoreAsync(keys, references: null, cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -214,7 +233,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     // Anything queued under the old generation is skipped when it is dequeued. The
                     // recorded failure goes too: the key is being removed, so it is no longer owed.
                     state.Generation++;
-                    state.Failure = null;
+                    state.ClearFailure();
                     SignalIfDrained(cacheKey, state);
                 }
             }
@@ -242,7 +261,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 lock (state.Gate)
                 {
                     state.Generation++;
-                    state.Failure = null;
+                    state.ClearFailure();
                     SignalIfDrained(cacheKey, state);
 
                     if (state.Outstanding == 0)
@@ -263,7 +282,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     // It describes contents the caller is about to replace outright, so reporting it
                     // to whoever waits on this key next would fail work over a copy that no longer
                     // exists.
-                    state.Failure = null;
+                    state.ClearFailure();
 
                     if (state.Outstanding == 0 && !state.Retired)
                     {
@@ -504,7 +523,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 // Reported as failed rather than silently dropped: losing its decrement would leave
                 // the key permanently undrainable.
-                CompleteOne(stranded.CacheKey, state, failure);
+                CompleteOne(stranded.CacheKey, state, stranded, failure);
             }
         }
 
@@ -554,7 +573,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
             finally
             {
-                CompleteOne(pending.CacheKey, state, failure);
+                CompleteOne(pending.CacheKey, state, pending, failure);
             }
         }
 
@@ -668,25 +687,47 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        private void CompleteOne(string cacheKey, KeyState state, Exception? failure)
+        /// <param name="cacheKey">The key the write was for.</param>
+        /// <param name="state">The key's state.</param>
+        /// <param name="written">The write that ran, or null when it never reached the queue.</param>
+        /// <param name="failure">Why the write failed, or null when it landed.</param>
+        private void CompleteOne(string cacheKey, KeyState state, PendingWrite? written, Exception? failure)
         {
             lock (state.Gate)
             {
                 state.Outstanding--;
 
-                if (failure != null)
+                if (written != null)
                 {
-                    state.Failure = failure;
+                    // Recorded per resource rather than per key. Several logs write and wait on one
+                    // key, and a hand-off can merge their resources into one batch, so only the
+                    // resources say whose work failed. A landed batch clears exactly the resources it
+                    // carried: a later batch of *different* resources landing says nothing about an
+                    // earlier one that never did.
+                    foreach (var reference in References(written))
+                    {
+                        if (failure != null)
+                        {
+                            state.FailedReferences.Add(reference);
+                        }
+                        else
+                        {
+                            state.FailedReferences.Remove(reference);
+                        }
+                    }
+
+                    if (failure != null)
+                    {
+                        state.LastFailure = failure;
+                    }
                 }
 
-                // A success never clears a recorded failure. Writes to one key append *different*
-                // resources, so a later batch landing says nothing about an earlier one that never
-                // did -- and Normalization writes this key once per resource type, so clearing here
-                // would let any later type mask a whole type that never reached durable storage.
-                // The failure is cleared where it is reported instead, in ThrowIfFailed.
                 SignalIfDrained(cacheKey, state);
             }
         }
+
+        private static IEnumerable<string> References(PendingWrite write) =>
+            write.Resources.Select(resource => resource.TypeName + "/" + resource.Id);
 
         /// <remarks>
         /// Callers hold <see cref="KeyState.Gate"/>. A key that drained cleanly is retired from the
@@ -703,7 +744,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             state.Completion.TrySetResult();
             state.Completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            if (state.Failure == null)
+            if (state.FailedReferences.Count == 0)
             {
                 state.Retired = true;
 
@@ -714,33 +755,38 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        /// <remarks>Callers hold <see cref="KeyState.Gate"/>.</remarks>
-        private void ThrowIfFailed(string cacheKey, KeyState state)
+        /// <remarks>
+        /// Callers hold <see cref="KeyState.Gate"/>. Reporting a failure does not consume it. When it
+        /// did, only the first of several waiters on one key was told -- possibly a sibling log whose
+        /// own resources had landed, leaving the log that owned the failure to be told the key was
+        /// durable. A failure now lasts until the resources it covers are written again, which a
+        /// redelivery does before it reaches this check, so recovery still works.
+        /// </remarks>
+        /// <param name="cacheKey">The key being checked.</param>
+        /// <param name="state">The key's state.</param>
+        /// <param name="references">
+        /// The resources the caller wrote, or null to be told about any failure on the key.
+        /// </param>
+        private static void ThrowIfFailed(string cacheKey, KeyState state, IReadOnlyCollection<string>? references)
         {
-            var failure = state.Failure;
-
-            if (failure == null)
+            if (state.FailedReferences.Count == 0)
             {
                 return;
             }
 
-            // Consumed as it is reported. The caller is being told this key is not durable and will
-            // fail its work; the redelivery that follows rewrites the key from the start, so a
-            // failure that outlived its report would fail that attempt too and the message could
-            // never recover. Reported once, to the caller that has to act on it.
-            state.Failure = null;
+            var owed = references == null
+                ? state.FailedReferences.ToList()
+                : references.Where(state.FailedReferences.Contains).ToList();
 
-            if (state.Outstanding == 0)
+            if (owed.Count == 0)
             {
-                // SignalIfDrained leaves a failed key in place so its waiter can still see the
-                // failure. That waiter is here, so the state has no one left to inform.
-                state.Retired = true;
-                _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+                return;
             }
 
             throw new ResourceCacheDurabilityException(
-                $"Resource cache key '{cacheKey}' could not be written to durable storage.",
-                failure);
+                $"Resource cache key '{cacheKey}' could not be written to durable storage: {owed.Count} "
+                + $"resource(s) did not land, including '{owed[0]}'.",
+                state.LastFailure);
         }
 
         private sealed record PendingWrite(
@@ -756,7 +802,16 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             public readonly object Gate = new();
             public int Outstanding;
             public int Generation;
-            public Exception? Failure;
+
+            /// <summary>
+            /// Resources whose durable write failed and has not been made good by a later one.
+            /// </summary>
+            public readonly HashSet<string> FailedReferences = new(StringComparer.Ordinal);
+
+            /// <summary>
+            /// The most recent failure, kept as the cause to report.
+            /// </summary>
+            public Exception? LastFailure;
 
             /// <summary>
             /// Set when this instance has been taken out of the dictionary. A writer that reached it
@@ -787,6 +842,15 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             public TaskCompletionSource Completion { get; set; } =
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            /// <summary>
+            /// Forgets every recorded failure. Only for a key whose contents are being removed or replaced.
+            /// </summary>
+            public void ClearFailure()
+            {
+                FailedReferences.Clear();
+                LastFailure = null;
+            }
         }
     }
 }

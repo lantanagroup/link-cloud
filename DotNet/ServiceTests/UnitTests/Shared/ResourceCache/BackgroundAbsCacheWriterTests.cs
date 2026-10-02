@@ -592,11 +592,11 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExhaustedWrite_ReportedOnce_ThenTheKeyCanRecover()
+    public async Task ExhaustedWrite_SameResourcesRewritten_KeyRecovers()
     {
-        // The caller fails its work and the message is redelivered, which rewrites the key from
-        // the start. A failure that outlived its report would fail that attempt too, and the
-        // message could never recover from a transient outage.
+        // The caller fails its work and the message is redelivered, which rewrites the same
+        // resources. The failure is no longer consumed when reported, so it is the rewrite landing
+        // that clears it -- otherwise the message could never recover from a transient outage.
         _abs.FailKey("corr:Patient");
         await _writer.EnqueueAsync("corr:Patient", Resources("Patient/1"), ResourceType.Patient);
 
@@ -656,10 +656,8 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     [Fact]
     public async Task WaitingOnOneKey_DoesNotConsumeAnotherKeysFailure()
     {
-        // Two sibling acquisition logs write different keys of one correlation. A failure is reported
-        // once, to the waiter that sees it, so a waiter scoped to the whole correlation would consume
-        // the other log's failure and retire its state -- and that log's own barrier would then find
-        // nothing to wait on and report a key as durable that never reached durable storage.
+        // Two sibling acquisition logs write different keys of one correlation. A waiter on one key
+        // is not told about the other's failure, and does not take it away from the log that owns it.
         _abs.FailKey("corr:Condition");
 
         await _writer.EnqueueAsync("corr:Observation", Resources("Observation/1"), ResourceType.Observation);
@@ -674,9 +672,10 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task WaitingOnTheCorrelation_ConsumesEveryKeysFailure()
+    public async Task WaitForCorrelationAsync_KeyFailed_DoesNotConsumeTheOwnersFailure()
     {
-        // The behaviour the per-key wait exists to avoid, pinned so the difference is not accidental.
+        // A correlation-wide waiter used to consume every key's failure, after which the owner was
+        // told its key was durable. Reporting no longer consumes, so both are told.
         _abs.FailKey("corr:Condition");
 
         await _writer.EnqueueAsync("corr:Observation", Resources("Observation/1"), ResourceType.Observation);
@@ -685,8 +684,119 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
             () => _writer.WaitForCorrelationAsync("corr").WaitAsync(Timeout));
 
-        // Consumed by the correlation-wide waiter, so the owner is no longer told.
-        await _writer.WaitForDurableAsync(["corr:Condition"]).WaitAsync(Timeout);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Condition"], ["Condition/1"]).WaitAsync(Timeout));
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_TwoWaitersOnAFailedMergedBatch_BothAreTold()
+    {
+        // H2: two logs on one pod write the same key and both wait on it. Their batches merge in a
+        // hand-off and the merged write fails. Whichever waiter took the lock first used to consume
+        // the failure, and the other -- possibly the log that owned it -- was told the key was durable.
+        _abs.FailKey("corr:Observation");
+        _abs.BlockWritesFor("corr:Observation");
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+
+        // Log B's write hands off, and log A's next write merges into it. Two counted items become
+        // one when they merge, so the queue depth says when that has happened.
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/b1"), ResourceType.Observation);
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a2"), ResourceType.Observation);
+        await WaitUntilAsync(() => _writer.QueueDepth == 2);
+
+        var logA = _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1", "Observation/a2"]);
+        var logB = _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/b1"]);
+        var keyWaiterOne = _writer.WaitForDurableAsync(["corr:Observation"]);
+        var keyWaiterTwo = _writer.WaitForDurableAsync(["corr:Observation"]);
+
+        _abs.ReleaseBlockedWrite();
+
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(() => logA.WaitAsync(Timeout));
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(() => logB.WaitAsync(Timeout));
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(() => keyWaiterOne.WaitAsync(Timeout));
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(() => keyWaiterTwo.WaitAsync(Timeout));
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_ReferenceScoped_SiblingWhoseResourcesLanded_IsNotFailed()
+    {
+        // Same key, separate batches: log A's exhausts its retries, log B's lands. B is not failed
+        // for A's write, so B is not sent round to re-acquire data that is already durable.
+        _abs.FailKeyTimes("corr:Observation", 3);
+        _abs.BlockWritesFor("corr:Observation");
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/b1"), ResourceType.Observation);
+
+        _abs.ReleaseBlockedWrite();
+
+        await _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/b1"]).WaitAsync(Timeout);
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_ReferenceScoped_OwnerWaitsAfterSibling_IsStillFailed()
+    {
+        // The exact H2 interleaving: the sibling reaches the barrier first. However it waits -- on its
+        // own resources or on the whole key -- the owner of the failed write is still told afterwards.
+        _abs.FailKeyTimes("corr:Observation", 3);
+        _abs.BlockWritesFor("corr:Observation");
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await _abs.WaitUntilBlocked().WaitAsync(Timeout);
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/b1"), ResourceType.Observation);
+
+        _abs.ReleaseBlockedWrite();
+
+        await _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/b1"]).WaitAsync(Timeout);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout));
+
+        var thrown = await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1"]).WaitAsync(Timeout));
+        Assert.Contains("Observation/a1", thrown.Message);
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_FailedReferencesRewritten_Succeeds()
+    {
+        // The redelivery of the failed log writes the same resources again. Once they land, neither
+        // the owner nor a key-wide waiter is failed, and the key's state is let go.
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1", "Observation/a2"), ResourceType.Observation);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1"]).WaitAsync(Timeout));
+
+        _abs.ClearFailures();
+
+        // Rewriting only part of it leaves the rest owed.
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout));
+
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a2"), ResourceType.Observation);
+        await _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1", "Observation/a2"]).WaitAsync(Timeout);
+        await _writer.WaitForDurableAsync(["corr:Observation"]).WaitAsync(Timeout);
+
+        Assert.Equal(0, _writer.TrackedKeyCount);
+    }
+
+    [Fact]
+    public async Task WaitForDurableAsync_UnrelatedReferencesAfterFailure_AreNotFailed()
+    {
+        // A failure nobody has made good yet must not be handed to the next, unrelated log that
+        // happens to write the same key.
+        _abs.FailKey("corr:Observation");
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/a1"), ResourceType.Observation);
+        await Assert.ThrowsAsync<ResourceCacheDurabilityException>(
+            () => _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/a1"]).WaitAsync(Timeout));
+
+        _abs.ClearFailures();
+        await _writer.EnqueueAsync("corr:Observation", Resources("Observation/c1"), ResourceType.Observation);
+
+        await _writer.WaitForDurableAsync(["corr:Observation"], ["Observation/c1"]).WaitAsync(Timeout);
     }
 
     [Fact]
@@ -759,11 +869,35 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
             Mock.Of<ILogger<BackgroundAbsCacheWriter>>());
     }
 
+    /// <summary>
+    /// Builds each resource as the type its reference names. Failures are tracked per reference, so
+    /// "Encounter/1" built as a Patient would collide with "Patient/1".
+    /// </summary>
     private static List<DomainResource> Resources(params string[] references)
     {
         return references
-            .Select(reference => (DomainResource)new Patient { Id = reference.Split('/')[1] })
+            .Select(reference =>
+            {
+                var parts = reference.Split('/');
+                var resource = (DomainResource)Activator.CreateInstance(ModelInfo.GetTypeForFhirType(parts[0])!)!;
+                resource.Id = parts[1];
+                return resource;
+            })
             .ToList();
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + Timeout;
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("Condition was not met in time.");
+            }
+
+            await Task.Delay(10);
+        }
     }
 
     /// <summary>
@@ -973,6 +1107,11 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
             CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                        IReadOnlyCollection<string> references,
+                                        CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
         public Task WaitForDurableAsync(string correlationId, CancellationToken cancellationToken = default) =>
