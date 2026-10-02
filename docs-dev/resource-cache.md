@@ -186,8 +186,19 @@ marked Completed, and advertised data that existed only in Redis.
 
 So acquisition waits on the keys its own log wrote, and passes the ids it acquired (already
 `resourceType/resourceId`, the same form the writer records) so that it is failed exactly when its
-own resources did not land, never for a sibling's. Normalization and the tail finalizer wait on the
-whole correlation, which is correct for them: they own all of it.
+own resources did not land, never for a sibling's. Normalization waits on the correlation key the
+same way, passing the resources it appended in this message.
+
+Reference-scoped waits matter because a failure is only ever cleared on the pod that recorded it. The
+redelivery that writes the resources again can land on another pod, so this pod may never see the
+rewrite. A key-wide wait here would then keep failing for data durable storage already holds. That
+could retry a message to exhaustion, dead-letter it and purge the correlation.
+
+A failure is therefore also **bounded in time**. It is reported for six hours, longer than an
+acquisition log can run before stall recovery resets it (240 minutes by default). The owning log only
+waits at the end of its execution, and after a reset it is re-run anyway. A sweep every ten minutes
+drops expired failures and releases keys with nothing outstanding, so a key whose failed resources
+are never written again on this pod does not stay tracked for the life of the process.
 
 ### Restoring the correlation entry before the supplemental append
 
@@ -350,16 +361,22 @@ correlation key too, which is the entry MeasureEval had just been told to read. 
 that turned out reportable, that also deleted the resources the SUPPLEMENTAL evaluation needed.
 
 A redelivery can still arrive after the release, from a pod dying before the offset commit or from a
-duplicate. So before dead-lettering an empty listed key, Normalization checks the correlation key:
+duplicate. The release deletes blob keys **in listed order** (the Redis half is best effort, and a key
+Redis lost is still read from its blob), so a redelivery always finds a **leading run** of empty keys.
+That is the only shape treated as already normalized:
 
-- **Populated:** the message was already normalized. It crosses the durability barrier for anything it
-  re-appended on the way, finishes the release, and is acknowledged **without producing again and
-  without purging**.
-- **Empty:** a genuine producer defect, dead-lettered as before.
+- **The first listed key is empty, nothing has been copied yet in this pass, and the correlation key
+  is populated:** the message was already normalized. It finishes the release and is acknowledged
+  **without producing again and without purging**.
+- **Any other empty key:** a genuine producer defect, dead-lettered as before. An empty key after a
+  populated one cannot be left by a release, and by then the correlation key holds what this pass just
+  appended, so checking it would prove nothing.
 
-The trade-off: a genuine Data Acquisition defect on a **SUPPLEMENTAL** pass, where the correlation key
-already holds the INITIAL resources, is now acknowledged instead of dead-lettered. That patient stalls
-visibly, logged as a warning naming the empty key, rather than having its data purged.
+The trade-off: a genuine Data Acquisition defect whose **first** listed key is empty, on a
+**SUPPLEMENTAL** pass where the correlation key already holds the INITIAL resources, is acknowledged
+instead of dead-lettered. That patient stalls visibly, logged as a warning naming the empty key, rather
+than having its data purged. Telling the two apart in that one shape needs an explicit
+"already produced" marker.
 
 ## Configuration
 
