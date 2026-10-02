@@ -271,6 +271,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IResourceCache resourceCache = _resourceCache;
         var cacheKeys = result.Message.Value.CacheKeys ?? [];
         var copiedKeys = new List<string>(cacheKeys.Count);
+        var appendedReferences = new HashSet<string>(StringComparer.Ordinal);
 
         var mappingOutcomes = new MappingOutcomeAccumulator();
 
@@ -299,25 +300,24 @@ public class ResourcesAcquiredListener : BackgroundService
                 List<DomainResource> resources = await resourceCache.GetAsync(cacheKey, cancellationToken);
                 if (resources.Count == 0)
                 {
-                    // Keys are released only after ResourcesNormalized is produced, so an empty listed
-                    // key next to a populated correlation entry means this message was already
-                    // normalized: a redelivery after the release, or a duplicate. Dead-lettering it
-                    // would purge {correlationId}, which MeasureEval has already been told to read.
-                    if (await resourceCache.HasResourcesAsync(correlationId, cancellationToken))
+                    // Keys are released only after ResourcesNormalized is produced, and in listed order,
+                    // so a redelivery after a full or partial release finds a leading run of empty keys.
+                    // That is the only shape treated as already normalized: the first key empty, before
+                    // this pass has copied anything, with the correlation entry populated. An empty key
+                    // after a populated one cannot be a release, and checking the correlation entry
+                    // then would only find what this pass just appended to it. Dead-lettering a real
+                    // redelivery would purge {correlationId}, which MeasureEval has been told to read.
+                    if (copiedKeys.Count == 0 && await resourceCache.HasResourcesAsync(correlationId, cancellationToken))
                     {
                         _logger.LogWarning(
                             "ResourcesAcquired for FacilityId={FacilityId}, CorrelationId={CorrelationId}, QueryType={QueryType} "
-                            + "lists cache key {CacheKey}, which is empty while the correlation entry is populated. Treating "
-                            + "the message as already normalized and acknowledging it without producing again.",
+                            + "lists cache key {CacheKey} first, and it is empty while the correlation entry is populated. "
+                            + "Treating the message as already normalized and acknowledging it without producing again.",
                             result.Message.Key.FacilityId.SanitizeForLog(),
                             correlationId.SanitizeForLog(),
                             result.Message.Value.QueryType.SanitizeForLog(),
                             cacheKey.SanitizeForLog());
 
-                        // Keys before this one were re-appended on the way here. They duplicate what is
-                        // already durable, but a failed write of them is still recorded, so they get
-                        // the same barrier as a first pass rather than being left in the queue.
-                        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
                         await TryReleaseAcquisitionKeysAsync(resourceCache, cacheKeys, correlationId, cancellationToken);
                         return;
                     }
@@ -446,6 +446,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
             await resourceCache.AppendResourcesAsync(correlationId, resources, resourceType, cancellationToken);
             copiedKeys.Add(cacheKey);
+            appendedReferences.UnionWith(resources.Select(resource => resource.TypeName + "/" + resource.Id));
         }
 
         if (cacheKeys.Count == 0)
@@ -459,7 +460,12 @@ public class ResourcesAcquiredListener : BackgroundService
         // The durability barrier. ResourcesNormalized names this correlation's cache key, and the
         // durable write for it is still on a background queue -- produce first and a reader can
         // arrive after the cache entry is evicted but before the durable copy exists.
-        await resourceCache.WaitForDurableAsync(correlationId, cancellationToken);
+        //
+        // Scoped to the resources this message appended. A failure is kept until its resources are
+        // written again, and the redelivery that does that may land on another pod -- so a wait on
+        // the whole key here would keep failing on a failure this pod still remembers, for data
+        // durable storage already holds.
+        await resourceCache.WaitForDurableAsync([correlationId], appendedReferences, cancellationToken);
 
         await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 

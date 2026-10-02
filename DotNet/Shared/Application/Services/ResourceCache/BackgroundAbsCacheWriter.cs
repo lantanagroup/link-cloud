@@ -38,14 +38,31 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly ILogger<BackgroundAbsCacheWriter> _logger;
         private readonly Channel<PendingWrite> _queue;
         private readonly ConcurrentDictionary<string, KeyState> _keys = new();
+        private readonly TimeProvider _timeProvider;
+
+        /// <summary>
+        /// How long a failed write is reported for. Longer than an acquisition log can run before
+        /// stall recovery resets it (240 minutes by default), because the log that owns a failure only
+        /// waits at the end of its execution. Past that the owner has been re-run regardless, and a
+        /// failure kept any longer only fails work it does not belong to -- or, once its redelivery
+        /// landed on another pod, work over data durable storage already holds.
+        /// </summary>
+        private static readonly TimeSpan FailedReferenceRetention = TimeSpan.FromHours(6);
+
+        /// <summary>
+        /// How often expired failures are swept, so a key nobody writes or waits on again is released.
+        /// </summary>
+        private static readonly TimeSpan FailureSweepInterval = TimeSpan.FromMinutes(10);
 
         public BackgroundAbsCacheWriter(
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             IOptions<ResourceCacheSettings> settings,
             IResourceCacheMetrics metrics,
+            TimeProvider timeProvider,
             ILogger<BackgroundAbsCacheWriter> logger)
         {
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
@@ -181,7 +198,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 {
                     if (state.Outstanding == 0)
                     {
-                        ThrowIfFailed(cacheKey, state, references);
+                        ThrowIfFailed(cacheKey, state, references, _timeProvider.GetUtcNow());
                         continue;
                     }
 
@@ -192,7 +209,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 lock (state.Gate)
                 {
-                    ThrowIfFailed(cacheKey, state, references);
+                    ThrowIfFailed(cacheKey, state, references, _timeProvider.GetUtcNow());
                 }
             }
         }
@@ -301,9 +318,91 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             var workers = Enumerable
                 .Range(0, _settings.MaxConcurrency)
                 .Select(_ => Task.Run(() => ConsumeAsync(stoppingToken), CancellationToken.None))
+                .Append(Task.Run(() => SweepExpiredFailuresAsync(stoppingToken), CancellationToken.None))
                 .ToArray();
 
             await Task.WhenAll(workers);
+        }
+
+        /// <summary>
+        /// Drops failures older than <see cref="FailedReferenceRetention"/>, and releases keys left with
+        /// nothing outstanding and nothing owed.
+        /// </summary>
+        /// <remarks>
+        /// Without it a key whose failed resources are never written again on this pod -- the retry
+        /// landed elsewhere, or the work failed terminally -- stays tracked for the life of the process.
+        /// </remarks>
+        private async Task SweepExpiredFailuresAsync(CancellationToken stoppingToken)
+        {
+            using var timer = new PeriodicTimer(FailureSweepInterval, _timeProvider);
+
+            try
+            {
+                while (await timer.WaitForNextTickAsync(stoppingToken))
+                {
+                    try
+                    {
+                        SweepExpiredFailures();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Housekeeping. A fault here must not end the host's background service.
+                        _logger.LogWarning(ex, "Resource cache blob writer could not sweep expired write failures.");
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Shutting down.
+            }
+        }
+
+        private void SweepExpiredFailures()
+        {
+            var now = _timeProvider.GetUtcNow();
+
+            foreach (var (cacheKey, state) in _keys)
+            {
+                lock (state.Gate)
+                {
+                    if (state.Retired)
+                    {
+                        continue;
+                    }
+
+                    PruneExpiredFailures(state, now);
+
+                    if (state.Outstanding == 0 && state.FailedReferences.Count == 0)
+                    {
+                        state.Retired = true;
+                        _keys.TryRemove(new KeyValuePair<string, KeyState>(cacheKey, state));
+                    }
+                }
+            }
+        }
+
+        /// <remarks>Callers hold <see cref="KeyState.Gate"/>.</remarks>
+        private static void PruneExpiredFailures(KeyState state, DateTimeOffset now)
+        {
+            if (state.FailedReferences.Count == 0)
+            {
+                return;
+            }
+
+            var expired = state.FailedReferences
+                .Where(failed => now - failed.Value >= FailedReferenceRetention)
+                .Select(failed => failed.Key)
+                .ToList();
+
+            foreach (var reference in expired)
+            {
+                state.FailedReferences.Remove(reference);
+            }
+
+            if (state.FailedReferences.Count == 0)
+            {
+                state.LastFailure = null;
+            }
         }
 
         /// <summary>
@@ -699,6 +798,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 if (written != null)
                 {
+                    var now = _timeProvider.GetUtcNow();
+
                     // Recorded per resource rather than per key. Several logs write and wait on one
                     // key, and a hand-off can merge their resources into one batch, so only the
                     // resources say whose work failed. A landed batch clears exactly the resources it
@@ -708,7 +809,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     {
                         if (failure != null)
                         {
-                            state.FailedReferences.Add(reference);
+                            state.FailedReferences[reference] = now;
                         }
                         else
                         {
@@ -767,16 +868,22 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <param name="references">
         /// The resources the caller wrote, or null to be told about any failure on the key.
         /// </param>
-        private static void ThrowIfFailed(string cacheKey, KeyState state, IReadOnlyCollection<string>? references)
+        /// <param name="now">The current time, for dropping failures past their retention.</param>
+        private static void ThrowIfFailed(string cacheKey,
+                                          KeyState state,
+                                          IReadOnlyCollection<string>? references,
+                                          DateTimeOffset now)
         {
+            PruneExpiredFailures(state, now);
+
             if (state.FailedReferences.Count == 0)
             {
                 return;
             }
 
             var owed = references == null
-                ? state.FailedReferences.ToList()
-                : references.Where(state.FailedReferences.Contains).ToList();
+                ? state.FailedReferences.Keys.ToList()
+                : references.Where(state.FailedReferences.ContainsKey).ToList();
 
             if (owed.Count == 0)
             {
@@ -804,9 +911,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             public int Generation;
 
             /// <summary>
-            /// Resources whose durable write failed and has not been made good by a later one.
+            /// Resources whose durable write failed and has not been made good by a later one, with
+            /// when each failed, so a failure is reported for a bounded time rather than forever.
             /// </summary>
-            public readonly HashSet<string> FailedReferences = new(StringComparer.Ordinal);
+            public readonly Dictionary<string, DateTimeOffset> FailedReferences = new(StringComparer.Ordinal);
 
             /// <summary>
             /// The most recent failure, kept as the cause to report.
