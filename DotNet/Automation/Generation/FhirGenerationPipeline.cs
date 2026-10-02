@@ -733,18 +733,11 @@ public static class FhirGenerationPipeline
             }
 
             entries = ImportedPatientLoader.ParseBundleEntries(bundleJson, patientId);
-            // Same gate as pre-load: bundle imports upload `entries`, so only an
-            // existing-id import may gain Locations that were read from the server.
-            if (imported.Source == ImportedPatientSource.ExistingId)
-            {
-                await ReferencedLocationExpander.AppendMissingAsync(
-                    entries,
-                    (id, token) => ImportedPatientLoader.ReadLocationAsync(fhirDataLoader, id, token),
-                    output,
-                    cancellationToken,
-                    fhirDataLoader.FhirServerBase).ConfigureAwait(false);
-            }
+            await ImportedPatientLoader.ExpandReferencedLocationsAsync(
+                imported, entries, fhirDataLoader, output, cancellationToken).ConfigureAwait(false);
         }
+
+        manifestBuilder.AddAbsentReferencedLocationIds(imported.AbsentReferencedLocationIds);
 
         if (entries.Count == 0)
             throw new InvalidOperationException($"Imported patient '{patientId}' produced no FHIR entries.");
