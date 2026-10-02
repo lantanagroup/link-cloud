@@ -588,6 +588,120 @@ public class RunMetricsSnapshotServiceTests
         prom.Verify(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public void CacheReadCountQuery_ForOneService_FiltersOnItsExportedJob()
+    {
+        // Normalization reads keys moments after writing them, so its hits swamp a combined ratio.
+        // Whether Redis serves evaluation is only visible with MeasureEval's reads on their own.
+        RunMetricsSnapshotService.CacheReadCountQuery("hit", 90, "measureeval")
+            .Should().Be("sum(increase(link_resource_cache_read_duration_milliseconds_count{exported_job=\"measureeval\",cache_outcome=\"hit\"}[90s]))");
+    }
+
+    [Fact]
+    public void CacheFallbackReasonCountQuery_FiltersOnServiceOutcomeAndReason()
+    {
+        RunMetricsSnapshotService.CacheFallbackReasonCountQuery("partial", 90, "measureeval")
+            .Should().Be("sum(increase(link_resource_cache_read_duration_milliseconds_count{exported_job=\"measureeval\",cache_outcome=\"fallback\",cache_fallback_reason=\"partial\"}[90s]))");
+    }
+
+    [Fact]
+    public async Task Capture_records_measure_evaluation_cache_reads_apart_from_the_combined_reads()
+    {
+        var saved = await CaptureWithCacheReads(new Dictionary<string, double>
+        {
+            ["{cache_outcome=\"hit\"}"] = 100,
+            ["{cache_outcome=\"fallback\"}"] = 20,
+            ["{exported_job=\"measureeval\",cache_outcome=\"hit\"}"] = 30,
+            ["{exported_job=\"measureeval\",cache_outcome=\"fallback\"}"] = 10,
+            ["{exported_job=\"measureeval\",cache_outcome=\"empty\"}"] = 2,
+            ["cache_fallback_reason=\"miss\""] = 6,
+            ["cache_fallback_reason=\"partial\""] = 3,
+            ["cache_fallback_reason=\"unavailable\""] = 1
+        });
+
+        var cache = saved.ResourceCache;
+        cache.Unavailable.Should().BeFalse();
+
+        // The combined figures are unchanged, so earlier runs still compare like for like.
+        cache.HitCount.Should().Be(100);
+        cache.FallbackCount.Should().Be(20);
+
+        cache.EvaluationHitCount.Should().Be(30);
+        cache.EvaluationFallbackCount.Should().Be(10);
+        cache.EvaluationEmptyCount.Should().Be(2);
+        cache.EvaluationHitRatio.Should().BeApproximately(0.75, 0.0001);
+        cache.EvaluationMissCount.Should().Be(6);
+        cache.EvaluationPartialCount.Should().Be(3);
+        cache.EvaluationUnavailableCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Capture_leaves_measure_evaluation_cache_reads_unrecorded_when_it_read_nothing()
+    {
+        // An old MeasureEval image, or telemetry export off for it, looks like zero reads. Say
+        // unrecorded rather than report a confident 0% served from cache.
+        var saved = await CaptureWithCacheReads(new Dictionary<string, double>
+        {
+            ["{cache_outcome=\"hit\"}"] = 100,
+            ["{cache_outcome=\"fallback\"}"] = 20
+        });
+
+        var cache = saved.ResourceCache;
+        cache.Unavailable.Should().BeFalse();
+        cache.HitCount.Should().Be(100);
+
+        cache.EvaluationHitCount.Should().BeNull();
+        cache.EvaluationFallbackCount.Should().BeNull();
+        cache.EvaluationEmptyCount.Should().BeNull();
+        cache.EvaluationHitRatio.Should().BeNull();
+        cache.EvaluationMissCount.Should().BeNull();
+        cache.EvaluationPartialCount.Should().BeNull();
+        cache.EvaluationUnavailableCount.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Captures a run whose Prometheus answers the cache read-count queries from
+    /// <paramref name="readCounts"/>, keyed by a fragment of the query's label filter.
+    /// </summary>
+    private static async Task<AutomationRunMetricsDocument> CaptureWithCacheReads(IReadOnlyDictionary<string, double> readCounts)
+    {
+        var store = new Mock<IRunMetricsStore>();
+        AutomationRunMetricsDocument? saved = null;
+        store.Setup(s => s.UpsertAsync(It.IsAny<AutomationRunMetricsDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<AutomationRunMetricsDocument, CancellationToken>((doc, _) => saved = doc)
+            .Returns(Task.CompletedTask);
+
+        var prom = new Mock<IPrometheusHistogramClient>();
+        prom.Setup(p => p.IsReachableAsync(It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        prom.Setup(p => p.QueryScalarAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string query, DateTimeOffset _, CancellationToken _) =>
+            {
+                if (!query.StartsWith("sum(increase(link_resource_cache_read_duration_milliseconds_count", StringComparison.Ordinal))
+                    return null;
+
+                // Most specific fragment first: a reason filter also contains its service and outcome.
+                return readCounts
+                    .Where(entry => query.Contains(entry.Key, StringComparison.Ordinal))
+                    .OrderByDescending(entry => entry.Key.Length)
+                    .Select(entry => (double?)entry.Value)
+                    .FirstOrDefault();
+            });
+        prom.Setup(p => p.QueryVectorAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var service = CreateService(
+            store.Object,
+            new TelemetrySettings { PrometheusQueryEndpoint = "http://localhost:9090" },
+            Mock.Of<IAutomationUiMetrics>(),
+            prom.Object,
+            new ImmediateTimeProvider());
+
+        await service.CaptureAsync(Input(isMetricsRun: true, startedAt: DateTimeOffset.UtcNow.AddSeconds(-90)));
+
+        saved.Should().NotBeNull();
+        return saved!;
+    }
+
     private static RunMetricsSnapshotService CreateService(
         IRunMetricsStore store,
         TelemetrySettings telemetry,

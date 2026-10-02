@@ -198,4 +198,29 @@ public sealed class ResourceCacheView
     public double? QueueWaitP95Ms { get; set; }
     public double? PeakQueueDepth { get; set; }
     public double? WriteExhaustedCount { get; set; }
+
+    /// <summary>
+    /// True when measure evaluation's own reads were not recorded for the run: an older run, or a
+    /// MeasureEval that was not exporting them.
+    /// </summary>
+    public bool EvaluationUnavailable { get; set; } = true;
+
+    /// <summary>
+    /// Measure evaluation's reads Redis answered, as a percentage of its reads that found something.
+    /// The combined ratio is dominated by Normalization, which reads keys moments after writing them.
+    /// </summary>
+    public double? EvaluationHitRatioPercent { get; set; }
+
+    public double? EvaluationHitCount { get; set; }
+    public double? EvaluationFallbackCount { get; set; }
+
+    /// <summary>Evaluation reads that found nothing in either store: patients evaluated on no data.</summary>
+    public double? EvaluationEmptyCount { get; set; }
+
+    public double? EvaluationMissCount { get; set; }
+
+    /// <summary>Redis held fewer resources than durable storage: a partial entry the check caught.</summary>
+    public double? EvaluationPartialCount { get; set; }
+
+    public double? EvaluationUnavailableCount { get; set; }
 }

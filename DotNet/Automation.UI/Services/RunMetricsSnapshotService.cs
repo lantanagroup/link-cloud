@@ -81,6 +81,12 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         string ExportedJob,
         ProcessRuntimeKind Runtime);
 
+    /// <summary>
+    /// The job label MeasureEval's telemetry is exported under. Its process and cache-read queries
+    /// both filter on it, so they must agree.
+    /// </summary>
+    internal const string MeasureEvalExportedJob = "measureeval";
+
     // Process RSS/CPU is not facility-scoped. The lookback is the pipeline window
     // (report created → ABS submit), which is accurate when one metrics run is in flight.
     internal static readonly ProcessUtilizationQuery[] ProcessUtilizationQueries =
@@ -89,7 +95,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         new("acquisition-worker", "Data Acquisition worker", "FHIR query worker", "DataAcquisitionWorker", ProcessRuntimeKind.DotNet),
         new("normalization", "Normalization", "Cleaning and reshaping FHIR", "Normalization", ProcessRuntimeKind.DotNet),
         new("report", "Report", "Report store and schedule", "Report", ProcessRuntimeKind.DotNet),
-        new("measureeval", "Measure Evaluation", "Running the measure", "measureeval", ProcessRuntimeKind.Jvm),
+        new("measureeval", "Measure Evaluation", "Running the measure", MeasureEvalExportedJob, ProcessRuntimeKind.Jvm),
         new("validation", "Validation", "Checking the measure report", "ValidationService", ProcessRuntimeKind.Jvm),
         new("submission", "Submission", "Uploading the report package", "Submission", ProcessRuntimeKind.DotNet)
     ];
@@ -474,6 +480,17 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
     internal static string CacheReadCountQuery(string outcome, int windowSeconds) =>
         $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
 
+    /// <summary>One service's cache reads with the given outcome.</summary>
+    internal static string CacheReadCountQuery(string outcome, int windowSeconds, string exportedJob) =>
+        $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
+
+    /// <summary>
+    /// One service's fallback reads for one reason. Only MeasureEval tags the reason, as
+    /// <c>cache.fallback.reason</c>: miss, partial or unavailable.
+    /// </summary>
+    internal static string CacheFallbackReasonCountQuery(string reason, int windowSeconds, string exportedJob) =>
+        $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",cache_outcome=\"fallback\",cache_fallback_reason=\"{reason}\"}}[{windowSeconds}s]))";
+
     internal static string CacheQuantileQuery(string histogramBase, string labels, int windowSeconds, string quantile) =>
         $"histogram_quantile({quantile}, sum by (le) (increase({histogramBase}_bucket{labels}[{windowSeconds}s])))";
 
@@ -698,7 +715,7 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
 
         var served = hits + fallbacks;
 
-        return new ResourceCacheSnapshot
+        var snapshot = new ResourceCacheSnapshot
         {
             Unavailable = false,
             HitCount = hits,
@@ -714,6 +731,41 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
             WriteRetryCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "retried", windowSeconds)),
             WriteExhaustedCount = await Scalar(CacheCounterQuery("link_resource_cache_write_retry_count", "exhausted", windowSeconds))
         };
+
+        await AddEvaluationReadsAsync(snapshot, Scalar, windowSeconds);
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Fills in MeasureEval's own cache reads. The combined counts sum every service, and
+    /// Normalization reads keys moments after writing them, so its hits hide whether Redis serves
+    /// evaluation -- which is the question a Hybrid versus ABS-only comparison has to answer.
+    /// </summary>
+    private static async Task AddEvaluationReadsAsync(
+        ResourceCacheSnapshot snapshot,
+        Func<string, Task<double>> scalar,
+        int windowSeconds)
+    {
+        var hits = await scalar(CacheReadCountQuery("hit", windowSeconds, MeasureEvalExportedJob));
+        var fallbacks = await scalar(CacheReadCountQuery("fallback", windowSeconds, MeasureEvalExportedJob));
+        var empties = await scalar(CacheReadCountQuery("empty", windowSeconds, MeasureEvalExportedJob));
+
+        if (hits + fallbacks + empties <= 0)
+        {
+            // An image without the metric, or telemetry export off for MeasureEval, looks exactly
+            // like this. Leave it unrecorded rather than report 0% served from cache.
+            return;
+        }
+
+        var served = hits + fallbacks;
+
+        snapshot.EvaluationHitCount = hits;
+        snapshot.EvaluationFallbackCount = fallbacks;
+        snapshot.EvaluationEmptyCount = empties;
+        snapshot.EvaluationHitRatio = served > 0 ? hits / served : 0;
+        snapshot.EvaluationMissCount = await scalar(CacheFallbackReasonCountQuery("miss", windowSeconds, MeasureEvalExportedJob));
+        snapshot.EvaluationPartialCount = await scalar(CacheFallbackReasonCountQuery("partial", windowSeconds, MeasureEvalExportedJob));
+        snapshot.EvaluationUnavailableCount = await scalar(CacheFallbackReasonCountQuery("unavailable", windowSeconds, MeasureEvalExportedJob));
     }
 
     private async Task<StageLatencySnapshot> QueryStageAsync(
