@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.RedisKeyCommands;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -85,6 +88,32 @@ class RedisResourceServiceTest {
         assertEquals("p1", resources.get(0).getResourceId());
     }
 
+    /**
+     * Runs the callback cleanup() hands to executePipelined against a mocked connection and returns
+     * every UNLINK it issued, one entry per call, each holding that call's keys.
+     */
+    @SuppressWarnings("unchecked")
+    private List<List<String>> runCleanupPipeline(String correlationId) {
+        RedisConnection connection = mock(RedisConnection.class);
+        RedisKeyCommands keyCommands = mock(RedisKeyCommands.class);
+        when(connection.keyCommands()).thenReturn(keyCommands);
+        when(redisTemplate.executePipelined(any(RedisCallback.class))).thenAnswer(invocation -> {
+            RedisCallback<?> callback = invocation.getArgument(0);
+            callback.doInRedis(connection);
+            return List.of();
+        });
+
+        service.cleanup(correlationId);
+
+        ArgumentCaptor<byte[][]> calls = ArgumentCaptor.forClass(byte[][].class);
+        verify(keyCommands, atLeastOnce()).unlink(calls.capture());
+        return calls.getAllValues().stream()
+                .map(keys -> java.util.Arrays.stream(keys)
+                        .map(key -> new String(key, java.nio.charset.StandardCharsets.UTF_8))
+                        .toList())
+                .toList();
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void cleanup_unlinksTheCorrelationAndEveryAcquisitionKeyItCouldHave() {
@@ -92,15 +121,11 @@ class RedisResourceServiceTest {
         // the correlation just as completely — the bare key plus any surviving
         // {correlationId}:{ResourceType} acquisition keys a dead-lettered correlation left behind.
         // The acquisition keys are enumerable (the FHIR resource types are a closed set), so they
-        // are built and unlinked in one round trip rather than discovered with SCAN, which walks
-        // the whole shared keyspace once per correlation.
-        ArgumentCaptor<Collection<String>> keys = ArgumentCaptor.forClass(Collection.class);
+        // are built rather than discovered with SCAN, which walks the whole shared keyspace once
+        // per correlation.
+        List<String> unlinked = runCleanupPipeline("corr-1").stream().flatMap(List::stream).toList();
 
-        service.cleanup("corr-1");
-
-        verify(redisTemplate).unlink(keys.capture());
         verify(redisTemplate, never()).scan(any(ScanOptions.class));
-        Collection<String> unlinked = keys.getValue();
         assertTrue(unlinked.contains("corr-1"), "the bare correlation key");
         assertTrue(unlinked.contains("corr-1:Encounter"), "an acquisition key");
         assertTrue(unlinked.contains("corr-1:Patient"), "an acquisition key");
@@ -108,6 +133,19 @@ class RedisResourceServiceTest {
                 "the Hybrid cache-type memo was removed in LEGLINK-1276; nothing writes it any more");
         assertEquals(ResourceType.values().length + 1, unlinked.size(),
                 "one key per FHIR resource type plus the bare key, nothing else");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cleanup_sendsOneKeyPerUnlink_inASinglePipeline() {
+        // A multi-key UNLINK fails CROSSSLOT on a clustered Redis (OSS clustering policy) because
+        // the keys hash to different slots -- and the correlation key fails with the rest. One key
+        // per command is valid under any policy, and pipelining keeps it to one round trip.
+        List<List<String>> calls = runCleanupPipeline("corr-1");
+
+        assertTrue(calls.stream().allMatch(call -> call.size() == 1), "every UNLINK names exactly one key");
+        verify(redisTemplate, times(1)).executePipelined(any(RedisCallback.class));
+        verify(redisTemplate, never()).unlink(anyCollection());
     }
 
     @Test
