@@ -46,6 +46,15 @@ public class MeasureEvalMetrics {
      */
     static final String DURABLE_COUNT_READ_FAILURE_COUNT = "link_resource_cache_durable_count_read_failure_count";
 
+    /**
+     * Tags {@code link_measureeval_eval_count} with whether the evaluation succeeded. Same attribute
+     * name and values as the .NET services' {@code DiagnosticNames.Outcome}, so one query shape finds
+     * failures in every stage.
+     */
+    static final String OUTCOME = "outcome";
+    static final String OUTCOME_SUCCESS = "success";
+    static final String OUTCOME_FAILURE = "failure";
+
     public MeasureEvalMetrics(OpenTelemetry openTelemetry) {
 
         Meter meter = openTelemetry.getMeter("com.lantanagroup.link.measureeval.services.ResourcesNormalizedConsumer");
@@ -145,8 +154,20 @@ public class MeasureEvalMetrics {
     }
 
     void MeasureEvalDuration(long elapsedTime, Attributes attributes) {
-        measureEvaluatedCounter.add(1, attributes);
+        measureEvaluatedCounter.add(1, withOutcome(attributes, OUTCOME_SUCCESS));
         evaluationDuration.record(elapsedTime, attributes);
+    }
+
+    /**
+     * Counts an evaluation that threw. The counter used to see only successes, so no query could find
+     * a failed evaluation and the stage's error count was always zero.
+     */
+    void recordEvaluationFailure(Attributes attributes) {
+        measureEvaluatedCounter.add(1, withOutcome(attributes, OUTCOME_FAILURE));
+    }
+
+    private static Attributes withOutcome(Attributes attributes, String outcome) {
+        return attributes.toBuilder().put(stringKey(OUTCOME), outcome).build();
     }
 
     public static Attributes buildAttributes(String queryType,
