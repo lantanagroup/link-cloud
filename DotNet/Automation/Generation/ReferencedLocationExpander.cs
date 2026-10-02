@@ -19,7 +19,9 @@ public static class ReferencedLocationExpander
         Func<string, CancellationToken, Task<Location?>> readLocation,
         IAutomationOutput? output,
         CancellationToken cancellationToken,
-        Uri? configuredFhirBase = null)
+        Uri? configuredFhirBase = null,
+        ISet<string>? absentLocationIds = null,
+        bool appendFoundLocations = true)
     {
         if (entries == null)
             throw new ArgumentNullException(nameof(entries));
@@ -41,7 +43,7 @@ public static class ReferencedLocationExpander
         {
             if (entry?.Resource == null)
                 continue;
-            foreach (var id in ReferencedLocationIds(entry.Resource, configuredFhirBase))
+            foreach (var id in ReferencedLocationIds(entry.Resource, configuredFhirBase, appendFoundLocations))
                 Enqueue(requested, pending, id);
         }
 
@@ -52,9 +54,18 @@ public static class ReferencedLocationExpander
             cancellationToken.ThrowIfCancellationRequested();
             // The check is before the next GET, so a partOf enqueued by the last
             // successful read is still pending here. Leaving it unread would publish
-            // a short manifest as a green run.
+            // a short manifest as a green run when found Locations are appended.
+            // Record-only reads stop instead of failing the import: an unread id is
+            // not treated as absent, so the hierarchy check stays strict for it.
             if (reads >= MaxLocationReads)
             {
+                if (!appendFoundLocations)
+                {
+                    output?.WriteLine(
+                        $"  [imported] Stopped checking referenced Locations after {MaxLocationReads} reads; {pending.Count} reference(s) were not proven absent.");
+                    break;
+                }
+
                 throw new InvalidOperationException(
                     $"Referenced Location expansion hit the {MaxLocationReads}-read cap with {pending.Count} reference(s) still unread. The import is stopping.");
             }
@@ -64,6 +75,7 @@ public static class ReferencedLocationExpander
             var location = await readLocation(id, cancellationToken).ConfigureAwait(false);
             if (location == null)
             {
+                absentLocationIds?.Add(id);
                 output?.WriteLine(
                     $"  [imported] Location/{id} is referenced but not on the FHIR server.");
                 continue;
@@ -71,6 +83,13 @@ public static class ReferencedLocationExpander
 
             if (string.IsNullOrWhiteSpace(location.Id))
                 location.Id = id;
+
+            if (!appendFoundLocations)
+            {
+                foreach (var referencedId in ReferencedLocationIds(location, configuredFhirBase, rewriteReferences: false))
+                    Enqueue(requested, pending, referencedId);
+                continue;
+            }
 
             if (!present.Add(location.Id))
                 continue;
@@ -101,7 +120,10 @@ public static class ReferencedLocationExpander
             pending.Enqueue(id);
     }
 
-    private static IEnumerable<string> ReferencedLocationIds(Base node, Uri? configuredFhirBase)
+    private static IEnumerable<string> ReferencedLocationIds(
+        Base node,
+        Uri? configuredFhirBase,
+        bool rewriteReferences = true)
     {
         if (node is ResourceReference resourceReference
             && TryParseLocationId(resourceReference.Reference, configuredFhirBase, out var id))
@@ -109,9 +131,13 @@ public static class ReferencedLocationExpander
             // Query-plan simulation matches the literal prefix Location/{id}.
             // A same-base absolute reference has to be rewritten to that form or
             // the Location this method reads never enters the manifest.
+            // Record-only expansion leaves the uploaded reference text alone.
             var relative = $"Location/{id}";
-            if (!string.Equals(resourceReference.Reference, relative, StringComparison.Ordinal))
+            if (rewriteReferences
+                && !string.Equals(resourceReference.Reference, relative, StringComparison.Ordinal))
+            {
                 resourceReference.Reference = relative;
+            }
 
             yield return id;
         }
@@ -122,7 +148,7 @@ public static class ReferencedLocationExpander
         foreach (var child in node.Children())
 #pragma warning restore CS0618
         {
-            foreach (var nested in ReferencedLocationIds(child, configuredFhirBase))
+            foreach (var nested in ReferencedLocationIds(child, configuredFhirBase, rewriteReferences))
                 yield return nested;
         }
     }
