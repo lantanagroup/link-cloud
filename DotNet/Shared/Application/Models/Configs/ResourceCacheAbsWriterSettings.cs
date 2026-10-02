@@ -31,6 +31,20 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public int MaxConcurrency { get; set; } = 8;
 
         /// <summary>
+        /// The most resources that may be folded into one blob write when several writes for the
+        /// same key are outstanding. Defaults to 2000.
+        /// </summary>
+        /// <remarks>
+        /// A worker that finds a key already being written hands its batch to the holder rather than
+        /// waiting, and successive hand-offs merge. That is what stops one key monopolising the
+        /// workers, but a dequeued batch no longer occupies a channel slot, so without a ceiling the
+        /// merged batch would grow outside what <see cref="QueueCapacity"/> bounds. At the ceiling a
+        /// worker waits for the key instead, which bounds what the writer holds at roughly
+        /// (QueueCapacity + 2 x MaxConcurrency) x this value.
+        /// </remarks>
+        public int MaxCoalescedResources { get; set; } = 2000;
+
+        /// <summary>
         /// How many times a failing blob write is retried before the key is treated as permanently
         /// failed. Defaults to 3.
         /// </summary>
