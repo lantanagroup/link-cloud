@@ -1,4 +1,6 @@
+using System.Text;
 using LantanaGroup.Automation.Generation;
+using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Automation;
 
@@ -61,5 +63,39 @@ public class ReportPackageTests
         Assert.Equal(2, snapshot.TotalResourceCount);
         Assert.Equal(2, snapshot.ManifestResourceCount);
         Assert.Equal(1, snapshot.TotalCountsByType["Observation"]);
+    }
+
+    [Fact]
+    public async Task CopyEntryTextToAsync_CopiesOneEntryAndReturnsTheCharacterCount()
+    {
+        const string text = "{\"resourceType\":\"Patient\",\"id\":\"p1\"}\n";
+        await using var package = ReportPackage.FromTextEntries(
+        [
+            new KeyValuePair<string, string>("patient-p1.ndjson", text)
+        ]);
+
+        using var destination = new MemoryStream();
+        var count = await package.CopyEntryTextToAsync("patient-p1.ndjson", destination, CancellationToken.None);
+
+        Assert.Equal(text.Length, count);
+        Assert.Equal(text, Encoding.UTF8.GetString(destination.ToArray()));
+        Assert.Null(await package.CopyEntryTextToAsync("missing.ndjson", destination, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CopyEntryTextToAsync_CancellationStopsBeforeTheDestinationIsWritten()
+    {
+        await using var package = ReportPackage.FromTextEntries(
+        [
+            new KeyValuePair<string, string>("patient-p1.ndjson", "{\"resourceType\":\"Patient\"}\n")
+        ]);
+        using var destination = new MemoryStream();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            package.CopyEntryTextToAsync("patient-p1.ndjson", destination, cts.Token));
+
+        Assert.Equal(0, destination.Length);
     }
 }

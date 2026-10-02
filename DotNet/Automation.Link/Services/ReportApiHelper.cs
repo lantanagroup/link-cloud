@@ -644,6 +644,7 @@ public class ReportApiHelper
         _output.WriteLine($"Downloading report {reportId}...");
 
         var tempPath = ReportPackage.CreateTempPath();
+        string? savedPath = null;
         try
         {
             int statusCode;
@@ -664,9 +665,14 @@ public class ReportApiHelper
                 if (!Directory.Exists(_automationConfig.DownloadPath))
                     Directory.CreateDirectory(_automationConfig.DownloadPath);
 
-                var downloadPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
-                File.Copy(tempPath, downloadPath, overwrite: true);
-                _output.WriteLine($"Report downloaded to {downloadPath}");
+                savedPath = Path.Combine(_automationConfig.DownloadPath, config.DownloadFileName);
+                await using (var source = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous))
+                await using (var destination = new FileStream(savedPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                {
+                    await source.CopyToAsync(destination, 81920, cancellationToken);
+                }
+
+                _output.WriteLine($"Report downloaded to {savedPath}");
             }
 
             return ReportPackage.Open(tempPath, deleteOnDispose: true);
@@ -681,6 +687,18 @@ public class ReportApiHelper
             catch (IOException)
             {
                 // The caller's exception is the one that matters.
+            }
+
+            if (!string.IsNullOrEmpty(savedPath))
+            {
+                try
+                {
+                    if (File.Exists(savedPath))
+                        File.Delete(savedPath);
+                }
+                catch (IOException)
+                {
+                }
             }
 
             throw;

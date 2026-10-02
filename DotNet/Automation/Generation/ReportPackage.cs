@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 
 namespace LantanaGroup.Automation.Generation;
 
@@ -126,6 +127,43 @@ public sealed class ReportPackage : IDisposable, IAsyncDisposable
         using var stream = entry.Open();
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
+    }
+
+    /// <summary>
+    /// Copies one entry to <paramref name="destination"/> in 80 KB chunks.
+    /// The returned count is the number of decoded characters, matching
+    /// <see cref="ReadEntryText"/>. The destination stays open.
+    /// </summary>
+    public async Task<int?> CopyEntryTextToAsync(
+        string fullName,
+        Stream destination,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ThrowIfDisposed();
+        var entry = _archive.GetEntry(fullName);
+        if (entry == null)
+            return null;
+
+        await using var source = entry.Open();
+        using var reader = new StreamReader(source);
+        await using var writer = new StreamWriter(
+            destination,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 81920,
+            leaveOpen: true);
+
+        var buffer = new char[81920];
+        var charCount = 0;
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) > 0)
+        {
+            charCount += read;
+            await writer.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+        }
+
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+        return charCount;
     }
 
     public void Dispose()

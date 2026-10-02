@@ -101,6 +101,37 @@ public class ReportDownloadTests
         Assert.Contains("not a ZIP", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task DownloadReportAsync_CancelledSaveDeletesThePartialFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "link-report-download-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var client = new StreamingSubmissionClient((destination, _) =>
+            {
+                WriteZip(destination, ("manifest.ndjson", "{\"resourceType\":\"List\"}\n"));
+                return Task.FromResult(new SubmissionDownloadResult(200, null));
+            });
+            var helper = CreateHelper(client, new AutomationConfig { DownloadPath = directory });
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                helper.DownloadReportAsync(
+                    "facility",
+                    "report-1",
+                    new TestScenarioConfig { DownloadFileName = "saved.zip" },
+                    cancellationToken: cts.Token));
+
+            Assert.False(File.Exists(Path.Combine(directory, "saved.zip")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static ReportApiHelper CreateHelper(
         StreamingSubmissionClient client,
         AutomationConfig config,

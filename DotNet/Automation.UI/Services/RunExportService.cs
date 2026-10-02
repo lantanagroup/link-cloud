@@ -583,48 +583,77 @@ public sealed class RunExportService : IRunExportService
             return false;
 
         var tempPath = ReportPackage.CreateTempPath();
+        var stageDir = Path.Combine(Path.GetTempPath(), "link-abs-" + Guid.NewGuid().ToString("N"));
+        var staged = new List<(string Name, string Path, int CharCount)>();
         try
         {
-            await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            var stagedOk = false;
+            try
             {
-                var result = await _submissionClient.CopySubmissionAsync(
-                    run.FacilityId, run.ReportId, file, external: false, cancellationToken: ct);
-                if (!result.IsSuccess)
+                await using (var file = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+                {
+                    var result = await _submissionClient.CopySubmissionAsync(
+                        run.FacilityId, run.ReportId, file, external: false, cancellationToken: ct);
+                    if (!result.IsSuccess)
+                        return false;
+                }
+
+                if (!ReportPackage.HasZipHeader(tempPath))
                     return false;
+
+                using var package = ReportPackage.Open(tempPath, deleteOnDispose: true);
+                var names = package.EntryNames
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (names.Count == 0)
+                    return false;
+
+                // Stage every entry before touching the diagnostics archive. A later
+                // failure must not leave a partial live copy next to the fallback note.
+                Directory.CreateDirectory(stageDir);
+                foreach (var name in names)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var stagedPath = Path.Combine(stageDir, Guid.NewGuid().ToString("N"));
+                    await using var stagedFile = new FileStream(stagedPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+                    var charCount = await package.CopyEntryTextToAsync(name, stagedFile, ct);
+                    if (charCount == null)
+                        return false;
+
+                    staged.Add((name, stagedPath, charCount.Value));
+                }
+
+                stagedOk = true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
+                    run.RunId, run.FacilityId, run.ReportId);
+                return false;
             }
 
-            if (!ReportPackage.HasZipHeader(tempPath))
+            if (!stagedOk)
                 return false;
 
-            using var package = ReportPackage.Open(tempPath, deleteOnDispose: true);
-            var names = package.EntryNames
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (names.Count == 0)
-                return false;
-
-            listing.AppendLine($"Total files: {names.Count:N0}");
+            listing.AppendLine($"Total files: {staged.Count:N0}");
             listing.AppendLine();
-            foreach (var name in names)
+            foreach (var (name, stagedPath, charCount) in staged)
             {
                 ct.ThrowIfCancellationRequested();
-                var text = package.ReadEntryText(name) ?? string.Empty;
-                listing.AppendLine($"  {name}  ({text.Length:N0} chars)");
+                listing.AppendLine($"  {name}  ({charCount:N0} chars)");
 
                 var entry = archive.CreateEntry($"abs/{name}", CompressionLevel.Optimal);
                 await using var target = entry.Open();
-                var bytes = Encoding.UTF8.GetBytes(text);
-                await target.WriteAsync(bytes, ct);
+                await using var source = new FileStream(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+                await source.CopyToAsync(target, 81920, ct);
             }
 
             return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
-                run.RunId, run.FacilityId, run.ReportId);
-            return false;
         }
         finally
         {
@@ -636,6 +665,15 @@ public sealed class RunExportService : IRunExportService
             catch (IOException)
             {
                 // The package dispose already tries to delete this file.
+            }
+
+            try
+            {
+                if (Directory.Exists(stageDir))
+                    Directory.Delete(stageDir, recursive: true);
+            }
+            catch (IOException)
+            {
             }
         }
     }
@@ -805,6 +843,10 @@ public sealed class RunExportService : IRunExportService
         {
             var content = await contentFactory();
             await WriteEntryAsync(archive, entryName, content);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
