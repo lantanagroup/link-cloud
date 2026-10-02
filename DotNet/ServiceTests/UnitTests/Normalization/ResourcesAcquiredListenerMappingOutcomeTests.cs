@@ -11,7 +11,6 @@ using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Listeners;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -515,7 +514,6 @@ public class ResourcesAcquiredListenerMappingOutcomeTests
                     QueryType = "Initial",
                     ReportableEvent = "Adhoc",
                     ScheduledReports = [new ScheduledReport { ReportTrackingId = "tracking-1" }],
-                    CacheType = ResourceCacheType.ABS,
                     CacheKeys = cacheKeys
                 }
             }

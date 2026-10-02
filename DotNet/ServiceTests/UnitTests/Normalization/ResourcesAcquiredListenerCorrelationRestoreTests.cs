@@ -8,7 +8,6 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Listeners;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -190,7 +189,6 @@ public class ResourcesAcquiredListenerCorrelationRestoreTests
                     QueryType = queryType,
                     ReportableEvent = "Adhoc",
                     ScheduledReports = new List<ScheduledReport> { new() { ReportTrackingId = "tracking-1" } },
-                    CacheType = ResourceCacheType.ABS,
                     CacheKeys = new List<string> { PatientCacheKey }
                 }
             }

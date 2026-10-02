@@ -75,7 +75,6 @@ public class KafkaDeadLetterContractTests
             {
               "queryType": "Initial",
               "reportableEvent": "Discharge",
-              "cacheType": "Redis",
               "cacheKey": "corr-1",
               "scheduledReports": [ { "reportTrackingId": "r1" }, { "reportTrackingId": "r2" } ]
             }
@@ -86,7 +85,6 @@ public class KafkaDeadLetterContractTests
         summary.Should().Contain("facilityId=fac-1");
         summary.Should().Contain("patientId=pat-9");
         summary.Should().Contain("queryType=Initial");
-        summary.Should().Contain("cacheType=Redis");
         summary.Should().Contain("cacheKey=corr-1");
         summary.Should().Contain("scheduledReports=2");
         summary.Should().Contain("resourceType=(null)");
