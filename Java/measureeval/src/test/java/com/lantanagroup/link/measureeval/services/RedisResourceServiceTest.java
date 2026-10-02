@@ -110,41 +110,58 @@ class RedisResourceServiceTest {
                 "one key per FHIR resource type plus the bare key, nothing else");
     }
 
+    // ----- the durable count, read from the same HGETALL as the resources (L7) -----
+
     @Test
     @SuppressWarnings("unchecked")
-    void readDurableResourceCount_returnsTheRecordedCount() {
-        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn("12");
+    void readEntry_takesTheDurableCountFromTheSameRead() {
+        when(hashOps.entries("corr")).thenReturn(Map.of(
+                "Patient/p1", "{\"resourceType\":\"Patient\",\"id\":\"p1\"}",
+                RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD, "12"));
 
-        assertEquals(12, service.readDurableResourceCount("corr"));
+        RedisCacheEntry entry = service.readEntry("fac", "corr", "pat");
+
+        assertEquals(12, entry.durableCount());
+        assertFalse(entry.durableCountUnparseable());
+        assertEquals(1, entry.resources().size(), "the count field is metadata, not a resource");
+        verify(hashOps, never()).get(anyString(), anyString());
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void readDurableResourceCount_returnsNull_whenNoneRecorded() {
+    void readEntry_noRecordedCount_isNull() {
         // No durable write has landed for the key yet (or the entry predates the field).
-        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn(null);
+        when(hashOps.entries("corr")).thenReturn(Map.of(
+                "Patient/p1", "{\"resourceType\":\"Patient\",\"id\":\"p1\"}"));
 
-        assertNull(service.readDurableResourceCount("corr"));
+        RedisCacheEntry entry = service.readEntry("fac", "corr", "pat");
+
+        assertNull(entry.durableCount());
+        assertFalse(entry.durableCountUnparseable());
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void readDurableResourceCount_returnsNull_whenTheValueIsNotANumber() {
-        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenReturn("not-a-number");
+    void readEntry_countThatIsNotANumber_isNull_andFlagged() {
+        when(hashOps.entries("corr")).thenReturn(Map.of(
+                "Patient/p1", "{\"resourceType\":\"Patient\",\"id\":\"p1\"}",
+                RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD, "not-a-number"));
 
-        assertNull(service.readDurableResourceCount("corr"),
-                "a malformed count must read as unrecorded so the entry is trusted rather than rejected");
+        RedisCacheEntry entry = service.readEntry("fac", "corr", "pat");
+
+        assertNull(entry.durableCount(), "a malformed count reads as unrecorded so the entry is trusted");
+        assertTrue(entry.durableCountUnparseable(), "and is flagged so the reader can count it");
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void readDurableResourceCount_wrapsAsCacheUnavailable_whenRedisDown() {
-        RedisConnectionFailureException cause = new RedisConnectionFailureException("redis unavailable");
-        when(hashOps.get("corr", RedisResourceService.DURABLE_RESOURCE_COUNT_FIELD)).thenThrow(cause);
+    void readEntry_emptyKey_hasNoResourcesAndNoCount() {
+        when(hashOps.entries("corr")).thenReturn(Map.of());
 
-        ResourceCacheUnavailableException ex = assertThrows(ResourceCacheUnavailableException.class,
-                () -> service.readDurableResourceCount("corr"));
-        assertSame(cause, ex.getCause());
+        RedisCacheEntry entry = service.readEntry("fac", "corr", "pat");
+
+        assertTrue(entry.resources().isEmpty());
+        assertNull(entry.durableCount());
     }
 
     @Test

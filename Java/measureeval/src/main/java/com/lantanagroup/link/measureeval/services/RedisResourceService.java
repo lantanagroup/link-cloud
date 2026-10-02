@@ -36,6 +36,15 @@ public class RedisResourceService {
     static final String METADATA_FIELD_PREFIX = "__";
 
     public List<Resource> readResources(String facilityId, String correlationId, String patientId) {
+        return readEntry(facilityId, correlationId, patientId).resources();
+    }
+
+    /**
+     * Reads the entry's resources and its recorded durable count in one HGETALL. Reading the count
+     * separately left a gap: an eviction between the two calls made a partial entry look count-less,
+     * so the reader trusted it.
+     */
+    public RedisCacheEntry readEntry(String facilityId, String correlationId, String patientId) {
         HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
 
         Map<String, String> fields;
@@ -56,11 +65,13 @@ public class RedisResourceService {
         if (fields.isEmpty()) {
             // Reached only when the cache was reachable: the key genuinely has no fields.
             logger.debug("No Redis entries for correlationId='{}' (cache reachable, key absent)", LogUtils.sanitize(correlationId));
-            return resources;
+            return new RedisCacheEntry(resources, null, false);
         }
 
         int malformedFields = 0;
         int unknownTypes = 0;
+        Integer durableCount = null;
+        boolean durableCountUnparseable = false;
 
         for (Map.Entry<String, String> entry : fields.entrySet()) {
             String field = entry.getKey();
@@ -76,6 +87,15 @@ public class RedisResourceService {
             // warning here would fire once per correlation read, on the hottest path there is.
             // See docs-dev/resource-cache.md.
             if (field.startsWith(METADATA_FIELD_PREFIX)) {
+                if (DURABLE_RESOURCE_COUNT_FIELD.equals(field)) {
+                    try {
+                        durableCount = Integer.parseInt(json.trim());
+                    } catch (NumberFormatException e) {
+                        logger.warn("Unparseable durable resource count '{}' on Redis key '{}'. Treating the count as unrecorded.",
+                                LogUtils.sanitize(json), LogUtils.sanitize(correlationId));
+                        durableCountUnparseable = true;
+                    }
+                }
                 continue;
             }
 
@@ -108,9 +128,9 @@ public class RedisResourceService {
             resources.add(resource);
         }
 
-        logger.debug("Read {} resources for correlationId='{}' (malformed={}, unknownTypes={})",
-                resources.size(), correlationId, malformedFields, unknownTypes);
-        return resources;
+        logger.debug("Read {} resources for correlationId='{}' (malformed={}, unknownTypes={}, durableCount={})",
+                resources.size(), correlationId, malformedFields, unknownTypes, durableCount);
+        return new RedisCacheEntry(resources, durableCount, durableCountUnparseable);
     }
 
     /**
@@ -121,36 +141,6 @@ public class RedisResourceService {
      * collide. See docs-dev/resource-cache.md.
      */
     static final String DURABLE_RESOURCE_COUNT_FIELD = "__durableResourceCount";
-
-    /**
-     * The durable resource count recorded on the entry, or {@code null} when none is recorded or
-     * the recorded value is not a number. A Redis outage surfaces as
-     * {@link ResourceCacheUnavailableException}, as in {@link #readResources}.
-     */
-    public Integer readDurableResourceCount(String correlationId) {
-        HashOperations<String, String, String> hashOps = redisTemplate.opsForHash();
-
-        String value;
-        try {
-            value = hashOps.get(correlationId, DURABLE_RESOURCE_COUNT_FIELD);
-        } catch (DataAccessException e) {
-            throw new ResourceCacheUnavailableException(
-                    "Resource cache (Redis) unavailable while reading the durable resource count for correlationId=" + correlationId, e);
-        }
-
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            logger.warn("Unparseable durable resource count '{}' on Redis key '{}'. Treating the count as unrecorded.",
-                    LogUtils.sanitize(value), LogUtils.sanitize(correlationId));
-            return null;
-        }
-    }
-
 
     public void cleanup(String correlationId) {
         // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
