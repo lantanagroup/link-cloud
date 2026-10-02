@@ -146,6 +146,43 @@ public class RunMetricsSnapshotServiceTests
     }
 
     [Fact]
+    public void CacheCounterQuery_UsesTheExportedTotalName()
+    {
+        // The exporter appends _total to counters. Without it the query matches nothing, the empty
+        // result becomes 0, and an exhausted durable write never shows.
+        RunMetricsSnapshotService.CacheCounterQuery("link_resource_cache_write_retry_count", "exhausted", 90)
+            .Should().Be("sum(increase(link_resource_cache_write_retry_count_total{cache_outcome=\"exhausted\"}[90s]))");
+    }
+
+    [Theory]
+    [InlineData("link_measureeval_eval_count")]
+    [InlineData("link_validation_counter")]
+    [InlineData("link_submission_upload_count")]
+    public void StageErrorQuery_UsesTheExportedTotalName(string errorCounter)
+    {
+        RunMetricsSnapshotService.StageErrorQuery(errorCounter, "fac-1", "failure", 90)
+            .Should().Contain($"increase({errorCounter}_total{{");
+    }
+
+    [Fact]
+    public void StageHistograms_ErrorCounters_AreQueriedByTheirExportedName()
+    {
+        // Pins every configured error counter, so one added later without the suffix fails here.
+        foreach (var stage in RunMetricsSnapshotService.StageHistograms.Where(stage => stage.ErrorCounter != null))
+        {
+            RunMetricsSnapshotService.StageErrorQuery(stage.ErrorCounter!, "fac-1", stage.ErrorOutcome!, 90)
+                .Should().Contain(stage.ErrorCounter + "_total{");
+        }
+    }
+
+    [Fact]
+    public void PromCounter_NameAlreadySuffixed_IsNotSuffixedTwice()
+    {
+        RunMetricsSnapshotService.PromCounter("process_cpu_time_seconds_total")
+            .Should().Be("process_cpu_time_seconds_total");
+    }
+
+    [Fact]
     public void Stage_queries_use_increase_over_the_window()
     {
         RunMetricsSnapshotService.StageCountQuery("link_data_acq_query_duration_milliseconds", "fac-1", 90)
