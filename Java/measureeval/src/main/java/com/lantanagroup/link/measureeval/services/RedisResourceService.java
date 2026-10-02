@@ -8,9 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -168,14 +170,29 @@ public class RedisResourceService {
         //
         // These are the only key shapes a correlation owns (see the key layout in
         // docs-dev/resource-cache.md). A new shape under the correlation prefix must be added here.
+        //
+        // One key per UNLINK, pipelined. A single multi-key UNLINK fails CROSSSLOT on a clustered
+        // Redis (OSS clustering policy), because the keys hash to different slots -- and the
+        // correlation key would fail with the rest. Single-key commands are valid under any
+        // policy, and the pipeline keeps the whole batch to one round trip.
         ResourceType[] resourceTypes = ResourceType.values();
-        List<String> keys = new ArrayList<>(resourceTypes.length + 1);
-        keys.add(correlationId);
+        List<byte[]> keys = new ArrayList<>(resourceTypes.length + 1);
+        keys.add(correlationId.getBytes(StandardCharsets.UTF_8));
         for (ResourceType resourceType : resourceTypes) {
-            keys.add(correlationId + ":" + resourceType.name());
+            keys.add((correlationId + ":" + resourceType.name()).getBytes(StandardCharsets.UTF_8));
         }
-        Long unlinked = redisTemplate.unlink(keys);
-        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'",
-                unlinked == null ? 0 : unlinked, LogUtils.sanitize(correlationId));
+
+        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            for (byte[] key : keys) {
+                connection.keyCommands().unlink(key);
+            }
+            return null;
+        });
+
+        long unlinked = results == null ? 0 : results.stream()
+                .filter(Long.class::isInstance)
+                .mapToLong(Long.class::cast)
+                .sum();
+        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'", unlinked, LogUtils.sanitize(correlationId));
     }
 }
