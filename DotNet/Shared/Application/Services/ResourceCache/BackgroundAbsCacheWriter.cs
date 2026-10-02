@@ -22,6 +22,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     /// appending to it and two concurrent writers would both miss the other's resources. Writes to
     /// different keys run concurrently, bounded by
     /// <see cref="ResourceCacheAbsWriterSettings.MaxConcurrency"/>.
+    /// <para>
+    /// A worker that finds a key already being written does not wait for it. It hands its batch to
+    /// the worker holding the key, which writes it before giving the key up, and goes back for other
+    /// keys. Without that, one correlation -- which writes its key once per acquired resource type,
+    /// commonly more times than there are workers -- parks the whole pool on a single key.
+    /// </para>
     /// </remarks>
     public class BackgroundAbsCacheWriter : BackgroundService, IBackgroundAbsCacheWriter
     {
@@ -58,6 +64,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 throw new ArgumentOutOfRangeException(
                     nameof(settings),
                     "ResourceCache:AbsWriter:MaxConcurrency must be greater than zero.");
+            }
+
+            if (_settings.MaxCoalescedResources <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(settings),
+                    "ResourceCache:AbsWriter:MaxCoalescedResources must be greater than zero.");
             }
 
             _metrics.TrackQueueDepth(() => QueueDepth);
@@ -345,42 +358,168 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             // The state travels with the item. Looking it up again could find a different instance,
             // because a key that drains to nothing is retired and a later write creates a fresh one.
             var state = pending.State;
+            var current = pending;
+
+            // Claim the key, or give the work to whoever already holds it. Claiming and checking the
+            // generation happen in one critical section, so a cancel cannot land between them, which
+            // is what the second check used to cover.
+            while (true)
+            {
+                Task vacancy;
+
+                lock (state.Gate)
+                {
+                    if (current.Generation != state.Generation)
+                    {
+                        state.Outstanding--;
+                        SignalIfDrained(current.CacheKey, state);
+                        return;
+                    }
+
+                    if (!state.Writing)
+                    {
+                        state.Writing = true;
+                        break;
+                    }
+
+                    // Busy. Hand the work over and go find another key. Waiting here is what lets a
+                    // single correlation -- which writes this key once per acquired resource type,
+                    // commonly more times than there are workers -- park the entire pool on one key.
+
+                    // A cancel bumps the generation but leaves the hand-off attached until the
+                    // holder collects it. Merging into one of those loses this write: the holder sees
+                    // a stale batch and discards all of it, while the waiter is still told the key is
+                    // durable. Drop it here instead, taking the count it was still owed with it.
+                    if (state.HandedOff is not null && state.HandedOff.Generation != current.Generation)
+                    {
+                        state.HandedOff = null;
+                        state.Outstanding--;
+                    }
+
+                    if (state.HandedOff is null)
+                    {
+                        // Copied, because a later hand-off appends to this list and the original
+                        // belongs to whoever enqueued it.
+                        state.HandedOff = current with { Resources = [.. current.Resources] };
+                        return;
+                    }
+
+                    if (state.HandedOff.Resources.Count + current.Resources.Count <= _settings.MaxCoalescedResources)
+                    {
+                        state.HandedOff.Resources.AddRange(current.Resources);
+
+                        // Two counted items became one, so one count goes with it.
+                        state.Outstanding--;
+                        SignalIfDrained(current.CacheKey, state);
+                        return;
+                    }
+
+                    // Merging further would grow one batch without bound, and a dequeued item no
+                    // longer occupies a channel slot, so the queue capacity would not cover it.
+                    // Wait for the key instead: the old behaviour, now reached only in the case the
+                    // bound exists for.
+                    vacancy = (state.Vacancy ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+                }
+
+                await vacancy;
+            }
+
+            try
+            {
+                PendingWrite? item = current;
+
+                while (item is not null)
+                {
+                    await WriteOneAsync(item, state, stoppingToken);
+                    item = TakeHandedOffOrRelease(state);
+                }
+            }
+            catch (Exception ex)
+            {
+                // WriteOneAsync reports every failure itself, so this should be unreachable. Handled
+                // regardless: a hand-off left attached is counted in Outstanding with nobody to run
+                // it, and every waiter on this key -- WaitForDurableAsync and CancelAndDrainAsync
+                // alike -- would then block forever.
+                ReleaseAndFailOwnedWork(state, ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Takes the next item handed to this writer, or gives up the key.
+        /// </summary>
+        /// <remarks>
+        /// The check and the release are one critical section with the hand-off in
+        /// <see cref="ProcessAsync"/>, so a hand-off can never arrive into a key that is being given
+        /// up. Either the donor sees <see cref="KeyState.Writing"/> and attaches, and is collected
+        /// here, or it sees the key free and claims it.
+        /// </remarks>
+        private PendingWrite? TakeHandedOffOrRelease(KeyState state)
+        {
+            lock (state.Gate)
+            {
+                while (true)
+                {
+                    var next = state.HandedOff;
+                    state.HandedOff = null;
+
+                    if (next is null)
+                    {
+                        state.Writing = false;
+                        state.Vacancy?.TrySetResult();
+                        state.Vacancy = null;
+                        return null;
+                    }
+
+                    if (next.Generation == state.Generation)
+                    {
+                        return next;
+                    }
+
+                    // Cancelled while it sat attached. The donor has already returned, so this is the
+                    // only place left that can account for it.
+                    state.Outstanding--;
+                    SignalIfDrained(next.CacheKey, state);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gives up the key after an unexpected fault, failing any work still attached to it.
+        /// </summary>
+        private void ReleaseAndFailOwnedWork(KeyState state, Exception failure)
+        {
+            PendingWrite? stranded;
 
             lock (state.Gate)
             {
-                if (pending.Generation != state.Generation)
-                {
-                    state.Outstanding--;
-                    SignalIfDrained(pending.CacheKey, state);
-                    return;
-                }
+                stranded = state.HandedOff;
+                state.HandedOff = null;
+                state.Writing = false;
+                state.Vacancy?.TrySetResult();
+                state.Vacancy = null;
             }
 
+            if (stranded is not null)
+            {
+                // Reported as failed rather than silently dropped: losing its decrement would leave
+                // the key permanently undrainable.
+                CompleteOne(stranded.CacheKey, state, failure);
+            }
+        }
+
+        private async Task WriteOneAsync(PendingWrite pending, KeyState state, CancellationToken stoppingToken)
+        {
             Exception? failure = null;
-
-            await state.WriteLock.WaitAsync(CancellationToken.None);
-
-            // Checked again, because the wait above can be long: another worker may hold the lock for
-            // this key while Cancel and the delete that follows it run to completion. Writing now
-            // would put the deleted key back in blob storage, where nothing expires it.
-            lock (state.Gate)
-            {
-                if (pending.Generation != state.Generation)
-                {
-                    state.WriteLock.Release();
-                    state.Outstanding--;
-                    SignalIfDrained(pending.CacheKey, state);
-                    return;
-                }
-            }
-
-            // Measured from enqueue to the start of the write, so a backlog is distinguishable from
-            // storage having slowed down.
-            _metrics.RecordQueueWait(Stopwatch.GetElapsedTime(pending.QueuedAtTimestamp).TotalMilliseconds);
             var writeStart = Stopwatch.GetTimestamp();
 
             try
             {
+                // Measured from enqueue to the start of the write, so a backlog is distinguishable
+                // from storage having slowed down.
+                _metrics.RecordQueueWait(Stopwatch.GetElapsedTime(pending.QueuedAtTimestamp).TotalMilliseconds);
+                writeStart = Stopwatch.GetTimestamp();
+
                 await WriteWithRetryAsync(pending, stoppingToken);
                 _metrics.RecordWrite(ResourceCacheStores.Blob, ResourceCacheOutcomes.Ok, Elapsed(writeStart));
 
@@ -415,7 +554,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
             finally
             {
-                state.WriteLock.Release();
                 CompleteOne(pending.CacheKey, state, failure);
             }
         }
@@ -616,7 +754,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private sealed class KeyState
         {
             public readonly object Gate = new();
-            public readonly SemaphoreSlim WriteLock = new(1, 1);
             public int Outstanding;
             public int Generation;
             public Exception? Failure;
@@ -626,6 +763,27 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             /// through a stale lookup must go round again rather than counting into it.
             /// </summary>
             public bool Retired;
+
+            /// <summary>
+            /// Whether a worker is inside this key's write section. Replaces a SemaphoreSlim:
+            /// nothing waits on it in the normal path, so a flag under <see cref="Gate"/> makes
+            /// releasing it under the same lock that guards the hand-off impossible to get wrong.
+            /// </summary>
+            public bool Writing;
+
+            /// <summary>
+            /// Work a worker could not start because this key was busy, for the holder to pick up
+            /// before it gives the key up. Further hand-offs merge into it, so a key accumulates at
+            /// most one follow-up write however many arrive.
+            /// </summary>
+            public PendingWrite? HandedOff;
+
+            /// <summary>
+            /// Signalled when the key is given up. Only used when a hand-off would exceed
+            /// <see cref="ResourceCacheAbsWriterSettings.MaxCoalescedResources"/> and a worker has
+            /// to wait, as every worker did before hand-off existed.
+            /// </summary>
+            public TaskCompletionSource? Vacancy;
 
             public TaskCompletionSource Completion { get; set; } =
                 new(TaskCreationOptions.RunContinuationsAsynchronously);
