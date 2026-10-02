@@ -51,53 +51,52 @@ public sealed class RunExportService : IRunExportService
         var path = Path.Combine(Path.GetTempPath(), "link-export-" + Guid.NewGuid().ToString("N") + ".zip");
         try
         {
-        await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
-        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
-        {
-            await SafeWriteAsync(archive, "RunDetails.txt",
-                () => Task.FromResult(BuildRunDetails(run)));
+            await using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous))
+            using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                await SafeWriteAsync(archive, "RunDetails.txt",
+                    () => Task.FromResult(BuildRunDetails(run)));
 
-            await SafeWriteAsync(archive, "RunManifest.txt",
-                async () => await BuildRunManifestAsync(runId));
+                await SafeWriteAsync(archive, "RunManifest.txt",
+                    async () => await BuildRunManifestAsync(runId));
 
-            await SafeWriteAsync(archive, "LokiLogs.txt",
-                () => Task.FromResult(FilterLogs(run.Logs, IsLokiLine,
-                    "Loki error/diagnostic lines captured by the run.")));
+                await SafeWriteAsync(archive, "LokiLogs.txt",
+                    () => Task.FromResult(FilterLogs(run.Logs, IsLokiLine,
+                        "Loki error/diagnostic lines captured by the run.")));
 
-            await SafeWriteAsync(archive, "Kafka.txt",
-                () => Task.FromResult(FilterLogs(run.Logs, IsKafkaLine,
-                    "Kafka error/retry topic entries captured by the run.")));
+                await SafeWriteAsync(archive, "Kafka.txt",
+                    () => Task.FromResult(FilterLogs(run.Logs, IsKafkaLine,
+                        "Kafka error/retry topic entries captured by the run.")));
 
-            // Service-scoped sections sourced from the per-run pipeline snapshot,
-            // which is itself rebuilt from the persisted domain snapshots so this
-            // path makes no live cross-service calls.
-            var pipelineSnapshot = await SafeGetPipelineSnapshotAsync(runId, cancellationToken);
+                // Service-scoped sections sourced from the per-run pipeline snapshot,
+                // which is itself rebuilt from the persisted domain snapshots so this
+                // path makes no live cross-service calls.
+                var pipelineSnapshot = await SafeGetPipelineSnapshotAsync(runId, cancellationToken);
 
-            await SafeWriteAsync(archive, "Report.txt",
-                async () => await BuildReportSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "Report.txt",
+                    async () => await BuildReportSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "DataAcquisition.txt",
-                async () => await BuildDataAcquisitionSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "DataAcquisition.txt",
+                    async () => await BuildDataAcquisitionSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "Validation.txt",
-                async () => await BuildValidationSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "Validation.txt",
+                    async () => await BuildValidationSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "MeasureEval.txt",
-                async () => await BuildMeasureEvalSectionAsync(runId, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "MeasureEval.txt",
+                    async () => await BuildMeasureEvalSectionAsync(runId, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "Normalization.txt",
-                async () => await BuildNormalizationSectionAsync(runId, run.Logs, pipelineSnapshot, cancellationToken));
+                await SafeWriteAsync(archive, "Normalization.txt",
+                    async () => await BuildNormalizationSectionAsync(runId, run.Logs, pipelineSnapshot, cancellationToken));
 
-            await SafeWriteAsync(archive, "LiveSimulation.json",
-                async () => await BuildLiveSimulationSectionAsync(runId, cancellationToken));
+                await SafeWriteAsync(archive, "LiveSimulation.json",
+                    async () => await BuildLiveSimulationSectionAsync(runId, cancellationToken));
+            }
 
-            await SafeWriteAsync(archive, "abs/_README.txt",
-                async () => await WriteAbsFilesAsync(archive, run, cancellationToken));
-        }
+            await AppendAbsSectionAsync(path, run, cancellationToken);
 
-        return new RunExportPackage(
-            FileName: $"TestRunDiagnostics-{runId:D}.zip",
-            FilePath: path);
+            return new RunExportPackage(
+                FileName: $"TestRunDiagnostics-{runId:D}.zip",
+                FilePath: path);
         }
         catch
         {
@@ -528,6 +527,45 @@ public sealed class RunExportService : IRunExportService
             _logger.LogWarning(ex, "[Export][{RunId}] Failed to read normalization evidence snapshot.", runId);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Adds the ABS section by swapping in a finished copy of the diagnostics file.
+    /// A failure while writing <c>abs/</c> deletes that copy, so the returned
+    /// archive does not keep a partial live section.
+    /// </summary>
+    private async Task AppendAbsSectionAsync(string exportPath, AutomationRunSummary run, CancellationToken ct)
+    {
+        try
+        {
+            await ZipSectionCommit.CommitAsync(exportPath, async (archive, token) =>
+            {
+                var readme = await WriteAbsFilesAsync(archive, run, token);
+                await WriteEntryAsync(archive, "abs/_README.txt", readme);
+            }, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[Export][{RunId}] Failed while committing the ABS section.", run.RunId);
+            await AppendTextEntryAsync(
+                exportPath,
+                "abs/_README.txt.ERROR.txt",
+                $"Failed to build this section: {ex.GetType().Name}: {ex.Message}",
+                ct);
+        }
+    }
+
+    private static async Task AppendTextEntryAsync(string zipPath, string entryName, string content, CancellationToken ct)
+    {
+        await ZipSectionCommit.CommitAsync(zipPath, (archive, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            return WriteEntryAsync(archive, entryName, content);
+        }, ct);
     }
 
     /// <summary>
