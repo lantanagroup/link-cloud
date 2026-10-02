@@ -324,7 +324,7 @@ public class HybridResourceCacheTests
     }
 
     [Fact]
-    public async Task DeleteAsync_still_deletes_from_durable_storage_when_the_cache_delete_fails()
+    public async Task DeleteAsync_leaves_durable_storage_alone_when_the_cache_delete_fails()
     {
         var keys = new List<string> { CacheKey };
 
@@ -332,9 +332,12 @@ public class HybridResourceCacheTests
             .Setup(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("cache down"));
 
-        await CreateSut().DeleteAsync(keys);
+        var act = () => CreateSut().DeleteAsync(keys);
 
-        _abs.Verify(c => c.DeleteAsync(keys, It.IsAny<CancellationToken>()), Times.Once);
+        // Deleting the blobs under surviving cache entries would let a redelivered ResourcesAcquired
+        // copy one key and find a later, evicted one empty, and dead-letter it.
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _abs.Verify(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

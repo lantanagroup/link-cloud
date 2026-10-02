@@ -268,13 +268,17 @@ Rather than hold the delete up until the write finishes, the write undoes itself
 re-checks the generation and, if the key was cancelled, deletes it from durable storage. Both orders
 reach the same end state, and the delete path stays non-blocking.
 
-`DeleteAsync` tolerates a failed cache delete, since the entry expires on its own and the durable
-delete is what matters. The encounter strip cannot use it. A cache write merges, so removing
-entries means rewriting the key, and done as a delete and a write the key is briefly empty and a
-tolerated delete failure leaves the stripped encounters in place for the write to merge back in.
-Checking afterwards does not close that either: the check reads through the same cache that just
-failed and is tolerated there too, so an unreachable cache fails the delete, then reports the key as
-clear.
+`DeleteAsync` deletes from Redis first and raises a failed cache delete **without touching durable
+storage**, leaving every key to expiry and the lifecycle rule. It used to tolerate the failure and
+delete the blobs anyway, but a cache entry that outlives its blob is still served whole, since its
+durable count lives in Redis too. That breaks the release's leading-run guarantee (see
+[Releasing the acquisition keys after a success](#releasing-the-acquisition-keys-after-a-success)).
+Both callers, the success-path release and the terminal-failure purge, already treat a delete
+failure as best effort.
+
+The encounter strip cannot use `DeleteAsync`. A cache write merges, so removing entries means
+rewriting the key. Done as a delete and a write, the key is briefly empty, and a failure between the
+two loses the survivors.
 
 `ReplaceResourcesAsync` is what the strip uses instead. It clears and repopulates the key as one
 Redis `MULTI`/`EXEC` and raises any failure, so the strip either applies or does not happen; failing
@@ -361,9 +365,12 @@ correlation key too, which is the entry MeasureEval had just been told to read. 
 that turned out reportable, that also deleted the resources the SUPPLEMENTAL evaluation needed.
 
 A redelivery can still arrive after the release, from a pod dying before the offset commit or from a
-duplicate. The release deletes blob keys **in listed order** (the Redis half is best effort, and a key
-Redis lost is still read from its blob), so a redelivery always finds a **leading run** of empty keys.
-That is the only shape treated as already normalized:
+duplicate. The release clears every key from Redis, then deletes the blob keys **in listed order**, so
+a redelivery always finds a **leading run** of empty keys. That depends on the Redis delete landing
+first. If it fails, no blob is deleted: a key whose cache entry survived its blob would be served
+from Redis, so a redelivery could copy it and then find a later key, evicted and with no blob, empty.
+
+A leading run of empty keys is the only shape treated as already normalized:
 
 - **The first listed key is empty, nothing has been copied yet in this pass, and the correlation key
   is populated:** the message was already normalized. It finishes the release and is acknowledged
