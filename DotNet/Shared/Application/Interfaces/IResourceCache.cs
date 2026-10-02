@@ -127,9 +127,10 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// </summary>
         /// <remarks>
         /// Prefer this over the correlation-wide overload when the caller owns only part of a
-        /// correlation. A failure is reported once, to the waiter that sees it, so a caller waiting on
-        /// keys it does not own can consume a failure meant for the caller that does -- which then
-        /// finds nothing to wait on and reports an undurable key as durable.
+        /// correlation. A failure is reported to every waiter on the key until the resources it covers
+        /// are written again, so this fails whenever any write to these keys did -- including a
+        /// sibling's. A caller that knows which resources it wrote should use the overload that takes
+        /// them.
         /// </remarks>
         /// <param name="cacheKeys">The keys to wait on.</param>
         /// <param name="cancellationToken">Cancels the wait.</param>
@@ -137,6 +138,28 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// A durable write for one of these keys failed permanently, so they must not be advertised.
         /// </exception>
         Task WaitForDurableAsync(IEnumerable<string> cacheKeys, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Blocks until every durable write for <paramref name="cacheKeys"/> has landed, and fails only
+        /// if one of <paramref name="references"/> did not.
+        /// </summary>
+        /// <remarks>
+        /// For a caller that shares keys with other work, such as sibling acquisition logs writing the
+        /// same resource type. Several of them can wait on one key, and a hand-off can merge their
+        /// resources into one durable write, so the key alone cannot say whose write failed. Scoping
+        /// the answer to the caller's own resources tells the log that owns a failure, and only that
+        /// log.
+        /// </remarks>
+        /// <param name="cacheKeys">The keys to wait on.</param>
+        /// <param name="references">The caller's resources, as <c>{ResourceType}/{id}</c>.</param>
+        /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <exception cref="ResourceCacheDurabilityException">
+        /// A durable write holding one of <paramref name="references"/> failed permanently, so these
+        /// keys must not be advertised.
+        /// </exception>
+        Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                 IReadOnlyCollection<string> references,
+                                 CancellationToken cancellationToken = default);
 
         /// <summary>
         /// True when the backing store has at least one resource for <paramref name="cacheKey"/>,

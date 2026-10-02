@@ -764,12 +764,12 @@ public class PatientDataService : IPatientDataService
                 // Only this path persists ResourceAcquiredIds, so only this path can newly advertise
                 // a key -- the failure paths carry ids a previous successful pass already made durable.
                 //
-                // Scoped to the keys this log wrote, not the whole correlation. A durability failure is
-                // reported once, to the waiter that sees it, so waiting on a sibling log's keys would
-                // consume that sibling's failure and retire its state -- and the sibling's own barrier
-                // would then find nothing to wait on and advertise a key that never reached durable
-                // storage. Acquired ids are "ResourceType/resourceId", which is exactly what the cache
-                // key is built from.
+                // Scoped to the keys this log wrote, and to the resources it wrote into them. Sibling
+                // logs that return the same type share a key, and a hand-off can merge their writes
+                // into one, so a failure on the key may be this log's or a sibling's. Passing this
+                // log's own ids means it is failed exactly when its resources did not land. Acquired
+                // ids are "ResourceType/resourceId", which is what both the cache key and the writer's
+                // failure record are built from.
                 var logCacheKeys = resourceIds
                     .Select(acquiredId => acquiredId.Split('/')[0])
                     .Where(resourceTypeName => !string.IsNullOrWhiteSpace(resourceTypeName))
@@ -777,7 +777,7 @@ public class PatientDataService : IPatientDataService
                     .Select(resourceTypeName => $"{log.CorrelationId}:{resourceTypeName}")
                     .ToList();
 
-                await _resourceCache.WaitForDurableAsync(logCacheKeys, cancellationToken);
+                await _resourceCache.WaitForDurableAsync(logCacheKeys, resourceIds, cancellationToken);
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {

@@ -217,6 +217,16 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Completes immediately: this cache has no separate durable tier to wait for.
+        /// </summary>
+        public Task WaitForDurableAsync(IEnumerable<string> cacheKeys,
+                                        IReadOnlyCollection<string> references,
+                                        CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
         public async Task<bool> HasResourcesAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             // Asks the same question GetResourceCountAsync answers, so it has to discount the same
