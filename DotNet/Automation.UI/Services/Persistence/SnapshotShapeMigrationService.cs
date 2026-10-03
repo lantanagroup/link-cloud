@@ -232,13 +232,16 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 if (activeGenerations.Contains(generationKey))
                     continue;
 
-                var newest = await _parts.Find(p => p.RunId == part.RunId
+                // Run, domain, and generation are indexed. UpdatedAt is not a
+                // sort key on that index, and Cosmos rejects the sort.
+                var freshId = await _parts.Find(p => p.RunId == part.RunId
                         && p.Domain == part.Domain
-                        && p.GenerationId == part.GenerationId)
-                    .SortByDescending(p => p.UpdatedAt)
-                    .Project(p => p.UpdatedAt)
+                        && p.GenerationId == part.GenerationId
+                        && p.UpdatedAt >= cutoff)
+                    .Limit(1)
+                    .Project(p => p.Id)
                     .FirstOrDefaultAsync(ct);
-                if (newest >= cutoff)
+                if (!string.IsNullOrEmpty(freshId))
                 {
                     activeGenerations.Add(generationKey);
                     continue;
@@ -291,6 +294,9 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// not the current header. A crash after publish, or a later commit that
     /// retired only the generation it replaced, leaves these parts behind.
     /// The pass is bounded to one batch and does not load part bodies.
+    /// Confirming the live generation moves the cursor past that generation's
+    /// part ids, and never backward, so a long retained snapshot does not
+    /// stall a later orphan. An empty page still wraps to the start.
     /// </summary>
     private async Task SweepSettledGenerationsAsync(CancellationToken ct)
     {
@@ -328,6 +334,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 && string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal))
             {
                 _liveSettledConfirmedAt[key] = DateTimeOffset.UtcNow;
+                AdvanceSettledCursorPastGeneration(part);
                 continue;
             }
 
@@ -462,6 +469,21 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         return snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
             ? parsed
             : null;
+    }
+
+    /// <summary>
+    /// Part ids are "{runId:N}:{domain}:{generationId}:{ordinal:D8}".
+    /// A trailing "::" sorts after every ordinal of that generation and
+    /// before the next generation id. The cursor only moves forward.
+    /// </summary>
+    private void AdvanceSettledCursorPastGeneration(PartMeta part)
+    {
+        var generationEnd = $"{part.RunId:N}:{part.Domain}:{part.GenerationId}::";
+        if (_settledSweepAfterId == null
+            || string.CompareOrdinal(generationEnd, _settledSweepAfterId) > 0)
+        {
+            _settledSweepAfterId = generationEnd;
+        }
     }
 
     private void PruneExpiredLiveConfirmations(DateTimeOffset now)

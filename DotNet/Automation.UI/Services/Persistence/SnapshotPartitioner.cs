@@ -139,6 +139,13 @@ public static class SnapshotPartitioner
         if (EstimateStoredDocumentBytes(header) > budget)
             return BytePlan(json, [], budget);
 
+        // Slices are filled to the 1 MB budget before the path is counted.
+        // A JSON-pointer path can still push one piece over the 2 MB cap.
+        // Ordinary paths add a few bytes, so the fallback is the hard cap,
+        // which is the same limit WritePartsAsync enforces.
+        if (pieces.Exists(piece => EstimatePieceBytes(piece.Data, piece.Path, piece.ItemKey) > HardCapBytes))
+            return BytePlan(json, [], budget);
+
         return new SnapshotPlan.Partitioned(StructuredMode, skeletonJson, pieces);
     }
 

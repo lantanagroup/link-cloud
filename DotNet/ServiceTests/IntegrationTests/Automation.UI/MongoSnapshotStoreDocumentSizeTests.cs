@@ -2092,6 +2092,77 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Sweep_keeps_a_generation_with_one_fresh_part()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var runId = Guid.NewGuid();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = SnapshotPartitioner.BuildHeaderJson("live", "records", 1, null),
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        var aged = AgedPart(runId, "old", 0);
+        var fresh = AgedPart(runId, "old", 1);
+        fresh.UpdatedAt = DateTimeOffset.UtcNow;
+        var gone = AgedPart(runId, "gone", 0);
+        await parts.InsertManyAsync([aged, fresh, gone]);
+
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        await service.SweepOrphanPartsAsync(CancellationToken.None);
+
+        (await parts.Find(p => p.GenerationId == "old").CountDocumentsAsync()).Should().Be(2);
+        (await parts.Find(p => p.GenerationId == "gone").AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Sweep_jumps_past_a_long_live_generation_to_a_later_orphan()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var runId = Guid.NewGuid();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = SnapshotPartitioner.BuildHeaderJson("live", "records", 20, null),
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        var live = Enumerable.Range(0, 20).Select(ordinal =>
+        {
+            var part = AgedPart(runId, "live", ordinal);
+            part.Settled = true;
+            return part;
+        }).ToList();
+        var orphan = AgedPart(runId, "old", 0);
+        orphan.Settled = true;
+        await parts.InsertManyAsync(live.Append(orphan));
+
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        await service.SweepOrphanPartsAsync(CancellationToken.None);
+        (await parts.Find(p => p.GenerationId == "old").AnyAsync()).Should().BeTrue();
+        (await parts.Find(p => p.GenerationId == "live").CountDocumentsAsync()).Should().Be(20);
+        service.PartitionHeaderReads.Should().Be(1);
+
+        await service.SweepOrphanPartsAsync(CancellationToken.None);
+        (await parts.Find(p => p.GenerationId == "old").AnyAsync()).Should().BeFalse();
+        (await parts.Find(p => p.GenerationId == "live").CountDocumentsAsync()).Should().Be(20);
+        service.PartitionHeaderReads.Should().Be(2);
+    }
+
+    [Fact]
     public async Task Sweep_advances_past_live_settled_parts_and_wraps_to_an_earlier_orphan()
     {
         var database = CreateGuardedDatabase();

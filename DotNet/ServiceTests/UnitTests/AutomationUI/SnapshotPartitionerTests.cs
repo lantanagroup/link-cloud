@@ -159,6 +159,25 @@ public class SnapshotPartitionerTests
     }
 
     [Fact]
+    public void Huge_property_name_falls_back_to_byte_mode()
+    {
+        var name = new string('/', 600_000);
+        var value = new string('a', 1_050_000);
+        var json = "{\"" + name + "\":\"" + value + "\"}";
+
+        var split = SnapshotPartitioner.Plan(json).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Mode.Should().Be(SnapshotPartitioner.BytesMode);
+        split.Pieces.Should().NotBeEmpty();
+        foreach (var piece in split.Pieces)
+        {
+            SnapshotPartitioner.EstimatePieceBytes(piece.Data, piece.Path, piece.ItemKey)
+                .Should().BeLessThanOrEqualTo(SnapshotPartitioner.HardCapBytes);
+        }
+
+        RoundTrip(split).Should().Be(json);
+    }
+
+    [Fact]
     public void Two_strings_over_the_budget_round_trip_as_separate_items()
     {
         var first = new string('a', SnapshotPartitioner.MaxDocumentJsonBytes + 10);
