@@ -409,6 +409,102 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Guard_rejects_a_bulk_write_of_two_full_size_parts()
+    {
+        var database = CreateGuardedDatabase();
+        var parts = database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var payload = new string('a', 1_100_000);
+        var writes = new WriteModel<SnapshotPartDocument>[]
+        {
+            Replacement("bulk-a", payload),
+            Replacement("bulk-b", payload)
+        };
+
+        var act = () => parts.BulkWriteAsync(writes);
+        await act.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+    }
+
+    [Fact]
+    public async Task Guard_rejects_an_oversized_replacement()
+    {
+        var database = CreateGuardedDatabase();
+        var parts = database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var oversized = new SnapshotPartDocument
+        {
+            Id = "replaced-too-big",
+            RunId = Guid.NewGuid(),
+            Domain = "acquisitionLogs",
+            GenerationId = "g",
+            Ordinal = 0,
+            Kind = "element",
+            Path = "$",
+            Data = new string('a', SnapshotPartitioner.HardCapBytes),
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var act = () => parts.ReplaceOneAsync(p => p.Id == oversized.Id, oversized);
+        await act.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_stores_full_size_slices_without_one_oversized_request()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var note = new string('z', SnapshotPartitioner.MaxDocumentJsonBytes * 2);
+
+        await store.SetDomainAsync(runId, "generationManifest", new Item("only", note), CancellationToken.None);
+
+        var read = await store.GetDomainAsync<Item>(runId, "generationManifest", CancellationToken.None);
+        read!.Data.Note.Should().Be(note);
+        var parts = await Parts(runId, "generationManifest");
+        parts.Should().HaveCountGreaterThan(1);
+        await AssertRunDocumentsFit(runId);
+    }
+
+    [Fact]
+    public async Task TryUpgrade_leaves_a_snapshot_alone_when_its_timestamp_changed()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        legacy.UpdatedAt = legacy.UpdatedAt.AddMinutes(-5);
+
+        (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        var stored = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        stored.Data.Should().Be(payload);
+    }
+
+    private static ReplaceOneModel<SnapshotPartDocument> Replacement(string id, string payload)
+        => new(
+            Builders<SnapshotPartDocument>.Filter.Eq(p => p.Id, id),
+            new SnapshotPartDocument
+            {
+                Id = id,
+                RunId = Guid.NewGuid(),
+                Domain = "acquisitionLogs",
+                GenerationId = "g",
+                Ordinal = 0,
+                Kind = "slice",
+                Path = "$",
+                Data = payload,
+                UpdatedAt = DateTimeOffset.UtcNow
+            })
+        {
+            IsUpsert = true
+        };
+
+    [Fact]
     public async Task Split_keeps_the_order_of_an_earlier_unsequenced_chunk()
     {
         var store = CreateGuardedStore();
@@ -635,15 +731,16 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
                     Reject(document);
                     break;
                 case IEnumerable<WriteModel<T>> writes:
+                    var bulkBytes = 0;
                     foreach (var write in writes)
                     {
                         switch (write)
                         {
                             case InsertOneModel<T> insert:
-                                Reject(insert.Document);
+                                bulkBytes += Reject(insert.Document);
                                 break;
                             case ReplaceOneModel<T> replace:
-                                Reject(replace.Replacement);
+                                bulkBytes += Reject(replace.Replacement);
                                 break;
                             case UpdateOneModel<T> one:
                                 RejectUpdate(one.Filter, one.Update);
@@ -654,10 +751,13 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
                         }
                     }
 
+                    RejectTotal(bulkBytes);
                     break;
                 case IEnumerable<T> many:
+                    var insertBytes = 0;
                     foreach (var document in many)
-                        Reject(document);
+                        insertBytes += Reject(document);
+                    RejectTotal(insertBytes);
                     break;
                 case FilterDefinition<T> foundFilter:
                     filter = foundFilter;
@@ -779,8 +879,21 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
         }
     }
 
-    private static void Reject(T document)
-        => RejectText(document.ToBsonDocument().ToJson());
+    private static int Reject(T document)
+    {
+        var json = document.ToBsonDocument().ToJson();
+        RejectText(json);
+        return Encoding.UTF8.GetByteCount(json);
+    }
+
+    private static void RejectTotal(int bytes)
+    {
+        if (bytes > SnapshotPartitioner.HardCapBytes)
+        {
+            throw new SnapshotDocumentTooLargeException(
+                $"Rejected a {bytes} byte bulk write. Cosmos DB for MongoDB RU allows {SnapshotPartitioner.HardCapBytes} bytes in one request.");
+        }
+    }
 
     private static void RejectText(string? json)
     {
