@@ -712,12 +712,16 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var chosen = await ChooseHeaderAsync(legacy.RunId, legacy.Domain, ct);
         if (chosen == null || chosen.Id != legacy.Id)
         {
-            if (chosen != null && legacy.UpdatedAt <= chosen.UpdatedAt)
+            // An older writer does not store a revision, so a missing revision
+            // plus an equal timestamp is not proof that this header is stale.
+            var revisionless = string.IsNullOrEmpty(legacy.Revision);
+            var older = chosen != null && (revisionless
+                ? legacy.UpdatedAt < chosen.UpdatedAt
+                : legacy.UpdatedAt <= chosen.UpdatedAt);
+            if (older)
             {
-                var stale = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
-                    & SameRevision(legacy.Revision);
                 await CosmosThrottle.ExecuteAsync(
-                    token => _snapshots.DeleteOneAsync(stale, token),
+                    token => _snapshots.DeleteOneAsync(ObservedSnapshot(legacy), token),
                     ct,
                     _logger);
             }
@@ -735,11 +739,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var plan = SnapshotPartitioner.Plan(payloadJson);
-        // Match id and revision. The legacy payload can already be near 2 MB,
-        // and putting it in the update filter makes the command exceed the cap.
-        // UpdatedAt is not unique across writers.
-        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
-            & SameRevision(legacy.Revision);
+        // Match the id and the revision. The legacy payload can already be near
+        // 2 MB, and putting it in the update filter makes the command exceed the
+        // cap. A document with no revision also has to carry the timestamp that
+        // was read, because an older writer changes the payload without a revision.
+        var filter = ObservedSnapshot(legacy);
 
         if (plan is SnapshotPlan.Inline inline)
         {
@@ -2257,6 +2261,23 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     }
 
     private static string NewSnapshotRevision() => Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// Matches the snapshot that was read. A stored revision is enough, because
+    /// this build changes it on every write. A missing revision is not, so the
+    /// timestamp read with it has to match too.
+    /// </summary>
+    private static FilterDefinition<DomainSnapshotDocument> ObservedSnapshot(DomainSnapshotDocument legacy)
+    {
+        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
+            & SameRevision(legacy.Revision);
+        if (string.IsNullOrEmpty(legacy.Revision))
+        {
+            filter &= Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, legacy.UpdatedAt);
+        }
+
+        return filter;
+    }
 
     /// <summary>
     /// A missing or empty revision is a document written before the field
