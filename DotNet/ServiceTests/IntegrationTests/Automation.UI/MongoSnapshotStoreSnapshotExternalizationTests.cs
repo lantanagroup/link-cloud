@@ -26,7 +26,7 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task SetDomainAsync_externalizes_large_allowed_domain_and_GetDomainAsync_hydrates_from_payload_store()
+    public async Task SetDomainAsync_keeps_a_small_manifest_inline_and_does_not_call_blob_storage()
     {
         var payloadStore = new FakeSnapshotPayloadStore();
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
@@ -46,16 +46,45 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
 
         stored.Should().NotBeNull();
         using var storedDoc = JsonDocument.Parse(stored!.Data);
-        storedDoc.RootElement.TryGetProperty("__externalSnapshotPayloadPointer", out var pointerNode).Should().BeTrue();
-        var pointer = pointerNode.Deserialize<SnapshotPayloadPointer>();
-        pointer.Should().NotBeNull();
-        pointer!.Kind.Should().Be(SnapshotPayloadPointer.KindValue);
-        pointer.BlobName.Should().NotBeNullOrWhiteSpace();
+        storedDoc.RootElement.TryGetProperty("__externalSnapshotPayloadPointer", out _).Should().BeFalse();
+        storedDoc.RootElement.TryGetProperty(SnapshotPartitioner.ShapeProperty, out _).Should().BeFalse();
+        payloadStore.ReadCount.Should().Be(0);
 
         var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
         hydrated.Should().NotBeNull();
         hydrated!.Data.Should().ContainKey("p-0001");
         hydrated.Data["p-0001"].Length.Should().Be(512);
+    }
+
+    [Fact]
+    public async Task GetDomainAsync_hydrates_a_legacy_externalized_snapshot()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var payloadJson = JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["p-0001"] = new string('x', 512)
+        });
+        var pointer = await payloadStore.StoreAsync(runId, "generationManifest", payloadJson, CancellationToken.None);
+        var envelope = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
+        {
+            ["__externalSnapshotPayloadPointer"] = pointer
+        });
+
+        var snapshotCollection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        await snapshotCollection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "generationManifest",
+            Data = envelope,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated.Should().NotBeNull();
+        hydrated!.Data["p-0001"].Length.Should().Be(512);
+        payloadStore.ReadCount.Should().Be(1);
     }
 
     [Fact]
