@@ -848,11 +848,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         break;
                     }
 
+                    // A successor's row carries that attempt's id. Rewriting it
+                    // from this attempt's stale plan drops lines the successor
+                    // already kept.
+                    if (existing != null
+                        && !string.Equals(existing.SplitAttempt, chunk.SplitAttempt, StringComparison.Ordinal))
+                    {
+                        collided = true;
+                        break;
+                    }
+
                     // Same text at a different sequence is an appended event. A resume
                     // that only compares text would delete the source and lose it.
                     if (existing != null && !SameLogLines(existing, document))
                     {
-                        await PreserveAppendedReplacementAsync(existing, chunk, ct);
+                        await PreserveAppendedReplacementAsync(existing, chunk, chunk.SplitAttempt, ct);
                         collided = true;
                         break;
                     }
@@ -1248,7 +1258,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (!await SplitAttemptStillOwnedAsync(chunk, ct))
                 return;
 
-            await PreserveAppendedReplacementAsync(existing, chunk, ct);
+            await PreserveAppendedReplacementAsync(existing, chunk, existing.SplitAttempt, ct);
         }
     }
 
@@ -1278,7 +1288,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             && claim.ClaimedAt >= DateTimeOffset.UtcNow - LogSplitClaimLease;
     }
 
-    private async Task PreserveAppendedReplacementAsync(RunLogDocument existing, RunLogDocument source, CancellationToken ct)
+    private async Task PreserveAppendedReplacementAsync(
+        RunLogDocument existing,
+        RunLogDocument source,
+        string? authorizedAttempt,
+        CancellationToken ct)
     {
         var normalized = new List<string>(source.Lines.Count);
         foreach (var line in source.Lines)
@@ -1306,7 +1320,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 token => _logs.DeleteOneAsync(
                     l => l.Id == existing.Id
                         && l.SplitFromId == source.Id
-                        && l.SplitAttempt == existing.SplitAttempt,
+                        && l.SplitAttempt == authorizedAttempt,
                     token),
                 ct,
                 _logger);
