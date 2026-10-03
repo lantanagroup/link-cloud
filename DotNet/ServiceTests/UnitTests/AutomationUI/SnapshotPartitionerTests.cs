@@ -131,6 +131,48 @@ public class SnapshotPartitionerTests
     }
 
     [Fact]
+    public void Many_tiny_records_are_packed_once_each_row_is_under_512_bytes()
+    {
+        var items = Enumerable.Range(0, 600).Select(i => new Record(i, "x")).ToList();
+        var json = JsonSerializer.Serialize(items);
+        var budget = 8_000;
+
+        var split = SnapshotPartitioner.Plan(json, budget).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Pieces.Should().OnlyContain(p => p.Kind == "pack");
+        split.Pieces.Count.Should().BeLessThan(items.Count);
+        AssertEveryPieceFits(split, budget);
+        JsonSerializer.Deserialize<List<Record>>(RoundTrip(split)).Should().Equal(items);
+    }
+
+    [Fact]
+    public void One_string_over_the_budget_round_trips_as_a_one_element_array()
+    {
+        var value = new string('a', SnapshotPartitioner.MaxDocumentJsonBytes + 10);
+        var payload = new[] { value };
+        var json = JsonSerializer.Serialize(payload);
+
+        var split = SnapshotPartitioner.Plan(json).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Pieces.Should().OnlyContain(p => p.Kind == "slice");
+        split.Pieces.Select(p => p.Index).Distinct().Should().Equal(0);
+        JsonSerializer.Deserialize<string[]>(RoundTrip(split)).Should().Equal(value);
+    }
+
+    [Fact]
+    public void Two_strings_over_the_budget_round_trip_as_separate_items()
+    {
+        var first = new string('a', SnapshotPartitioner.MaxDocumentJsonBytes + 10);
+        var second = new string('b', SnapshotPartitioner.MaxDocumentJsonBytes + 10);
+        var payload = new[] { first, second };
+        var json = JsonSerializer.Serialize(payload);
+
+        var split = SnapshotPartitioner.Plan(json).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Mode.Should().Be(SnapshotPartitioner.StructuredMode);
+        split.Pieces.Should().OnlyContain(p => p.Kind == "slice");
+        split.Pieces.Select(p => p.Index).Distinct().Should().HaveCount(2);
+        JsonSerializer.Deserialize<string[]>(RoundTrip(split)).Should().Equal(first, second);
+    }
+
+    [Fact]
     public void Budget_smaller_than_the_envelope_is_rejected()
     {
         var act = () => SnapshotPartitioner.Plan("{}", SnapshotPartitioner.DocumentEnvelopeBytes);
@@ -180,6 +222,14 @@ public class SnapshotPartitionerTests
 
         var large = JsonSerializer.Serialize(new string('q', SnapshotPartitioner.MaxDocumentJsonBytes));
         SnapshotPartitioner.ShouldTranslateStoredData(large).Should().BeTrue();
+
+        var numericKind = """
+            {"__externalSnapshotPayloadPointer":{"kind":1,"blob":"runs/1/domain.json"}}
+            """;
+        var read = () => SnapshotPartitionHeader.IsExternalPointer(numericKind);
+        read.Should().NotThrow();
+        read().Should().BeFalse();
+        SnapshotPartitioner.ShouldTranslateStoredData(numericKind).Should().BeFalse();
     }
 
     [Fact]
@@ -246,6 +296,11 @@ public class SnapshotPartitionerTests
         Encoding.UTF8.GetByteCount(bounded!).Should().BeLessThanOrEqualTo(ApiHealthResultBudget.MaxBodyBytes);
         bounded.Should().EndWith(" [truncated: exceeded document budget]");
         bounded.Should().NotContain("\uFFFD");
+
+        var quotes = new string('"', 300_000);
+        var boundedQuotes = ApiHealthResultBudget.Bound(quotes);
+        SnapshotPartitioner.EscapedContentBytes(boundedQuotes!).Should().BeLessThanOrEqualTo(ApiHealthResultBudget.MaxBodyBytes);
+        boundedQuotes.Should().EndWith(" [truncated: exceeded document budget]");
     }
 
     private static string RoundTrip(SnapshotPlan.Partitioned split)

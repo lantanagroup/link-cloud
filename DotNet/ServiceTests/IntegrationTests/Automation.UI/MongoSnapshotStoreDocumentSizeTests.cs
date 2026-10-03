@@ -217,6 +217,49 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Split_resumes_from_the_saved_start_without_duplicating_lines()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var lines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var sourceId = $"{runId:N}:00000000";
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = sourceId,
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = lines.Count,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            Lines = lines,
+            LineSequences = [],
+            SplitStart = 1,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = $"{runId:N}:00000001",
+            RunId = runId,
+            ChunkNumber = 1,
+            LineCount = 1,
+            BsonByteCount = 400_000,
+            Lines = [lines[0]],
+            LineSequences = [0],
+            SplitFromId = sourceId,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(lines);
+        var stored = await logs.Find(l => l.RunId == runId).ToListAsync();
+        stored.Should().NotContain(l => l.Id == sourceId);
+        stored.SelectMany(l => l.Lines).Should().Equal(lines);
+    }
+
+    [Fact]
     public async Task Migration_translates_a_large_snapshot_sweeps_orphans_and_can_resume()
     {
         var database = CreateGuardedDatabase();
@@ -232,6 +275,7 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
             Data = JsonSerializerPayload(payload),
             UpdatedAt = DateTimeOffset.UtcNow
         });
+        var activeRunId = Guid.NewGuid();
         await parts.InsertOneAsync(new SnapshotPartDocument
         {
             Id = "orphan-part",
@@ -243,6 +287,30 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
             Path = "$",
             Data = "{}",
             UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
+        });
+        await parts.InsertOneAsync(new SnapshotPartDocument
+        {
+            Id = "active-old",
+            RunId = activeRunId,
+            Domain = "entries",
+            GenerationId = "still-writing",
+            Ordinal = 0,
+            Kind = "element",
+            Path = "$",
+            Data = "{}",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
+        });
+        await parts.InsertOneAsync(new SnapshotPartDocument
+        {
+            Id = "active-fresh",
+            RunId = activeRunId,
+            Domain = "entries",
+            GenerationId = "still-writing",
+            Ordinal = 1,
+            Kind = "element",
+            Path = "$",
+            Data = "{}",
+            UpdatedAt = DateTimeOffset.UtcNow
         });
 
         var service = new SnapshotShapeMigrationService(
@@ -263,6 +331,8 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
 
         await service.StopAsync(CancellationToken.None);
         migrated.Should().BeTrue();
+        (await parts.Find(p => p.Id == "active-old").AnyAsync()).Should().BeTrue();
+        (await parts.Find(p => p.Id == "active-fresh").AnyAsync()).Should().BeTrue();
 
         var read = await store.GetDomainAsync<List<Item>>(runId, "measureResources", CancellationToken.None);
         read!.Data.Should().Equal(payload);
@@ -296,6 +366,162 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
             .Find(p => p.Id == "too-big")
             .FirstOrDefaultAsync();
         stored.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Guard_rejects_an_update_that_grows_a_document_over_two_megabytes()
+    {
+        var database = CreateGuardedDatabase();
+        var logs = database.GetCollection<RunLogDocument>("automation_logs");
+        var id = "grow-me";
+        var line = new string('a', 1_600_000);
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = id,
+            RunId = Guid.NewGuid(),
+            ChunkNumber = 0,
+            LineCount = 1,
+            BsonByteCount = line.Length,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = [line],
+            LineSequences = [0],
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var pushed = new string('b', 500_000);
+        var act = () => logs.UpdateOneAsync(
+            l => l.Id == id,
+            Builders<RunLogDocument>.Update.Push(l => l.Lines, pushed));
+        await act.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+
+        var bulk = () => logs.BulkWriteAsync(
+        [
+            new UpdateOneModel<RunLogDocument>(
+                Builders<RunLogDocument>.Filter.Eq(l => l.Id, id),
+                Builders<RunLogDocument>.Update.Push(l => l.Lines, pushed))
+        ]);
+        await bulk.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+
+        var stored = await _fixture.Database.GetCollection<RunLogDocument>("automation_logs")
+            .Find(l => l.Id == id)
+            .FirstAsync();
+        stored.Lines.Should().ContainSingle().Which.Should().Be(line);
+    }
+
+    [Fact]
+    public async Task Split_keeps_the_order_of_an_earlier_unsequenced_chunk()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var firstLines = new List<string> { "first-a", "first-b" };
+        var secondLines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertManyAsync(
+        [
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000000",
+                RunId = runId,
+                ChunkNumber = 0,
+                LineCount = firstLines.Count,
+                BsonByteCount = 100,
+                Lines = firstLines,
+                LineSequences = [],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000001",
+                RunId = runId,
+                ChunkNumber = 1,
+                LineCount = secondLines.Count,
+                BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+                Lines = secondLines,
+                LineSequences = [],
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(firstLines.Concat(secondLines));
+    }
+
+    [Fact]
+    public async Task GetLogs_hides_a_replacement_while_its_source_chunk_exists()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var sourceId = $"{runId:N}:00000000";
+        await logs.InsertManyAsync(
+        [
+            new RunLogDocument
+            {
+                Id = sourceId,
+                RunId = runId,
+                ChunkNumber = 0,
+                LineCount = 2,
+                BsonByteCount = 20,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["keep-a", "keep-b"],
+                LineSequences = [0, 1],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000001",
+                RunId = runId,
+                ChunkNumber = 1,
+                LineCount = 1,
+                BsonByteCount = 10,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["dup-a"],
+                LineSequences = [0],
+                SplitFromId = sourceId,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal("keep-a", "keep-b");
+    }
+
+    [Fact]
+    public async Task AppendLogs_recomputes_a_legacy_raw_byte_count_before_appending()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var legacyLine = new string('\u0001', 300_000);
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var legacyId = $"{runId:N}:00000000";
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = legacyId,
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 1,
+            BsonByteCount = Encoding.UTF8.GetByteCount(legacyLine) + 64,
+            ByteCountVersion = 0,
+            Lines = [legacyLine],
+            LineSequences = [0],
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var appended = new string('a', 400_000);
+        await store.AppendLogsAsync(runId, [appended], CancellationToken.None);
+
+        var stored = await logs.Find(l => l.RunId == runId).ToListAsync();
+        stored.Should().HaveCountGreaterThan(1);
+        foreach (var chunk in stored)
+            Encoding.UTF8.GetByteCount(chunk.ToBsonDocument().ToJson()).Should().BeLessThanOrEqualTo(SnapshotPartitioner.HardCapBytes);
+
+        var legacy = stored.Single(l => l.Id == legacyId);
+        legacy.Lines.Should().ContainSingle().Which.Should().Be(legacyLine);
+        legacy.ByteCountVersion.Should().Be(MongoSnapshotStore.EscapedLogByteCountVersion);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(legacyLine, appended);
     }
 
     private MongoSnapshotStore CreateGuardedStore()
@@ -382,7 +608,7 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
 
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
-        Inspect(targetMethod!.Name, args);
+        Inspect(args);
         try
         {
             return targetMethod.Invoke(Inner, args);
@@ -394,43 +620,162 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
         }
     }
 
-    private static void Inspect(string name, object?[]? args)
+    private void Inspect(object?[]? args)
     {
         if (args == null || args.Length == 0)
             return;
 
-        if (name is "InsertOne" or "InsertOneAsync" && args[0] is T inserted)
-            Reject(inserted);
-        else if (name is "ReplaceOne" or "ReplaceOneAsync" && args[0] is T replaced)
-            Reject(replaced);
-        else if (name is "InsertMany" or "InsertManyAsync" && args[0] is IEnumerable<T> many)
+        FilterDefinition<T>? filter = null;
+        UpdateDefinition<T>? update = null;
+        foreach (var arg in args)
         {
-            foreach (var document in many)
-                Reject(document);
-        }
-        else if (name is "BulkWrite" or "BulkWriteAsync" && args[0] is IEnumerable<WriteModel<T>> writes)
-        {
-            foreach (var write in writes)
+            switch (arg)
             {
-                switch (write)
-                {
-                    case InsertOneModel<T> insert:
-                        Reject(insert.Document);
-                        break;
-                    case ReplaceOneModel<T> replace:
-                        Reject(replace.Replacement);
-                        break;
-                    case UpdateOneModel<T> update:
-                        RejectText(update.Update.ToString());
-                        break;
-                }
+                case T document:
+                    Reject(document);
+                    break;
+                case IEnumerable<WriteModel<T>> writes:
+                    foreach (var write in writes)
+                    {
+                        switch (write)
+                        {
+                            case InsertOneModel<T> insert:
+                                Reject(insert.Document);
+                                break;
+                            case ReplaceOneModel<T> replace:
+                                Reject(replace.Replacement);
+                                break;
+                            case UpdateOneModel<T> one:
+                                RejectUpdate(one.Filter, one.Update);
+                                break;
+                            case UpdateManyModel<T> manyUpdate:
+                                RejectUpdate(manyUpdate.Filter, manyUpdate.Update);
+                                break;
+                        }
+                    }
+
+                    break;
+                case IEnumerable<T> many:
+                    foreach (var document in many)
+                        Reject(document);
+                    break;
+                case FilterDefinition<T> foundFilter:
+                    filter = foundFilter;
+                    break;
+                case UpdateDefinition<T> foundUpdate:
+                    update = foundUpdate;
+                    break;
             }
         }
-        else if (name is "UpdateOne" or "UpdateOneAsync" or "UpdateMany" or "UpdateManyAsync"
-                 or "FindOneAndUpdate" or "FindOneAndUpdateAsync")
+
+        if (update != null)
+            RejectUpdate(filter, update);
+    }
+
+    private void RejectUpdate(FilterDefinition<T>? filter, UpdateDefinition<T>? update)
+    {
+        if (update == null || Inner == null)
+            return;
+
+        BsonDocument rendered;
+        try
         {
-            if (args.Length > 1)
-                RejectText(args[1]?.ToString());
+            rendered = update.Render(new RenderArgs<T>(Inner.DocumentSerializer, Inner.Settings.SerializerRegistry)).AsBsonDocument;
+        }
+        catch (Exception)
+        {
+            RejectText(update.ToString());
+            return;
+        }
+
+        RejectText(rendered.ToJson());
+        var current = LoadMatched(filter);
+        var prospective = current == null ? new BsonDocument() : current.ToBsonDocument();
+        if (current == null)
+            ApplySet(prospective, rendered, "$setOnInsert");
+
+        ApplySet(prospective, rendered, "$set");
+        ApplyPush(prospective, rendered, "$push");
+        RejectText(prospective.ToJson());
+    }
+
+    private T? LoadMatched(FilterDefinition<T>? filter)
+    {
+        if (filter == null || Inner == null)
+            return default;
+
+        BsonDocument rendered;
+        try
+        {
+            rendered = filter.Render(new RenderArgs<T>(Inner.DocumentSerializer, Inner.Settings.SerializerRegistry)).AsBsonDocument;
+        }
+        catch (Exception)
+        {
+            return default;
+        }
+
+        var id = FindId(rendered);
+        if (id == null)
+            return default;
+
+        return Inner.Find(Builders<T>.Filter.Eq("_id", id)).Limit(1).FirstOrDefault();
+    }
+
+    private static BsonValue? FindId(BsonDocument filter)
+    {
+        if (filter.TryGetValue("_id", out var id))
+        {
+            if (id.IsBsonDocument && id.AsBsonDocument.TryGetValue("$eq", out var eq))
+                return eq;
+            if (!id.IsBsonDocument)
+                return id;
+        }
+
+        foreach (var name in new[] { "$and", "$or" })
+        {
+            if (!filter.TryGetValue(name, out var items) || !items.IsBsonArray)
+                continue;
+
+            foreach (var item in items.AsBsonArray)
+            {
+                if (item.IsBsonDocument && FindId(item.AsBsonDocument) is { } found)
+                    return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static void ApplySet(BsonDocument document, BsonDocument update, string op)
+    {
+        if (!update.TryGetValue(op, out var value) || !value.IsBsonDocument)
+            return;
+
+        foreach (var element in value.AsBsonDocument)
+            document[element.Name] = element.Value;
+    }
+
+    private static void ApplyPush(BsonDocument document, BsonDocument update, string op)
+    {
+        if (!update.TryGetValue(op, out var value) || !value.IsBsonDocument)
+            return;
+
+        foreach (var element in value.AsBsonDocument)
+        {
+            var array = document.TryGetValue(element.Name, out var existing) && existing.IsBsonArray
+                ? new BsonArray(existing.AsBsonArray)
+                : new BsonArray();
+            if (element.Value.IsBsonDocument && element.Value.AsBsonDocument.TryGetValue("$each", out var each) && each.IsBsonArray)
+            {
+                foreach (var item in each.AsBsonArray)
+                    array.Add(item);
+            }
+            else
+            {
+                array.Add(element.Value);
+            }
+
+            document[element.Name] = array;
         }
     }
 
