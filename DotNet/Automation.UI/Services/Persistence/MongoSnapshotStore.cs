@@ -31,7 +31,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     // part fills a bulk command; a second part goes in the next command.
     private const int MaxBulkWriteJsonBytes = 1_048_576;
     internal const int EscapedLogByteCountVersion = 1;
-    private const int EstimatedBsonBytesPerLineOverhead = 64;
+    internal const int EstimatedBsonBytesPerLineOverhead = 64;
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
     private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
     private static readonly TimeSpan LogSplitClaimLease = TimeSpan.FromMinutes(5);
@@ -1564,40 +1564,30 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (EstimateLogLineBsonBytes(line) <= MaxLogChunkEstimatedBsonBytes)
             return line;
 
-        var kept = line;
-        while (kept.Length > 0
-               && EstimateLogLineBsonBytes(kept + OversizedLogLineSuffix) > MaxLogChunkEstimatedBsonBytes)
+        var suffixBytes = SnapshotPartitioner.EscapedContentBytes(OversizedLogLineSuffix);
+        var contentBudget = MaxLogChunkEstimatedBsonBytes - EstimatedBsonBytesPerLineOverhead - suffixBytes;
+        var keptBytes = 0;
+        var builder = new StringBuilder();
+        foreach (var rune in line.EnumerateRunes())
         {
-            var runeCount = 0;
-            foreach (var _ in kept.EnumerateRunes())
-                runeCount++;
+            var runeText = rune.ToString();
+            var runeBytes = SnapshotPartitioner.EscapedContentBytes(runeText);
+            if (keptBytes + runeBytes > contentBudget)
+                break;
 
-            kept = TakeRunes(kept, Math.Max(0, runeCount - Math.Max(1, runeCount / 8)));
+            builder.Append(runeText);
+            keptBytes += runeBytes;
         }
 
+        builder.Append(OversizedLogLineSuffix);
+        var persisted = builder.ToString();
         _logger.LogWarning(
             "[Store] AppendLogs: truncated oversized log line for run={RunId} from {OriginalBytes} to {PersistedBytes} bytes",
             runId.ToString().SanitizeForLog(),
             Encoding.UTF8.GetByteCount(line),
-            Encoding.UTF8.GetByteCount(kept));
+            Encoding.UTF8.GetByteCount(persisted));
 
-        return kept + OversizedLogLineSuffix;
-    }
-
-    private static string TakeRunes(string value, int runeCount)
-    {
-        var builder = new StringBuilder(value.Length);
-        var taken = 0;
-        foreach (var rune in value.EnumerateRunes())
-        {
-            if (taken >= runeCount)
-                break;
-
-            builder.Append(rune.ToString());
-            taken++;
-        }
-
-        return builder.ToString();
+        return persisted;
     }
 
     private static int EstimateLogLineBsonBytes(string line)

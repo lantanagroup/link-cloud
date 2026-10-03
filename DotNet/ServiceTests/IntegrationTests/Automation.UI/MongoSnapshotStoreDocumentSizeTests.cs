@@ -213,7 +213,8 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         var after = await store.GetLogsAsync(runId, CancellationToken.None);
         after.Should().HaveCount(lines.Count + 1);
         after[^1].Should().EndWith(" [truncated: exceeded log chunk byte budget]");
-        after[^1].Length.Should().BeLessThan(SnapshotPartitioner.HardCapBytes);
+        SnapshotPartitioner.EscapedContentBytes(after[^1]).Should().Be(
+            MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes - MongoSnapshotStore.EstimatedBsonBytesPerLineOverhead);
     }
 
     [Fact]
@@ -276,18 +277,34 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
             UpdatedAt = DateTimeOffset.UtcNow
         });
         var activeRunId = Guid.NewGuid();
-        await parts.InsertOneAsync(new SnapshotPartDocument
-        {
-            Id = "orphan-part",
-            RunId = Guid.NewGuid(),
-            Domain = "entries",
-            GenerationId = "gone",
-            Ordinal = 0,
-            Kind = "element",
-            Path = "$",
-            Data = "{}",
-            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
-        });
+        var orphanRunId = Guid.NewGuid();
+        await parts.InsertManyAsync(
+        [
+            new SnapshotPartDocument
+            {
+                Id = "orphan-part",
+                RunId = orphanRunId,
+                Domain = "entries",
+                GenerationId = "gone",
+                Ordinal = 0,
+                Kind = "element",
+                Path = "$",
+                Data = "{}",
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
+            },
+            new SnapshotPartDocument
+            {
+                Id = "orphan-part-2",
+                RunId = orphanRunId,
+                Domain = "entries",
+                GenerationId = "gone",
+                Ordinal = 1,
+                Kind = "element",
+                Path = "$",
+                Data = "{}",
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
+            }
+        ]);
         await parts.InsertOneAsync(new SnapshotPartDocument
         {
             Id = "active-old",
@@ -326,7 +343,8 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
             var orphan = await parts.Find(p => p.Id == "orphan-part").FirstOrDefaultAsync();
             migrated = header != null
                 && header.Data.Contains(SnapshotPartitioner.ShapeProperty, StringComparison.Ordinal)
-                && orphan == null;
+                && orphan == null
+            && await parts.Find(p => p.Id == "orphan-part-2").FirstOrDefaultAsync() == null;
         }
 
         await service.StopAsync(CancellationToken.None);
