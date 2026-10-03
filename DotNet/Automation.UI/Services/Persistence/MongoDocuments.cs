@@ -164,6 +164,12 @@ public sealed class RunLogDocument
     /// </summary>
     public string? SplitOwner { get; set; }
 
+    /// <summary>
+    /// Id of one split attempt. Replacements written by that attempt carry the
+    /// same value. A stale attempt does not update a later attempt's rows.
+    /// </summary>
+    public string? SplitAttempt { get; set; }
+
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? SplitClaimedAt { get; set; }
 
@@ -203,6 +209,9 @@ public sealed class LogSplitClaimDocument
     public int SplitStart { get; set; }
 
     public int SplitCount { get; set; }
+
+    /// <summary>Id of the split attempt that holds this lease.</summary>
+    public string AttemptId { get; set; } = string.Empty;
 }
 
 /// <summary>
