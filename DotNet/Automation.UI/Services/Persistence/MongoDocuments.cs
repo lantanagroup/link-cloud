@@ -256,4 +256,10 @@ public sealed class SnapshotPartDocument
 
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// True once this part belongs to the committed header. The orphan sweep
+    /// skips settled parts so it does not reread every retained generation.
+    /// </summary>
+    public bool Settled { get; set; }
 }

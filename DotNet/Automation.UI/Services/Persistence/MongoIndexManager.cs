@@ -161,6 +161,13 @@ public sealed class MongoIndexManager
             },
             unique: false,
             "idx_run_domain_generation_ordinal");
+        // The sweep looks for unsettled parts older than the grace period.
+        // Settled generations drop out of that query.
+        CreateIndexSafe(
+            collection,
+            new BsonDocument { { "Settled", 1 }, { "UpdatedAt", 1 } },
+            unique: false,
+            "idx_settled_updated");
     }
 
     // --- automation_scenarios ---

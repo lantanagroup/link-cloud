@@ -31,6 +31,8 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// <summary>How many partition headers this instance has loaded. Tests use it.</summary>
     internal int PartitionHeaderReads { get; private set; }
 
+    private bool _settledBackfillComplete;
+
     public SnapshotShapeMigrationService(
         IMongoDatabase database,
         MongoSnapshotStore store,
@@ -148,17 +150,22 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
     internal async Task<int> SweepOrphanPartsAsync(CancellationToken ct)
     {
+        await BackfillMissingSettledAsync(ct);
         var swept = 0;
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         string? afterId = null;
         var activeGenerations = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
+        var markedSettled = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
         var headerCache = new Dictionary<(Guid RunId, string Domain), SnapshotPartitionHeader?>();
         while (!ct.IsCancellationRequested)
         {
+            var aged = Builders<SnapshotPartDocument>.Filter.And(
+                Builders<SnapshotPartDocument>.Filter.Eq(p => p.Settled, false),
+                Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff));
             var filter = afterId == null
-                ? Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff)
+                ? aged
                 : Builders<SnapshotPartDocument>.Filter.And(
-                    Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff),
+                    aged,
                     Builders<SnapshotPartDocument>.Filter.Gt(p => p.Id, afterId));
             var batch = await CosmosThrottle.ExecuteAsync(
                 token => _parts.Find(filter)
@@ -191,7 +198,10 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 }
 
                 if (!IsOrphanPart(header, part))
+                {
+                    await MarkSettledOnceAsync(markedSettled, part, ct);
                     continue;
+                }
 
                 var generationKey = (part.RunId, part.Domain, part.GenerationId);
                 if (activeGenerations.Contains(generationKey))
@@ -223,6 +233,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 if (!IsOrphanPart(header, part))
                 {
                     activeGenerations.Add(generationKey);
+                    await MarkSettledOnceAsync(markedSettled, part, ct);
                     continue;
                 }
 
@@ -248,6 +259,77 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
         return swept;
     }
+
+    private async Task BackfillMissingSettledAsync(CancellationToken ct)
+    {
+        if (_settledBackfillComplete)
+            return;
+
+        var missing = await CosmosThrottle.ExecuteAsync(
+            token => _parts.Find(Builders<SnapshotPartDocument>.Filter.Exists(p => p.Settled, false))
+                .Limit(BatchSize)
+                .Project(p => new PartMeta
+                {
+                    Id = p.Id,
+                    RunId = p.RunId,
+                    Domain = p.Domain,
+                    GenerationId = p.GenerationId,
+                    Ordinal = p.Ordinal,
+                    UpdatedAt = p.UpdatedAt
+                })
+                .ToListAsync(token),
+            ct,
+            _logger);
+        if (missing.Count == 0)
+        {
+            _settledBackfillComplete = true;
+            return;
+        }
+
+        var seen = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
+        foreach (var part in missing)
+        {
+            ct.ThrowIfCancellationRequested();
+            var key = (part.RunId, part.Domain, part.GenerationId);
+            if (!seen.Add(key))
+                continue;
+
+            var header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+            if (!IsOrphanPart(header, part))
+            {
+                await MarkGenerationSettledAsync(part, ct);
+                continue;
+            }
+
+            // Give the field a value so the next pass does not select this
+            // generation again. The aged-part query deletes real orphans.
+            await CosmosThrottle.ExecuteAsync(
+                token => _parts.UpdateManyAsync(
+                    p => p.RunId == part.RunId && p.Domain == part.Domain && p.GenerationId == part.GenerationId,
+                    Builders<SnapshotPartDocument>.Update.Set(p => p.Settled, false),
+                    cancellationToken: token),
+                ct,
+                _logger);
+        }
+    }
+
+    private async Task MarkSettledOnceAsync(
+        HashSet<(Guid RunId, string Domain, string GenerationId)> marked,
+        PartMeta part,
+        CancellationToken ct)
+    {
+        if (marked.Add((part.RunId, part.Domain, part.GenerationId)))
+            await MarkGenerationSettledAsync(part, ct);
+    }
+
+    private Task MarkGenerationSettledAsync(PartMeta part, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.UpdateManyAsync(
+                p => p.RunId == part.RunId && p.Domain == part.Domain && p.GenerationId == part.GenerationId,
+                Builders<SnapshotPartDocument>.Update.Set(p => p.Settled, true),
+                cancellationToken: token),
+            ct,
+            _logger);
 
     private async Task<SnapshotPartitionHeader?> ReadPartitionHeaderAsync(Guid runId, string domain, CancellationToken ct)
     {

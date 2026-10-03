@@ -42,6 +42,24 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// is reloaded. Production leaves it null.
     /// </summary>
     internal static Func<CancellationToken, Task>? AfterLogSplitClaimedForTests { get; set; }
+
+    /// <summary>
+    /// Test hook invoked after a split has reloaded its source and before it
+    /// inserts replacements. Production leaves it null.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? BeforeLogReplacementInsertForTests { get; set; }
+
+    /// <summary>
+    /// Test hook invoked after parts are written and before the header publish.
+    /// Production leaves it null.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? BeforePartitionHeaderPublishForTests { get; set; }
+
+    /// <summary>
+    /// True after one pass found no legacy or oversized log chunks. Later passes
+    /// in this process skip the collection scan. A new process scans once.
+    /// </summary>
+    internal bool LogRepairCaughtUp { get; private set; }
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
     private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
     private static readonly TimeSpan LogSplitClaimLease = TimeSpan.FromMinutes(5);
@@ -699,7 +717,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task<int> SplitOversizedLogChunksAsync(CancellationToken ct = default)
     {
-        await RewriteLegacyLogByteCountsAsync(ct);
+        if (LogRepairCaughtUp)
+            return 0;
+
+        var sawLegacy = await RewriteLegacyLogByteCountsAsync(ct);
         var split = 0;
         var oversized = await _logs.Find(l => l.BsonByteCount > MaxLogChunkEstimatedBsonBytes
                 || l.LineCount > MaxLogLinesPerChunk
@@ -707,6 +728,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .SortBy(l => l.Id)
             .Limit(25)
             .ToListAsync(ct);
+        if (!sawLegacy && oversized.Count == 0)
+        {
+            LogRepairCaughtUp = true;
+            return 0;
+        }
 
         foreach (var candidate in oversized)
         {
@@ -730,7 +756,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
             var fresh = await _logs.Find(l => l.Id == chunk.Id).FirstOrDefaultAsync(ct);
             if (fresh == null)
+            {
+                await DeleteAbandonedSplitAsync(chunk, start.Value, planned.Count, ct);
                 continue;
+            }
 
             await OverlaySequenceStampsAsync([fresh], ct);
             if (fresh.LineCount != chunk.LineCount
@@ -761,6 +790,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var wrote = false;
             for (var attempt = 0; attempt < 5 && !wrote; attempt++)
             {
+                if (BeforeLogReplacementInsertForTests != null)
+                {
+                    var insertHook = BeforeLogReplacementInsertForTests;
+                    BeforeLogReplacementInsertForTests = null;
+                    await insertHook(ct);
+                }
                 var collided = false;
                 for (var n = 0; n < planned.Count; n++)
                 {
@@ -822,7 +857,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
 
             if (start == null || !await StillOwnLogSplitAsync(chunk.Id, metadataFits, ct))
+            {
+                if (start != null && !await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct))
+                    await DeleteAbandonedSplitAsync(chunk, start.Value, planned.Count, ct);
                 continue;
+            }
 
             if (!wrote)
             {
@@ -839,7 +878,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 ct,
                 _logger);
             if (deleted.DeletedCount != 1)
+            {
+                if (!await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct))
+                    await DeleteAbandonedSplitAsync(chunk, start.Value, planned.Count, ct);
                 continue;
+            }
 
             await CosmosThrottle.ExecuteAsync(
                 token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
@@ -1112,11 +1155,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         foreach (var line in source.Lines)
             normalized.Add(NormalizeLineForChunkBudget(source.RunId, line));
 
+        var fallback = await FallbackSequenceBeforeChunkAsync(source, ct);
         var copied = ContiguousSourcePrefixLength(
             existing.Lines,
             existing.LineSequences,
             normalized,
-            source.LineSequences);
+            EffectiveLogSequences(source, fallback));
         var extras = new List<string>();
         var sequences = new List<long>();
         var storedSequences = existing.LineSequences ?? [];
@@ -1275,6 +1319,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 partitioned.SkeletonJson);
             SnapshotPartitioner.EnsureWithinHardCap(headerJson);
             await WritePartsAsync(runId, domain, generationId, partitioned.Pieces, ct);
+            if (BeforePartitionHeaderPublishForTests != null)
+                await BeforePartitionHeaderPublishForTests(ct);
 
             var update = Builders<DomainSnapshotDocument>.Update
                 .Set(d => d.Data, headerJson)
@@ -1284,14 +1330,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 .SetOnInsert(d => d.Domain, domain);
             var options = new FindOneAndUpdateOptions<DomainSnapshotDocument>
             {
-                IsUpsert = compareAndSwap == null && upsert,
+                // A retry matches the header this attempt already published. Upserting
+                // on a miss would insert a second document with the same id.
+                IsUpsert = attempt == 0 && compareAndSwap == null && upsert,
                 ReturnDocument = ReturnDocument.Before
             };
             var before = await CosmosThrottle.ExecuteAsync(
                 token => _snapshots.FindOneAndUpdateAsync(headerFilter, update, options, token),
                 ct,
                 _logger);
-            if (compareAndSwap != null && before == null)
+            // A first upsert has no previous document, so Before is null on success.
+            // A missed compare-and-swap, or a later attempt whose published header
+            // was replaced, also returns null. Leave that newer header alone.
+            if (before == null && (compareAndSwap != null || attempt > 0))
             {
                 await DeleteGenerationAsync(runId, domain, generationId, ct);
                 return false;
@@ -1312,9 +1363,16 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     await DeleteGenerationAsync(runId, domain, previousGeneration, ct);
 
                 if (await GenerationIsCommittedAsync(headerId, runId, domain, generationId, ct))
+                {
+                    await MarkGenerationSettledAsync(runId, domain, generationId, ct);
                     return true;
+                }
             }
 
+            // The header we just published is incomplete because its parts were
+            // removed. The next attempt may replace that header and no other.
+            headerFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId)
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Data, headerJson);
             await DeleteGenerationAsync(runId, domain, generationId, ct);
         }
 
@@ -1383,7 +1441,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 Slice = piece.Slice,
                 ItemKey = itemKey,
                 Data = piece.Data,
-                UpdatedAt = batchStamp
+                UpdatedAt = batchStamp,
+                Settled = false
             };
             writes.Add(new ReplaceOneModel<SnapshotPartDocument>(
                 Builders<SnapshotPartDocument>.Filter.Eq(p => p.Id, document.Id),
@@ -1479,6 +1538,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             token => _parts.DeleteManyAsync(
                 p => p.RunId == runId && p.Domain == domain && p.GenerationId == generationId,
                 token),
+            ct,
+            _logger);
+
+    private Task MarkGenerationSettledAsync(Guid runId, string domain, string generationId, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.UpdateManyAsync(
+                p => p.RunId == runId && p.Domain == domain && p.GenerationId == generationId,
+                Builders<SnapshotPartDocument>.Update.Set(p => p.Settled, true),
+                cancellationToken: token),
             ct,
             _logger);
 
@@ -1958,8 +2026,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return fallback;
     }
 
-    private async Task RewriteLegacyLogByteCountsAsync(CancellationToken ct)
+    private async Task<bool> RewriteLegacyLogByteCountsAsync(CancellationToken ct)
     {
+        var sawLegacy = false;
         string? afterId = null;
         while (!ct.IsCancellationRequested)
         {
@@ -1970,7 +2039,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     Builders<RunLogDocument>.Filter.Gt(l => l.Id, afterId));
             var chunk = await _logs.Find(filter).SortBy(l => l.Id).Limit(1).FirstOrDefaultAsync(ct);
             if (chunk == null)
-                return;
+                return sawLegacy;
+
+            sawLegacy = true;
 
             afterId = chunk.Id;
             if (!LogMetadataFits(chunk))
@@ -1990,6 +2061,39 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 ct,
                 _logger);
         }
+
+        return sawLegacy;
+    }
+
+    private static List<long> EffectiveLogSequences(RunLogDocument chunk, long fallback)
+    {
+        var stored = chunk.LineSequences ?? [];
+        var effective = new List<long>(chunk.Lines.Count);
+        for (var i = 0; i < chunk.Lines.Count; i++)
+            effective.Add(NextLogSequence(i, stored, ref fallback));
+        return effective;
+    }
+
+    private async Task DeleteAbandonedSplitAsync(RunLogDocument chunk, int start, int count, CancellationToken ct)
+    {
+        await CosmosThrottle.ExecuteAsync(
+            token => _logs.DeleteManyAsync(
+                l => l.SplitFromId == chunk.Id
+                    && l.ChunkNumber >= start
+                    && l.ChunkNumber < start + count,
+                token),
+            ct,
+            _logger);
+        await CosmosThrottle.ExecuteAsync(
+            token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
+            ct,
+            _logger);
+        await CosmosThrottle.ExecuteAsync(
+            token => _logSplitClaims.DeleteOneAsync(
+                c => c.Id == chunk.Id && c.Owner == _logSplitOwner,
+                token),
+            ct,
+            _logger);
     }
 
     private static bool IsPendingSplitReplacement(string? splitFromId, IReadOnlySet<string> existingIds)
@@ -2140,48 +2244,34 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private async Task<RunLogDocument?> FindAppendTargetAsync(Guid runId, CancellationToken ct)
     {
-        string? beforeId = null;
-        while (true)
-        {
-            var filter = beforeId == null
-                ? CreateLogChunkFilter(runId)
-                : Builders<RunLogDocument>.Filter.And(
-                    CreateLogChunkFilter(runId),
-                    Builders<RunLogDocument>.Filter.Lt(l => l.Id, beforeId));
-            var page = await _logs.Find(filter)
-                .SortByDescending(l => l.Id)
-                .Limit(20)
-                .Project(l => new RunLogDocument
-                {
-                    Id = l.Id,
-                    SplitFromId = l.SplitFromId,
-                    SplitStart = l.SplitStart
-                })
-                .ToListAsync(ct);
-            if (page.Count == 0)
-                return null;
-
-            foreach (var candidate in page)
+        // The newest chunk is the only append target. Walking back to an older
+        // chunk while this one is frozen puts the new line ahead of unsequenced
+        // lines that GetLogs still reads from the frozen source.
+        var newest = await _logs.Find(CreateLogChunkFilter(runId))
+            .SortByDescending(l => l.Id)
+            .Limit(1)
+            .Project(l => new RunLogDocument
             {
-                if (await IsFrozenForAppendAsync(candidate, ct))
-                    continue;
+                Id = l.Id,
+                SplitFromId = l.SplitFromId,
+                SplitStart = l.SplitStart
+            })
+            .FirstOrDefaultAsync(ct);
+        if (newest == null || await IsFrozenForAppendAsync(newest, ct))
+            return null;
 
-                if (!string.IsNullOrEmpty(candidate.SplitFromId))
-                {
-                    await CosmosThrottle.ExecuteAsync(
-                        token => _logs.UpdateOneAsync(
-                            l => l.Id == candidate.Id && l.SplitFromId == candidate.SplitFromId,
-                            Builders<RunLogDocument>.Update.Unset(l => l.SplitFromId),
-                            cancellationToken: token),
-                        ct,
-                        _logger);
-                }
-
-                return await _logs.Find(l => l.Id == candidate.Id).FirstOrDefaultAsync(ct);
-            }
-
-            beforeId = page[^1].Id;
+        if (!string.IsNullOrEmpty(newest.SplitFromId))
+        {
+            await CosmosThrottle.ExecuteAsync(
+                token => _logs.UpdateOneAsync(
+                    l => l.Id == newest.Id && l.SplitFromId == newest.SplitFromId,
+                    Builders<RunLogDocument>.Update.Unset(l => l.SplitFromId),
+                    cancellationToken: token),
+                ct,
+                _logger);
         }
+
+        return await _logs.Find(l => l.Id == newest.Id).FirstOrDefaultAsync(ct);
     }
 
     private async Task<bool> IsFrozenForAppendAsync(RunLogDocument chunk, CancellationToken ct)
@@ -2242,18 +2332,24 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static FilterDefinition<LogSplitClaimDocument> CreateLogSplitClaimFilter(Guid runId)
     {
+        // A near-cap legacy chunk is stored under runId.ToString(), which is the
+        // hyphenated form. Its lease uses that same id and is outside the compact prefix.
         var prefix = CreateLogChunkPrefix(runId);
-        return Builders<LogSplitClaimDocument>.Filter.And(
-            Builders<LogSplitClaimDocument>.Filter.Gte(c => c.Id, prefix),
-            Builders<LogSplitClaimDocument>.Filter.Lt(c => c.Id, prefix + '\uffff'));
+        return Builders<LogSplitClaimDocument>.Filter.Or(
+            Builders<LogSplitClaimDocument>.Filter.And(
+                Builders<LogSplitClaimDocument>.Filter.Gte(c => c.Id, prefix),
+                Builders<LogSplitClaimDocument>.Filter.Lt(c => c.Id, prefix + '\uffff')),
+            Builders<LogSplitClaimDocument>.Filter.Eq(c => c.Id, runId.ToString()));
     }
 
     private static FilterDefinition<LogSequenceStampDocument> CreateSequenceStampFilter(Guid runId)
     {
         var prefix = CreateLogChunkPrefix(runId);
-        return Builders<LogSequenceStampDocument>.Filter.And(
-            Builders<LogSequenceStampDocument>.Filter.Gte(s => s.Id, prefix),
-            Builders<LogSequenceStampDocument>.Filter.Lt(s => s.Id, prefix + '\uffff'));
+        return Builders<LogSequenceStampDocument>.Filter.Or(
+            Builders<LogSequenceStampDocument>.Filter.And(
+                Builders<LogSequenceStampDocument>.Filter.Gte(s => s.Id, prefix),
+                Builders<LogSequenceStampDocument>.Filter.Lt(s => s.Id, prefix + '\uffff')),
+            Builders<LogSequenceStampDocument>.Filter.Eq(s => s.Id, runId.ToString()));
     }
 
     private static string CreateLogChunkId(Guid runId, int chunkNumber) => $"{CreateLogChunkPrefix(runId)}{chunkNumber:D8}";
