@@ -225,6 +225,27 @@ public sealed class LogSequenceStampDocument
 /// does not overwrite the generation a reader is still using.
 /// <see cref="GenerationId"/> must match the header before a reader accepts the piece.
 /// </summary>
+/// <summary>
+/// A committed generation whose parts still need to be removed. The sweep
+/// retries these after a writer crashes or a delete fails. A generation that
+/// is still the header is left alone.
+/// </summary>
+[BsonIgnoreExtraElements]
+public sealed class RetiredSnapshotGenerationDocument
+{
+    public const string CollectionName = "automation_snapshot_retired_generations";
+
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string Domain { get; set; } = string.Empty;
+
+    public string GenerationId { get; set; } = string.Empty;
+}
+
 [BsonIgnoreExtraElements]
 public sealed class SnapshotPartDocument
 {

@@ -70,6 +70,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
     private readonly IMongoCollection<SnapshotPartDocument> _parts;
+    private readonly IMongoCollection<RetiredSnapshotGenerationDocument> _retiredGenerations;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<LogSplitClaimDocument> _logSplitClaims;
     private readonly IMongoCollection<LogSequenceStampDocument> _logSequenceStamps;
@@ -86,6 +87,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _parts = database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        _retiredGenerations = database.GetCollection<RetiredSnapshotGenerationDocument>(RetiredSnapshotGenerationDocument.CollectionName);
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSplitClaims = database.GetCollection<LogSplitClaimDocument>(LogSplitClaimDocument.CollectionName);
         _logSequenceStamps = database.GetCollection<LogSequenceStampDocument>(LogSequenceStampDocument.CollectionName);
@@ -128,6 +130,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await DeletePartsAsync(runId, ct);
+        await _retiredGenerations.DeleteManyAsync(t => t.RunId == runId, ct);
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
@@ -435,6 +438,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await DeletePartsAsync(runId, ct);
+        await _retiredGenerations.DeleteManyAsync(t => t.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
         await _logSequenceStamps.DeleteManyAsync(CreateSequenceStampFilter(runId), ct);
@@ -813,6 +817,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         break;
                     }
 
+                    // Same text at a different sequence is an appended event. A resume
+                    // that only compares text would delete the source and lose it.
                     if (existing != null && !SameLogLines(existing, document))
                     {
                         await PreserveAppendedReplacementAsync(existing, chunk, ct);
@@ -1233,7 +1239,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     }
 
     private static bool SameLogLines(RunLogDocument left, RunLogDocument right)
-        => left.Lines.Count == right.Lines.Count && left.Lines.SequenceEqual(right.Lines);
+        => left.Lines.Count == right.Lines.Count
+            && left.Lines.SequenceEqual(right.Lines)
+            && SameSequences(left.LineSequences, right.LineSequences);
 
     private async Task<bool> LogSplitRangeCollidesAsync(
         RunLogDocument chunk,
@@ -1322,9 +1330,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (BeforePartitionHeaderPublishForTests != null)
                 await BeforePartitionHeaderPublishForTests(ct);
 
+            // The retry matches this timestamp, not the header JSON. A header near
+            // 1 MB plus the same JSON in the filter would cross the 2 MB request cap.
+            var publishedAt = DateTimeOffset.UtcNow;
             var update = Builders<DomainSnapshotDocument>.Update
                 .Set(d => d.Data, headerJson)
-                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+                .Set(d => d.UpdatedAt, publishedAt)
                 .SetOnInsert(d => d.Id, headerId)
                 .SetOnInsert(d => d.RunId, runId)
                 .SetOnInsert(d => d.Domain, domain);
@@ -1360,7 +1371,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 // commits after us has a different generation id, and deleting
                 // every other generation would remove that writer's parts.
                 if (previousGeneration != null)
-                    await DeleteGenerationAsync(runId, domain, previousGeneration, ct);
+                    await RetireGenerationAsync(runId, domain, previousGeneration, ct);
 
                 if (await GenerationIsCommittedAsync(headerId, runId, domain, generationId, ct))
                 {
@@ -1370,9 +1381,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
 
             // The header we just published is incomplete because its parts were
-            // removed. The next attempt may replace that header and no other.
+            // removed. The next attempt may replace that revision and no other.
             headerFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId)
-                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Data, headerJson);
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, publishedAt);
             await DeleteGenerationAsync(runId, domain, generationId, ct);
         }
 
@@ -1525,7 +1536,58 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             return;
         }
 
-        await DeleteGenerationAsync(current.RunId, current.Domain, previousGeneration, ct);
+        await RetireGenerationAsync(current.RunId, current.Domain, previousGeneration, ct);
+    }
+
+    private async Task RetireGenerationAsync(Guid runId, string domain, string generationId, CancellationToken ct)
+    {
+        var tombstone = new RetiredSnapshotGenerationDocument
+        {
+            Id = $"{runId:N}:{domain}:{generationId}",
+            RunId = runId,
+            Domain = domain,
+            GenerationId = generationId
+        };
+        await CosmosThrottle.ExecuteAsync(
+            token => _retiredGenerations.ReplaceOneAsync(
+                t => t.Id == tombstone.Id,
+                tombstone,
+                new ReplaceOptions { IsUpsert = true },
+                token),
+            ct,
+            _logger);
+        await DeleteGenerationAsync(runId, domain, generationId, ct);
+        await CosmosThrottle.ExecuteAsync(
+            token => _retiredGenerations.DeleteOneAsync(t => t.Id == tombstone.Id, token),
+            ct,
+            _logger);
+    }
+
+    /// <summary>
+    /// Finishes generation deletes that a writer recorded and then did not
+    /// complete. A tombstone whose generation is still the header is left in
+    /// place so a later commit can remove it.
+    /// </summary>
+    internal async Task SweepRetiredGenerationsAsync(CancellationToken ct)
+    {
+        var batch = await _retiredGenerations
+            .Find(FilterDefinition<RetiredSnapshotGenerationDocument>.Empty)
+            .Limit(8)
+            .ToListAsync(ct);
+        foreach (var item in batch)
+        {
+            ct.ThrowIfCancellationRequested();
+            var header = await ChooseHeaderAsync(item.RunId, item.Domain, ct);
+            var current = GenerationIdOf(header?.Data);
+            if (string.Equals(current, item.GenerationId, StringComparison.Ordinal))
+                continue;
+
+            await DeleteGenerationAsync(item.RunId, item.Domain, item.GenerationId, ct);
+            await CosmosThrottle.ExecuteAsync(
+                token => _retiredGenerations.DeleteOneAsync(t => t.Id == item.Id, token),
+                ct,
+                _logger);
+        }
     }
 
     private static string? GenerationIdOf(string? data)
@@ -2134,6 +2196,26 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var existingIds = new HashSet<string>(StringComparer.Ordinal) { chunk.Id };
         foreach (var item in later)
             existingIds.Add(item.Id);
+
+        // A replacement of an earlier chunk is past this id, so the source is
+        // not in the page above. It is still hidden while that source exists.
+        var unknownSources = new List<string>();
+        foreach (var item in later)
+        {
+            if (string.IsNullOrEmpty(item.SplitFromId) || existingIds.Contains(item.SplitFromId))
+                continue;
+            if (!unknownSources.Contains(item.SplitFromId))
+                unknownSources.Add(item.SplitFromId);
+        }
+
+        if (unknownSources.Count > 0)
+        {
+            var present = await _logs.Find(Builders<RunLogDocument>.Filter.In(l => l.Id, unknownSources))
+                .Project(l => l.Id)
+                .ToListAsync(ct);
+            foreach (var id in present)
+                existingIds.Add(id);
+        }
 
         foreach (var item in later)
         {

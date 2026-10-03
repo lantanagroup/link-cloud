@@ -1421,7 +1421,9 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
 
             return snapshots.UpdateOneAsync(
                 d => d.RunId == runId && d.Domain == "populations",
-                Builders<DomainSnapshotDocument>.Update.Set(d => d.Data, "{\"name\":\"newer\"}"));
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(d => d.Data, "{\"name\":\"newer\"}")
+                    .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
         };
 
         try
@@ -1705,6 +1707,209 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Split_keeps_an_appended_line_when_the_saved_range_does_not_collide()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var source = new RunLogDocument
+        {
+            Id = $"{runId:N}:00000000",
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 2,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = ["alpha", "beta"],
+            LineSequences = [0, 1],
+            SplitStart = 5,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await logs.InsertManyAsync(
+        [
+            source,
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000005",
+                RunId = runId,
+                ChunkNumber = 5,
+                LineCount = 2,
+                BsonByteCount = 64,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["alpha", "beta"],
+                LineSequences = [0, 4],
+                SplitFromId = source.Id,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal("alpha", "beta", "beta");
+        var kept = await logs.Find(l => l.LineSequences.Contains(4)).SingleAsync();
+        kept.Lines.Should().Equal("beta");
+    }
+
+    [Fact]
+    public async Task Split_does_not_stamp_a_replacement_whose_earlier_source_still_exists()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var sourceId = $"{runId:N}:00000000";
+        await logs.InsertManyAsync(
+        [
+            new RunLogDocument
+            {
+                Id = sourceId,
+                RunId = runId,
+                ChunkNumber = 0,
+                LineCount = 2,
+                BsonByteCount = 32,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["alpha", "beta"],
+                LineSequences = [0, 1],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000002",
+                RunId = runId,
+                ChunkNumber = 2,
+                LineCount = 1,
+                BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["mid"],
+                LineSequences = [2],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000005",
+                RunId = runId,
+                ChunkNumber = 5,
+                LineCount = 2,
+                BsonByteCount = 64,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["alpha", "beta"],
+                LineSequences = [0],
+                SplitFromId = sourceId,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var replacement = await logs.Find(l => l.Id == $"{runId:N}:00000005").SingleAsync();
+        replacement.LineSequences.Should().Equal(0L);
+        replacement.SplitFromId.Should().Be(sourceId);
+    }
+
+    [Fact]
+    public async Task Guard_rejects_a_filter_and_update_that_together_exceed_two_megabytes()
+    {
+        var database = CreateGuardedDatabase();
+        var snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var id = ObjectId.GenerateNewId();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            Id = id,
+            RunId = Guid.NewGuid(),
+            Domain = "entries",
+            Data = "{}",
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var filterValue = new string('a', 1_100_000);
+        var updateValue = new string('b', 1_100_000);
+        var act = () => snapshots.UpdateOneAsync(
+            d => d.Id == id && d.Data == filterValue,
+            Builders<DomainSnapshotDocument>.Update.Set(d => d.Data, updateValue));
+        await act.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+        var stored = await _fixture.Database
+            .GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(d => d.Id == id)
+            .SingleAsync();
+        stored.Data.Should().Be("{}");
+    }
+
+    [Fact]
+    public async Task Sweep_removes_a_retired_settled_generation_and_keeps_the_live_one()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var retired = _fixture.Database.GetCollection<RetiredSnapshotGenerationDocument>(RetiredSnapshotGenerationDocument.CollectionName);
+        var runId = Guid.NewGuid();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = SnapshotPartitioner.BuildHeaderJson("live", "records", 1, null),
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await parts.InsertManyAsync(
+        [
+            new SnapshotPartDocument
+            {
+                Id = $"{runId:N}:entries:live:00000000",
+                RunId = runId,
+                Domain = "entries",
+                GenerationId = "live",
+                Ordinal = 0,
+                Kind = "element",
+                Path = "$",
+                Data = "{}",
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Settled = true
+            },
+            new SnapshotPartDocument
+            {
+                Id = $"{runId:N}:entries:old:00000000",
+                RunId = runId,
+                Domain = "entries",
+                GenerationId = "old",
+                Ordinal = 0,
+                Kind = "element",
+                Path = "$",
+                Data = "{}",
+                UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1),
+                Settled = true
+            }
+        ]);
+        await retired.InsertManyAsync(
+        [
+            new RetiredSnapshotGenerationDocument
+            {
+                Id = $"{runId:N}:entries:old",
+                RunId = runId,
+                Domain = "entries",
+                GenerationId = "old"
+            },
+            new RetiredSnapshotGenerationDocument
+            {
+                Id = $"{runId:N}:entries:live",
+                RunId = runId,
+                Domain = "entries",
+                GenerationId = "live"
+            }
+        ]);
+
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        await service.SweepOrphanPartsAsync(CancellationToken.None);
+
+        (await parts.Find(p => p.GenerationId == "old").AnyAsync()).Should().BeFalse();
+        (await parts.Find(p => p.GenerationId == "live").AnyAsync()).Should().BeTrue();
+        (await retired.Find(t => t.GenerationId == "old").AnyAsync()).Should().BeFalse();
+        (await retired.Find(t => t.GenerationId == "live").AnyAsync()).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Append_during_a_near_cap_split_stays_outside_the_reserved_range()
     {
         var store = CreateGuardedStore();
@@ -1981,7 +2186,9 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
             return;
         }
 
-        RejectText(rendered.ToJson());
+        var updateJson = rendered.ToJson();
+        RejectText(updateJson);
+        RejectCombined(RenderedFilterJson(filter), updateJson);
         var current = LoadMatched(filter);
         var prospective = current == null ? new BsonDocument() : current.ToBsonDocument();
         if (current == null)
@@ -1990,6 +2197,33 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
         ApplySet(prospective, rendered, "$set");
         ApplyPush(prospective, rendered, "$push");
         RejectText(prospective.ToJson());
+    }
+
+    private string RenderedFilterJson(FilterDefinition<T>? filter)
+    {
+        if (filter == null || Inner == null)
+            return "";
+
+        try
+        {
+            return filter.Render(new RenderArgs<T>(Inner.DocumentSerializer, Inner.Settings.SerializerRegistry))
+                .AsBsonDocument
+                .ToJson();
+        }
+        catch (Exception)
+        {
+            return filter.ToString() ?? "";
+        }
+    }
+
+    private static void RejectCombined(string? filterJson, string? updateJson)
+    {
+        var bytes = Encoding.UTF8.GetByteCount(filterJson ?? "") + Encoding.UTF8.GetByteCount(updateJson ?? "");
+        if (bytes > SnapshotPartitioner.HardCapBytes)
+        {
+            throw new SnapshotDocumentTooLargeException(
+                $"Rejected a {bytes} byte update request. Cosmos DB for MongoDB RU allows {SnapshotPartitioner.HardCapBytes} bytes in one request.");
+        }
     }
 
     private T? LoadMatched(FilterDefinition<T>? filter)

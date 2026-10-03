@@ -150,6 +150,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
     internal async Task<int> SweepOrphanPartsAsync(CancellationToken ct)
     {
+        await _store.SweepRetiredGenerationsAsync(ct);
         await BackfillMissingSettledAsync(ct);
         var swept = 0;
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
