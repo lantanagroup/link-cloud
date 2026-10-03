@@ -85,6 +85,29 @@ public static class SnapshotPartitioner
         }
     }
 
+    /// <summary>
+    /// Stored size of one part, including the payload, path, and optional item key.
+    /// </summary>
+    public static int EstimatePieceBytes(string data, string path, string? itemKey)
+    {
+        var bytes = EstimateStoredDocumentBytes(data) + EscapedContentBytes(path);
+        if (!string.IsNullOrEmpty(itemKey))
+            bytes += EscapedContentBytes(itemKey);
+        return bytes;
+    }
+
+    /// <summary>
+    /// Item keys are optional metadata. Drop one that would push the part over the budget.
+    /// The value itself stays in the part payload.
+    /// </summary>
+    public static string? FitItemKey(string? itemKey, string data, string path, int budget)
+    {
+        if (string.IsNullOrEmpty(itemKey))
+            return null;
+
+        return EstimatePieceBytes(data, path, itemKey) <= budget ? itemKey : null;
+    }
+
     public static SnapshotPlan Plan(string json, int? maxDocumentBytes = null)
     {
         ArgumentNullException.ThrowIfNull(json);
@@ -231,7 +254,7 @@ public static class SnapshotPartitioner
             var item = elements[i];
             if (item.Bytes <= budget)
             {
-                pieces.Add(new SnapshotPiece("element", path, i, 0, item.Raw, ItemKey(item.El)));
+                pieces.Add(Piece("element", path, i, 0, item.Raw, ItemKey(item.El), budget));
                 continue;
             }
 
@@ -244,7 +267,7 @@ public static class SnapshotPartitioner
 
             if (skeleton != null && EstimateStoredDocumentBytes(skeleton) <= budget)
             {
-                pieces.Add(new SnapshotPiece("element", path, i, 0, skeleton, ItemKey(item.El)));
+                pieces.Add(Piece("element", path, i, 0, skeleton, ItemKey(item.El), budget));
                 continue;
             }
 
@@ -379,7 +402,7 @@ public static class SnapshotPartitioner
                 var entryJson = EntryJson(entries[i].Name, entries[i].Raw);
                 if (EstimateStoredDocumentBytes(entryJson) <= budget)
                 {
-                    pieces.Add(new SnapshotPiece("entry", path, i, 0, entryJson, entries[i].Name));
+                    pieces.Add(Piece("entry", path, i, 0, entryJson, entries[i].Name, budget));
                 }
                 else
                 {
@@ -510,8 +533,15 @@ public static class SnapshotPartitioner
             foreach (var prop in obj.Select(p => p.Key).ToList())
             {
                 var childPath = ChildPath(path, prop);
-                if (index.HasAtOrUnder(childPath))
-                    obj[prop] = Apply(obj[prop], childPath, index);
+                if (!index.HasAtOrUnder(childPath))
+                    continue;
+
+                var child = obj[prop];
+                var replacement = Apply(child, childPath, index);
+                // Apply mutates a skeleton node in place and returns it. Writing
+                // that same instance back throws because it already has a parent.
+                if (!ReferenceEquals(replacement, child))
+                    obj[prop] = replacement;
             }
         }
         else if (current is JsonArray array)
@@ -519,8 +549,13 @@ public static class SnapshotPartitioner
             for (var i = 0; i < array.Count; i++)
             {
                 var childPath = path + "/" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                if (index.HasAtOrUnder(childPath))
-                    array[i] = Apply(array[i], childPath, index);
+                if (!index.HasAtOrUnder(childPath))
+                    continue;
+
+                var child = array[i];
+                var replacement = Apply(child, childPath, index);
+                if (!ReferenceEquals(replacement, child))
+                    array[i] = replacement;
             }
         }
 
@@ -589,6 +624,9 @@ public static class SnapshotPartitioner
 
     private static JsonNode? ParseFragment(string raw)
         => JsonNode.Parse(raw);
+
+    private static SnapshotPiece Piece(string kind, string path, int index, int slice, string data, string? itemKey, int budget)
+        => new(kind, path, index, slice, data, FitItemKey(itemKey, data, path, budget));
 
     private static string? ItemKey(JsonElement element)
     {

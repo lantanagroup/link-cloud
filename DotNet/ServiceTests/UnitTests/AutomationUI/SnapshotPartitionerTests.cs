@@ -310,6 +310,29 @@ public class SnapshotPartitionerTests
         return SnapshotPartitioner.Reassemble(split.Mode, split.SkeletonJson, split.Pieces);
     }
 
+    [Fact]
+    public void Huge_record_id_is_not_copied_into_the_item_key()
+    {
+        var id = new string('k', 1_500_000);
+        var json = JsonSerializer.Serialize(new[]
+        {
+            new Dictionary<string, string> { ["Id"] = id, ["Note"] = "n" }
+        });
+
+        var split = SnapshotPartitioner.Plan(json).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Pieces.Should().OnlyContain(p => p.ItemKey == null);
+        foreach (var piece in split.Pieces)
+        {
+            SnapshotPartitioner.EstimatePieceBytes(piece.Data, piece.Path, piece.ItemKey)
+                .Should().BeLessThanOrEqualTo(SnapshotPartitioner.HardCapBytes);
+        }
+
+        var rebuilt = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(RoundTrip(split));
+        rebuilt.Should().ContainSingle();
+        rebuilt![0]["Id"].Should().Be(id);
+        rebuilt[0]["Note"].Should().Be("n");
+    }
+
     private static void AssertEveryPieceFits(SnapshotPlan.Partitioned split, int budget)
     {
         split.Pieces.Should().NotBeEmpty();

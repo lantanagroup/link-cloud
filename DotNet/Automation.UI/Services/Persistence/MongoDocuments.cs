@@ -149,6 +149,18 @@ public sealed class RunLogDocument
     /// <summary>Id of the source chunk this replacement was split from.</summary>
     public string? SplitFromId { get; set; }
 
+    /// <summary>How many replacement chunks <see cref="SplitStart"/> reserves.</summary>
+    public int? SplitCount { get; set; }
+
+    /// <summary>
+    /// Process that owns an in-progress split. Another process takes over only
+    /// after <see cref="SplitClaimedAt"/> is older than the claim lease.
+    /// </summary>
+    public string? SplitOwner { get; set; }
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset? SplitClaimedAt { get; set; }
+
     /// <summary>
     /// 1 when <see cref="BsonByteCount"/> counts escaped JSON bytes.
     /// A missing or zero value is a legacy raw UTF-8 count and is recomputed before another line is appended.

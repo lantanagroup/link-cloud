@@ -70,9 +70,10 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
             {
                 await Task.Delay(SweepInterval, stoppingToken);
                 var swept = await SweepOrphanPartsAsync(stoppingToken);
-                if (swept > 0)
+                var split = await _store.SplitOversizedLogChunksAsync(stoppingToken);
+                if (swept > 0 || split > 0)
                 {
-                    _logger.LogInformation("Swept {Swept} orphan snapshot parts.", swept);
+                    _logger.LogInformation("Swept {Swept} orphan snapshot parts. Split log chunks {Split}.", swept, split);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -150,7 +151,19 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                     Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff),
                     Builders<SnapshotPartDocument>.Filter.Gt(p => p.Id, afterId));
             var batch = await CosmosThrottle.ExecuteAsync(
-                token => _parts.Find(filter).SortBy(p => p.Id).Limit(BatchSize).ToListAsync(token),
+                token => _parts.Find(filter)
+                    .SortBy(p => p.Id)
+                    .Limit(BatchSize)
+                    .Project(p => new PartMeta
+                    {
+                        Id = p.Id,
+                        RunId = p.RunId,
+                        Domain = p.Domain,
+                        GenerationId = p.GenerationId,
+                        Ordinal = p.Ordinal,
+                        UpdatedAt = p.UpdatedAt
+                    })
+                    .ToListAsync(token),
                 ct,
                 _logger);
             if (batch.Count == 0)
@@ -163,8 +176,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 var key = (part.RunId, part.Domain);
                 if (!headerCache.TryGetValue(key, out var header))
                 {
-                    var snapshot = await _snapshots.Find(s => s.RunId == part.RunId && s.Domain == part.Domain)
-                        .FirstOrDefaultAsync(ct);
+                    var snapshot = await _store.ReadHeaderAsync(part.RunId, part.Domain, ct);
                     header = snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
                         ? parsed
                         : null;
@@ -202,5 +214,15 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         }
 
         return swept;
+    }
+
+    private sealed class PartMeta
+    {
+        public string Id { get; set; } = string.Empty;
+        public Guid RunId { get; set; }
+        public string Domain { get; set; } = string.Empty;
+        public string GenerationId { get; set; } = string.Empty;
+        public int Ordinal { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 }
