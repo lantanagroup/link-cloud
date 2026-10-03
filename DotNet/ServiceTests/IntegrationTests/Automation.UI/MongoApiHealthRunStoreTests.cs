@@ -178,18 +178,22 @@ public class MongoApiHealthRunStoreTests : IAsyncLifetime
             body,
             body);
         result.ErrorMessage = body;
+        result.ResponseSnippet = body;
 
         await _store.SaveRunResultsAsync([result], "Single", startedAt);
 
         result.RequestBody.Should().Be(body);
         result.ResponseBody.Should().Be(body);
         result.ErrorMessage.Should().Be(body);
+        result.ResponseSnippet.Should().Be(body);
 
         var saved = await _store.GetLatestResultsForRunAsync(runId, ["Tenant.Create"]);
         saved["Tenant.Create"].ResponseBody.Should().EndWith(" [truncated: exceeded document budget]");
         saved["Tenant.Create"].RequestBody.Should().EndWith(" [truncated: exceeded document budget]");
         saved["Tenant.Create"].ErrorMessage.Should().EndWith(" [truncated: exceeded document budget]");
+        saved["Tenant.Create"].ResponseSnippet.Should().EndWith(" [truncated: exceeded document budget]");
         saved["Tenant.Create"].ResponseBody!.Length.Should().BeLessThan(body.Length);
+        saved["Tenant.Create"].ResponseSnippet!.Length.Should().BeLessThan(body.Length);
     }
 
     [Fact]

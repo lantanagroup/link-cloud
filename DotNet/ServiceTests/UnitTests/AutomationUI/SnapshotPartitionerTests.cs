@@ -312,7 +312,8 @@ public class SnapshotPartitionerTests
         {
             ResponseBody = body,
             RequestBody = body,
-            ErrorMessage = body
+            ErrorMessage = body,
+            ResponseSnippet = body
         };
 
         var copy = ApiHealthResultBudget.CopyWithinBudget(result);
@@ -320,11 +321,14 @@ public class SnapshotPartitionerTests
         result.ResponseBody.Should().Be(body);
         result.RequestBody.Should().Be(body);
         result.ErrorMessage.Should().Be(body);
+        result.ResponseSnippet.Should().Be(body);
         copy.Should().NotBeSameAs(result);
         copy.ResponseBody.Should().EndWith(" [truncated: exceeded document budget]");
         copy.RequestBody.Should().EndWith(" [truncated: exceeded document budget]");
         copy.ErrorMessage.Should().EndWith(" [truncated: exceeded document budget]");
+        copy.ResponseSnippet.Should().EndWith(" [truncated: exceeded document budget]");
         copy.ResponseBody!.Length.Should().BeLessThan(body.Length);
+        copy.ResponseSnippet!.Length.Should().BeLessThan(body.Length);
     }
 
     private static string RoundTrip(SnapshotPlan.Partitioned split)
