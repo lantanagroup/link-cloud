@@ -739,6 +739,78 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomain_saves_when_the_first_generation_is_swept_before_publish()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var payload = Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList();
+        var removed = false;
+        MongoSnapshotStore.BeforePartitionHeaderPublishForTests = ct =>
+        {
+            if (removed)
+                return Task.CompletedTask;
+
+            removed = true;
+            return parts.DeleteManyAsync(p => p.RunId == runId && p.Domain == "populations", ct);
+        };
+
+        try
+        {
+            await store.SetDomainAsync(runId, "populations", payload, CancellationToken.None);
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+        }
+
+        removed.Should().BeTrue();
+        var read = await store.GetDomainAsync<List<Item>>(runId, "populations", CancellationToken.None);
+        read.Should().NotBeNull();
+        read!.Data.Should().Equal(payload);
+    }
+
+    [Fact]
+    public async Task Tied_header_timestamps_keep_the_canonical_snapshot()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var stamp = DateTimeOffset.UtcNow;
+        var canonical = MongoSnapshotStore.CanonicalSnapshotId(runId, "entries");
+        var other = ObjectId.GenerateNewId();
+        await snapshots.InsertManyAsync(
+        [
+            new DomainSnapshotDocument
+            {
+                Id = canonical,
+                RunId = runId,
+                Domain = "entries",
+                Data = "{\"Name\":\"canonical\"}",
+                UpdatedAt = stamp
+            },
+            new DomainSnapshotDocument
+            {
+                Id = other,
+                RunId = runId,
+                Domain = "entries",
+                Data = "{\"Name\":\"other\"}",
+                UpdatedAt = stamp
+            }
+        ]);
+
+        await store.DeleteStaleHeadersAsync(runId, "entries", other, CancellationToken.None);
+        (await snapshots.Find(d => d.Id == canonical).AnyAsync()).Should().BeTrue();
+        (await snapshots.Find(d => d.Id == other).AnyAsync()).Should().BeTrue();
+        var during = await store.GetDomainAsync<LegacySchedule>(runId, "entries", CancellationToken.None);
+        during!.Data.Name.Should().Be("canonical");
+
+        await store.DeleteStaleHeadersAsync(runId, "entries", canonical, CancellationToken.None);
+        (await snapshots.Find(d => d.Id == canonical).AnyAsync()).Should().BeTrue();
+        (await snapshots.Find(d => d.Id == other).AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Append_during_a_partial_split_keeps_the_new_line()
     {
         var store = CreateGuardedStore();

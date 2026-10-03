@@ -1911,6 +1911,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var headerFilter = compareAndSwap
             ?? Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId);
+        var headerPublished = false;
         for (var attempt = 0; attempt < 5; attempt++)
         {
             ct.ThrowIfCancellationRequested();
@@ -1956,7 +1957,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 // A retry matches the header this attempt already published. Upserting
                 // on a miss would insert a second document with the same id.
-                IsUpsert = attempt == 0 && compareAndSwap == null && upsert,
+                // An attempt that never published, because its parts were gone,
+                // is still the first write.
+                IsUpsert = !headerPublished && compareAndSwap == null && upsert,
                 ReturnDocument = ReturnDocument.Before
             };
             var before = await CosmosThrottle.ExecuteAsync(
@@ -1966,11 +1969,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             // A first upsert has no previous document, so Before is null on success.
             // A missed compare-and-swap, or a later attempt whose published header
             // was replaced, also returns null. Leave that newer header alone.
-            if (before == null && (compareAndSwap != null || attempt > 0))
+            // A pre-publish retry has not published yet, so a null Before is the
+            // first upsert, not a lost header.
+            if (before == null && (compareAndSwap != null || headerPublished))
             {
                 await DeleteGenerationAsync(runId, domain, generationId, ct);
                 return false;
             }
+
+            headerPublished = true;
 
             if (AfterPartitionHeaderPublishForTests != null)
             {
@@ -2391,6 +2398,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return matches
             .OrderByDescending(d => d.UpdatedAt)
             .ThenByDescending(d => d.Id == canonical)
+            .ThenByDescending(d => d.Id)
             .First();
     }
 
@@ -2418,16 +2426,32 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             chosen);
     }
 
-    private async Task DeleteStaleHeadersAsync(Guid runId, string domain, ObjectId keptId, CancellationToken ct)
+    /// <summary>
+    /// Removes headers that lose to <paramref name="keptId"/>. A newer timestamp
+    /// wins, then the canonical id, then the greater id. A tie is not deleted
+    /// by the loser, so two cleanups cannot erase both snapshots.
+    /// </summary>
+    internal async Task DeleteStaleHeadersAsync(Guid runId, string domain, ObjectId keptId, CancellationToken ct)
     {
         var kept = await _snapshots.Find(d => d.Id == keptId).FirstOrDefaultAsync(ct);
         if (kept == null)
             return;
 
+        var canonical = CanonicalSnapshotId(runId, domain);
+        var sameDomain = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+            & Builders<DomainSnapshotDocument>.Filter.Ne(d => d.Id, keptId);
+        // The canonical id wins a timestamp tie. Any other kept id deletes only
+        // a strictly older header, or a tie whose id is lower and not canonical.
+        var loses = kept.Id == canonical
+            ? Builders<DomainSnapshotDocument>.Filter.Lte(d => d.UpdatedAt, kept.UpdatedAt)
+            : Builders<DomainSnapshotDocument>.Filter.Lt(d => d.UpdatedAt, kept.UpdatedAt)
+                | (Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, kept.UpdatedAt)
+                    & Builders<DomainSnapshotDocument>.Filter.Lt(d => d.Id, kept.Id)
+                    & Builders<DomainSnapshotDocument>.Filter.Ne(d => d.Id, canonical));
+
         await CosmosThrottle.ExecuteAsync(
-            token => _snapshots.DeleteManyAsync(
-                d => d.RunId == runId && d.Domain == domain && d.Id != keptId && d.UpdatedAt <= kept.UpdatedAt,
-                token),
+            token => _snapshots.DeleteManyAsync(sameDomain & loses, token),
             ct,
             _logger);
     }
