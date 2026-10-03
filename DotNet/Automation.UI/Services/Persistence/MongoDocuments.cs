@@ -170,6 +170,13 @@ public sealed class RunLogDocument
     /// </summary>
     public string? SplitAttempt { get; set; }
 
+    /// <summary>
+    /// In-memory only. Set when a takeover adopts an attempt that is already
+    /// publishing, so the caller finishes that attempt instead of rewriting it.
+    /// </summary>
+    [BsonIgnore]
+    internal bool ResumePublishing { get; set; }
+
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? SplitClaimedAt { get; set; }
 
@@ -212,6 +219,13 @@ public sealed class LogSplitClaimDocument
 
     /// <summary>Id of the split attempt that holds this lease.</summary>
     public string AttemptId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Set to <see cref="AttemptId"/> once that attempt's replacements are
+    /// durable and the source may be deleted. A takeover finishes this attempt
+    /// instead of deleting its rows.
+    /// </summary>
+    public string? PublishingAttempt { get; set; }
 }
 
 /// <summary>
