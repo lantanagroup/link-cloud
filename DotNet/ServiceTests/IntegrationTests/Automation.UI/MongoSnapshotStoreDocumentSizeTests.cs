@@ -1653,6 +1653,74 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TryUpgrade_keeps_a_revisionless_write_with_a_new_timestamp()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        await snapshots.UpdateOneAsync(
+            d => d.Id == legacy.Id,
+            Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, "{\"Name\":\"newer\"}")
+                .Set(d => d.UpdatedAt, legacy.UpdatedAt.AddMinutes(5))
+                .Unset(d => d.Revision));
+
+        (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"Name\":\"newer\"}");
+    }
+
+    [Fact]
+    public async Task TryUpgrade_does_not_delete_a_revisionless_header_on_a_timestamp_tie()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var stamp = DateTimeOffset.UtcNow;
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        var legacyId = ObjectId.GenerateNewId();
+        await snapshots.InsertManyAsync(
+        [
+            new DomainSnapshotDocument
+            {
+                Id = MongoSnapshotStore.CanonicalSnapshotId(runId, "populations"),
+                RunId = runId,
+                Domain = "populations",
+                Data = "{\"Name\":\"canonical\"}",
+                UpdatedAt = stamp
+            },
+            new DomainSnapshotDocument
+            {
+                Id = legacyId,
+                RunId = runId,
+                Domain = "populations",
+                Data = payload,
+                UpdatedAt = stamp
+            }
+        ]);
+        var legacy = await snapshots.Find(d => d.Id == legacyId).FirstAsync();
+        await snapshots.UpdateOneAsync(
+            d => d.Id == legacyId,
+            Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, "{\"Name\":\"newer\"}")
+                .Set(d => d.UpdatedAt, legacy.UpdatedAt)
+                .Unset(d => d.Revision));
+
+        (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        var stored = await snapshots.Find(d => d.Id == legacyId).FirstAsync();
+        stored.Data.Should().Be("{\"Name\":\"newer\"}");
+    }
+
+    [Fact]
     public async Task Retry_keeps_a_same_timestamp_write_that_has_its_own_revision()
     {
         var store = CreateGuardedStore();
