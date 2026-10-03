@@ -8,12 +8,14 @@ namespace Automation.UI.Services.Persistence;
 /// documents. The pass is idempotent, pages one small batch at a time, and backs
 /// off when Cosmos DB throttles. Documents that already fit, and documents that
 /// are already partitioned, are skipped. A failure on one document does not stop
-/// the rest, and startup is not blocked.
+/// the rest, and startup is not blocked. After that pass, orphan parts are
+/// swept on a timer for the life of the process.
 /// </summary>
 public sealed class SnapshotShapeMigrationService : BackgroundService
 {
     private const int BatchSize = 8;
     private static readonly TimeSpan OrphanGrace = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(5);
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
     private readonly IMongoCollection<SnapshotPartDocument> _parts;
     private readonly MongoSnapshotStore _store;
@@ -55,10 +57,32 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation("Snapshot document migration cancelled.");
+            return;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Snapshot document migration failed. Legacy snapshots remain readable.");
+        }
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(SweepInterval, stoppingToken);
+                var swept = await SweepOrphanPartsAsync(stoppingToken);
+                if (swept > 0)
+                {
+                    _logger.LogInformation("Swept {Swept} orphan snapshot parts.", swept);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Orphan snapshot sweep failed. It will retry.");
+            }
         }
     }
 
@@ -117,6 +141,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         string? afterId = null;
         var headerCache = new Dictionary<(Guid RunId, string Domain), SnapshotPartitionHeader?>(64);
+        var activeGenerations = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
         while (!ct.IsCancellationRequested)
         {
             var filter = afterId == null
@@ -151,6 +176,22 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                     || part.Ordinal >= header.PartCount;
                 if (!orphan)
                     continue;
+
+                var generationKey = (part.RunId, part.Domain, part.GenerationId);
+                if (activeGenerations.Contains(generationKey))
+                    continue;
+
+                var newest = await _parts.Find(p => p.RunId == part.RunId
+                        && p.Domain == part.Domain
+                        && p.GenerationId == part.GenerationId)
+                    .SortByDescending(p => p.UpdatedAt)
+                    .Project(p => p.UpdatedAt)
+                    .FirstOrDefaultAsync(ct);
+                if (newest >= cutoff)
+                {
+                    activeGenerations.Add(generationKey);
+                    continue;
+                }
 
                 await CosmosThrottle.ExecuteAsync(
                     token => _parts.DeleteOneAsync(p => p.Id == part.Id, token),

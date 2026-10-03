@@ -139,6 +139,21 @@ public sealed class RunLogDocument
     public List<string> Lines { get; set; } = [];
     public List<long> LineSequences { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Chunk number where a split of this document started writing replacements.
+    /// Set before the first replacement insert so a retry reuses the same ids.
+    /// </summary>
+    public int? SplitStart { get; set; }
+
+    /// <summary>Id of the source chunk this replacement was split from.</summary>
+    public string? SplitFromId { get; set; }
+
+    /// <summary>
+    /// 1 when <see cref="BsonByteCount"/> counts escaped JSON bytes.
+    /// A missing or zero value is a legacy raw UTF-8 count and is recomputed before another line is appended.
+    /// </summary>
+    public int ByteCountVersion { get; set; }
 }
 
 public sealed class RunLogSequenceDocument

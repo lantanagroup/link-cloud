@@ -24,19 +24,20 @@ internal static class ApiHealthResultBudget
         if (string.IsNullOrEmpty(value))
             return value;
 
-        if (Encoding.UTF8.GetByteCount(value) <= MaxBodyBytes)
+        if (SnapshotPartitioner.EscapedContentBytes(value) <= MaxBodyBytes)
             return value;
 
-        var suffixBytes = Encoding.UTF8.GetByteCount(Suffix);
+        var suffixBytes = SnapshotPartitioner.EscapedContentBytes(Suffix);
         var keptBytes = 0;
         var builder = new StringBuilder(value.Length);
         foreach (var rune in value.EnumerateRunes())
         {
-            var runeBytes = rune.Utf8SequenceLength;
+            var runeText = rune.ToString();
+            var runeBytes = SnapshotPartitioner.EscapedContentBytes(runeText);
             if (keptBytes + runeBytes + suffixBytes > MaxBodyBytes)
                 break;
 
-            builder.Append(rune.ToString());
+            builder.Append(runeText);
             keptBytes += runeBytes;
         }
 

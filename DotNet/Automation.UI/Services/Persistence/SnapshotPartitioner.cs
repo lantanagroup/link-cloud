@@ -130,9 +130,16 @@ public static class SnapshotPartitioner
         }
 
         var root = skeletonJson == null ? null : JsonNode.Parse(skeletonJson);
-        var rebuilt = Apply(root, "$", pieces);
+        var rebuilt = Apply(root, "$", new PieceIndex(pieces));
         return rebuilt?.ToJsonString() ?? "null";
     }
+
+    /// <summary>
+    /// Stored-byte estimates include the document envelope, so a tiny value still
+    /// looks larger than <see cref="MinPracticalItemBytes"/>. Compare the payload.
+    /// </summary>
+    private static bool IsLargeEnoughToItemize(int storedDocumentBytes)
+        => storedDocumentBytes >= DocumentEnvelopeBytes + 2 + MinPracticalItemBytes;
 
     public static string BuildHeaderJson(string generationId, string mode, int partCount, string? skeletonJson)
     {
@@ -211,7 +218,7 @@ public static class SnapshotPartitioner
             e.El.ValueKind is JsonValueKind.Object or JsonValueKind.Array);
         var itemize = recordLike
             && (elements.Count <= MaxSmallIndividualItems
-                || elements.TrueForAll(e => e.Bytes >= MinPracticalItemBytes));
+                || elements.TrueForAll(e => IsLargeEnoughToItemize(e.Bytes)));
 
         if (!itemize)
         {
@@ -364,7 +371,7 @@ public static class SnapshotPartitioner
         JsonObject kept)
     {
         var itemize = entries.Count <= MaxSmallIndividualItems
-            || entries.TrueForAll(e => e.Bytes >= MinPracticalItemBytes);
+            || entries.TrueForAll(e => IsLargeEnoughToItemize(e.Bytes));
         if (itemize)
         {
             for (var i = 0; i < entries.Count; i++)
@@ -492,11 +499,10 @@ public static class SnapshotPartitioner
             yield return value.Substring(start, length);
     }
 
-    private static JsonNode? Apply(JsonNode? node, string path, IReadOnlyList<SnapshotPiece> all)
+    private static JsonNode? Apply(JsonNode? node, string path, PieceIndex index)
     {
-        var direct = all.Where(p => p.Path == path).ToList();
         var current = node;
-        if (direct.Count > 0)
+        if (index.TryGetDirect(path, out var direct))
             current = Materialize(current, direct);
 
         if (current is JsonObject obj)
@@ -504,8 +510,8 @@ public static class SnapshotPartitioner
             foreach (var prop in obj.Select(p => p.Key).ToList())
             {
                 var childPath = ChildPath(path, prop);
-                if (all.Any(p => p.Path == childPath || p.Path.StartsWith(childPath + "/", StringComparison.Ordinal)))
-                    obj[prop] = Apply(obj[prop], childPath, all);
+                if (index.HasAtOrUnder(childPath))
+                    obj[prop] = Apply(obj[prop], childPath, index);
             }
         }
         else if (current is JsonArray array)
@@ -513,8 +519,8 @@ public static class SnapshotPartitioner
             for (var i = 0; i < array.Count; i++)
             {
                 var childPath = path + "/" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                if (all.Any(p => p.Path == childPath || p.Path.StartsWith(childPath + "/", StringComparison.Ordinal)))
-                    array[i] = Apply(array[i], childPath, all);
+                if (index.HasAtOrUnder(childPath))
+                    array[i] = Apply(array[i], childPath, index);
             }
         }
 
@@ -547,7 +553,11 @@ public static class SnapshotPartitioner
             return obj;
         }
 
-        if (direct.All(p => p.Kind == "slice"))
+        // A sliced property is one JSON value. A sliced array element must stay
+        // inside the array, including when the array has only one element.
+        if (node is not JsonArray
+            && direct.All(p => p.Kind == "slice")
+            && direct.Select(p => p.Index).Distinct().Count() == 1)
         {
             var json = string.Concat(direct.OrderBy(p => p.Slice).Select(p => p.Data));
             return JsonNode.Parse(json);
@@ -686,6 +696,7 @@ public sealed record SnapshotPartitionHeader(string GenerationId, string Mode, i
             }
 
             if (!pointer.TryGetProperty("kind", out var kind)
+                || kind.ValueKind != JsonValueKind.String
                 || !string.Equals(kind.GetString(), SnapshotPayloadPointer.KindValue, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
@@ -699,7 +710,51 @@ public sealed record SnapshotPartitionHeader(string GenerationId, string Mode, i
         {
             return false;
         }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
+}
+
+/// <summary>
+/// Pieces grouped by path, plus every ancestor path, so reassembly does not
+/// scan the full piece list for each record.
+/// </summary>
+internal sealed class PieceIndex
+{
+    private readonly Dictionary<string, List<SnapshotPiece>> _byPath;
+    private readonly HashSet<string> _covered;
+
+    public PieceIndex(IReadOnlyList<SnapshotPiece> pieces)
+    {
+        _byPath = new Dictionary<string, List<SnapshotPiece>>(pieces.Count, StringComparer.Ordinal);
+        _covered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var piece in pieces)
+        {
+            if (!_byPath.TryGetValue(piece.Path, out var list))
+            {
+                list = new List<SnapshotPiece>();
+                _byPath[piece.Path] = list;
+            }
+
+            list.Add(piece);
+            var path = piece.Path;
+            while (_covered.Add(path))
+            {
+                var slash = path.LastIndexOf('/');
+                if (slash <= 0)
+                    break;
+
+                path = path.Substring(0, slash);
+            }
+        }
+    }
+
+    public bool TryGetDirect(string path, out List<SnapshotPiece> pieces)
+        => _byPath.TryGetValue(path, out pieces!);
+
+    public bool HasAtOrUnder(string path) => _covered.Contains(path);
 }
 
 public sealed class SnapshotDocumentTooLargeException : Exception
