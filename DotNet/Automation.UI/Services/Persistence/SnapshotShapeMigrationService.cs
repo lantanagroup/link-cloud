@@ -28,6 +28,9 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// </summary>
     internal Func<CancellationToken, Task>? BeforeOrphanPartDelete { get; set; }
 
+    /// <summary>How many partition headers this instance has loaded. Tests use it.</summary>
+    internal int PartitionHeaderReads { get; private set; }
+
     public SnapshotShapeMigrationService(
         IMongoDatabase database,
         MongoSnapshotStore store,
@@ -149,6 +152,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         string? afterId = null;
         var activeGenerations = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
+        var headerCache = new Dictionary<(Guid RunId, string Domain), SnapshotPartitionHeader?>();
         while (!ct.IsCancellationRequested)
         {
             var filter = afterId == null
@@ -179,7 +183,13 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 afterId = part.Id;
-                var header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+                var cacheKey = (part.RunId, part.Domain);
+                if (!headerCache.TryGetValue(cacheKey, out var header))
+                {
+                    header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+                    headerCache[cacheKey] = header;
+                }
+
                 if (!IsOrphanPart(header, part))
                     continue;
 
@@ -206,10 +216,10 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                     await callback(ct);
                 }
 
-                // The header read above can be older than a commit that landed
-                // while this generation was being judged. Decide from the header
-                // that is current at the delete.
+                // The cached header can be older than a commit that landed while
+                // this generation was being judged. Decide from a fresh read.
                 header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+                headerCache[cacheKey] = header;
                 if (!IsOrphanPart(header, part))
                 {
                     activeGenerations.Add(generationKey);
@@ -241,6 +251,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
     private async Task<SnapshotPartitionHeader?> ReadPartitionHeaderAsync(Guid runId, string domain, CancellationToken ct)
     {
+        PartitionHeaderReads++;
         var snapshot = await _store.ReadHeaderAsync(runId, domain, ct);
         return snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
             ? parsed

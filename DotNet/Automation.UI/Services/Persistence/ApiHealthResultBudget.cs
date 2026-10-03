@@ -19,6 +19,42 @@ internal static class ApiHealthResultBudget
         result.ErrorMessage = Bound(result.ErrorMessage);
     }
 
+    /// <summary>
+    /// Returns a result whose diagnostic bodies fit the persist budget.
+    /// The caller's instance is left unchanged so a live event can still carry it.
+    /// </summary>
+    public static ApiTestRunResult CopyWithinBudget(ApiTestRunResult result)
+    {
+        var copy = new ApiTestRunResult
+        {
+            Id = result.Id,
+            RunId = result.RunId,
+            EndpointKey = result.EndpointKey,
+            ServiceName = result.ServiceName,
+            EndpointName = result.EndpointName,
+            Passed = result.Passed,
+            Skipped = result.Skipped,
+            SkipReason = result.SkipReason,
+            ActualStatusCode = result.ActualStatusCode,
+            ExpectedStatusCode = result.ExpectedStatusCode,
+            ErrorMessage = result.ErrorMessage,
+            ResponseSnippet = result.ResponseSnippet,
+            ExecutedAt = result.ExecutedAt,
+            DurationMs = result.DurationMs,
+            Commit = result.Commit,
+            Build = result.Build,
+            Version = result.Version,
+            ProductVersion = result.ProductVersion,
+            RequestUrl = result.RequestUrl,
+            RequestMethod = result.RequestMethod,
+            RequestBody = result.RequestBody,
+            TraceId = result.TraceId,
+            ResponseBody = result.ResponseBody
+        };
+        Fit(copy);
+        return copy;
+    }
+
     internal static string? Bound(string? value)
     {
         if (string.IsNullOrEmpty(value))

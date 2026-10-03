@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 
@@ -301,6 +302,29 @@ public class SnapshotPartitionerTests
         var boundedQuotes = ApiHealthResultBudget.Bound(quotes);
         SnapshotPartitioner.EscapedContentBytes(boundedQuotes!).Should().BeLessThanOrEqualTo(ApiHealthResultBudget.MaxBodyBytes);
         boundedQuotes.Should().EndWith(" [truncated: exceeded document budget]");
+    }
+
+    [Fact]
+    public void Api_health_budget_copies_a_result_and_leaves_the_caller_unchanged()
+    {
+        var body = new string('q', ApiHealthResultBudget.MaxBodyBytes + 32);
+        var result = new ApiTestRunResult
+        {
+            ResponseBody = body,
+            RequestBody = body,
+            ErrorMessage = body
+        };
+
+        var copy = ApiHealthResultBudget.CopyWithinBudget(result);
+
+        result.ResponseBody.Should().Be(body);
+        result.RequestBody.Should().Be(body);
+        result.ErrorMessage.Should().Be(body);
+        copy.Should().NotBeSameAs(result);
+        copy.ResponseBody.Should().EndWith(" [truncated: exceeded document budget]");
+        copy.RequestBody.Should().EndWith(" [truncated: exceeded document budget]");
+        copy.ErrorMessage.Should().EndWith(" [truncated: exceeded document budget]");
+        copy.ResponseBody!.Length.Should().BeLessThan(body.Length);
     }
 
     private static string RoundTrip(SnapshotPlan.Partitioned split)

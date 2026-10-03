@@ -206,6 +206,21 @@ public sealed class LogSplitClaimDocument
 }
 
 /// <summary>
+/// Line sequences for a log chunk that cannot store them without crossing the
+/// Cosmos 2 MB document cap. The chunk document is left unchanged.
+/// </summary>
+[BsonIgnoreExtraElements]
+public sealed class LogSequenceStampDocument
+{
+    public const string CollectionName = "automation_log_sequence_stamps";
+
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    public List<long> LineSequences { get; set; } = [];
+}
+
+/// <summary>
 /// One piece of a domain snapshot. The id includes the generation so a rewrite
 /// does not overwrite the generation a reader is still using.
 /// <see cref="GenerationId"/> must match the header before a reader accepts the piece.
