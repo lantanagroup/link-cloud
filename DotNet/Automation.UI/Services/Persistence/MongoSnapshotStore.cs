@@ -26,6 +26,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     // Escaped JSON size of the lines in one chunk. Cosmos DB for MongoDB RU
     // rejects documents over 2 MB; 1 MB leaves room for field names and sequences.
     internal const int MaxLogChunkEstimatedBsonBytes = 1_048_576;
+    // Cosmos DB rejects a request over 2 MB, not only a document. One full-size
+    // part fills a bulk command; a second part goes in the next command.
+    private const int MaxBulkWriteJsonBytes = 1_048_576;
     internal const int EscapedLogByteCountVersion = 1;
     private const int EstimatedBsonBytesPerLineOverhead = 64;
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
@@ -629,8 +632,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var plan = SnapshotPartitioner.Plan(payloadJson);
+        // Match id and timestamp. The legacy payload can already be near 2 MB,
+        // and putting it in the update filter makes the command exceed the cap.
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
-            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Data, legacy.Data);
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, legacy.UpdatedAt);
         var domainFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, legacy.RunId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, legacy.Domain);
 
@@ -959,44 +964,62 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         IReadOnlyList<SnapshotPiece> pieces,
         CancellationToken ct)
     {
-        const int batchSize = 100;
-        for (var offset = 0; offset < pieces.Count; offset += batchSize)
-        {
-            var now = DateTimeOffset.UtcNow;
-            var writes = new List<WriteModel<SnapshotPartDocument>>(Math.Min(batchSize, pieces.Count - offset));
-            var end = Math.Min(offset + batchSize, pieces.Count);
-            for (var ordinal = offset; ordinal < end; ordinal++)
-            {
-                var piece = pieces[ordinal];
-                SnapshotPartitioner.EnsureWithinHardCap(piece.Data);
-                var document = new SnapshotPartDocument
-                {
-                    Id = SnapshotPartId(runId, domain, generationId, ordinal),
-                    RunId = runId,
-                    Domain = domain,
-                    GenerationId = generationId,
-                    Ordinal = ordinal,
-                    Kind = piece.Kind,
-                    Path = piece.Path,
-                    Index = piece.Index,
-                    Slice = piece.Slice,
-                    ItemKey = piece.ItemKey,
-                    Data = piece.Data,
-                    UpdatedAt = now
-                };
-                writes.Add(new ReplaceOneModel<SnapshotPartDocument>(
-                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.Id, document.Id),
-                    document)
-                {
-                    IsUpsert = true
-                });
-            }
+        const int maxBatchCount = 100;
+        var writes = new List<WriteModel<SnapshotPartDocument>>();
+        var batchBytes = 0;
+        var batchStamp = DateTimeOffset.UtcNow;
 
+        async Task FlushAsync()
+        {
+            if (writes.Count == 0)
+                return;
+
+            var pending = writes;
+            writes = new List<WriteModel<SnapshotPartDocument>>();
+            batchBytes = 0;
+            batchStamp = DateTimeOffset.UtcNow;
             await CosmosThrottle.ExecuteAsync(
-                token => _parts.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = true }, token),
+                token => _parts.BulkWriteAsync(pending, new BulkWriteOptions { IsOrdered = true }, token),
                 ct,
                 _logger);
         }
+
+        for (var ordinal = 0; ordinal < pieces.Count; ordinal++)
+        {
+            var piece = pieces[ordinal];
+            SnapshotPartitioner.EnsureWithinHardCap(piece.Data);
+            var estimate = SnapshotPartitioner.EstimateStoredDocumentBytes(piece.Data);
+            if (writes.Count > 0
+                && (writes.Count >= maxBatchCount || batchBytes + estimate > MaxBulkWriteJsonBytes))
+            {
+                await FlushAsync();
+            }
+
+            var document = new SnapshotPartDocument
+            {
+                Id = SnapshotPartId(runId, domain, generationId, ordinal),
+                RunId = runId,
+                Domain = domain,
+                GenerationId = generationId,
+                Ordinal = ordinal,
+                Kind = piece.Kind,
+                Path = piece.Path,
+                Index = piece.Index,
+                Slice = piece.Slice,
+                ItemKey = piece.ItemKey,
+                Data = piece.Data,
+                UpdatedAt = batchStamp
+            };
+            writes.Add(new ReplaceOneModel<SnapshotPartDocument>(
+                Builders<SnapshotPartDocument>.Filter.Eq(p => p.Id, document.Id),
+                document)
+            {
+                IsUpsert = true
+            });
+            batchBytes += estimate;
+        }
+
+        await FlushAsync();
     }
 
     private async Task<List<SnapshotPiece>> LoadCommittedPiecesAsync(
