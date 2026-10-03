@@ -539,7 +539,7 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TryUpgrade_leaves_a_snapshot_alone_when_its_timestamp_changed()
+    public async Task TryUpgrade_leaves_a_snapshot_alone_when_its_revision_changed()
     {
         var store = CreateGuardedStore();
         var runId = Guid.NewGuid();
@@ -554,11 +554,17 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         });
 
         var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
-        legacy.UpdatedAt = legacy.UpdatedAt.AddMinutes(-5);
+        await snapshots.UpdateOneAsync(
+            d => d.Id == legacy.Id,
+            Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, "{\"name\":\"newer\"}")
+                .Set(d => d.Revision, "replaced")
+                .Set(d => d.UpdatedAt, legacy.UpdatedAt));
 
         (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
-        var stored = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
-        stored.Data.Should().Be(payload);
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"name\":\"newer\"}");
+        stored.Revision.Should().Be("replaced");
     }
 
     private static ReplaceOneModel<SnapshotPartDocument> Replacement(string id, string payload)
@@ -1514,7 +1520,8 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
                 d => d.RunId == runId && d.Domain == "populations",
                 Builders<DomainSnapshotDocument>.Update
                     .Set(d => d.Data, "{\"name\":\"newer\"}")
-                    .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+                    .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5))
+                    .Set(d => d.Revision, "other-writer"));
         };
 
         try
@@ -1528,6 +1535,89 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
 
         var stored = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
         stored.Data.Should().Be("{\"name\":\"newer\"}");
+    }
+
+    [Fact]
+    public async Task TryUpgrade_keeps_a_same_timestamp_write_that_has_its_own_revision()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        var stamp = DateTimeOffset.UtcNow;
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = stamp
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        MongoSnapshotStore.BeforePartitionHeaderPublishForTests = async _ =>
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+            var current = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+            await snapshots.UpdateOneAsync(
+                d => d.Id == legacy.Id,
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(d => d.Data, "{\"name\":\"newer\"}")
+                    .Set(d => d.UpdatedAt, current.UpdatedAt)
+                    .Set(d => d.Revision, "other-writer"));
+        };
+
+        try
+        {
+            (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+        }
+
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"name\":\"newer\"}");
+        stored.UpdatedAt.Should().Be(legacy.UpdatedAt);
+        stored.Revision.Should().Be("other-writer");
+    }
+
+    [Fact]
+    public async Task Retry_keeps_a_same_timestamp_write_that_has_its_own_revision()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        MongoSnapshotStore.AfterPartitionHeaderPublishForTests = async _ =>
+        {
+            var current = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+            await snapshots.UpdateOneAsync(
+                d => d.Id == legacy.Id,
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(d => d.Data, "{\"name\":\"newer\"}")
+                    .Set(d => d.UpdatedAt, current.UpdatedAt)
+                    .Set(d => d.Revision, "other-writer"));
+        };
+
+        try
+        {
+            (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterPartitionHeaderPublishForTests = null;
+        }
+
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"name\":\"newer\"}");
+        stored.Revision.Should().Be("other-writer");
     }
 
     [Fact]

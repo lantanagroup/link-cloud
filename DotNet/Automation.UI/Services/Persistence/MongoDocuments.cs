@@ -123,6 +123,13 @@ public sealed class DomainSnapshotDocument
     public string Data { get; set; } = string.Empty;
 
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Changes on every header write. A compare-and-swap matches this value.
+    /// <see cref="UpdatedAt"/> is a wall clock and can repeat. Empty on a
+    /// document stored before this field existed.
+    /// </summary>
+    public string Revision { get; set; } = string.Empty;
 }
 
 /// <summary>
