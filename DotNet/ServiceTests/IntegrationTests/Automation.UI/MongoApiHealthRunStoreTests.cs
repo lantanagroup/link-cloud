@@ -165,6 +165,34 @@ public class MongoApiHealthRunStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SaveRunResultsAsync_BoundsACopyAndLeavesTheCallerIntact()
+    {
+        var runId = Guid.NewGuid();
+        var startedAt = DateTimeOffset.UtcNow;
+        var body = new string('q', ApiHealthResultBudget.MaxBodyBytes + 50);
+        var result = MakeResult(
+            runId,
+            "Tenant",
+            "Tenant.Create",
+            startedAt,
+            body,
+            body);
+        result.ErrorMessage = body;
+
+        await _store.SaveRunResultsAsync([result], "Single", startedAt);
+
+        result.RequestBody.Should().Be(body);
+        result.ResponseBody.Should().Be(body);
+        result.ErrorMessage.Should().Be(body);
+
+        var saved = await _store.GetLatestResultsForRunAsync(runId, ["Tenant.Create"]);
+        saved["Tenant.Create"].ResponseBody.Should().EndWith(" [truncated: exceeded document budget]");
+        saved["Tenant.Create"].RequestBody.Should().EndWith(" [truncated: exceeded document budget]");
+        saved["Tenant.Create"].ErrorMessage.Should().EndWith(" [truncated: exceeded document budget]");
+        saved["Tenant.Create"].ResponseBody!.Length.Should().BeLessThan(body.Length);
+    }
+
+    [Fact]
     public async Task GetLatestResultsByServiceAsync_ReturnsLatestServiceRun()
     {
         // Arrange

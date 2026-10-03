@@ -19,6 +19,7 @@ namespace Automation.UI.Services.Persistence;
 ///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
 ///   automation_logs       — full log output per run
 ///   automation_log_split_claims - lease for a log split that cannot grow its source chunk
+///   automation_log_sequence_stamps - sequences for a chunk that cannot store them inline
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
@@ -53,6 +54,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<SnapshotPartDocument> _parts;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<LogSplitClaimDocument> _logSplitClaims;
+    private readonly IMongoCollection<LogSequenceStampDocument> _logSequenceStamps;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
     private readonly IMongoCollection<OwnedFacilityTombstoneDocument> _ownedFacilityTombstones;
@@ -68,6 +70,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _parts = database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSplitClaims = database.GetCollection<LogSplitClaimDocument>(LogSplitClaimDocument.CollectionName);
+        _logSequenceStamps = database.GetCollection<LogSequenceStampDocument>(LogSequenceStampDocument.CollectionName);
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
         _ownedFacilityTombstones = database.GetCollection<OwnedFacilityTombstoneDocument>("automation_owned_facility_tombstones");
@@ -416,6 +419,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await DeletePartsAsync(runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
+        await _logSequenceStamps.DeleteManyAsync(CreateSequenceStampFilter(runId), ct);
 
         // Payload blobs follow the Mongo child rows so a DB failure cannot orphan
         // pointer records that still reference payload data. The summary stays until
@@ -697,7 +701,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await RewriteLegacyLogByteCountsAsync(ct);
         var split = 0;
         var oversized = await _logs.Find(l => l.BsonByteCount > MaxLogChunkEstimatedBsonBytes
-                || l.LineCount > MaxLogLinesPerChunk)
+                || l.LineCount > MaxLogLinesPerChunk
+                || l.ByteCountVersion != EscapedLogByteCountVersion)
             .SortBy(l => l.Id)
             .Limit(25)
             .ToListAsync(ct);
@@ -711,6 +716,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 continue;
 
             var metadataFits = LogMetadataFits(chunk);
+            await OverlaySequenceStampsAsync([chunk], ct);
             var firstSequence = await FallbackSequenceBeforeChunkAsync(chunk, ct);
             await StampFollowingUnsequencedChunksAsync(chunk, firstSequence, ct);
             var planned = PlanLogSplit(chunk, firstSequence);
@@ -725,6 +731,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (fresh == null)
                 continue;
 
+            await OverlaySequenceStampsAsync([fresh], ct);
             if (fresh.LineCount != chunk.LineCount
                 || !fresh.Lines.SequenceEqual(chunk.Lines)
                 || !SameSequences(fresh.LineSequences, chunk.LineSequences))
@@ -832,6 +839,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 _logger);
             if (deleted.DeletedCount != 1)
                 continue;
+
+            await CosmosThrottle.ExecuteAsync(
+                token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
+                ct,
+                _logger);
 
             if (!metadataFits)
             {
@@ -1099,7 +1111,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         foreach (var line in source.Lines)
             normalized.Add(NormalizeLineForChunkBudget(source.RunId, line));
 
-        var copied = ContiguousSourcePrefixLength(existing.Lines, normalized);
+        var copied = ContiguousSourcePrefixLength(
+            existing.Lines,
+            existing.LineSequences,
+            normalized,
+            source.LineSequences);
         var extras = new List<string>();
         var sequences = new List<long>();
         var storedSequences = existing.LineSequences ?? [];
@@ -1137,8 +1153,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             _logger);
     }
 
-    private static int ContiguousSourcePrefixLength(IReadOnlyList<string> existing, IReadOnlyList<string> normalized)
+    private static int ContiguousSourcePrefixLength(
+        IReadOnlyList<string> existing,
+        IReadOnlyList<long>? existingSequences,
+        IReadOnlyList<string> normalized,
+        IReadOnlyList<long>? sourceSequences)
     {
+        var existingSeq = existingSequences ?? [];
+        var sourceSeq = sourceSequences ?? [];
         var best = 0;
         for (var start = 0; start < normalized.Count; start++)
         {
@@ -1147,6 +1169,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                    && length < existing.Count
                    && string.Equals(existing[length], normalized[start + length], StringComparison.Ordinal))
             {
+                // Same text at a different sequence is an appended event, not a copy.
+                if (length < existingSeq.Count
+                    && start + length < sourceSeq.Count
+                    && existingSeq[length] != sourceSeq[start + length])
+                {
+                    break;
+                }
+
                 length++;
             }
 
@@ -1653,6 +1683,16 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
                 if (currentChunk != null && currentChunk.ByteCountVersion != EscapedLogByteCountVersion)
                 {
+                    // A near-cap legacy chunk cannot grow to record the new byte-count
+                    // version. Leave it unchanged and append onto a new chunk.
+                    if (!LogMetadataFits(currentChunk))
+                    {
+                        currentChunk = null;
+                    }
+                }
+
+                if (currentChunk != null && currentChunk.ByteCountVersion != EscapedLogByteCountVersion)
+                {
                     var estimatedChunkBsonBytes = EstimateChunkLinesBsonBytes(currentChunk.Lines);
                     var recomputeFilter = Builders<RunLogDocument>.Filter.And(
                         Builders<RunLogDocument>.Filter.Eq(l => l.Id, currentChunk.Id),
@@ -1831,6 +1871,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var chunks = await _logs.Find(CreateLogChunkFilter(runId))
             .SortBy(l => l.Id)
             .ToListAsync(ct);
+        await OverlaySequenceStampsAsync(chunks, ct);
 
         var orderedLines = new List<(long Sequence, int Ordinal, string Line)>();
         var existingIds = new HashSet<string>(StringComparer.Ordinal);
@@ -1890,6 +1931,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 SplitFromId = l.SplitFromId
             })
             .ToListAsync(ct);
+        await OverlaySequenceStampsAsync(earlier, ct);
 
         var existingIds = new HashSet<string>(StringComparer.Ordinal) { chunk.Id };
         if (legacy != null)
@@ -1993,8 +2035,22 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (item.LineCount == 0 || IsPendingSplitReplacement(item.SplitFromId, existingIds))
                 continue;
 
-            var sequences = item.LineSequences ?? [];
-            if (sequences.Count == item.LineCount)
+            var projectedSequences = item.LineSequences ?? [];
+            if (projectedSequences.Count == item.LineCount)
+            {
+                var max = projectedSequences.Max();
+                if (next <= max)
+                    next = max + 1;
+                continue;
+            }
+
+            var full = await _logs.Find(l => l.Id == item.Id).FirstOrDefaultAsync(ct);
+            if (full == null || full.LineCount != item.LineCount)
+                continue;
+
+            await OverlaySequenceStampsAsync([full], ct);
+            var sequences = full.LineSequences ?? [];
+            if (sequences.Count == full.LineCount)
             {
                 var max = sequences.Max();
                 if (next <= max)
@@ -2002,18 +2058,83 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 continue;
             }
 
-            var assigned = new List<long>(item.LineCount);
-            for (var i = 0; i < item.LineCount; i++)
+            var assigned = new List<long>(full.LineCount);
+            for (var i = 0; i < full.LineCount; i++)
                 assigned.Add(NextLogSequence(i, sequences, ref next));
 
+            if (LineSequencesFit(full, assigned))
+            {
+                await CosmosThrottle.ExecuteAsync(
+                    token => _logs.UpdateOneAsync(
+                        l => l.Id == full.Id && l.LineCount == full.LineCount,
+                        Builders<RunLogDocument>.Update.Set(l => l.LineSequences, assigned),
+                        cancellationToken: token),
+                    ct,
+                    _logger);
+                continue;
+            }
+
+            // The chunk is already at the document cap. Sequences live beside it.
             await CosmosThrottle.ExecuteAsync(
-                token => _logs.UpdateOneAsync(
-                    l => l.Id == item.Id && l.LineCount == item.LineCount,
-                    Builders<RunLogDocument>.Update.Set(l => l.LineSequences, assigned),
-                    cancellationToken: token),
+                token => _logSequenceStamps.ReplaceOneAsync(
+                    s => s.Id == full.Id,
+                    new LogSequenceStampDocument { Id = full.Id, LineSequences = assigned },
+                    new ReplaceOptions { IsUpsert = true },
+                    token),
                 ct,
                 _logger);
         }
+    }
+
+    private async Task OverlaySequenceStampsAsync(IReadOnlyList<RunLogDocument> chunks, CancellationToken ct)
+    {
+        var pending = new List<RunLogDocument>();
+        foreach (var chunk in chunks)
+        {
+            if (chunk.LineCount > 0 && (chunk.LineSequences?.Count ?? 0) != chunk.LineCount)
+                pending.Add(chunk);
+        }
+
+        if (pending.Count == 0)
+            return;
+
+        var ids = pending.Select(chunk => chunk.Id).ToList();
+        var stamps = await _logSequenceStamps
+            .Find(Builders<LogSequenceStampDocument>.Filter.In(s => s.Id, ids))
+            .ToListAsync(ct);
+        var byId = stamps.ToDictionary(stamp => stamp.Id, StringComparer.Ordinal);
+        foreach (var chunk in pending)
+        {
+            if (byId.TryGetValue(chunk.Id, out var stamp) && stamp.LineSequences.Count == chunk.LineCount)
+                chunk.LineSequences = stamp.LineSequences;
+        }
+    }
+
+    /// <summary>
+    /// True when the chunk document can store <paramref name="sequences"/> and
+    /// stay under the Cosmos 2 MB cap. The caller's document is not modified.
+    /// </summary>
+    private static bool LineSequencesFit(RunLogDocument chunk, IReadOnlyList<long> sequences)
+    {
+        var measured = new RunLogDocument
+        {
+            Id = chunk.Id,
+            RunId = chunk.RunId,
+            ChunkNumber = chunk.ChunkNumber,
+            LineCount = chunk.LineCount,
+            BsonByteCount = chunk.BsonByteCount,
+            Lines = chunk.Lines,
+            LineSequences = [.. sequences],
+            UpdatedAt = chunk.UpdatedAt,
+            SplitStart = chunk.SplitStart,
+            SplitFromId = chunk.SplitFromId,
+            SplitCount = chunk.SplitCount,
+            SplitOwner = chunk.SplitOwner,
+            SplitClaimedAt = chunk.SplitClaimedAt,
+            ByteCountVersion = chunk.ByteCountVersion
+        };
+        var bytes = Encoding.UTF8.GetByteCount(measured.ToBsonDocument().ToJson());
+        return bytes <= SnapshotPartitioner.HardCapBytes;
     }
 
     private async Task<RunLogDocument?> FindAppendTargetAsync(Guid runId, CancellationToken ct)
@@ -2104,6 +2225,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return Builders<RunLogDocument>.Filter.And(
             Builders<RunLogDocument>.Filter.Gte(l => l.Id, prefix),
             Builders<RunLogDocument>.Filter.Lt(l => l.Id, prefix + '\uffff'));
+    }
+
+    private static FilterDefinition<LogSequenceStampDocument> CreateSequenceStampFilter(Guid runId)
+    {
+        var prefix = CreateLogChunkPrefix(runId);
+        return Builders<LogSequenceStampDocument>.Filter.And(
+            Builders<LogSequenceStampDocument>.Filter.Gte(s => s.Id, prefix),
+            Builders<LogSequenceStampDocument>.Filter.Lt(s => s.Id, prefix + '\uffff'));
     }
 
     private static string CreateLogChunkId(Guid runId, int chunkNumber) => $"{CreateLogChunkPrefix(runId)}{chunkNumber:D8}";
