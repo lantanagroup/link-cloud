@@ -184,6 +184,28 @@ public sealed class RunLogSequenceDocument
 }
 
 /// <summary>
+/// Lease for a log split whose source chunk cannot accept more fields without
+/// crossing the Cosmos 2 MB document cap. The source document is left unchanged.
+/// </summary>
+[BsonIgnoreExtraElements]
+public sealed class LogSplitClaimDocument
+{
+    public const string CollectionName = "automation_log_split_claims";
+
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    public string Owner { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset ClaimedAt { get; set; }
+
+    public int SplitStart { get; set; }
+
+    public int SplitCount { get; set; }
+}
+
+/// <summary>
 /// One piece of a domain snapshot. The id includes the generation so a rewrite
 /// does not overwrite the generation a reader is still using.
 /// <see cref="GenerationId"/> must match the header before a reader accepts the piece.

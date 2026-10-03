@@ -29,7 +29,9 @@ internal static class ApiHealthResultBudget
 
         var suffixBytes = SnapshotPartitioner.EscapedContentBytes(Suffix);
         var keptBytes = 0;
-        var builder = new StringBuilder(value.Length);
+        // The retained text is at most the escaped-byte budget, so a multi-megabyte
+        // body must not allocate a builder the size of the input.
+        var builder = new StringBuilder(Math.Min(value.Length, MaxBodyBytes + Suffix.Length));
         foreach (var rune in value.EnumerateRunes())
         {
             var runeText = rune.ToString();
