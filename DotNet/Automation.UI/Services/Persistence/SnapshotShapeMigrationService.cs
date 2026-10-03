@@ -32,6 +32,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     internal int PartitionHeaderReads { get; private set; }
 
     private bool _settledBackfillComplete;
+    private readonly Dictionary<(Guid RunId, string Domain, string GenerationId), DateTimeOffset> _liveSettledConfirmedAt = new();
 
     public SnapshotShapeMigrationService(
         IMongoDatabase database,
@@ -152,6 +153,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     {
         await _store.SweepRetiredGenerationsAsync(ct);
         await BackfillMissingSettledAsync(ct);
+        await SweepSettledGenerationsAsync(ct);
         var swept = 0;
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         string? afterId = null;
@@ -200,6 +202,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
                 if (!IsOrphanPart(header, part))
                 {
+                    RememberLiveGeneration(header, part);
                     await MarkSettledOnceAsync(markedSettled, part, ct);
                     continue;
                 }
@@ -234,6 +237,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 if (!IsOrphanPart(header, part))
                 {
                     activeGenerations.Add(generationKey);
+                    RememberLiveGeneration(header, part);
                     await MarkSettledOnceAsync(markedSettled, part, ct);
                     continue;
                 }
@@ -259,6 +263,80 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         }
 
         return swept;
+    }
+
+    /// <summary>
+    /// Deletes settled generations that are older than the grace period and are
+    /// not the current header. A crash after publish, or a later commit that
+    /// retired only the generation it replaced, leaves these parts behind.
+    /// The pass is bounded to one batch and does not load part bodies.
+    /// </summary>
+    private async Task SweepSettledGenerationsAsync(CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
+        var batch = await CosmosThrottle.ExecuteAsync(
+            token => _parts.Find(Builders<SnapshotPartDocument>.Filter.And(
+                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.Settled, true),
+                    Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff)))
+                .SortBy(p => p.UpdatedAt)
+                .Limit(BatchSize)
+                .Project(p => new PartMeta
+                {
+                    Id = p.Id,
+                    RunId = p.RunId,
+                    Domain = p.Domain,
+                    GenerationId = p.GenerationId,
+                    Ordinal = p.Ordinal,
+                    UpdatedAt = p.UpdatedAt
+                })
+                .ToListAsync(token),
+            ct,
+            _logger);
+        var seen = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
+        foreach (var part in batch)
+        {
+            ct.ThrowIfCancellationRequested();
+            var key = (part.RunId, part.Domain, part.GenerationId);
+            if (!seen.Add(key))
+                continue;
+
+            if (_liveSettledConfirmedAt.TryGetValue(key, out var confirmedAt)
+                && DateTimeOffset.UtcNow - confirmedAt < SweepInterval)
+            {
+                continue;
+            }
+
+            var header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+            if (header != null
+                && string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal))
+            {
+                _liveSettledConfirmedAt[key] = DateTimeOffset.UtcNow;
+                continue;
+            }
+
+            _liveSettledConfirmedAt.Remove(key);
+
+            var freshId = await _parts.Find(p => p.RunId == part.RunId
+                    && p.Domain == part.Domain
+                    && p.GenerationId == part.GenerationId
+                    && p.UpdatedAt >= cutoff)
+                .Limit(1)
+                .Project(p => p.Id)
+                .FirstOrDefaultAsync(ct);
+            if (!string.IsNullOrEmpty(freshId))
+                continue;
+
+            await CosmosThrottle.ExecuteAsync(
+                token => _parts.DeleteManyAsync(
+                    p => p.RunId == part.RunId
+                        && p.Domain == part.Domain
+                        && p.GenerationId == part.GenerationId
+                        && p.Settled
+                        && p.UpdatedAt < cutoff,
+                    token),
+                ct,
+                _logger);
+        }
     }
 
     private async Task BackfillMissingSettledAsync(CancellationToken ct)
@@ -339,6 +417,14 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         return snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
             ? parsed
             : null;
+    }
+
+    private void RememberLiveGeneration(SnapshotPartitionHeader? header, PartMeta part)
+    {
+        if (header == null || !string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal))
+            return;
+
+        _liveSettledConfirmedAt[(part.RunId, part.Domain, part.GenerationId)] = DateTimeOffset.UtcNow;
     }
 
     private static bool IsOrphanPart(SnapshotPartitionHeader? header, PartMeta part)

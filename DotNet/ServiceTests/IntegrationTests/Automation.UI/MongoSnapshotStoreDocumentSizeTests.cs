@@ -1910,6 +1910,141 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Inline_rewrite_retires_the_replaced_generation_when_a_newer_header_lands()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var first = Enumerable.Range(0, 20).Select(i => new Item("a" + i, new string('a', 60_000))).ToList();
+        var newer = Enumerable.Range(0, 20).Select(i => new Item("b" + i, new string('b', 60_000))).ToList();
+        await store.SetDomainAsync(runId, "entries", first, CancellationToken.None);
+        var firstGeneration = (await Parts(runId, "entries")).Select(p => p.GenerationId).Distinct().Single();
+
+        MongoSnapshotStore.BeforeInlineGenerationRetireForTests = async _ =>
+        {
+            await store.SetDomainAsync(runId, "entries", newer, CancellationToken.None);
+        };
+        try
+        {
+            await store.SetDomainAsync(runId, "entries", new Item("small", "ok"), CancellationToken.None);
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforeInlineGenerationRetireForTests = null;
+        }
+
+        var parts = await Parts(runId, "entries");
+        parts.Should().NotBeEmpty();
+        parts.Select(p => p.GenerationId).Should().NotContain(firstGeneration);
+        parts.Select(p => p.GenerationId).Distinct().Should().HaveCount(1);
+        var read = await store.GetDomainAsync<List<Item>>(runId, "entries", CancellationToken.None);
+        read!.Data.Should().Equal(newer);
+        var retired = _fixture.Database.GetCollection<RetiredSnapshotGenerationDocument>(RetiredSnapshotGenerationDocument.CollectionName);
+        (await retired.Find(t => t.RunId == runId).AnyAsync()).Should().BeFalse();
+        await AssertRunDocumentsFit(runId);
+    }
+
+    [Fact]
+    public async Task Sweep_removes_an_old_settled_generation_the_header_no_longer_names()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var runId = Guid.NewGuid();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = SnapshotPartitioner.BuildHeaderJson("live", "records", 1, null),
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        var live = AgedPart(runId, "live", 0);
+        live.Settled = true;
+        var gone = AgedPart(runId, "gone", 0);
+        gone.Settled = true;
+        var recent = AgedPart(runId, "recent", 0);
+        recent.Settled = true;
+        recent.UpdatedAt = DateTimeOffset.UtcNow;
+        recent.Id = $"{runId:N}:entries:recent:00000000";
+        recent.GenerationId = "recent";
+        await parts.InsertManyAsync([live, gone, recent]);
+
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        await service.SweepOrphanPartsAsync(CancellationToken.None);
+
+        (await parts.Find(p => p.GenerationId == "gone").AnyAsync()).Should().BeFalse();
+        (await parts.Find(p => p.GenerationId == "live").AnyAsync()).Should().BeTrue();
+        (await parts.Find(p => p.GenerationId == "recent").AnyAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Split_keeps_lines_when_reconciliation_resumes_after_takeover()
+    {
+        var storeA = CreateGuardedStore();
+        var storeB = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var lines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var sourceId = $"{runId:N}:00000000";
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = sourceId,
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = lines.Count,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            Lines = lines,
+            LineSequences = [0, 1, 2],
+            SplitStart = 0,
+            SplitCount = 1,
+            SplitOwner = "stale-owner",
+            SplitClaimedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var replacementsWritten = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reconcileFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? splitB = null;
+        MongoSnapshotStore.BeforeLogSourceDeleteForTests = async ct =>
+        {
+            replacementsWritten.TrySetResult();
+            await reconcileFinished.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+        };
+        MongoSnapshotStore.BeforeReplacementReconcileForTests = async ct =>
+        {
+            await logs.UpdateOneAsync(
+                l => l.Id == sourceId,
+                Builders<RunLogDocument>.Update.Set(l => l.SplitClaimedAt, DateTimeOffset.UtcNow.AddMinutes(-10)),
+                cancellationToken: ct);
+            splitB = storeB.SplitOversizedLogChunksAsync(ct);
+            await replacementsWritten.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+        };
+
+        try
+        {
+            await storeA.SplitOversizedLogChunksAsync(CancellationToken.None);
+            reconcileFinished.TrySetResult();
+            splitB.Should().NotBeNull();
+            await splitB!;
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforeLogSourceDeleteForTests = null;
+            MongoSnapshotStore.BeforeReplacementReconcileForTests = null;
+            replacementsWritten.TrySetResult();
+            reconcileFinished.TrySetResult();
+        }
+
+        var read = await storeA.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(lines);
+        (await logs.Find(l => l.Id == sourceId).AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Split_keeps_lines_when_another_worker_deletes_the_source_first()
     {
         var storeA = CreateGuardedStore();
