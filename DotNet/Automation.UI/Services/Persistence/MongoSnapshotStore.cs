@@ -23,7 +23,9 @@ namespace Automation.UI.Services.Persistence;
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
     private const int MaxLogLinesPerChunk = 1_000;
-    private const int MaxLogChunkEstimatedBsonBytes = 12 * 1024 * 1024;
+    // Escaped JSON size of the lines in one chunk. Cosmos DB for MongoDB RU
+    // rejects documents over 2 MB; 1 MB leaves room for field names and sequences.
+    internal const int MaxLogChunkEstimatedBsonBytes = 1_048_576;
     private const int EstimatedBsonBytesPerLineOverhead = 64;
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
     private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
@@ -31,6 +33,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
+    private readonly IMongoCollection<SnapshotPartDocument> _parts;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
@@ -44,6 +47,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        _parts = database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -83,6 +87,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // Clear stale domain snapshot data so milestones/entries from a prior report
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await DeletePartsAsync(runId, ct);
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
@@ -389,6 +394,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await DeletePartsAsync(runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
 
@@ -511,37 +517,26 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     public async Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
     {
         var json = JsonSerializer.Serialize(data);
-        var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
+        var plan = SnapshotPartitioner.Plan(json);
 
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
-
         var existing = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
         var existingPointer = TryReadSnapshotPayloadPointer(existing?.Data);
 
-        SnapshotPayloadPointer? newPointer = null;
-        var storedJson = json;
-        if (_snapshotPayloadStore.ShouldExternalize(domain, payloadUtf8Bytes))
+        if (plan is SnapshotPlan.Inline inline)
         {
-            newPointer = await _snapshotPayloadStore.StoreAsync(runId, domain, json, ct);
-            storedJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
-            {
-                [SnapshotPayloadPointerEnvelopeProperty] = newPointer
-            });
+            SnapshotPartitioner.EnsureWithinHardCap(inline.Json);
+            await CommitHeaderAsync(filter, runId, domain, inline.Json, ct);
+            await DeletePartsAsync(runId, domain, ct);
+        }
+        else if (plan is SnapshotPlan.Partitioned partitioned)
+        {
+            await CommitPartitionAsync(filter, runId, domain, partitioned, ct);
         }
 
-        var update = Builders<DomainSnapshotDocument>.Update
-            .Set(d => d.Data, storedJson)
-            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
-            .SetOnInsert(d => d.RunId, runId)
-            .SetOnInsert(d => d.Domain, domain);
-
-        await _snapshots.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
-
-        if (existingPointer != null && (newPointer == null || !string.Equals(existingPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
-        {
+        if (existingPointer != null)
             await _snapshotPayloadStore.DeleteIfExistsAsync(existingPointer, ct);
-        }
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
@@ -549,45 +544,442 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
 
-        var doc = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
-        if (doc == null)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
-            return null;
-        }
-
-        try
-        {
-            var payloadJson = doc.Data;
-            var pointer = TryReadSnapshotPayloadPointer(payloadJson);
-            if (pointer != null)
+            var doc = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
+            if (doc == null)
             {
-                payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
-                if (string.IsNullOrWhiteSpace(payloadJson))
-                {
-                    var sanitizedRunId = runId.ToString().SanitizeForLog();
-                    var sanitizedDomain = domain.SanitizeForLog();
-                    var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
-                    _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
-                    return null;
-                }
-            }
-
-            var data = JsonSerializer.Deserialize<T>(payloadJson);
-            if (data == null)
-            {
-                _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, doc.Data?.Length ?? 0);
+                _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
                 return null;
             }
 
-            return new DomainSnapshot<T> { UpdatedAt = doc.UpdatedAt, Data = data };
+            try
+            {
+                if (SnapshotPartitionHeader.TryRead(doc.Data, out var header) && header != null)
+                {
+                    var pieces = await LoadCommittedPiecesAsync(runId, domain, header, ct);
+                    var payloadJson = SnapshotPartitioner.ReadCommitted(doc.Data, pieces);
+                    if (payloadJson == null)
+                    {
+                        if (attempt < 2)
+                        {
+                            await Task.Delay(50, ct);
+                            continue;
+                        }
+
+                        var sanitizedRunId = runId.ToString().SanitizeForLog();
+                        var sanitizedDomain = domain.SanitizeForLog();
+                        _logger.LogWarning(
+                            "[Store] GetDomain: partitioned snapshot for run={RunId} domain={Domain} was incomplete",
+                            sanitizedRunId,
+                            sanitizedDomain);
+                        return null;
+                    }
+
+                    return DeserializeDomain<T>(runId, domain, doc, payloadJson);
+                }
+
+                var inlineJson = doc.Data;
+                var pointer = TryReadSnapshotPayloadPointer(inlineJson);
+                if (pointer != null)
+                {
+                    inlineJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
+                    if (string.IsNullOrWhiteSpace(inlineJson))
+                    {
+                        var sanitizedRunId = runId.ToString().SanitizeForLog();
+                        var sanitizedDomain = domain.SanitizeForLog();
+                        var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
+                        _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
+                        return null;
+                    }
+                }
+
+                return DeserializeDomain<T>(runId, domain, doc, inlineJson);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, doc.Data?.Length ?? 0);
+                return null;
+            }
         }
-        catch (JsonException ex)
+
+        return null;
+    }
+
+    /// <summary>
+    /// Rewrites one legacy snapshot document when its payload has not changed
+    /// since it was read. A concurrent poll that stored a newer payload wins.
+    /// </summary>
+    public async Task<bool> TryUpgradeLegacyDomainAsync(DomainSnapshotDocument legacy, CancellationToken ct = default)
+    {
+        if (legacy == null || string.IsNullOrWhiteSpace(legacy.Data))
+            return false;
+
+        if (!SnapshotPartitioner.ShouldTranslateStoredData(legacy.Data))
+            return false;
+
+        var pointer = TryReadSnapshotPayloadPointer(legacy.Data);
+        var payloadJson = legacy.Data;
+        if (pointer != null)
         {
-            _logger.LogWarning(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, doc.Data?.Length ?? 0);
-            return null;
+            payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
+            if (string.IsNullOrWhiteSpace(payloadJson))
+                return false;
+        }
+
+        var plan = SnapshotPartitioner.Plan(payloadJson);
+        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Data, legacy.Data);
+        var domainFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, legacy.RunId)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, legacy.Domain);
+
+        if (plan is SnapshotPlan.Inline inline)
+        {
+            SnapshotPartitioner.EnsureWithinHardCap(inline.Json);
+            var inlineUpdate = Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, inline.Json)
+                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow);
+            var inlineResult = await CosmosThrottle.ExecuteAsync(
+                token => _snapshots.UpdateOneAsync(filter, inlineUpdate, cancellationToken: token),
+                ct,
+                _logger);
+            if (inlineResult.MatchedCount == 0)
+                return false;
+
+            await DeletePartsAsync(legacy.RunId, legacy.Domain, ct);
+            if (pointer != null)
+                await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, ct);
+            return true;
+        }
+
+        if (plan is not SnapshotPlan.Partitioned partitioned)
+            return false;
+
+        var committed = await CommitPartitionAsync(domainFilter, legacy.RunId, legacy.Domain, partitioned, ct, filter);
+        if (!committed)
+            return false;
+
+        if (pointer != null)
+            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, ct);
+        return true;
+    }
+
+    public async Task<int> SplitOversizedLogChunksAsync(CancellationToken ct = default)
+    {
+        var split = 0;
+        var oversized = await _logs.Find(l => l.BsonByteCount > MaxLogChunkEstimatedBsonBytes
+                || l.LineCount > MaxLogLinesPerChunk)
+            .Limit(25)
+            .ToListAsync(ct);
+
+        foreach (var chunk in oversized)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (chunk.Lines.Count == 0)
+                continue;
+
+            var sequences = chunk.LineSequences ?? [];
+            var maxChunkNumber = await _logs.Find(l => l.RunId == chunk.RunId)
+                .SortByDescending(l => l.ChunkNumber)
+                .Project(l => l.ChunkNumber)
+                .FirstOrDefaultAsync(ct);
+
+            var bufferLines = new List<string>();
+            var bufferSequences = new List<long>();
+            var bufferBytes = 0;
+            var nextNumber = maxChunkNumber + 1;
+
+            async Task FlushAsync()
+            {
+                if (bufferLines.Count == 0)
+                    return;
+
+                var document = new RunLogDocument
+                {
+                    Id = CreateLogChunkId(chunk.RunId, nextNumber),
+                    RunId = chunk.RunId,
+                    ChunkNumber = nextNumber,
+                    LineCount = bufferLines.Count,
+                    BsonByteCount = bufferBytes,
+                    Lines = [.. bufferLines],
+                    LineSequences = [.. bufferSequences],
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+                EnsureLogChunkWithinCap(document);
+                await CosmosThrottle.ExecuteAsync(
+                    token => _logs.InsertOneAsync(document, cancellationToken: token),
+                    ct,
+                    _logger);
+                nextNumber++;
+                bufferLines.Clear();
+                bufferSequences.Clear();
+                bufferBytes = 0;
+            }
+
+            for (var i = 0; i < chunk.Lines.Count; i++)
+            {
+                var line = NormalizeLineForChunkBudget(chunk.RunId, chunk.Lines[i]);
+                var lineBytes = EstimateLogLineBsonBytes(line);
+                var sequence = i < sequences.Count ? sequences[i] : 0L;
+                if (bufferLines.Count > 0
+                    && (bufferLines.Count >= MaxLogLinesPerChunk
+                        || bufferBytes + lineBytes > MaxLogChunkEstimatedBsonBytes))
+                {
+                    await FlushAsync();
+                }
+
+                bufferLines.Add(line);
+                bufferSequences.Add(sequence);
+                bufferBytes += lineBytes;
+            }
+
+            await FlushAsync();
+            await CosmosThrottle.ExecuteAsync(
+                token => _logs.DeleteOneAsync(l => l.Id == chunk.Id, token),
+                ct,
+                _logger);
+            split++;
+        }
+
+        return split;
+    }
+
+    private async Task CommitHeaderAsync(
+        FilterDefinition<DomainSnapshotDocument> filter,
+        Guid runId,
+        string domain,
+        string data,
+        CancellationToken ct)
+    {
+        var update = Builders<DomainSnapshotDocument>.Update
+            .Set(d => d.Data, data)
+            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+            .SetOnInsert(d => d.RunId, runId)
+            .SetOnInsert(d => d.Domain, domain);
+
+        await CosmosThrottle.ExecuteAsync(
+            token => _snapshots.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, token),
+            ct,
+            _logger);
+    }
+
+    private async Task<bool> CommitPartitionAsync(
+        FilterDefinition<DomainSnapshotDocument> upsertFilter,
+        Guid runId,
+        string domain,
+        SnapshotPlan.Partitioned partitioned,
+        CancellationToken ct,
+        FilterDefinition<DomainSnapshotDocument>? compareAndSwap = null)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var generationId = Guid.NewGuid().ToString("N");
+            var headerJson = SnapshotPartitioner.BuildHeaderJson(
+                generationId,
+                partitioned.Mode,
+                partitioned.Pieces.Count,
+                partitioned.SkeletonJson);
+            SnapshotPartitioner.EnsureWithinHardCap(headerJson);
+            await WritePartsAsync(runId, domain, generationId, partitioned.Pieces, ct);
+
+            var update = Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, headerJson)
+                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+                .SetOnInsert(d => d.RunId, runId)
+                .SetOnInsert(d => d.Domain, domain);
+
+            if (compareAndSwap == null)
+            {
+                await CosmosThrottle.ExecuteAsync(
+                    token => _snapshots.UpdateOneAsync(upsertFilter, update, new UpdateOptions { IsUpsert = true }, token),
+                    ct,
+                    _logger);
+            }
+            else
+            {
+                var result = await CosmosThrottle.ExecuteAsync(
+                    token => _snapshots.UpdateOneAsync(compareAndSwap, update, cancellationToken: token),
+                    ct,
+                    _logger);
+                if (result.MatchedCount == 0)
+                {
+                    await DeleteGenerationAsync(runId, domain, generationId, ct);
+                    return false;
+                }
+            }
+
+            if (await GenerationIsCommittedAsync(upsertFilter, runId, domain, generationId, ct))
+            {
+                // Drop generations this commit replaced, including one written by a
+                // racer that started before our header existed. Then confirm we still
+                // own the header, so we did not delete the winner's parts.
+                await DeleteOtherGenerationsAsync(runId, domain, generationId, ct);
+                if (await GenerationIsCommittedAsync(upsertFilter, runId, domain, generationId, ct))
+                    return true;
+            }
+
+            await DeleteGenerationAsync(runId, domain, generationId, ct);
+        }
+
+        throw new InvalidOperationException(
+            $"Could not commit a consistent snapshot for domain '{domain}'.");
+    }
+
+    private async Task WritePartsAsync(
+        Guid runId,
+        string domain,
+        string generationId,
+        IReadOnlyList<SnapshotPiece> pieces,
+        CancellationToken ct)
+    {
+        const int batchSize = 100;
+        var now = DateTimeOffset.UtcNow;
+        for (var offset = 0; offset < pieces.Count; offset += batchSize)
+        {
+            var writes = new List<WriteModel<SnapshotPartDocument>>(Math.Min(batchSize, pieces.Count - offset));
+            var end = Math.Min(offset + batchSize, pieces.Count);
+            for (var ordinal = offset; ordinal < end; ordinal++)
+            {
+                var piece = pieces[ordinal];
+                SnapshotPartitioner.EnsureWithinHardCap(piece.Data);
+                var document = new SnapshotPartDocument
+                {
+                    Id = SnapshotPartId(runId, domain, generationId, ordinal),
+                    RunId = runId,
+                    Domain = domain,
+                    GenerationId = generationId,
+                    Ordinal = ordinal,
+                    Kind = piece.Kind,
+                    Path = piece.Path,
+                    Index = piece.Index,
+                    Slice = piece.Slice,
+                    ItemKey = piece.ItemKey,
+                    Data = piece.Data,
+                    UpdatedAt = now
+                };
+                writes.Add(new ReplaceOneModel<SnapshotPartDocument>(
+                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.Id, document.Id),
+                    document)
+                {
+                    IsUpsert = true
+                });
+            }
+
+            await CosmosThrottle.ExecuteAsync(
+                token => _parts.BulkWriteAsync(writes, new BulkWriteOptions { IsOrdered = true }, token),
+                ct,
+                _logger);
         }
     }
+
+    private async Task<List<SnapshotPiece>> LoadCommittedPiecesAsync(
+        Guid runId,
+        string domain,
+        SnapshotPartitionHeader header,
+        CancellationToken ct)
+    {
+        var pieces = new List<SnapshotPiece>(header.PartCount);
+        var ordinal = 0;
+        while (pieces.Count < header.PartCount)
+        {
+            var batch = await _parts.Find(p => p.RunId == runId
+                    && p.Domain == domain
+                    && p.GenerationId == header.GenerationId
+                    && p.Ordinal >= ordinal)
+                .SortBy(p => p.Ordinal)
+                .Limit(200)
+                .ToListAsync(ct);
+            if (batch.Count == 0)
+                break;
+
+            foreach (var document in batch)
+            {
+                if (document.Ordinal != pieces.Count)
+                    return pieces;
+
+                pieces.Add(new SnapshotPiece(
+                    document.Kind,
+                    document.Path,
+                    document.Index,
+                    document.Slice,
+                    document.Data,
+                    document.ItemKey));
+            }
+
+            ordinal = batch[^1].Ordinal + 1;
+        }
+
+        return pieces;
+    }
+
+    private Task DeletePartsAsync(Guid runId, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.DeleteManyAsync(p => p.RunId == runId, token),
+            ct,
+            _logger);
+
+    private Task DeletePartsAsync(Guid runId, string domain, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.DeleteManyAsync(p => p.RunId == runId && p.Domain == domain, token),
+            ct,
+            _logger);
+
+    private Task DeleteGenerationAsync(Guid runId, string domain, string generationId, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.DeleteManyAsync(
+                p => p.RunId == runId && p.Domain == domain && p.GenerationId == generationId,
+                token),
+            ct,
+            _logger);
+
+    private Task DeleteOtherGenerationsAsync(Guid runId, string domain, string generationId, CancellationToken ct)
+        => CosmosThrottle.ExecuteAsync(
+            token => _parts.DeleteManyAsync(
+                p => p.RunId == runId && p.Domain == domain && p.GenerationId != generationId,
+                token),
+            ct,
+            _logger);
+
+    private async Task<bool> GenerationIsCommittedAsync(
+        FilterDefinition<DomainSnapshotDocument> filter,
+        Guid runId,
+        string domain,
+        string generationId,
+        CancellationToken ct)
+    {
+        var committed = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
+        if (!SnapshotPartitionHeader.TryRead(committed?.Data, out var header)
+            || header == null
+            || !string.Equals(header.GenerationId, generationId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var pieces = await LoadCommittedPiecesAsync(runId, domain, header, ct);
+        return pieces.Count == header.PartCount;
+    }
+
+    private DomainSnapshot<T>? DeserializeDomain<T>(Guid runId, string domain, DomainSnapshotDocument doc, string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            _logger.LogDebug("[Store] GetDomain: empty payload for run={RunId} domain={Domain}", runId, domain);
+            return null;
+        }
+
+        var data = JsonSerializer.Deserialize<T>(payloadJson);
+        if (data == null)
+        {
+            _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, payloadJson.Length);
+            return null;
+        }
+
+        return new DomainSnapshot<T> { UpdatedAt = doc.UpdatedAt, Data = data };
+    }
+
+    internal static string SnapshotPartId(Guid runId, string domain, string generationId, int ordinal)
+        => $"{runId:N}:{domain}:{generationId}:{ordinal:D8}";
 
     private static SnapshotPayloadPointer? TryReadSnapshotPayloadPointer(string? payload)
     {
@@ -707,6 +1099,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
                     try
                     {
+                        EnsureLogChunkWithinCap(nextChunk);
                         await _logs.InsertOneAsync(nextChunk, cancellationToken: ct);
                         break;
                     }
@@ -782,21 +1175,54 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (EstimateLogLineBsonBytes(line) <= MaxLogChunkEstimatedBsonBytes)
             return line;
 
-        var suffixBytes = Encoding.UTF8.GetByteCount(OversizedLogLineSuffix);
-        var maxLineContentBytes = Math.Max(0, MaxLogChunkEstimatedBsonBytes - EstimatedBsonBytesPerLineOverhead - suffixBytes);
-        var truncatedLine = TruncateToUtf8ByteCount(line, maxLineContentBytes);
+        var kept = line;
+        while (kept.Length > 0
+               && EstimateLogLineBsonBytes(kept + OversizedLogLineSuffix) > MaxLogChunkEstimatedBsonBytes)
+        {
+            var runeCount = 0;
+            foreach (var _ in kept.EnumerateRunes())
+                runeCount++;
+
+            kept = TakeRunes(kept, Math.Max(0, runeCount - Math.Max(1, runeCount / 8)));
+        }
 
         _logger.LogWarning(
             "[Store] AppendLogs: truncated oversized log line for run={RunId} from {OriginalBytes} to {PersistedBytes} bytes",
-            runId,
+            runId.ToString().SanitizeForLog(),
             Encoding.UTF8.GetByteCount(line),
-            Encoding.UTF8.GetByteCount(truncatedLine));
+            Encoding.UTF8.GetByteCount(kept));
 
-        return truncatedLine + OversizedLogLineSuffix;
+        return kept + OversizedLogLineSuffix;
+    }
+
+    private static string TakeRunes(string value, int runeCount)
+    {
+        var builder = new StringBuilder(value.Length);
+        var taken = 0;
+        foreach (var rune in value.EnumerateRunes())
+        {
+            if (taken >= runeCount)
+                break;
+
+            builder.Append(rune.ToString());
+            taken++;
+        }
+
+        return builder.ToString();
     }
 
     private static int EstimateLogLineBsonBytes(string line)
-        => Encoding.UTF8.GetByteCount(line) + EstimatedBsonBytesPerLineOverhead;
+        => SnapshotPartitioner.EscapedContentBytes(line) + EstimatedBsonBytesPerLineOverhead;
+
+    private static void EnsureLogChunkWithinCap(RunLogDocument chunk)
+    {
+        var json = JsonSerializer.Serialize(chunk);
+        if (Encoding.UTF8.GetByteCount(json) > SnapshotPartitioner.HardCapBytes)
+        {
+            throw new SnapshotDocumentTooLargeException(
+                $"Run log chunk is {Encoding.UTF8.GetByteCount(json)} UTF-8 bytes, over the {SnapshotPartitioner.HardCapBytes} byte Cosmos limit.");
+        }
+    }
 
     private static int EstimateChunkLinesBsonBytes(IReadOnlyList<string> lines)
     {
@@ -805,26 +1231,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             total += EstimateLogLineBsonBytes(chunkLine);
 
         return total;
-    }
-
-    private static string TruncateToUtf8ByteCount(string value, int maxBytes)
-    {
-        if (string.IsNullOrEmpty(value) || maxBytes <= 0)
-            return string.Empty;
-
-        var builder = new StringBuilder(value.Length);
-        var usedBytes = 0;
-        foreach (var rune in value.EnumerateRunes())
-        {
-            var runeBytes = rune.Utf8SequenceLength;
-            if (usedBytes + runeBytes > maxBytes)
-                break;
-
-            builder.Append(rune.ToString());
-            usedBytes += runeBytes;
-        }
-
-        return builder.ToString();
     }
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)

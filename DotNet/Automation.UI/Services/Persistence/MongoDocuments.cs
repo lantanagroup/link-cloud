@@ -149,3 +149,41 @@ public sealed class RunLogSequenceDocument
 
     public long NextSequence { get; set; }
 }
+
+/// <summary>
+/// One piece of a domain snapshot. The id includes the generation so a rewrite
+/// does not overwrite the generation a reader is still using.
+/// <see cref="GenerationId"/> must match the header before a reader accepts the piece.
+/// </summary>
+[BsonIgnoreExtraElements]
+public sealed class SnapshotPartDocument
+{
+    public const string CollectionName = "automation_snapshot_parts";
+
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string Domain { get; set; } = string.Empty;
+
+    public string GenerationId { get; set; } = string.Empty;
+
+    public int Ordinal { get; set; }
+
+    public string Kind { get; set; } = string.Empty;
+
+    public string Path { get; set; } = string.Empty;
+
+    public int Index { get; set; }
+
+    public int Slice { get; set; }
+
+    public string? ItemKey { get; set; }
+
+    public string Data { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset UpdatedAt { get; set; }
+}
