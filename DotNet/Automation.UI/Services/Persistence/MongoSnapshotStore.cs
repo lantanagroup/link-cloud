@@ -1752,9 +1752,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private async Task StampFollowingUnsequencedChunksAsync(RunLogDocument chunk, long firstSequence, CancellationToken ct)
     {
         var next = firstSequence + chunk.Lines.Count;
-        var prefix = CreateLogChunkPrefix(chunk.RunId);
         var later = await _logs.Find(Builders<RunLogDocument>.Filter.And(
-                Builders<RunLogDocument>.Filter.Gte(l => l.Id, prefix),
+                CreateLogChunkFilter(chunk.RunId),
                 Builders<RunLogDocument>.Filter.Gt(l => l.Id, chunk.Id)))
             .SortBy(l => l.Id)
             .Project(l => new RunLogDocument
@@ -1825,6 +1824,17 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 if (await IsFrozenForAppendAsync(candidate, ct))
                     continue;
+
+                if (!string.IsNullOrEmpty(candidate.SplitFromId))
+                {
+                    await CosmosThrottle.ExecuteAsync(
+                        token => _logs.UpdateOneAsync(
+                            l => l.Id == candidate.Id && l.SplitFromId == candidate.SplitFromId,
+                            Builders<RunLogDocument>.Update.Unset(l => l.SplitFromId),
+                            cancellationToken: token),
+                        ct,
+                        _logger);
+                }
 
                 return await _logs.Find(l => l.Id == candidate.Id).FirstOrDefaultAsync(ct);
             }
