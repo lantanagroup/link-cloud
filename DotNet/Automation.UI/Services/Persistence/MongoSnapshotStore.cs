@@ -63,6 +63,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal static Func<CancellationToken, Task>? BeforePartitionHeaderPublishForTests { get; set; }
 
     /// <summary>
+    /// Test hook invoked after a header publish returns and before the commit
+    /// check. Production leaves it null. Cleared after one call.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? AfterPartitionHeaderPublishForTests { get; set; }
+
+    /// <summary>
     /// Test hook invoked after a header id is chosen and before the header
     /// document is written. Production leaves it null.
     /// </summary>
@@ -708,10 +714,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             if (chosen != null && legacy.UpdatedAt <= chosen.UpdatedAt)
             {
+                var stale = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
+                    & SameRevision(legacy.Revision);
                 await CosmosThrottle.ExecuteAsync(
-                    token => _snapshots.DeleteOneAsync(
-                        d => d.Id == legacy.Id && d.UpdatedAt == legacy.UpdatedAt,
-                        token),
+                    token => _snapshots.DeleteOneAsync(stale, token),
                     ct,
                     _logger);
             }
@@ -729,10 +735,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var plan = SnapshotPartitioner.Plan(payloadJson);
-        // Match id and timestamp. The legacy payload can already be near 2 MB,
+        // Match id and revision. The legacy payload can already be near 2 MB,
         // and putting it in the update filter makes the command exceed the cap.
+        // UpdatedAt is not unique across writers.
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
-            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, legacy.UpdatedAt);
+            & SameRevision(legacy.Revision);
 
         if (plan is SnapshotPlan.Inline inline)
         {
@@ -1878,6 +1885,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var update = Builders<DomainSnapshotDocument>.Update
             .Set(d => d.Data, data)
             .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+            .Set(d => d.Revision, NewSnapshotRevision())
             .SetOnInsert(d => d.Id, headerId)
             .SetOnInsert(d => d.RunId, runId)
             .SetOnInsert(d => d.Domain, domain);
@@ -1924,12 +1932,23 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (BeforePartitionHeaderPublishForTests != null)
                 await BeforePartitionHeaderPublishForTests(ct);
 
-            // The retry matches this timestamp, not the header JSON. A header near
+            // A sweep can remove parts that aged out before the header exists.
+            // Publishing after that would replace a readable snapshot with a
+            // header whose parts are already gone.
+            if (!await GenerationPartsPresentAsync(runId, domain, generationId, partitioned.Pieces.Count, ct))
+            {
+                await DeleteGenerationAsync(runId, domain, generationId, ct);
+                continue;
+            }
+
+            // The retry matches this revision, not the header JSON. A header near
             // 1 MB plus the same JSON in the filter would cross the 2 MB request cap.
-            var publishedAt = DateTimeOffset.UtcNow;
+            // UpdatedAt can be shared by two writers, so it is not the match.
+            var publishedRevision = NewSnapshotRevision();
             var update = Builders<DomainSnapshotDocument>.Update
                 .Set(d => d.Data, headerJson)
-                .Set(d => d.UpdatedAt, publishedAt)
+                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+                .Set(d => d.Revision, publishedRevision)
                 .SetOnInsert(d => d.Id, headerId)
                 .SetOnInsert(d => d.RunId, runId)
                 .SetOnInsert(d => d.Domain, domain);
@@ -1951,6 +1970,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 await DeleteGenerationAsync(runId, domain, generationId, ct);
                 return false;
+            }
+
+            if (AfterPartitionHeaderPublishForTests != null)
+            {
+                var afterPublish = AfterPartitionHeaderPublishForTests;
+                AfterPartitionHeaderPublishForTests = null;
+                await afterPublish(ct);
             }
 
             // A sweep that already decided these parts were old must not match
@@ -1984,7 +2010,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             // The header we just published is incomplete because its parts were
             // removed. The next attempt may replace that revision and no other.
             headerFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId)
-                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, publishedAt);
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, publishedRevision);
             await DeleteGenerationAsync(runId, domain, generationId, ct);
         }
 
@@ -2221,6 +2247,42 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 ct,
                 _logger);
         }
+    }
+
+    private static string NewSnapshotRevision() => Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// A missing or empty revision is a document written before the field
+    /// existed. A stored revision matches only that exact value.
+    /// </summary>
+    private static FilterDefinition<DomainSnapshotDocument> SameRevision(string? revision)
+    {
+        if (!string.IsNullOrEmpty(revision))
+            return Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, revision);
+
+        return Builders<DomainSnapshotDocument>.Filter.Or(
+            Builders<DomainSnapshotDocument>.Filter.Exists(d => d.Revision, false),
+            Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, string.Empty),
+            Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, (string?)null));
+    }
+
+    private async Task<bool> GenerationPartsPresentAsync(
+        Guid runId,
+        string domain,
+        string generationId,
+        int partCount,
+        CancellationToken ct)
+    {
+        var count = await CosmosThrottle.ExecuteAsync(
+            token => _parts.CountDocumentsAsync(
+                p => p.RunId == runId
+                    && p.Domain == domain
+                    && p.GenerationId == generationId
+                    && p.Ordinal < partCount,
+                cancellationToken: token),
+            ct,
+            _logger);
+        return count == partCount;
     }
 
     private static string? GenerationIdOf(string? data)
