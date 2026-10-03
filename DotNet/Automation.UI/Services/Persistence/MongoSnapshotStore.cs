@@ -748,7 +748,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (plan is SnapshotPlan.Inline inline)
         {
             SnapshotPartitioner.EnsureWithinHardCap(inline.Json);
-            var before = await ReplaceHeaderAsync(filter, legacy.Id, legacy.RunId, legacy.Domain, inline.Json, upsert: false, ct);
+            var before = await ReplaceHeaderAsync(
+                filter, legacy.Id, legacy.RunId, legacy.Domain, inline.Json, upsert: false, ct, legacy.UpdatedAt);
             if (before == null)
                 return false;
 
@@ -762,7 +763,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (plan is not SnapshotPlan.Partitioned partitioned)
             return false;
 
-        var committed = await CommitPartitionAsync(legacy.Id, upsert: false, legacy.RunId, legacy.Domain, partitioned, ct, filter);
+        var committed = await CommitPartitionAsync(
+            legacy.Id, upsert: false, legacy.RunId, legacy.Domain, partitioned, ct, filter, legacy.UpdatedAt);
         if (!committed)
             return false;
 
@@ -1877,7 +1879,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         string domain,
         string data,
         bool upsert,
-        CancellationToken ct)
+        CancellationToken ct,
+        DateTimeOffset? preserveUpdatedAt = null)
     {
         if (BeforeSnapshotHeaderWriteForTests != null)
         {
@@ -1886,9 +1889,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             await beforeWrite(ct);
         }
 
+        // Migration keeps the timestamp it read. A newer duplicate written while
+        // this publish was in progress must stay newer than the migrated header.
         var update = Builders<DomainSnapshotDocument>.Update
             .Set(d => d.Data, data)
-            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+            .Set(d => d.UpdatedAt, preserveUpdatedAt ?? DateTimeOffset.UtcNow)
             .Set(d => d.Revision, NewSnapshotRevision())
             .SetOnInsert(d => d.Id, headerId)
             .SetOnInsert(d => d.RunId, runId)
@@ -1911,7 +1916,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         string domain,
         SnapshotPlan.Partitioned partitioned,
         CancellationToken ct,
-        FilterDefinition<DomainSnapshotDocument>? compareAndSwap = null)
+        FilterDefinition<DomainSnapshotDocument>? compareAndSwap = null,
+        DateTimeOffset? preserveUpdatedAt = null)
     {
         var headerFilter = compareAndSwap
             ?? Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId);
@@ -1952,7 +1958,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var publishedRevision = NewSnapshotRevision();
             var update = Builders<DomainSnapshotDocument>.Update
                 .Set(d => d.Data, headerJson)
-                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
+                .Set(d => d.UpdatedAt, preserveUpdatedAt ?? DateTimeOffset.UtcNow)
                 .Set(d => d.Revision, publishedRevision)
                 .SetOnInsert(d => d.Id, headerId)
                 .SetOnInsert(d => d.RunId, runId)

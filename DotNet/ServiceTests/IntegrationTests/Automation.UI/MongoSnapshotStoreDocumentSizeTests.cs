@@ -1721,6 +1721,52 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TryUpgrade_keeps_a_newer_duplicate_inserted_during_migration()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        var duplicateId = ObjectId.GenerateNewId();
+        MongoSnapshotStore.BeforePartitionHeaderPublishForTests = _ =>
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+            return snapshots.InsertOneAsync(new DomainSnapshotDocument
+            {
+                Id = duplicateId,
+                RunId = runId,
+                Domain = "populations",
+                Data = "{\"Name\":\"newer\"}",
+                UpdatedAt = legacy.UpdatedAt.AddMinutes(2)
+            });
+        };
+
+        try
+        {
+            (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeTrue();
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+        }
+
+        var migrated = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        migrated.UpdatedAt.Should().Be(legacy.UpdatedAt);
+        var duplicate = await snapshots.Find(d => d.Id == duplicateId).FirstAsync();
+        duplicate.Data.Should().Be("{\"Name\":\"newer\"}");
+        var read = await store.GetDomainAsync<LegacySchedule>(runId, "populations", CancellationToken.None);
+        read!.Data.Name.Should().Be("newer");
+    }
+
+    [Fact]
     public async Task Retry_keeps_a_same_timestamp_write_that_has_its_own_revision()
     {
         var store = CreateGuardedStore();
