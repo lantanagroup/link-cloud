@@ -339,6 +339,29 @@ public class SnapshotPartitionerTests
     }
 
     [Fact]
+    public void Deep_structured_payload_round_trips_at_the_nesting_limit()
+    {
+        const int maxDepth = 64;
+        var json = "{\"value\":\"" + new string('d', 20_000) + "\"}";
+        for (var depth = 1; depth < maxDepth; depth++)
+            json = "{\"child\":" + json + "}";
+
+        using (var payload = JsonDocument.Parse(json))
+            payload.RootElement.ValueKind.Should().Be(JsonValueKind.Object);
+
+        var split = SnapshotPartitioner.Plan(json, 8_000).Should().BeOfType<SnapshotPlan.Partitioned>().Subject;
+        split.Mode.Should().Be(SnapshotPartitioner.StructuredMode);
+        split.SkeletonJson.Should().NotBeNull();
+        var header = SnapshotPartitioner.BuildHeaderJson("gen", split.Mode, split.Pieces.Count, split.SkeletonJson);
+        var parseHeader = () => JsonDocument.Parse(header);
+        parseHeader.Should().Throw<JsonException>();
+
+        SnapshotPartitionHeader.TryRead(header, out var read).Should().BeTrue();
+        read!.PartCount.Should().Be(split.Pieces.Count);
+        SnapshotPartitioner.ReadCommitted(header, split.Pieces).Should().Be(json);
+    }
+
+    [Fact]
     public void Huge_record_id_is_not_copied_into_the_item_key()
     {
         var id = new string('k', 1_500_000);

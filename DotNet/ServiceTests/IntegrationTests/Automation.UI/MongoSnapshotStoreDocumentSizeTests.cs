@@ -2373,6 +2373,72 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         (await logs.Find(l => l.Id == source.Id).AnyAsync()).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task Split_keeps_lines_when_near_cap_takeover_deletes_the_source()
+    {
+        var storeA = CreateGuardedStore();
+        var storeB = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var claims = _fixture.Database.GetCollection<LogSplitClaimDocument>(LogSplitClaimDocument.CollectionName);
+        var runs = _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs");
+        await runs.InsertOneAsync(new AutomationRunDocument
+        {
+            RunId = runId,
+            Status = "Running",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        var source = LargestTwoLineChunkUnderTheCap(runId);
+        source.ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion;
+        MongoSnapshotStore.LogMetadataFits(source).Should().BeFalse();
+        await logs.InsertOneAsync(source);
+
+        var bClaimed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var aPublished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? splitB = null;
+        MongoSnapshotStore.BeforeLogSourceDeleteForTests = async ct =>
+        {
+            var claim = await claims.Find(c => c.Id == source.Id).FirstAsync(ct);
+            claim.PublishingAttempt.Should().NotBeNullOrEmpty();
+            await claims.UpdateOneAsync(
+                c => c.Id == source.Id && c.PublishingAttempt == claim.PublishingAttempt,
+                Builders<LogSplitClaimDocument>.Update.Set(c => c.ClaimedAt, DateTimeOffset.UtcNow.AddMinutes(-10)),
+                cancellationToken: ct);
+            MongoSnapshotStore.AfterLogSplitClaimedForTests = async innerCt =>
+            {
+                bClaimed.TrySetResult();
+                await aPublished.Task.WaitAsync(TimeSpan.FromSeconds(30), innerCt);
+            };
+            splitB = storeB.SplitOversizedLogChunksAsync(ct);
+            await bClaimed.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+        };
+        MongoSnapshotStore.AfterLogSourceDeletedForTests = _ =>
+        {
+            aPublished.TrySetResult();
+            return Task.CompletedTask;
+        };
+
+        try
+        {
+            await storeA.SplitOversizedLogChunksAsync(CancellationToken.None);
+            splitB.Should().NotBeNull();
+            await splitB!;
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforeLogSourceDeleteForTests = null;
+            MongoSnapshotStore.AfterLogSplitClaimedForTests = null;
+            MongoSnapshotStore.AfterLogSourceDeletedForTests = null;
+            bClaimed.TrySetResult();
+            aPublished.TrySetResult();
+        }
+
+        (await logs.Find(l => l.Id == source.Id).AnyAsync()).Should().BeFalse();
+        (await logs.Find(l => l.SplitFromId == source.Id).AnyAsync()).Should().BeFalse();
+        var read = await storeA.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(source.Lines);
+    }
+
     private static RunLogDocument OversizedChunk(Guid runId, int chunkNumber, IReadOnlyList<string> lines)
         => new()
         {

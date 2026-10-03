@@ -664,6 +664,12 @@ public sealed record SnapshotPiece(string Kind, string Path, int Index, int Slic
 
 public sealed record SnapshotPartitionHeader(string GenerationId, string Mode, int PartCount, string? SkeletonJson)
 {
+    /// <summary>
+    /// One level past System.Text.Json's default of 64, for the object
+    /// <see cref="SnapshotPartitioner.BuildHeaderJson"/> adds around the skeleton.
+    /// </summary>
+    public const int HeaderJsonMaxDepth = 65;
+
     public static bool TryRead(string? data, out SnapshotPartitionHeader? header)
     {
         header = null;
@@ -672,7 +678,9 @@ public sealed record SnapshotPartitionHeader(string GenerationId, string Mode, i
 
         try
         {
-            using var doc = JsonDocument.Parse(data);
+            // The skeleton can already be at the default nesting limit. The header
+            // wraps it in one more object, so this parse allows that extra level.
+            using var doc = JsonDocument.Parse(data, new JsonDocumentOptions { MaxDepth = HeaderJsonMaxDepth });
             if (doc.RootElement.ValueKind != JsonValueKind.Object)
                 return false;
 
