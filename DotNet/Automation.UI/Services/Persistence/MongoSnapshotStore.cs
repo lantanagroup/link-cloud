@@ -796,10 +796,20 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
             if (chunk.ResumePublishing)
             {
-                await FinishExternalPublishAsync(chunk, start.Value, chunk.SplitCount ?? planned.Count, ct);
+                if (await FinishExternalPublishAsync(chunk, start.Value, chunk.SplitCount ?? planned.Count, ct))
+                {
+                    chunk.ResumePublishing = false;
+                    split++;
+                    continue;
+                }
+
                 chunk.ResumePublishing = false;
-                split++;
-                continue;
+                var replanned = await ReplanChangedExternalSplitAsync(chunk, metadataFits, ct);
+                if (replanned == null || chunk.SplitStart == null)
+                    continue;
+
+                planned = replanned;
+                start = chunk.SplitStart;
             }
 
             var fresh = await _logs.Find(l => l.Id == chunk.Id).FirstOrDefaultAsync(ct);
@@ -835,88 +845,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     continue;
             }
 
-            var wrote = false;
-            for (var attempt = 0; attempt < 5 && !wrote; attempt++)
-            {
-                if (BeforeLogReplacementInsertForTests != null)
-                {
-                    var insertHook = BeforeLogReplacementInsertForTests;
-                    BeforeLogReplacementInsertForTests = null;
-                    await insertHook(ct);
-                }
-                var collided = false;
-                for (var n = 0; n < planned.Count; n++)
-                {
-                    var document = planned[n];
-                    document.Id = CreateLogChunkId(chunk.RunId, start.Value + n);
-                    document.ChunkNumber = start.Value + n;
-                    document.SplitFromId = chunk.Id;
-                    document.SplitAttempt = chunk.SplitAttempt;
-                    document.UpdatedAt = DateTimeOffset.UtcNow;
-                    EnsureLogChunkWithinCap(document);
-
-                    var existing = await _logs.Find(l => l.Id == document.Id).FirstOrDefaultAsync(ct);
-                    if (existing != null && existing.SplitFromId != chunk.Id)
-                    {
-                        collided = true;
-                        break;
-                    }
-
-                    // A successor's row carries that attempt's id. Rewriting it
-                    // from this attempt's stale plan drops lines the successor
-                    // already kept.
-                    if (existing != null
-                        && !string.Equals(existing.SplitAttempt, chunk.SplitAttempt, StringComparison.Ordinal))
-                    {
-                        collided = true;
-                        break;
-                    }
-
-                    // Same text at a different sequence is an appended event. A resume
-                    // that only compares text would delete the source and lose it.
-                    if (existing != null && !SameLogLines(existing, document))
-                    {
-                        await PreserveAppendedReplacementAsync(existing, chunk, chunk.SplitAttempt, ct);
-                        collided = true;
-                        break;
-                    }
-
-                    if (existing == null)
-                    {
-                        try
-                        {
-                            await CosmosThrottle.ExecuteAsync(
-                                token => _logs.InsertOneAsync(document, cancellationToken: token),
-                                ct,
-                                _logger);
-                        }
-                        catch (Exception ex) when (IsDuplicateKey(ex))
-                        {
-                            collided = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!collided)
-                {
-                    wrote = true;
-                    break;
-                }
-
-                if (!await StillOwnLogSplitAsync(chunk.Id, metadataFits, ct))
-                {
-                    start = null;
-                    break;
-                }
-
-                await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: false, ct);
-                chunk.SplitStart = null;
-                start = await ClaimLogSplitStartAsync(chunk, planned.Count, metadataFits, ct, resumeSavedStart: false);
-                if (start == null)
-                    break;
-            }
-
+            var write = await WriteSplitReplacementsAsync(chunk, planned, start.Value, metadataFits, ct);
+            start = write.Start;
             if (start == null || !await StillOwnLogSplitAsync(chunk.Id, metadataFits, ct))
             {
                 if (start != null && !await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct))
@@ -924,7 +854,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 continue;
             }
 
-            if (!wrote)
+            if (!write.Wrote)
             {
                 throw new InvalidOperationException(
                     $"Could not split log chunk '{chunk.Id.SanitizeForLog()}' without overwriting another chunk.");
@@ -935,11 +865,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             // removing them and then finding the source already gone.
             if (!metadataFits)
             {
-                if (!await MarkExternalSplitPublishingAsync(chunk, ct))
+                if (!await PublishExternalSplitAsync(chunk, planned, start.Value, metadataFits, ct))
                     continue;
 
-                await FinishExternalPublishAsync(chunk, start.Value, planned.Count, ct);
                 split++;
+                continue;
+            }
+
+            await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: true, ct);
+            if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+            {
+                if (!await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct))
+                    await DeleteAbandonedSplitAsync(chunk, start.Value, planned.Count, ct);
                 continue;
             }
 
@@ -1265,7 +1202,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     & Builders<LogSplitClaimDocument>.Filter.Gte(c => c.ClaimedAt, cutoff),
                 Builders<LogSplitClaimDocument>.Update
                     .Set(c => c.PublishingAttempt, chunk.SplitAttempt)
-                    .Set(c => c.ClaimedAt, now),
+                    .Set(c => c.ClaimedAt, now)
+                    .Set(c => c.SourceLineCount, chunk.LineCount),
                 new FindOneAndUpdateOptions<LogSplitClaimDocument> { ReturnDocument = ReturnDocument.After },
                 token),
             ct,
@@ -1273,16 +1211,50 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return updated != null
             && string.Equals(updated.Owner, _logSplitOwner, StringComparison.Ordinal)
             && string.Equals(updated.PublishingAttempt, chunk.SplitAttempt, StringComparison.Ordinal)
-            && string.Equals(updated.AttemptId, chunk.SplitAttempt, StringComparison.Ordinal);
+            && string.Equals(updated.AttemptId, chunk.SplitAttempt, StringComparison.Ordinal)
+            && updated.SourceLineCount == chunk.LineCount;
     }
 
     /// <summary>
-    /// Deletes the source when it still has the planned line count, then detaches
-    /// this attempt's replacements. A source that is already gone is treated as
-    /// published. A source whose line count changed is left alone.
+    /// Deletes the source when it still has the line count stored with the
+    /// publishing mark, then detaches this attempt's replacements. A source that
+    /// is already gone is treated as published. A source that grew is left in
+    /// place and the mark is cleared so the caller can split the new lines.
     /// </summary>
-    private async Task FinishExternalPublishAsync(RunLogDocument chunk, int start, int count, CancellationToken ct)
+    private async Task<bool> FinishExternalPublishAsync(RunLogDocument chunk, int start, int count, CancellationToken ct)
     {
+        if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+            return false;
+
+        var claim = await _logSplitClaims.Find(c => c.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (claim == null
+            || !string.Equals(claim.PublishingAttempt, chunk.SplitAttempt, StringComparison.Ordinal)
+            || !string.Equals(claim.AttemptId, chunk.SplitAttempt, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // A claim marked before this field existed has no stored count. Those
+        // deletes keep the in-memory count. New marks always store it.
+        var storedCount = claim.SourceLineCount > 0 ? claim.SourceLineCount : chunk.LineCount;
+        var live = await _logs.Find(l => l.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (live == null)
+        {
+            await DetachPublishedExternalSplitAsync(chunk, start, count, deletedSource: false, ct);
+            return true;
+        }
+
+        if (live.LineCount != storedCount)
+        {
+            await ClearExternalPublishingAsync(chunk, ct);
+            return false;
+        }
+
+        // Drop other attempts' copies while this attempt still owns the lease.
+        // A late insert from a worker that already lost the lease must not
+        // survive next to this attempt's rows.
+        await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: true, ct);
+
         if (BeforeLogSourceDeleteForTests != null)
         {
             var beforeSourceDelete = BeforeLogSourceDeleteForTests;
@@ -1290,17 +1262,169 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             await beforeSourceDelete(ct);
         }
 
+        live = await _logs.Find(l => l.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (live == null)
+        {
+            await DetachPublishedExternalSplitAsync(chunk, start, count, deletedSource: false, ct);
+            return true;
+        }
+
+        if (live.LineCount != storedCount)
+        {
+            await ClearExternalPublishingAsync(chunk, ct);
+            return false;
+        }
+
+        var current = await _logSplitClaims.Find(c => c.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (current == null
+            || !string.Equals(current.AttemptId, chunk.SplitAttempt, StringComparison.Ordinal)
+            || !string.Equals(current.PublishingAttempt, chunk.SplitAttempt, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
         var deleted = await CosmosThrottle.ExecuteAsync(
             token => _logs.DeleteOneAsync(
-                l => l.Id == chunk.Id && l.LineCount == chunk.LineCount,
+                l => l.Id == chunk.Id && l.LineCount == storedCount,
                 token),
             ct,
             _logger);
-        var sourceGone = deleted.DeletedCount == 1
-            || !await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct);
-        if (!sourceGone || string.IsNullOrEmpty(chunk.SplitAttempt))
+        if (deleted.DeletedCount == 1)
+        {
+            await DetachPublishedExternalSplitAsync(chunk, start, count, deletedSource: true, ct);
+            return true;
+        }
+
+        if (!await _logs.Find(l => l.Id == chunk.Id).AnyAsync(ct))
+        {
+            await DetachPublishedExternalSplitAsync(chunk, start, count, deletedSource: false, ct);
+            return true;
+        }
+
+        await ClearExternalPublishingAsync(chunk, ct);
+        return false;
+    }
+
+    /// <summary>
+    /// Marks, deletes, and, when the source grew after the mark, splits that
+    /// source again. <paramref name="planned"/> is already stored.
+    /// </summary>
+    private async Task<bool> PublishExternalSplitAsync(
+        RunLogDocument chunk,
+        List<RunLogDocument> planned,
+        int start,
+        bool metadataFits,
+        CancellationToken ct)
+    {
+        var current = planned;
+        var currentStart = start;
+        for (var pass = 0; pass < 5; pass++)
+        {
+            if (!await MarkExternalSplitPublishingAsync(chunk, ct))
+                return false;
+
+            if (await FinishExternalPublishAsync(chunk, currentStart, current.Count, ct))
+                return true;
+
+            var replanned = await ReplanChangedExternalSplitAsync(chunk, metadataFits, ct);
+            if (replanned == null || chunk.SplitStart == null)
+                return false;
+
+            current = replanned;
+            currentStart = chunk.SplitStart.Value;
+            var write = await WriteSplitReplacementsAsync(chunk, current, currentStart, metadataFits, ct);
+            if (!write.Wrote || write.Start == null)
+                return false;
+
+            currentStart = write.Start.Value;
+            if (!await StillOwnLogSplitAsync(chunk.Id, metadataFits, ct))
+                return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reloads a source that grew after its replacements were marked, drops
+    /// those replacements, and claims a range for the lines that are there now.
+    /// </summary>
+    private async Task<List<RunLogDocument>?> ReplanChangedExternalSplitAsync(
+        RunLogDocument chunk,
+        bool metadataFits,
+        CancellationToken ct)
+    {
+        if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+            return null;
+
+        var live = await _logs.Find(l => l.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (live == null || live.Lines.Count == 0)
+            return null;
+
+        chunk.Lines = live.Lines;
+        chunk.LineCount = live.LineCount;
+        chunk.LineSequences = live.LineSequences;
+        chunk.BsonByteCount = live.BsonByteCount;
+        chunk.ByteCountVersion = live.ByteCountVersion;
+        await OverlaySequenceStampsAsync([chunk], ct);
+
+        // The old attempt still owns these rows. Remove the copies built from
+        // the shorter source before the new claim allocates another range.
+        await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: false, ct);
+        if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+            return null;
+
+        await ClearExternalPublishingAsync(chunk, ct);
+        var claim = await _logSplitClaims.Find(c => c.Id == chunk.Id).FirstOrDefaultAsync(ct);
+        if (claim != null && !string.IsNullOrEmpty(claim.PublishingAttempt))
+            return null;
+
+        chunk.ResumePublishing = false;
+        chunk.SplitStart = null;
+        var firstSequence = await FallbackSequenceBeforeChunkAsync(chunk, ct);
+        await StampFollowingUnsequencedChunksAsync(chunk, firstSequence, ct);
+        var planned = PlanLogSplit(chunk, firstSequence);
+        if (planned.Count == 0)
+            return null;
+
+        var claimedStart = await ClaimLogSplitStartAsync(
+            chunk,
+            planned.Count,
+            metadataFits,
+            ct,
+            resumeSavedStart: false);
+        if (claimedStart == null || chunk.ResumePublishing)
+            return null;
+
+        chunk.SplitStart = claimedStart;
+        return planned;
+    }
+
+    private async Task ClearExternalPublishingAsync(RunLogDocument chunk, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(chunk.SplitAttempt))
             return;
 
+        await CosmosThrottle.ExecuteAsync(
+            token => _logSplitClaims.UpdateOneAsync(
+                c => c.Id == chunk.Id
+                    && c.Owner == _logSplitOwner
+                    && c.AttemptId == chunk.SplitAttempt
+                    && c.PublishingAttempt == chunk.SplitAttempt,
+                Builders<LogSplitClaimDocument>.Update
+                    .Unset(c => c.PublishingAttempt)
+                    .Set(c => c.SourceLineCount, 0),
+                cancellationToken: token),
+            ct,
+            _logger);
+    }
+
+    private async Task DetachPublishedExternalSplitAsync(
+        RunLogDocument chunk,
+        int start,
+        int count,
+        bool deletedSource,
+        CancellationToken ct)
+    {
         await CosmosThrottle.ExecuteAsync(
             token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
             ct,
@@ -1314,7 +1438,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             ct,
             _logger);
 
-        if (deleted.DeletedCount == 1 && AfterLogSourceDeletedForTests != null)
+        if (deletedSource && AfterLogSourceDeletedForTests != null)
         {
             var sourceDeleted = AfterLogSourceDeletedForTests;
             AfterLogSourceDeletedForTests = null;
@@ -1331,6 +1455,124 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 cancellationToken: token),
             ct,
             _logger);
+    }
+
+    /// <summary>
+    /// Inserts <paramref name="planned"/> under the current attempt. A worker
+    /// that loses the lease stops before it writes and does not reconcile the
+    /// successor's rows.
+    /// </summary>
+    private async Task<(bool Wrote, int? Start)> WriteSplitReplacementsAsync(
+        RunLogDocument chunk,
+        List<RunLogDocument> planned,
+        int rangeStart,
+        bool metadataFits,
+        CancellationToken ct)
+    {
+        int? start = rangeStart;
+        var wrote = false;
+        for (var attempt = 0; attempt < 5 && !wrote; attempt++)
+        {
+            if (BeforeLogReplacementInsertForTests != null)
+            {
+                var insertHook = BeforeLogReplacementInsertForTests;
+                BeforeLogReplacementInsertForTests = null;
+                await insertHook(ct);
+            }
+
+            if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+            {
+                start = null;
+                break;
+            }
+
+            var collided = false;
+            var lostLease = false;
+            for (var n = 0; n < planned.Count; n++)
+            {
+                if (!await SplitAttemptStillOwnedAsync(chunk, ct))
+                {
+                    lostLease = true;
+                    break;
+                }
+
+                var document = planned[n];
+                document.Id = CreateLogChunkId(chunk.RunId, start.Value + n);
+                document.ChunkNumber = start.Value + n;
+                document.SplitFromId = chunk.Id;
+                document.SplitAttempt = chunk.SplitAttempt;
+                document.UpdatedAt = DateTimeOffset.UtcNow;
+                EnsureLogChunkWithinCap(document);
+
+                var existing = await _logs.Find(l => l.Id == document.Id).FirstOrDefaultAsync(ct);
+                if (existing != null && existing.SplitFromId != chunk.Id)
+                {
+                    collided = true;
+                    break;
+                }
+
+                // A successor's row carries that attempt's id. Rewriting it
+                // from this attempt's stale plan drops lines the successor
+                // already kept.
+                if (existing != null
+                    && !string.Equals(existing.SplitAttempt, chunk.SplitAttempt, StringComparison.Ordinal))
+                {
+                    collided = true;
+                    break;
+                }
+
+                // Same text at a different sequence is an appended event. A resume
+                // that only compares text would delete the source and lose it.
+                if (existing != null && !SameLogLines(existing, document))
+                {
+                    await PreserveAppendedReplacementAsync(existing, chunk, chunk.SplitAttempt, ct);
+                    collided = true;
+                    break;
+                }
+
+                if (existing == null)
+                {
+                    try
+                    {
+                        await CosmosThrottle.ExecuteAsync(
+                            token => _logs.InsertOneAsync(document, cancellationToken: token),
+                            ct,
+                            _logger);
+                    }
+                    catch (Exception ex) when (IsDuplicateKey(ex))
+                    {
+                        collided = true;
+                        break;
+                    }
+                }
+            }
+
+            if (lostLease)
+            {
+                start = null;
+                break;
+            }
+
+            if (!collided)
+            {
+                wrote = true;
+                break;
+            }
+
+            if (!await StillOwnLogSplitAsync(chunk.Id, metadataFits, ct))
+            {
+                start = null;
+                break;
+            }
+
+            await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: false, ct);
+            chunk.SplitStart = null;
+            start = await ClaimLogSplitStartAsync(chunk, planned.Count, metadataFits, ct, resumeSavedStart: false);
+            if (start == null)
+                break;
+        }
+
+        return (wrote, start);
     }
 
     private async Task<bool> TryClaimLogSplitAsync(RunLogDocument chunk, int start, int count, CancellationToken ct)
