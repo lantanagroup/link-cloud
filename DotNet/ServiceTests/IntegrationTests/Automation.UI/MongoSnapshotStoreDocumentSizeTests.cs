@@ -940,6 +940,80 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         read.Should().Equal(sourceLines);
     }
 
+    [Fact]
+    public async Task TryUpgrade_does_not_replace_a_newer_header()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var stale = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        var current = JsonSerializerPayload(new LegacySchedule("current"));
+        await snapshots.InsertManyAsync(
+        [
+            new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "schedule",
+                Data = stale,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-2)
+            },
+            new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "schedule",
+                Data = current,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var older = await snapshots.Find(d => d.RunId == runId && d.Domain == "schedule").SortBy(d => d.UpdatedAt).FirstAsync();
+        (await store.TryUpgradeLegacyDomainAsync(older, CancellationToken.None)).Should().BeFalse();
+        var remaining = await snapshots.Find(d => d.RunId == runId && d.Domain == "schedule").ToListAsync();
+        remaining.Should().ContainSingle();
+        remaining[0].Data.Should().Be(current);
+        var read = await store.GetDomainAsync<LegacySchedule>(runId, "schedule", CancellationToken.None);
+        read!.Data.Name.Should().Be("current");
+    }
+
+    [Fact]
+    public async Task Split_keeps_following_lines_after_explicit_source_sequences()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var sourceLines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertManyAsync(
+        [
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000000",
+                RunId = runId,
+                ChunkNumber = 0,
+                LineCount = sourceLines.Count,
+                BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+                Lines = sourceLines,
+                LineSequences = [10, 11, 12],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000001",
+                RunId = runId,
+                ChunkNumber = 1,
+                LineCount = 1,
+                BsonByteCount = 10,
+                Lines = ["after"],
+                LineSequences = [],
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(sourceLines.Append("after"));
+    }
+
     private MongoSnapshotStore CreateGuardedStore()
         => new(CreateGuardedDatabase(), NullLogger<MongoSnapshotStore>.Instance);
 

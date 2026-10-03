@@ -104,6 +104,7 @@ public sealed class AutomationRunInputDocument
 }
 
 /// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
+[BsonIgnoreExtraElements]
 public sealed class DomainSnapshotDocument
 {
     [BsonId]
@@ -124,7 +125,12 @@ public sealed class DomainSnapshotDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>
+/// <summary>
+/// MongoDB document for an ordered chunk in automation_run_logs.
+/// Extra elements are ignored so a newer field does not break this build.
+/// An older build without that attribute still fails to read a chunk this build has written.
+/// </summary>
+[BsonIgnoreExtraElements]
 public sealed class RunLogDocument
 {
     [BsonId]
