@@ -23,6 +23,20 @@ internal static class CosmosThrottle
             if (current is MongoWriteException write && write.WriteError?.Code == 16500)
                 return true;
 
+            // BulkWriteAsync reports 16500 on WriteErrors. The exception text is
+            // "Code: 16500", which does not match the message phrases below.
+            if (current is MongoBulkWriteException bulk)
+            {
+                foreach (var error in bulk.WriteErrors)
+                {
+                    if (error.Code is 16500 or 429)
+                        return true;
+                }
+
+                if (bulk.WriteConcernError?.Code is 16500 or 429)
+                    return true;
+            }
+
             var message = current.Message;
             if (message.Contains("TooManyRequests", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("Request rate is large", StringComparison.OrdinalIgnoreCase)

@@ -1,8 +1,15 @@
+using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.Core.Clusters;
+using MongoDB.Driver.Core.Connections;
+using MongoDB.Driver.Core.Servers;
 
 // ServiceTests globally imports Hl7.Fhir.Model, which has its own Task type.
 using Task = System.Threading.Tasks.Task;
@@ -298,6 +305,55 @@ public class SnapshotPartitionerTests
         {
             CosmosThrottle.DelayOverride = previous;
         }
+    }
+
+    [Fact]
+    public async Task Bulk_write_code_16500_is_retried_without_the_message_phrases()
+    {
+        var throttled = BulkWrite(16500, "throttled");
+        throttled.Message.Should().NotContain("TooManyRequests");
+        throttled.Message.Should().NotContain("code 16500");
+        throttled.Message.Should().NotContain("Error=16500");
+        CosmosThrottle.IsThrottle(throttled).Should().BeTrue();
+        CosmosThrottle.IsThrottle(BulkWrite(11000, "duplicate key")).Should().BeFalse();
+
+        var previous = CosmosThrottle.DelayOverride;
+        CosmosThrottle.DelayOverride = TimeSpan.Zero;
+        try
+        {
+            var calls = 0;
+            await CosmosThrottle.ExecuteAsync(_ =>
+            {
+                calls++;
+                if (calls == 1)
+                    throw BulkWrite(16500, "throttled");
+                return Task.CompletedTask;
+            }, CancellationToken.None);
+            calls.Should().Be(2);
+        }
+        finally
+        {
+            CosmosThrottle.DelayOverride = previous;
+        }
+    }
+
+    private static MongoBulkWriteException<BsonDocument> BulkWrite(int code, string message)
+    {
+        var categoryType = typeof(BulkWriteError).Assembly.GetType("MongoDB.Driver.ServerErrorCategory");
+        var category = Enum.ToObject(categoryType!, 0);
+        var ctor = typeof(BulkWriteError).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            new[] { typeof(int), categoryType!, typeof(int), typeof(string), typeof(BsonDocument) },
+            modifiers: null);
+        var error = (BulkWriteError)ctor!.Invoke(new object?[] { 0, category, code, message, new BsonDocument() });
+        var connection = new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017)));
+        return new MongoBulkWriteException<BsonDocument>(
+            connection,
+            result: null!,
+            writeErrors: new[] { error },
+            writeConcernError: null,
+            unprocessedRequests: Array.Empty<WriteModel<BsonDocument>>());
     }
 
     [Fact]
