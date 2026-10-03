@@ -13,9 +13,18 @@ public sealed class AbsExportLocatorSnapshot
     public int FileCount { get; init; }
     public IReadOnlyList<string> FileNames { get; init; } = [];
 
-    public static AbsExportLocatorSnapshot Build(string facilityId, string reportId, IDictionary<string, object> files, bool external = false)
+    public static AbsExportLocatorSnapshot Build(string facilityId, string reportId, IDictionary<string, object> files, bool external = false) =>
+        Build(facilityId, reportId, files.Keys, external);
+
+    public static AbsExportLocatorSnapshot Build(string facilityId, string reportId, ReportPackage package, bool external = false)
     {
-        var names = files.Keys
+        ArgumentNullException.ThrowIfNull(package);
+        return Build(facilityId, reportId, package.EntryNames, external);
+    }
+
+    private static AbsExportLocatorSnapshot Build(string facilityId, string reportId, IEnumerable<string> fileNames, bool external)
+    {
+        var names = fileNames
             .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
             .ToList();
 

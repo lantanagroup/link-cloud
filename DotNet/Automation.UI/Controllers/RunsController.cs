@@ -312,7 +312,7 @@ public class RunsController(
         if (package == null)
             return NotFound();
 
-        return File(package.Content, "application/zip", package.FileName);
+        return new DeleteAfterSendFileResult(package.FilePath, "application/zip", package.FileName);
     }
 
     [HttpPost]
