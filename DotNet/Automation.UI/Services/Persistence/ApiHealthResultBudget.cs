@@ -17,6 +17,7 @@ internal static class ApiHealthResultBudget
         result.ResponseBody = Bound(result.ResponseBody);
         result.RequestBody = Bound(result.RequestBody);
         result.ErrorMessage = Bound(result.ErrorMessage);
+        result.ResponseSnippet = Bound(result.ResponseSnippet);
     }
 
     /// <summary>

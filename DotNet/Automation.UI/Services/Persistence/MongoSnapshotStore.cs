@@ -420,6 +420,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
         await _logSequenceStamps.DeleteManyAsync(CreateSequenceStampFilter(runId), ct);
+        await _logSplitClaims.DeleteManyAsync(CreateLogSplitClaimFilter(runId), ct);
 
         // Payload blobs follow the Mongo child rows so a DB failure cannot orphan
         // pointer records that still reference payload data. The summary stays until
@@ -2216,6 +2217,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 next = end;
         }
 
+        // A near-cap source stores its reservation beside the chunk. Append has
+        // to stay past that range or it lands on a replacement id.
+        var externalClaims = await _logSplitClaims.Find(CreateLogSplitClaimFilter(runId))
+            .Project(c => new LogSplitClaimDocument { SplitStart = c.SplitStart, SplitCount = c.SplitCount })
+            .ToListAsync(ct);
+        foreach (var claim in externalClaims)
+        {
+            var end = claim.SplitStart + Math.Max(claim.SplitCount, 1);
+            if (next < end)
+                next = end;
+        }
+
         return next;
     }
 
@@ -2225,6 +2238,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return Builders<RunLogDocument>.Filter.And(
             Builders<RunLogDocument>.Filter.Gte(l => l.Id, prefix),
             Builders<RunLogDocument>.Filter.Lt(l => l.Id, prefix + '\uffff'));
+    }
+
+    private static FilterDefinition<LogSplitClaimDocument> CreateLogSplitClaimFilter(Guid runId)
+    {
+        var prefix = CreateLogChunkPrefix(runId);
+        return Builders<LogSplitClaimDocument>.Filter.And(
+            Builders<LogSplitClaimDocument>.Filter.Gte(c => c.Id, prefix),
+            Builders<LogSplitClaimDocument>.Filter.Lt(c => c.Id, prefix + '\uffff'));
     }
 
     private static FilterDefinition<LogSequenceStampDocument> CreateSequenceStampFilter(Guid runId)

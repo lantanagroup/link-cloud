@@ -1366,6 +1366,82 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         (await parts.Find(p => p.RunId == runId).CountDocumentsAsync()).Should().Be(4);
     }
 
+    [Fact]
+    public async Task DeleteRunAsync_removes_log_split_claims_and_sequence_stamps()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var otherRunId = Guid.NewGuid();
+        var claims = _fixture.Database.GetCollection<LogSplitClaimDocument>(LogSplitClaimDocument.CollectionName);
+        var stamps = _fixture.Database.GetCollection<LogSequenceStampDocument>(LogSequenceStampDocument.CollectionName);
+        await claims.InsertManyAsync(
+        [
+            new LogSplitClaimDocument
+            {
+                Id = $"{runId:N}:00000000",
+                Owner = "owner",
+                ClaimedAt = DateTimeOffset.UtcNow,
+                SplitStart = 1,
+                SplitCount = 2
+            },
+            new LogSplitClaimDocument
+            {
+                Id = $"{otherRunId:N}:00000000",
+                Owner = "other",
+                ClaimedAt = DateTimeOffset.UtcNow,
+                SplitStart = 4,
+                SplitCount = 1
+            }
+        ]);
+        await stamps.InsertOneAsync(new LogSequenceStampDocument
+        {
+            Id = $"{runId:N}:00000001",
+            LineSequences = [1, 2]
+        });
+
+        await store.DeleteRunAsync(runId, CancellationToken.None);
+
+        (await claims.Find(c => c.Id == $"{runId:N}:00000000").AnyAsync()).Should().BeFalse();
+        (await stamps.Find(s => s.Id == $"{runId:N}:00000001").AnyAsync()).Should().BeFalse();
+        (await claims.Find(c => c.Id == $"{otherRunId:N}:00000000").AnyAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Append_during_a_near_cap_split_stays_outside_the_reserved_range()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var source = LargestTwoLineChunkUnderTheCap(runId);
+        MongoSnapshotStore.LogMetadataFits(source).Should().BeFalse();
+        await logs.InsertOneAsync(source);
+
+        var appended = false;
+        MongoSnapshotStore.AfterLogSplitClaimedForTests = ct =>
+        {
+            if (appended)
+                return Task.CompletedTask;
+
+            appended = true;
+            return store.AppendLogsAsync(runId, ["tail"], ct);
+        };
+
+        try
+        {
+            var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+            split.Should().Be(1);
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterLogSplitClaimedForTests = null;
+        }
+
+        appended.Should().BeTrue();
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal([.. source.Lines, "tail"]);
+        (await logs.Find(l => l.Id == source.Id).AnyAsync()).Should().BeFalse();
+    }
+
     private static RunLogDocument OversizedChunk(Guid runId, int chunkNumber, IReadOnlyList<string> lines)
         => new()
         {
