@@ -861,6 +861,85 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         read.Should().Equal(sourceLines.Append("later"));
     }
 
+    [Fact]
+    public async Task Append_clears_a_split_marker_when_the_source_chunk_is_gone()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = $"{runId:N}:00000000",
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 1,
+            BsonByteCount = 80,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = ["kept"],
+            LineSequences = [0],
+            SplitFromId = "missing-source",
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await store.AppendLogsAsync(runId, ["extra"], timeout.Token);
+
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal("kept", "extra");
+        var stored = await logs.Find(l => l.RunId == runId).SingleAsync();
+        stored.SplitFromId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Split_does_not_stamp_sequences_on_a_later_run()
+    {
+        var store = CreateGuardedStore();
+        Guid runId;
+        Guid otherRunId;
+        do
+        {
+            runId = Guid.NewGuid();
+            otherRunId = Guid.NewGuid();
+        }
+        while (string.Compare(otherRunId.ToString("N"), runId.ToString("N"), StringComparison.Ordinal) <= 0);
+
+        var sourceLines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var otherId = $"{otherRunId:N}:00000000";
+        await logs.InsertManyAsync(
+        [
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000000",
+                RunId = runId,
+                ChunkNumber = 0,
+                LineCount = sourceLines.Count,
+                BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+                Lines = sourceLines,
+                LineSequences = [],
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new RunLogDocument
+            {
+                Id = otherId,
+                RunId = otherRunId,
+                ChunkNumber = 0,
+                LineCount = 1,
+                BsonByteCount = 10,
+                Lines = ["other"],
+                LineSequences = [],
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var other = await logs.Find(l => l.Id == otherId).SingleAsync();
+        (other.LineSequences ?? []).Should().BeEmpty();
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(sourceLines);
+    }
+
     private MongoSnapshotStore CreateGuardedStore()
         => new(CreateGuardedDatabase(), NullLogger<MongoSnapshotStore>.Instance);
 
