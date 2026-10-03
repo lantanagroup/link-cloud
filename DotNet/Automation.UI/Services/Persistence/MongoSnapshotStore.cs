@@ -38,6 +38,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     // is split without writing those fields onto it.
     internal const int LogMetadataReserveBytes = 4096;
     /// <summary>
+    /// Test hook invoked after the legacy log document is read and before the
+    /// chunk query. Production leaves it null. A split that finishes in that
+    /// window must not make GetLogs return the legacy lines twice.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? AfterLegacyLogReadForTests { get; set; }
+
+    /// <summary>
     /// Test hook that runs after a split claim is stored and before the source
     /// is reloaded. Production leaves it null.
     /// </summary>
@@ -2626,12 +2633,40 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
     {
-        var legacyLog = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
-        var chunks = await _logs.Find(CreateLogChunkFilter(runId))
-            .SortBy(l => l.Id)
-            .ToListAsync(ct);
-        await OverlaySequenceStampsAsync(chunks, ct);
+        // A split can delete the legacy document and publish its replacements
+        // between these two reads. The in-memory legacy copy would then be
+        // returned again next to the published chunks. Read both again.
+        const int attempts = 3;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            var legacyLog = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
+            if (AfterLegacyLogReadForTests != null)
+            {
+                var afterLegacyRead = AfterLegacyLogReadForTests;
+                AfterLegacyLogReadForTests = null;
+                await afterLegacyRead(ct);
+            }
 
+            var chunks = await _logs.Find(CreateLogChunkFilter(runId))
+                .SortBy(l => l.Id)
+                .ToListAsync(ct);
+            if (legacyLog != null && !await _logs.Find(l => l.Id == legacyLog.Id).AnyAsync(ct))
+            {
+                if (attempt + 1 < attempts)
+                    continue;
+
+                legacyLog = null;
+            }
+
+            await OverlaySequenceStampsAsync(chunks, ct);
+            return OrderStoredLogLines(legacyLog, chunks);
+        }
+
+        return [];
+    }
+
+    private static List<string> OrderStoredLogLines(RunLogDocument? legacyLog, List<RunLogDocument> chunks)
+    {
         var orderedLines = new List<(long Sequence, int Ordinal, string Line)>();
         var existingIds = new HashSet<string>(StringComparer.Ordinal);
         if (legacyLog != null)

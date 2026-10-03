@@ -31,6 +31,12 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// <summary>How many partition headers this instance has loaded. Tests use it.</summary>
     internal int PartitionHeaderReads { get; private set; }
 
+    /// <summary>
+    /// Test hook invoked before a legacy snapshot is translated. Production
+    /// leaves it null. A throttle from this hook must not skip later documents.
+    /// </summary>
+    internal Func<DomainSnapshotDocument, CancellationToken, Task>? BeforeTranslateDocumentForTests { get; set; }
+
     internal void RememberLiveConfirmationForTests(
         Guid runId,
         string domain,
@@ -111,7 +117,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         }
     }
 
-    private async Task<int> TranslateSnapshotsAsync(CancellationToken ct)
+    internal async Task<int> TranslateSnapshotsAsync(CancellationToken ct)
     {
         var translated = 0;
         ObjectId? after = null;
@@ -136,6 +142,9 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
                 try
                 {
+                    if (BeforeTranslateDocumentForTests != null)
+                        await BeforeTranslateDocumentForTests(document, ct);
+
                     if (await _store.TryUpgradeLegacyDomainAsync(document, ct))
                         translated++;
                 }
@@ -145,8 +154,9 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 }
                 catch (Exception ex) when (CosmosThrottle.IsThrottle(ex))
                 {
-                    _logger.LogWarning(ex, "Snapshot migration throttled past the retry budget. The document will be tried again on the next start.");
-                    return translated;
+                    _logger.LogWarning(
+                        ex,
+                        "Snapshot migration left one document for the next start and continued with the rest.");
                 }
                 catch (Exception ex)
                 {
