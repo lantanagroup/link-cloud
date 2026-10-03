@@ -56,6 +56,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal static Func<CancellationToken, Task>? BeforePartitionHeaderPublishForTests { get; set; }
 
     /// <summary>
+    /// Test hook invoked after the source chunk is deleted and before its
+    /// replacements are published. Production leaves it null.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? AfterLogSourceDeletedForTests { get; set; }
+
+    /// <summary>
+    /// Test hook invoked after a missing source is considered for cleanup.
+    /// Production leaves it null.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? AfterAbandonedSplitConsideredForTests { get; set; }
+
+    /// <summary>
     /// True after one pass found no legacy or oversized log chunks. Later passes
     /// in this process skip the collection scan. A new process scans once.
     /// </summary>
@@ -903,6 +915,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         token),
                     ct,
                     _logger);
+            }
+
+            if (AfterLogSourceDeletedForTests != null)
+            {
+                var sourceDeleted = AfterLogSourceDeletedForTests;
+                AfterLogSourceDeletedForTests = null;
+                await sourceDeleted(ct);
             }
 
             await CosmosThrottle.ExecuteAsync(
@@ -2138,24 +2157,38 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private async Task DeleteAbandonedSplitAsync(RunLogDocument chunk, int start, int count, CancellationToken ct)
     {
-        await CosmosThrottle.ExecuteAsync(
-            token => _logs.DeleteManyAsync(
-                l => l.SplitFromId == chunk.Id
-                    && l.ChunkNumber >= start
-                    && l.ChunkNumber < start + count,
-                token),
-            ct,
-            _logger);
-        await CosmosThrottle.ExecuteAsync(
-            token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
-            ct,
-            _logger);
-        await CosmosThrottle.ExecuteAsync(
-            token => _logSplitClaims.DeleteOneAsync(
-                c => c.Id == chunk.Id && c.Owner == _logSplitOwner,
-                token),
-            ct,
-            _logger);
+        // The source can be gone because another worker already published the
+        // split and has not cleared SplitFromId yet. Those replacements are the
+        // only copy of the lines. Remove them only when the run itself is gone.
+        var runExists = await _runs.Find(r => r.RunId == chunk.RunId).AnyAsync(ct);
+        if (!runExists)
+        {
+            await CosmosThrottle.ExecuteAsync(
+                token => _logs.DeleteManyAsync(
+                    l => l.SplitFromId == chunk.Id
+                        && l.ChunkNumber >= start
+                        && l.ChunkNumber < start + count,
+                    token),
+                ct,
+                _logger);
+            await CosmosThrottle.ExecuteAsync(
+                token => _logSequenceStamps.DeleteOneAsync(s => s.Id == chunk.Id, token),
+                ct,
+                _logger);
+            await CosmosThrottle.ExecuteAsync(
+                token => _logSplitClaims.DeleteOneAsync(
+                    c => c.Id == chunk.Id && c.Owner == _logSplitOwner,
+                    token),
+                ct,
+                _logger);
+        }
+
+        if (AfterAbandonedSplitConsideredForTests != null)
+        {
+            var considered = AfterAbandonedSplitConsideredForTests;
+            AfterAbandonedSplitConsideredForTests = null;
+            await considered(ct);
+        }
     }
 
     private static bool IsPendingSplitReplacement(string? splitFromId, IReadOnlySet<string> existingIds)

@@ -1910,6 +1910,118 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Split_keeps_lines_when_another_worker_deletes_the_source_first()
+    {
+        var storeA = CreateGuardedStore();
+        var storeB = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var runs = _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs");
+        await runs.InsertOneAsync(new AutomationRunDocument
+        {
+            RunId = runId,
+            Status = "Running",
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        var sourceId = $"{runId:N}:00000000";
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = sourceId,
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 2,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = ["alpha", "beta"],
+            LineSequences = [0, 1],
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var bPaused = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var aFinishedCleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var claims = 0;
+        Task bTask = Task.CompletedTask;
+        MongoSnapshotStore.AfterLogSplitClaimedForTests = async ct =>
+        {
+            if (Interlocked.Increment(ref claims) != 1)
+                return;
+
+            await logs.UpdateOneAsync(
+                l => l.Id == sourceId,
+                Builders<RunLogDocument>.Update.Set(l => l.SplitClaimedAt, DateTimeOffset.UtcNow.AddMinutes(-10)),
+                cancellationToken: ct);
+            MongoSnapshotStore.AfterLogSourceDeletedForTests = async _ =>
+            {
+                MongoSnapshotStore.AfterLogSourceDeletedForTests = null;
+                bPaused.TrySetResult();
+                await aFinishedCleanup.Task;
+            };
+            bTask = storeB.SplitOversizedLogChunksAsync(ct);
+            var paused = await Task.WhenAny(bPaused.Task, Task.Delay(TimeSpan.FromSeconds(30)));
+            if (paused != bPaused.Task)
+                throw new TimeoutException("The second worker did not pause after deleting the source.");
+        };
+        MongoSnapshotStore.AfterAbandonedSplitConsideredForTests = _ =>
+        {
+            aFinishedCleanup.TrySetResult();
+            return Task.CompletedTask;
+        };
+
+        try
+        {
+            await storeA.SplitOversizedLogChunksAsync(CancellationToken.None);
+            var finished = await Task.WhenAny(bTask, Task.Delay(TimeSpan.FromSeconds(30)));
+            if (finished != bTask)
+                throw new TimeoutException("The second worker did not finish publishing the replacements.");
+            await bTask;
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterLogSplitClaimedForTests = null;
+            MongoSnapshotStore.AfterLogSourceDeletedForTests = null;
+            MongoSnapshotStore.AfterAbandonedSplitConsideredForTests = null;
+            bPaused.TrySetResult();
+            aFinishedCleanup.TrySetResult();
+        }
+
+        (await logs.Find(l => l.Id == sourceId).AnyAsync()).Should().BeFalse();
+        var read = await storeA.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal("alpha", "beta");
+    }
+
+    [Fact]
+    public async Task Guard_rejects_an_update_selected_by_run_id_that_grows_past_two_megabytes()
+    {
+        var database = CreateGuardedDatabase();
+        var logs = database.GetCollection<RunLogDocument>("automation_logs");
+        var runId = Guid.NewGuid();
+        var line = new string('a', 1_600_000);
+        var id = $"{runId:N}:00000000";
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = id,
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 1,
+            BsonByteCount = line.Length,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = [line],
+            LineSequences = [0],
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var act = () => logs.UpdateOneAsync(
+            l => l.RunId == runId,
+            Builders<RunLogDocument>.Update.Push(l => l.Lines, new string('b', 500_000)));
+        await act.Should().ThrowAsync<SnapshotDocumentTooLargeException>();
+        var stored = await _fixture.Database
+            .GetCollection<RunLogDocument>("automation_logs")
+            .Find(l => l.Id == id)
+            .SingleAsync();
+        stored.Lines.Should().Equal(line);
+    }
+
+    [Fact]
     public async Task Append_during_a_near_cap_split_stays_outside_the_reserved_range()
     {
         var store = CreateGuardedStore();
@@ -2231,46 +2343,14 @@ public class CosmosWriteGuardCollection<T> : DispatchProxy
         if (filter == null || Inner == null)
             return default;
 
-        BsonDocument rendered;
         try
         {
-            rendered = filter.Render(new RenderArgs<T>(Inner.DocumentSerializer, Inner.Settings.SerializerRegistry)).AsBsonDocument;
+            return Inner.Find(filter).Limit(1).FirstOrDefault();
         }
         catch (Exception)
         {
             return default;
         }
-
-        var id = FindId(rendered);
-        if (id == null)
-            return default;
-
-        return Inner.Find(Builders<T>.Filter.Eq("_id", id)).Limit(1).FirstOrDefault();
-    }
-
-    private static BsonValue? FindId(BsonDocument filter)
-    {
-        if (filter.TryGetValue("_id", out var id))
-        {
-            if (id.IsBsonDocument && id.AsBsonDocument.TryGetValue("$eq", out var eq))
-                return eq;
-            if (!id.IsBsonDocument)
-                return id;
-        }
-
-        foreach (var name in new[] { "$and", "$or" })
-        {
-            if (!filter.TryGetValue(name, out var items) || !items.IsBsonArray)
-                continue;
-
-            foreach (var item in items.AsBsonArray)
-            {
-                if (item.IsBsonDocument && FindId(item.AsBsonDocument) is { } found)
-                    return found;
-            }
-        }
-
-        return null;
     }
 
     private static void ApplySet(BsonDocument document, BsonDocument update, string op)
