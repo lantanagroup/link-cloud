@@ -205,11 +205,23 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                     continue;
                 }
 
-                await CosmosThrottle.ExecuteAsync(
-                    token => _parts.DeleteOneAsync(p => p.Id == part.Id, token),
+                var deleteFilter = Builders<SnapshotPartDocument>.Filter.And(
+                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.RunId, part.RunId),
+                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.Domain, part.Domain),
+                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.GenerationId, part.GenerationId),
+                    Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff));
+                if (header != null
+                    && string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal))
+                {
+                    deleteFilter &= Builders<SnapshotPartDocument>.Filter.Gte(p => p.Ordinal, header.PartCount);
+                }
+
+                var deleted = await CosmosThrottle.ExecuteAsync(
+                    token => _parts.DeleteManyAsync(deleteFilter, token),
                     ct,
                     _logger);
-                swept++;
+                swept += (int)deleted.DeletedCount;
+                activeGenerations.Add(generationKey);
             }
         }
 
