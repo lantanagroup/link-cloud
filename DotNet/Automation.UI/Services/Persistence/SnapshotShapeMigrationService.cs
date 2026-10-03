@@ -31,6 +31,16 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// <summary>How many partition headers this instance has loaded. Tests use it.</summary>
     internal int PartitionHeaderReads { get; private set; }
 
+    internal void RememberLiveConfirmationForTests(
+        Guid runId,
+        string domain,
+        string generationId,
+        DateTimeOffset confirmedAt)
+        => _liveSettledConfirmedAt[(runId, domain, generationId)] = confirmedAt;
+
+    internal bool HasLiveConfirmationForTests(Guid runId, string domain, string generationId)
+        => _liveSettledConfirmedAt.ContainsKey((runId, domain, generationId));
+
     private bool _settledBackfillComplete;
     private string? _settledSweepAfterId;
     private readonly Dictionary<(Guid RunId, string Domain, string GenerationId), DateTimeOffset> _liveSettledConfirmedAt = new();
@@ -274,6 +284,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     /// </summary>
     private async Task SweepSettledGenerationsAsync(CancellationToken ct)
     {
+        PruneExpiredLiveConfirmations(DateTimeOffset.UtcNow);
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         var batch = await PageSettledPartsAsync(_settledSweepAfterId, cutoff, ct);
         if (batch.Count == 0 && _settledSweepAfterId != null)
@@ -441,6 +452,25 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         return snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
             ? parsed
             : null;
+    }
+
+    private void PruneExpiredLiveConfirmations(DateTimeOffset now)
+    {
+        List<(Guid RunId, string Domain, string GenerationId)>? stale = null;
+        foreach (var entry in _liveSettledConfirmedAt)
+        {
+            if (now - entry.Value < SweepInterval)
+                continue;
+
+            stale ??= new List<(Guid, string, string)>();
+            stale.Add(entry.Key);
+        }
+
+        if (stale == null)
+            return;
+
+        foreach (var key in stale)
+            _liveSettledConfirmedAt.Remove(key);
     }
 
     private void RememberLiveGeneration(SnapshotPartitionHeader? header, PartMeta part)

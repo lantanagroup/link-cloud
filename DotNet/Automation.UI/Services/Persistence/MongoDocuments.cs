@@ -226,6 +226,13 @@ public sealed class LogSplitClaimDocument
     /// instead of deleting its rows.
     /// </summary>
     public string? PublishingAttempt { get; set; }
+
+    /// <summary>
+    /// Line count of the source when <see cref="PublishingAttempt"/> was recorded.
+    /// A resumed delete uses this count. A source that has grown since then is
+    /// split again instead of being removed.
+    /// </summary>
+    public int SourceLineCount { get; set; }
 }
 
 /// <summary>
