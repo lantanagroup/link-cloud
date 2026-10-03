@@ -1031,6 +1031,48 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetLogs_does_not_repeat_a_chunk_split_between_pages()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var lines = new List<string> { "alpha", "beta", "gamma" };
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertManyAsync(
+        [
+            OversizedChunk(runId, 0, lines),
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000001",
+                RunId = runId,
+                ChunkNumber = 1,
+                LineCount = 1,
+                BsonByteCount = 10,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = ["tail"],
+                LineSequences = [3],
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var previousPageSize = MongoSnapshotStore.LogChunkReadPageSize;
+        MongoSnapshotStore.LogChunkReadPageSize = 1;
+        MongoSnapshotStore.AfterLogChunkPageForTests = ct => store.SplitOversizedLogChunksAsync(ct);
+        try
+        {
+            var read = await store.GetLogsAsync(runId, CancellationToken.None);
+            read.Should().Equal(lines.Append("tail"));
+        }
+        finally
+        {
+            MongoSnapshotStore.LogChunkReadPageSize = previousPageSize;
+            MongoSnapshotStore.AfterLogChunkPageForTests = null;
+        }
+
+        (await logs.Find(l => l.Id == $"{runId:N}:00000000").AnyAsync()).Should().BeFalse();
+        (await logs.Find(l => l.SplitFromId != null).AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Append_clears_a_split_marker_when_the_source_chunk_is_gone()
     {
         var store = CreateGuardedStore();

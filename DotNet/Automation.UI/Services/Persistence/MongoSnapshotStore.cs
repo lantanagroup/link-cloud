@@ -45,6 +45,21 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal static Func<CancellationToken, Task>? AfterLegacyLogReadForTests { get; set; }
 
     /// <summary>
+    /// Documents loaded per log-chunk page. A page stays under one server
+    /// batch so a split cannot land inside it. Tests set this to 1. Production
+    /// starts at 32.
+    /// </summary>
+    internal static int LogChunkReadPageSize { get; set; } = 32;
+
+    /// <summary>
+    /// Test hook invoked after a full page of log chunks is loaded and before
+    /// the next page. Production leaves it null. Cleared after one call. A
+    /// split in that window must not make GetLogs return the source and its
+    /// replacements.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? AfterLogChunkPageForTests { get; set; }
+
+    /// <summary>
     /// Test hook that runs after a split claim is stored and before the source
     /// is reloaded. Production leaves it null.
     /// </summary>
@@ -2746,9 +2761,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
     {
-        // A split can delete the legacy document and publish its replacements
-        // between these two reads. The in-memory legacy copy would then be
-        // returned again next to the published chunks. Read both again.
+        // A split can delete the legacy document, or delete a source chunk and
+        // clear SplitFromId on its replacements, while this read is in flight.
+        // Either race would return the same lines twice. Read again when the
+        // stored ids changed, and on the last attempt keep only ids that are
+        // still there.
         const int attempts = 3;
         for (var attempt = 0; attempt < attempts; attempt++)
         {
@@ -2760,9 +2777,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 await afterLegacyRead(ct);
             }
 
-            var chunks = await _logs.Find(CreateLogChunkFilter(runId))
-                .SortBy(l => l.Id)
-                .ToListAsync(ct);
+            var chunks = await ReadLogChunkPagesAsync(runId, ct);
+            var freshIds = await ReadLogChunkIdsAsync(runId, ct);
+            if (!LogChunkIdsMatch(chunks, freshIds))
+            {
+                if (attempt + 1 < attempts)
+                    continue;
+
+                chunks = await AlignLogChunksToIdsAsync(chunks, freshIds, ct);
+                var confirmedIds = await ReadLogChunkIdsAsync(runId, ct);
+                if (!LogChunkIdsMatch(chunks, confirmedIds))
+                    chunks = await AlignLogChunksToIdsAsync(chunks, confirmedIds, ct);
+            }
+
             if (legacyLog != null && !await _logs.Find(l => l.Id == legacyLog.Id).AnyAsync(ct))
             {
                 if (attempt + 1 < attempts)
@@ -2776,6 +2803,101 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         return [];
+    }
+
+    private async Task<List<RunLogDocument>> ReadLogChunkPagesAsync(Guid runId, CancellationToken ct)
+    {
+        var pageSize = LogChunkReadPageSize;
+        if (pageSize < 1)
+            pageSize = 1;
+
+        var loaded = new List<RunLogDocument>();
+        string? afterId = null;
+        while (true)
+        {
+            var filter = afterId == null
+                ? CreateLogChunkFilter(runId)
+                : Builders<RunLogDocument>.Filter.And(
+                    CreateLogChunkFilter(runId),
+                    Builders<RunLogDocument>.Filter.Gt(l => l.Id, afterId));
+            var page = await _logs.Find(filter).SortBy(l => l.Id).Limit(pageSize).ToListAsync(ct);
+            if (page.Count == 0)
+                break;
+
+            loaded.AddRange(page);
+            afterId = page[^1].Id;
+            if (page.Count < pageSize)
+                break;
+
+            if (AfterLogChunkPageForTests != null)
+            {
+                var afterPage = AfterLogChunkPageForTests;
+                AfterLogChunkPageForTests = null;
+                await afterPage(ct);
+            }
+        }
+
+        return loaded;
+    }
+
+    private async Task<HashSet<string>> ReadLogChunkIdsAsync(Guid runId, CancellationToken ct)
+    {
+        var ids = await _logs.Find(CreateLogChunkFilter(runId))
+            .Project(l => l.Id)
+            .ToListAsync(ct);
+        return new HashSet<string>(ids, StringComparer.Ordinal);
+    }
+
+    private static bool LogChunkIdsMatch(List<RunLogDocument> chunks, HashSet<string> ids)
+    {
+        if (chunks.Count != ids.Count)
+            return false;
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var chunk in chunks)
+        {
+            if (!ids.Contains(chunk.Id) || !seen.Add(chunk.Id))
+                return false;
+        }
+
+        return seen.Count == ids.Count;
+    }
+
+    /// <summary>
+    /// Drops chunks a concurrent split removed and loads ids this read missed.
+    /// The caller uses this only after the paged read no longer matches storage.
+    /// </summary>
+    private async Task<List<RunLogDocument>> AlignLogChunksToIdsAsync(
+        List<RunLogDocument> loaded,
+        HashSet<string> ids,
+        CancellationToken ct)
+    {
+        var kept = new List<RunLogDocument>(ids.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var chunk in loaded)
+        {
+            if (ids.Contains(chunk.Id) && seen.Add(chunk.Id))
+                kept.Add(chunk);
+        }
+
+        var missing = new List<string>();
+        foreach (var id in ids)
+        {
+            if (!seen.Contains(id))
+                missing.Add(id);
+        }
+
+        const int batchSize = 32;
+        for (var offset = 0; offset < missing.Count; offset += batchSize)
+        {
+            var count = Math.Min(batchSize, missing.Count - offset);
+            var slice = missing.GetRange(offset, count);
+            var extras = await _logs.Find(Builders<RunLogDocument>.Filter.In(l => l.Id, slice)).ToListAsync(ct);
+            kept.AddRange(extras);
+        }
+
+        kept.Sort(static (left, right) => string.CompareOrdinal(left.Id, right.Id));
+        return kept;
     }
 
     private static List<string> OrderStoredLogLines(RunLogDocument? legacyLog, List<RunLogDocument> chunks)
