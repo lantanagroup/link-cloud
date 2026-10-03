@@ -56,6 +56,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal static Func<CancellationToken, Task>? BeforePartitionHeaderPublishForTests { get; set; }
 
     /// <summary>
+    /// Test hook invoked after a header id is chosen and before the header
+    /// document is written. Production leaves it null.
+    /// </summary>
+    internal static Func<CancellationToken, Task>? BeforeSnapshotHeaderWriteForTests { get; set; }
+
+    /// <summary>
     /// Test hook invoked after the source chunk is deleted and before its
     /// replacements are published. Production leaves it null.
     /// </summary>
@@ -1035,7 +1041,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             await CopyExternalClaimOntoChunkAsync(chunk, ct);
 
         int start;
-        var reconcileAfterClaim = false;
+        // A new claim always gets a new attempt id. Replacements from the saved
+        // attempt must be reconciled even when this claim reuses that range.
+        var reconcilePredecessors = chunk.SplitStart != null;
         if (chunk.SplitStart is int existing
             && !await LogSplitRangeCollidesAsync(chunk, existing, replacementCount, ct))
         {
@@ -1043,7 +1051,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         else
         {
-            reconcileAfterClaim = chunk.SplitStart != null;
             // Chunk ids are zero-padded, so _id order matches chunk order and
             // the range query can use the _id index. Cosmos rejects a sort on
             // ChunkNumber because that field is not indexed.
@@ -1067,7 +1074,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (!claimed)
             return null;
 
-        if (reconcileAfterClaim)
+        if (reconcilePredecessors)
             await ReconcileAbandonedReplacementsAsync(chunk, predecessorsOnly: true, ct);
 
         if (!await SplitAttemptStillOwnedAsync(chunk, ct))
@@ -1420,7 +1427,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return false;
     }
 
-    private Task<DomainSnapshotDocument?> ReplaceHeaderAsync(
+    private async Task<DomainSnapshotDocument?> ReplaceHeaderAsync(
         FilterDefinition<DomainSnapshotDocument> filter,
         ObjectId headerId,
         Guid runId,
@@ -1429,6 +1436,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         bool upsert,
         CancellationToken ct)
     {
+        if (BeforeSnapshotHeaderWriteForTests != null)
+        {
+            var beforeWrite = BeforeSnapshotHeaderWriteForTests;
+            BeforeSnapshotHeaderWriteForTests = null;
+            await beforeWrite(ct);
+        }
+
         var update = Builders<DomainSnapshotDocument>.Update
             .Set(d => d.Data, data)
             .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
@@ -1440,7 +1454,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             IsUpsert = upsert,
             ReturnDocument = ReturnDocument.Before
         };
-        return CosmosThrottle.ExecuteAsync(
+        return await CosmosThrottle.ExecuteAsync(
             async token => (DomainSnapshotDocument?)await _snapshots.FindOneAndUpdateAsync(filter, update, options, token),
             ct,
             _logger);
@@ -1468,6 +1482,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 partitioned.SkeletonJson);
             SnapshotPartitioner.EnsureWithinHardCap(headerJson);
             await WritePartsAsync(runId, domain, generationId, partitioned.Pieces, ct);
+            if (BeforeSnapshotHeaderWriteForTests != null)
+            {
+                var beforeWrite = BeforeSnapshotHeaderWriteForTests;
+                BeforeSnapshotHeaderWriteForTests = null;
+                await beforeWrite(ct);
+            }
+
             if (BeforePartitionHeaderPublishForTests != null)
                 await BeforePartitionHeaderPublishForTests(ct);
 
@@ -1894,10 +1915,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var chosen = await ChooseHeaderAsync(runId, domain, ct);
+        // Upsert the chosen id. A concurrent cleanup can delete it after this
+        // resolve, and an update-only write would then match nothing.
         return new HeaderWrite(
             Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, chosen!.Id),
             chosen.Id,
-            false,
+            true,
             chosen);
     }
 

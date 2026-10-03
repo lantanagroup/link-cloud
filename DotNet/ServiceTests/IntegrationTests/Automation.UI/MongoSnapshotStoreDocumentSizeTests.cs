@@ -2079,6 +2079,89 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Split_reuses_a_saved_range_without_keeping_the_old_attempt()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var lines = new List<string> { new string('a', 600_000), new string('b', 600_000) };
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var source = OversizedChunk(runId, 0, lines);
+        source.LineSequences = [0, 1];
+        source.SplitStart = 1;
+        source.SplitCount = 2;
+        source.SplitAttempt = "crashed-attempt";
+        source.SplitOwner = "crashed-owner";
+        source.SplitClaimedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+        source.ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion;
+        await logs.InsertManyAsync(
+        [
+            source,
+            new RunLogDocument
+            {
+                Id = $"{runId:N}:00000001",
+                RunId = runId,
+                ChunkNumber = 1,
+                LineCount = 1,
+                BsonByteCount = 600_000,
+                ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+                Lines = [lines[0]],
+                LineSequences = [0],
+                SplitFromId = source.Id,
+                SplitAttempt = "crashed-attempt",
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+
+        split.Should().Be(1);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(lines);
+        (await logs.Find(l => l.SplitAttempt == "crashed-attempt").AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetDomain_saves_when_the_resolved_header_is_deleted()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        await store.SetDomainAsync(runId, "schedule", new Item("first", "old"), CancellationToken.None);
+        var inlineHeader = await snapshots.Find(d => d.RunId == runId && d.Domain == "schedule").FirstAsync();
+        MongoSnapshotStore.BeforeSnapshotHeaderWriteForTests = ct =>
+            snapshots.DeleteOneAsync(d => d.Id == inlineHeader.Id, ct);
+        try
+        {
+            await store.SetDomainAsync(runId, "schedule", new Item("second", "new"), CancellationToken.None);
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforeSnapshotHeaderWriteForTests = null;
+        }
+
+        var inline = await store.GetDomainAsync<Item>(runId, "schedule", CancellationToken.None);
+        inline!.Data.Should().Be(new Item("second", "new"));
+
+        var entries = Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('e', 60_000))).ToList();
+        await store.SetDomainAsync(runId, "entries", entries, CancellationToken.None);
+        var entriesHeader = await snapshots.Find(d => d.RunId == runId && d.Domain == "entries").FirstAsync();
+        MongoSnapshotStore.BeforeSnapshotHeaderWriteForTests = ct =>
+            snapshots.DeleteOneAsync(d => d.Id == entriesHeader.Id, ct);
+        try
+        {
+            await store.SetDomainAsync(runId, "entries", entries, CancellationToken.None);
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforeSnapshotHeaderWriteForTests = null;
+        }
+
+        var partitioned = await store.GetDomainAsync<List<Item>>(runId, "entries", CancellationToken.None);
+        partitioned!.Data.Should().Equal(entries);
+        await AssertRunDocumentsFit(runId);
+    }
+
+    [Fact]
     public async Task Split_keeps_lines_when_reconciliation_resumes_after_takeover()
     {
         var storeA = CreateGuardedStore();
