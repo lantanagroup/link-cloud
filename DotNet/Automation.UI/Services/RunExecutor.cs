@@ -938,16 +938,50 @@ internal sealed class RunExecutor
                 reportId,
                 BuildNormalizationSuiteSnapshot(normalizationResolution));
 
-            var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
-            var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
+            // External names are checked and that package is released before the
+            // internal ZIP is downloaded. Holding both expanded packages is what
+            // exhausted the process on a large census.
+            await using (var externalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, cancellationToken: cancellationToken))
+            {
+                output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
 
-            output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
+                if (!externalPackage.TryMatchEntry("manifest.ndjson", out var manifestKey))
+                {
+                    if (_suppressExternalManifest)
+                    {
+                        output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
+                    }
+                }
+                else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
+                {
+                    output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
+                }
+
+                foreach (var patientId in expectedSubmittedPatientIds)
+                {
+                    var expectedPatientFile = $"patient-{patientId}.ndjson";
+                    if (!externalPackage.TryMatchEntry(expectedPatientFile, out var patientFileKey))
+                        throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
+
+                    if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
+                        output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
+                }
+            }
+
+            await using var internalPackage = await reportHelper.DownloadReportAsync(
+                facilityId, reportId, scenarioConfig, external: false, cancellationToken: cancellationToken);
+
             output.WriteLine($"[ABS] OperationOutcome writer={(_operationOutcomeExpectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}; expected only for FailedValidation patients ({_operationOutcomeExpectationSource}).");
 
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
             {
-                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
+                var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
                 await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
@@ -961,53 +995,12 @@ internal sealed class RunExecutor
             // Best-effort: a persistence failure must not abort the run.
             try
             {
-                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalAbsResources);
+                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
                 await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
                 output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
-            }
-
-            static bool HasExternalFile(IReadOnlyDictionary<string, object> files, string expectedFileName, out string? matchedKey)
-            {
-                if (files.ContainsKey(expectedFileName))
-                {
-                    matchedKey = expectedFileName;
-                    return true;
-                }
-
-                var suffix = "_" + expectedFileName;
-                matchedKey = files.Keys.FirstOrDefault(k =>
-                    k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
-                return matchedKey != null;
-            }
-
-            if (!HasExternalFile(downloadedResources, "manifest.ndjson", out var manifestKey))
-            {
-                if (_suppressExternalManifest)
-                {
-                    output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
-                }
-                else
-                {
-                    throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
-                }
-
-            }
-            else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
-            {
-                output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
-            }
-
-            foreach (var patientId in expectedSubmittedPatientIds)
-            {
-                var expectedPatientFile = $"patient-{patientId}.ndjson";
-                if (!HasExternalFile(downloadedResources, expectedPatientFile, out var patientFileKey))
-                    throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
-
-                if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
-                    output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
             }
 
             // Flush stale cache from diagnostics polling so validators read authoritative data.
@@ -1030,7 +1023,7 @@ internal sealed class RunExecutor
 
             await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
                 reportAbsValidator.ValidateAllAsync(
-                    internalAbsResources,
+                    internalPackage,
                     expectedSubmittedPatientIds,
                     measureIds,
                     scenarioConfig.StartDate,
@@ -1258,7 +1251,7 @@ internal sealed class RunExecutor
                     try
                     {
                         await normalizationSuiteApplicationValidator.ValidateAllAsync(
-                            internalAbsResources, normalizationResolution, normalizationSummaryLogs);
+                            internalPackage, normalizationResolution, normalizationSummaryLogs);
                         return;
                     }
                     catch (InvalidOperationException ex) when (hslocMapEnabled && DateTimeOffset.UtcNow < deadline)
