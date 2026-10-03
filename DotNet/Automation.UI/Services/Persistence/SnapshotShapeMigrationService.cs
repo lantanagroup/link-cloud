@@ -32,6 +32,7 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     internal int PartitionHeaderReads { get; private set; }
 
     private bool _settledBackfillComplete;
+    private string? _settledSweepAfterId;
     private readonly Dictionary<(Guid RunId, string Domain, string GenerationId), DateTimeOffset> _liveSettledConfirmedAt = new();
 
     public SnapshotShapeMigrationService(
@@ -274,24 +275,19 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     private async Task SweepSettledGenerationsAsync(CancellationToken ct)
     {
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
-        var batch = await CosmosThrottle.ExecuteAsync(
-            token => _parts.Find(Builders<SnapshotPartDocument>.Filter.And(
-                    Builders<SnapshotPartDocument>.Filter.Eq(p => p.Settled, true),
-                    Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff)))
-                .SortBy(p => p.UpdatedAt)
-                .Limit(BatchSize)
-                .Project(p => new PartMeta
-                {
-                    Id = p.Id,
-                    RunId = p.RunId,
-                    Domain = p.Domain,
-                    GenerationId = p.GenerationId,
-                    Ordinal = p.Ordinal,
-                    UpdatedAt = p.UpdatedAt
-                })
-                .ToListAsync(token),
-            ct,
-            _logger);
+        var batch = await PageSettledPartsAsync(_settledSweepAfterId, cutoff, ct);
+        if (batch.Count == 0 && _settledSweepAfterId != null)
+        {
+            // The last page was past every remaining row. Start over so an
+            // orphan inserted behind the cursor is not skipped forever.
+            _settledSweepAfterId = null;
+            batch = await PageSettledPartsAsync(null, cutoff, ct);
+        }
+
+        if (batch.Count == 0)
+            return;
+
+        _settledSweepAfterId = batch[^1].Id;
         var seen = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
         foreach (var part in batch)
         {
@@ -337,6 +333,34 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                 ct,
                 _logger);
         }
+    }
+
+    private Task<List<PartMeta>> PageSettledPartsAsync(string? afterId, DateTimeOffset cutoff, CancellationToken ct)
+    {
+        var filter = Builders<SnapshotPartDocument>.Filter.And(
+            Builders<SnapshotPartDocument>.Filter.Eq(p => p.Settled, true),
+            Builders<SnapshotPartDocument>.Filter.Lt(p => p.UpdatedAt, cutoff));
+        if (afterId != null)
+        {
+            filter &= Builders<SnapshotPartDocument>.Filter.Gt(p => p.Id, afterId);
+        }
+
+        return CosmosThrottle.ExecuteAsync(
+            token => _parts.Find(filter)
+                .SortBy(p => p.Id)
+                .Limit(BatchSize)
+                .Project(p => new PartMeta
+                {
+                    Id = p.Id,
+                    RunId = p.RunId,
+                    Domain = p.Domain,
+                    GenerationId = p.GenerationId,
+                    Ordinal = p.Ordinal,
+                    UpdatedAt = p.UpdatedAt
+                })
+                .ToListAsync(token),
+            ct,
+            _logger);
     }
 
     private async Task BackfillMissingSettledAsync(CancellationToken ct)
