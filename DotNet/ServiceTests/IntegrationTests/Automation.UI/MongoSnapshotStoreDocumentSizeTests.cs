@@ -146,6 +146,64 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Translation_continues_after_one_document_is_throttled()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var large = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        var firstId = ObjectId.GenerateNewId();
+        var secondId = ObjectId.GenerateNewId();
+        var firstRun = Guid.NewGuid();
+        var secondRun = Guid.NewGuid();
+        await snapshots.InsertManyAsync(
+        [
+            new DomainSnapshotDocument
+            {
+                Id = firstId,
+                RunId = firstRun,
+                Domain = "populations",
+                Data = large,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new DomainSnapshotDocument
+            {
+                Id = secondId,
+                RunId = secondRun,
+                Domain = "populations",
+                Data = large,
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        service.BeforeTranslateDocumentForTests = (document, _) =>
+        {
+            if (document.Id == firstId)
+                throw new InvalidOperationException("Error=16500");
+
+            return Task.CompletedTask;
+        };
+        try
+        {
+            var translated = await service.TranslateSnapshotsAsync(CancellationToken.None);
+            translated.Should().Be(1);
+        }
+        finally
+        {
+            service.BeforeTranslateDocumentForTests = null;
+        }
+
+        SnapshotPartitioner.ShouldTranslateStoredData(
+            (await snapshots.Find(d => d.Id == firstId).FirstAsync()).Data).Should().BeTrue();
+        var second = await store.GetDomainAsync<List<Item>>(secondRun, "populations", CancellationToken.None);
+        second!.Data.Should().HaveCount(20);
+    }
+
+    [Fact]
     public async Task Concurrent_rewrites_return_one_complete_generation()
     {
         var store = CreateGuardedStore();
@@ -859,6 +917,39 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         split.Should().Be(1);
         var read = await store.GetLogsAsync(runId, CancellationToken.None);
         read.Should().Equal(sourceLines.Append("later"));
+    }
+
+    [Fact]
+    public async Task GetLogs_does_not_repeat_a_legacy_log_split_between_the_reads()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var lines = Enumerable.Range(0, 3).Select(i => new string((char)('a' + i), 400_000)).ToList();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertOneAsync(new RunLogDocument
+        {
+            Id = runId.ToString(),
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = lines.Count,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            Lines = lines,
+            LineSequences = [],
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        MongoSnapshotStore.AfterLegacyLogReadForTests = ct => store.SplitOversizedLogChunksAsync(ct);
+        try
+        {
+            var read = await store.GetLogsAsync(runId, CancellationToken.None);
+            read.Should().Equal(lines);
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterLegacyLogReadForTests = null;
+        }
+
+        (await logs.Find(l => l.Id == runId.ToString()).AnyAsync()).Should().BeFalse();
     }
 
     [Fact]
