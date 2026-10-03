@@ -1014,6 +1014,241 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         read.Should().Equal(sourceLines.Append("after"));
     }
 
+    [Fact]
+    public async Task Split_keeps_order_across_consecutive_unsequenced_chunks()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var first = new[] { new string('a', 600_000), new string('b', 600_000) };
+        var second = new[] { new string('c', 600_000), new string('d', 600_000) };
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        await logs.InsertManyAsync(
+        [
+            OversizedChunk(runId, 0, first),
+            OversizedChunk(runId, 1, second)
+        ]);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(2);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(first.Concat(second));
+    }
+
+    [Fact]
+    public async Task Split_reconciles_a_partial_copy_when_the_source_changes_after_the_claim()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var sourceLines = new List<string> { new string('a', 600_000), new string('b', 600_000) };
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var source = OversizedChunk(runId, 0, sourceLines);
+        source.SplitStart = 5;
+        source.SplitCount = 2;
+        var copy = new RunLogDocument
+        {
+            Id = $"{runId:N}:00000005",
+            RunId = runId,
+            ChunkNumber = 5,
+            LineCount = 1,
+            BsonByteCount = 600_000,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = [sourceLines[0]],
+            LineSequences = [0],
+            SplitFromId = source.Id,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        await logs.InsertManyAsync([source, copy]);
+
+        var appended = false;
+        MongoSnapshotStore.AfterLogSplitClaimedForTests = _ =>
+        {
+            if (appended)
+                return Task.CompletedTask;
+
+            appended = true;
+            var changed = sourceLines.Append("appended-after-claim").ToList();
+            return logs.UpdateOneAsync(
+                l => l.Id == source.Id,
+                Builders<RunLogDocument>.Update
+                    .Set(l => l.Lines, changed)
+                    .Set(l => l.LineCount, changed.Count)
+                    .Set(l => l.BsonByteCount, MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1));
+        };
+
+        try
+        {
+            var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+            split.Should().Be(1);
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterLogSplitClaimedForTests = null;
+        }
+
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(sourceLines[0], sourceLines[1], "appended-after-claim");
+        var stored = await logs.Find(l => l.RunId == runId).ToListAsync();
+        stored.SelectMany(l => l.Lines).Should().Equal(sourceLines[0], sourceLines[1], "appended-after-claim");
+    }
+
+    [Fact]
+    public async Task Reads_use_the_newest_header_past_the_first_eight()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var now = DateTimeOffset.UtcNow;
+        var documents = new List<DomainSnapshotDocument>();
+        for (var i = 0; i < 8; i++)
+        {
+            documents.Add(new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "schedule",
+                Data = JsonSerializerPayload(new LegacySchedule($"old-{i}")),
+                UpdatedAt = now.AddMinutes(-30 + i)
+            });
+        }
+
+        documents.Add(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "schedule",
+            Data = JsonSerializerPayload(new LegacySchedule("newest")),
+            UpdatedAt = now
+        });
+        await snapshots.InsertManyAsync(documents);
+
+        var read = await store.GetDomainAsync<LegacySchedule>(runId, "schedule", CancellationToken.None);
+        read!.Data.Name.Should().Be("newest");
+    }
+
+    [Fact]
+    public async Task Split_moves_a_near_cap_legacy_chunk_without_growing_it()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var logs = _fixture.Database.GetCollection<RunLogDocument>("automation_logs");
+        var source = LargestTwoLineChunkUnderTheCap(runId);
+        MongoSnapshotStore.LogMetadataFits(source).Should().BeFalse();
+        await logs.InsertOneAsync(source);
+
+        var split = await store.SplitOversizedLogChunksAsync(CancellationToken.None);
+        split.Should().Be(1);
+        var read = await store.GetLogsAsync(runId, CancellationToken.None);
+        read.Should().Equal(source.Lines);
+        (await logs.Find(l => l.Id == source.Id).AnyAsync()).Should().BeFalse();
+        var claims = _fixture.Database.GetCollection<LogSplitClaimDocument>(LogSplitClaimDocument.CollectionName);
+        (await claims.Find(c => c.Id == source.Id).AnyAsync()).Should().BeFalse();
+        var stored = await logs.Find(l => l.RunId == runId).ToListAsync();
+        stored.Should().NotBeEmpty();
+        stored.Should().OnlyContain(l => l.ByteCountVersion == MongoSnapshotStore.EscapedLogByteCountVersion);
+    }
+
+    [Fact]
+    public async Task Sweep_keeps_parts_committed_before_the_delete()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var parts = _fixture.Database.GetCollection<SnapshotPartDocument>(SnapshotPartDocument.CollectionName);
+        var runId = Guid.NewGuid();
+        const string generation = "committed-late";
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = "{\"name\":\"old\"}",
+            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1)
+        });
+        await parts.InsertManyAsync(
+        [
+            AgedPart(runId, generation, 0),
+            AgedPart(runId, generation, 1)
+        ]);
+
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        service.BeforeOrphanPartDelete = _ => snapshots.UpdateOneAsync(
+            d => d.RunId == runId && d.Domain == "entries",
+            Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, SnapshotPartitioner.BuildHeaderJson(generation, "records", 2, null))
+                .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow));
+
+        var swept = await service.SweepOrphanPartsAsync(CancellationToken.None);
+        swept.Should().Be(0);
+        (await parts.Find(p => p.RunId == runId).CountDocumentsAsync()).Should().Be(2);
+    }
+
+    private static RunLogDocument OversizedChunk(Guid runId, int chunkNumber, IReadOnlyList<string> lines)
+        => new()
+        {
+            Id = $"{runId:N}:{chunkNumber:D8}",
+            RunId = runId,
+            ChunkNumber = chunkNumber,
+            LineCount = lines.Count,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            ByteCountVersion = MongoSnapshotStore.EscapedLogByteCountVersion,
+            Lines = [.. lines],
+            LineSequences = [],
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+    private static RunLogDocument LargestTwoLineChunkUnderTheCap(Guid runId)
+    {
+        var low = 900_000;
+        var high = 1_100_000;
+        var best = low;
+        while (low <= high)
+        {
+            var mid = (low + high) / 2;
+            var plain = Encoding.UTF8.GetByteCount(TwoLineChunk(runId, mid).ToBsonDocument().ToJson());
+            if (plain <= SnapshotPartitioner.HardCapBytes)
+            {
+                best = mid;
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        return TwoLineChunk(runId, best);
+    }
+
+    private static RunLogDocument TwoLineChunk(Guid runId, int lineLength)
+    {
+        var line = new string('z', lineLength);
+        return new RunLogDocument
+        {
+            Id = $"{runId:N}:00000000",
+            RunId = runId,
+            ChunkNumber = 0,
+            LineCount = 2,
+            BsonByteCount = MongoSnapshotStore.MaxLogChunkEstimatedBsonBytes + 1,
+            Lines = [line, new string('z', lineLength)],
+            LineSequences = [],
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private static SnapshotPartDocument AgedPart(Guid runId, string generation, int ordinal)
+        => new()
+        {
+            Id = $"{runId:N}:entries:{generation}:{ordinal:D8}",
+            RunId = runId,
+            Domain = "entries",
+            GenerationId = generation,
+            Ordinal = ordinal,
+            Kind = "element",
+            Path = "$",
+            Data = "{}",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-20)
+        };
+
     private MongoSnapshotStore CreateGuardedStore()
         => new(CreateGuardedDatabase(), NullLogger<MongoSnapshotStore>.Instance);
 

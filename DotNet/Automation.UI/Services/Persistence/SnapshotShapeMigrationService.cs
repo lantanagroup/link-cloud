@@ -21,6 +21,13 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
     private readonly MongoSnapshotStore _store;
     private readonly ILogger<SnapshotShapeMigrationService> _logger;
 
+    /// <summary>
+    /// Test hook invoked once, after a generation looks orphaned and before it
+    /// is deleted. Production leaves it null. The sweep re-reads the header
+    /// after the hook returns.
+    /// </summary>
+    internal Func<CancellationToken, Task>? BeforeOrphanPartDelete { get; set; }
+
     public SnapshotShapeMigrationService(
         IMongoDatabase database,
         MongoSnapshotStore store,
@@ -136,12 +143,11 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
         return translated;
     }
 
-    private async Task<int> SweepOrphanPartsAsync(CancellationToken ct)
+    internal async Task<int> SweepOrphanPartsAsync(CancellationToken ct)
     {
         var swept = 0;
         var cutoff = DateTimeOffset.UtcNow - OrphanGrace;
         string? afterId = null;
-        var headerCache = new Dictionary<(Guid RunId, string Domain), SnapshotPartitionHeader?>(64);
         var activeGenerations = new HashSet<(Guid RunId, string Domain, string GenerationId)>();
         while (!ct.IsCancellationRequested)
         {
@@ -173,20 +179,8 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 afterId = part.Id;
-                var key = (part.RunId, part.Domain);
-                if (!headerCache.TryGetValue(key, out var header))
-                {
-                    var snapshot = await _store.ReadHeaderAsync(part.RunId, part.Domain, ct);
-                    header = snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
-                        ? parsed
-                        : null;
-                    headerCache[key] = header;
-                }
-
-                var orphan = header == null
-                    || !string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal)
-                    || part.Ordinal >= header.PartCount;
-                if (!orphan)
+                var header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+                if (!IsOrphanPart(header, part))
                     continue;
 
                 var generationKey = (part.RunId, part.Domain, part.GenerationId);
@@ -200,6 +194,23 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
                     .Project(p => p.UpdatedAt)
                     .FirstOrDefaultAsync(ct);
                 if (newest >= cutoff)
+                {
+                    activeGenerations.Add(generationKey);
+                    continue;
+                }
+
+                if (BeforeOrphanPartDelete != null)
+                {
+                    var callback = BeforeOrphanPartDelete;
+                    BeforeOrphanPartDelete = null;
+                    await callback(ct);
+                }
+
+                // The header read above can be older than a commit that landed
+                // while this generation was being judged. Decide from the header
+                // that is current at the delete.
+                header = await ReadPartitionHeaderAsync(part.RunId, part.Domain, ct);
+                if (!IsOrphanPart(header, part))
                 {
                     activeGenerations.Add(generationKey);
                     continue;
@@ -227,6 +238,19 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
 
         return swept;
     }
+
+    private async Task<SnapshotPartitionHeader?> ReadPartitionHeaderAsync(Guid runId, string domain, CancellationToken ct)
+    {
+        var snapshot = await _store.ReadHeaderAsync(runId, domain, ct);
+        return snapshot != null && SnapshotPartitionHeader.TryRead(snapshot.Data, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static bool IsOrphanPart(SnapshotPartitionHeader? header, PartMeta part)
+        => header == null
+            || !string.Equals(header.GenerationId, part.GenerationId, StringComparison.Ordinal)
+            || part.Ordinal >= header.PartCount;
 
     private sealed class PartMeta
     {
