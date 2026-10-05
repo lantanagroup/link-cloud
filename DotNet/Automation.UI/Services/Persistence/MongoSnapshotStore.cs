@@ -46,6 +46,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
+    /// <summary>
+    /// Test seam. Runs after a single-document header update has been sent
+    /// and before this write treats that update as acknowledged.
+    /// </summary>
+    internal Func<Task>? AfterSingleHeaderUpdate { get; set; }
+
+    /// <summary>
+    /// Test seam. Runs after this write's header is stored and before the
+    /// displaced-header lookup.
+    /// </summary>
+    internal Func<Task>? BeforeDeleteDisplaced { get; set; }
+
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
@@ -722,11 +734,24 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     .Unset(d => d.ChunkIndex)
                     .Unset(d => d.ChunkCount)
                     .Unset(d => d.Revision);
-                var result = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), update, cancellationToken: ct);
-                if (result.MatchedCount == 0)
-                    continue;
+                try
+                {
+                    var result = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), update, cancellationToken: ct);
+                    if (result.MatchedCount == 0)
+                        continue;
 
-                keepId = previous.Id;
+                    keepId = previous.Id;
+                    if (AfterSingleHeaderUpdate != null)
+                        await AfterSingleHeaderUpdate();
+                }
+                catch (Exception)
+                {
+                    // The update may have landed even though the acknowledgement did not.
+                    // The header no longer carries the old revision, so a later write cannot
+                    // find those slices. Drop them only when no header still points at them.
+                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+                    throw;
+                }
             }
 
             if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision))
@@ -931,7 +956,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// already won, in which case this write's own header is removed and its
     /// slices go with it. Two first inserts can pass each other: the newer one
     /// may finish before the older header exists, so the older write has to
-    /// drop itself when it finally sees that newer header.
+    /// drop itself when it finally sees that newer header. A revision this
+    /// write already replaced is dropped too, once no header still names it.
     /// </summary>
     private async Task<bool> DeleteDisplacedAsync(
         Guid runId,
@@ -939,12 +965,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         ObjectId keepId,
         string? previousRevision)
     {
+        if (BeforeDeleteDisplaced != null)
+            await BeforeDeleteDisplaced();
+
         using var timeout = StartCleanupLookupTimeout();
         var ct = timeout.Token;
         var headers = await FindHeadersAsync(runId, domain, ct);
         var me = headers.FirstOrDefault(header => header.Id == keepId);
         if (me == null)
+        {
+            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
             return false;
+        }
 
         var newest = headers
             .OrderByDescending(header => header.UpdatedAt)
@@ -953,6 +985,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (newest.Id != keepId)
         {
             await DeleteHeaderIfUnchangedAsync(runId, domain, me, ct);
+            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
             return false;
         }
 
@@ -1035,6 +1068,34 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static bool LosesTo(DomainSnapshotDocument header, ObjectId keepId, DateTimeOffset now)
         => header.UpdatedAt < now || (header.UpdatedAt == now && header.Id.CompareTo(keepId) < 0);
+
+    /// <summary>
+    /// Deletes slices for <paramref name="revision"/> when no header still
+    /// references it. A failed lookup deletes nothing.
+    /// </summary>
+    private async Task ReclaimUnreferencedRevisionAsync(Guid runId, string domain, string? revision)
+    {
+        if (string.IsNullOrEmpty(revision))
+            return;
+
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            var headers = await FindHeadersAsync(runId, domain, timeout.Token);
+            if (headers.Any(header => header.ChunkIndex == -1 && header.Revision == revision))
+                return;
+
+            await DeleteSlicesAsync(runId, domain, revision, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Snapshot revision cleanup failed for domain {Domain} run {RunId}.",
+                domain.SanitizeForLog(),
+                runId.ToString().SanitizeForLog());
+        }
+    }
 
     private Task DeleteSlicesAsync(Guid runId, string domain, string revision, CancellationToken ct)
     {

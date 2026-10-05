@@ -309,6 +309,68 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
             && chunk.LineCount <= 1_000);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_reclaims_slices_when_the_single_document_update_is_not_acknowledged()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+
+        store.AfterSingleHeaderUpdate = () => throw new IOException("ack lost");
+
+        var act = () => store.SetDomainAsync(runId, "entries", "kept", CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.ChunkIndex >= 0);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("kept");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_drops_a_displaced_revision_when_a_newer_header_wins()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        store.BeforeDeleteDisplaced = () => collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = "\"winner\"",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(5)
+        });
+
+        await store.SetDomainAsync(runId, "entries", "loser", CancellationToken.None);
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.ChunkIndex >= 0);
+        docs.Should().ContainSingle(doc => doc.Data == "\"winner\"");
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("winner");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_displaced_revision_when_its_header_is_gone()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        store.BeforeDeleteDisplaced = () => collection.DeleteManyAsync(
+            doc => doc.RunId == runId && doc.Domain == "entries" && (doc.ChunkIndex == null || doc.ChunkIndex == -1));
+
+        await store.SetDomainAsync(runId, "entries", "loser", CancellationToken.None);
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.ChunkIndex >= 0);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None)).Should().BeNull();
+    }
+
     private Task<List<DomainSnapshotDocument>> Docs(Guid runId)
         => _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
             .Find(doc => doc.RunId == runId && doc.Domain == "entries")
