@@ -33,6 +33,7 @@ public sealed class MongoIndexManager
         EnsureRunIndexes();
         EnsureRunInputIndexes();
         EnsureSnapshotIndexes();
+        EnsureSnapshotClockIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
         EnsureGeneratedTemplateCacheVersionIndexes();
@@ -144,6 +145,12 @@ public sealed class MongoIndexManager
 
         // Compound key used for upserts and lookups (RunId + Domain)
         CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: false, "idx_runId_domain");
+    }
+
+    private void EnsureSnapshotClockIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_snapshot_clocks");
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 } }, unique: false, "idx_runId");
     }
 
     // --- automation_scenarios ---

@@ -175,8 +175,19 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         await collection.UpdateOneAsync(
             doc => doc.Id == stored.Id,
             Builders<DomainSnapshotDocument>.Update
-                .Set(doc => doc.WriteClock, DateTimeOffset.UtcNow.AddMinutes(5))
                 .Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+        var clockId = MongoSnapshotStore.SnapshotClockId(runId, "generationManifest");
+        await _fixture.Database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks")
+            .ReplaceOneAsync(
+                c => c.Id == clockId,
+                new SnapshotWriteClockDocument
+                {
+                    Id = clockId,
+                    RunId = runId,
+                    Domain = "generationManifest",
+                    WriteClock = DateTimeOffset.UtcNow.AddMinutes(5)
+                },
+                new ReplaceOptions { IsUpsert = true });
 
         var second = new Dictionary<string, string> { ["p"] = new string('y', 512) };
         await store.SetDomainAsync(runId, "generationManifest", second, CancellationToken.None);

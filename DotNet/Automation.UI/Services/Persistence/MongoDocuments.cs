@@ -136,16 +136,24 @@ public sealed class DomainSnapshotDocument
     [BsonIgnoreIfNull]
     public string? Revision { get; set; }
 
-    /// <summary>
-    /// Clock value captured when this header was written. Compare-and-swap uses
-    /// <see cref="UpdatedAt"/>, which moves forward by a millisecond when the clock
-    /// does not. This field stays at the writer's clock so a later write from that
-    /// same clock is not treated as stale.
-    /// </summary>
-    [BsonIgnoreIfNull]
-    public DateTimeOffset? WriteClock { get; set; }
-
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Writer clock for one snapshot domain. Kept off <see cref="DomainSnapshotDocument"/>
+/// so a single-document snapshot stays readable by a build that does not know this field.
+/// </summary>
+public sealed class SnapshotWriteClockDocument
+{
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string Domain { get; set; } = string.Empty;
+
+    public DateTimeOffset WriteClock { get; set; }
 }
 
 /// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>
