@@ -58,6 +58,14 @@ public static class LokiEvidenceQuery
         return lookback;
     }
 
+    /// <summary>
+    /// Extends an attempt lookback when the run has been going longer than that
+    /// window. Call this immediately before a Loki request so time spent waiting
+    /// or paging does not slide the start of the window past the run start.
+    /// </summary>
+    public static TimeSpan LookbackForRequest(TimeSpan attemptLookback, TimeSpan coverage) =>
+        coverage > attemptLookback ? coverage : attemptLookback;
+
     public static TimeSpan? DelayBeforeAttempt(int attemptIndex)
     {
         if (attemptIndex <= 0 || attemptIndex > RetryDelays.Length)
@@ -114,23 +122,24 @@ public static class LokiEvidenceQuery
         Func<TimeSpan, CancellationToken, Task> delayAsync,
         IAutomationOutput output,
         CancellationToken cancellationToken = default,
-        TimeSpan? coverage = null)
+        TimeSpan? coverage = null,
+        Func<TimeSpan>? coverageNow = null)
     {
         List<string> logs = [];
 
         for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
             var delay = DelayBeforeAttempt(attempt);
-            var lookback = LookbackForAttempt(configuredWindow, attempt, coverage);
-
             if (delay is { } wait)
             {
                 output.WriteLine(
-                    $"[Normalization Suite] Loki evidence incomplete; waiting {wait.TotalSeconds:F0}s then retrying with lookback {lookback.TotalMinutes:F0}m " +
+                    $"[Normalization Suite] Loki evidence incomplete; waiting {wait.TotalSeconds:F0}s then retrying " +
                     $"(attempt {attempt + 1}/{MaxAttempts}).");
                 await delayAsync(wait, cancellationToken);
             }
 
+            var span = coverageNow?.Invoke() ?? coverage;
+            var lookback = LookbackForAttempt(configuredWindow, attempt, span);
             logs = await queryAsync(lookback, cancellationToken);
             output.WriteLine(
                 $"[Normalization Suite] Loki scrape attempt {attempt + 1}/{MaxAttempts}: {logs.Count} summary line(s) " +

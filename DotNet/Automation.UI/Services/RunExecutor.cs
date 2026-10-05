@@ -1109,33 +1109,38 @@ internal sealed class RunExecutor
             {
                 var logs = new List<string>();
 
+                TimeSpan LookbackNow()
+                {
+                    var started = state.StartedAt ?? state.CreatedAt;
+                    var coverage = DateTimeOffset.UtcNow - started;
+                    if (coverage < TimeSpan.Zero)
+                        coverage = TimeSpan.Zero;
+                    return LokiEvidenceQuery.LookbackForRequest(lookback, coverage);
+                }
+
+                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+                    lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        LookbackNow(),
+                        additionalContainsFilters: filters,
+                        limit: limit,
+                        maxPages: maxPages,
+                        cancellationToken: queryToken);
+
                 if (evidenceRequiredResourceTypes.Count > 0)
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
                         queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
-                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
 
                         if (logsForResourceType.Count == 0)
                         {
                             queryToken.ThrowIfCancellationRequested();
                             output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
-                            logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                                LokiScraper.Components.Normalization,
-                                normalizationSummaryMarker,
-                                lookback,
-                                additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                                limit: 500,
-                                maxPages: 40,
-                                cancellationToken: queryToken);
+                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
                         }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
@@ -1146,27 +1151,13 @@ internal sealed class RunExecutor
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
                         queryToken.ThrowIfCancellationRequested();
-                        logs = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: runScopeFilters,
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                     }
                 }
                 else
                 {
                     queryToken.ThrowIfCancellationRequested();
-                    logs = await lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        lookback,
-                        additionalContainsFilters: runScopeFilters,
-                        limit: 5000,
-                        maxPages: 20,
-                        cancellationToken: queryToken);
+                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                 }
 
                 return logs
@@ -1203,10 +1194,6 @@ internal sealed class RunExecutor
                     : DateTimeOffset.UtcNow;
                 while (true)
                 {
-                    var evidenceCoverage = DateTimeOffset.UtcNow - (state.StartedAt ?? state.CreatedAt);
-                    if (evidenceCoverage < TimeSpan.Zero)
-                        evidenceCoverage = TimeSpan.Zero;
-
                     var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
                         scenarioConfig.LokiScrapeWindow,
                         evidenceRequiredResourceTypes,
@@ -1215,7 +1202,11 @@ internal sealed class RunExecutor
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
                         cancellationToken,
-                        evidenceCoverage);
+                        coverageNow: () =>
+                        {
+                            var coverage = DateTimeOffset.UtcNow - (state.StartedAt ?? state.CreatedAt);
+                            return coverage < TimeSpan.Zero ? TimeSpan.Zero : coverage;
+                        });
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
