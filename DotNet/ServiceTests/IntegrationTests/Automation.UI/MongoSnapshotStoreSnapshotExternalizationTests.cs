@@ -291,6 +291,58 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         keptDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName.Should().Be(winnerBlob);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_an_uploaded_blob_when_the_header_write_fails()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        store.BeforeHeaderWrite = () => throw new IOException("header write failed");
+
+        var act = () => store.SetDomainAsync(
+            runId,
+            "generationManifest",
+            new Dictionary<string, string> { ["p"] = new string('a', 512) },
+            CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.BlobNames.Should().BeEmpty();
+        var stored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .ToListAsync();
+        stored.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_keeps_an_uploaded_blob_when_the_header_was_published()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(
+            runId,
+            "generationManifest",
+            new Dictionary<string, string> { ["p"] = new string('a', 512) },
+            CancellationToken.None);
+        store.AfterSingleHeaderUpdate = () => throw new IOException("ack lost");
+
+        var act = () => store.SetDomainAsync(
+            runId,
+            "generationManifest",
+            new Dictionary<string, string> { ["p"] = new string('b', 512) },
+            CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('b', 512));
+        var stored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .SingleAsync();
+        using var storedDoc = JsonDocument.Parse(stored.Data);
+        var publishedBlob = storedDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+        payloadStore.HasBlob(publishedBlob!).Should().BeTrue();
+    }
+
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
     {
         private readonly ConcurrentDictionary<string, string> _payloadByBlob = new(StringComparer.Ordinal);

@@ -413,6 +413,55 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("winner");
     }
 
+    [Fact]
+    public async Task SetDomainAsync_advances_the_timestamp_when_the_clock_does_not()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var frozen = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        store.Clock = () => frozen;
+        var runId = Guid.NewGuid();
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+
+        await store.SetDomainAsync(runId, "schedule", "one", CancellationToken.None);
+        var first = await collection.Find(doc => doc.RunId == runId && doc.Domain == "schedule").SingleAsync();
+        first.UpdatedAt.Should().Be(frozen);
+
+        await store.SetDomainAsync(runId, "schedule", "two", CancellationToken.None);
+        var second = await collection.Find(doc => doc.RunId == runId && doc.Domain == "schedule").SingleAsync();
+        second.UpdatedAt.Should().Be(frozen.AddMilliseconds(1));
+        second.Data.Should().Be("\"two\"");
+
+        var matched = await collection.UpdateOneAsync(
+            MongoSnapshotStore.ObservedHeaderFilter(first),
+            Builders<DomainSnapshotDocument>.Update.Set(doc => doc.Data, "\"stale\""));
+        matched.MatchedCount.Should().Be(0);
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("two");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_the_previous_revision_when_the_displaced_lookup_fails()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+        var original = (await Docs(runId)).Single(doc => doc.ChunkIndex == -1).Revision;
+
+        store.BeforeDeleteDisplaced = () =>
+        {
+            store.FailNextHeaderLookup = true;
+            return Task.CompletedTask;
+        };
+
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.Revision == original);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
+    }
+
     private Task<List<DomainSnapshotDocument>> Docs(Guid runId)
         => _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
             .Find(doc => doc.RunId == runId && doc.Domain == "entries")

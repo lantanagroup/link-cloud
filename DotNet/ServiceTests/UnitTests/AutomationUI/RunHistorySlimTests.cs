@@ -227,7 +227,11 @@ public class RunHistorySlimTests
         slim.EvidenceChunkCount.Should().Be(0);
         slim.SummaryLines.Should().BeEmpty();
         slim.ParsedSteps.Should().BeEmpty();
+        slim.OmittedStepCount.Should().Be(1);
         slim.SuiteSequences.Should().ContainSingle();
+        var export = NormalizationDiagnosticsWriter.FormatExportAppendix(slim);
+        export.Should().Contain("1 execution step(s) omitted from this snapshot");
+        export.Should().NotContain("no parsable [NormalizationExecutionSummary] steps");
         slim.OperationConfigs.Should().ContainSingle();
         slim.OperationConfigs[0].Name.Should().Be("Copy");
         slim.OperationConfigs[0].Conditions.Should().BeEmpty();
