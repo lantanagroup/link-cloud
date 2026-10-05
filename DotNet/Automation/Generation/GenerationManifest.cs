@@ -160,6 +160,15 @@ public sealed class GenerationManifest
     public IReadOnlySet<string> PreExistingPatientIds { get; set; }
         = new HashSet<string>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Location logical ids referenced by an import and proven absent (HTTP 404 or 410).
+    /// An organization-location mapping whose parent id is in this set is a dangling
+    /// <c>partOf</c>, not a hierarchy gap. Empty for generated patients and for manifests
+    /// saved before this set existed.
+    /// </summary>
+    public IReadOnlySet<string> AbsentReferencedLocationIds { get; set; }
+        = new HashSet<string>(StringComparer.Ordinal);
+
     // ----- Acquired / Expected-in-ABS resource type filters -----
 
     /// <summary>
@@ -551,7 +560,51 @@ public sealed class GenerationManifest
                 added++;
         }
 
+        if (other.AbsentReferencedLocationIds.Count > 0)
+        {
+            var absent = EnsureMutableSet(AbsentReferencedLocationIds);
+            foreach (var id in other.AbsentReferencedLocationIds)
+            {
+                if (!string.IsNullOrWhiteSpace(id))
+                    absent.Add(id);
+            }
+
+            AbsentReferencedLocationIds = absent;
+        }
+
+        // A parent recorded absent before its bundle was uploaded is not absent
+        // once any slice in this manifest contains that Location.
+        RemoveSuppliedLocationsFromAbsentSet();
         return added;
+    }
+
+    /// <summary>
+    /// Drops absent location ids that this manifest actually contains.
+    /// The id was proven missing only against the server at read time. A later
+    /// import can supply the same Location.
+    /// </summary>
+    private void RemoveSuppliedLocationsFromAbsentSet()
+    {
+        if (AbsentReferencedLocationIds.Count == 0 || ResourceKeysByPatient.Count == 0)
+            return;
+
+        const string prefix = "Location/";
+        var supplied = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var keys in ResourceKeysByPatient.Values)
+        {
+            foreach (var key in keys)
+            {
+                if (key.Length > prefix.Length && key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    supplied.Add(key[prefix.Length..]);
+            }
+        }
+
+        if (supplied.Count == 0)
+            return;
+
+        var absent = EnsureMutableSet(AbsentReferencedLocationIds);
+        absent.RemoveWhere(supplied.Contains);
+        AbsentReferencedLocationIds = absent;
     }
 
     private void MergeSharedInfrastructure(GenerationManifest other)
@@ -696,6 +749,7 @@ public sealed class GenerationManifest
         private readonly Dictionary<string, int> _totalsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _simulatedAcquiredKeys = new(StringComparer.Ordinal);
         private readonly HashSet<string> _preExistingPatientIds = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _absentReferencedLocationIds = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _templateCacheKeys = new(StringComparer.Ordinal);
         private int _totalCount;
 
@@ -806,6 +860,45 @@ public sealed class GenerationManifest
         }
 
         /// <summary>
+        /// Records location ids that import proved are not on the FHIR server.
+        /// </summary>
+        public void AddAbsentReferencedLocationIds(IEnumerable<string>? locationIds)
+        {
+            if (locationIds == null) return;
+            lock (_lock)
+            {
+                foreach (var id in locationIds)
+                {
+                    if (!string.IsNullOrWhiteSpace(id))
+                        _absentReferencedLocationIds.Add(id);
+                }
+            }
+        }
+
+        private HashSet<string> AbsentIdsNotSuppliedByEntries()
+        {
+            const string prefix = "Location/";
+            var supplied = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var keys in _keysByPatient.Values)
+            {
+                foreach (var key in keys)
+                {
+                    if (key.Length > prefix.Length && key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        supplied.Add(key[prefix.Length..]);
+                }
+            }
+
+            var absent = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var id in _absentReferencedLocationIds)
+            {
+                if (!supplied.Contains(id))
+                    absent.Add(id);
+            }
+
+            return absent;
+        }
+
+        /// <summary>
         /// Records the ABS template-cache key used to generate this patient's FHIR
         /// so later downloads can replay the same template without a per-run copy.
         /// </summary>
@@ -840,6 +933,7 @@ public sealed class GenerationManifest
                     SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal),
                     CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal),
                     PreExistingPatientIds = new HashSet<string>(_preExistingPatientIds, StringComparer.Ordinal),
+                    AbsentReferencedLocationIds = AbsentIdsNotSuppliedByEntries(),
                     TemplateCacheKeyByPatient = new Dictionary<string, string>(_templateCacheKeys, StringComparer.Ordinal)
                 };
             }

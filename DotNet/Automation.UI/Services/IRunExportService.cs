@@ -11,4 +11,4 @@ public interface IRunExportService
     Task<RunExportPackage?> BuildAsync(Guid runId, CancellationToken cancellationToken = default);
 }
 
-public sealed record RunExportPackage(string FileName, byte[] Content);
+public sealed record RunExportPackage(string FileName, string FilePath);
