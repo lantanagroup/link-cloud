@@ -213,6 +213,47 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomainAsync_does_not_replace_a_header_newer_than_this_write()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "entries", "current", CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var header = await collection.Find(doc => doc.RunId == runId && doc.Domain == "entries").SingleAsync();
+        await collection.UpdateOneAsync(
+            doc => doc.Id == header.Id,
+            Builders<DomainSnapshotDocument>.Update
+                .Set(doc => doc.Data, "\"newer\"")
+                .Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+
+        await store.SetDomainAsync(runId, "entries", "stale", CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("newer");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_does_not_slice_over_a_header_newer_than_this_write()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var current = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", current, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var header = await collection.Find(doc => doc.RunId == runId && doc.Domain == "entries" && doc.ChunkIndex == -1).SingleAsync();
+        await collection.UpdateOneAsync(
+            doc => doc.Id == header.Id,
+            Builders<DomainSnapshotDocument>.Update.Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+
+        var stale = new string('b', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", stale, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(current);
+        (await Docs(runId)).Should().NotContain(doc => doc.Data.Contains('b'));
+    }
+
+    [Fact]
     public async Task SetDomainAsync_concurrent_chunked_writes_keep_one_revision()
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
