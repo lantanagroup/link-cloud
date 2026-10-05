@@ -131,6 +131,7 @@ public class RunHistorySlimTests
         slim.SuiteName.Should().Be("Epic");
         slim.CollectedLineCount.Should().Be(40);
         slim.RawLinesOmitted.Should().BeTrue();
+        slim.StepsCollapsed.Should().BeFalse();
         slim.EvidenceChunkCount.Should().Be(0);
         slim.SummaryLines.Should().BeEmpty();
         slim.ParsedSteps.Should().BeEmpty();
@@ -218,6 +219,7 @@ public class RunHistorySlimTests
         evidence!.SuiteName.Should().Be("Epic");
         evidence.CollectedLineCount.Should().Be(4);
         evidence.EvidenceChunkCount.Should().Be(0);
+        evidence.StepsCollapsed.Should().BeFalse();
         evidence.SummaryLines.Should().BeEmpty();
         evidence.ParsedSteps.Should().BeEmpty();
         evidence.OperationConfigs.Should().ContainSingle();
