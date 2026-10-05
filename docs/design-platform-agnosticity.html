@@ -495,48 +495,202 @@
                 </div>
             </nav>
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
-<h1>PayloadSubmitted</h1><p class="text-muted">Payload Submitted</p>
+<h1>Platform Agnosticity in Microservices</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produced By:</strong> <a href="service-submissionservice.html">Submission Service [service]</a></div><div class="mb-3"><strong>Consumed By:</strong> <a href="service-reportservice.html">Report Service [service]</a></div>
-        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Acknowledges successful creation of a patient bundle or manifest so reporting workflows can update their status.</p>
-<div class="mermaid-container"><pre class="mermaid">
-flowchart LR
-nPayloadSubmitted_1D7D15C7["Event: Payload Submitted"]
-  nSubmissionService_30800FFD["Service: SubmissionService"] -->|produces| nPayloadSubmitted_1D7D15C7
-  nPayloadSubmitted_1D7D15C7 -->|consumed by| nReportService_7E534222["Service: ReportService"]
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPayloadSubmitted_1D7D15C7
-    nReportService_7E534222
-    nSubmissionService_30800FFD
-  end
-</pre></div>
-<h2 id="event-schema" class="content-heading">Event Schema <a href="#event-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="key" class="content-heading">Key <a href="#key" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p>A JSON object containing the facility ID and report schedule ID is used as the Kafka message key.</p>
-<pre><code class="language-json">{
-  &quot;facilityId&quot;: &quot;string&quot;,
-  &quot;reportScheduleId&quot;: &quot;string&quot;
+        
+        <p>Platform agnosticity means keeping a microservice’s business logic independent of the infrastructure it runs on. A service should be able to change its hosting environment or infrastructure provider without rewriting its core business behavior.</p>
+<p>For example, a document service might store files in Azure Blob Storage when deployed to Azure and Amazon S3 when deployed to AWS. The document-processing logic stays the same; the storage implementation and deployment configuration change.</p>
+<p>This does not mean .NET and Java share executable code. Both can apply the same architectural pattern independently.</p>
+<h2 id="the-basic-pattern" class="content-heading">The Basic Pattern <a href="#the-basic-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: The Basic Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Use three parts:</p>
+<ol>
+<li><strong>Interface:</strong> Defines a capability the business logic needs, such as saving a document.</li>
+<li><strong>Concrete implementations:</strong> Provide that capability using specific technologies.</li>
+<li><strong>Deployment-time configuration:</strong> Selects which implementation the service creates at startup.</li>
+</ol>
+<pre class="mermaid">flowchart TD
+    Config["Deployment configuration&lt;br/>STORAGE_PROVIDER"] --> Composition["Startup composition root"]
+    Composition --> Azure["AzureBlobStorage"]
+    Composition --> S3["S3Storage"]
+
+    Business["DocumentService&lt;br/>Business logic"] --> Interface["IDocumentStorage / DocumentStorage&lt;br/>Storage interface"]
+    Interface -. implemented by .-> Azure
+    Interface -. implemented by .-> S3
+
+    Azure --> AzureSDK["Azure Blob Storage SDK"]
+    S3 --> S3SDK["AWS S3 SDK"]
+
+    AzureSDK --> AzurePlatform["Azure Blob Storage"]
+    S3SDK --> AWSPlatform["Amazon S3"]
+</pre>
+<p>The business logic depends on the interface. Provider-specific SDKs and behavior belong inside the concrete implementations. Deployment configuration selects the implementation during startup.</p>
+<h2 id="net-example" class="content-heading">.NET Example <a href="#net-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: .NET Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="define-the-interface-and-implementations" class="content-heading">Define the interface and implementations <a href="#define-the-interface-and-implementations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Define the interface and implementations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The following implementations are illustrative: the console messages mark where actual provider SDK calls would go.</p>
+<pre><code class="language-csharp">public interface IDocumentStorage
+{
+    Task SaveAsync(string name, byte[] content);
+}
+
+public sealed class AzureBlobStorage : IDocumentStorage
+{
+    public Task SaveAsync(string name, byte[] content)
+    {
+        // Use the Azure Blob Storage SDK here.
+        Console.WriteLine($&quot;Saving {name} to Azure Blob Storage&quot;);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class S3Storage : IDocumentStorage
+{
+    public Task SaveAsync(string name, byte[] content)
+    {
+        // Use the AWS S3 SDK here.
+        Console.WriteLine($&quot;Saving {name} to Amazon S3&quot;);
+        return Task.CompletedTask;
+    }
 }
 </code></pre>
-<h3 id="headers" class="content-heading">Headers <a href="#headers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Headers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<table>
-<thead>
-<tr>
-<th>Header Name</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>X-Correlation-Id</td>
-<td>The correlation ID associated with the event that should be used in logs produced during the event</td>
-</tr>
-</tbody>
-</table>
-<h3 id="payload" class="content-heading">Payload <a href="#payload" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Payload"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<p><em>(SchemaViewer tag used improperly, or no schema specified)</em></p>
+<h3 id="keep-business-logic-independent-of-the-provider" class="content-heading">Keep business logic independent of the provider <a href="#keep-business-logic-independent-of-the-provider" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Keep business logic independent of the provider"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Constructor injection gives the service its storage dependency. The service does not need to know which implementation it receives.</p>
+<pre><code class="language-csharp">public sealed class DocumentService
+{
+    private readonly IDocumentStorage _storage;
+
+    public DocumentService(IDocumentStorage storage)
+    {
+        _storage = storage;
+    }
+
+    public Task UploadAsync(string name, byte[] content)
+    {
+        // Provider-independent validation and business rules go here.
+        return _storage.SaveAsync(name, content);
+    }
+}
+</code></pre>
+<h3 id="select-the-implementation-at-startup" class="content-heading">Select the implementation at startup <a href="#select-the-implementation-at-startup" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Select the implementation at startup"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>In an ASP.NET Core application's <code>Program.cs</code>:</p>
+<pre><code class="language-csharp">var builder = WebApplication.CreateBuilder(args);
+
+var provider = builder.Configuration[&quot;STORAGE_PROVIDER&quot;]
+    ?? throw new InvalidOperationException(
+        &quot;STORAGE_PROVIDER must be configured.&quot;);
+
+switch (provider.ToLowerInvariant())
+{
+    case &quot;azure&quot;:
+        builder.Services.AddSingleton&lt;IDocumentStorage, AzureBlobStorage&gt;();
+        break;
+
+    case &quot;s3&quot;:
+        builder.Services.AddSingleton&lt;IDocumentStorage, S3Storage&gt;();
+        break;
+
+    default:
+        throw new InvalidOperationException(
+            $&quot;Unsupported storage provider: {provider}&quot;);
+}
+
+builder.Services.AddScoped&lt;DocumentService&gt;();
+
+var app = builder.Build();
+
+// Map application endpoints that use DocumentService here.
+
+app.Run();
+</code></pre>
+<p>ASP.NET Core's default configuration includes environment variables, allowing the deployment to supply <code>STORAGE_PROVIDER</code>. See <a href="https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-10.0">ASP.NET Core configuration</a>.</p>
+<h2 id="java-example" class="content-heading">Java Example <a href="#java-example" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Java Example"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="define-the-interface-and-implementations-1" class="content-heading">Define the interface and implementations <a href="#define-the-interface-and-implementations-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Define the interface and implementations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>These implementations use the same illustrative placeholders as the .NET example.</p>
+<pre><code class="language-java">public interface DocumentStorage {
+    void save(String name, byte[] content);
+}
+
+public final class AzureBlobStorage implements DocumentStorage {
+    @Override
+    public void save(String name, byte[] content) {
+        // Use the Azure Blob Storage SDK here.
+        System.out.println(&quot;Saving &quot; + name + &quot; to Azure Blob Storage&quot;);
+    }
+}
+
+public final class S3Storage implements DocumentStorage {
+    @Override
+    public void save(String name, byte[] content) {
+        // Use the AWS S3 SDK here.
+        System.out.println(&quot;Saving &quot; + name + &quot; to Amazon S3&quot;);
+    }
+}
+</code></pre>
+<p>Each public Java type belongs in its own matching <code>.java</code> file.</p>
+<h3 id="keep-business-logic-independent-of-the-provider-1" class="content-heading">Keep business logic independent of the provider <a href="#keep-business-logic-independent-of-the-provider-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Keep business logic independent of the provider"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre><code class="language-java">public final class DocumentService {
+    private final DocumentStorage storage;
+
+    public DocumentService(DocumentStorage storage) {
+        this.storage = storage;
+    }
+
+    public void upload(String name, byte[] content) {
+        // Provider-independent validation and business rules go here.
+        storage.save(name, content);
+    }
+}
+</code></pre>
+<h3 id="select-the-implementation-at-startup-1" class="content-heading">Select the implementation at startup <a href="#select-the-implementation-at-startup-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Select the implementation at startup"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>This framework-independent factory uses constructor injection without requiring a dependency injection container.</p>
+<pre><code class="language-java">public final class ServiceFactory {
+    public static DocumentService createDocumentService() {
+        String provider = System.getenv(&quot;STORAGE_PROVIDER&quot;);
+
+        if (provider == null || provider.isBlank()) {
+            throw new IllegalStateException(
+                &quot;STORAGE_PROVIDER must be configured.&quot;);
+        }
+
+        DocumentStorage storage;
+
+        if (&quot;azure&quot;.equalsIgnoreCase(provider)) {
+            storage = new AzureBlobStorage();
+        } else if (&quot;s3&quot;.equalsIgnoreCase(provider)) {
+            storage = new S3Storage();
+        } else {
+            throw new IllegalStateException(
+                &quot;Unsupported storage provider: &quot; + provider);
+        }
+
+        return new DocumentService(storage);
+    }
+}
+</code></pre>
+<p>The application's startup code calls <code>ServiceFactory.createDocumentService()</code> and passes the result to its request handlers. Java reads the deployment variable through <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/System.html#getenv(java.lang.String)"><code>System.getenv</code></a>.</p>
+<h2 id="deployment-time-configuration" class="content-heading">Deployment-Time Configuration <a href="#deployment-time-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment-Time Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The same environment variable works for either service:</p>
+<pre><code class="language-yaml"># Configuration for a deployment using Azure Blob Storage
+env:
+  - name: STORAGE_PROVIDER
+    value: azure
+</code></pre>
+<pre><code class="language-yaml"># Configuration for a deployment using Amazon S3
+env:
+  - name: STORAGE_PROVIDER
+    value: s3
+</code></pre>
+<p>These are Kubernetes container configuration fragments. Other deployment systems can supply the same environment variable.</p>
+<p>Each service can reuse its own application image across these deployments, provided the image already contains both implementations and their dependencies. At startup, configuration determines which implementation is injected.</p>
+<p>Actual storage adapters also need provider-specific settings, such as bucket or container names, endpoints, and credentials or workload identity. Deployment supplies those settings; the business logic remains unaware of them.</p>
+<h2 id="what-this-achieves" class="content-heading">What This Achieves <a href="#what-this-achieves" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: What This Achieves"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li><strong>Portability:</strong> Infrastructure changes are concentrated in adapters and deployment configuration.</li>
+<li><strong>Testability:</strong> Tests can inject an in-memory storage implementation.</li>
+<li><strong>Maintainability:</strong> Provider SDK code stays separate from business rules.</li>
+<li><strong>Consistency:</strong> .NET and Java services follow the same design, even with different frameworks.</li>
+</ul>
+<p>An interface alone does not guarantee portability. Implementations must satisfy the same behavioral contract, including error handling and overwrite behavior. Moving platforms may still require data migration and changes to identity, networking, and deployment infrastructure.</p>
 
         
     </div>
@@ -544,14 +698,7 @@ nPayloadSubmitted_1D7D15C7["Event: Payload Submitted"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPayloadSubmitted_1D7D15C7["Event: Payload Submitted"]
-  nSubmissionService_30800FFD["Service: SubmissionService"] -->|produces| nPayloadSubmitted_1D7D15C7
-  nPayloadSubmitted_1D7D15C7 -->|consumed by| nReportService_7E534222["Service: ReportService"]
-  subgraph nReport_523BC237_domain["Domain: Report"]
-    nPayloadSubmitted_1D7D15C7
-    nReportService_7E534222
-    nSubmissionService_30800FFD
-  end</pre>
+nplatform_agnosticity_58A71A29["Design: Platform Agnosticity in Microservices"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
