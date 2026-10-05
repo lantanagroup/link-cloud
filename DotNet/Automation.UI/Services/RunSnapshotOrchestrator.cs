@@ -97,11 +97,27 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         //    after we clear snapshots. StopAsync awaits the current poll cycle, so
         //    after this returns the old poller is guaranteed idle.
         var isMetricsRun = false;
-        if (_activePollers.TryRemove(runId, out var existingHandle))
+        var leaveFinalizing = false;
+        if (_activePollers.TryGetValue(runId, out var existingHandle))
         {
-            isMetricsRun = existingHandle.IsMetricsRun;
-            await existingHandle.StopAsync();
-            _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
+            if (existingHandle.IsFinalizing)
+            {
+                leaveFinalizing = true;
+                _logger.LogInformation("Leaving the finalizing poller for run {RunId} in place", runId);
+            }
+            else if (existingHandle.TryDetach())
+            {
+                isMetricsRun = existingHandle.IsMetricsRun;
+                TryRemoveExact(_activePollers, runId, existingHandle);
+                await existingHandle.StopAsync();
+                _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
+            }
+            else if (_activePollers.TryGetValue(runId, out var stillRegistered)
+                     && ReferenceEquals(stillRegistered, existingHandle))
+            {
+                leaveFinalizing = true;
+                _logger.LogInformation("Leaving the poller for run {RunId} in place because this update does not own it", runId);
+            }
         }
 
         // 2. Now safe to update meta and clear stale domain snapshots - no writer
@@ -110,6 +126,9 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
         // 3. Immediately start a new poller bound to the regenerated report so the
         //    UI doesn't have to wait up to 2s for the next reconciliation cycle.
+        if (leaveFinalizing)
+            return;
+
         if (!isMetricsRun)
             isMetricsRun = (await _store.GetRunMetaAsync(runId, ct))?.IsMetricsRun ?? false;
         var meta = new RunSnapshotMeta
@@ -195,11 +214,12 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
         finally
         {
-            if (ownsHandle && _activePollers.TryRemove(runId, out var handle))
+            if (ownsHandle && activeHandle != null)
             {
                 try
                 {
-                    await handle.StopAsync();
+                    TryRemoveExact(_activePollers, runId, activeHandle);
+                    await activeHandle.StopAsync();
                     _logger.LogInformation("Stopped poller for completed run {RunId}", runId);
                 }
                 catch (Exception ex)
@@ -225,7 +245,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             {
                 if (existingHandle.TryDetach())
                 {
-                    _activePollers.TryRemove(meta.RunId, out _);
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
                     await existingHandle.StopAsync();
                     _logger.LogWarning("Restarting completed poller task for still-active run {RunId}", meta.RunId);
                 }
@@ -241,7 +261,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 {
                     var oldFacilityId = existingHandle.FacilityId;
                     var oldReportId = existingHandle.ReportId;
-                    _activePollers.TryRemove(meta.RunId, out _);
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
                     await existingHandle.StopAsync();
                     _logger.LogInformation(
                         "Restarting poller for run {RunId} due to context change (facility: {OldFacility}->{NewFacility}, report: {OldReport}->{NewReport})",
@@ -273,12 +293,16 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 if (!handle.TryDetach())
                     continue;
 
-                _activePollers.TryRemove(runId, out _);
+                TryRemoveExact(_activePollers, runId, handle);
                 await handle.StopAsync();
                 _logger.LogInformation("Removed stale poller for run {RunId}", runId);
             }
         }
     }
+
+    internal static bool TryRemoveExact<T>(ConcurrentDictionary<Guid, T> pollers, Guid runId, T expected)
+        where T : class
+        => pollers.TryRemove(new KeyValuePair<Guid, T>(runId, expected));
 
     private void StartPoller(RunSnapshotMeta meta, CancellationToken ct)
     {

@@ -45,15 +45,17 @@ public class PipelineDataReader
     /// and caches the result. Concurrent callers for the same key wait for the
     /// single in-flight fetch rather than issuing duplicate HTTP calls.
     /// </summary>
-    private async Task<T?> GetOrFetchAsync<T>(string cacheKey, Func<Task<T?>> factory)
+    private async Task<T?> GetOrFetchAsync<T>(string cacheKey, Func<Task<T?>> factory, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_cache.TryGetValue(cacheKey, out var entry) && DateTime.UtcNow < entry.ExpiresAt)
             return (T?)entry.Value;
 
         var keyLock = _cacheLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
-        await keyLock.WaitAsync();
+        await keyLock.WaitAsync(cancellationToken);
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Double-check after acquiring lock
             if (_cache.TryGetValue(cacheKey, out entry) && DateTime.UtcNow < entry.ExpiresAt)
                 return (T?)entry.Value;
@@ -157,11 +159,11 @@ public class PipelineDataReader
     public record EncounterLocationInfo(string? LocationId);
     public record EncounterMappingInfo(string? FacilityId, string? PatientId, string? EncounterId, bool MappedToOrg, List<EncounterLocationInfo> EncounterLocations);
 
-    public virtual Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
+    public virtual Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId, CancellationToken cancellationToken = default)
     {
         return GetOrFetchAsync($"schedule:{scheduleId}", async () =>
         {
-            var response = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
+            var response = await _reportClient.SearchSchedulesAsync(scheduleId.ToString(), cancellationToken);
             var record = response.Body?.Records?.FirstOrDefault();
             if (record == null)
                 return null;
@@ -178,17 +180,17 @@ public class PipelineDataReader
                 record.ReportEndDate,
                 record.CreateDate,
                 record.SubmitReportDateTime);
-        });
+        }, cancellationToken);
     }
 
     public Task<List<ReportEntryInfo>> GetReportEntriesAsync(Guid scheduleId)
         => GetReportEntriesWithMeasureReportsAsync(scheduleId);
 
-    public virtual async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId)
+    public virtual async Task<List<ReportEntryInfo>> GetReportEntriesWithMeasureReportsAsync(Guid scheduleId, CancellationToken cancellationToken = default)
     {
         var result = await GetOrFetchAsync($"entries:{scheduleId}", async () =>
         {
-            var response = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
+            var response = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString(), cancellationToken);
             var entries = response.Body;
             if (entries == null)
                 return new List<ReportEntryInfo>();
@@ -211,7 +213,7 @@ public class PipelineDataReader
                     e.CreateDate,
                     e.ModifyDate);
             }).ToList();
-        });
+        }, cancellationToken);
 
         return result ?? [];
     }
@@ -241,11 +243,11 @@ public class PipelineDataReader
             .ToList();
     }
 
-    public async Task<List<ReportPopulationInfo>> GetReportPopulationsAsync(Guid scheduleId, string facilityId)
+    public async Task<List<ReportPopulationInfo>> GetReportPopulationsAsync(Guid scheduleId, string facilityId, CancellationToken cancellationToken = default)
     {
         var result = await GetOrFetchAsync($"populations:{scheduleId}:{facilityId}", async () =>
         {
-            var response = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
+            var response = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString(), cancellationToken: cancellationToken);
             var pops = response.Body;
             if (pops == null)
                 return new List<ReportPopulationInfo>();
@@ -255,7 +257,7 @@ public class PipelineDataReader
                 p.GroupPopulations.Select(gp => new GroupPopulationInfo(
                     gp.PopulationCodeJson,
                     gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationInfo(mrp.MeasureReportId)).ToList())).ToList())).ToList();
-        });
+        }, cancellationToken);
 
         return result ?? [];
     }
@@ -266,14 +268,14 @@ public class PipelineDataReader
         return entries.Where(e => string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
-    public async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsAsync(string facilityId, string reportId)
+    public async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsAsync(string facilityId, string reportId, CancellationToken cancellationToken = default)
     {
-        var results = await GetAcquisitionLogsCoreAsync(facilityId, reportId);
+        var results = await GetAcquisitionLogsCoreAsync(facilityId, reportId, cancellationToken);
         if (results.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
             return results;
 
         // Facility can occasionally drift from report context; retry report-only for deterministic validation.
-        return await GetAcquisitionLogsCoreAsync(string.Empty, reportId);
+        return await GetAcquisitionLogsCoreAsync(string.Empty, reportId, cancellationToken);
     }
 
     public async Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id)
@@ -323,7 +325,7 @@ public class PipelineDataReader
             detailed => (detailed?.ReferenceResourceCount ?? 0) > 0);
     }
 
-    private async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsCoreAsync(string facilityId, string reportId)
+    private async Task<List<AcquisitionLogInfo>> GetAcquisitionLogsCoreAsync(string facilityId, string reportId, CancellationToken cancellationToken)
     {
         var pageNumber = 1;
         const int pageSize = 100;
@@ -332,7 +334,13 @@ public class PipelineDataReader
 
         while (true)
         {
-            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            cancellationToken.ThrowIfCancellationRequested();
+            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(
+                facilityId,
+                reportId,
+                pageSize: pageSize,
+                pageNumber: pageNumber,
+                cancellationToken: cancellationToken);
             var page = response.Body;
             var records = page?.Records ?? [];
             if (records.Count == 0)
@@ -516,9 +524,9 @@ public class PipelineDataReader
                 facility.ScheduledReports?.Weekly ?? []));
     }
 
-    public async Task<List<OrganizationLocationConfigurationInfo>> GetOrganizationLocationConfigurationsAsync(string facilityId)
+    public async Task<List<OrganizationLocationConfigurationInfo>> GetOrganizationLocationConfigurationsAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var response = await _dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId);
+        var response = await _dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
         if (!response.IsSuccessStatusCode || response.Body == null)
             return [];
 
@@ -528,9 +536,9 @@ public class PipelineDataReader
             c.Conditions?.Count ?? 0)).ToList();
     }
 
-    public async Task<List<OrganizationLocationMappingInfo>> GetOrganizationLocationMappingsAsync(string facilityId)
+    public async Task<List<OrganizationLocationMappingInfo>> GetOrganizationLocationMappingsAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var response = await _dataAcqClient.GetOrganizationLocationMappingsAsync(facilityId);
+        var response = await _dataAcqClient.GetOrganizationLocationMappingsAsync(facilityId, cancellationToken);
         if (!response.IsSuccessStatusCode || response.Body == null)
             return [];
 
@@ -542,9 +550,9 @@ public class PipelineDataReader
             m.PartOfValue)).ToList();
     }
 
-    public async Task<List<EncounterMappingInfo>> GetEncounterMappingsAsync(string facilityId)
+    public async Task<List<EncounterMappingInfo>> GetEncounterMappingsAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var response = await _dataAcqClient.GetEncounterMappingsAsync(facilityId);
+        var response = await _dataAcqClient.GetEncounterMappingsAsync(facilityId, cancellationToken);
         if (!response.IsSuccessStatusCode || response.Body == null)
             return [];
 
@@ -558,9 +566,9 @@ public class PipelineDataReader
                 .ToList())).ToList();
     }
 
-    public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId)
+    public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId, CancellationToken cancellationToken = default)
     {
-        var entries = await GetReportEntriesWithMeasureReportsAsync(scheduleId);
+        var entries = await GetReportEntriesWithMeasureReportsAsync(scheduleId, cancellationToken);
         var rows = entries
             .SelectMany(e => e.MeasureReports.SelectMany(mr => mr.ResourceCounts.Select(rc =>
                 new PatientResourceTypeCount(e.PatientId, rc.ResourceType, rc.ResourceCount))))
@@ -663,11 +671,11 @@ public class PipelineDataReader
         return keys ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
-    public Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId)
+    public Task<AcquisitionSummaryInfo?> GetDataAcquisitionReportSummaryAsync(string reportId, CancellationToken cancellationToken = default)
     {
         return GetOrFetchAsync($"acqSummary:{reportId}", async () =>
         {
-            var response = await _dataAcqClient.GetReportSummaryAsync(reportId);
+            var response = await _dataAcqClient.GetReportSummaryAsync(reportId, cancellationToken);
             var summary = response.Body;
             if (summary == null) return null;
 
@@ -688,6 +696,6 @@ public class PipelineDataReader
                     .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType))
                     .Select(r => new ResourceTypeCountInfo(r.ResourceType, r.Count))
                     .ToList());
-        });
+        }, cancellationToken);
     }
 }

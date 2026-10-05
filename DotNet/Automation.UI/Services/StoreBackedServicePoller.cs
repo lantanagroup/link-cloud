@@ -165,25 +165,25 @@ public sealed class StoreBackedServicePoller
 
     private async Task PollScheduleAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportScheduleAsync(scheduleId);
+        var result = await _reader.GetReportScheduleAsync(scheduleId, ct);
         await _store.SetDomainAsync(_meta.RunId, "schedule", result, ct);
     }
 
     private async Task PollEntriesAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
+        var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId, ct);
         await _store.SetDomainAsync(_meta.RunId, "entries", result, ct);
     }
 
     private async Task PollPopulationsAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId);
+        var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId, ct);
         await _store.SetDomainAsync(_meta.RunId, "populations", RunHistorySlim.ToPopulationCounts(result), ct);
     }
 
     private async Task PollAcquisitionAsync(CancellationToken ct)
     {
-        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId);
+        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId, ct);
 
         // Always write � even when null � so stale data from a prior report
         // (e.g., before regeneration cleared snapshots) is overwritten.
@@ -192,22 +192,22 @@ public sealed class StoreBackedServicePoller
 
     private async Task PollAcquisitionLogsAsync(CancellationToken ct)
     {
-        var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId);
+        var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId, ct);
         await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.ToAcquisitionChart(logs), ct);
     }
 
     private async Task PollOrgLocationAsync(CancellationToken ct)
     {
         var snapshot = new OrgLocationSnapshot(
-            await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId),
-            await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId),
-            await _reader.GetEncounterMappingsAsync(_meta.FacilityId));
+            await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId, ct),
+            await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId, ct),
+            await _reader.GetEncounterMappingsAsync(_meta.FacilityId, ct));
         await _store.SetDomainAsync(_meta.RunId, "orgLocation", RunHistorySlim.SlimOrgLocation(snapshot), ct);
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId);
+        var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId, ct);
         await _store.SetDomainAsync(_meta.RunId, "measureResources", RunHistorySlim.SlimMeasureResources(result), ct);
     }
 }

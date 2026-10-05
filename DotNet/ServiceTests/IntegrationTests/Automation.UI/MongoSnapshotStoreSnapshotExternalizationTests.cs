@@ -185,6 +185,31 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         hydrated!.Data["p"].Should().Be(new string('x', 512));
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_the_blob_from_the_header_it_replaced()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('a', 512) }, CancellationToken.None);
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var first = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var firstDoc = JsonDocument.Parse(first.Data);
+        var firstBlob = firstDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('b', 512) }, CancellationToken.None);
+        var second = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var secondDoc = JsonDocument.Parse(second.Data);
+        var secondBlob = secondDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+
+        payloadStore.DeletedBlobNames.Should().ContainSingle().Which.Should().Be(firstBlob);
+        payloadStore.HasBlob(firstBlob!).Should().BeFalse();
+        payloadStore.HasBlob(secondBlob!).Should().BeTrue();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('b', 512));
+    }
+
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
     {
         private readonly ConcurrentDictionary<string, string> _payloadByBlob = new(StringComparer.Ordinal);
