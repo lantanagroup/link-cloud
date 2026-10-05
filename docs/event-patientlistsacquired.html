@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,15 +503,15 @@
 <p>Used to update admission or discharge status and to trigger additional processing for each patient.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
-  nDataAcquisitionWorkerService_32E6F397["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_2B002DF
-  nPatientListsAcquired_2B002DF -->|consumed by| nCensusService_676D2042["Service: CensusService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionWorkerService_32E6F397
-    nPatientListsAcquired_2B002DF
+nPatientListsAcquired_36D412D8["Event: Patient Lists Acquired"]
+  nDataAcquisitionWorkerService_34AD5529["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_36D412D8
+  nPatientListsAcquired_36D412D8 -->|consumed by| nCensusService_2C014B95["Service: CensusService"]
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionWorkerService_34AD5529
+    nPatientListsAcquired_36D412D8
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end
 </pre></div>
 <h2 id="event-schema" class="content-heading">Event Schema <a href="#event-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Event Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -539,15 +541,15 @@ nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientListsAcquired_2B002DF["Event: Patient Lists Acquired"]
-  nDataAcquisitionWorkerService_32E6F397["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_2B002DF
-  nPatientListsAcquired_2B002DF -->|consumed by| nCensusService_676D2042["Service: CensusService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionWorkerService_32E6F397
-    nPatientListsAcquired_2B002DF
+nPatientListsAcquired_36D412D8["Event: Patient Lists Acquired"]
+  nDataAcquisitionWorkerService_34AD5529["Service: DataAcquisitionWorkerService"] -->|produces| nPatientListsAcquired_36D412D8
+  nPatientListsAcquired_36D412D8 -->|consumed by| nCensusService_2C014B95["Service: CensusService"]
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionWorkerService_34AD5529
+    nPatientListsAcquired_36D412D8
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

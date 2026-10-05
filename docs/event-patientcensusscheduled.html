@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -502,17 +504,17 @@
 to date.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
+nPatientCensusScheduled_49BC5D3C["Event: Patient Census Scheduled"]
+  nCensusService_2C014B95["Service: CensusService"] -->|produces| nPatientCensusScheduled_49BC5D3C
+  nPatientCensusScheduled_49BC5D3C -->|consumed by| nDataAcquisitionService_6CAFA860["Service: DataAcquisitionService"]
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionService_6CAFA860
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientCensusScheduled_49BC5D3C
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end
 </pre></div>
 
@@ -522,17 +524,17 @@ nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nPatientCensusScheduled_3CE52530["Event: Patient Census Scheduled"]
-  nCensusService_676D2042["Service: CensusService"] -->|produces| nPatientCensusScheduled_3CE52530
-  nPatientCensusScheduled_3CE52530 -->|consumed by| nDataAcquisitionService_2716332D["Service: DataAcquisitionService"]
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionService_2716332D
+nPatientCensusScheduled_49BC5D3C["Event: Patient Census Scheduled"]
+  nCensusService_2C014B95["Service: CensusService"] -->|produces| nPatientCensusScheduled_49BC5D3C
+  nPatientCensusScheduled_49BC5D3C -->|consumed by| nDataAcquisitionService_6CAFA860["Service: DataAcquisitionService"]
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionService_6CAFA860
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nPatientCensusScheduled_3CE52530
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nPatientCensusScheduled_49BC5D3C
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nCensusService_676D2042
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nCensusService_2C014B95
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

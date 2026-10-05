@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,13 +503,13 @@
 <p>A RESTful query made to the Tenant service to retrieve a list of all facilities configured in the system.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nGetFacilitiesList_7612A70C["Query: Get Facilities List"]
-  nTenantService_7F5659F3["Service: TenantService"] -->|provides| nGetFacilitiesList_7612A70C
-  nAdminBFF_4E2096B7["Service: AdminBFF"] -->|provides| nGetFacilitiesList_7612A70C
-  nTenantService_7F5659F3["Service: TenantService"] -->|requests| nGetFacilitiesList_7612A70C
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nGetFacilitiesList_7612A70C
-    nTenantService_7F5659F3
+nGetFacilitiesList_48F17BCD["Query: Get Facilities List"]
+  nTenantService_29AF3ECE["Service: TenantService"] -->|provides| nGetFacilitiesList_48F17BCD
+  nAdminBFF_7A9CD338["Service: AdminBFF"] -->|provides| nGetFacilitiesList_48F17BCD
+  nTenantService_29AF3ECE["Service: TenantService"] -->|requests| nGetFacilitiesList_48F17BCD
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nGetFacilitiesList_48F17BCD
+    nTenantService_29AF3ECE
   end
 </pre></div>
 <h2 id="rest-api-details" class="content-heading">REST API Details <a href="#rest-api-details" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: REST API Details"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -546,13 +548,13 @@ nGetFacilitiesList_7612A70C["Query: Get Facilities List"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nGetFacilitiesList_7612A70C["Query: Get Facilities List"]
-  nTenantService_7F5659F3["Service: TenantService"] -->|provides| nGetFacilitiesList_7612A70C
-  nAdminBFF_4E2096B7["Service: AdminBFF"] -->|provides| nGetFacilitiesList_7612A70C
-  nTenantService_7F5659F3["Service: TenantService"] -->|requests| nGetFacilitiesList_7612A70C
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nGetFacilitiesList_7612A70C
-    nTenantService_7F5659F3
+nGetFacilitiesList_48F17BCD["Query: Get Facilities List"]
+  nTenantService_29AF3ECE["Service: TenantService"] -->|provides| nGetFacilitiesList_48F17BCD
+  nAdminBFF_7A9CD338["Service: AdminBFF"] -->|provides| nGetFacilitiesList_48F17BCD
+  nTenantService_29AF3ECE["Service: TenantService"] -->|requests| nGetFacilitiesList_48F17BCD
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nGetFacilitiesList_48F17BCD
+    nTenantService_29AF3ECE
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
