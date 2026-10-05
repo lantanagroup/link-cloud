@@ -2302,7 +2302,7 @@
 
                 renderDaLogRows(records, daSearchTerm ? 'No matching logs.' : 'No logs found.');
             } catch {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Source no longer available.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading logs.</td></tr>';
             }
         }
 
@@ -2364,7 +2364,7 @@
                 const res = await fetch(`${dataAcqLogDetailUrl}?id=${encodeURIComponent(runId)}&logId=${encodeURIComponent(logId)}`);
                 if (!res.ok) {
                     subtitle.textContent = '';
-                    body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
+                    body.innerHTML = '<div class="text-danger">Failed to load log details.</div>';
                     return;
                 }
 
@@ -2430,7 +2430,7 @@
                 `;
             } catch {
                 subtitle.textContent = '';
-                body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
+                body.innerHTML = '<div class="text-danger">Error loading log details.</div>';
             }
         }
 
