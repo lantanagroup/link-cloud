@@ -862,6 +862,37 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_slices_when_the_epoch_check_fails()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        using var cts = new CancellationTokenSource();
+        store.BeforeHeaderInsert = () =>
+        {
+            cts.Cancel();
+            return Task.CompletedTask;
+        };
+
+        var act = () => store.SetDomainAsync(
+            runId,
+            "entries",
+            new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1),
+            0L,
+            cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        (await Docs(runId)).Should().BeEmpty();
+    }
+
     private Task MoveEpochAsync(Guid runId)
         => _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs")
             .UpdateOneAsync(
