@@ -96,12 +96,52 @@ public class ReportAbsManifestValidator
         GenerationManifest? manifest = null,
         OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
     {
+        using var package = ReportPackage.FromTextEntries(TextEntries(internalAbsResources));
+        await ValidateAllAsync(
+            package,
+            expectedPatientIds,
+            expectedMeasureIds,
+            expectedStartDate,
+            expectedEndDate,
+            facilityId,
+            reportId,
+            generatedBundles,
+            expectedManifestPatientListIds,
+            expectDataAcquisitionData,
+            manifest,
+            operationOutcomeExpectations);
+    }
+
+    private static IEnumerable<KeyValuePair<string, string>> TextEntries(IDictionary<string, object> files)
+    {
+        foreach (var (key, value) in files)
+        {
+            if (value is string text)
+                yield return new KeyValuePair<string, string>(key, text);
+        }
+    }
+
+    public async Task ValidateAllAsync(
+        ReportPackage package,
+        IReadOnlyCollection<string> expectedPatientIds,
+        IReadOnlyList<string> expectedMeasureIds,
+        string expectedStartDate,
+        string expectedEndDate,
+        string? facilityId = null,
+        string? reportId = null,
+        IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
+        IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
+        bool expectDataAcquisitionData = true,
+        GenerationManifest? manifest = null,
+        OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
+    {
         var errors = new List<string>();
 
         var expectedSubmittedPatientIds = expectedPatientIds;
         var expectedListPatientIds = expectedManifestPatientListIds ?? expectedSubmittedPatientIds;
 
-        if (!internalAbsResources.TryGetValue("manifest.ndjson", out var manifestObj) || manifestObj is not string manifestNdjson)
+        var manifestNdjson = package.ReadEntryText("manifest.ndjson");
+        if (manifestNdjson == null)
         {
             AddError(errors, "manifest.ndjson was not found in internal ABS artifacts.");
             await FailIfNeededAsync(errors);
@@ -112,7 +152,7 @@ public class ReportAbsManifestValidator
             .Select(id => $"patient-{id}.ndjson")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var actualPatientFiles = internalAbsResources.Keys
+        var actualPatientFiles = package.EntryNames
             .Where(k => k.StartsWith("patient-", StringComparison.OrdinalIgnoreCase) && k.EndsWith(".ndjson", StringComparison.OrdinalIgnoreCase))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -135,14 +175,22 @@ public class ReportAbsManifestValidator
         foreach (var patientId in expectedSubmittedPatientIds)
         {
             var fileName = $"patient-{patientId}.ndjson";
-            if (!internalAbsResources.TryGetValue(fileName, out var patientObj) || patientObj is not string patientNdjson)
+            var patientNdjson = package.ReadEntryText(fileName);
+            if (patientNdjson == null)
                 continue;
 
+            // One patient file is parsed, checked, then dropped. Later passes
+            // keep only type and id, not the resource document.
             var patientResources = ParseNdjson(patientNdjson, fileName, errors);
-            parsedPatientResources.AddRange(patientResources
-                .Select(r => new AbsResourceRecord(fileName, patientId, GetString(r, "resourceType") ?? string.Empty, GetString(r, "id") ?? string.Empty, r)));
-
             ValidatePatientArtifact(patientId, patientResources, patientMeasureReportIds, errors);
+            foreach (var resource in patientResources)
+            {
+                parsedPatientResources.Add(new AbsResourceRecord(
+                    fileName,
+                    patientId,
+                    GetString(resource, "resourceType") ?? string.Empty,
+                    GetString(resource, "id") ?? string.Empty));
+            }
         }
 
         HashSet<string>? expectedSubmittedMeasureReportIds = null;
@@ -960,5 +1008,5 @@ public class ReportAbsManifestValidator
     private static bool IsReadyForValidation(string? status) =>
         string.Equals(status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase);
 
-    private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId, JsonElement Resource);
+    private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId);
 }

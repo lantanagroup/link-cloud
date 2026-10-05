@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -508,15 +510,15 @@
 <p>On startup, the service loads configured ValueSets and CodeSystems from the local file system into an in-memory cache; runtime requests operate exclusively against this cache for predictable, fast responses and no external dependencies.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nTerminologyService_2AF4A3FC["Service: Terminology Service"]
-  nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"] -->|handled by| nTerminologyService_2AF4A3FC
-  nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"] -->|handled by| nTerminologyService_2AF4A3FC
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidateCodeSystemCode_2E03448C
-    nValidateValueSetCode_C70055C
+nTerminologyService_2123EB9E["Service: Terminology Service"]
+  nValidateValueSetCode_5A22B5A3["Command: ValidateValueSetCode"] -->|handled by| nTerminologyService_2123EB9E
+  nValidateCodeSystemCode_20E1E2AA["Command: ValidateCodeSystemCode"] -->|handled by| nTerminologyService_2123EB9E
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidateCodeSystemCode_20E1E2AA
+    nValidateValueSetCode_5A22B5A3
   end
-  subgraph nKnowledgeArtifactManagement_62728541_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2AF4A3FC
+  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_2123EB9E
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -1080,15 +1082,15 @@ and conformance requirements of the FHIR Terminology server.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nTerminologyService_2AF4A3FC["Service: Terminology Service"]
-  nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"] -->|handled by| nTerminologyService_2AF4A3FC
-  nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"] -->|handled by| nTerminologyService_2AF4A3FC
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidateCodeSystemCode_2E03448C
-    nValidateValueSetCode_C70055C
+nTerminologyService_2123EB9E["Service: Terminology Service"]
+  nValidateValueSetCode_5A22B5A3["Command: ValidateValueSetCode"] -->|handled by| nTerminologyService_2123EB9E
+  nValidateCodeSystemCode_20E1E2AA["Command: ValidateCodeSystemCode"] -->|handled by| nTerminologyService_2123EB9E
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidateCodeSystemCode_20E1E2AA
+    nValidateValueSetCode_5A22B5A3
   end
-  subgraph nKnowledgeArtifactManagement_62728541_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2AF4A3FC
+  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_2123EB9E
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

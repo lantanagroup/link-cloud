@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,41 +503,41 @@
 <p>The Report service is responsible for persisting the Measure Reports and FHIR resources that the Measure Eval service generates after evaluating a patient against a measure. When a tenant's reporting period end date has been met, the Report Service performs various workflows to determine if all of the patient MeasureReports are accounted for that period prior to initiating the submission process.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nReportService_417D4454["Service: Report Service"]
-  nReportService_417D4454 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
-  nReportService_417D4454 -->|produces| nReadyForValidation_27561738["Event: ReadyForValidation"]
-  nReportService_417D4454 -->|produces| nSubmitPayload_7A027AAE["Event: SubmitPayload"]
-  nValidationComplete_6ED20CD9["Event: ValidationComplete"] -->|consumed by| nReportService_417D4454
-  nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"] -->|consumed by| nReportService_417D4454
-  nPatientEvent_630CFEC8["Event: PatientEvent"] -->|consumed by| nReportService_417D4454
-  nReportScheduled_4BA62BDB["Event: ReportScheduled"] -->|consumed by| nReportService_417D4454
-  nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"] -->|consumed by| nReportService_417D4454
-  nReportService_417D4454 -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
-  nReportService_417D4454 -->|sends| nEvaluationRequested_4E6DD5AE["Command: EvaluationRequested"]
-  nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"] -->|handled by| nReportService_417D4454
-  nReportService_417D4454 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
-  nReportService_417D4454 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nAuditableEventOccurred_415BEB2
-    nEvaluationRequested_4E6DD5AE
-    nMeasureReportGenerated_6D344E8F
-    nReadyForValidation_27561738
-    nValidationComplete_6ED20CD9
+nReportService_7E534222["Service: Report Service"]
+  nReportService_7E534222 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
+  nReportService_7E534222 -->|produces| nReadyForValidation_6EC229A8["Event: ReadyForValidation"]
+  nReportService_7E534222 -->|produces| nSubmitPayload_6536AAAF["Event: SubmitPayload"]
+  nValidationComplete_6C766152["Event: ValidationComplete"] -->|consumed by| nReportService_7E534222
+  nMeasureReportGenerated_2395ABFF["Event: MeasureReportGenerated"] -->|consumed by| nReportService_7E534222
+  nPatientEvent_5A657A5A["Event: PatientEvent"] -->|consumed by| nReportService_7E534222
+  nReportScheduled_4CB82B8["Event: ReportScheduled"] -->|consumed by| nReportService_7E534222
+  nPayloadSubmitted_1D7D15C7["Event: PayloadSubmitted"] -->|consumed by| nReportService_7E534222
+  nReportService_7E534222 -->|sends| nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"]
+  nReportService_7E534222 -->|sends| nEvaluationRequested_5C898DCC["Command: EvaluationRequested"]
+  nGenerateReportRequested_5FF13A3F["Command: GenerateReportRequested"] -->|handled by| nReportService_7E534222
+  nReportService_7E534222 -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
+  nReportService_7E534222 -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nAuditableEventOccurred_AF8D6F7
+    nEvaluationRequested_5C898DCC
+    nMeasureReportGenerated_2395ABFF
+    nReadyForValidation_6EC229A8
+    nValidationComplete_6C766152
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_132A644D
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_2BDBDA78
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nGenerateReportRequested_150FD8B0
-    nPatientEvent_630CFEC8
-    nPayloadSubmitted_40AD77DB
-    nReportScheduled_4BA62BDB
-    nReportService_417D4454
-    nSubmitPayload_7A027AAE
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nGenerateReportRequested_5FF13A3F
+    nPatientEvent_5A657A5A
+    nPayloadSubmitted_1D7D15C7
+    nReportScheduled_4CB82B8
+    nReportService_7E534222
+    nSubmitPayload_6536AAAF
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nGetFacilityConfig_3B638653
-    nGetServiceInfo_1DD835E0
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nGetFacilityConfig_3026B4B5
+    nGetServiceInfo_56528670
   end
 </pre></div>
 <h2 id="configuration" class="content-heading">Configuration <a href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -1630,41 +1632,41 @@ When set to `false`, restores all previously deleted report schedules.</td></tr>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nReportService_417D4454["Service: Report Service"]
-  nReportService_417D4454 -->|produces| nAuditableEventOccurred_415BEB2["Event: AuditableEventOccurred"]
-  nReportService_417D4454 -->|produces| nReadyForValidation_27561738["Event: ReadyForValidation"]
-  nReportService_417D4454 -->|produces| nSubmitPayload_7A027AAE["Event: SubmitPayload"]
-  nValidationComplete_6ED20CD9["Event: ValidationComplete"] -->|consumed by| nReportService_417D4454
-  nMeasureReportGenerated_6D344E8F["Event: MeasureReportGenerated"] -->|consumed by| nReportService_417D4454
-  nPatientEvent_630CFEC8["Event: PatientEvent"] -->|consumed by| nReportService_417D4454
-  nReportScheduled_4BA62BDB["Event: ReportScheduled"] -->|consumed by| nReportService_417D4454
-  nPayloadSubmitted_40AD77DB["Event: PayloadSubmitted"] -->|consumed by| nReportService_417D4454
-  nReportService_417D4454 -->|sends| nDataAcquisitionRequested_132A644D["Command: DataAcquisitionRequested"]
-  nReportService_417D4454 -->|sends| nEvaluationRequested_4E6DD5AE["Command: EvaluationRequested"]
-  nGenerateReportRequested_150FD8B0["Command: GenerateReportRequested"] -->|handled by| nReportService_417D4454
-  nReportService_417D4454 -->|provides| nGetFacilityConfig_3B638653["Query: GetFacilityConfig"]
-  nReportService_417D4454 -->|provides| nGetServiceInfo_1DD835E0["Query: GetServiceInfo"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nAuditableEventOccurred_415BEB2
-    nEvaluationRequested_4E6DD5AE
-    nMeasureReportGenerated_6D344E8F
-    nReadyForValidation_27561738
-    nValidationComplete_6ED20CD9
+nReportService_7E534222["Service: Report Service"]
+  nReportService_7E534222 -->|produces| nAuditableEventOccurred_AF8D6F7["Event: AuditableEventOccurred"]
+  nReportService_7E534222 -->|produces| nReadyForValidation_6EC229A8["Event: ReadyForValidation"]
+  nReportService_7E534222 -->|produces| nSubmitPayload_6536AAAF["Event: SubmitPayload"]
+  nValidationComplete_6C766152["Event: ValidationComplete"] -->|consumed by| nReportService_7E534222
+  nMeasureReportGenerated_2395ABFF["Event: MeasureReportGenerated"] -->|consumed by| nReportService_7E534222
+  nPatientEvent_5A657A5A["Event: PatientEvent"] -->|consumed by| nReportService_7E534222
+  nReportScheduled_4CB82B8["Event: ReportScheduled"] -->|consumed by| nReportService_7E534222
+  nPayloadSubmitted_1D7D15C7["Event: PayloadSubmitted"] -->|consumed by| nReportService_7E534222
+  nReportService_7E534222 -->|sends| nDataAcquisitionRequested_2BDBDA78["Command: DataAcquisitionRequested"]
+  nReportService_7E534222 -->|sends| nEvaluationRequested_5C898DCC["Command: EvaluationRequested"]
+  nGenerateReportRequested_5FF13A3F["Command: GenerateReportRequested"] -->|handled by| nReportService_7E534222
+  nReportService_7E534222 -->|provides| nGetFacilityConfig_3026B4B5["Query: GetFacilityConfig"]
+  nReportService_7E534222 -->|provides| nGetServiceInfo_56528670["Query: GetServiceInfo"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nAuditableEventOccurred_AF8D6F7
+    nEvaluationRequested_5C898DCC
+    nMeasureReportGenerated_2395ABFF
+    nReadyForValidation_6EC229A8
+    nValidationComplete_6C766152
   end
-  subgraph nDataAccess_17E2EAFF_domain["Domain: Data Access"]
-    nDataAcquisitionRequested_132A644D
+  subgraph nDataAccess_43BF0C8B_domain["Domain: Data Access"]
+    nDataAcquisitionRequested_2BDBDA78
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nGenerateReportRequested_150FD8B0
-    nPatientEvent_630CFEC8
-    nPayloadSubmitted_40AD77DB
-    nReportScheduled_4BA62BDB
-    nReportService_417D4454
-    nSubmitPayload_7A027AAE
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nGenerateReportRequested_5FF13A3F
+    nPatientEvent_5A657A5A
+    nPayloadSubmitted_1D7D15C7
+    nReportScheduled_4CB82B8
+    nReportService_7E534222
+    nSubmitPayload_6536AAAF
   end
-  subgraph nTenant_1A301D0B_domain["Domain: Tenant"]
-    nGetFacilityConfig_3B638653
-    nGetServiceInfo_1DD835E0
+  subgraph nTenant_223E8F95_domain["Domain: Tenant"]
+    nGetFacilityConfig_3026B4B5
+    nGetServiceInfo_56528670
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

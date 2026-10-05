@@ -54,18 +54,8 @@ public static class ImportedPatientLoader
             }
 
             imp.PreLoadedEntries = ParseBundleEntries(bundleJson, imp.PatientId);
-            // Existing-id imports are already on the server, so a Location read here is
-            // only for the manifest. Bundle imports upload these same entries; a fetched
-            // Location would be PUT and later expunged.
-            if (imp.Source == ImportedPatientSource.ExistingId)
-            {
-                await ReferencedLocationExpander.AppendMissingAsync(
-                    imp.PreLoadedEntries,
-                    (id, token) => ReadLocationAsync(fhirDataLoader, id, token),
-                    output,
-                    ct,
-                    fhirDataLoader.FhirServerBase).ConfigureAwait(false);
-            }
+            await ExpandReferencedLocationsAsync(imp, imp.PreLoadedEntries, fhirDataLoader, output, ct)
+                .ConfigureAwait(false);
 
             // Backfill PatientId from the bundle when the user didn't specify one.
             if (string.IsNullOrWhiteSpace(imp.PatientId))
@@ -169,6 +159,32 @@ public static class ImportedPatientLoader
                 $"FHIR bundle does not contain Patient/{expectedPatientId}. Bundle imports must include a Patient resource whose id matches the configured value.");
 
         return result;
+    }
+
+    /// <summary>
+    /// Reads Locations referenced by an import. An existing-id import appends Locations
+    /// that are on the server so the manifest can predict them. A bundle import only
+    /// records ids that are not on the server; a found Location is not added to the
+    /// entries, because those entries are uploaded and would then be expunged.
+    /// </summary>
+    public static Task ExpandReferencedLocationsAsync(
+        ImportedPatientInput imported,
+        IList<Bundle.EntryComponent> entries,
+        FhirDataLoader fhirDataLoader,
+        IAutomationOutput? output,
+        CancellationToken cancellationToken)
+    {
+        if (imported == null)
+            throw new ArgumentNullException(nameof(imported));
+
+        return ReferencedLocationExpander.AppendMissingAsync(
+            entries,
+            (id, token) => ReadLocationAsync(fhirDataLoader, id, token),
+            output,
+            cancellationToken,
+            fhirDataLoader.FhirServerBase,
+            imported.AbsentReferencedLocationIds,
+            appendFoundLocations: imported.Source == ImportedPatientSource.ExistingId);
     }
 
     /// <summary>

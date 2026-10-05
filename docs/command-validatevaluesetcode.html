@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -543,15 +545,15 @@ terminology artifacts loaded in memory to support high performance.</p>
 </code></pre>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidateValueSetCode_C70055C["Command: Validate ValueSet Code"]
-  nValidationService_5D88FD53["Service: ValidationService"] -->|sends| nValidateValueSetCode_C70055C
-  nValidateValueSetCode_C70055C -->|handled by| nTerminologyService_2AF4A3FC["Service: TerminologyService"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidateValueSetCode_C70055C
-    nValidationService_5D88FD53
+nValidateValueSetCode_5A22B5A3["Command: Validate ValueSet Code"]
+  nValidationService_6640600D["Service: ValidationService"] -->|sends| nValidateValueSetCode_5A22B5A3
+  nValidateValueSetCode_5A22B5A3 -->|handled by| nTerminologyService_2123EB9E["Service: TerminologyService"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidateValueSetCode_5A22B5A3
+    nValidationService_6640600D
   end
-  subgraph nKnowledgeArtifactManagement_62728541_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2AF4A3FC
+  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_2123EB9E
   end
 </pre></div>
 
@@ -561,15 +563,15 @@ nValidateValueSetCode_C70055C["Command: Validate ValueSet Code"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidateValueSetCode_C70055C["Command: Validate ValueSet Code"]
-  nValidationService_5D88FD53["Service: ValidationService"] -->|sends| nValidateValueSetCode_C70055C
-  nValidateValueSetCode_C70055C -->|handled by| nTerminologyService_2AF4A3FC["Service: TerminologyService"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidateValueSetCode_C70055C
-    nValidationService_5D88FD53
+nValidateValueSetCode_5A22B5A3["Command: Validate ValueSet Code"]
+  nValidationService_6640600D["Service: ValidationService"] -->|sends| nValidateValueSetCode_5A22B5A3
+  nValidateValueSetCode_5A22B5A3 -->|handled by| nTerminologyService_2123EB9E["Service: TerminologyService"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidateValueSetCode_5A22B5A3
+    nValidationService_6640600D
   end
-  subgraph nKnowledgeArtifactManagement_62728541_domain["Domain: Knowledge Artifact Management"]
-    nTerminologyService_2AF4A3FC
+  subgraph nKnowledgeArtifactManagement_6717624D_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_2123EB9E
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

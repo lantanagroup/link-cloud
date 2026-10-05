@@ -56,8 +56,8 @@ public class SftpConnectionTestController(
         try
         {
             var result = await _connectionTestService.TestSftpConnectionAsync(
-                model.HostName,
-                model.HostUrlPort,
+                model.HostName!,
+                model.HostUrlPort.GetValueOrDefault(),
                 model.Username,
                 model.Password,
                 model.ReportDirectory,

@@ -1060,4 +1060,45 @@ public class LogController : Controller
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }
+
+    /// <summary>
+    /// Completed acquired-resource counts grouped by patient and resource type.
+    /// One database group-by. Facility is optional. An empty facility counts the whole report.
+    /// </summary>
+    [HttpGet("report/{reportId}/acquired-resource-counts-by-patient")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<AcquiredResourceCountByPatientApiModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<List<AcquiredResourceCountByPatientApiModel>>> GetAcquiredResourceCountsByPatient(
+        [FromRoute] string reportId,
+        [FromQuery] string? facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest("reportId cannot be null or empty.");
+
+        if (!Guid.TryParse(reportId, out _))
+            return BadRequest("reportId must be a valid GUID.");
+
+        try
+        {
+            var rows = await _logQueries.GetAcquiredResourceCountsByPatientTypeAsync(
+                reportId.SanitizeAndRemove(),
+                string.IsNullOrWhiteSpace(facilityId) ? null : facilityId.SanitizeAndRemove(),
+                cancellationToken);
+
+            return Ok(rows.Select(row => new AcquiredResourceCountByPatientApiModel
+            {
+                PatientId = row.PatientId,
+                ResourceType = row.ResourceType,
+                Count = row.Count
+            }).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAcquiredResourceCountsByPatient"), ex,
+                "An exception occurred while attempting to get acquired resource counts for report {reportId}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
 }

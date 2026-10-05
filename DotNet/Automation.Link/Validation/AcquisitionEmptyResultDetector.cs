@@ -22,12 +22,14 @@ public static class AcquisitionEmptyResultDetector
     public static IReadOnlyList<EmptyAcquisition> Find(
         GenerationManifest manifest,
         IEnumerable<string> acquiredResourceIds,
-        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo>? logs = null)
+        IReadOnlyList<PipelineDataReader.AcquisitionLogInfo>? logs = null,
+        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient = null)
     {
         var acquiredIds = acquiredResourceIds
             .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
             .ToList();
 
+        var countsByPatient = BuildCountLookup(acquiredByPatient);
         var notReportablePatients = BuildNotReportablePatients(logs);
         var findings = new List<EmptyAcquisition>();
 
@@ -45,13 +47,61 @@ public static class AcquisitionEmptyResultDetector
                 if (expectedCount <= 0)
                     continue;
 
-                var actualCount = CountAcquiredForPatient(acquiredIds, patientId, resourceType);
+                var actualCount = CountForPatient(acquiredIds, countsByPatient, patientId, resourceType);
                 if (actualCount == 0)
                     findings.Add(new EmptyAcquisition(patientId, resourceType, expectedCount, actualCount));
             }
         }
 
         return findings;
+    }
+
+    private static Dictionary<string, Dictionary<string, int>>? BuildCountLookup(
+        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount>? acquiredByPatient)
+    {
+        if (acquiredByPatient == null)
+            return null;
+
+        var lookup = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+        foreach (var row in acquiredByPatient)
+        {
+            if (string.IsNullOrWhiteSpace(row.PatientId) || string.IsNullOrWhiteSpace(row.ResourceType))
+                continue;
+
+            if (!lookup.TryGetValue(row.PatientId, out var byType))
+            {
+                byType = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                lookup[row.PatientId] = byType;
+            }
+
+            byType[row.ResourceType] = byType.TryGetValue(row.ResourceType, out var current)
+                ? current + row.Count
+                : row.Count;
+        }
+
+        return lookup;
+    }
+
+    private static int CountForPatient(
+        IReadOnlyList<string> acquiredResourceIds,
+        Dictionary<string, Dictionary<string, int>>? countsByPatient,
+        string patientId,
+        string resourceType)
+    {
+        // Log rows already name the patient. Imported resources use their own ids, so a
+        // "{patientId}-" prefix on the resource id is not a reliable owner check.
+        if (countsByPatient != null)
+        {
+            if (countsByPatient.TryGetValue(patientId, out var byType)
+                && byType.TryGetValue(resourceType, out var count))
+            {
+                return count;
+            }
+
+            return 0;
+        }
+
+        return CountAcquiredForPatient(acquiredResourceIds, patientId, resourceType);
     }
 
     public static bool ResourceIdBelongsToPatient(string resourceId, string patientId)
