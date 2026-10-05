@@ -133,6 +133,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     {
         // Stop the loop before the final flush. The loop and the final poll
         // write the same domains, and the final poll has to be the last writer.
+        // This method takes no caller token. Cancelling here would skip that flush.
+        // DrainAsync already cancels the polling loop.
         if (_activePollers.TryGetValue(runId, out var activeHandle))
         {
             activeHandle.MarkFinalizing();

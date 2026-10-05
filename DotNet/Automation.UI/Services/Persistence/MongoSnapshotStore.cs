@@ -733,8 +733,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         _logger.LogWarning(
             "Snapshot domain {Domain} for run {RunId} kept its previous document after a concurrent write.",
-            domain,
-            runId);
+            domain.SanitizeForLog(),
+            runId.ToString().SanitizeForLog());
         return false;
     }
 
@@ -822,8 +822,22 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     throw;
                 }
 
-                var publishedHeader = (await FindHeadersAsync(runId, domain, CancellationToken.None))
-                    .FirstOrDefault(header => header.ChunkIndex == -1 && header.Revision == revision);
+                DomainSnapshotDocument? publishedHeader;
+                try
+                {
+                    using var timeout = StartCleanupLookupTimeout();
+                    publishedHeader = (await FindHeadersAsync(runId, domain, timeout.Token))
+                        .FirstOrDefault(header => header.ChunkIndex == -1 && header.Revision == revision);
+                }
+                catch (Exception lookupEx)
+                {
+                    _logger.LogWarning(
+                        lookupEx,
+                        "Snapshot header lookup failed for domain {Domain} run {RunId}.",
+                        domain.SanitizeForLog(),
+                        runId.ToString().SanitizeForLog());
+                    publishedHeader = null;
+                }
                 if (publishedHeader == null)
                     throw;
 
@@ -844,8 +858,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         _logger.LogWarning(
             "Snapshot domain {Domain} for run {RunId} kept its previous revision after a concurrent write.",
-            domain,
-            runId);
+            domain.SanitizeForLog(),
+            runId.ToString().SanitizeForLog());
         return false;
     }
 
@@ -862,7 +876,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         try
         {
-            var found = await _snapshots.Find(d => d.Id == id).Limit(1).FirstOrDefaultAsync(CancellationToken.None);
+            using var timeout = StartCleanupLookupTimeout();
+            var found = await _snapshots.Find(d => d.Id == id).Limit(1).FirstOrDefaultAsync(timeout.Token);
             return found != null;
         }
         catch (Exception ex)
@@ -880,7 +895,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         try
         {
-            var headers = await FindHeadersAsync(runId, domain, CancellationToken.None);
+            using var timeout = StartCleanupLookupTimeout();
+            var headers = await FindHeadersAsync(runId, domain, timeout.Token);
             return headers.Any(header => header.ChunkIndex == -1 && header.Revision == revision);
         }
         catch (Exception ex)
@@ -958,6 +974,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 : filter.Eq(d => d.Revision, revision));
     }
 
+    /// <summary>
+    /// Cleanup after a failed header write keeps going when the caller cancels.
+    /// The timeout is the only bound, so a hung lookup cannot sit forever.
+    /// </summary>
+    private static CancellationTokenSource StartCleanupLookupTimeout()
+        => new(TimeSpan.FromSeconds(15));
+
     private static bool LosesTo(DomainSnapshotDocument header, ObjectId keepId, DateTimeOffset now)
         => header.UpdatedAt < now || (header.UpdatedAt == now && header.Id.CompareTo(keepId) < 0);
 
@@ -975,7 +998,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         try
         {
-            await DeleteSlicesAsync(runId, domain, revision, CancellationToken.None);
+            using var timeout = StartCleanupLookupTimeout();
+            await DeleteSlicesAsync(runId, domain, revision, timeout.Token);
         }
         catch (Exception cleanupEx)
         {
