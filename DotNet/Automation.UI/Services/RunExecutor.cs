@@ -1112,9 +1112,7 @@ internal sealed class RunExecutor
                 TimeSpan LookbackNow()
                 {
                     var started = state.StartedAt ?? state.CreatedAt;
-                    var coverage = DateTimeOffset.UtcNow - started;
-                    if (coverage < TimeSpan.Zero)
-                        coverage = TimeSpan.Zero;
+                    var coverage = LokiEvidenceQuery.CoverageSince(started, DateTimeOffset.UtcNow);
                     return LokiEvidenceQuery.LookbackForRequest(lookback, coverage);
                 }
 
@@ -1202,11 +1200,9 @@ internal sealed class RunExecutor
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
                         cancellationToken,
-                        coverageNow: () =>
-                        {
-                            var coverage = DateTimeOffset.UtcNow - (state.StartedAt ?? state.CreatedAt);
-                            return coverage < TimeSpan.Zero ? TimeSpan.Zero : coverage;
-                        });
+                        coverageNow: () => LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(

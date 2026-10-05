@@ -52,6 +52,26 @@ public class LokiEvidenceQueryTests
     }
 
     [Fact]
+    public void Coverage_before_the_run_starts_does_not_shrink_the_lookback()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var coverage = LokiEvidenceQuery.CoverageSince(now.AddMinutes(5), now);
+
+        coverage.Should().Be(TimeSpan.Zero);
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(30), coverage).Should().Be(TimeSpan.FromMinutes(30));
+    }
+
+    [Fact]
+    public void Coverage_since_a_past_start_extends_the_lookback()
+    {
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var coverage = LokiEvidenceQuery.CoverageSince(now.AddMinutes(-80), now);
+
+        coverage.Should().Be(TimeSpan.FromMinutes(80));
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(30), coverage).Should().Be(TimeSpan.FromMinutes(80));
+    }
+
+    [Fact]
     public async Task CollectWithRetry_measures_coverage_after_the_retry_delay()
     {
         var coverageReads = 0;
