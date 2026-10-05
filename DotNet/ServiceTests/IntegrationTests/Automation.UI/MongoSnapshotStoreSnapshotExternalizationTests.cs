@@ -158,12 +158,41 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         listCalls.Should().BeGreaterThanOrEqualTo(2);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_the_uploaded_blob_when_a_newer_header_wins()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var first = new Dictionary<string, string> { ["p"] = new string('x', 512) };
+        await store.SetDomainAsync(runId, "generationManifest", first, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var stored = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var storedDoc = JsonDocument.Parse(stored.Data);
+        var keptBlob = storedDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+        await collection.UpdateOneAsync(
+            doc => doc.Id == stored.Id,
+            Builders<DomainSnapshotDocument>.Update.Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+
+        var second = new Dictionary<string, string> { ["p"] = new string('y', 512) };
+        await store.SetDomainAsync(runId, "generationManifest", second, CancellationToken.None);
+
+        payloadStore.DeletedBlobNames.Should().ContainSingle();
+        payloadStore.DeletedBlobNames[0].Should().NotBe(keptBlob);
+        payloadStore.HasBlob(keptBlob!).Should().BeTrue();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('x', 512));
+    }
+
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
     {
         private readonly ConcurrentDictionary<string, string> _payloadByBlob = new(StringComparer.Ordinal);
 
         public List<Guid> DeletedRunIds { get; } = [];
+        public List<string> DeletedBlobNames { get; } = [];
         public int ReadCount { get; private set; }
+        public bool HasBlob(string blobName) => _payloadByBlob.ContainsKey(blobName);
 
         public bool ShouldExternalize(string domain, int payloadUtf8Bytes) =>
             string.Equals(domain, "generationManifest", StringComparison.OrdinalIgnoreCase)
@@ -189,6 +218,7 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
 
         public Task DeleteIfExistsAsync(SnapshotPayloadPointer pointer, CancellationToken ct = default)
         {
+            DeletedBlobNames.Add(pointer.BlobName);
             _payloadByBlob.TryRemove(pointer.BlobName, out _);
             return Task.CompletedTask;
         }

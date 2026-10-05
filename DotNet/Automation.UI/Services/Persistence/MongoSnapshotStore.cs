@@ -540,7 +540,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
 
         if (!wrote)
+        {
+            if (newPointer != null)
+                await DeleteUnusedSnapshotBlobAsync(runId, domain, newPointer);
             return;
+        }
 
         if (existingPointer != null && (newPointer == null || !string.Equals(existingPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
             await _snapshotPayloadStore.DeleteIfExistsAsync(existingPointer, ct);
@@ -680,6 +684,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
+            if (previous != null && previous.UpdatedAt > now)
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return false;
+            }
+
             var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
             ObjectId keepId;
             if (previous == null)
@@ -745,6 +755,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
+            if (previous != null && previous.UpdatedAt > now)
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return false;
+            }
+
             var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
             var revision = Guid.NewGuid().ToString("N");
 
@@ -972,6 +988,31 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             & (revision == null
                 ? filter.Eq(d => d.Revision, null)
                 : filter.Eq(d => d.Revision, revision));
+    }
+
+    private void LogDroppedNewerHeader(Guid runId, string domain)
+    {
+        _logger.LogWarning(
+            "Snapshot domain {Domain} for run {RunId} dropped this write because the stored header is newer.",
+            domain.SanitizeForLog(),
+            runId.ToString().SanitizeForLog());
+    }
+
+    private async Task DeleteUnusedSnapshotBlobAsync(Guid runId, string domain, SnapshotPayloadPointer pointer)
+    {
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Deleting an unused snapshot blob for domain {Domain} run {RunId} failed.",
+                domain.SanitizeForLog(),
+                runId.ToString().SanitizeForLog());
+        }
     }
 
     /// <summary>
