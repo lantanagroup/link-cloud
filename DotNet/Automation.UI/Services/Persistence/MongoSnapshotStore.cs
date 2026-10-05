@@ -706,25 +706,28 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
             else
             {
-                var filter = Builders<DomainSnapshotDocument>.Filter;
-                var cas = filter.Eq(d => d.Id, previous.Id)
-                    & (previousRevision == null
-                        ? filter.Eq(d => d.Revision, null)
-                        : filter.Eq(d => d.Revision, previousRevision));
                 var update = Builders<DomainSnapshotDocument>.Update
                     .Set(d => d.Data, storedJson)
                     .Set(d => d.UpdatedAt, now)
                     .Unset(d => d.ChunkIndex)
                     .Unset(d => d.ChunkCount)
                     .Unset(d => d.Revision);
-                var result = await _snapshots.UpdateOneAsync(cas, update, cancellationToken: ct);
+                var result = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), update, cancellationToken: ct);
                 if (result.MatchedCount == 0)
                     continue;
 
                 keepId = previous.Id;
             }
 
-            await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, now, ct);
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, ct))
+            {
+                _logger.LogWarning(
+                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
+                    domain.SanitizeForLog(),
+                    runId.ToString().SanitizeForLog());
+                return false;
+            }
+
             return true;
         }
 
@@ -792,18 +795,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
                 else
                 {
-                    var filter = Builders<DomainSnapshotDocument>.Filter;
-                    var cas = filter.Eq(d => d.Id, previous.Id)
-                        & (previousRevision == null
-                            ? filter.Eq(d => d.Revision, null)
-                            : filter.Eq(d => d.Revision, previousRevision));
                     var headerUpdate = Builders<DomainSnapshotDocument>.Update
                         .Set(d => d.Data, string.Empty)
                         .Set(d => d.ChunkIndex, -1)
                         .Set(d => d.ChunkCount, slices.Count)
                         .Set(d => d.Revision, revision)
                         .Set(d => d.UpdatedAt, now);
-                    var flip = await _snapshots.UpdateOneAsync(cas, headerUpdate, cancellationToken: ct);
+                    var flip = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), headerUpdate, cancellationToken: ct);
                     if (flip.MatchedCount == 0)
                     {
                         await DeleteSlicesAsync(runId, domain, revision, ct);
@@ -832,7 +830,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 keepId = publishedHeader.Id;
             }
 
-            await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, now, ct);
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, ct))
+            {
+                _logger.LogWarning(
+                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
+                    domain.SanitizeForLog(),
+                    runId.ToString().SanitizeForLog());
+                return false;
+            }
+
             return true;
         }
 
@@ -888,37 +894,68 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
     }
 
-    private async Task DeleteDisplacedAsync(
+    /// <summary>
+    /// Drops headers this write displaced. Returns false when a newer header
+    /// already won, in which case this write's own header is removed and its
+    /// slices go with it. Two first inserts can pass each other: the newer one
+    /// may finish before the older header exists, so the older write has to
+    /// drop itself when it finally sees that newer header.
+    /// </summary>
+    private async Task<bool> DeleteDisplacedAsync(
         Guid runId,
         string domain,
         ObjectId keepId,
         string? previousRevision,
-        DateTimeOffset now,
         CancellationToken ct)
     {
         var headers = await FindHeadersAsync(runId, domain, ct);
-        var losers = headers
-            .Where(header => header.Id != keepId && LosesTo(header, keepId, now))
-            .ToList();
-        var revisions = new HashSet<string>(StringComparer.Ordinal);
-        if (!string.IsNullOrEmpty(previousRevision))
-            revisions.Add(previousRevision);
+        var me = headers.FirstOrDefault(header => header.Id == keepId);
+        if (me == null)
+            return true;
 
-        foreach (var loser in losers)
+        var newest = headers
+            .OrderByDescending(header => header.UpdatedAt)
+            .ThenByDescending(header => header.Id)
+            .First();
+        if (newest.Id != keepId)
         {
-            if (!string.IsNullOrEmpty(loser.Revision))
-                revisions.Add(loser.Revision);
+            await DeleteHeaderIfUnchangedAsync(runId, domain, me, ct);
+            return false;
         }
 
-        foreach (var revision in revisions)
-            await DeleteSlicesAsync(runId, domain, revision, ct);
+        foreach (var loser in headers.Where(header => header.Id != keepId && LosesTo(header, keepId, me.UpdatedAt)))
+            await DeleteHeaderIfUnchangedAsync(runId, domain, loser, ct);
 
-        if (losers.Count == 0)
+        if (!string.IsNullOrEmpty(previousRevision))
+            await DeleteSlicesAsync(runId, domain, previousRevision, ct);
+
+        return true;
+    }
+
+    private async Task DeleteHeaderIfUnchangedAsync(
+        Guid runId,
+        string domain,
+        DomainSnapshotDocument header,
+        CancellationToken ct)
+    {
+        var removed = await _snapshots.DeleteOneAsync(ObservedHeaderFilter(header), ct);
+        if (removed.DeletedCount == 0 || string.IsNullOrEmpty(header.Revision))
             return;
 
-        var ids = losers.Select(loser => loser.Id).ToList();
+        await DeleteSlicesAsync(runId, domain, header.Revision, ct);
+    }
+
+    internal static FilterDefinition<DomainSnapshotDocument> ObservedHeaderFilter(DomainSnapshotDocument previous)
+    {
         var filter = Builders<DomainSnapshotDocument>.Filter;
-        await _snapshots.DeleteManyAsync(filter.In(d => d.Id, ids), ct);
+        var revision = previous.ChunkIndex == -1 ? previous.Revision : null;
+        int? chunkIndex = previous.ChunkIndex == -1 ? -1 : null;
+        return filter.Eq(d => d.Id, previous.Id)
+            & filter.Eq(d => d.UpdatedAt, previous.UpdatedAt)
+            & filter.Eq(d => d.ChunkIndex, chunkIndex)
+            & (revision == null
+                ? filter.Eq(d => d.Revision, null)
+                : filter.Eq(d => d.Revision, revision));
     }
 
     private static bool LosesTo(DomainSnapshotDocument header, ObjectId keepId, DateTimeOffset now)

@@ -180,12 +180,24 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             _logger.LogDebug(ex, "Could not extract pipeline duration for run {RunId}", runId);
         }
 
-        await _store.CompleteRunAsync(runId, duration);
-
-        if (_activePollers.TryRemove(runId, out var handle))
+        try
         {
-            await handle.StopAsync();
-            _logger.LogInformation("Stopped poller for completed run {RunId}", runId);
+            await _store.CompleteRunAsync(runId, duration);
+        }
+        finally
+        {
+            if (_activePollers.TryRemove(runId, out var handle))
+            {
+                try
+                {
+                    await handle.StopAsync();
+                    _logger.LogInformation("Stopped poller for completed run {RunId}", runId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Stopping the poller for completed run {RunId} failed", runId);
+                }
+            }
         }
     }
 
