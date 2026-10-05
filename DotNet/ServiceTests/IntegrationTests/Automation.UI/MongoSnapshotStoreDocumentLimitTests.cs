@@ -814,6 +814,60 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(scheduleRun, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
     }
 
+    [Fact]
+    public async Task SetDomainAsync_stale_cleanup_keeps_a_newer_report_on_the_same_header()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        var started = DateTimeOffset.UtcNow;
+        var current = StoreAt(started);
+        var stale = StoreAt(started.AddMinutes(5));
+        stale.AfterHeaderCommitted = async () =>
+        {
+            await MoveEpochAsync(runId);
+            await current.SetDomainAsync(runId, "schedule", "new-schedule", 1L, CancellationToken.None);
+        };
+
+        await stale.SetDomainAsync(runId, "schedule", "old-schedule", 0L, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_stale_cleanup_drops_its_own_header_when_the_epoch_moved()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        var stale = StoreAt(DateTimeOffset.UtcNow);
+        stale.AfterHeaderCommitted = () => MoveEpochAsync(runId);
+
+        await stale.SetDomainAsync(runId, "schedule", "old-schedule", 0L, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None)).Should().BeNull();
+    }
+
+    private Task MoveEpochAsync(Guid runId)
+        => _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs")
+            .UpdateOneAsync(
+                run => run.RunId == runId,
+                Builders<AutomationRunDocument>.Update.Inc(run => run.SnapshotEpoch, 1));
+
     private MongoSnapshotStore StoreAt(DateTimeOffset now)
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
