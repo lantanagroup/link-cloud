@@ -69,6 +69,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// <summary>Test seam. Runs before this write stores a header.</summary>
     internal Func<Task>? BeforeHeaderWrite { get; set; }
 
+    /// <summary>
+    /// Test seam. Runs after this write's clock is stored and before the header
+    /// is published, so a test can run another writer in that window.
+    /// </summary>
+    internal Func<Task>? AfterClockClaimed { get; set; }
+
+    /// <summary>
+    /// Test seam. Runs after the header is published and before displaced
+    /// documents are removed. A throw here still drops the blob that header replaced.
+    /// </summary>
+    internal Func<Task>? AfterHeaderCommitted { get; set; }
+
     /// <summary>Test seam. Replaces <see cref="DateTimeOffset.UtcNow"/> for one store.</summary>
     internal Func<DateTimeOffset>? Clock { get; set; }
 
@@ -762,20 +774,100 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return doc == null ? null : doc.WriteClock;
     }
 
-    private Task RememberWriteClockAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    private enum ClockGate
     {
+        Proceed,
+        Drop,
+        Retry
+    }
+
+    /// <summary>
+    /// Moves the clock forward to <paramref name="now"/> only when the stored
+    /// clock is still the value just read. A slower writer cannot replace a
+    /// later clock. Returns null when another writer won the compare-and-swap.
+    /// </summary>
+    private async Task<bool?> ClaimWriteClockAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    {
+        var observed = await ReadWriteClockAsync(runId, domain, ct);
+        if (observed > now)
+            return false;
+        if (observed == now)
+            return true;
+
         var id = SnapshotClockId(runId, domain);
-        return _writeClocks.ReplaceOneAsync(
-            c => c.Id == id,
-            new SnapshotWriteClockDocument
+        if (observed == null)
+        {
+            try
             {
-                Id = id,
-                RunId = runId,
-                Domain = domain,
-                WriteClock = now
-            },
-            new ReplaceOptions { IsUpsert = true },
-            ct);
+                await _writeClocks.InsertOneAsync(new SnapshotWriteClockDocument
+                {
+                    Id = id,
+                    RunId = runId,
+                    Domain = domain,
+                    WriteClock = now
+                }, cancellationToken: ct);
+                return true;
+            }
+            catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+            {
+                return null;
+            }
+        }
+
+        var updated = await _writeClocks.UpdateOneAsync(
+            c => c.Id == id && c.WriteClock == observed.Value,
+            Builders<SnapshotWriteClockDocument>.Update.Set(c => c.WriteClock, now),
+            cancellationToken: ct);
+        return updated.MatchedCount == 1 ? true : null;
+    }
+
+    /// <summary>
+    /// Stores this write's clock before the header is published. A clock that
+    /// moves past <paramref name="now"/> before the header write drops this attempt.
+    /// </summary>
+    private async Task<ClockGate> AdvanceClockBeforePublishAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    {
+        var claim = await ClaimWriteClockAsync(runId, domain, now, ct);
+        if (claim == null)
+            return ClockGate.Retry;
+        if (claim == false)
+            return ClockGate.Drop;
+
+        if (AfterClockClaimed != null)
+            await AfterClockClaimed();
+
+        var raced = await ReadWriteClockAsync(runId, domain, ct);
+        return raced > now ? ClockGate.Drop : ClockGate.Proceed;
+    }
+
+    private async Task<SnapshotWrite> FinishPublishedWriteAsync(
+        Guid runId,
+        string domain,
+        ObjectId keepId,
+        string? previousRevision,
+        DomainSnapshotDocument? previous)
+    {
+        try
+        {
+            if (AfterHeaderCommitted != null)
+                await AfterHeaderCommitted();
+
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
+            {
+                _logger.LogWarning(
+                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
+                    domain.SanitizeForLog(),
+                    runId.ToString().SanitizeForLog());
+                return new SnapshotWrite(false, DisplacedPointer(previous));
+            }
+
+            return new SnapshotWrite(true, DisplacedPointer(previous));
+        }
+        catch
+        {
+            await ReclaimDisplacedBlobAsync(runId, domain, previous);
+            throw;
+        }
     }
 
     private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
@@ -789,6 +881,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
             var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
             if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return new SnapshotWrite(false, null);
+            }
+
+            var gate = await AdvanceClockBeforePublishAsync(runId, domain, now, ct);
+            if (gate == ClockGate.Retry)
+                continue;
+            if (gate == ClockGate.Drop)
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -848,17 +949,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
             }
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
-            {
-                _logger.LogWarning(
-                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
-                    domain.SanitizeForLog(),
-                    runId.ToString().SanitizeForLog());
-                return new SnapshotWrite(false, DisplacedPointer(previous));
-            }
-
-            await RememberWriteClockAsync(runId, domain, now, ct);
-            return new SnapshotWrite(true, DisplacedPointer(previous));
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous);
         }
 
         _logger.LogWarning(
@@ -885,6 +976,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
             var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
             if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return new SnapshotWrite(false, null);
+            }
+
+            var gate = await AdvanceClockBeforePublishAsync(runId, domain, now, ct);
+            if (gate == ClockGate.Retry)
+                continue;
+            if (gate == ClockGate.Drop)
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -1002,17 +1102,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 keepId = publishedHeader.Id;
             }
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
-            {
-                _logger.LogWarning(
-                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
-                    domain.SanitizeForLog(),
-                    runId.ToString().SanitizeForLog());
-                return new SnapshotWrite(false, DisplacedPointer(previous));
-            }
-
-            await RememberWriteClockAsync(runId, domain, now, ct);
-            return new SnapshotWrite(true, DisplacedPointer(previous));
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous);
         }
 
         _logger.LogWarning(

@@ -471,6 +471,105 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_reclaims_the_replaced_blob_when_publication_cleanup_fails()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('a', 512) }, CancellationToken.None);
+        var replacedBlob = await StoredBlobName(runId);
+
+        store.AfterHeaderCommitted = () => throw new IOException("clock write failed");
+        var act = () => store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('b', 512) }, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.HasBlob(replacedBlob).Should().BeFalse();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('b', 512));
+        payloadStore.HasBlob(await StoredBlobName(runId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_the_replaced_blob_when_publication_cleanup_is_cancelled()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('a', 512) }, CancellationToken.None);
+        var replacedBlob = await StoredBlobName(runId);
+
+        store.AfterHeaderCommitted = () => throw new OperationCanceledException();
+        var act = () => store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('b', 512) }, CancellationToken.None);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+
+        payloadStore.HasBlob(replacedBlob).Should().BeFalse();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('b', 512));
+        payloadStore.HasBlob(await StoredBlobName(runId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_replaced_blob_when_chunked_publication_cleanup_fails()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var oldPointer = await payloadStore.StoreAsync(runId, "entries", "\"old\"", CancellationToken.None);
+        await SeedPointerHeader(runId, oldPointer);
+
+        store.AfterHeaderCommitted = () => throw new IOException("clock write failed");
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.HasBlob(oldPointer.BlobName).Should().BeFalse();
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_replaced_blob_when_chunked_publication_cleanup_is_cancelled()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var oldPointer = await payloadStore.StoreAsync(runId, "entries", "\"old\"", CancellationToken.None);
+        await SeedPointerHeader(runId, oldPointer);
+
+        store.AfterHeaderCommitted = () => throw new OperationCanceledException();
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+
+        payloadStore.HasBlob(oldPointer.BlobName).Should().BeFalse();
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
+    }
+
+    private async Task<string> StoredBlobName(Guid runId)
+    {
+        var stored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .SingleAsync();
+        using var doc = JsonDocument.Parse(stored.Data);
+        return doc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName!;
+    }
+
+    private Task SeedPointerHeader(Guid runId, SnapshotPayloadPointer pointer)
+    {
+        var pointerJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer>
+        {
+            ["__externalSnapshotPayloadPointer"] = pointer
+        });
+        return _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots").InsertOneAsync(
+            new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "entries",
+                Data = pointerJson,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            });
+    }
+
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
     {
         private readonly ConcurrentDictionary<string, string> _payloadByBlob = new(StringComparer.Ordinal);
