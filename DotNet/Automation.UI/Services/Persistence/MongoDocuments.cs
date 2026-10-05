@@ -126,11 +126,14 @@ public sealed class DomainSnapshotDocument
     public string Data { get; set; } = string.Empty;
 
     /// <summary>Null for a single document. -1 for a chunk header. 0+ for a slice.</summary>
+    [BsonIgnoreIfNull]
     public int? ChunkIndex { get; set; }
 
+    [BsonIgnoreIfNull]
     public int? ChunkCount { get; set; }
 
     /// <summary>Shared by a header and its slices. Null on a single document.</summary>
+    [BsonIgnoreIfNull]
     public string? Revision { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

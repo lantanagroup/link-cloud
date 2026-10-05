@@ -1,6 +1,7 @@
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Task = System.Threading.Tasks.Task;
 
@@ -99,6 +100,55 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomainAsync_omits_null_chunk_fields_on_a_single_document()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "entries", "plain", CancellationToken.None);
+
+        var raw = await _fixture.Database.GetCollection<BsonDocument>("automation_snapshots")
+            .Find(Builders<BsonDocument>.Filter.Eq("RunId", runId.ToString())
+                & Builders<BsonDocument>.Filter.Eq("Domain", "entries"))
+            .SingleAsync();
+        raw.Contains("ChunkIndex").Should().BeFalse();
+        raw.Contains("ChunkCount").Should().BeFalse();
+        raw.Contains("Revision").Should().BeFalse();
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("plain");
+    }
+
+    [Fact]
+    public async Task Observed_header_filter_misses_after_an_intervening_small_write()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "entries", "first", CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var original = await collection.Find(doc => doc.RunId == runId && doc.Domain == "entries").SingleAsync();
+        var observed = new DomainSnapshotDocument
+        {
+            Id = original.Id,
+            UpdatedAt = original.UpdatedAt,
+            ChunkIndex = original.ChunkIndex,
+            Revision = original.Revision
+        };
+        (await collection.Find(MongoSnapshotStore.ObservedHeaderFilter(observed)).CountDocumentsAsync())
+            .Should().Be(1);
+
+        await collection.UpdateOneAsync(
+            doc => doc.Id == original.Id,
+            Builders<DomainSnapshotDocument>.Update
+                .Set(doc => doc.Data, "\"second\"")
+                .Set(doc => doc.UpdatedAt, original.UpdatedAt.AddMinutes(1)));
+
+        var matched = await collection.UpdateOneAsync(
+            MongoSnapshotStore.ObservedHeaderFilter(observed),
+            Builders<DomainSnapshotDocument>.Update.Set(doc => doc.Data, "\"stale\""));
+        matched.MatchedCount.Should().Be(0);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("second");
+    }
+
+    [Fact]
     public async Task SetDomainAsync_small_write_keeps_slices_from_another_revision()
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
@@ -179,11 +229,9 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         read!.Data.Should().BeOneOf(first, second);
 
         var docs = await Docs(runId);
-        var winner = docs.Where(doc => doc.ChunkIndex is null or -1)
-            .OrderByDescending(doc => doc.UpdatedAt)
-            .ThenByDescending(doc => doc.Id)
-            .First();
-        var winnerRevision = winner.Revision;
+        var headers = docs.Where(doc => doc.ChunkIndex is null or -1).ToList();
+        headers.Should().ContainSingle();
+        var winnerRevision = headers[0].Revision;
         docs.Where(doc => doc.ChunkIndex >= 0).Should().OnlyContain(doc => doc.Revision == winnerRevision);
     }
 
