@@ -230,7 +230,7 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId)).thenReturn(List.of());
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId)).thenReturn(new RedisCacheEntry(List.of(), null, false));
         when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
                 .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
 
@@ -239,7 +239,7 @@ class AbstractResourceConsumerTest {
 
         consumer.process(buildConsumerRecord(facilityId, patientId, value));
 
-        verify(redisResourceService).readResources(facilityId, cacheKey, patientId);
+        verify(redisResourceService).readEntry(facilityId, cacheKey, patientId);
         verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
         verify(evaluateMeasureService).evaluateMeasure(anyString(), any(), any(), any());
     }
@@ -254,7 +254,7 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
                 .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
         when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
                 .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
@@ -276,8 +276,8 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
+                .thenReturn(new RedisCacheEntry(List.of(cachedResource(facilityId, cacheKey, patientId)), null, false));
 
         stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
         stubMongoBulkWrite();
@@ -311,8 +311,8 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
+                .thenReturn(new RedisCacheEntry(List.of(cachedResource(facilityId, cacheKey, patientId)), null, false));
 
         PatientReportingEvaluationStatus patientStatus = patientStatus(facilityId, cacheKey, patientId);
         when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
@@ -365,8 +365,8 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
+                .thenReturn(new RedisCacheEntry(List.of(cachedResource(facilityId, cacheKey, patientId)), null, false));
 
         stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
         stubMongoBulkWrite();
@@ -388,8 +388,8 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
+                .thenReturn(new RedisCacheEntry(List.of(cachedResource(facilityId, cacheKey, patientId)), null, false));
 
         stubHappyPathEvaluation(facilityId, cacheKey, patientId, false);
         stubMongoBulkWrite();
@@ -410,8 +410,8 @@ class AbstractResourceConsumerTest {
 
         ResourcesNormalized value = buildValue(cacheKey);
 
-        when(redisResourceService.readResources(facilityId, cacheKey, patientId))
-                .thenReturn(List.of(cachedResource(facilityId, cacheKey, patientId)));
+        when(redisResourceService.readEntry(facilityId, cacheKey, patientId))
+                .thenReturn(new RedisCacheEntry(List.of(cachedResource(facilityId, cacheKey, patientId)), null, false));
 
         stubHappyPathEvaluation(facilityId, cacheKey, patientId, true);
 

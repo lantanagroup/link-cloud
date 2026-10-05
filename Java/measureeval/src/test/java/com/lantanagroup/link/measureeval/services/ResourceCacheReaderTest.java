@@ -21,6 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -46,6 +47,16 @@ class ResourceCacheReaderTest {
         return resource;
     }
 
+    /** A Redis read result with the given resources and recorded durable count (null = none recorded). */
+    private static RedisCacheEntry entry(Integer durableCount, Resource... resources) {
+        return new RedisCacheEntry(List.of(resources), durableCount, false);
+    }
+
+    /** A Redis read result whose recorded durable count could not be parsed. */
+    private static RedisCacheEntry unparseableCount(Resource... resources) {
+        return new RedisCacheEntry(List.of(resources), null, true);
+    }
+
     @BeforeEach
     void setUp() {
         redis = mock(RedisResourceService.class);
@@ -61,7 +72,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_redisHit_recordsHit_withNoFallbackReason() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null, resource("p1")));
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
@@ -70,7 +81,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_redisMiss_recordsFallback_withMissReason() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p1")));
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
@@ -81,8 +92,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_partialEntry_recordsFallback_withPartialReason() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(3, resource("p1")));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
                 .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
 
@@ -94,7 +104,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_redisUnavailable_recordsFallback_withUnavailableReason() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT))
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT))
                 .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p1")));
 
@@ -106,7 +116,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_bothStoresEmpty_recordsEmpty_withTheReasonRedisMissed() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of());
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
@@ -119,7 +129,7 @@ class ResourceCacheReaderTest {
     void metrics_absError_recordsNothing_andStillPropagates() {
         // The read did not produce an outcome -- the record is retried -- so counting it as a hit,
         // fallback or empty would misreport what the cache served.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("abs outage"));
 
@@ -132,7 +142,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_eachRead_recordsExactlyOnce() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null, resource("p1")));
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
@@ -146,7 +156,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_recordTheReadsPass_onAHit() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null, resource("p1")));
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
 
@@ -156,8 +166,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_recordTheReadsPass_onAPartialFallback() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(3, resource("p1")));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
                 .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
 
@@ -168,16 +177,28 @@ class ResourceCacheReaderTest {
                 eq("Initial"), anyDouble());
     }
 
-    // ----- durable-count read failures -----
-    // A count that cannot be read makes the reader trust the entry. That is the right call for one
-    // read, but if it happens often the partial-entry protection is effectively off without anyone
-    // noticing, so each occurrence is counted.
+    // ----- unusable durable counts -----
+    // The count arrives in the same read as the resources, so the only way it can be unusable is a
+    // value that does not parse. The reader then trusts the entry -- right for one read, but if it
+    // happens often the partial-entry protection is effectively off, so each occurrence is counted.
 
     @Test
-    void metrics_countReadFailure_isCounted_withThePass_andTheHitIsStillServed() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION))
-                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+    void redisRead_isASingleCall_returningTheResourcesAndTheirCount() {
+        // L7: the count used to be a second HGET. An eviction between the two calls made a partial
+        // entry look count-less, so it was trusted. One read closes that gap.
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(3, resource("p1")));
+        when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
+                .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
+
+        reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
+
+        verify(redis, times(1)).readEntry(FACILITY, CORRELATION, PATIENT);
+        verifyNoMoreInteractions(redis);
+    }
+
+    @Test
+    void metrics_unparseableCount_isCounted_withThePass_andTheHitIsStillServed() {
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(unparseableCount(resource("p1")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
 
@@ -189,8 +210,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void metrics_countReadSuccess_isNotCountedAsAFailure() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(1);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(1, resource("p1")));
 
         reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION, "Supplemental");
 
@@ -199,7 +219,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void redisHit_isServedFromRedis_withoutConsultingAbs() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null, resource("p1")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
@@ -211,7 +231,7 @@ class ResourceCacheReaderTest {
     @Test
     void redisEmpty_fallsBackToAbs() {
         // An absent key is indistinguishable from an evicted one; ABS is the authority either way.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p2")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
@@ -223,7 +243,7 @@ class ResourceCacheReaderTest {
     @Test
     void redisUnavailable_fallsBackToAbs_insteadOfFailing() {
         // A Redis outage must cost latency, never fail the record: the durable copy is in ABS.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT))
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT))
                 .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of(resource("p3")));
 
@@ -235,7 +255,7 @@ class ResourceCacheReaderTest {
 
     @Test
     void bothStoresEmpty_returnsEmpty() {
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION)).thenReturn(List.of());
 
         assertTrue(reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION).isEmpty());
@@ -245,7 +265,7 @@ class ResourceCacheReaderTest {
     void absErrors_propagateForRetry() {
         // The durable store being unreachable means the resources are UNKNOWN, not absent: the
         // record must go to the retry ladder rather than evaluate an empty/partial bundle.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of());
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null));
         when(abs.readResources(anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new RuntimeException("abs outage"));
 
@@ -257,12 +277,12 @@ class ResourceCacheReaderTest {
     void redisHit_usesTheCacheKey_notTheCorrelationId() {
         // For today's consumers cacheKey == correlationId, but the reader must key Redis on the
         // cacheKey argument so it stays correct if a record ever advertises a different key.
-        when(redis.readResources(FACILITY, "other-key", PATIENT)).thenReturn(List.of(resource("p4")));
+        when(redis.readEntry(FACILITY, "other-key", PATIENT)).thenReturn(entry(null, resource("p4")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, "other-key");
 
         assertEquals("p4", result.get(0).getResourceId());
-        verify(redis).readResources(FACILITY, "other-key", PATIENT);
+        verify(redis).readEntry(FACILITY, "other-key", PATIENT);
         verify(abs, never()).readResources(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -271,8 +291,7 @@ class ResourceCacheReaderTest {
         // A cache write is a merge that recreates an evicted key, so an entry rebuilt by the
         // supplemental append alone is non-empty yet missing the initial pass. The durable count
         // the .NET writer records is what exposes it; ABS is the whole record.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(3);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(3, resource("p1")));
         when(abs.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION))
                 .thenReturn(List.of(resource("p1"), resource("p2"), resource("p3")));
 
@@ -286,8 +305,7 @@ class ResourceCacheReaderTest {
     void redisHit_withNoRecordedDurableCount_isTrusted() {
         // No count means no durable write has landed for the key, so ABS has nothing more to
         // offer; falling back would turn a usable entry into an empty read.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(null);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(null, resource("p1")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
@@ -299,8 +317,7 @@ class ResourceCacheReaderTest {
     void redisHit_meetingOrExceedingTheDurableCount_isTrusted() {
         // Holding more than the recorded count is the cache running ahead of a durable write
         // still in flight — the ordinary state between the two writes, not a partial entry.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1"), resource("p2")));
-        when(redis.readDurableResourceCount(CORRELATION)).thenReturn(1);
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(entry(1, resource("p1"), resource("p2")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
@@ -309,12 +326,10 @@ class ResourceCacheReaderTest {
     }
 
     @Test
-    void redisHit_whenTheDurableCountCannotBeRead_isTrusted() {
-        // Failing to read the count must not demote a usable hit to an ABS read: the entry is
-        // treated as whole, as the .NET reader does.
-        when(redis.readResources(FACILITY, CORRELATION, PATIENT)).thenReturn(List.of(resource("p1")));
-        when(redis.readDurableResourceCount(CORRELATION))
-                .thenThrow(new ResourceCacheUnavailableException("redis down", new RuntimeException()));
+    void redisHit_whenTheDurableCountDoesNotParse_isTrusted() {
+        // An unusable count must not demote a usable hit to an ABS read: the entry is treated as
+        // whole, as the .NET reader does when it cannot read the count.
+        when(redis.readEntry(FACILITY, CORRELATION, PATIENT)).thenReturn(unparseableCount(resource("p1")));
 
         List<Resource> result = reader.readResources(FACILITY, CORRELATION, PATIENT, CORRELATION);
 
