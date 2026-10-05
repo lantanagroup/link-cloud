@@ -379,6 +379,37 @@ public class PipelineDataReader
         return results;
     }
 
+    /// <summary>
+    /// Loads notes for the failed logs in <paramref name="failureIds"/> only.
+    /// The search response does not include notes.
+    /// </summary>
+    public async Task<List<AcquisitionLogInfo>> AttachFailureNotesAsync(
+        List<AcquisitionLogInfo> logs,
+        IReadOnlyList<long> failureIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (logs.Count == 0 || failureIds.Count == 0)
+            return logs;
+
+        var notesById = new Dictionary<long, List<string>>();
+        foreach (var id in failureIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var response = await _dataAcqClient.GetAcquisitionLogNotesAsync(id, cancellationToken);
+            if (!response.IsSuccessStatusCode || response.Body == null)
+                continue;
+
+            notesById[id] = response.Body;
+        }
+
+        if (notesById.Count == 0)
+            return logs;
+
+        return logs
+            .Select(log => notesById.TryGetValue(log.Id, out var notes) ? log with { Notes = notes } : log)
+            .ToList();
+    }
+
     private async Task<bool> HasAnyDetailedRowsForReportCoreAsync(
         string facilityId,
         string reportId,

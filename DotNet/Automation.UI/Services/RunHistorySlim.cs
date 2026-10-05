@@ -51,7 +51,7 @@ public static class RunHistorySlim
             foreach (var type in ResourceTypes(log))
                 typeCounts[type] = typeCounts.GetValueOrDefault(type) + 1;
 
-            if (log.CompletionTimeMilliseconds is long milliseconds && milliseconds > 0)
+            if (log.CompletionTimeMilliseconds is long milliseconds && milliseconds >= 0)
             {
                 durationSum += milliseconds;
                 durationCount++;
@@ -119,6 +119,29 @@ public static class RunHistorySlim
         }
 
         return chart;
+    }
+
+    /// <summary>
+    /// The first <see cref="AcquisitionFailureSampleCap"/> failed log ids, in list order.
+    /// </summary>
+    public static IReadOnlyList<long> FailureSampleIds(IReadOnlyList<PipelineDataReader.AcquisitionLogInfo>? logs)
+    {
+        if (logs == null || logs.Count == 0)
+            return [];
+
+        var ids = new List<long>(AcquisitionFailureSampleCap);
+        foreach (var log in logs)
+        {
+            var status = string.IsNullOrWhiteSpace(log.Status) ? "Unknown" : log.Status!;
+            if (!IsFailureStatus(status))
+                continue;
+
+            ids.Add(log.Id);
+            if (ids.Count == AcquisitionFailureSampleCap)
+                break;
+        }
+
+        return ids;
     }
 
     private static bool IsFailureStatus(string status)

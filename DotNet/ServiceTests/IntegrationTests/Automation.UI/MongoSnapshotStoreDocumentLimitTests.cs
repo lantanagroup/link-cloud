@@ -697,16 +697,18 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
         var runId = Guid.NewGuid();
-        store.FailNextHeaderLookup = true;
         store.AfterSliceInserted = index =>
         {
-            if (index == 0)
-                throw new IOException("slice insert failed");
-            return Task.CompletedTask;
+            if (index != 0)
+                return Task.CompletedTask;
+
+            // The first header lookup already ran. Arm the next one, then fail this insert.
+            store.FailNextHeaderLookup = true;
+            throw new IOException("slice insert failed");
         };
 
         var act = () => store.SetDomainAsync(runId, "entries", new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
-        await act.Should().ThrowAsync<IOException>();
+        await act.Should().ThrowAsync<IOException>().WithMessage("slice insert failed");
 
         (await Docs(runId)).Should().BeEmpty();
     }
