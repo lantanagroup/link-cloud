@@ -127,6 +127,67 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomainAsync_drops_an_older_header_and_its_slices()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "entries", "current", CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = string.Empty,
+            ChunkIndex = -1,
+            ChunkCount = 1,
+            Revision = "oldrevisionoldrevisionoldrevis",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-10)
+        });
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = "old-slice",
+            ChunkIndex = 0,
+            ChunkCount = 1,
+            Revision = "oldrevisionoldrevisionoldrevis",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-10)
+        });
+
+        await store.SetDomainAsync(runId, "entries", "kept", CancellationToken.None);
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.Revision == "oldrevisionoldrevisionoldrevis");
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("kept");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_concurrent_chunked_writes_keep_one_revision()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var first = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        var second = new string('b', MongoSnapshotStore.SnapshotChunkBytes - 1);
+
+        await Task.WhenAll(
+            store.SetDomainAsync(runId, "entries", first, CancellationToken.None),
+            store.SetDomainAsync(runId, "entries", second, CancellationToken.None));
+
+        var read = await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None);
+        read.Should().NotBeNull();
+        read!.Data.Should().BeOneOf(first, second);
+
+        var docs = await Docs(runId);
+        var winner = docs.Where(doc => doc.ChunkIndex is null or -1)
+            .OrderByDescending(doc => doc.UpdatedAt)
+            .ThenByDescending(doc => doc.Id)
+            .First();
+        var winnerRevision = winner.Revision;
+        docs.Where(doc => doc.ChunkIndex >= 0).Should().OnlyContain(doc => doc.Revision == winnerRevision);
+    }
+
+    [Fact]
     public async Task SetDomainAsync_concurrent_writes_leave_a_readable_snapshot()
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
