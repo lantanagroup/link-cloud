@@ -1203,6 +1203,10 @@ internal sealed class RunExecutor
                     : DateTimeOffset.UtcNow;
                 while (true)
                 {
+                    var evidenceCoverage = DateTimeOffset.UtcNow - (state.StartedAt ?? state.CreatedAt);
+                    if (evidenceCoverage < TimeSpan.Zero)
+                        evidenceCoverage = TimeSpan.Zero;
+
                     var normalizationSummaryLogs = await LokiEvidenceQuery.CollectWithRetryAsync(
                         scenarioConfig.LokiScrapeWindow,
                         evidenceRequiredResourceTypes,
@@ -1210,7 +1214,8 @@ internal sealed class RunExecutor
                         (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
-                        cancellationToken);
+                        cancellationToken,
+                        evidenceCoverage);
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(

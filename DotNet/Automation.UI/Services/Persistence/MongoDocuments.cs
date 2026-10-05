@@ -136,6 +136,15 @@ public sealed class DomainSnapshotDocument
     [BsonIgnoreIfNull]
     public string? Revision { get; set; }
 
+    /// <summary>
+    /// Clock value captured when this header was written. Compare-and-swap uses
+    /// <see cref="UpdatedAt"/>, which moves forward by a millisecond when the clock
+    /// does not. This field stays at the writer's clock so a later write from that
+    /// same clock is not treated as stale.
+    /// </summary>
+    [BsonIgnoreIfNull]
+    public DateTimeOffset? WriteClock { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; }
 }
 

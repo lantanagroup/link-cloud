@@ -40,6 +40,16 @@ public class LokiEvidenceQueryTests
     }
 
     [Fact]
+    public void Lookback_covers_a_run_that_is_longer_than_the_configured_window()
+    {
+        var coverage = TimeSpan.FromMinutes(80);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 0, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 1, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 3, coverage).Should().Be(coverage);
+        LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(90), 0, coverage).Should().Be(TimeSpan.FromMinutes(90));
+    }
+
+    [Fact]
     public void Delay_before_retry_attempts_is_5_10_20_seconds()
     {
         LokiEvidenceQuery.DelayBeforeAttempt(0).Should().BeNull();
