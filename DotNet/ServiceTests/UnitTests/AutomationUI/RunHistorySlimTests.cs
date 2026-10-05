@@ -76,6 +76,40 @@ public class RunHistorySlimTests
         System.Text.Encoding.UTF8.GetByteCount(json).Should().BeLessThan(20_000);
     }
 
+    [Fact]
+    public void Acquisition_chart_counts_MaxRetriesReached_and_apply_keeps_the_sample_without_timestamps()
+    {
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                4,
+                "patient-9",
+                null,
+                null,
+                "MaxRetriesReached",
+                "Initial",
+                ["gave up"],
+                [],
+                [],
+                ResourceTypes: ["Observation"])
+        ]);
+
+        chart.FailureCount.Should().Be(1);
+        chart.SpanCount.Should().Be(0);
+        chart.CompletedCount.Should().Be(0);
+        chart.Failures.Should().ContainSingle();
+
+        var target = new PipelineSummarySnapshotBuilder.DataAcquisitionSnapshot();
+        chart.Apply(target, 0, DateTimeOffset.UtcNow);
+        target.Errors.Should().ContainSingle().Which.Should().Contain("MaxRetriesReached").And.Contain("gave up");
+        target.ActiveDurationSeconds.Should().BeNull();
+        target.ThroughputBuckets.Should().BeEmpty();
+
+        var alreadyReported = new PipelineSummarySnapshotBuilder.DataAcquisitionSnapshot { Errors = ["loki"] };
+        chart.Apply(alreadyReported, 0, DateTimeOffset.UtcNow);
+        alreadyReported.Errors.Should().Equal("loki");
+    }
+
     private static PipelineDataReader.AcquisitionLogInfo Log(
         long id,
         string patientId,

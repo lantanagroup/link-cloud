@@ -560,7 +560,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 return null;
             }
 
-            var header = docs.Where(d => d.ChunkIndex == -1).OrderByDescending(d => d.UpdatedAt).FirstOrDefault();
+            var header = docs.Where(d => d.ChunkIndex == -1)
+                .OrderByDescending(d => d.UpdatedAt)
+                .ThenByDescending(d => d.Id)
+                .FirstOrDefault();
             string payloadJson;
             DateTimeOffset updatedAt;
             if (header?.ChunkCount is > 0 && !string.IsNullOrEmpty(header.Revision))
@@ -587,7 +590,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
             else
             {
-                var single = docs.Where(d => d.ChunkIndex is null).OrderByDescending(d => d.UpdatedAt).FirstOrDefault()
+                var single = docs.Where(d => d.ChunkIndex is null)
+                    .OrderByDescending(d => d.UpdatedAt)
+                    .ThenByDescending(d => d.Id)
+                    .FirstOrDefault()
                     ?? header;
                 if (single == null || string.IsNullOrEmpty(single.Data))
                     return null;
@@ -675,35 +681,67 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private async Task<bool> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
     {
-        var update = Builders<DomainSnapshotDocument>.Update
-            .Set(d => d.Data, storedJson)
-            .Set(d => d.UpdatedAt, now)
-            .Unset(d => d.ChunkIndex)
-            .Unset(d => d.ChunkCount)
-            .Unset(d => d.Revision)
-            .SetOnInsert(d => d.RunId, runId)
-            .SetOnInsert(d => d.Domain, domain);
-
-        var result = await _snapshots.UpdateOneAsync(SingleOrHeaderFilter(runId, domain), update, new UpdateOptions { IsUpsert = true }, ct);
-        ObjectId keepId;
-        if (result.UpsertedId != null)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            keepId = result.UpsertedId.AsObjectId;
-        }
-        else
-        {
-            var kept = await _snapshots.Find(SingleOrHeaderFilter(runId, domain)).FirstOrDefaultAsync(ct);
-            if (kept == null)
-                return false;
+            ct.ThrowIfCancellationRequested();
+            var previous = await _snapshots.Find(SingleOrHeaderFilter(runId, domain))
+                .SortByDescending(d => d.UpdatedAt)
+                .ThenByDescending(d => d.Id)
+                .FirstOrDefaultAsync(ct);
+            var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
+            var update = Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, storedJson)
+                .Set(d => d.UpdatedAt, now)
+                .Unset(d => d.ChunkIndex)
+                .Unset(d => d.ChunkCount)
+                .Unset(d => d.Revision)
+                .SetOnInsert(d => d.RunId, runId)
+                .SetOnInsert(d => d.Domain, domain);
 
-            keepId = kept.Id;
+            UpdateResult result;
+            if (previous == null)
+            {
+                result = await _snapshots.UpdateOneAsync(
+                    SingleOrHeaderFilter(runId, domain),
+                    update,
+                    new UpdateOptions { IsUpsert = true },
+                    ct);
+            }
+            else
+            {
+                var filter = Builders<DomainSnapshotDocument>.Filter;
+                var cas = filter.Eq(d => d.Id, previous.Id)
+                    & (previousRevision == null
+                        ? filter.Eq(d => d.Revision, null)
+                        : filter.Eq(d => d.Revision, previousRevision));
+                result = await _snapshots.UpdateOneAsync(cas, update, cancellationToken: ct);
+            }
+
+            if (result.MatchedCount == 0 && result.UpsertedId == null)
+                continue;
+
+            var keepId = result.UpsertedId?.AsObjectId ?? previous?.Id ?? ObjectId.Empty;
+            if (keepId == ObjectId.Empty)
+            {
+                var kept = await _snapshots.Find(SingleOrHeaderFilter(runId, domain))
+                    .SortByDescending(d => d.UpdatedAt)
+                    .ThenByDescending(d => d.Id)
+                    .FirstOrDefaultAsync(ct);
+                if (kept == null)
+                    return false;
+
+                keepId = kept.Id;
+            }
+
+            await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, now, ct);
+            return true;
         }
 
-        var others = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
-            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
-            & Builders<DomainSnapshotDocument>.Filter.Ne(d => d.Id, keepId);
-        await _snapshots.DeleteManyAsync(others, ct);
-        return true;
+        _logger.LogWarning(
+            "Snapshot domain {Domain} for run {RunId} kept its previous document after a concurrent write.",
+            domain,
+            runId);
+        return false;
     }
 
     private async Task<bool> WriteChunkedAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
@@ -736,11 +774,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     }, cancellationToken: ct);
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception)
             {
-                await DeleteRevisionAsync(runId, domain, revision, CancellationToken.None);
-                _logger.LogWarning(ex, "Snapshot chunks for domain {Domain} run {RunId} were not stored.", domain, runId);
-                return false;
+                await DeleteRevisionQuietlyAsync(runId, domain, revision);
+                throw;
             }
 
             var headerUpdate = Builders<DomainSnapshotDocument>.Update
@@ -753,22 +790,30 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 .SetOnInsert(d => d.Domain, domain);
 
             UpdateResult flip;
-            if (previous == null)
+            try
             {
-                flip = await _snapshots.UpdateOneAsync(
-                    SingleOrHeaderFilter(runId, domain),
-                    headerUpdate,
-                    new UpdateOptions { IsUpsert = true },
-                    ct);
+                if (previous == null)
+                {
+                    flip = await _snapshots.UpdateOneAsync(
+                        SingleOrHeaderFilter(runId, domain),
+                        headerUpdate,
+                        new UpdateOptions { IsUpsert = true },
+                        ct);
+                }
+                else
+                {
+                    var filter = Builders<DomainSnapshotDocument>.Filter;
+                    var cas = filter.Eq(d => d.Id, previous.Id)
+                        & (previousRevision == null
+                            ? filter.Eq(d => d.Revision, null)
+                            : filter.Eq(d => d.Revision, previousRevision));
+                    flip = await _snapshots.UpdateOneAsync(cas, headerUpdate, cancellationToken: ct);
+                }
             }
-            else
+            catch (Exception)
             {
-                var filter = Builders<DomainSnapshotDocument>.Filter;
-                var cas = filter.Eq(d => d.Id, previous.Id)
-                    & (previousRevision == null
-                        ? filter.Eq(d => d.Revision, null)
-                        : filter.Eq(d => d.Revision, previousRevision));
-                flip = await _snapshots.UpdateOneAsync(cas, headerUpdate, cancellationToken: ct);
+                await DeleteRevisionQuietlyAsync(runId, domain, revision);
+                throw;
             }
 
             if (flip.MatchedCount == 0 && flip.UpsertedId == null)
@@ -777,15 +822,23 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 continue;
             }
 
-            if (!string.IsNullOrEmpty(previousRevision))
+            var keepId = flip.UpsertedId?.AsObjectId ?? previous?.Id ?? ObjectId.Empty;
+            if (keepId == ObjectId.Empty)
             {
-                var oldChunks = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
-                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
-                    & Builders<DomainSnapshotDocument>.Filter.Gte(d => d.ChunkIndex, 0)
-                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, previousRevision);
-                await _snapshots.DeleteManyAsync(oldChunks, ct);
+                var kept = await _snapshots.Find(SingleOrHeaderFilter(runId, domain))
+                    .SortByDescending(d => d.UpdatedAt)
+                    .ThenByDescending(d => d.Id)
+                    .FirstOrDefaultAsync(ct);
+                if (kept == null)
+                {
+                    await DeleteRevisionAsync(runId, domain, revision, ct);
+                    continue;
+                }
+
+                keepId = kept.Id;
             }
 
+            await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, now, ct);
             return true;
         }
 
@@ -796,12 +849,52 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return false;
     }
 
+    private async Task DeleteDisplacedAsync(
+        Guid runId,
+        string domain,
+        ObjectId keepId,
+        string? previousRevision,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(previousRevision))
+        {
+            var oldChunks = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+                & Builders<DomainSnapshotDocument>.Filter.Gte(d => d.ChunkIndex, 0)
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, previousRevision);
+            await _snapshots.DeleteManyAsync(oldChunks, ct);
+        }
+
+        var filter = Builders<DomainSnapshotDocument>.Filter;
+        var staleHeaders = SingleOrHeaderFilter(runId, domain)
+            & filter.Ne(d => d.Id, keepId)
+            & filter.Lt(d => d.UpdatedAt, now);
+        await _snapshots.DeleteManyAsync(staleHeaders, ct);
+    }
+
     private Task DeleteRevisionAsync(Guid runId, string domain, string revision, CancellationToken ct)
     {
         var mine = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, revision);
         return _snapshots.DeleteManyAsync(mine, ct);
+    }
+
+    private async Task DeleteRevisionQuietlyAsync(Guid runId, string domain, string revision)
+    {
+        try
+        {
+            await DeleteRevisionAsync(runId, domain, revision, CancellationToken.None);
+        }
+        catch (Exception cleanupEx)
+        {
+            _logger.LogWarning(
+                cleanupEx,
+                "Snapshot chunk cleanup failed for domain {Domain} run {RunId}.",
+                domain.SanitizeForLog(),
+                runId.ToString().SanitizeForLog());
+        }
     }
 
     private static SnapshotPayloadPointer? TryReadSnapshotPayloadPointer(string? payload)
