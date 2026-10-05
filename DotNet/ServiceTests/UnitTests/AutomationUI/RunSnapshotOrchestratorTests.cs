@@ -157,6 +157,64 @@ public class RunSnapshotOrchestratorTests
     }
 
     [Fact]
+    public async Task ReconcileAsync_keeps_a_poller_whose_run_is_still_active()
+    {
+        var runId = Guid.NewGuid();
+        var meta = new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "report",
+            StartedAt = DateTimeOffset.UtcNow,
+            IsActive = true
+        };
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RunSnapshotMeta>());
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(meta);
+
+        var orchestrator = CreateOrchestrator(store);
+        await orchestrator.RegisterRunAsync(runId, "facility", "report");
+
+        var reconcile = typeof(RunSnapshotOrchestrator).GetMethod("ReconcileAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await ((Task)reconcile.Invoke(orchestrator, new object[] { CancellationToken.None })!).WaitAsync(TimeSpan.FromSeconds(10));
+
+        PollerCount(orchestrator).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_stops_a_poller_whose_run_is_no_longer_active()
+    {
+        var runId = Guid.NewGuid();
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<RunSnapshotMeta>());
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RunSnapshotMeta?)null);
+
+        var orchestrator = CreateOrchestrator(store);
+        await orchestrator.RegisterRunAsync(runId, "facility", "report");
+
+        var reconcile = typeof(RunSnapshotOrchestrator).GetMethod("ReconcileAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await ((Task)reconcile.Invoke(orchestrator, new object[] { CancellationToken.None })!).WaitAsync(TimeSpan.FromSeconds(10));
+
+        PollerCount(orchestrator).Should().Be(0);
+    }
+
+    [Fact]
     public async Task CompleteRunAsync_shares_an_in_flight_completion()
     {
         var calls = 0;

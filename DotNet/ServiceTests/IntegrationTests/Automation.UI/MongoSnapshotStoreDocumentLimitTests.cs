@@ -674,6 +674,24 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await Clock(runId, "entries")).WriteClock.Should().Be(origin.AddMinutes(30));
     }
 
+    [Fact]
+    public async Task SetDomainAsync_reclaims_the_previous_revision_when_publication_cleanup_fails()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "entries", new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
+        var original = (await Docs(runId)).Single(doc => doc.ChunkIndex == -1).Revision;
+
+        store.AfterHeaderCommitted = () => throw new IOException("cleanup failed");
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.Revision == original);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
+    }
+
     private MongoSnapshotStore StoreAt(DateTimeOffset now)
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
