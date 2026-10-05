@@ -865,6 +865,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch
         {
+            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
             await ReclaimDisplacedBlobAsync(runId, domain, previous);
             throw;
         }

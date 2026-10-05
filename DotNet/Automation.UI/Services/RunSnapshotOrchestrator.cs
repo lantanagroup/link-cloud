@@ -394,6 +394,12 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
                     continue;
 
+                // The active list was captured before this gate. A run registered
+                // after that read is still active and must keep its poller.
+                var meta = await _store.GetRunMetaAsync(runId, ct);
+                if (meta is { IsActive: true })
+                    continue;
+
                 if (!current.TryDetach())
                     continue;
 
