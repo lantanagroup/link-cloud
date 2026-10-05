@@ -53,6 +53,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal Func<Task>? AfterSingleHeaderUpdate { get; set; }
 
     /// <summary>
+    /// Test seam. Runs after a chunked header flip has been sent and before
+    /// this write treats that flip as acknowledged.
+    /// </summary>
+    internal Func<Task>? AfterChunkedHeaderUpdate { get; set; }
+
+    /// <summary>
     /// Test seam. Runs after this write's header is stored and before the
     /// displaced-header lookup.
     /// </summary>
@@ -553,6 +559,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             if (newPointer != null)
                 await DeleteUnusedSnapshotBlobAsync(runId, domain, newPointer);
+            if (write.Displaced != null && (newPointer == null || !string.Equals(write.Displaced.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
+                await DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, write.Displaced);
             return;
         }
 
@@ -760,7 +768,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
                     domain.SanitizeForLog(),
                     runId.ToString().SanitizeForLog());
-                return new SnapshotWrite(false, null);
+                return new SnapshotWrite(false, DisplacedPointer(previous));
             }
 
             return new SnapshotWrite(true, DisplacedPointer(previous));
@@ -850,6 +858,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     }
 
                     keepId = previous.Id;
+                    if (AfterChunkedHeaderUpdate != null)
+                        await AfterChunkedHeaderUpdate();
                 }
             }
             catch (Exception)
@@ -860,6 +870,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     if (published == false)
                         await DeleteSlicesQuietlyAsync(runId, domain, revision);
 
+                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
                     throw;
                 }
 
@@ -891,7 +902,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
                     domain.SanitizeForLog(),
                     runId.ToString().SanitizeForLog());
-                return new SnapshotWrite(false, null);
+                return new SnapshotWrite(false, DisplacedPointer(previous));
             }
 
             return new SnapshotWrite(true, DisplacedPointer(previous));
@@ -1040,6 +1051,34 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             "Snapshot domain {Domain} for run {RunId} dropped this write because the stored header is newer.",
             domain.SanitizeForLog(),
             runId.ToString().SanitizeForLog());
+    }
+
+    private async Task DeleteDisplacedBlobIfUnreferencedAsync(Guid runId, string domain, SnapshotPayloadPointer pointer)
+    {
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            var filter = Builders<DomainSnapshotDocument>.Filter;
+            var docs = await _snapshots.Find(filter.Eq(d => d.RunId, runId) & filter.Eq(d => d.Domain, domain))
+                .ToListAsync(timeout.Token);
+            var referenced = docs.Any(doc =>
+            {
+                var found = TryReadSnapshotPayloadPointer(doc.Data);
+                return found != null && string.Equals(found.BlobName, pointer.BlobName, StringComparison.Ordinal);
+            });
+            if (referenced)
+                return;
+
+            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Snapshot blob cleanup failed for domain {Domain} run {RunId}.",
+                domain.SanitizeForLog(),
+                runId.ToString().SanitizeForLog());
+        }
     }
 
     private async Task DeleteUnusedSnapshotBlobAsync(Guid runId, string domain, SnapshotPayloadPointer pointer)

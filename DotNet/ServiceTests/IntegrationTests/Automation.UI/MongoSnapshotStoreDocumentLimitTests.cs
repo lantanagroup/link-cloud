@@ -371,6 +371,48 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None)).Should().BeNull();
     }
 
+    [Fact]
+    public async Task SetDomainAsync_reclaims_the_previous_revision_when_a_chunked_header_update_is_not_acknowledged()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var original = (await Docs(runId)).Single(doc => doc.ChunkIndex == -1).Revision;
+        const string replacement = "r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2r2";
+        store.AfterChunkedHeaderUpdate = async () =>
+        {
+            var header = await collection.Find(doc => doc.RunId == runId && doc.Domain == "entries" && doc.ChunkIndex == -1).SingleAsync();
+            await collection.UpdateOneAsync(
+                doc => doc.Id == header.Id,
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(doc => doc.Revision, replacement)
+                    .Set(doc => doc.ChunkCount, 1)
+                    .Set(doc => doc.Data, string.Empty));
+            await collection.InsertOneAsync(new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "entries",
+                Data = "\"winner\"",
+                ChunkIndex = 0,
+                ChunkCount = 1,
+                Revision = replacement,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            throw new IOException("ack lost");
+        };
+
+        var act = () => store.SetDomainAsync(runId, "entries", new string('b', MongoSnapshotStore.SnapshotChunkBytes - 1), CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        var docs = await Docs(runId);
+        docs.Should().NotContain(doc => doc.Revision == original);
+        docs.Where(doc => doc.ChunkIndex >= 0).Should().OnlyContain(doc => doc.Revision == replacement);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("winner");
+    }
+
     private Task<List<DomainSnapshotDocument>> Docs(Guid runId)
         => _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
             .Find(doc => doc.RunId == runId && doc.Domain == "entries")

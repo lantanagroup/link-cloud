@@ -210,6 +210,10 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     private async Task FinishCompletionAsync(Guid runId, TaskCompletionSource work)
     {
+        // Same gate as a report switch. Completion waits until that switch
+        // finishes, then finalizes whichever poller is registered.
+        var gate = Gate(runId);
+        await gate.WaitAsync();
         try
         {
             await CompleteRunCoreAsync(runId);
@@ -221,6 +225,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
         finally
         {
+            gate.Release();
             _completions.TryRemove(new KeyValuePair<Guid, Task>(runId, work.Task));
         }
     }

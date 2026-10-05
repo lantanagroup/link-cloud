@@ -215,6 +215,54 @@ public class RunSnapshotOrchestratorTests
         store.Verify(s => s.CompleteRunAsync(runId, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task CompleteRunAsync_waits_for_a_report_switch_before_marking_the_run_inactive()
+    {
+        var runId = Guid.NewGuid();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completions = 0;
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RunSnapshotMeta?)null);
+        store.Setup(s => s.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(It.IsAny<Guid>(), "schedule", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DomainSnapshot<PipelineDataReader.ReportScheduleInfo>?)null);
+        store.Setup(s => s.UpdateRunMetaAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(async (Guid _, string _, string _, CancellationToken _) =>
+            {
+                entered.TrySetResult();
+                await release.Task;
+            });
+        store.Setup(s => s.CompleteRunAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                Interlocked.Increment(ref completions);
+                return Task.CompletedTask;
+            });
+
+        var orchestrator = CreateOrchestrator(store);
+        await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
+        var updating = orchestrator.UpdateRunAsync(runId, "facility", Guid.NewGuid().ToString());
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var completing = orchestrator.CompleteRunAsync(runId);
+        await Task.Delay(300);
+        completing.IsCompleted.Should().BeFalse();
+        completions.Should().Be(0);
+
+        release.TrySetResult();
+        await updating.WaitAsync(TimeSpan.FromSeconds(10));
+        await completing.WaitAsync(TimeSpan.FromSeconds(10));
+        completions.Should().Be(1);
+        PollerCount(orchestrator).Should().Be(0);
+    }
+
     private static int PollerCount(RunSnapshotOrchestrator orchestrator)
     {
         var pollers = typeof(RunSnapshotOrchestrator)
