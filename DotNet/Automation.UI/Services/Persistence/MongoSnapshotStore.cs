@@ -64,6 +64,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// </summary>
     internal Func<Task>? BeforeDeleteDisplaced { get; set; }
 
+    /// <summary>Test seam. Runs before this write stores a header.</summary>
+    internal Func<Task>? BeforeHeaderWrite { get; set; }
+
+    /// <summary>Test seam. Replaces <see cref="DateTimeOffset.UtcNow"/> for one store.</summary>
+    internal Func<DateTimeOffset>? Clock { get; set; }
+
+    /// <summary>Test seam. The next header lookup throws once.</summary>
+    internal bool FailNextHeaderLookup { get; set; }
+
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
@@ -537,7 +546,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var json = JsonSerializer.Serialize(data);
         var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
-        var now = DateTimeOffset.UtcNow;
+        var now = Clock?.Invoke() ?? DateTimeOffset.UtcNow;
 
         SnapshotPayloadPointer? newPointer = null;
         var storedJson = json;
@@ -551,9 +560,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var storedBytes = Encoding.UTF8.GetByteCount(storedJson);
-        var write = storedBytes <= SnapshotChunkBytes
-            ? await WriteSingleAsync(runId, domain, storedJson, now, ct)
-            : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
+        SnapshotWrite write;
+        try
+        {
+            write = storedBytes <= SnapshotChunkBytes
+                ? await WriteSingleAsync(runId, domain, storedJson, now, ct)
+                : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
+        }
+        catch
+        {
+            if (newPointer != null)
+                await DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, newPointer);
+            throw;
+        }
 
         if (!write.Wrote)
         {
@@ -698,8 +717,24 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private readonly record struct SnapshotWrite(bool Wrote, SnapshotPayloadPointer? Displaced);
 
+    /// <summary>
+    /// BSON datetimes keep milliseconds. A stored header must be strictly newer
+    /// than the one this write observed, or a same-millisecond update still matches
+    /// <see cref="ObservedHeaderFilter"/>.
+    /// </summary>
+    internal static DateTimeOffset NextSnapshotTimestamp(DateTimeOffset now, DateTimeOffset? previous)
+    {
+        if (previous == null || now > previous.Value)
+            return now;
+
+        return previous.Value.AddMilliseconds(1);
+    }
+
     private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
     {
+        if (BeforeHeaderWrite != null)
+            await BeforeHeaderWrite();
+
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
@@ -711,6 +746,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
 
             var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
+            var stamp = NextSnapshotTimestamp(now, previous?.UpdatedAt);
             ObjectId keepId;
             if (previous == null)
             {
@@ -720,7 +756,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     RunId = runId,
                     Domain = domain,
                     Data = storedJson,
-                    UpdatedAt = now
+                    UpdatedAt = stamp
                 };
                 try
                 {
@@ -738,7 +774,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 var update = Builders<DomainSnapshotDocument>.Update
                     .Set(d => d.Data, storedJson)
-                    .Set(d => d.UpdatedAt, now)
+                    .Set(d => d.UpdatedAt, stamp)
                     .Unset(d => d.ChunkIndex)
                     .Unset(d => d.ChunkCount)
                     .Unset(d => d.Revision);
@@ -783,6 +819,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private async Task<SnapshotWrite> WriteChunkedAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
     {
+        if (BeforeHeaderWrite != null)
+            await BeforeHeaderWrite();
+
+        return await WriteChunkedCoreAsync(runId, domain, json, now, ct);
+    }
+
+    private async Task<SnapshotWrite> WriteChunkedCoreAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
+    {
         var slices = SplitUtf8(json, SnapshotChunkBytes);
         for (var attempt = 0; attempt < 3; attempt++)
         {
@@ -795,6 +839,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             }
 
             var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
+            var stamp = NextSnapshotTimestamp(now, previous?.UpdatedAt);
             var revision = Guid.NewGuid().ToString("N");
 
             try
@@ -837,7 +882,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         ChunkIndex = -1,
                         ChunkCount = slices.Count,
                         Revision = revision,
-                        UpdatedAt = now
+                        UpdatedAt = stamp
                     };
                     await _snapshots.InsertOneAsync(created, cancellationToken: ct);
                     keepId = created.Id;
@@ -849,7 +894,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         .Set(d => d.ChunkIndex, -1)
                         .Set(d => d.ChunkCount, slices.Count)
                         .Set(d => d.Revision, revision)
-                        .Set(d => d.UpdatedAt, now);
+                        .Set(d => d.UpdatedAt, stamp);
                     var flip = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), headerUpdate, cancellationToken: ct);
                     if (flip.MatchedCount == 0)
                     {
@@ -922,7 +967,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     }
 
     private Task<List<DomainSnapshotDocument>> FindHeadersAsync(Guid runId, string domain, CancellationToken ct)
-        => _snapshots.Find(SingleOrHeaderFilter(runId, domain)).ToListAsync(ct);
+    {
+        if (FailNextHeaderLookup)
+        {
+            FailNextHeaderLookup = false;
+            throw new IOException("lookup failed");
+        }
+
+        return _snapshots.Find(SingleOrHeaderFilter(runId, domain)).ToListAsync(ct);
+    }
 
     private async Task<bool> DocumentExistsAsync(ObjectId id)
     {
@@ -981,7 +1034,16 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         using var timeout = StartCleanupLookupTimeout();
         var ct = timeout.Token;
-        var headers = await FindHeadersAsync(runId, domain, ct);
+        List<DomainSnapshotDocument> headers;
+        try
+        {
+            headers = await FindHeadersAsync(runId, domain, ct);
+        }
+        catch (Exception)
+        {
+            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+            throw;
+        }
         var me = headers.FirstOrDefault(header => header.Id == keepId);
         if (me == null)
         {

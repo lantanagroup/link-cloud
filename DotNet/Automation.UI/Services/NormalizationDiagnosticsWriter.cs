@@ -121,7 +121,9 @@ internal static class NormalizationDiagnosticsWriter
         sb.AppendLine();
         sb.AppendLine("-- Execution evidence inventory --");
         var inventory = FormatEvidenceInventory(snapshot.ParsedSteps);
-        if (inventory.Count == 0)
+        if (inventory.Count == 0 && snapshot.OmittedStepCount > 0)
+            sb.AppendLine($"  ({snapshot.OmittedStepCount} execution step(s) omitted from this snapshot)");
+        else if (inventory.Count == 0)
             sb.AppendLine("  (no parsable [NormalizationExecutionSummary] steps)");
         else
         {
@@ -404,6 +406,7 @@ internal static class NormalizationDiagnosticsWriter
             CollectedLineCount = source.CollectedLineCount,
             RawLinesOmitted = source.RawLinesOmitted,
             StepsCollapsed = source.StepsCollapsed,
+            OmittedStepCount = source.OmittedStepCount,
             EvidenceChunkCount = source.EvidenceChunkCount,
             EvidenceAttemptId = source.EvidenceAttemptId,
             SummaryLines = [.. source.SummaryLines],
