@@ -582,6 +582,105 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         legacy.Domain.Should().Be("schedule");
     }
 
+    [Fact]
+    public async Task SetDomainAsync_a_paused_writer_does_not_roll_the_clock_back()
+    {
+        var origin = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var seed = StoreAt(origin);
+        var paused = StoreAt(origin.AddMinutes(10));
+        var newer = StoreAt(origin.AddMinutes(30));
+        await seed.SetDomainAsync(runId, "schedule", "seed", CancellationToken.None);
+
+        paused.AfterClockClaimed = () =>
+        {
+            paused.AfterClockClaimed = null;
+            return newer.SetDomainAsync(runId, "schedule", "from-newer", CancellationToken.None);
+        };
+
+        await paused.SetDomainAsync(runId, "schedule", "from-paused", CancellationToken.None);
+
+        (await paused.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("from-newer");
+        (await Clock(runId, "schedule")).WriteClock.Should().Be(origin.AddMinutes(30));
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_a_paused_chunked_writer_does_not_roll_the_clock_back()
+    {
+        var origin = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var seed = StoreAt(origin);
+        var paused = StoreAt(origin.AddMinutes(10));
+        var newer = StoreAt(origin.AddMinutes(30));
+        var newerPayload = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        await seed.SetDomainAsync(runId, "entries", "seed", CancellationToken.None);
+
+        paused.AfterClockClaimed = () =>
+        {
+            paused.AfterClockClaimed = null;
+            return newer.SetDomainAsync(runId, "entries", newerPayload, CancellationToken.None);
+        };
+
+        await paused.SetDomainAsync(runId, "entries", new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
+
+        (await paused.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(newerPayload);
+        (await Clock(runId, "entries")).WriteClock.Should().Be(origin.AddMinutes(30));
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_a_claimed_clock_rejects_an_older_writer()
+    {
+        var origin = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var seed = StoreAt(origin);
+        var paused = StoreAt(origin.AddMinutes(30));
+        var older = StoreAt(origin.AddMinutes(20));
+        await seed.SetDomainAsync(runId, "schedule", "seed", CancellationToken.None);
+
+        paused.AfterClockClaimed = async () =>
+        {
+            paused.AfterClockClaimed = null;
+            await older.SetDomainAsync(runId, "schedule", "from-older", CancellationToken.None);
+            (await paused.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("seed");
+        };
+
+        await paused.SetDomainAsync(runId, "schedule", "from-paused", CancellationToken.None);
+
+        (await paused.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("from-paused");
+        (await Clock(runId, "schedule")).WriteClock.Should().Be(origin.AddMinutes(30));
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_a_claimed_chunked_clock_rejects_an_older_writer()
+    {
+        var origin = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
+        var runId = Guid.NewGuid();
+        var seed = StoreAt(origin);
+        var paused = StoreAt(origin.AddMinutes(30));
+        var older = StoreAt(origin.AddMinutes(20));
+        var pausedPayload = new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        await seed.SetDomainAsync(runId, "entries", "seed", CancellationToken.None);
+
+        paused.AfterClockClaimed = async () =>
+        {
+            paused.AfterClockClaimed = null;
+            await older.SetDomainAsync(runId, "entries", new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
+            (await paused.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("seed");
+        };
+
+        await paused.SetDomainAsync(runId, "entries", pausedPayload, CancellationToken.None);
+
+        (await paused.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(pausedPayload);
+        (await Clock(runId, "entries")).WriteClock.Should().Be(origin.AddMinutes(30));
+    }
+
+    private MongoSnapshotStore StoreAt(DateTimeOffset now)
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        store.Clock = () => now;
+        return store;
+    }
+
     private Task<List<DomainSnapshotDocument>> Docs(Guid runId)
         => _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
             .Find(doc => doc.RunId == runId && doc.Domain == "entries")
