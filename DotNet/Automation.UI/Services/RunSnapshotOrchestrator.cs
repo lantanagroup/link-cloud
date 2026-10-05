@@ -135,6 +135,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         // write the same domains, and the final poll has to be the last writer.
         if (_activePollers.TryGetValue(runId, out var activeHandle))
         {
+            activeHandle.MarkFinalizing();
             try
             {
                 await activeHandle.DrainAsync();
@@ -196,7 +197,10 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         // Start pollers for runs that don't have one yet
         foreach (var meta in activeRuns)
         {
-            if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsCompleted)
+            if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsFinalizing)
+                continue;
+
+            if (_activePollers.TryGetValue(meta.RunId, out existingHandle) && existingHandle.IsCompleted)
             {
                 if (_activePollers.TryRemove(meta.RunId, out var completedHandle))
                 {
@@ -241,6 +245,9 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         {
             if (!activeRunIds.Contains(runId))
             {
+                if (handle.IsFinalizing)
+                    continue;
+
                 if (_activePollers.TryRemove(runId, out var removed))
                 {
                     await removed.StopAsync();
@@ -336,6 +343,12 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         public string ReportId => poller.ReportId;
         public bool IsMetricsRun => poller.IsMetricsRun;
         public bool IsCompleted => pollerTask.IsCompleted;
+
+        private int _finalizing;
+
+        public bool IsFinalizing => Volatile.Read(ref _finalizing) == 1;
+
+        public void MarkFinalizing() => Volatile.Write(ref _finalizing, 1);
 
         public Task FinalPollAsync() => poller.FinalPollAsync();
 
