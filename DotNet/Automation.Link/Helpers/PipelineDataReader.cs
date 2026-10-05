@@ -61,6 +61,9 @@ public class PipelineDataReader
                 return (T?)entry.Value;
 
             var result = await factory();
+            // The SDK turns a cancelled HTTP call into a bodyless response. Do not cache that
+            // empty result, or the final poll reuses it for the cache window.
+            cancellationToken.ThrowIfCancellationRequested();
             _cache[cacheKey] = (result, DateTime.UtcNow.Add(CacheTtl));
             return result;
         }

@@ -55,4 +55,49 @@ public class PipelineDataReaderCancellationTests
         await act.Should().ThrowAsync<OperationCanceledException>();
         calls.Should().Be(1);
     }
+
+    [Fact]
+    public async Task GetDataAcquisitionReportSummaryAsync_does_not_cache_a_result_after_cancellation()
+    {
+        var calls = 0;
+        using var cts = new CancellationTokenSource();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.GetReportSummaryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    cts.Cancel();
+                    return Task.FromResult(new LinkApiResponse<DataAcquisitionReportSummaryApiModel>
+                    {
+                        StatusCode = 0
+                    });
+                }
+
+                return Task.FromResult(new LinkApiResponse<DataAcquisitionReportSummaryApiModel>
+                {
+                    StatusCode = 200,
+                    Body = new DataAcquisitionReportSummaryApiModel
+                    {
+                        ReportId = "report",
+                        TotalLogs = 4
+                    }
+                });
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+
+        var cancelled = () => reader.GetDataAcquisitionReportSummaryAsync("report", cts.Token);
+        await cancelled.Should().ThrowAsync<OperationCanceledException>();
+
+        var summary = await reader.GetDataAcquisitionReportSummaryAsync("report", CancellationToken.None);
+        calls.Should().Be(2);
+        summary!.TotalLogs.Should().Be(4);
+    }
 }
