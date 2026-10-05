@@ -613,8 +613,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     .Where(d => d.ChunkIndex >= 0 && d.Revision == chosen.Revision)
                     .OrderBy(d => d.ChunkIndex)
                     .ToList();
-                var complete = chunks.Count == chosen.ChunkCount
-                    && chunks.Select(c => c.ChunkIndex).Distinct().Count() == chunks.Count;
+                var expected = chosen.ChunkCount.Value;
+                var complete = chunks.Count == expected
+                    && chunks.Select((chunk, index) => chunk.ChunkIndex == index).All(match => match);
                 if (!complete)
                 {
                     if (attempt < 2)

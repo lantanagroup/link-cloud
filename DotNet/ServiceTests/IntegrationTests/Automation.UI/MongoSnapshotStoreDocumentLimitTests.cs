@@ -83,6 +83,37 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetDomainAsync_rejects_slices_that_do_not_start_at_zero()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        const string revision = "gaprevisiongaprevisiongaprevis";
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = string.Empty,
+            ChunkIndex = -1,
+            ChunkCount = 1,
+            Revision = revision,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = "\"skipped\"",
+            ChunkIndex = 1,
+            ChunkCount = 1,
+            Revision = revision,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetDomainAsync_reads_a_legacy_single_document()
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
