@@ -104,6 +104,7 @@ public class RunSnapshotOrchestratorTests
     public async Task UpdateRunAsync_keeps_reconcile_from_starting_the_old_report()
     {
         var runId = Guid.NewGuid();
+        var otherRunId = Guid.NewGuid();
         var oldReport = Guid.NewGuid().ToString();
         var newReport = Guid.NewGuid().ToString();
         var meta = new RunSnapshotMeta
@@ -111,6 +112,14 @@ public class RunSnapshotOrchestratorTests
             RunId = runId,
             FacilityId = "facility",
             ReportId = oldReport,
+            StartedAt = DateTimeOffset.UtcNow,
+            IsActive = true
+        };
+        var otherMeta = new RunSnapshotMeta
+        {
+            RunId = otherRunId,
+            FacilityId = "facility",
+            ReportId = "other-report",
             StartedAt = DateTimeOffset.UtcNow,
             IsActive = true
         };
@@ -125,9 +134,9 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
-            .Returns(() => Task.FromResult<IReadOnlyList<RunSnapshotMeta>>(new List<RunSnapshotMeta> { meta }));
+            .Returns(() => Task.FromResult<IReadOnlyList<RunSnapshotMeta>>(new List<RunSnapshotMeta> { meta, otherMeta }));
         store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Returns(() => Task.FromResult<RunSnapshotMeta?>(meta));
+            .Returns((Guid id, CancellationToken _) => Task.FromResult<RunSnapshotMeta?>(id == otherRunId ? otherMeta : meta));
         store.Setup(s => s.UpdateRunMetaAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(async (Guid _, string facilityId, string reportId, CancellationToken _) =>
             {
@@ -144,16 +153,16 @@ public class RunSnapshotOrchestratorTests
 
         var reconcile = typeof(RunSnapshotOrchestrator).GetMethod("ReconcileAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var reconciling = (Task)reconcile.Invoke(orchestrator, new object[] { CancellationToken.None })!;
-        await Task.Delay(300);
-        reconciling.IsCompleted.Should().BeFalse();
-        PollerCount(orchestrator).Should().Be(0);
+        await reconciling.WaitAsync(TimeSpan.FromSeconds(10));
+        PollerCount(orchestrator).Should().Be(1);
+        PollerReportId(orchestrator, otherRunId).Should().Be("other-report");
 
         release.TrySetResult();
         await updating.WaitAsync(TimeSpan.FromSeconds(10));
-        await reconciling.WaitAsync(TimeSpan.FromSeconds(10));
 
-        PollerCount(orchestrator).Should().Be(1);
+        PollerCount(orchestrator).Should().Be(2);
         PollerReportId(orchestrator, runId).Should().Be(newReport);
+        PollerReportId(orchestrator, otherRunId).Should().Be("other-report");
     }
 
     [Fact]

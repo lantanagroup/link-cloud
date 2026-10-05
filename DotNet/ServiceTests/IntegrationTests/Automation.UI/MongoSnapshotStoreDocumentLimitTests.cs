@@ -692,6 +692,25 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_slices_when_a_later_slice_insert_fails()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        store.FailNextHeaderLookup = true;
+        store.AfterSliceInserted = index =>
+        {
+            if (index == 0)
+                throw new IOException("slice insert failed");
+            return Task.CompletedTask;
+        };
+
+        var act = () => store.SetDomainAsync(runId, "entries", new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        (await Docs(runId)).Should().BeEmpty();
+    }
+
     private MongoSnapshotStore StoreAt(DateTimeOffset now)
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
