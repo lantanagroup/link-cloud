@@ -134,7 +134,7 @@ internal static class NormalizationDiagnosticsWriter
             sb.AppendLine();
             sb.AppendLine("-- Snapshot size --");
             if (snapshot.RawLinesOmitted)
-                sb.AppendLine($"  Raw log lines omitted ({snapshot.CollectedLineCount} collected). The Cosmos document cap cannot hold them.");
+                sb.AppendLine($"  Raw log lines are not kept on the run ({snapshot.CollectedLineCount} collected). Open Normalization if the source is still there.");
             if (snapshot.StepsCollapsed)
                 sb.AppendLine("  Per-resource steps rolled up by operation so the snapshot could be stored.");
         }

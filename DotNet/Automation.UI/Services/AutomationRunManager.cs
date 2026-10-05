@@ -444,7 +444,7 @@ public class AutomationRunManager : IAutomationRunManager
             {
                 var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
                 var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
-                var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
+                var populationCounts = await ReadPopulationCountsAsync(runId, cancellationToken);
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
                 var acquisitionLogs = await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
@@ -455,7 +455,7 @@ public class AutomationRunManager : IAutomationRunManager
                     runId,
                     schedule != null,
                     entries.Count,
-                    populations.Count,
+                    populationCounts?.ReportTypeCount ?? 0,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
                     measureResources.Count);
@@ -464,7 +464,7 @@ public class AutomationRunManager : IAutomationRunManager
                 {
                     Schedule = schedule,
                     Entries = entries,
-                    Populations = populations,
+                    PopulationCounts = populationCounts,
                     AcquisitionSummary = acquisitionSummary,
                     AcquisitionLogs = acquisitionLogs,
                     MeasureEvalResourceCounts = measureResources,
@@ -735,6 +735,18 @@ public class AutomationRunManager : IAutomationRunManager
 
         summary.RunConfigurationJson = null;
         await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId, cancellationToken);
+    }
+
+    private async Task<PipelineDataReader.PopulationCountSnapshot?> ReadPopulationCountsAsync(
+        Guid runId,
+        CancellationToken cancellationToken)
+    {
+        var counts = await SafeGetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", cancellationToken);
+        if (counts != null)
+            return counts;
+
+        var legacy = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken);
+        return legacy == null ? null : RunHistorySlim.ToPopulationCounts(legacy);
     }
 
     /// <summary>

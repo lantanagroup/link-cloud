@@ -5,11 +5,13 @@ namespace Automation.UI.Services.Persistence;
 
 /// <summary>
 /// Translates legacy single-document and blob-backed snapshots into partitioned
-/// documents. The pass is idempotent, pages one small batch at a time, and backs
-/// off when Cosmos DB throttles. Documents that already fit, and documents that
-/// are already partitioned, are skipped. A failure on one document does not stop
-/// the rest, and startup is not blocked. After that pass, orphan parts are
-/// swept on a timer for the life of the process.
+/// documents, and rewrites stored run-history payloads down to chart summaries.
+/// The pass is idempotent, pages one small batch at a time, and backs
+/// off when Cosmos DB throttles. Documents that already fit and already use the
+/// summary shape are skipped, and so are documents that are already partitioned.
+/// Normalization evidence chunk documents are deleted. A failure on one document
+/// does not stop the rest, and startup is not blocked. After that pass, orphan
+/// parts are swept on a timer for the life of the process.
 /// </summary>
 public sealed class SnapshotShapeMigrationService : BackgroundService
 {
@@ -137,8 +139,39 @@ public sealed class SnapshotShapeMigrationService : BackgroundService
             {
                 ct.ThrowIfCancellationRequested();
                 after = document.Id;
-                if (!SnapshotPartitioner.ShouldTranslateStoredData(document.Data))
+                if (RunHistorySlim.IsNormalizationEvidenceChunkDomain(document.Domain))
+                {
+                    try
+                    {
+                        if (BeforeTranslateDocumentForTests != null)
+                            await BeforeTranslateDocumentForTests(document, ct);
+
+                        await _store.DeleteDomainSnapshotAsync(document.RunId, document.Domain, ct);
+                        translated++;
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (CosmosThrottle.IsThrottle(ex))
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Snapshot migration left one document for the next start and continued with the rest.");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Snapshot migration skipped one document and will try it again on the next start.");
+                    }
+
                     continue;
+                }
+
+                if (!SnapshotPartitioner.ShouldTranslateStoredData(document.Data)
+                    && RunHistorySlim.TrySlimStoredJson(document.Domain, document.Data) == null)
+                {
+                    continue;
+                }
 
                 try
                 {

@@ -24,6 +24,11 @@ public class PipelineSummarySnapshotBuilder
         public PipelineDataReader.ReportScheduleInfo? Schedule { get; init; }
         public IReadOnlyList<PipelineDataReader.ReportEntryInfo> Entries { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.ReportPopulationInfo> Populations { get; init; } = [];
+
+        /// <summary>
+        /// Set when the store kept population counts and not the measure-report id lists.
+        /// </summary>
+        public PipelineDataReader.PopulationCountSnapshot? PopulationCounts { get; init; }
         public PipelineDataReader.AcquisitionSummaryInfo? AcquisitionSummary { get; init; }
         public IReadOnlyList<PipelineDataReader.AcquisitionLogInfo> AcquisitionLogs { get; init; } = [];
         public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> MeasureEvalResourceCounts { get; init; } = [];
@@ -216,11 +221,28 @@ public class PipelineSummarySnapshotBuilder
             .OrderByDescending(x => x.Count)
             .ToList();
 
-        var populationGroupCount = populations.Sum(p => p.GroupPopulations.Count);
-        var measureReportPopulationCount = populations.Sum(p => p.GroupPopulations.Sum(g => g.MeasureReportPopulations.Count));
-        snapshot.Report.PopulationSummary = populations.Count == 0
+        int populationReportTypes;
+        int populationGroupCount;
+        int measureReportPopulationCount;
+        if (data.PopulationCounts is { } populationCounts)
+        {
+            populationReportTypes = populationCounts.ReportTypeCount;
+            populationGroupCount = populationCounts.GroupCount;
+            measureReportPopulationCount = populationCounts.MeasureReportPopulationCount;
+        }
+        else
+        {
+            populationReportTypes = populations.Count;
+            populationGroupCount = populations.Sum(p => p.GroupPopulations?.Count ?? 0);
+            measureReportPopulationCount = populations.Sum(p =>
+                (p.GroupPopulations ?? []).Sum(g => g.MeasureReportPopulations?.Count ?? 0));
+        }
+
+        snapshot.Report.PopulationSummary = populationReportTypes == 0
+            && populationGroupCount == 0
+            && measureReportPopulationCount == 0
             ? "No report populations available yet."
-            : $"{populations.Count} report type(s), {populationGroupCount} group population set(s), {measureReportPopulationCount} measure report population reference(s).";
+            : $"{populationReportTypes} report type(s), {populationGroupCount} group population set(s), {measureReportPopulationCount} measure report population reference(s).";
 
         snapshot.DataAcquisition.StatusCounts = (acquisitionSummary?.StatusCounts ?? [])
             .Select(s => new CategoryCountSnapshot { Status = s.Status, Count = s.Count })
