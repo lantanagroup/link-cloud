@@ -69,6 +69,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// <summary>Test seam. Runs before this write stores a header.</summary>
     internal Func<Task>? BeforeHeaderWrite { get; set; }
 
+    /// <summary>Test seam. Runs after each chunk slice is inserted. The argument is the slice index.</summary>
+    internal Func<int, Task>? AfterSliceInserted { get; set; }
+
     /// <summary>
     /// Test seam. Runs after this write's clock is stored and before the header
     /// is published, so a test can run another writer in that window.
@@ -1011,13 +1014,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         Revision = revision,
                         UpdatedAt = now
                     }, cancellationToken: ct);
+                    if (AfterSliceInserted != null)
+                        await AfterSliceInserted(i);
                 }
             }
             catch (Exception)
             {
-                if (await HeaderHasRevisionAsync(runId, domain, revision) == false)
-                    await DeleteSlicesQuietlyAsync(runId, domain, revision);
-
+                // The header is written only after every slice insert succeeds.
+                await DeleteSlicesQuietlyAsync(runId, domain, revision);
                 throw;
             }
 

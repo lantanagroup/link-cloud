@@ -322,7 +322,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         foreach (var listed in activeRuns)
         {
             var gate = Gate(listed.RunId);
-            await gate.WaitAsync(ct);
+            if (!await gate.WaitAsync(0, ct))
+                continue;
             try
             {
                 var meta = await _store.GetRunMetaAsync(listed.RunId, ct);
@@ -388,7 +389,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 continue;
 
             var gate = Gate(runId);
-            await gate.WaitAsync(ct);
+            if (!await gate.WaitAsync(0, ct))
+                continue;
             try
             {
                 if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
