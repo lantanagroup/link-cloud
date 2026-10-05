@@ -972,7 +972,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         CancellationToken ct)
     {
         var removed = await _snapshots.DeleteOneAsync(ObservedHeaderFilter(header), ct);
-        if (removed.DeletedCount == 0 || string.IsNullOrEmpty(header.Revision))
+        if (removed.DeletedCount == 0)
+            return;
+
+        var pointer = TryReadSnapshotPayloadPointer(header.Data);
+        if (pointer != null)
+            await DeleteUnusedSnapshotBlobAsync(runId, domain, pointer);
+
+        if (string.IsNullOrEmpty(header.Revision))
             return;
 
         await DeleteSlicesAsync(runId, domain, header.Revision, ct);

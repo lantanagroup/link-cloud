@@ -5,6 +5,7 @@ using Azure.Storage.Blobs.Models;
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Logging.Abstractions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -208,6 +209,45 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         payloadStore.HasBlob(secondBlob!).Should().BeTrue();
         var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
         hydrated!.Data["p"].Should().Be(new string('b', 512));
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_deletes_the_blob_on_a_displaced_header()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('a', 512) }, CancellationToken.None);
+        var first = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var firstDoc = JsonDocument.Parse(first.Data);
+        var firstBlob = firstDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+
+        var secondPointer = await payloadStore.StoreAsync(runId, "generationManifest", "{\"p\":\"manual\"}", CancellationToken.None);
+        var secondStored = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
+        {
+            ["__externalSnapshotPayloadPointer"] = secondPointer
+        });
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            Id = ObjectId.GenerateNewId(),
+            RunId = runId,
+            Domain = "generationManifest",
+            Data = secondStored,
+            UpdatedAt = first.UpdatedAt
+        });
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('c', 512) }, CancellationToken.None);
+
+        payloadStore.HasBlob(firstBlob!).Should().BeFalse();
+        payloadStore.HasBlob(secondPointer.BlobName).Should().BeFalse();
+        var kept = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var keptDoc = JsonDocument.Parse(kept.Data);
+        var keptBlob = keptDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+        payloadStore.HasBlob(keptBlob!).Should().BeTrue();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('c', 512));
     }
 
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore

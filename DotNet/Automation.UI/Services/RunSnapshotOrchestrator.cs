@@ -93,41 +93,54 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// </summary>
     public async Task UpdateRunAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default)
     {
-        // 1. Stop the existing poller FIRST so it cannot write stale domain data
-        //    after we clear snapshots. StopAsync awaits the current poll cycle, so
-        //    after this returns the old poller is guaranteed idle.
+        // Stop the existing poller before clearing snapshots. A finalizing poller is
+        // still the last writer for the old report, so wait until that flush stops.
         var isMetricsRun = false;
-        var leaveFinalizing = false;
-        if (_activePollers.TryGetValue(runId, out var existingHandle))
+        while (_activePollers.TryGetValue(runId, out var existingHandle))
         {
-            if (existingHandle.IsFinalizing)
-            {
-                leaveFinalizing = true;
-                _logger.LogInformation("Leaving the finalizing poller for run {RunId} in place", runId);
-            }
-            else if (existingHandle.TryDetach())
+            if (existingHandle.TryDetach())
             {
                 isMetricsRun = existingHandle.IsMetricsRun;
                 TryRemoveExact(_activePollers, runId, existingHandle);
                 await existingHandle.StopAsync();
                 _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
+                break;
             }
-            else if (_activePollers.TryGetValue(runId, out var stillRegistered)
-                     && ReferenceEquals(stillRegistered, existingHandle))
+
+            _logger.LogInformation("Waiting for the poller for run {RunId} to stop before changing its report", runId);
+            await existingHandle.WhenReleased.WaitAsync(ct);
+            if (_activePollers.TryGetValue(runId, out var stillThere) && ReferenceEquals(stillThere, existingHandle))
             {
-                leaveFinalizing = true;
-                _logger.LogInformation("Leaving the poller for run {RunId} in place because this update does not own it", runId);
+                TryRemoveExact(_activePollers, runId, existingHandle);
+                break;
             }
         }
 
-        // 2. Now safe to update meta and clear stale domain snapshots - no writer
-        //    can re-populate them with old-report data.
+        // No writer for this run is still flushing. Clear the old report snapshots.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
-        // 3. Immediately start a new poller bound to the regenerated report so the
-        //    UI doesn't have to wait up to 2s for the next reconciliation cycle.
-        if (leaveFinalizing)
+        // A replacement may have been registered while this update waited.
+        if (_activePollers.TryGetValue(runId, out var registered))
+        {
+            if (string.Equals(registered.FacilityId, facilityId, StringComparison.Ordinal)
+                && string.Equals(registered.ReportId, reportId, StringComparison.Ordinal))
+            {
+                _logger.LogInformation("Leaving the poller already registered for run {RunId}", runId);
+                return;
+            }
+
+            if (registered.TryDetach())
+            {
+                TryRemoveExact(_activePollers, runId, registered);
+                await registered.StopAsync();
+            }
+        }
+
+        if (_activePollers.ContainsKey(runId))
+        {
+            _logger.LogInformation("Leaving the poller already registered for run {RunId}", runId);
             return;
+        }
 
         if (!isMetricsRun)
             isMetricsRun = (await _store.GetRunMetaAsync(runId, ct))?.IsMetricsRun ?? false;
@@ -399,6 +412,10 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
         public bool TryDetach() => _slot.TryDetach();
 
+        private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WhenReleased => _released.Task;
+
         public Task FinalPollAsync() => poller.FinalPollAsync();
 
         public async Task DrainAsync()
@@ -416,18 +433,25 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
         public async Task StopAsync()
         {
-            await cts.CancelAsync();
             try
             {
-                await pollerTask;
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected
-            }
+                await cts.CancelAsync();
+                try
+                {
+                    await pollerTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected
+                }
 
-            scope.Dispose();
-            cts.Dispose();
+                scope.Dispose();
+                cts.Dispose();
+            }
+            finally
+            {
+                _released.TrySetResult();
+            }
         }
     }
 }
