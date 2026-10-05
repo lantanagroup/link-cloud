@@ -583,7 +583,10 @@ public class RunsController(
                     sortOrder,
                     normalizedSearchTerm,
                     cancellationToken);
-                if ((fallback?.Body?.Records?.Count ?? 0) > 0 || result?.Body == null)
+                if (AcquisitionLogAvailability.PreferFallback(
+                        result?.Body != null,
+                        fallback?.Body?.Records?.Count ?? 0,
+                        fallback?.Body != null))
                     result = fallback;
             }
 

@@ -9,43 +9,32 @@ namespace UnitTests.AutomationUI;
 public class RunHistorySlimTests
 {
     [Fact]
-    public void Acquisition_logs_keep_timing_and_drop_notes_ids_and_queries()
+    public void Acquisition_chart_keeps_durations_buckets_and_drops_patient_rows()
     {
         var start = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
-        var slim = RunHistorySlim.SlimAcquisitionLogs(
+        var chart = RunHistorySlim.ToAcquisitionChart(
         [
-            new PipelineDataReader.AcquisitionLogInfo(
-                7,
-                "patient-1",
-                "correlation",
-                "report",
-                "Completed",
-                "Initial",
-                ["a long note"],
-                ["Patient/patient-1", "Observation/1"],
-                [new PipelineDataReader.FhirQueryInfo(["Observation"])],
-                ExecutionDate: start,
-                CreateDate: start,
-                CompletionDate: start.AddSeconds(4),
-                CompletionTimeMilliseconds: 4_000,
-                ResourceTypes: ["Observation"])
+            Log(7, "patient-1", "Completed", "Initial", start, 1_000, ["Observation"], ["a long note"]),
+            Log(8, "patient-2", "Completed", "Initial", start.AddSeconds(10), 3_000, ["Observation"]),
+            Log(9, "patient-3", "Completed", "Initial", start.AddSeconds(10), 5_000, ["Encounter"])
         ]);
 
-        slim.Should().ContainSingle();
-        slim[0].Id.Should().Be(7);
-        slim[0].PatientId.Should().Be("patient-1");
-        slim[0].Status.Should().Be("Completed");
-        slim[0].CompletionTimeMilliseconds.Should().Be(4_000);
-        slim[0].ResourceTypes.Should().Equal("Observation");
-        slim[0].Notes.Should().BeEmpty();
-        slim[0].ResourceAcquiredIds.Should().BeEmpty();
-        slim[0].FhirQueries.Should().BeEmpty();
+        chart.TotalLogs.Should().Be(3);
+        chart.CompletedCount.Should().Be(3);
+        chart.MinDurationMs.Should().Be(1_000);
+        chart.AverageDurationMs.Should().Be(3_000);
+        chart.MaxDurationMs.Should().Be(5_000);
+        chart.ThroughputBuckets.Select(bucket => (bucket.Label, bucket.Count)).Should().Equal(("0s", 1), ("10s", 2));
+        chart.ResourceTypeCounts.Select(type => (type.Status, type.Count)).Should().Equal(("Observation", 2), ("Encounter", 1));
+        var json = System.Text.Json.JsonSerializer.Serialize(chart);
+        json.Should().NotContain("patient-1");
+        json.Should().NotContain("a long note");
     }
 
     [Fact]
-    public void Acquisition_logs_keep_resource_types_that_were_only_on_the_query()
+    public void Acquisition_chart_counts_resource_types_that_were_only_on_the_query()
     {
-        var slim = RunHistorySlim.SlimAcquisitionLogs(
+        var chart = RunHistorySlim.ToAcquisitionChart(
         [
             new PipelineDataReader.AcquisitionLogInfo(
                 8,
@@ -63,9 +52,54 @@ public class RunHistorySlimTests
                 ResourceTypes: ["Observation"])
         ]);
 
-        slim[0].ResourceTypes.Should().Equal("Observation", "Patient");
-        slim[0].FhirQueries.Should().BeEmpty();
+        chart.ResourceTypeCounts.Select(type => type.Status).Should().Equal("Observation", "Patient");
     }
+
+    [Fact]
+    public void Acquisition_chart_caps_the_failure_sample_and_stays_small_for_10_000_logs()
+    {
+        var start = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        var logs = new List<PipelineDataReader.AcquisitionLogInfo>(10_000);
+        for (var i = 0; i < 10_000; i++)
+        {
+            var status = i < 25 ? "Failed" : "Completed";
+            logs.Add(Log(i + 1, $"patient-{i}", status, "Initial", start.AddSeconds(i % 30), 100, ["Observation"], ["boom " + i]));
+        }
+
+        var chart = RunHistorySlim.ToAcquisitionChart(logs);
+        chart.TotalLogs.Should().Be(10_000);
+        chart.FailureCount.Should().Be(25);
+        chart.Failures.Should().HaveCount(RunHistorySlim.AcquisitionFailureSampleCap);
+        chart.Failures.Should().OnlyContain(failure => failure.LogId > 0 && failure.Message != null && failure.Message.StartsWith("boom"));
+        var json = System.Text.Json.JsonSerializer.Serialize(chart);
+        json.Should().NotContain("patient-");
+        System.Text.Encoding.UTF8.GetByteCount(json).Should().BeLessThan(20_000);
+    }
+
+    private static PipelineDataReader.AcquisitionLogInfo Log(
+        long id,
+        string patientId,
+        string status,
+        string phase,
+        DateTime completed,
+        long durationMs,
+        IEnumerable<string> types,
+        IEnumerable<string>? notes = null)
+        => new(
+            id,
+            patientId,
+            "correlation",
+            "report",
+            status,
+            phase,
+            notes?.ToList() ?? [],
+            ["Observation/1"],
+            [new PipelineDataReader.FhirQueryInfo(types.ToList())],
+            ExecutionDate: completed.AddMilliseconds(-durationMs),
+            CreateDate: completed.AddMilliseconds(-durationMs),
+            CompletionDate: completed,
+            CompletionTimeMilliseconds: durationMs,
+            ResourceTypes: types.ToList());
 
     [Fact]
     public void Populations_keep_counts_and_drop_measure_report_ids()

@@ -103,7 +103,11 @@ public sealed class AutomationRunInputDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
+/// <summary>
+/// One row in automation_snapshots. A normal snapshot is a single document.
+/// A payload over the chunk size is a header (ChunkIndex -1) plus ordered
+/// chunk documents that share Revision.
+/// </summary>
 public sealed class DomainSnapshotDocument
 {
     [BsonId]
@@ -115,11 +119,19 @@ public sealed class DomainSnapshotDocument
     public string Domain { get; set; } = string.Empty;
 
     /// <summary>
-    /// Serialized domain payload as plain JSON text.
+    /// Serialized domain payload as plain JSON text, or one slice of it.
     /// Using plain JSON avoids Mongo extended-JSON date serialization
     /// surprises during round-trips through System.Text.Json.
     /// </summary>
     public string Data { get; set; } = string.Empty;
+
+    /// <summary>Null for a single document. -1 for a chunk header. 0+ for a slice.</summary>
+    public int? ChunkIndex { get; set; }
+
+    public int? ChunkCount { get; set; }
+
+    /// <summary>Shared by a header and its slices. Null on a single document.</summary>
+    public string? Revision { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
 }

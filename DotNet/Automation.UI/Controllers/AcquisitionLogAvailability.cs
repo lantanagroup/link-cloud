@@ -25,4 +25,12 @@ internal static class AcquisitionLogAvailability
             : statusCode.Value;
         return new AcquisitionLogRead(false, status);
     }
+
+    /// <summary>
+    /// A fallback replaces the first response when it has rows, or when the
+    /// first response had no body and the fallback has one. A failed fallback
+    /// does not replace a bodyless success.
+    /// </summary>
+    public static bool PreferFallback(bool initialHasBody, int fallbackRecordCount, bool fallbackHasBody)
+        => fallbackRecordCount > 0 || (!initialHasBody && fallbackHasBody);
 }

@@ -369,20 +369,39 @@ public sealed class RunExportService : IRunExportService
 
     private async Task AppendAcquisitionLogsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
     {
-        var snap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct);
-        var logs = snap?.Data;
-        if (logs is not { Count: > 0 })
+        var chart = (await _snapshotStore.GetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", ct))?.Data;
+        if (chart == null)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct))?.Data;
+            if (legacy is { Count: > 0 })
+                chart = RunHistorySlim.ToAcquisitionChart(legacy);
+        }
+
+        if (chart == null || chart.TotalLogs == 0)
             return;
 
         sb.AppendLine();
-        WriteSubHeader(sb, $"Acquisition log timing ({logs.Count})");
-        sb.AppendLine("  Notes, acquired resource ids, and FHIR queries are not kept on the run.");
-        sb.AppendLine("  Open the log in Data Acquisition while that row is still there.");
-        foreach (var log in logs)
+        WriteSubHeader(sb, $"Acquisition log summary ({chart.TotalLogs})");
+        sb.AppendLine("  Individual logs are not kept on the run. Open Data Acquisition while the source is still there.");
+        sb.AppendLine($"  Completed                    : {chart.CompletedCount}");
+        sb.AppendLine($"  Skipped                      : {chart.SkippedCount}");
+        sb.AppendLine($"  Failed                       : {chart.FailureCount}");
+        sb.AppendLine($"  Duration ms (min/avg/max)    : {chart.MinDurationMs} / {chart.AverageDurationMs} / {chart.MaxDurationMs}");
+        if (chart.ResourceTypeCounts.Count > 0)
         {
-            var types = string.Join(",", log.ResourceTypes ?? []);
-            sb.AppendLine(
-                $"  log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}] completed={log.CompletionDate:u}");
+            sb.AppendLine("  Logs by resource type:");
+            foreach (var type in chart.ResourceTypeCounts)
+                sb.AppendLine($"    {type.Status,-28} {type.Count}");
+        }
+
+        if (chart.Failures.Count == 0)
+            return;
+
+        sb.AppendLine($"  Failure sample ({chart.Failures.Count} of {chart.FailureCount}):");
+        foreach (var failure in chart.Failures)
+        {
+            var types = string.Join(",", failure.ResourceTypes);
+            sb.AppendLine($"    log={failure.LogId} status={failure.Status} phase={failure.QueryPhase} types=[{types}] {failure.Message}");
         }
     }
 

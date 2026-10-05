@@ -193,7 +193,7 @@ public sealed class StoreBackedServicePoller
     private async Task PollAcquisitionLogsAsync(CancellationToken ct)
     {
         var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId);
-        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.SlimAcquisitionLogs(logs), ct);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.ToAcquisitionChart(logs), ct);
     }
 
     private async Task PollOrgLocationAsync(CancellationToken ct)

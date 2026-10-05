@@ -39,4 +39,17 @@ public class AcquisitionLogAvailabilityTests
         search.Unavailable.Should().BeFalse();
         search.ErrorStatus.Should().Be(404);
     }
+
+    [Fact]
+    public void A_failed_fallback_does_not_replace_a_bodyless_success()
+    {
+        AcquisitionLogAvailability.PreferFallback(initialHasBody: false, fallbackRecordCount: 0, fallbackHasBody: false)
+            .Should().BeFalse();
+        AcquisitionLogAvailability.PreferFallback(initialHasBody: false, fallbackRecordCount: 0, fallbackHasBody: true)
+            .Should().BeTrue();
+        AcquisitionLogAvailability.PreferFallback(initialHasBody: true, fallbackRecordCount: 0, fallbackHasBody: false)
+            .Should().BeFalse();
+        AcquisitionLogAvailability.PreferFallback(initialHasBody: true, fallbackRecordCount: 2, fallbackHasBody: true)
+            .Should().BeTrue();
+    }
 }
