@@ -1,3 +1,4 @@
+using Automation.UI.Services;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
@@ -99,5 +100,75 @@ public class PipelineDataReaderCancellationTests
         var summary = await reader.GetDataAcquisitionReportSummaryAsync("report", CancellationToken.None);
         calls.Should().Be(2);
         summary!.TotalLogs.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task Search_shaped_logs_keep_a_zero_duration_and_load_notes_only_for_the_failure()
+    {
+        var completed = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.SearchAcquisitionLogsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+            {
+                StatusCode = 200,
+                Body = new PagedConfigModel<DataAcquisitionLogApiModel>(
+                    [
+                        new DataAcquisitionLogApiModel
+                        {
+                            Id = 11,
+                            Status = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus.Completed,
+                            CompletionTimeMilliseconds = 0,
+                            CompletionDate = completed,
+                            Notes = null,
+                            ResourceTypes = ["Observation"]
+                        },
+                        new DataAcquisitionLogApiModel
+                        {
+                            Id = 12,
+                            Status = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus.Failed,
+                            CompletionTimeMilliseconds = 100,
+                            CompletionDate = completed,
+                            Notes = null,
+                            ResourceTypes = ["Encounter"]
+                        }
+                    ],
+                    new PaginationMetadata(100, 1, 2))
+            });
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(12, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<List<string>>
+            {
+                StatusCode = 200,
+                Body = ["gave up"]
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+
+        var logs = await reader.GetAcquisitionLogsAsync("facility", "report");
+        logs.Should().OnlyContain(log => log.Notes.Count == 0);
+        logs.Select(log => log.CompletionTimeMilliseconds).Should().Equal(0L, 100L);
+
+        var withNotes = await reader.AttachFailureNotesAsync(logs, RunHistorySlim.FailureSampleIds(logs));
+        var chart = RunHistorySlim.ToAcquisitionChart(withNotes);
+
+        chart.MinDurationMs.Should().Be(0);
+        chart.AverageDurationMs.Should().Be(50);
+        chart.MaxDurationMs.Should().Be(100);
+        chart.Failures.Should().ContainSingle().Which.Message.Should().Be("gave up");
+        dataAcq.Verify(client => client.GetAcquisitionLogNotesAsync(12, It.IsAny<CancellationToken>()), Times.Once);
+        dataAcq.Verify(client => client.GetAcquisitionLogNotesAsync(11, It.IsAny<CancellationToken>()), Times.Never);
     }
 }

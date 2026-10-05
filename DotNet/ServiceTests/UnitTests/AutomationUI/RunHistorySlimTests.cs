@@ -32,6 +32,33 @@ public class RunHistorySlimTests
     }
 
     [Fact]
+    public void Acquisition_chart_counts_a_zero_duration_and_skips_a_missing_one()
+    {
+        var start = new DateTime(2026, 10, 5, 12, 0, 0, DateTimeKind.Utc);
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            Log(1, "patient-1", "Completed", "Initial", start, 0, ["Observation"]),
+            Log(2, "patient-2", "Completed", "Initial", start, 100, ["Observation"]),
+            new PipelineDataReader.AcquisitionLogInfo(
+                3,
+                "patient-3",
+                null,
+                null,
+                "Completed",
+                "Initial",
+                [],
+                [],
+                [],
+                CompletionDate: start,
+                CompletionTimeMilliseconds: null)
+        ]);
+
+        chart.MinDurationMs.Should().Be(0);
+        chart.AverageDurationMs.Should().Be(50);
+        chart.MaxDurationMs.Should().Be(100);
+    }
+
+    [Fact]
     public void Acquisition_chart_counts_resource_types_that_were_only_on_the_query()
     {
         var chart = RunHistorySlim.ToAcquisitionChart(
