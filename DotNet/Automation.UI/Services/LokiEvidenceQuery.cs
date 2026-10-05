@@ -41,13 +41,21 @@ public static class LokiEvidenceQuery
         return $"\"ResourceType\":\"{resourceType.Trim()}\"";
     }
 
-    public static TimeSpan LookbackForAttempt(TimeSpan configuredWindow, int attemptIndex)
+    public static TimeSpan LookbackForAttempt(TimeSpan configuredWindow, int attemptIndex, TimeSpan? coverage = null)
     {
+        TimeSpan lookback;
         if (attemptIndex <= 0 || attemptIndex > WidenedWindows.Length)
-            return configuredWindow;
+            lookback = configuredWindow;
+        else
+        {
+            var widened = WidenedWindows[attemptIndex - 1];
+            lookback = configuredWindow > widened ? configuredWindow : widened;
+        }
 
-        var widened = WidenedWindows[attemptIndex - 1];
-        return configuredWindow > widened ? configuredWindow : widened;
+        if (coverage is { } span && span > lookback)
+            return span;
+
+        return lookback;
     }
 
     public static TimeSpan? DelayBeforeAttempt(int attemptIndex)
@@ -105,14 +113,15 @@ public static class LokiEvidenceQuery
         Func<TimeSpan, CancellationToken, Task<List<string>>> queryAsync,
         Func<TimeSpan, CancellationToken, Task> delayAsync,
         IAutomationOutput output,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        TimeSpan? coverage = null)
     {
         List<string> logs = [];
 
         for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
             var delay = DelayBeforeAttempt(attempt);
-            var lookback = LookbackForAttempt(configuredWindow, attempt);
+            var lookback = LookbackForAttempt(configuredWindow, attempt, coverage);
 
             if (delay is { } wait)
             {

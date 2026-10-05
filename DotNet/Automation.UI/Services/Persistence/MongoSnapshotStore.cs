@@ -73,6 +73,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// <summary>Test seam. The next header lookup throws once.</summary>
     internal bool FailNextHeaderLookup { get; set; }
 
+    /// <summary>
+    /// Test seam. Runs after a lost acknowledgement has been confirmed as
+    /// published and before the follow-up header lookup.
+    /// </summary>
+    internal Func<Task>? AfterPublishConfirmed { get; set; }
+
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
@@ -731,6 +737,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return previous.Value.AddMilliseconds(1);
     }
 
+    /// <summary>
+    /// True when the stored header was written by a clock later than this write.
+    /// <see cref="DomainSnapshotDocument.WriteClock"/> is that clock. Older documents
+    /// only have <see cref="DomainSnapshotDocument.UpdatedAt"/>, which also moves
+    /// forward to keep compare-and-swap unique.
+    /// </summary>
+    internal static bool StoredHeaderIsNewerThan(DomainSnapshotDocument previous, DateTimeOffset now)
+    {
+        var clock = previous.WriteClock ?? previous.UpdatedAt;
+        return clock > now;
+    }
+
     private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
     {
         if (BeforeHeaderWrite != null)
@@ -740,7 +758,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            if (previous != null && previous.UpdatedAt > now)
+            if (previous != null && StoredHeaderIsNewerThan(previous, now))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -757,6 +775,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     RunId = runId,
                     Domain = domain,
                     Data = storedJson,
+                    WriteClock = now,
                     UpdatedAt = stamp
                 };
                 try
@@ -775,6 +794,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 var update = Builders<DomainSnapshotDocument>.Update
                     .Set(d => d.Data, storedJson)
+                    .Set(d => d.WriteClock, now)
                     .Set(d => d.UpdatedAt, stamp)
                     .Unset(d => d.ChunkIndex)
                     .Unset(d => d.ChunkCount)
@@ -800,7 +820,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
             }
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision))
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
             {
                 _logger.LogWarning(
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
@@ -834,7 +854,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            if (previous != null && previous.UpdatedAt > now)
+            if (previous != null && StoredHeaderIsNewerThan(previous, now))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -884,6 +904,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         ChunkIndex = -1,
                         ChunkCount = slices.Count,
                         Revision = revision,
+                        WriteClock = now,
                         UpdatedAt = stamp
                     };
                     await _snapshots.InsertOneAsync(created, cancellationToken: ct);
@@ -896,6 +917,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         .Set(d => d.ChunkIndex, -1)
                         .Set(d => d.ChunkCount, slices.Count)
                         .Set(d => d.Revision, revision)
+                        .Set(d => d.WriteClock, now)
                         .Set(d => d.UpdatedAt, stamp);
                     var flip = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), headerUpdate, cancellationToken: ct);
                     if (flip.MatchedCount == 0)
@@ -922,6 +944,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     throw;
                 }
 
+                if (AfterPublishConfirmed != null)
+                    await AfterPublishConfirmed();
+
                 DomainSnapshotDocument? publishedHeader;
                 try
                 {
@@ -940,6 +965,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
                 if (publishedHeader == null)
                 {
+                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+                    await ReclaimUnreferencedRevisionAsync(runId, domain, revision);
                     await ReclaimDisplacedBlobAsync(runId, domain, previous);
                     throw;
                 }
@@ -947,7 +974,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 keepId = publishedHeader.Id;
             }
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision))
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
             {
                 _logger.LogWarning(
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
@@ -1033,7 +1060,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         Guid runId,
         string domain,
         ObjectId keepId,
-        string? previousRevision)
+        string? previousRevision,
+        DomainSnapshotDocument? previous)
     {
         if (BeforeDeleteDisplaced != null)
             await BeforeDeleteDisplaced();
@@ -1048,6 +1076,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         catch (Exception)
         {
             await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+            await ReclaimDisplacedBlobAsync(runId, domain, previous);
             throw;
         }
         var me = headers.FirstOrDefault(header => header.Id == keepId);

@@ -174,7 +174,9 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         var keptBlob = storedDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
         await collection.UpdateOneAsync(
             doc => doc.Id == stored.Id,
-            Builders<DomainSnapshotDocument>.Update.Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+            Builders<DomainSnapshotDocument>.Update
+                .Set(doc => doc.WriteClock, DateTimeOffset.UtcNow.AddMinutes(5))
+                .Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
 
         var second = new Dictionary<string, string> { ["p"] = new string('y', 512) };
         await store.SetDomainAsync(runId, "generationManifest", second, CancellationToken.None);
@@ -382,6 +384,80 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         payloadStore.HasBlob(oldPointer.BlobName).Should().BeFalse();
         var hydrated = await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None);
         hydrated!.Data.Should().Be(replacement);
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_replaced_blob_when_the_displaced_lookup_fails()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(
+            runId,
+            "generationManifest",
+            new Dictionary<string, string> { ["p"] = new string('a', 512) },
+            CancellationToken.None);
+        var firstStored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .SingleAsync();
+        using var firstDoc = JsonDocument.Parse(firstStored.Data);
+        var replacedBlob = firstDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+        store.BeforeDeleteDisplaced = () =>
+        {
+            store.FailNextHeaderLookup = true;
+            return Task.CompletedTask;
+        };
+
+        var act = () => store.SetDomainAsync(
+            runId,
+            "generationManifest",
+            new Dictionary<string, string> { ["p"] = new string('b', 512) },
+            CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.HasBlob(replacedBlob!).Should().BeFalse();
+        var hydrated = await store.GetDomainAsync<Dictionary<string, string>>(runId, "generationManifest", CancellationToken.None);
+        hydrated!.Data["p"].Should().Be(new string('b', 512));
+        var stored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .SingleAsync();
+        using var storedDoc = JsonDocument.Parse(stored.Data);
+        var publishedBlob = storedDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+        publishedBlob.Should().NotBe(replacedBlob);
+        payloadStore.HasBlob(publishedBlob!).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_replaced_blob_when_a_chunked_displaced_lookup_fails()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var oldPointer = await payloadStore.StoreAsync(runId, "entries", "\"old\"", CancellationToken.None);
+        var pointerJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer>
+        {
+            ["__externalSnapshotPayloadPointer"] = oldPointer
+        });
+        await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots").InsertOneAsync(
+            new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "entries",
+                Data = pointerJson,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            });
+        store.BeforeDeleteDisplaced = () =>
+        {
+            store.FailNextHeaderLookup = true;
+            return Task.CompletedTask;
+        };
+
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.HasBlob(oldPointer.BlobName).Should().BeFalse();
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
     }
 
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
