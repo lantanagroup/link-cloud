@@ -814,7 +814,20 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (hook != null)
             await hook();
 
-        if (!await RunEpochMovedAsync(runId, epoch, ct))
+        bool moved;
+        try
+        {
+            moved = await RunEpochMovedAsync(runId, epoch, ct);
+        }
+        catch
+        {
+            // Slices are already stored. A failed epoch read must not leave them behind.
+            if (!string.IsNullOrEmpty(revision))
+                await DeleteSlicesQuietlyAsync(runId, domain, revision);
+            throw;
+        }
+
+        if (!moved)
             return false;
 
         if (!string.IsNullOrEmpty(revision))
