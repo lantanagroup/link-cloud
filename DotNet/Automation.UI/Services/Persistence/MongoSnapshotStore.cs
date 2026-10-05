@@ -134,7 +134,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.FacilityId, facilityId)
-            .Set(r => r.ReportId, reportId);
+            .Set(r => r.ReportId, reportId)
+            .Inc(r => r.SnapshotEpoch, 1);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
 
@@ -522,7 +523,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         ReportId = doc.ReportId,
         StartedAt = doc.StartedAt,
         IsActive = doc.IsActive,
-        IsMetricsRun = doc.IsMetricsRun
+        IsMetricsRun = doc.IsMetricsRun,
+        SnapshotEpoch = doc.SnapshotEpoch
     };
 
     private static AutomationRunSummary ToSummary(AutomationRunDocument doc)
@@ -568,8 +570,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     // --- Domain snapshots ---
 
-    public async Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
+    public Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
+        => SetDomainCoreAsync(runId, domain, data, snapshotEpoch: null, ct);
+
+    public Task SetDomainAsync<T>(Guid runId, string domain, T data, long snapshotEpoch, CancellationToken ct = default)
+        => SetDomainCoreAsync(runId, domain, data, snapshotEpoch, ct);
+
+    private async Task SetDomainCoreAsync<T>(Guid runId, string domain, T data, long? snapshotEpoch, CancellationToken ct)
     {
+        var epoch = snapshotEpoch ?? await ReadSnapshotEpochAsync(runId, ct);
         var json = JsonSerializer.Serialize(data);
         var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
         var now = Clock?.Invoke() ?? DateTimeOffset.UtcNow;
@@ -590,8 +599,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         try
         {
             write = storedBytes <= SnapshotChunkBytes
-                ? await WriteSingleAsync(runId, domain, storedJson, now, ct)
-                : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
+                ? await WriteSingleAsync(runId, domain, storedJson, epoch, now, ct)
+                : await WriteChunkedAsync(runId, domain, storedJson, epoch, now, ct);
         }
         catch
         {
@@ -771,10 +780,43 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     internal static string SnapshotClockId(Guid runId, string domain) => $"{runId:N}|{domain}";
 
-    private async Task<DateTimeOffset?> ReadWriteClockAsync(Guid runId, string domain, CancellationToken ct)
+    private async Task<long> ReadSnapshotEpochAsync(Guid runId, CancellationToken ct)
     {
-        var doc = await _writeClocks.Find(c => c.Id == SnapshotClockId(runId, domain)).FirstOrDefaultAsync(ct);
-        return doc == null ? null : doc.WriteClock;
+        var doc = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
+        return doc?.SnapshotEpoch ?? 0;
+    }
+
+    private async Task<SnapshotWriteClockDocument?> ReadClockAsync(Guid runId, string domain, CancellationToken ct)
+        => await _writeClocks.Find(c => c.Id == SnapshotClockId(runId, domain)).FirstOrDefaultAsync(ct);
+
+    /// <summary>
+    /// A later report epoch wins even when its clock time is earlier. The same epoch
+    /// still loses to a later clock. No clock document falls back to the header time.
+    /// </summary>
+    private static bool DropForNewerGeneration(
+        SnapshotWriteClockDocument? clock,
+        long epoch,
+        DomainSnapshotDocument? previous,
+        DateTimeOffset now)
+    {
+        if (clock != null && clock.Epoch > epoch)
+            return true;
+        if (previous == null)
+            return false;
+        if (clock != null && clock.Epoch < epoch)
+            return false;
+        return StoredHeaderIsNewerThan(previous, now, clock?.WriteClock);
+    }
+
+    private static FilterDefinition<SnapshotWriteClockDocument> EpochStill(long epoch)
+    {
+        var equal = Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.Epoch, epoch);
+        if (epoch != 0)
+            return equal;
+
+        return Builders<SnapshotWriteClockDocument>.Filter.Or(
+            equal,
+            Builders<SnapshotWriteClockDocument>.Filter.Exists(c => c.Epoch, false));
     }
 
     private enum ClockGate
@@ -789,12 +831,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// clock is still the value just read. A slower writer cannot replace a
     /// later clock. Returns null when another writer won the compare-and-swap.
     /// </summary>
-    private async Task<bool?> ClaimWriteClockAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    private async Task<bool?> ClaimWriteClockAsync(Guid runId, string domain, long epoch, DateTimeOffset now, CancellationToken ct)
     {
-        var observed = await ReadWriteClockAsync(runId, domain, ct);
-        if (observed > now)
+        var observed = await ReadClockAsync(runId, domain, ct);
+        if (observed != null && observed.Epoch > epoch)
             return false;
-        if (observed == now)
+        if (observed != null && observed.Epoch == epoch && observed.WriteClock > now)
+            return false;
+        if (observed != null && observed.Epoch == epoch && observed.WriteClock == now)
             return true;
 
         var id = SnapshotClockId(runId, domain);
@@ -807,6 +851,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     Id = id,
                     RunId = runId,
                     Domain = domain,
+                    Epoch = epoch,
                     WriteClock = now
                 }, cancellationToken: ct);
                 return true;
@@ -818,8 +863,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         var updated = await _writeClocks.UpdateOneAsync(
-            c => c.Id == id && c.WriteClock == observed.Value,
-            Builders<SnapshotWriteClockDocument>.Update.Set(c => c.WriteClock, now),
+            Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.Id, id)
+                & Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.WriteClock, observed.WriteClock)
+                & EpochStill(observed.Epoch),
+            Builders<SnapshotWriteClockDocument>.Update
+                .Set(c => c.WriteClock, now)
+                .Set(c => c.Epoch, epoch),
             cancellationToken: ct);
         return updated.MatchedCount == 1 ? true : null;
     }
@@ -828,9 +877,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// Stores this write's clock before the header is published. A clock that
     /// moves past <paramref name="now"/> before the header write drops this attempt.
     /// </summary>
-    private async Task<ClockGate> AdvanceClockBeforePublishAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    private async Task<ClockGate> AdvanceClockBeforePublishAsync(Guid runId, string domain, long epoch, DateTimeOffset now, CancellationToken ct)
     {
-        var claim = await ClaimWriteClockAsync(runId, domain, now, ct);
+        var claim = await ClaimWriteClockAsync(runId, domain, epoch, now, ct);
         if (claim == null)
             return ClockGate.Retry;
         if (claim == false)
@@ -839,8 +888,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (AfterClockClaimed != null)
             await AfterClockClaimed();
 
-        var raced = await ReadWriteClockAsync(runId, domain, ct);
-        return raced > now ? ClockGate.Drop : ClockGate.Proceed;
+        var raced = await ReadClockAsync(runId, domain, ct);
+        if (raced == null || raced.Epoch < epoch)
+            return ClockGate.Retry;
+        if (raced.Epoch > epoch || raced.WriteClock > now)
+            return ClockGate.Drop;
+        return ClockGate.Proceed;
     }
 
     private async Task<SnapshotWrite> FinishPublishedWriteAsync(
@@ -874,7 +927,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
     }
 
-    private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
+    private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, long epoch, DateTimeOffset now, CancellationToken ct)
     {
         if (BeforeHeaderWrite != null)
             await BeforeHeaderWrite();
@@ -883,14 +936,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
-            if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
+            var clock = await ReadClockAsync(runId, domain, ct);
+            if (DropForNewerGeneration(clock, epoch, previous, now))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
             }
 
-            var gate = await AdvanceClockBeforePublishAsync(runId, domain, now, ct);
+            var gate = await AdvanceClockBeforePublishAsync(runId, domain, epoch, now, ct);
             if (gate == ClockGate.Retry)
                 continue;
             if (gate == ClockGate.Drop)
@@ -963,29 +1016,29 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return new SnapshotWrite(false, null);
     }
 
-    private async Task<SnapshotWrite> WriteChunkedAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
+    private async Task<SnapshotWrite> WriteChunkedAsync(Guid runId, string domain, string json, long epoch, DateTimeOffset now, CancellationToken ct)
     {
         if (BeforeHeaderWrite != null)
             await BeforeHeaderWrite();
 
-        return await WriteChunkedCoreAsync(runId, domain, json, now, ct);
+        return await WriteChunkedCoreAsync(runId, domain, json, epoch, now, ct);
     }
 
-    private async Task<SnapshotWrite> WriteChunkedCoreAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
+    private async Task<SnapshotWrite> WriteChunkedCoreAsync(Guid runId, string domain, string json, long epoch, DateTimeOffset now, CancellationToken ct)
     {
         var slices = SplitUtf8(json, SnapshotChunkBytes);
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
-            if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
+            var clock = await ReadClockAsync(runId, domain, ct);
+            if (DropForNewerGeneration(clock, epoch, previous, now))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
             }
 
-            var gate = await AdvanceClockBeforePublishAsync(runId, domain, now, ct);
+            var gate = await AdvanceClockBeforePublishAsync(runId, domain, epoch, now, ct);
             if (gate == ClockGate.Retry)
                 continue;
             if (gate == ClockGate.Drop)

@@ -80,9 +80,9 @@ public static class RunHistorySlim
                 chart.InFlight = true;
         }
 
-        chart.MinDurationMs = minDuration ?? 0;
-        chart.MaxDurationMs = maxDuration ?? 0;
-        chart.AverageDurationMs = durationCount == 0 ? 0 : durationSum / durationCount;
+        chart.MinDurationMs = minDuration;
+        chart.MaxDurationMs = maxDuration;
+        chart.AverageDurationMs = durationCount == 0 ? null : durationSum / durationCount;
         chart.WindowStart = windowStart;
         chart.WindowEnd = windowEnd;
         chart.StatusCounts = statusCounts
@@ -334,9 +334,20 @@ public sealed class AcquisitionLogChart
     public int EventCount { get; set; }
     public int SpanCount { get; set; }
     public bool InFlight { get; set; }
-    public long MinDurationMs { get; set; }
-    public long MaxDurationMs { get; set; }
-    public long AverageDurationMs { get; set; }
+    public long? MinDurationMs { get; set; }
+    public long? MaxDurationMs { get; set; }
+    public long? AverageDurationMs { get; set; }
+
+    /// <summary>Min/avg/max text. Missing samples stay unavailable so they are not the same as a measured 0 ms.</summary>
+    public static string FormatDuration(AcquisitionLogChart chart)
+    {
+        if (chart.MinDurationMs is not long min
+            || chart.AverageDurationMs is not long average
+            || chart.MaxDurationMs is not long max)
+            return "unavailable";
+
+        return $"{min} / {average} / {max}";
+    }
     public DateTimeOffset? WindowStart { get; set; }
     public DateTimeOffset? WindowEnd { get; set; }
     public List<PipelineSummarySnapshotBuilder.CategoryCountSnapshot> StatusCounts { get; set; } = [];

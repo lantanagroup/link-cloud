@@ -16,6 +16,9 @@ public sealed class AutomationRunDocument
     public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
 
+    /// <summary>Incremented when the run switches reports. Missing on older rows, which read as 0.</summary>
+    public long SnapshotEpoch { get; set; }
+
     public string RunName { get; set; } = string.Empty;
     public string Scenario { get; set; } = string.Empty;
     public string SelectedMeasure { get; set; } = string.Empty;
@@ -154,6 +157,9 @@ public sealed class SnapshotWriteClockDocument
     public string Domain { get; set; } = string.Empty;
 
     public DateTimeOffset WriteClock { get; set; }
+
+    /// <summary>Report generation that owns this domain. A lower epoch cannot replace a higher one.</summary>
+    public long Epoch { get; set; }
 }
 
 /// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>

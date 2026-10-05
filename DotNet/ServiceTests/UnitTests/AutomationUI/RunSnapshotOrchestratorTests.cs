@@ -27,6 +27,8 @@ public class RunSnapshotOrchestratorTests
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.CompleteRunAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
@@ -131,6 +133,8 @@ public class RunSnapshotOrchestratorTests
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
@@ -182,6 +186,8 @@ public class RunSnapshotOrchestratorTests
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
@@ -206,6 +212,8 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -293,6 +301,8 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
