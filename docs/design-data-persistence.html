@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -511,12 +513,12 @@
     AuditService[[Audit Service]]
     CensusService[[Census Service]]
     DAService[[Data Acquisition Service]]
+		MEService[[Measure Evaluation Service]]
     NormService[[Normalization Service]]
-    NotifService[[Notification Service]]
-    TenantService[[Tenant Service]]
-    MEService[[Measure Evaluation Service]]
+		QueryDispatchService[[Query Dispatch Service]]
     ReportService[[Report Service]]
     SubService[[Submission Service]]
+		TenantService[[Tenant Service]]
     ValService[[Validation Service]]
 
     %% Connections to SQL
@@ -525,7 +527,7 @@
     CensusService --- SQL
     DAService --- SQL
     NormService --- SQL
-    NotifService --- SQL
+		QueryDispatchService --- SQL
     ReportService --- SQL
     TenantService --- SQL
     ValService --- SQL
@@ -538,6 +540,8 @@
     MEService --- ABS
     SubService --- ABS
     ValService --- ABS
+		ReportService --- ABS
+		
 
     classDef database fill:#f9f,stroke:#333,stroke-width:2px;
     class SQL,Mongo,ABS database;
@@ -563,7 +567,7 @@
 <li><a href="service-censusservice.html">Census Service</a></li>
 <li><a href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
 <li><a href="service-normalizationservice.html">Normalization Service</a></li>
-<li><a href="service-notificationservice.html">service:NotificationService</a></li>
+<li><a href="service-querydispatchservice.html">Query Dispatch Service</a></li>
 <li><a href="service-reportservice.html">Report Service</a></li>
 <li><a href="service-submissionservice.html">Submission Service</a></li>
 <li><a href="service-tenantservice.html">Tenant Service</a></li>
@@ -639,7 +643,7 @@
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ndata_persistence_F204525["Design: Data Persistence"]</pre>
+ndata_persistence_4874B872["Design: Data Persistence"]</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>

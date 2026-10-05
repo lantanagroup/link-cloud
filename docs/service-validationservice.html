@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,17 +503,17 @@
 <p>The Validation service is a Java based application that is responsible for validating FHIR resources against the FHIR specification and any additional constraints defined by the Link Cloud tenant. The service utilizes the <a href="https://hapifhir.io/">HAPI FHIR library</a> to perform the validation.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidationService_5D88FD53["Service: Validation Service"]
-  nValidationService_5D88FD53 -->|produces| nValidationComplete_6ED20CD9["Event: ValidationComplete"]
-  nReadyForValidation_27561738["Event: ReadyForValidation"] -->|consumed by| nValidationService_5D88FD53
-  nValidationService_5D88FD53 -->|sends| nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"]
-  nValidationService_5D88FD53 -->|sends| nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nReadyForValidation_27561738
-    nValidateCodeSystemCode_2E03448C
-    nValidateValueSetCode_C70055C
-    nValidationComplete_6ED20CD9
-    nValidationService_5D88FD53
+nValidationService_6640600D["Service: Validation Service"]
+  nValidationService_6640600D -->|produces| nValidationComplete_6C766152["Event: ValidationComplete"]
+  nReadyForValidation_6EC229A8["Event: ReadyForValidation"] -->|consumed by| nValidationService_6640600D
+  nValidationService_6640600D -->|sends| nValidateValueSetCode_5A22B5A3["Command: ValidateValueSetCode"]
+  nValidationService_6640600D -->|sends| nValidateCodeSystemCode_20E1E2AA["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nReadyForValidation_6EC229A8
+    nValidateCodeSystemCode_20E1E2AA
+    nValidateValueSetCode_5A22B5A3
+    nValidationComplete_6C766152
+    nValidationService_6640600D
   end
 </pre></div>
 <h2 id="common-configurations" class="content-heading">Common Configurations <a href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
@@ -1470,17 +1472,17 @@ are missing, it will issue warnings.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidationService_5D88FD53["Service: Validation Service"]
-  nValidationService_5D88FD53 -->|produces| nValidationComplete_6ED20CD9["Event: ValidationComplete"]
-  nReadyForValidation_27561738["Event: ReadyForValidation"] -->|consumed by| nValidationService_5D88FD53
-  nValidationService_5D88FD53 -->|sends| nValidateValueSetCode_C70055C["Command: ValidateValueSetCode"]
-  nValidationService_5D88FD53 -->|sends| nValidateCodeSystemCode_2E03448C["Command: ValidateCodeSystemCode"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nReadyForValidation_27561738
-    nValidateCodeSystemCode_2E03448C
-    nValidateValueSetCode_C70055C
-    nValidationComplete_6ED20CD9
-    nValidationService_5D88FD53
+nValidationService_6640600D["Service: Validation Service"]
+  nValidationService_6640600D -->|produces| nValidationComplete_6C766152["Event: ValidationComplete"]
+  nReadyForValidation_6EC229A8["Event: ReadyForValidation"] -->|consumed by| nValidationService_6640600D
+  nValidationService_6640600D -->|sends| nValidateValueSetCode_5A22B5A3["Command: ValidateValueSetCode"]
+  nValidationService_6640600D -->|sends| nValidateCodeSystemCode_20E1E2AA["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nReadyForValidation_6EC229A8
+    nValidateCodeSystemCode_20E1E2AA
+    nValidateValueSetCode_5A22B5A3
+    nValidationComplete_6C766152
+    nValidationService_6640600D
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-mock-dmrp.html">Mock DMRP</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Auto-Scaling Strategy</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>This design defines how Link dynamically scales application processing and Kubernetes infrastructure in response to workload demand.</p>
+<p>Capacity targets and burst requirements are defined by <a href="design-performance-model.html">Performance Model</a>. This design describes how the platform supplies the application, Kafka, and Kubernetes capacity necessary to meet those requirements.</p>
+<p>This design assumes the Workload Mode capability defined by <a href="proposal-workload-mode.html">Service Workload Mode</a> has been implemented so REST/API processing and asynchronous worker processing can be deployed and scaled independently.</p>
+<h2 id="terminology" class="content-heading">Terminology <a href="#terminology" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p><strong>KEDA (Kubernetes Event-Driven Autoscaling)</strong> is a Kubernetes autoscaling component that can scale workloads based on external workload signals such as Kafka consumer lag. In this design, KEDA is the preferred mechanism for translating Kafka backlog into desired Worker replica counts, while Kubernetes HPA performs the underlying pod scaling behavior.</p>
+<h1 id="high-level-guidance" class="content-heading">High-Level Guidance <a href="#high-level-guidance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: High-Level Guidance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>Kafka topic partition counts should be provisioned according to the burst-processing capacity required by <a href="design-performance-model.html">Performance Model</a>, with appropriate headroom for expected growth.</li>
+<li>Kafka partitions are planned capacity. Partition counts should not be automatically increased or decreased as part of pod autoscaling.</li>
+<li>Services that combine REST APIs and asynchronous processing should be deployed as separate API and Worker Kubernetes Deployments using the same application image and different Workload Modes.</li>
+<li>API and Worker Deployments should scale independently.</li>
+<li>Kafka Worker deployments should scale primarily according to Kafka consumer lag/backlog.</li>
+<li>REST/API deployments should scale according to CPU, memory, and where practical request-oriented utilization/latency metrics.</li>
+<li>REST/API deployments must not scale to zero.</li>
+<li>Worker deployments may scale to zero only when service-specific startup, latency, scheduling, and availability characteristics make doing so safe.</li>
+<li>Kafka Worker maximum replicas must not exceed useful consumer concurrency provided by the relevant consumer-group/topic partition topology.</li>
+<li>Kubernetes resource requests must accurately represent workload consumption because pod scheduling and node-pool autoscaling depend on those requests.</li>
+<li>AKS node pools should automatically add capacity when pods cannot be scheduled because sufficient requested CPU/memory capacity is unavailable, and remove capacity when nodes become safely underutilized.</li>
+<li>Scale-up should be comparatively aggressive when backlog develops. Scale-down should be conservative and require sustained low demand.</li>
+<li>Autoscaling limits must account for downstream constraints and not merely available Kubernetes compute capacity.</li>
+<li>Kubernetes should monitor Kafka consumer lag, including via the Kafka REST API consumer-group lag summary endpoint where available, to determine when to increase replicas for Kafka-backed services. See <a href="https://docs.confluent.io/platform/current/kafka-rest/api.html#get--clusters-cluster_id-consumer-groups-consumer_group_id-lag-summary">Confluent Documentation</a> for more information.</li>
+</ul>
+<h1 id="visual-model" class="content-heading">Visual Model <a href="#visual-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Visual Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="three-layer-capacity-model" class="content-heading">Three-Layer Capacity Model <a href="#three-layer-capacity-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Three-Layer Capacity Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Partitions define available parallelism. Replicas consume that parallelism. Nodes provide the compute needed to run those replicas.</p>
+<pre class="mermaid">flowchart TB
+    subgraph Kafka["Layer 1 - Kafka Capacity"]
+        Partitions["Kafka Partitions&lt;br>Available Consumer Parallelism"]
+    end
+
+    subgraph App["Layer 2 - Application Capacity"]
+        Workers["Worker Replicas&lt;br>Active Processing Capacity"]
+    end
+
+    subgraph Compute["Layer 3 - Infrastructure Capacity"]
+        Nodes["AKS Nodes&lt;br>CPU / Memory Capacity"]
+    end
+
+    Performance["Achievable Throughput"]
+
+    Partitions -->|"Limits useful&lt;br>consumer concurrency"| Workers
+    Nodes -->|"Provides compute&lt;br>for replicas"| Workers
+    Workers --> Performance
+
+    Partitions -. "Planned capacity" .-> Performance
+    Nodes -. "Elastic infrastructure" .-> Performance
+</pre>
+<h2 id="end-to-end-scaling-chain" class="content-heading">End-to-End Scaling Chain <a href="#end-to-end-scaling-chain" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: End-to-End Scaling Chain"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Workload demand first changes pod demand. AKS node scaling occurs only when Kubernetes cannot schedule the desired pods with the currently available requested CPU and memory capacity.</p>
+<pre class="mermaid">flowchart LR
+    Demand["Workload Demand&lt;br>Kafka Lag / API Traffic"]
+
+    subgraph WorkloadScaling["Workload Scaling"]
+        Scaler["KEDA / HPA"]
+        Pods["Desired Pod Replicas"]
+    end
+
+    subgraph Kubernetes["Kubernetes Scheduling"]
+        Scheduler["Kubernetes Scheduler"]
+        Pending["Pending / Unschedulable Pods"]
+    end
+
+    subgraph Infrastructure["AKS Infrastructure"]
+        ClusterAutoscaler["AKS Cluster Autoscaler"]
+        Nodes["Additional Node Capacity"]
+    end
+
+    Throughput["Higher Processing Throughput"]
+
+    Demand --> Scaler
+    Scaler --> Pods
+    Pods --> Scheduler
+
+    Scheduler -->|"Capacity available"| Throughput
+    Scheduler -->|"Insufficient requested&lt;br>CPU / memory"| Pending
+
+    Pending --> ClusterAutoscaler
+    ClusterAutoscaler --> Nodes
+    Nodes --> Scheduler
+
+    Throughput -. "Reduces backlog / demand" .-> Demand
+</pre>
+<h2 id="burst-scaling-timeline" class="content-heading">Burst Scaling Timeline <a href="#burst-scaling-timeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Burst Scaling Timeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Reporting workloads are intentionally handled asymmetrically: scale up quickly when backlog develops, drain the burst, then scale down conservatively after demand remains low.</p>
+<pre class="mermaid">flowchart LR
+    Normal["1. Normal Load&lt;br>Low Kafka Lag&lt;br>Minimum Workers"]
+
+    Burst["2. Reporting Burst&lt;br>Messages Arrive Rapidly"]
+
+    Lag["3. Kafka Lag Increases"]
+
+    PodScale["4. Worker Autoscaler&lt;br>Adds Replicas"]
+
+    NodeScale["5. AKS Adds Nodes&lt;br>If Pods Cannot Schedule"]
+
+    Peak["6. Processing Capacity&lt;br>Reaches Burst Demand"]
+
+    Drain["7. Backlog Drains"]
+
+    Stabilize["8. Sustained Low Demand&lt;br>Scale-Down Window"]
+
+    Contract["9. Worker Replicas Reduce&lt;br>Unused Nodes Removed"]
+
+    Normal --> Burst
+    Burst --> Lag
+    Lag --> PodScale
+    PodScale --> NodeScale
+    NodeScale --> Peak
+    Peak --> Drain
+    Drain --> Stabilize
+    Stabilize --> Contract
+    Contract --> Normal
+</pre>
+<h1 id="scaling-layers" class="content-heading">Scaling Layers <a href="#scaling-layers" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scaling Layers"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Link autoscaling operates at three related layers.</p>
+<h2 id="1-kafka-capacity" class="content-heading">1. Kafka Capacity <a href="#1-kafka-capacity" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: 1. Kafka Capacity"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Kafka partitions define how much consumer parallelism is available.</p>
+<p>Increasing the number of worker pods does not guarantee increased throughput if Kafka cannot assign useful partition work to those replicas.</p>
+<p>Partition counts should therefore be derived from anticipated burst throughput in <a href="design-performance-model.html">Performance Model</a> and revised through explicit capacity-planning activities as production load grows.</p>
+<p>Partition count is intentionally not a reactive autoscaling mechanism because:</p>
+<ul>
+<li>Kafka partition increases are operationally significant.</li>
+<li>Partition counts generally cannot be reduced in place.</li>
+<li>Changing partition counts may change key-to-partition mapping for future messages.</li>
+<li>Excessive partition counts introduce broker and operational overhead.</li>
+<li>Capacity should be available before a reporting burst rather than created in reaction to one.</li>
+</ul>
+<p>Partition plans should include reasonable growth headroom so Worker autoscaling does not immediately reach a Kafka concurrency ceiling during a burst.</p>
+<h2 id="useful-consumer-concurrency" class="content-heading">Useful Consumer Concurrency <a href="#useful-consumer-concurrency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Useful Consumer Concurrency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The maximum useful replica count must be determined from the actual consumer topology rather than using a single universal formula.</p>
+<p>For the common case where one consumer group consumes one topic:</p>
+<p><code>maximum useful worker replicas = topic partition count</code></p>
+<p>For a consumer group subscribed to multiple topics, useful concurrency can reflect the partitions available across the subscribed topics.</p>
+<p>If one service process hosts multiple independent consumer groups, the useful replica ceiling may differ again because each group receives its own partition assignments.</p>
+<p>Therefore each independently scaled Kafka workload must document:</p>
+<ul>
+<li>Consumer group or groups</li>
+<li>Subscribed topic or topics</li>
+<li>Partition count per topic</li>
+<li>Message key / partitioning strategy</li>
+<li>Maximum useful pod concurrency</li>
+</ul>
+<p>Partition/key distribution must also be monitored. A topic with many partitions may still provide poor parallelism if workload is concentrated on a small number of keys.</p>
+<h1 id="application-deployment-model" class="content-heading">Application Deployment Model <a href="#application-deployment-model" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Application Deployment Model"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Services that expose application REST endpoints and perform Kafka/background processing should use separate Kubernetes Deployments.</p>
+<p>Example:</p>
+<ul>
+<li><p><code>report-api</code></p>
+<ul>
+<li>Workload Mode: <code>Api</code></li>
+<li>Handles synchronous UI/API traffic</li>
+<li>Kafka consumers disabled</li>
+<li>Maintains a non-zero minimum replica count</li>
+</ul>
+</li>
+<li><p><code>report-worker</code></p>
+<ul>
+<li>Workload Mode: <code>Worker</code></li>
+<li>Handles Kafka/background processing</li>
+<li>Application REST controllers disabled</li>
+<li>Scales independently according to asynchronous workload</li>
+</ul>
+</li>
+</ul>
+<p>Both Deployments use the same application image.</p>
+<p>Services that have only one responsibility do not need to be artificially split.</p>
+<h1 id="kafka-worker-autoscaling" class="content-heading">Kafka Worker Autoscaling <a href="#kafka-worker-autoscaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Worker Autoscaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Kafka consumer workloads should use Kafka backlog as their primary scaling signal.</p>
+<p>KEDA or an equivalent Kubernetes external-metric mechanism should expose Kafka consumer lag to the Kubernetes autoscaling system.</p>
+<p>CPU and memory remain important resource and safety signals but should not be the sole basis for scaling event-processing workers. A service may have substantial queued work while waiting on database, storage, network, garbage collection, or other dependencies without maintaining consistently high CPU utilization.</p>
+<p>The preferred autoscaling objective is not simply to maintain zero lag. Short-lived backlog during reporting bursts is expected.</p>
+<p>Scaling should instead be tuned to maintain an acceptable backlog age or drain time for each pipeline stage.</p>
+<p>For example:</p>
+<p><code>required replicas ≈ queued work / (measured work per replica per minute × acceptable drain window)</code></p>
+<p>Production measurements should be used to refine the actual scaler configuration.</p>
+<h2 id="worker-minimum-replicas" class="content-heading">Worker Minimum Replicas <a href="#worker-minimum-replicas" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Worker Minimum Replicas"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Worker minimum replica count is service-specific.</p>
+<p>Scale-to-zero may be appropriate when:</p>
+<ul>
+<li>No work is expected outside discrete bursts.</li>
+<li>Startup is fast.</li>
+<li>No required scheduler or coordination responsibility exists.</li>
+<li>The first queued event may tolerate pod startup delay.</li>
+</ul>
+<p>A non-zero minimum should be retained when:</p>
+<ul>
+<li>The service has expensive warm-up or in-memory compilation/cache behavior.</li>
+<li>Near-immediate event processing is required.</li>
+<li>Startup creates significant load on databases or dependent systems.</li>
+<li>The process owns background responsibilities that must remain available.</li>
+</ul>
+<p>Measure Evaluation is a notable candidate for retaining warm capacity because measure evaluator compilation and caching can make cold starts more expensive.</p>
+<h1 id="rest-api-autoscaling" class="content-heading">REST/API Autoscaling <a href="#rest-api-autoscaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: REST/API Autoscaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>API deployments shall never scale to zero.</p>
+<p>Interactive and operational APIs should retain an availability-appropriate minimum replica count independent of pipeline workload.</p>
+<p>REST scaling should use Kubernetes HPA or equivalent metrics based on:</p>
+<ul>
+<li>CPU utilization</li>
+<li>Memory utilization where useful</li>
+<li>Request rate/concurrency when available</li>
+<li>Request latency when available and operationally reliable</li>
+</ul>
+<p>API scaling limits should be independent from Kafka partition counts because API replicas do not consume partition assignments.</p>
+<p>Separating API and Worker deployments prevents reporting bursts from controlling the amount of synchronous API capacity available to users.</p>
+<h1 id="scale-up-and-scale-down-behavior" class="content-heading">Scale-Up and Scale-Down Behavior <a href="#scale-up-and-scale-down-behavior" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scale-Up and Scale-Down Behavior"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Reporting workloads are burst-oriented. Scaling behavior should therefore be asymmetric.</p>
+<h2 id="scale-up" class="content-heading">Scale Up <a href="#scale-up" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scale Up"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Worker capacity should increase quickly when sustained backlog develops.</p>
+<p>Scale-up stabilization should be minimal unless testing demonstrates that rapid increases overload a downstream dependency.</p>
+<p>Multiple replicas may be added during a scaling interval when required to meet backlog-drain objectives.</p>
+<h2 id="scale-down" class="content-heading">Scale Down <a href="#scale-down" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scale Down"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Scale-down should be conservative.</p>
+<p>Workers should only be removed after low demand has persisted for an appropriate stabilization period. Initial configurations should favor multi-minute stabilization rather than immediately removing replicas whenever lag falls.</p>
+<p>Scale-down must account for work already being processed.</p>
+<p>Services must support graceful termination so a pod can:</p>
+<ol>
+<li>Stop accepting new asynchronous work.</li>
+<li>Complete or safely relinquish in-flight work.</li>
+<li>Commit Kafka offsets only according to the service's successful-processing semantics.</li>
+<li>Cleanly leave the consumer group.</li>
+<li>Terminate within the Kubernetes termination grace period.</li>
+</ol>
+<p>Consumers should tolerate at-least-once delivery and duplicate processing where appropriate.</p>
+<h1 id="kubernetes-node-pool-autoscaling" class="content-heading">Kubernetes Node Pool Autoscaling <a href="#kubernetes-node-pool-autoscaling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kubernetes Node Pool Autoscaling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Pod autoscaling and node autoscaling serve different purposes.</p>
+<p>The expected scaling chain is:</p>
+<ol>
+<li>Kafka lag or API workload causes the workload autoscaler to request additional pods.</li>
+<li>Kubernetes schedules those pods onto existing node capacity where possible.</li>
+<li>If pods cannot be scheduled because adequate requested CPU/memory is unavailable, the AKS Cluster Autoscaler adds node capacity.</li>
+<li>Pending pods are scheduled onto the new nodes.</li>
+<li>When workloads later contract, underutilized nodes may be removed when their workloads can be safely rescheduled elsewhere.</li>
+</ol>
+<p>Node scale-up should therefore be driven by Kubernetes scheduling demand rather than a direct rule such as &quot;node CPU exceeds X percent.&quot;</p>
+<p>Accurate pod resource requests are critical. If a workload substantially under-requests CPU or memory, Kubernetes may continue scheduling pods onto saturated nodes instead of creating the unschedulable-pod pressure needed to add capacity.</p>
+<h1 id="resource-requests-and-limits" class="content-heading">Resource Requests and Limits <a href="#resource-requests-and-limits" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Resource Requests and Limits"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Each scalable workload should define resource requests and limits based on measured production or performance-test behavior.</p>
+<p>API and Worker deployments from the same service may use different resource profiles.</p>
+<p>For example, a Measure Evaluation Worker performing CQL evaluation may require substantially more CPU than the API portion of the same application.</p>
+<p>Resource settings should be periodically compared with actual telemetry and adjusted as the performance model evolves.</p>
+<h1 id="node-pool-isolation" class="content-heading">Node Pool Isolation <a href="#node-pool-isolation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Node Pool Isolation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The platform should evaluate separating general/API workloads from compute-intensive reporting workers.</p>
+<p>A possible model is:</p>
+<ul>
+<li><p>General/system node pool</p>
+<ul>
+<li>User-facing APIs</li>
+<li>Admin BFF</li>
+<li>tenant/configuration services</li>
+<li>platform/system workloads</li>
+</ul>
+</li>
+<li><p>Processing node pool</p>
+<ul>
+<li>Normalization workers</li>
+<li>Measure Evaluation workers</li>
+<li>Validation workers</li>
+<li>other burst-processing workloads</li>
+</ul>
+</li>
+</ul>
+<p>This prevents a reporting burst from consuming all compute capacity required by interactive and operational services.</p>
+<p>Dedicated workload pools should be adopted only where measurements demonstrate sufficient operational or cost benefit.</p>
+<h1 id="scaling-ceilings-and-downstream-constraints" class="content-heading">Scaling Ceilings and Downstream Constraints <a href="#scaling-ceilings-and-downstream-constraints" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scaling Ceilings and Downstream Constraints"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Maximum replica count must not be based solely on available Kubernetes capacity.</p>
+<p>For each workload:</p>
+<p><code>maximum replicas = minimum of useful parallelism and all downstream safety limits</code></p>
+<p>Potential constraints include:</p>
+<ul>
+<li>Kafka partition/consumer concurrency</li>
+<li>EHR query throttling</li>
+<li>SQL/database capacity</li>
+<li>Redis/cache capacity</li>
+<li>Blob/storage throughput</li>
+<li>terminology-service capacity</li>
+<li>submission endpoint limitations</li>
+<li>internal per-pod concurrency</li>
+<li>cost guardrails</li>
+</ul>
+<p>The Data Acquisition workload is especially sensitive to external EHR constraints. Increasing pod count must never bypass tenant/facility-specific request throttling.</p>
+<h1 id="internal-concurrency" class="content-heading">Internal Concurrency <a href="#internal-concurrency" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Internal Concurrency"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Replica count is only one dimension of concurrency.</p>
+<p>Several Link services also have application-level concurrency controls, such as:</p>
+<ul>
+<li>bounded internal work queues</li>
+<li>worker-thread counts</li>
+<li>maximum degree of parallelism</li>
+<li>per-facility concurrency</li>
+<li>SFTP parallel-processing limits</li>
+</ul>
+<p>Autoscaling configuration and internal concurrency configuration must be evaluated together.</p>
+<p>Doubling both pod count and per-pod parallelism may increase downstream traffic by substantially more than intended.</p>
+<h1 id="observability" class="content-heading">Observability <a href="#observability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Observability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The Scale Dashboard described by <a href="design-performance-model.html">Performance Model</a> should correlate autoscaling behavior with actual throughput.</p>
+<p>At minimum, monitor:</p>
+<h2 id="kafka" class="content-heading">Kafka <a href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Consumer lag by group/topic/partition</li>
+<li>Oldest-message/backlog age where available</li>
+<li>Produce rate</li>
+<li>Consume rate</li>
+<li>Partition/key distribution</li>
+</ul>
+<h2 id="application" class="content-heading">Application <a href="#application" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Application"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Desired/current/ready replicas</li>
+<li>Processing throughput</li>
+<li>Processing duration</li>
+<li>Error rate</li>
+<li>Retry rate</li>
+<li>Dead-letter activity</li>
+<li>Startup/warm-up duration</li>
+</ul>
+<h2 id="kubernetes" class="content-heading">Kubernetes <a href="#kubernetes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kubernetes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>CPU and memory requests</li>
+<li>Actual CPU and memory utilization</li>
+<li>Pending/unschedulable pods</li>
+<li>Node count</li>
+<li>Allocatable versus requested resources</li>
+<li>Autoscaler decisions</li>
+</ul>
+<h2 id="pipeline" class="content-heading">Pipeline <a href="#pipeline" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pipeline"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Patients processed per minute</li>
+<li>End-to-end patient processing duration</li>
+<li>Time spent in each pipeline stage</li>
+</ul>
+<p>A particularly useful operational correlation is:</p>
+<p><code>Kafka lag → Worker replicas → Node count → Patients/minute</code></p>
+<p>If replicas increase without a corresponding increase in throughput, another system dependency has become the limiting factor.</p>
+<h1 id="capacity-planning" class="content-heading">Capacity Planning <a href="#capacity-planning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Capacity Planning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Autoscaling configuration should be derived from the performance model through the following relationship:</p>
+<p><code>Required throughput → measured per-replica throughput → required consumer concurrency → required Kafka partitions → pod resources → required node capacity</code></p>
+<p>These values should be revised from production measurements rather than assuming indefinitely linear scaling.</p>
+<h1 id="open-questions" class="content-heading">Open Questions <a href="#open-questions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Open Questions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ol>
+<li>Which services should initially be split into separate API and Worker Deployments?</li>
+<li>What is the complete service → consumer group → topic → partition topology for the current pipeline?</li>
+<li>How much Kafka partition headroom should be maintained above currently modeled burst requirements?</li>
+<li>Do the current message keys distribute burst workloads evenly enough to use the configured partition capacity?</li>
+<li>What backlog age or drain-time objective should apply to each major pipeline stage?</li>
+<li>Which worker services may safely scale to zero?</li>
+<li>What are the measured cold-start and warm-up costs for Measure Evaluation, Validation, Normalization, and other major workers?</li>
+<li>Can all Kafka consumers currently terminate safely during in-flight processing and consumer-group rebalancing?</li>
+<li>Which services have internal concurrency settings that must be coordinated with replica autoscaling?</li>
+<li>Which databases, caches, external endpoints, or downstream services establish maximum safe replica counts?</li>
+<li>Should API/general workloads and burst-processing workers use separate AKS node pools?</li>
+<li>How much pre-existing node capacity should be retained to reduce latency while AKS provisions new nodes?</li>
+<li>Should KEDA be the platform standard for Kafka scaling, or should Kafka metrics be routed through the existing Prometheus/HPA stack?</li>
+<li>What cost guardrails should prevent runaway scaling caused by malformed workloads, poison messages, or producer defects?</li>
+</ol>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nauto_scaling_strategy_594E871C["Design: Auto-Scaling Strategy"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>
