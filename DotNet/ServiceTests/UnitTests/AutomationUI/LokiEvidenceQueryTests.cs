@@ -47,6 +47,48 @@ public class LokiEvidenceQueryTests
         LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 1, coverage).Should().Be(coverage);
         LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(30), 3, coverage).Should().Be(coverage);
         LokiEvidenceQuery.LookbackForAttempt(TimeSpan.FromMinutes(90), 0, coverage).Should().Be(TimeSpan.FromMinutes(90));
+        LokiEvidenceQuery.LookbackForRequest(coverage, TimeSpan.FromMinutes(81)).Should().Be(TimeSpan.FromMinutes(81));
+        LokiEvidenceQuery.LookbackForRequest(TimeSpan.FromMinutes(90), coverage).Should().Be(TimeSpan.FromMinutes(90));
+    }
+
+    [Fact]
+    public async Task CollectWithRetry_measures_coverage_after_the_retry_delay()
+    {
+        var coverageReads = 0;
+        var delayed = false;
+        var secondReadWasAfterDelay = false;
+        var lookbacks = new List<TimeSpan>();
+        var output = new CapturingOutput();
+
+        await LokiEvidenceQuery.CollectWithRetryAsync(
+            TimeSpan.FromMinutes(30),
+            ["Observation"],
+            ["Observation"],
+            (lookback, _) =>
+            {
+                lookbacks.Add(lookback);
+                return Task.FromResult(new List<string>());
+            },
+            (_, _) =>
+            {
+                delayed = true;
+                return Task.CompletedTask;
+            },
+            output,
+            coverageNow: () =>
+            {
+                if (coverageReads == 1)
+                    secondReadWasAfterDelay = delayed;
+                return TimeSpan.FromMinutes(80 + coverageReads++);
+            });
+
+        secondReadWasAfterDelay.Should().BeTrue();
+
+        lookbacks.Should().Equal(
+            TimeSpan.FromMinutes(80),
+            TimeSpan.FromMinutes(81),
+            TimeSpan.FromMinutes(82),
+            TimeSpan.FromMinutes(83));
     }
 
     [Fact]
