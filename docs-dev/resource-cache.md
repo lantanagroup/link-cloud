@@ -28,11 +28,13 @@ There are two generations of entry per correlation.
 | Acquisition | `{correlationId}:{ResourceType}` | AcquisitionWorker, one key per resource type | Normalization |
 | Normalized | `{correlationId}` | Normalization, all types accumulated into one key | MeasureEval |
 
-These two shapes are the only keys a correlation owns. MeasureEval's Redis cleanup does not scan for
-them: it builds `{correlationId}` plus `{correlationId}:{ResourceType}` for every FHIR resource type
-and unlinks the batch in one round trip (`RedisResourceService.cleanup`). Adding a new key shape
-under the correlation prefix therefore means adding it there too, or it outlives the correlation
-until its TTL.
+These two shapes are the only keys a correlation owns, and each generation is cleaned up by the
+service that consumes it. Normalization deletes the acquisition keys after producing
+`ResourcesNormalized` and purges them on every terminal failure. MeasureEval's Redis cleanup
+(`RedisResourceService.cleanup`) unlinks only `{correlationId}`. Acquisition keys that Normalization
+fails to delete expire with the TTL. Keeping MeasureEval to one key also keeps it to single-key
+commands, which the OSS clustering policy requires: a multi-key `UNLINK` spanning hash slots is
+rejected with `CROSSSLOT`.
 
 `(FacilityId, CorrelationId)` identifies **one patient's acquisition run**, not the patient. The
 patient travels separately as `PatientId`. A re-run, a readmission or a regenerate gets a new
@@ -347,7 +349,7 @@ not the stopping token. Anything that does not finish follows the path above.
 | Trigger | Removes | Both stores |
 |---|---|---|
 | Normalization success | the acquisition keys, after `ResourcesNormalized` is produced (best effort) | yes |
-| MeasureEval terminal pass | everything under the correlation prefix | yes |
+| MeasureEval terminal pass | `{correlationId}` in Redis; everything under the correlation prefix in blob storage | yes |
 | Terminal normalization failure | acquisition keys and the correlation key | yes |
 | Redis TTL | Redis entries only | n/a |
 
