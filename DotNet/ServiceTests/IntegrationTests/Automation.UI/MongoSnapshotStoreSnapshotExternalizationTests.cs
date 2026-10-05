@@ -250,6 +250,47 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         hydrated!.Data["p"].Should().Be(new string('c', 512));
     }
 
+    [Fact]
+    public async Task SetDomainAsync_deletes_a_replaced_blob_when_a_newer_header_wins()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('a', 512) }, CancellationToken.None);
+        var first = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var firstDoc = JsonDocument.Parse(first.Data);
+        var firstBlob = firstDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
+
+        string? winnerBlob = null;
+        store.BeforeDeleteDisplaced = async () =>
+        {
+            var winner = await payloadStore.StoreAsync(runId, "generationManifest", "{\"p\":\"winner\"}", CancellationToken.None);
+            winnerBlob = winner.BlobName;
+            var stored = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer?>
+            {
+                ["__externalSnapshotPayloadPointer"] = winner
+            });
+            await collection.InsertOneAsync(new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "generationManifest",
+                Data = stored,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(5)
+            });
+        };
+
+        await store.SetDomainAsync(runId, "generationManifest", new Dictionary<string, string> { ["p"] = new string('b', 512) }, CancellationToken.None);
+
+        winnerBlob.Should().NotBeNullOrWhiteSpace();
+        payloadStore.BlobNames.Should().BeEquivalentTo(winnerBlob);
+        payloadStore.DeletedBlobNames.Should().Contain(firstBlob);
+        var kept = await collection.Find(doc => doc.RunId == runId && doc.Domain == "generationManifest").SingleAsync();
+        using var keptDoc = JsonDocument.Parse(kept.Data);
+        keptDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName.Should().Be(winnerBlob);
+    }
+
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore
     {
         private readonly ConcurrentDictionary<string, string> _payloadByBlob = new(StringComparer.Ordinal);
@@ -258,6 +299,8 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         public List<string> DeletedBlobNames { get; } = [];
         public int ReadCount { get; private set; }
         public bool HasBlob(string blobName) => _payloadByBlob.ContainsKey(blobName);
+
+        public IReadOnlyCollection<string> BlobNames => _payloadByBlob.Keys.ToArray();
 
         public bool ShouldExternalize(string domain, int payloadUtf8Bytes) =>
             string.Equals(domain, "generationManifest", StringComparison.OrdinalIgnoreCase)
