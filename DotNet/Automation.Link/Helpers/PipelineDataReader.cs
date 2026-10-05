@@ -110,6 +110,11 @@ public class PipelineDataReader
     public record GroupPopulationInfo(string? PopulationCodeJson, List<MeasureReportPopulationInfo> MeasureReportPopulations);
     public record MeasureReportPopulationInfo(string? MeasureReportId);
 
+    /// <summary>
+    /// Counts for the run-history chart. Measure-report ids stay in Report.
+    /// </summary>
+    public record PopulationCountSnapshot(int ReportTypeCount, int GroupCount, int MeasureReportPopulationCount);
+
     public record AcquisitionLogInfo(
         long Id,
         string? PatientId,

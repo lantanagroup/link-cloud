@@ -4,12 +4,13 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 namespace Automation.UI.Services;
 
 /// <summary>
-/// Per-run poller. Every run polls five pipeline domains so Run Details stays live.
+/// Per-run poller. Every run polls the pipeline so Run Details stays live.
 /// Metrics runs poll every 5s; ordinary runs poll every 15s. Both honor the 8s HTTP
-/// cache. A full-domain snapshot still runs once in <see cref="FinalPollAsync"/>.
+/// cache. A final poll still runs once in <see cref="FinalPollAsync"/>.
 ///
-/// Data persists across process restarts. Multiple UI instances can read
-/// the same data. The controller reads are instant (no API calls).
+/// The store keeps the counts, timestamps, and milestones the charts need.
+/// Notes, acquired resource ids, FHIR queries, measure-report id lists,
+/// per-patient measure rows, and org-location rows stay in Report and Data Acquisition.
 /// </summary>
 public sealed class StoreBackedServicePoller
 {
@@ -177,7 +178,7 @@ public sealed class StoreBackedServicePoller
     private async Task PollPopulationsAsync(Guid scheduleId, CancellationToken ct)
     {
         var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId);
-        await _store.SetDomainAsync(_meta.RunId, "populations", result, ct);
+        await _store.SetDomainAsync(_meta.RunId, "populations", RunHistorySlim.ToPopulationCounts(result), ct);
     }
 
     private async Task PollAcquisitionAsync(CancellationToken ct)
@@ -192,7 +193,7 @@ public sealed class StoreBackedServicePoller
     private async Task PollAcquisitionLogsAsync(CancellationToken ct)
     {
         var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId);
-        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", logs, ct);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.SlimAcquisitionLogs(logs), ct);
     }
 
     private async Task PollOrgLocationAsync(CancellationToken ct)
@@ -201,12 +202,12 @@ public sealed class StoreBackedServicePoller
             await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId),
             await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId),
             await _reader.GetEncounterMappingsAsync(_meta.FacilityId));
-        await _store.SetDomainAsync(_meta.RunId, "orgLocation", snapshot, ct);
+        await _store.SetDomainAsync(_meta.RunId, "orgLocation", RunHistorySlim.SlimOrgLocation(snapshot), ct);
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)
     {
         var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId);
-        await _store.SetDomainAsync(_meta.RunId, "measureResources", result, ct);
+        await _store.SetDomainAsync(_meta.RunId, "measureResources", RunHistorySlim.SlimMeasureResources(result), ct);
     }
 }

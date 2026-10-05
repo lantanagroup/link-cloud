@@ -1,8 +1,11 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text;
+using Automation.UI.Models;
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -143,6 +146,79 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
         populations!.Data.Should().HaveCount(20);
         (await snapshots.Find(d => d.Id == smallId).FirstAsync()).Data.Should().Be("""{"Name":"stay"}""");
         await AssertRunDocumentsFit(runId);
+    }
+
+    [Fact]
+    public async Task TryUpgrade_rewrites_a_small_population_id_list_to_counts()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var id = ObjectId.GenerateNewId();
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            Id = id,
+            RunId = runId,
+            Domain = "populations",
+            Data = """[{"ReportType":"ACH","GroupPopulations":[{"PopulationCodeJson":"{}","MeasureReportPopulations":[{"MeasureReportId":"mr-1"},{"MeasureReportId":"mr-2"}]}]}]""",
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var legacy = await snapshots.Find(d => d.Id == id).FirstAsync();
+        (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeTrue();
+        (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+
+        var counts = await store.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", CancellationToken.None);
+        counts!.Data.ReportTypeCount.Should().Be(1);
+        counts.Data.GroupCount.Should().Be(1);
+        counts.Data.MeasureReportPopulationCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Translation_drops_normalization_evidence_lines_and_chunk_documents()
+    {
+        var database = CreateGuardedDatabase();
+        var store = new MongoSnapshotStore(database, NullLogger<MongoSnapshotStore>.Instance);
+        var service = new SnapshotShapeMigrationService(
+            database,
+            store,
+            NullLogger<SnapshotShapeMigrationService>.Instance);
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var runId = Guid.NewGuid();
+        var headerId = ObjectId.GenerateNewId();
+        var chunkId = ObjectId.GenerateNewId();
+        await snapshots.InsertManyAsync(
+        [
+            new DomainSnapshotDocument
+            {
+                Id = headerId,
+                RunId = runId,
+                Domain = NormalizationEvidenceSnapshot.Domain,
+                Data = """{"SuiteName":"Epic","CollectedLineCount":2,"EvidenceChunkCount":1,"SummaryLines":["raw line"],"OperationConfigs":[]}""",
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new DomainSnapshotDocument
+            {
+                Id = chunkId,
+                RunId = runId,
+                Domain = NormalizationEvidenceSnapshot.ChunkDomain(1),
+                Data = """{"SummaryLines":["raw line"],"ParsedSteps":[]}""",
+                UpdatedAt = DateTimeOffset.UtcNow
+            }
+        ]);
+
+        var translated = await service.TranslateSnapshotsAsync(CancellationToken.None);
+        translated.Should().Be(2);
+
+        var evidence = await store.GetDomainAsync<NormalizationEvidenceSnapshot>(
+            runId, NormalizationEvidenceSnapshot.Domain, CancellationToken.None);
+        evidence!.Data.EvidenceChunkCount.Should().Be(0);
+        evidence.Data.SummaryLines.Should().BeEmpty();
+        evidence.Data.CollectedLineCount.Should().Be(2);
+        (await snapshots.Find(d => d.Id == chunkId).FirstOrDefaultAsync()).Should().BeNull();
+
+        translated = await service.TranslateSnapshotsAsync(CancellationToken.None);
+        translated.Should().Be(0);
     }
 
     [Fact]

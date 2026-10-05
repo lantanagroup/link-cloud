@@ -621,7 +621,7 @@ public class RunsController(
                 facilityId,
                 reportId);
 
-            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
+            return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 }, unavailable = true });
         }
     }
 
@@ -641,8 +641,8 @@ public class RunsController(
         try
         {
             var detailed = await dataAcqClient.GetAcquisitionLogByIdAsync(logId, cancellationToken);
-            if (detailed == null)
-                return NotFound();
+            if (detailed?.Body == null)
+                return Json(new { unavailable = true });
 
             // Fetch reference resources linked to this log.
             var referenceResourceIds = new List<string>();
@@ -732,7 +732,7 @@ public class RunsController(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load DA log detail for run {RunId}, log {LogId}", id, logId);
-            return NotFound();
+            return Json(new { unavailable = true });
         }
     }
 

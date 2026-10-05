@@ -2281,6 +2281,14 @@
                 }
 
                 const data = await res.json();
+                if (data.unavailable === true || data.Unavailable === true) {
+                    document.getElementById('dataAcqLogPaginationInfo').textContent = 'Source no longer available.';
+                    document.getElementById('dataAcqLogPrev').disabled = true;
+                    document.getElementById('dataAcqLogNext').disabled = true;
+                    renderDaLogRows([], 'Source no longer available.');
+                    return;
+                }
+
                 const records = data.records || data.Records || [];
                 const totalCount = data.metadata?.totalCount || data.Metadata?.TotalCount || 0;
                 const totalPages = Math.max(1, Math.ceil(totalCount / daLogPageSize));
@@ -2294,7 +2302,7 @@
 
                 renderDaLogRows(records, daSearchTerm ? 'No matching logs.' : 'No logs found.');
             } catch {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading logs.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Source no longer available.</td></tr>';
             }
         }
 
@@ -2356,11 +2364,16 @@
                 const res = await fetch(`${dataAcqLogDetailUrl}?id=${encodeURIComponent(runId)}&logId=${encodeURIComponent(logId)}`);
                 if (!res.ok) {
                     subtitle.textContent = '';
-                    body.innerHTML = '<div class="text-danger">Failed to load log details.</div>';
+                    body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
                     return;
                 }
 
                 const d = await res.json();
+                if (d.unavailable === true || d.Unavailable === true) {
+                    subtitle.textContent = '';
+                    body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
+                    return;
+                }
                 const notes = d.notes || d.Notes || [];
                 const resources = d.resourceAcquiredIds || d.ResourceAcquiredIds || [];
                 const referenceResources = d.referenceResourceIds || d.ReferenceResourceIds || [];
@@ -2417,7 +2430,7 @@
                 `;
             } catch {
                 subtitle.textContent = '';
-                body.innerHTML = '<div class="text-danger">Error loading log details.</div>';
+                body.innerHTML = '<div class="text-muted">Source no longer available.</div>';
             }
         }
 

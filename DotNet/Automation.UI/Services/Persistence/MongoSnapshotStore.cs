@@ -648,6 +648,33 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             await _snapshotPayloadStore.DeleteIfExistsAsync(existingPointer, ct);
     }
 
+    /// <summary>
+    /// Removes one run domain, including part documents and a blob pointer.
+    /// Used for normalization evidence chunks that are no longer stored.
+    /// </summary>
+    internal async Task DeleteDomainSnapshotAsync(Guid runId, string domain, CancellationToken ct)
+    {
+        var documents = await CosmosThrottle.ExecuteAsync(
+            token => _snapshots.Find(s => s.RunId == runId && s.Domain == domain).ToListAsync(token),
+            ct,
+            _logger);
+        foreach (var document in documents)
+        {
+            var pointer = TryReadSnapshotPayloadPointer(document.Data);
+            if (pointer != null)
+                await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, ct);
+        }
+
+        await CosmosThrottle.ExecuteAsync(
+            token => _snapshots.DeleteManyAsync(s => s.RunId == runId && s.Domain == domain, token),
+            ct,
+            _logger);
+        await CosmosThrottle.ExecuteAsync(
+            token => _parts.DeleteManyAsync(p => p.RunId == runId && p.Domain == domain, token),
+            ct,
+            _logger);
+    }
+
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
     {
         for (var attempt = 0; attempt < 3; attempt++)
@@ -721,7 +748,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (legacy == null || string.IsNullOrWhiteSpace(legacy.Data))
             return false;
 
-        if (!SnapshotPartitioner.ShouldTranslateStoredData(legacy.Data))
+        // A small population id list is under the partition threshold and still
+        // has to be rewritten. Payloads that are not the old pipeline shape
+        // return null here and stay on the size check alone.
+        var inlineSlim = SnapshotPartitionHeader.IsExternalPointer(legacy.Data)
+            ? null
+            : RunHistorySlim.TrySlimStoredJson(legacy.Domain, legacy.Data);
+        if (!SnapshotPartitioner.ShouldTranslateStoredData(legacy.Data) && inlineSlim == null)
             return false;
 
         var chosen = await ChooseHeaderAsync(legacy.RunId, legacy.Domain, ct);
@@ -752,6 +785,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             if (string.IsNullOrWhiteSpace(payloadJson))
                 return false;
         }
+
+        var slimmed = inlineSlim ?? RunHistorySlim.TrySlimStoredJson(legacy.Domain, payloadJson);
+        if (slimmed != null)
+            payloadJson = slimmed;
 
         var plan = SnapshotPartitioner.Plan(payloadJson);
         // Match the id and the revision. The legacy payload can already be near
