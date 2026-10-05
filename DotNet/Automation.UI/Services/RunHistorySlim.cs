@@ -91,7 +91,7 @@ public static class RunHistorySlim
             SuiteName = source.SuiteName,
             CollectedLineCount = source.CollectedLineCount,
             RawLinesOmitted = true,
-            StepsCollapsed = true,
+            StepsCollapsed = false,
             EvidenceChunkCount = 0,
             RuntimeSequences = source.RuntimeSequences,
             SuiteSequences = source.SuiteSequences,
