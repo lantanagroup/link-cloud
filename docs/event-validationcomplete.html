@@ -467,6 +467,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auto-scaling-strategy.html">Auto-Scaling Strategy</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-service-to-service-api.html">Service-to-Service Interactions & API</a></li>
@@ -479,6 +480,7 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-platform-agnosticity.html">Platform Agnosticity in Microservices</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
@@ -501,15 +503,15 @@
 <p>Sent once validation is finished, indicating whether the submission met all validation rules.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidationComplete_6ED20CD9["Event: Validation Complete"]
-  nValidationService_5D88FD53["Service: ValidationService"] -->|produces| nValidationComplete_6ED20CD9
-  nValidationComplete_6ED20CD9 -->|consumed by| nReportService_417D4454["Service: ReportService"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidationComplete_6ED20CD9
-    nValidationService_5D88FD53
+nValidationComplete_6C766152["Event: Validation Complete"]
+  nValidationService_6640600D["Service: ValidationService"] -->|produces| nValidationComplete_6C766152
+  nValidationComplete_6C766152 -->|consumed by| nReportService_7E534222["Service: ReportService"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidationComplete_6C766152
+    nValidationService_6640600D
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nReportService_417D4454
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nReportService_7E534222
   end
 </pre></div>
 
@@ -519,15 +521,15 @@ nValidationComplete_6ED20CD9["Event: Validation Complete"]
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidationComplete_6ED20CD9["Event: Validation Complete"]
-  nValidationService_5D88FD53["Service: ValidationService"] -->|produces| nValidationComplete_6ED20CD9
-  nValidationComplete_6ED20CD9 -->|consumed by| nReportService_417D4454["Service: ReportService"]
-  subgraph nCompliance_63C4143_domain["Domain: Compliance"]
-    nValidationComplete_6ED20CD9
-    nValidationService_5D88FD53
+nValidationComplete_6C766152["Event: Validation Complete"]
+  nValidationService_6640600D["Service: ValidationService"] -->|produces| nValidationComplete_6C766152
+  nValidationComplete_6C766152 -->|consumed by| nReportService_7E534222["Service: ReportService"]
+  subgraph nCompliance_11EAF98F_domain["Domain: Compliance"]
+    nValidationComplete_6C766152
+    nValidationService_6640600D
   end
-  subgraph nReport_6794871_domain["Domain: Report"]
-    nReportService_417D4454
+  subgraph nReport_523BC237_domain["Domain: Report"]
+    nReportService_7E534222
   end</pre>
             <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">

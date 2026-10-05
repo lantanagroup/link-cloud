@@ -106,7 +106,7 @@ public class FhirAuthenticationConfigurationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> CreateOrUpdateFhirAuthenticationConfiguration(
         string facilityId,
-        [FromBody] FhirAuthenticationConfigurationRequest request,
+        FhirAuthenticationConfigurationRequest request,
         CancellationToken cancellationToken)
     {
         try

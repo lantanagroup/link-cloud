@@ -1,4 +1,5 @@
 using System.Net;
+using System.Runtime.Serialization;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -15,6 +16,7 @@ namespace LantanaGroup.Link.Terminology.Application.Models;
 /// <see cref="Validate"/> rather than silently treated as omitted: dropping a blank <c>codeSystem</c> would
 /// widen the search to every loaded code group, which is not what the caller asked for.
 /// </remarks>
+[DataContract]
 public class CodeSearchQuery
 {
     private readonly string? _search;
@@ -26,6 +28,7 @@ public class CodeSearchQuery
     /// Free text matched against both the code and its display, or null to return everything in scope.
     /// </summary>
     [FromQuery(Name = CodeSearchParameters.Search)]
+    [DataMember]
     public string? Search
     {
         get => _search;
@@ -34,6 +37,7 @@ public class CodeSearchQuery
 
     /// <summary>The canonical URI of the single code system to search, if the caller named one.</summary>
     [FromQuery(Name = CodeSearchParameters.CodeSystem)]
+    [DataMember]
     public string? CodeSystem
     {
         get => _codeSystem;
@@ -42,6 +46,7 @@ public class CodeSearchQuery
 
     /// <summary>The canonical URI of the single value set to search, if the caller named one.</summary>
     [FromQuery(Name = CodeSearchParameters.ValueSet)]
+    [DataMember]
     public string? ValueSet
     {
         get => _valueSet;
@@ -53,6 +58,7 @@ public class CodeSearchQuery
     /// Null selects the latest loaded version.
     /// </summary>
     [FromQuery(Name = CodeSearchParameters.Version)]
+    [DataMember]
     public string? Version
     {
         get => _version;
@@ -61,10 +67,12 @@ public class CodeSearchQuery
 
     /// <summary>When true, codes whose resolved status is inactive are omitted.</summary>
     [FromQuery(Name = "excludeInactive")]
+    [DataMember]
     public bool ExcludeInactive { get; init; }
 
     /// <summary>The 1-based page to return. Values below 1 are clamped.</summary>
     [FromQuery(Name = "pageNumber")]
+    [DataMember]
     public int PageNumber { get; init; } = 1;
 
     /// <summary>
@@ -72,6 +80,7 @@ public class CodeSearchQuery
     /// return an entire code system.
     /// </summary>
     [FromQuery(Name = "pageSize")]
+    [DataMember]
     public int PageSize { get; init; } = CodeSearchDefaults.DefaultPageSize;
 
     /// <summary>
