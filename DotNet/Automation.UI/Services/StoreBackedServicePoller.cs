@@ -163,65 +163,91 @@ public sealed class StoreBackedServicePoller
         }
     }
 
-    private async Task<long> EpochBeforeReadAsync(CancellationToken ct)
+    private async Task<long?> EpochBeforeReadAsync(CancellationToken ct)
     {
         var meta = await _store.GetRunMetaAsync(_meta.RunId, ct);
-        return meta?.SnapshotEpoch ?? 0;
+        if (meta == null
+            || !string.Equals(meta.ReportId, _meta.ReportId, StringComparison.Ordinal)
+            || !string.Equals(meta.FacilityId, _meta.FacilityId, StringComparison.Ordinal))
+            return null;
+
+        return meta.SnapshotEpoch;
     }
 
     private async Task PollScheduleAsync(Guid scheduleId, CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var result = await _reader.GetReportScheduleAsync(scheduleId, ct);
-        await _store.SetDomainAsync(_meta.RunId, "schedule", result, epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "schedule", result, epoch.Value, ct);
     }
 
     private async Task PollEntriesAsync(Guid scheduleId, CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId, ct);
-        await _store.SetDomainAsync(_meta.RunId, "entries", result, epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "entries", result, epoch.Value, ct);
     }
 
     private async Task PollPopulationsAsync(Guid scheduleId, CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId, ct);
-        await _store.SetDomainAsync(_meta.RunId, "populations", RunHistorySlim.ToPopulationCounts(result), epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "populations", RunHistorySlim.ToPopulationCounts(result), epoch.Value, ct);
     }
 
     private async Task PollAcquisitionAsync(CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId, ct);
 
         // Always write � even when null � so stale data from a prior report
         // (e.g., before regeneration cleared snapshots) is overwritten.
-        await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, epoch.Value, ct);
     }
 
     private async Task PollAcquisitionLogsAsync(CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId, ct);
         var withNotes = await _reader.AttachFailureNotesAsync(logs, RunHistorySlim.FailureSampleIds(logs), ct);
-        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.ToAcquisitionChart(withNotes), epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.ToAcquisitionChart(withNotes), epoch.Value, ct);
     }
 
     private async Task PollOrgLocationAsync(CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var snapshot = new OrgLocationSnapshot(
             await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId, ct),
             await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId, ct),
             await _reader.GetEncounterMappingsAsync(_meta.FacilityId, ct));
-        await _store.SetDomainAsync(_meta.RunId, "orgLocation", RunHistorySlim.SlimOrgLocation(snapshot), epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "orgLocation", RunHistorySlim.SlimOrgLocation(snapshot), epoch.Value, ct);
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)
     {
         var epoch = await EpochBeforeReadAsync(ct);
+        if (epoch == null)
+            return;
+
         var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId, ct);
-        await _store.SetDomainAsync(_meta.RunId, "measureResources", RunHistorySlim.SlimMeasureResources(result), epoch, ct);
+        await _store.SetDomainAsync(_meta.RunId, "measureResources", RunHistorySlim.SlimMeasureResources(result), epoch.Value, ct);
     }
 }

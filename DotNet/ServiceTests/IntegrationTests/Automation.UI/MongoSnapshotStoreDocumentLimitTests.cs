@@ -744,6 +744,76 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("new-report");
     }
 
+    [Fact]
+    public async Task SetDomainAsync_stale_epoch_leaves_the_cleared_domain_empty()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+        await store.SetDomainAsync(runId, "entries", "before-switch", 0L, CancellationToken.None);
+        await store.UpdateRunMetaAsync(runId, "facility", "new-report", CancellationToken.None);
+
+        await store.SetDomainAsync(runId, "entries", "old-report", 0L, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_a_paused_writer_does_not_replace_the_new_report()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        var started = DateTimeOffset.UtcNow;
+        var current = StoreAt(started);
+        var stale = StoreAt(started.AddMinutes(5));
+        stale.BeforeHeaderInsert = async () =>
+        {
+            await store.UpdateRunMetaAsync(runId, "facility", "new-report", CancellationToken.None);
+            await current.SetDomainAsync(runId, "entries", "new-report", 1L, CancellationToken.None);
+        };
+
+        await stale.SetDomainAsync(
+            runId,
+            "entries",
+            new string('a', MongoSnapshotStore.SnapshotChunkBytes + 1),
+            0L,
+            CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("new-report");
+
+        var scheduleRun = Guid.NewGuid();
+        await store.RegisterRunAsync(scheduleRun, new RunSnapshotMeta
+        {
+            RunId = scheduleRun,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = started
+        }, CancellationToken.None);
+        var single = StoreAt(started.AddMinutes(10));
+        single.BeforeHeaderInsert = async () =>
+        {
+            await store.UpdateRunMetaAsync(scheduleRun, "facility", "new-report", CancellationToken.None);
+            await current.SetDomainAsync(scheduleRun, "schedule", "new-schedule", 1L, CancellationToken.None);
+        };
+        await single.SetDomainAsync(scheduleRun, "schedule", "old-schedule", 0L, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(scheduleRun, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
+    }
+
     private MongoSnapshotStore StoreAt(DateTimeOffset now)
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);

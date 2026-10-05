@@ -91,6 +91,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal bool FailNextHeaderLookup { get; set; }
 
     /// <summary>
+    /// Test seam. Runs after slices are stored and before the header is inserted,
+    /// so a test can move the report epoch in that window.
+    /// </summary>
+    internal Func<Task>? BeforeHeaderInsert { get; set; }
+
+    /// <summary>
     /// Test seam. Runs after a lost acknowledgement has been confirmed as
     /// published and before the follow-up header lookup.
     /// </summary>
@@ -786,6 +792,38 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return doc?.SnapshotEpoch ?? 0;
     }
 
+    /// <summary>
+    /// The run document is the generation fence. It stays when domain clocks are deleted.
+    /// </summary>
+    private async Task<bool> RunEpochMovedAsync(Guid runId, long epoch, CancellationToken ct)
+        => await ReadSnapshotEpochAsync(runId, ct) > epoch;
+
+    /// <summary>
+    /// Drops this write when the run moved on. Deletes slices this attempt already stored.
+    /// Does not touch another generation's header.
+    /// </summary>
+    private async Task<bool> AbandonForMovedEpochAsync(
+        Guid runId,
+        string domain,
+        long epoch,
+        string? revision,
+        CancellationToken ct)
+    {
+        var hook = BeforeHeaderInsert;
+        BeforeHeaderInsert = null;
+        if (hook != null)
+            await hook();
+
+        if (!await RunEpochMovedAsync(runId, epoch, ct))
+            return false;
+
+        if (!string.IsNullOrEmpty(revision))
+            await DeleteSlicesQuietlyAsync(runId, domain, revision);
+
+        LogDroppedNewerHeader(runId, domain);
+        return true;
+    }
+
     private async Task<SnapshotWriteClockDocument?> ReadClockAsync(Guid runId, string domain, CancellationToken ct)
         => await _writeClocks.Find(c => c.Id == SnapshotClockId(runId, domain)).FirstOrDefaultAsync(ct);
 
@@ -901,14 +939,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         string domain,
         ObjectId keepId,
         string? previousRevision,
-        DomainSnapshotDocument? previous)
+        DomainSnapshotDocument? previous,
+        long epoch)
     {
         try
         {
             if (AfterHeaderCommitted != null)
                 await AfterHeaderCommitted();
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous))
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous, epoch))
             {
                 _logger.LogWarning(
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
@@ -935,6 +974,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
+            if (await RunEpochMovedAsync(runId, epoch, ct))
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return new SnapshotWrite(false, null);
+            }
+
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
             var clock = await ReadClockAsync(runId, domain, ct);
             if (DropForNewerGeneration(clock, epoch, previous, now))
@@ -954,6 +999,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
             var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
             var stamp = NextSnapshotTimestamp(now, previous?.UpdatedAt);
+            if (await AbandonForMovedEpochAsync(runId, domain, epoch, revision: null, ct))
+                return new SnapshotWrite(false, null);
+
             ObjectId keepId;
             if (previous == null)
             {
@@ -1006,7 +1054,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
             }
 
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous);
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch);
         }
 
         _logger.LogWarning(
@@ -1030,6 +1078,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
+            if (await RunEpochMovedAsync(runId, epoch, ct))
+            {
+                LogDroppedNewerHeader(runId, domain);
+                return new SnapshotWrite(false, null);
+            }
+
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
             var clock = await ReadClockAsync(runId, domain, ct);
             if (DropForNewerGeneration(clock, epoch, previous, now))
@@ -1077,6 +1131,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 await DeleteSlicesQuietlyAsync(runId, domain, revision);
                 throw;
             }
+
+            if (await AbandonForMovedEpochAsync(runId, domain, epoch, revision, ct))
+                return new SnapshotWrite(false, null);
 
             ObjectId keepId;
             try
@@ -1160,7 +1217,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 keepId = publishedHeader.Id;
             }
 
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous);
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch);
         }
 
         _logger.LogWarning(
@@ -1238,13 +1295,23 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         string domain,
         ObjectId keepId,
         string? previousRevision,
-        DomainSnapshotDocument? previous)
+        DomainSnapshotDocument? previous,
+        long epoch)
     {
         if (BeforeDeleteDisplaced != null)
             await BeforeDeleteDisplaced();
 
         using var timeout = StartCleanupLookupTimeout();
         var ct = timeout.Token;
+        if (await RunEpochMovedAsync(runId, epoch, ct))
+        {
+            var ownHeader = await _snapshots.Find(d => d.Id == keepId).FirstOrDefaultAsync(ct);
+            if (ownHeader != null)
+                await DeleteHeaderIfUnchangedAsync(runId, domain, ownHeader, ct);
+            LogDroppedNewerHeader(runId, domain);
+            return false;
+        }
+
         List<DomainSnapshotDocument> headers;
         try
         {
