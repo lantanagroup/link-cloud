@@ -40,6 +40,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
     private readonly IMongoCollection<SnapshotWriteClockDocument> _writeClocks;
+    private readonly IMongoCollection<SnapshotRunTombstoneDocument> _runTombstones;
+    private readonly IMongoCollection<SnapshotHeaderEpochDocument> _headerEpochs;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
@@ -97,6 +99,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     internal Func<Task>? BeforeHeaderInsert { get; set; }
 
     /// <summary>
+    /// Test seam. Runs after the epoch check has accepted this write and before
+    /// the header is inserted.
+    /// </summary>
+    internal Func<Task>? AfterEpochAccepted { get; set; }
+
+    /// <summary>
     /// Test seam. Runs after a lost acknowledgement has been confirmed as
     /// published and before the follow-up header lookup.
     /// </summary>
@@ -108,6 +116,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _writeClocks = database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks");
+        _runTombstones = database.GetCollection<SnapshotRunTombstoneDocument>("automation_run_tombstones");
+        _headerEpochs = database.GetCollection<SnapshotHeaderEpochDocument>("automation_snapshot_header_epochs");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -148,6 +158,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // Clear stale domain snapshot data so milestones/entries from a prior report
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await _headerEpochs.DeleteManyAsync(epoch => epoch.RunId == runId, ct);
         await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
@@ -451,10 +462,20 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (run != null && retainOwnedFacilities)
             await RetainOwnedFacilitiesAsync(ToSummary(run), ct);
 
+        // The marker lands before the summary is removed, so a write already in
+        // flight can see that this run is gone instead of treating a missing
+        // summary as epoch 0.
+        await _runTombstones.ReplaceOneAsync(
+            tombstone => tombstone.RunId == runId,
+            new SnapshotRunTombstoneDocument { RunId = runId, DeletedAt = DateTimeOffset.UtcNow },
+            new ReplaceOptions { IsUpsert = true },
+            ct);
+
         // Drop child history first and the run summary last. A failure after the
         // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await _headerEpochs.DeleteManyAsync(epoch => epoch.RunId == runId, ct);
         await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
@@ -793,6 +814,16 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     }
 
     /// <summary>
+    /// True only after <see cref="DeleteRunAsync"/> marked the run. A missing run
+    /// summary with no marker is still epoch 0 and may accept a snapshot.
+    /// </summary>
+    private async Task<bool> IsRunDeletedAsync(Guid runId, CancellationToken ct)
+    {
+        var marker = await _runTombstones.Find(tombstone => tombstone.RunId == runId).Limit(1).FirstOrDefaultAsync(ct);
+        return marker != null;
+    }
+
+    /// <summary>
     /// The run document is the generation fence. It stays when domain clocks are deleted.
     /// </summary>
     private async Task<bool> RunEpochMovedAsync(Guid runId, long epoch, CancellationToken ct)
@@ -814,10 +845,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (hook != null)
             await hook();
 
-        bool moved;
+        bool deleted;
+        bool blocked;
         try
         {
-            moved = await RunEpochMovedAsync(runId, epoch, ct);
+            deleted = await IsRunDeletedAsync(runId, ct);
+            blocked = deleted || await RunEpochMovedAsync(runId, epoch, ct);
         }
         catch
         {
@@ -827,11 +860,29 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             throw;
         }
 
-        if (!moved)
+        if (!blocked)
+        {
+            if (AfterEpochAccepted != null)
+            {
+                try
+                {
+                    await AfterEpochAccepted();
+                }
+                catch
+                {
+                    if (!string.IsNullOrEmpty(revision))
+                        await DeleteSlicesQuietlyAsync(runId, domain, revision);
+                    throw;
+                }
+            }
+
             return false;
+        }
 
         if (!string.IsNullOrEmpty(revision))
             await DeleteSlicesQuietlyAsync(runId, domain, revision);
+        if (deleted)
+            await DeleteClockQuietlyAsync(runId, domain);
 
         LogDroppedNewerHeader(runId, domain);
         return true;
@@ -958,6 +1009,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         try
         {
+            await RememberHeaderEpochAsync(keepId, runId, domain, epoch);
             if (AfterHeaderCommitted != null)
                 await AfterHeaderCommitted();
 
@@ -988,7 +1040,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
-            if (await RunEpochMovedAsync(runId, epoch, ct))
+            if (await DropBecauseRunDeletedAsync(runId, domain, ct) || await RunEpochMovedAsync(runId, epoch, ct))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -1092,7 +1144,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         for (var attempt = 0; attempt < 3; attempt++)
         {
             ct.ThrowIfCancellationRequested();
-            if (await RunEpochMovedAsync(runId, epoch, ct))
+            if (await DropBecauseRunDeletedAsync(runId, domain, ct) || await RunEpochMovedAsync(runId, epoch, ct))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -1320,6 +1372,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         using var timeout = StartCleanupLookupTimeout();
         var ct = timeout.Token;
+        if (await IsRunDeletedAsync(runId, ct))
+        {
+            var retiredHeader = await _snapshots
+                .Find(d => d.Id == keepId && d.UpdatedAt == publishedStamp)
+                .FirstOrDefaultAsync(ct);
+            if (retiredHeader != null)
+                await DeleteHeaderIfUnchangedAsync(runId, domain, retiredHeader, ct);
+            await DeleteClockQuietlyAsync(runId, domain);
+            LogDroppedNewerHeader(runId, domain);
+            return false;
+        }
+
         if (await RunEpochMovedAsync(runId, epoch, ct))
         {
             var ownHeader = await _snapshots
@@ -1349,8 +1413,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             return false;
         }
 
+        var epochByHeader = await ReadHeaderEpochsAsync(headers, ct);
+        long? EpochOf(DomainSnapshotDocument header)
+            => epochByHeader.TryGetValue(header.Id.ToString(), out var headerEpoch) ? headerEpoch : null;
+        var mine = EpochOf(me);
+
+        foreach (var olderGeneration in headers.Where(header => mine != null && EpochOf(header) != null && EpochOf(header) < mine))
+            await DeleteHeaderIfUnchangedAsync(runId, domain, olderGeneration, ct);
+
         var newest = headers
-            .OrderByDescending(header => header.UpdatedAt)
+            .Where(header => mine == null || EpochOf(header) == null || EpochOf(header) >= mine)
+            .OrderByDescending(header => EpochOf(header) ?? mine ?? 0)
+            .ThenByDescending(header => header.UpdatedAt)
             .ThenByDescending(header => header.Id)
             .First();
         if (newest.Id != keepId)
@@ -1383,10 +1457,37 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (pointer != null)
             await DeleteUnusedSnapshotBlobAsync(runId, domain, pointer);
 
+        await _headerEpochs.DeleteOneAsync(epoch => epoch.Id == header.Id.ToString(), ct);
+
         if (string.IsNullOrEmpty(header.Revision))
             return;
 
         await DeleteSlicesAsync(runId, domain, header.Revision, ct);
+    }
+
+    private Task RememberHeaderEpochAsync(ObjectId headerId, Guid runId, string domain, long epoch)
+    {
+        using var timeout = StartCleanupLookupTimeout();
+        return _headerEpochs.ReplaceOneAsync(
+            row => row.Id == headerId.ToString(),
+            new SnapshotHeaderEpochDocument
+            {
+                Id = headerId.ToString(),
+                RunId = runId,
+                Domain = domain,
+                Epoch = epoch
+            },
+            new ReplaceOptions { IsUpsert = true },
+            timeout.Token);
+    }
+
+    private async Task<Dictionary<string, long>> ReadHeaderEpochsAsync(
+        IReadOnlyCollection<DomainSnapshotDocument> headers,
+        CancellationToken ct)
+    {
+        var ids = headers.Select(header => header.Id.ToString()).ToList();
+        var rows = await _headerEpochs.Find(row => ids.Contains(row.Id)).ToListAsync(ct);
+        return rows.ToDictionary(row => row.Id, row => row.Epoch);
     }
 
     internal static FilterDefinition<DomainSnapshotDocument> ObservedHeaderFilter(DomainSnapshotDocument previous)
@@ -1512,6 +1613,32 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             & filter.Gte(d => d.ChunkIndex, 0)
             & filter.Eq(d => d.Revision, revision);
         return _snapshots.DeleteManyAsync(slices, ct);
+    }
+
+    private async Task<bool> DropBecauseRunDeletedAsync(Guid runId, string domain, CancellationToken ct)
+    {
+        if (!await IsRunDeletedAsync(runId, ct))
+            return false;
+
+        await DeleteClockQuietlyAsync(runId, domain);
+        return true;
+    }
+
+    private async Task DeleteClockQuietlyAsync(Guid runId, string domain)
+    {
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            await _writeClocks.DeleteOneAsync(clock => clock.Id == SnapshotClockId(runId, domain), timeout.Token);
+        }
+        catch (Exception cleanupEx)
+        {
+            _logger.LogWarning(
+                cleanupEx,
+                "Snapshot clock cleanup failed for domain {Domain} run {RunId}.",
+                domain.SanitizeForLog(),
+                runId.ToString().SanitizeForLog());
+        }
     }
 
     private async Task DeleteSlicesQuietlyAsync(Guid runId, string domain, string revision)
