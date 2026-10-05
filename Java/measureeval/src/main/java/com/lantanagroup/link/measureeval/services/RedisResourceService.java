@@ -8,11 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.HashOperations;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -145,44 +143,13 @@ public class RedisResourceService {
     static final String DURABLE_RESOURCE_COUNT_FIELD = "__durableResourceCount";
 
     public void cleanup(String correlationId) {
-        // The bare correlation key plus any surviving {correlationId}:{ResourceType} acquisition
-        // keys. Normalization normally deletes the acquisition keys after each pass, but a
-        // dead-lettered correlation can leave them behind — and the ABS side sweeps its whole
-        // prefix, so the two stores should forget a correlation symmetrically instead of leaving
-        // Redis keys to age out at the TTL.
-        //
-        // The acquisition keys are enumerated, not discovered: FHIR resource types are a closed
-        // set, so every key the correlation could have is built up front and the whole batch goes
-        // in one UNLINK. A SCAN ... MATCH would walk the entire keyspace and filter server-side —
-        // MATCH is not an index — once per correlation on a Redis instance shared with other
-        // caches, which is O(correlations x keyspace) rather than O(keys deleted). UNLINK of a key
-        // that does not exist is a cheap no-op, so over-enumerating costs far less than scanning.
-        //
-        // These are the only key shapes a correlation owns (see the key layout in
-        // docs-dev/resource-cache.md). A new shape under the correlation prefix must be added here.
-        //
-        // One key per UNLINK, pipelined. A single multi-key UNLINK fails CROSSSLOT on a clustered
-        // Redis (OSS clustering policy), because the keys hash to different slots -- and the
-        // correlation key would fail with the rest. Single-key commands are valid under any
-        // policy, and the pipeline keeps the whole batch to one round trip.
-        ResourceType[] resourceTypes = ResourceType.values();
-        List<byte[]> keys = new ArrayList<>(resourceTypes.length + 1);
-        keys.add(correlationId.getBytes(StandardCharsets.UTF_8));
-        for (ResourceType resourceType : resourceTypes) {
-            keys.add((correlationId + ":" + resourceType.name()).getBytes(StandardCharsets.UTF_8));
-        }
-
-        List<Object> results = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
-            for (byte[] key : keys) {
-                connection.keyCommands().unlink(key);
-            }
-            return null;
-        });
-
-        long unlinked = results == null ? 0 : results.stream()
-                .filter(Long.class::isInstance)
-                .mapToLong(Long.class::cast)
-                .sum();
-        logger.debug("Cleaned up {} Redis key(s) for correlationId='{}'", unlinked, LogUtils.sanitize(correlationId));
+        // Only {correlationId}, the normalized entry MeasureEval reads. The acquisition keys
+        // ({correlationId}:{ResourceType}) belong to Normalization, which deletes them after producing
+        // ResourcesNormalized and purges them on every terminal failure; any it fails to delete expire
+        // with the TTL. One key per command is also what the OSS clustering policy of our Azure
+        // Managed Redis requires: a multi-key UNLINK spanning hash slots is rejected with CROSSSLOT.
+        Boolean unlinked = redisTemplate.unlink(correlationId);
+        logger.debug("Cleaned up Redis key for correlationId='{}' (present={})",
+                LogUtils.sanitize(correlationId), Boolean.TRUE.equals(unlinked));
     }
 }
