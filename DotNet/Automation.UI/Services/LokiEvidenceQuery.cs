@@ -66,6 +66,16 @@ public static class LokiEvidenceQuery
     public static TimeSpan LookbackForRequest(TimeSpan attemptLookback, TimeSpan coverage) =>
         coverage > attemptLookback ? coverage : attemptLookback;
 
+    /// <summary>
+    /// Time from <paramref name="started"/> to <paramref name="now"/>. A start
+    /// that is still in the future contributes no extra lookback.
+    /// </summary>
+    public static TimeSpan CoverageSince(DateTimeOffset started, DateTimeOffset now)
+    {
+        var coverage = now - started;
+        return coverage < TimeSpan.Zero ? TimeSpan.Zero : coverage;
+    }
+
     public static TimeSpan? DelayBeforeAttempt(int attemptIndex)
     {
         if (attemptIndex <= 0 || attemptIndex > RetryDelays.Length)
