@@ -893,6 +893,77 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await Docs(runId)).Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task SetDomainAsync_does_not_recreate_a_deleted_run()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+        await store.SetDomainAsync(runId, "schedule", "live", 0L, CancellationToken.None);
+
+        await store.DeleteRunAsync(runId, CancellationToken.None);
+        await store.SetDomainAsync(runId, "schedule", "stale", 0L, CancellationToken.None);
+
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None)).Should().BeNull();
+        var snapshots = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(document => document.RunId == runId)
+            .ToListAsync();
+        var clocks = await _fixture.Database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks")
+            .Find(clock => clock.RunId == runId)
+            .ToListAsync();
+        snapshots.Should().BeEmpty();
+        clocks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_current_report_survives_an_old_insert_after_the_epoch_check()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        var started = DateTimeOffset.UtcNow;
+        var current = StoreAt(started);
+        var stale = StoreAt(started.AddMinutes(5));
+        var currentReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleInserted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = Task.CompletedTask;
+
+        current.BeforeDeleteDisplaced = async () =>
+        {
+            currentReady.TrySetResult();
+            await staleInserted.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        };
+        stale.AfterHeaderCommitted = () =>
+        {
+            staleInserted.TrySetResult();
+            return Task.CompletedTask;
+        };
+        stale.AfterEpochAccepted = async () =>
+        {
+            await MoveEpochAsync(runId);
+            pending = Task.Run(() => current.SetDomainAsync(runId, "schedule", "new-schedule", 1L, CancellationToken.None));
+            await currentReady.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        };
+
+        await stale.SetDomainAsync(runId, "schedule", "old-schedule", 0L, CancellationToken.None);
+        await pending;
+
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
+    }
+
     private Task MoveEpochAsync(Guid runId)
         => _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs")
             .UpdateOneAsync(

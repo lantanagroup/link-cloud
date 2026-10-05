@@ -55,6 +55,38 @@ public sealed class AutomationRunDocument
     public string? GeneratedTemplateSetHash { get; set; }
 }
 
+/// <summary>
+/// Report generation for one snapshot header. Kept off <see cref="DomainSnapshotDocument"/>
+/// so a single-document snapshot stays readable by a build that does not know this field.
+/// A header with no row still ranks by timestamp.
+/// </summary>
+public sealed class SnapshotHeaderEpochDocument
+{
+    [BsonId]
+    public string Id { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public string Domain { get; set; } = string.Empty;
+
+    public long Epoch { get; set; }
+}
+
+/// <summary>
+/// A run whose summary was deleted. A late snapshot write must not recreate rows
+/// after that. No marker is not a deleted run: a snapshot can still be stored
+/// before the run summary exists.
+/// </summary>
+public sealed class SnapshotRunTombstoneDocument
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    public DateTimeOffset DeletedAt { get; set; }
+}
+
 /// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
 public sealed class OwnedFacilityTombstoneDocument
 {

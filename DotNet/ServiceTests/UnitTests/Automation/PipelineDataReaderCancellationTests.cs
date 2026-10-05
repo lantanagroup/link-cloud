@@ -171,4 +171,60 @@ public class PipelineDataReaderCancellationTests
         dataAcq.Verify(client => client.GetAcquisitionLogNotesAsync(12, It.IsAny<CancellationToken>()), Times.Once);
         dataAcq.Verify(client => client.GetAcquisitionLogNotesAsync(11, It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task AttachFailureNotesAsync_keeps_other_notes_when_one_lookup_throws()
+    {
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(1, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("notes failed"));
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse<List<string>> { StatusCode = 200, Body = ["kept"] });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+        var logs = new List<PipelineDataReader.AcquisitionLogInfo>
+        {
+            new(1, null, null, null, "Failed", null, [], [], []),
+            new(2, null, null, null, "Failed", null, [], [], [])
+        };
+
+        var withNotes = await reader.AttachFailureNotesAsync(logs, [1, 2]);
+
+        withNotes.Single(log => log.Id == 1).Notes.Should().BeEmpty();
+        withNotes.Single(log => log.Id == 2).Notes.Should().Equal("kept");
+    }
+
+    [Fact]
+    public async Task AttachFailureNotesAsync_still_stops_when_the_caller_cancels()
+    {
+        using var cts = new CancellationTokenSource();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(1, It.IsAny<CancellationToken>()))
+            .Returns((long _, CancellationToken token) =>
+            {
+                cts.Cancel();
+                return Task.FromException<LinkApiResponse<List<string>>>(new OperationCanceledException(token));
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+        var logs = new List<PipelineDataReader.AcquisitionLogInfo>
+        {
+            new(1, null, null, null, "Failed", null, [], [], [])
+        };
+
+        var act = () => reader.AttachFailureNotesAsync(logs, [1], cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }

@@ -395,11 +395,22 @@ public class PipelineDataReader
         foreach (var id in failureIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var response = await _dataAcqClient.GetAcquisitionLogNotesAsync(id, cancellationToken);
-            if (!response.IsSuccessStatusCode || response.Body == null)
-                continue;
+            try
+            {
+                var response = await _dataAcqClient.GetAcquisitionLogNotesAsync(id, cancellationToken);
+                if (!response.IsSuccessStatusCode || response.Body == null)
+                    continue;
 
-            notesById[id] = response.Body;
+                notesById[id] = response.Body;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // Notes are optional. One failed lookup must not drop the chart.
+            }
         }
 
         if (notesById.Count == 0)
