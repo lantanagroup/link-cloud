@@ -23,7 +23,14 @@ namespace Automation.UI.Services.Persistence;
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
     private const int MaxLogLinesPerChunk = 1_000;
-    private const int MaxLogChunkEstimatedBsonBytes = 12 * 1024 * 1024;
+
+    /// <summary>
+    /// Cosmos DB for MongoDB RU rejects a document over 2 MB. Snapshot slices
+    /// and run-log chunks stay at or under 1.5 MB so the wrapper still fits.
+    /// </summary>
+    internal const int SnapshotChunkBytes = 1_500_000;
+
+    private const int MaxLogChunkEstimatedBsonBytes = SnapshotChunkBytes;
     private const int EstimatedBsonBytesPerLineOverhead = 64;
     private const string OversizedLogLineSuffix = " [truncated: exceeded log chunk byte budget]";
     private const string SnapshotPayloadPointerEnvelopeProperty = "__externalSnapshotPayloadPointer";
@@ -38,12 +45,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<FacilityTeardownProgressDocument> _facilityTeardownProgress;
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
-
-    /// <summary>
-    /// Cosmos DB for MongoDB RU rejects a document over 2 MB. The check uses
-    /// the UTF-8 size of the JSON that would be stored.
-    /// </summary>
-    internal const int CosmosDocumentLimitBytes = 2_000_000;
 
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
@@ -518,23 +519,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var json = JsonSerializer.Serialize(data);
         var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
-        if (!_snapshotPayloadStore.ShouldExternalize(domain, payloadUtf8Bytes)
-            && payloadUtf8Bytes > CosmosDocumentLimitBytes)
-        {
-            _logger.LogWarning(
-                "Skipped snapshot domain {Domain} for run {RunId}. Serialized document is {Bytes} bytes, over the {Limit} byte Cosmos limit.",
-                domain,
-                runId,
-                payloadUtf8Bytes,
-                CosmosDocumentLimitBytes);
-            return;
-        }
-
-        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
-            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
-
-        var existing = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
-        var existingPointer = TryReadSnapshotPayloadPointer(existing?.Data);
+        var now = DateTimeOffset.UtcNow;
 
         SnapshotPayloadPointer? newPointer = null;
         var storedJson = json;
@@ -547,18 +532,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             });
         }
 
-        var update = Builders<DomainSnapshotDocument>.Update
-            .Set(d => d.Data, storedJson)
-            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow)
-            .SetOnInsert(d => d.RunId, runId)
-            .SetOnInsert(d => d.Domain, domain);
+        var existing = await _snapshots.Find(SingleOrHeaderFilter(runId, domain)).FirstOrDefaultAsync(ct);
+        var existingPointer = TryReadSnapshotPayloadPointer(existing?.Data);
+        var storedBytes = Encoding.UTF8.GetByteCount(storedJson);
+        var wrote = storedBytes <= SnapshotChunkBytes
+            ? await WriteSingleAsync(runId, domain, storedJson, now, ct)
+            : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
 
-        await _snapshots.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+        if (!wrote)
+            return;
 
         if (existingPointer != null && (newPointer == null || !string.Equals(existingPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
-        {
             await _snapshotPayloadStore.DeleteIfExistsAsync(existingPointer, ct);
-        }
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
@@ -566,44 +551,257 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
             & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
 
-        var doc = await _snapshots.Find(filter).FirstOrDefaultAsync(ct);
-        if (doc == null)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
-            return null;
-        }
-
-        try
-        {
-            var payloadJson = doc.Data;
-            var pointer = TryReadSnapshotPayloadPointer(payloadJson);
-            if (pointer != null)
+            var docs = await _snapshots.Find(filter).ToListAsync(ct);
+            if (docs.Count == 0)
             {
-                payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct);
-                if (string.IsNullOrWhiteSpace(payloadJson))
-                {
-                    var sanitizedRunId = runId.ToString().SanitizeForLog();
-                    var sanitizedDomain = domain.SanitizeForLog();
-                    var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
-                    _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
-                    return null;
-                }
-            }
-
-            var data = JsonSerializer.Deserialize<T>(payloadJson);
-            if (data == null)
-            {
-                _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, doc.Data?.Length ?? 0);
+                _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
                 return null;
             }
 
-            return new DomainSnapshot<T> { UpdatedAt = doc.UpdatedAt, Data = data };
+            var header = docs.Where(d => d.ChunkIndex == -1).OrderByDescending(d => d.UpdatedAt).FirstOrDefault();
+            string payloadJson;
+            DateTimeOffset updatedAt;
+            if (header?.ChunkCount is > 0 && !string.IsNullOrEmpty(header.Revision))
+            {
+                var chunks = docs
+                    .Where(d => d.ChunkIndex >= 0 && d.Revision == header.Revision)
+                    .OrderBy(d => d.ChunkIndex)
+                    .ToList();
+                var complete = chunks.Count == header.ChunkCount
+                    && chunks.Select(c => c.ChunkIndex).Distinct().Count() == chunks.Count;
+                if (!complete)
+                {
+                    if (attempt < 2)
+                        continue;
+
+                    _logger.LogWarning(
+                        "[Store] GetDomain: incomplete chunks for run={RunId} domain={Domain} revision={Revision} expected={Expected} found={Found}",
+                        runId, domain, header.Revision, header.ChunkCount, chunks.Count);
+                    return null;
+                }
+
+                payloadJson = string.Concat(chunks.Select(c => c.Data));
+                updatedAt = header.UpdatedAt;
+            }
+            else
+            {
+                var single = docs.Where(d => d.ChunkIndex is null).OrderByDescending(d => d.UpdatedAt).FirstOrDefault()
+                    ?? header;
+                if (single == null || string.IsNullOrEmpty(single.Data))
+                    return null;
+
+                payloadJson = single.Data;
+                updatedAt = single.UpdatedAt;
+            }
+
+            try
+            {
+                var pointer = TryReadSnapshotPayloadPointer(payloadJson);
+                if (pointer != null)
+                {
+                    payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(payloadJson))
+                    {
+                        var sanitizedRunId = runId.ToString().SanitizeForLog();
+                        var sanitizedDomain = domain.SanitizeForLog();
+                        var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
+                        _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
+                        return null;
+                    }
+                }
+
+                var data = JsonSerializer.Deserialize<T>(payloadJson);
+                if (data == null)
+                {
+                    _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, payloadJson.Length);
+                    return null;
+                }
+
+                return new DomainSnapshot<T> { UpdatedAt = updatedAt, Data = data };
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, payloadJson.Length);
+                return null;
+            }
         }
-        catch (JsonException ex)
+
+        return null;
+    }
+
+    /// <summary>
+    /// Splits <paramref name="json"/> on UTF-8 character boundaries so each
+    /// slice is at most <paramref name="maxBytes"/> bytes. A slice is not
+    /// valid JSON on its own. Concatenate the slices before deserializing.
+    /// </summary>
+    internal static List<string> SplitUtf8(string json, int maxBytes)
+    {
+        var slices = new List<string>();
+        if (string.IsNullOrEmpty(json))
+            return slices;
+
+        var start = 0;
+        var bytes = 0;
+        for (var i = 0; i < json.Length;)
         {
-            _logger.LogWarning(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, doc.Data?.Length ?? 0);
-            return null;
+            var width = char.IsHighSurrogate(json[i]) && i + 1 < json.Length ? 2 : 1;
+            var charBytes = Encoding.UTF8.GetByteCount(json.AsSpan(i, width));
+            if (bytes > 0 && bytes + charBytes > maxBytes)
+            {
+                slices.Add(json.Substring(start, i - start));
+                start = i;
+                bytes = 0;
+            }
+
+            bytes += charBytes;
+            i += width;
         }
+
+        if (start < json.Length)
+            slices.Add(json[start..]);
+
+        return slices;
+    }
+
+    private FilterDefinition<DomainSnapshotDocument> SingleOrHeaderFilter(Guid runId, string domain)
+    {
+        var filter = Builders<DomainSnapshotDocument>.Filter;
+        return filter.Eq(d => d.RunId, runId)
+            & filter.Eq(d => d.Domain, domain)
+            & (filter.Eq(d => d.ChunkIndex, null) | filter.Eq(d => d.ChunkIndex, -1));
+    }
+
+    private async Task<bool> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
+    {
+        var update = Builders<DomainSnapshotDocument>.Update
+            .Set(d => d.Data, storedJson)
+            .Set(d => d.UpdatedAt, now)
+            .Unset(d => d.ChunkIndex)
+            .Unset(d => d.ChunkCount)
+            .Unset(d => d.Revision)
+            .SetOnInsert(d => d.RunId, runId)
+            .SetOnInsert(d => d.Domain, domain);
+
+        var result = await _snapshots.UpdateOneAsync(SingleOrHeaderFilter(runId, domain), update, new UpdateOptions { IsUpsert = true }, ct);
+        ObjectId keepId;
+        if (result.UpsertedId != null)
+        {
+            keepId = result.UpsertedId.AsObjectId;
+        }
+        else
+        {
+            var kept = await _snapshots.Find(SingleOrHeaderFilter(runId, domain)).FirstOrDefaultAsync(ct);
+            if (kept == null)
+                return false;
+
+            keepId = kept.Id;
+        }
+
+        var others = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+            & Builders<DomainSnapshotDocument>.Filter.Ne(d => d.Id, keepId);
+        await _snapshots.DeleteManyAsync(others, ct);
+        return true;
+    }
+
+    private async Task<bool> WriteChunkedAsync(Guid runId, string domain, string json, DateTimeOffset now, CancellationToken ct)
+    {
+        var slices = SplitUtf8(json, SnapshotChunkBytes);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var previous = await _snapshots.Find(SingleOrHeaderFilter(runId, domain))
+                .SortByDescending(d => d.UpdatedAt)
+                .FirstOrDefaultAsync(ct);
+            var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
+            var revision = Guid.NewGuid().ToString("N");
+
+            try
+            {
+                for (var i = 0; i < slices.Count; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await _snapshots.InsertOneAsync(new DomainSnapshotDocument
+                    {
+                        Id = ObjectId.GenerateNewId(),
+                        RunId = runId,
+                        Domain = domain,
+                        Data = slices[i],
+                        ChunkIndex = i,
+                        ChunkCount = slices.Count,
+                        Revision = revision,
+                        UpdatedAt = now
+                    }, cancellationToken: ct);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await DeleteRevisionAsync(runId, domain, revision, CancellationToken.None);
+                _logger.LogWarning(ex, "Snapshot chunks for domain {Domain} run {RunId} were not stored.", domain, runId);
+                return false;
+            }
+
+            var headerUpdate = Builders<DomainSnapshotDocument>.Update
+                .Set(d => d.Data, string.Empty)
+                .Set(d => d.ChunkIndex, -1)
+                .Set(d => d.ChunkCount, slices.Count)
+                .Set(d => d.Revision, revision)
+                .Set(d => d.UpdatedAt, now)
+                .SetOnInsert(d => d.RunId, runId)
+                .SetOnInsert(d => d.Domain, domain);
+
+            UpdateResult flip;
+            if (previous == null)
+            {
+                flip = await _snapshots.UpdateOneAsync(
+                    SingleOrHeaderFilter(runId, domain),
+                    headerUpdate,
+                    new UpdateOptions { IsUpsert = true },
+                    ct);
+            }
+            else
+            {
+                var filter = Builders<DomainSnapshotDocument>.Filter;
+                var cas = filter.Eq(d => d.Id, previous.Id)
+                    & (previousRevision == null
+                        ? filter.Eq(d => d.Revision, null)
+                        : filter.Eq(d => d.Revision, previousRevision));
+                flip = await _snapshots.UpdateOneAsync(cas, headerUpdate, cancellationToken: ct);
+            }
+
+            if (flip.MatchedCount == 0 && flip.UpsertedId == null)
+            {
+                await DeleteRevisionAsync(runId, domain, revision, ct);
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(previousRevision))
+            {
+                var oldChunks = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+                    & Builders<DomainSnapshotDocument>.Filter.Gte(d => d.ChunkIndex, 0)
+                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, previousRevision);
+                await _snapshots.DeleteManyAsync(oldChunks, ct);
+            }
+
+            return true;
+        }
+
+        _logger.LogWarning(
+            "Snapshot domain {Domain} for run {RunId} kept its previous revision after a concurrent write.",
+            domain,
+            runId);
+        return false;
+    }
+
+    private Task DeleteRevisionAsync(Guid runId, string domain, string revision, CancellationToken ct)
+    {
+        var mine = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, revision);
+        return _snapshots.DeleteManyAsync(mine, ct);
     }
 
     private static SnapshotPayloadPointer? TryReadSnapshotPayloadPointer(string? payload)

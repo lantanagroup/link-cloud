@@ -440,13 +440,17 @@ public class AutomationRunManager : IAutomationRunManager
         try
         {
             // Build snapshot from store-cached domain data (zero API calls).
+            AcquisitionLogChart? acquisitionChart = null;
             var builder = new PipelineSummarySnapshotBuilder(async (scheduleId, fId) =>
             {
                 var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
                 var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
                 var populationCounts = await ReadPopulationCountsAsync(runId, cancellationToken);
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
-                var acquisitionLogs = await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? [];
+                acquisitionChart = await SafeGetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", cancellationToken);
+                var acquisitionLogs = acquisitionChart == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", cancellationToken) ?? []
+                    : [];
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
@@ -473,6 +477,8 @@ public class AutomationRunManager : IAutomationRunManager
             });
 
             var snapshot = await builder.BuildAsync(facilityId, reportId, logs, cancellationToken);
+            if (acquisitionChart != null)
+                acquisitionChart.Apply(snapshot.DataAcquisition, snapshot.DataAcquisition.ResourceCount, snapshot.GeneratedAt);
             snapshot.IsFinal = isFinal;
             return snapshot;
         }
