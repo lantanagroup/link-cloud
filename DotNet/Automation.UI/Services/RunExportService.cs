@@ -831,7 +831,7 @@ public sealed class RunExportService : IRunExportService
             {
                 "schedule"           => (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, domain, ct))?.Data,
                 "entries"            => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
-                "populations"        => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, domain, ct))?.Data,
+                "populations"        => (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, domain, ct))?.Data,
                 "acquisitionSummary" => (await _snapshotStore.GetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, domain, ct))?.Data,
                 "measureResources"   => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, domain, ct))?.Data,
                 "validatorResults"   => (await _snapshotStore.GetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, domain, ct))?.Data,
