@@ -131,10 +131,19 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// </summary>
     public async Task CompleteRunAsync(Guid runId)
     {
-        // Do a final domain-data flush BEFORE stopping the poller,
-        // so the last state of every domain is guaranteed to be persisted.
+        // Stop the loop before the final flush. The loop and the final poll
+        // write the same domains, and the final poll has to be the last writer.
         if (_activePollers.TryGetValue(runId, out var activeHandle))
         {
+            try
+            {
+                await activeHandle.DrainAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Stopping the poller before the final snapshot for run {RunId} failed", runId);
+            }
+
             try
             {
                 await activeHandle.FinalPollAsync();
@@ -329,6 +338,19 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         public bool IsCompleted => pollerTask.IsCompleted;
 
         public Task FinalPollAsync() => poller.FinalPollAsync();
+
+        public async Task DrainAsync()
+        {
+            await cts.CancelAsync();
+            try
+            {
+                await pollerTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // The loop stops here. StopAsync still disposes the scope after the final poll.
+            }
+        }
 
         public async Task StopAsync()
         {

@@ -99,6 +99,49 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomainAsync_small_write_keeps_slices_from_another_revision()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        var chunked = new string('a', MongoSnapshotStore.SnapshotChunkBytes - 1);
+        await store.SetDomainAsync(runId, "entries", chunked, CancellationToken.None);
+
+        var collection = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        await collection.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "entries",
+            Data = "foreign-slice",
+            ChunkIndex = 0,
+            ChunkCount = 1,
+            Revision = "foreignrevisionforeignrevision00",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+
+        await store.SetDomainAsync(runId, "entries", "kept", CancellationToken.None);
+
+        var docs = await Docs(runId);
+        docs.Should().Contain(d => d.Revision == "foreignrevisionforeignrevision00" && d.Data == "foreign-slice");
+        docs.Should().NotContain(d => d.ChunkIndex >= 0 && d.Data.Contains('a'));
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("kept");
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_concurrent_writes_leave_a_readable_snapshot()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+
+        await Task.WhenAll(
+            store.SetDomainAsync(runId, "entries", "one", CancellationToken.None),
+            store.SetDomainAsync(runId, "entries", "two", CancellationToken.None));
+
+        var read = await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None);
+        read.Should().NotBeNull();
+        read!.Data.Should().BeOneOf("one", "two");
+    }
+
+    [Fact]
     public async Task AppendLogsAsync_starts_a_new_chunk_before_1_5_MB()
     {
         var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);

@@ -123,7 +123,8 @@ public static class RunHistorySlim
 
     private static bool IsFailureStatus(string status)
         => status.Contains("fail", StringComparison.OrdinalIgnoreCase)
-            || status.Contains("error", StringComparison.OrdinalIgnoreCase);
+            || status.Contains("error", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("MaxRetriesReached", StringComparison.OrdinalIgnoreCase);
 
     private static AcquisitionLogFailure FailureSample(PipelineDataReader.AcquisitionLogInfo log, string status)
     {
@@ -321,6 +322,18 @@ public sealed class AcquisitionLogChart
 
     public void Apply(PipelineSummarySnapshotBuilder.DataAcquisitionSnapshot target, int resourceCount, DateTimeOffset generatedAt)
     {
+        if (target.Errors.Count == 0 && Failures.Count > 0)
+        {
+            target.Errors = Failures
+                .Select(failure =>
+                {
+                    var types = failure.ResourceTypes.Count == 0 ? "" : " [" + string.Join(",", failure.ResourceTypes) + "]";
+                    var message = string.IsNullOrWhiteSpace(failure.Message) ? "" : ": " + failure.Message;
+                    return $"log {failure.LogId} {failure.Status} {failure.QueryPhase}{types}{message}";
+                })
+                .ToList();
+        }
+
         if (WindowStart is not DateTimeOffset start || WindowEnd is not DateTimeOffset storedEnd || SpanCount == 0)
             return;
 
@@ -337,17 +350,6 @@ public sealed class AcquisitionLogChart
         target.CompletionRatePerSecond = Math.Round(events / seconds, 2);
         target.AverageResourcesPerSecond = resourceCount > 0 ? Math.Round(resourceCount / seconds, 2) : 0;
         target.ThroughputBuckets = ThroughputBuckets;
-        if (target.Errors.Count == 0 && Failures.Count > 0)
-        {
-            target.Errors = Failures
-                .Select(failure =>
-                {
-                    var types = failure.ResourceTypes.Count == 0 ? "" : " [" + string.Join(",", failure.ResourceTypes) + "]";
-                    var message = string.IsNullOrWhiteSpace(failure.Message) ? "" : ": " + failure.Message;
-                    return $"log {failure.LogId} {failure.Status} {failure.QueryPhase}{types}{message}";
-                })
-                .ToList();
-        }
     }
 }
 
