@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -22,8 +21,37 @@ public static class RunHistorySlim
         {
             Notes = [],
             ResourceAcquiredIds = [],
-            FhirQueries = []
+            FhirQueries = [],
+            ResourceTypes = ResourceTypes(log)
         }).ToList();
+    }
+
+    private static List<string> ResourceTypes(PipelineDataReader.AcquisitionLogInfo log)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var types = new List<string>();
+        Add(log.ResourceTypes);
+        if (log.FhirQueries != null)
+        {
+            foreach (var query in log.FhirQueries)
+                Add(query?.ResourceTypes);
+        }
+
+        return types;
+
+        void Add(IEnumerable<string>? values)
+        {
+            if (values == null)
+                return;
+
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value) || !seen.Add(value))
+                    continue;
+
+                types.Add(value);
+            }
+        }
     }
 
     public static PipelineDataReader.PopulationCountSnapshot ToPopulationCounts(
@@ -105,195 +133,8 @@ public static class RunHistorySlim
                 .ToList()
         };
     }
-
-    /// <summary>
-    /// Rewrites one stored payload to the summary shape. Returns null when the
-    /// JSON is already that shape, or when it is not the pipeline document
-    /// this domain used to store. Callers keep those documents as they are.
-    /// </summary>
-    public static string? TrySlimStoredJson(string? domain, string? json)
-    {
-        if (string.IsNullOrWhiteSpace(domain) || string.IsNullOrWhiteSpace(json))
-            return null;
-
-        if (domain is not ("acquisitionLogs" or "populations" or "measureResources" or "orgLocation" or "normalizationEvidence"))
-            return null;
-
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            return domain switch
-            {
-                "acquisitionLogs" => SlimStoredAcquisitionLogs(root),
-                "populations" => SlimStoredPopulations(root),
-                "measureResources" => SlimStoredMeasureResources(root),
-                "orgLocation" => SlimStoredOrgLocation(root),
-                "normalizationEvidence" => SlimStoredNormalization(json, root),
-                _ => null
-            };
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    public static bool IsNormalizationEvidenceChunkDomain(string? domain)
-        => !string.IsNullOrEmpty(domain)
-           && domain.StartsWith(NormalizationEvidenceSnapshot.Domain + "-chunk-", StringComparison.Ordinal);
-
-    private static string? SlimStoredAcquisitionLogs(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
-            return null;
-
-        var fat = false;
-        foreach (var item in root.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object
-                || (!item.TryGetProperty("Notes", out _)
-                    && !item.TryGetProperty("ResourceAcquiredIds", out _)
-                    && !item.TryGetProperty("FhirQueries", out _)))
-            {
-                return null;
-            }
-
-            if (HasItems(item, "Notes") || HasItems(item, "ResourceAcquiredIds") || HasItems(item, "FhirQueries"))
-                fat = true;
-        }
-
-        if (!fat)
-            return null;
-
-        var logs = JsonSerializer.Deserialize<List<PipelineDataReader.AcquisitionLogInfo>>(root.GetRawText());
-        return logs == null ? null : JsonSerializer.Serialize(SlimAcquisitionLogs(logs));
-    }
-
-    private static string? SlimStoredPopulations(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
-            return null;
-
-        foreach (var item in root.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("GroupPopulations", out _))
-                return null;
-        }
-
-        var populations = JsonSerializer.Deserialize<List<PipelineDataReader.ReportPopulationInfo>>(root.GetRawText());
-        return populations == null ? null : JsonSerializer.Serialize(ToPopulationCounts(populations));
-    }
-
-    private static string? SlimStoredMeasureResources(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
-            return null;
-
-        var fat = false;
-        foreach (var item in root.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object
-                || !item.TryGetProperty("PatientId", out var patientId)
-                || !item.TryGetProperty("ResourceType", out _)
-                || !item.TryGetProperty("Count", out _))
-            {
-                return null;
-            }
-
-            if (patientId.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(patientId.GetString()))
-                fat = true;
-        }
-
-        if (!fat)
-            return null;
-
-        var rows = JsonSerializer.Deserialize<List<PipelineDataReader.PatientResourceTypeCount>>(root.GetRawText());
-        return rows == null ? null : JsonSerializer.Serialize(SlimMeasureResources(rows));
-    }
-
-    private static string? SlimStoredOrgLocation(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Object)
-            return null;
-
-        if (!root.TryGetProperty("Configurations", out _)
-            && !root.TryGetProperty("LocationMappings", out _)
-            && !root.TryGetProperty("EncounterMappings", out _))
-        {
-            return null;
-        }
-
-        var snapshot = JsonSerializer.Deserialize<StoreBackedServicePoller.OrgLocationSnapshot>(root.GetRawText());
-        return snapshot == null ? null : JsonSerializer.Serialize(SlimOrgLocation(snapshot));
-    }
-
-    private static string? SlimStoredNormalization(string json, JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Object)
-            return null;
-
-        if (!root.TryGetProperty("SuiteName", out _) && !root.TryGetProperty("CollectedLineCount", out _))
-            return null;
-
-        if (!NormalizationHasDroppedFields(root))
-            return null;
-
-        var evidence = JsonSerializer.Deserialize<NormalizationEvidenceSnapshot>(json);
-        return evidence == null ? null : JsonSerializer.Serialize(SlimNormalizationEvidence(evidence));
-    }
-
-    private static bool NormalizationHasDroppedFields(JsonElement root)
-    {
-        if (HasItems(root, "SummaryLines") || HasItems(root, "ParsedSteps"))
-            return true;
-
-        if (root.TryGetProperty("EvidenceChunkCount", out var chunks)
-            && chunks.ValueKind == JsonValueKind.Number
-            && chunks.TryGetInt32(out var count)
-            && count > 0)
-        {
-            return true;
-        }
-
-        if (!root.TryGetProperty("OperationConfigs", out var operations) || operations.ValueKind != JsonValueKind.Array)
-            return false;
-
-        foreach (var operation in operations.EnumerateArray())
-        {
-            if (operation.ValueKind != JsonValueKind.Object)
-                continue;
-
-            if (HasItems(operation, "Conditions")
-                || HasItems(operation, "CodeSystemMaps")
-                || HasItems(operation, "ExtensionUrls")
-                || HasText(operation, "SourceFhirPath")
-                || HasText(operation, "TargetFhirPath")
-                || HasText(operation, "ConditionTargetFhirPath")
-                || HasText(operation, "ConditionTargetValue")
-                || HasText(operation, "CodeMapFhirPath"))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool HasItems(JsonElement item, string name)
-        => item.TryGetProperty(name, out var value)
-           && value.ValueKind == JsonValueKind.Array
-           && value.GetArrayLength() > 0;
-
-    private static bool HasText(JsonElement item, string name)
-        => item.TryGetProperty(name, out var value)
-           && value.ValueKind == JsonValueKind.String
-           && !string.IsNullOrEmpty(value.GetString());
 }
 
-/// <summary>
-/// Org-location totals for the run export warning. The mapping rows stay in Data Acquisition.
-/// </summary>
 public sealed class OrgLocationSummary
 {
     public int ConfigurationCount { get; set; }

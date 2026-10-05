@@ -239,8 +239,7 @@ builder.Services.AddSingleton<GeneratedTemplateCacheVersionStore>();
 builder.Services.AddSingleton<IGeneratedTemplateCacheVersionLookup>(sp => sp.GetRequiredService<GeneratedTemplateCacheVersionStore>());
 builder.Services.AddSingleton<GeneratedPatientBundleReplayService>();
 builder.Services.AddSingleton<ImportedBundleExecutionResolver>();
-builder.Services.AddSingleton<MongoSnapshotStore>();
-builder.Services.AddSingleton<ISnapshotStore>(sp => sp.GetRequiredService<MongoSnapshotStore>());
+builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<ICleanupSettingsStore, MongoCleanupSettingsStore>();
 builder.Services.AddSingleton<ICleanupReportStore, MongoCleanupReportStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
@@ -285,7 +284,6 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealt
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
 builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
 builder.Services.AddHostedService<PatientBundleExternalizationMigrationService>();
-builder.Services.AddHostedService<SnapshotShapeMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
