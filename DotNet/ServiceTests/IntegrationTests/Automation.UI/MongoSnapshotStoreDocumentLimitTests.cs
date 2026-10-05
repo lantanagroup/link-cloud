@@ -1,5 +1,6 @@
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
+using LantanaGroup.Link.Automation.Link.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -711,6 +712,36 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         await act.Should().ThrowAsync<IOException>().WithMessage("slice insert failed");
 
         (await Docs(runId)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_drops_a_later_write_from_an_older_report_epoch()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+        await store.SetDomainAsync(runId, "entries", "before-switch", 0L, CancellationToken.None);
+        await store.UpdateRunMetaAsync(runId, "facility", "new-report", CancellationToken.None);
+
+        var epoch = (await store.GetRunMetaAsync(runId, CancellationToken.None))!.SnapshotEpoch;
+        epoch.Should().Be(1);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None)).Should().BeNull();
+
+        var started = DateTimeOffset.UtcNow;
+        var early = StoreAt(started);
+        var later = StoreAt(started.AddMinutes(5));
+        await later.SetDomainAsync(runId, "entries", "old-report", 0L, CancellationToken.None);
+        await early.SetDomainAsync(runId, "entries", "new-report", epoch, CancellationToken.None);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("new-report");
+
+        await later.SetDomainAsync(runId, "entries", "old-report-again", 0L, CancellationToken.None);
+        (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be("new-report");
     }
 
     private MongoSnapshotStore StoreAt(DateTimeOffset now)

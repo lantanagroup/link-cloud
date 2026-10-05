@@ -386,7 +386,7 @@ public sealed class RunExportService : IRunExportService
         sb.AppendLine($"  Completed                    : {chart.CompletedCount}");
         sb.AppendLine($"  Skipped                      : {chart.SkippedCount}");
         sb.AppendLine($"  Failed                       : {chart.FailureCount}");
-        sb.AppendLine($"  Duration ms (min/avg/max)    : {chart.MinDurationMs} / {chart.AverageDurationMs} / {chart.MaxDurationMs}");
+        sb.AppendLine($"  Duration ms (min/avg/max)    : {AcquisitionLogChart.FormatDuration(chart)}");
         if (chart.ResourceTypeCounts.Count > 0)
         {
             sb.AppendLine("  Logs by resource type:");

@@ -56,6 +56,32 @@ public class RunHistorySlimTests
         chart.MinDurationMs.Should().Be(0);
         chart.AverageDurationMs.Should().Be(50);
         chart.MaxDurationMs.Should().Be(100);
+        AcquisitionLogChart.FormatDuration(chart).Should().Be("0 / 50 / 100");
+    }
+
+    [Fact]
+    public void Acquisition_chart_leaves_duration_unavailable_when_every_sample_is_missing()
+    {
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                4,
+                "patient-4",
+                null,
+                null,
+                "Completed",
+                "Initial",
+                [],
+                [],
+                [],
+                CompletionTimeMilliseconds: null)
+        ]);
+
+        chart.TotalLogs.Should().Be(1);
+        chart.MinDurationMs.Should().BeNull();
+        chart.AverageDurationMs.Should().BeNull();
+        chart.MaxDurationMs.Should().BeNull();
+        AcquisitionLogChart.FormatDuration(chart).Should().Be("unavailable");
     }
 
     [Fact]
