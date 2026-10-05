@@ -324,6 +324,11 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
             "generationManifest",
             new Dictionary<string, string> { ["p"] = new string('a', 512) },
             CancellationToken.None);
+        var firstStored = await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
+            .Find(doc => doc.RunId == runId && doc.Domain == "generationManifest")
+            .SingleAsync();
+        using var firstDoc = JsonDocument.Parse(firstStored.Data);
+        var replacedBlob = firstDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
         store.AfterSingleHeaderUpdate = () => throw new IOException("ack lost");
 
         var act = () => store.SetDomainAsync(
@@ -341,6 +346,42 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
         using var storedDoc = JsonDocument.Parse(stored.Data);
         var publishedBlob = storedDoc.RootElement.GetProperty("__externalSnapshotPayloadPointer").Deserialize<SnapshotPayloadPointer>()!.BlobName;
         payloadStore.HasBlob(publishedBlob!).Should().BeTrue();
+        replacedBlob.Should().NotBe(publishedBlob);
+        payloadStore.HasBlob(replacedBlob!).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SetDomainAsync_reclaims_a_replaced_blob_when_a_chunked_header_update_is_not_acknowledged()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+        var oldPointer = await payloadStore.StoreAsync(runId, "entries", "\"old\"", CancellationToken.None);
+        var pointerJson = JsonSerializer.Serialize(new Dictionary<string, SnapshotPayloadPointer>
+        {
+            ["__externalSnapshotPayloadPointer"] = oldPointer
+        });
+        await _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots").InsertOneAsync(
+            new DomainSnapshotDocument
+            {
+                RunId = runId,
+                Domain = "entries",
+                Data = pointerJson,
+                UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            });
+        store.AfterChunkedHeaderUpdate = () =>
+        {
+            store.FailNextHeaderLookup = true;
+            throw new IOException("ack lost");
+        };
+
+        var replacement = new string('b', MongoSnapshotStore.SnapshotChunkBytes + 1);
+        var act = () => store.SetDomainAsync(runId, "entries", replacement, CancellationToken.None);
+        await act.Should().ThrowAsync<IOException>();
+
+        payloadStore.HasBlob(oldPointer.BlobName).Should().BeFalse();
+        var hydrated = await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None);
+        hydrated!.Data.Should().Be(replacement);
     }
 
     private sealed class FakeSnapshotPayloadStore : ISnapshotPayloadStore

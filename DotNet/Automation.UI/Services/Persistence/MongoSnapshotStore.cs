@@ -792,9 +792,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 catch (Exception)
                 {
                     // The update may have landed even though the acknowledgement did not.
-                    // The header no longer carries the old revision, so a later write cannot
-                    // find those slices. Drop them only when no header still points at them.
+                    // The header no longer carries the old revision or the old blob pointer,
+                    // so a later write cannot find them. Drop each only when nothing still names it.
                     await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
                     throw;
                 }
             }
@@ -917,6 +918,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         await DeleteSlicesQuietlyAsync(runId, domain, revision);
 
                     await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
+                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
                     throw;
                 }
 
@@ -937,7 +939,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     publishedHeader = null;
                 }
                 if (publishedHeader == null)
+                {
+                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
                     throw;
+                }
 
                 keepId = publishedHeader.Id;
             }
@@ -1107,6 +1112,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static SnapshotPayloadPointer? DisplacedPointer(DomainSnapshotDocument? previous)
         => previous == null ? null : TryReadSnapshotPayloadPointer(previous.Data);
+
+    private Task ReclaimDisplacedBlobAsync(Guid runId, string domain, DomainSnapshotDocument? previous)
+    {
+        var displaced = DisplacedPointer(previous);
+        return displaced == null
+            ? Task.CompletedTask
+            : DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, displaced);
+    }
 
     private void LogDroppedNewerHeader(Guid runId, string domain)
     {
