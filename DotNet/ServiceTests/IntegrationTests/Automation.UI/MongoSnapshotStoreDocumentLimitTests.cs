@@ -256,8 +256,8 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
             doc => doc.Id == header.Id,
             Builders<DomainSnapshotDocument>.Update
                 .Set(doc => doc.Data, "\"newer\"")
-                .Set(doc => doc.WriteClock, DateTimeOffset.UtcNow.AddMinutes(5))
                 .Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+        await SetClock(runId, "entries", DateTimeOffset.UtcNow.AddMinutes(5));
 
         await store.SetDomainAsync(runId, "entries", "stale", CancellationToken.None);
 
@@ -277,8 +277,8 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         await collection.UpdateOneAsync(
             doc => doc.Id == header.Id,
             Builders<DomainSnapshotDocument>.Update
-                .Set(doc => doc.WriteClock, DateTimeOffset.UtcNow.AddMinutes(5))
                 .Set(doc => doc.UpdatedAt, DateTimeOffset.UtcNow.AddMinutes(5)));
+        await SetClock(runId, "entries", DateTimeOffset.UtcNow.AddMinutes(5));
 
         var stale = new string('b', MongoSnapshotStore.SnapshotChunkBytes - 1);
         await store.SetDomainAsync(runId, "entries", stale, CancellationToken.None);
@@ -463,13 +463,13 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         await store.SetDomainAsync(runId, "schedule", "two", CancellationToken.None);
         var second = await collection.Find(doc => doc.RunId == runId && doc.Domain == "schedule").SingleAsync();
         second.UpdatedAt.Should().Be(frozen.AddMilliseconds(1));
-        second.WriteClock.Should().Be(frozen);
+        (await Clock(runId, "schedule")).WriteClock.Should().Be(frozen);
         second.Data.Should().Be("\"two\"");
 
         await store.SetDomainAsync(runId, "schedule", "three", CancellationToken.None);
         var third = await collection.Find(doc => doc.RunId == runId && doc.Domain == "schedule").SingleAsync();
         third.UpdatedAt.Should().Be(frozen.AddMilliseconds(2));
-        third.WriteClock.Should().Be(frozen);
+        (await Clock(runId, "schedule")).WriteClock.Should().Be(frozen);
         third.Data.Should().Be("\"three\"");
 
         var matched = await collection.UpdateOneAsync(
@@ -492,7 +492,7 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         await store.SetDomainAsync(runId, "entries", new string('c', MongoSnapshotStore.SnapshotChunkBytes + 1), CancellationToken.None);
 
         var header = (await Docs(runId)).Single(doc => doc.ChunkIndex == -1);
-        header.WriteClock.Should().Be(frozen);
+        (await Clock(runId, "entries")).WriteClock.Should().Be(frozen);
         header.UpdatedAt.Should().Be(frozen.AddMilliseconds(2));
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data
             .Should().Be(new string('c', MongoSnapshotStore.SnapshotChunkBytes + 1));
@@ -562,8 +562,70 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "entries", CancellationToken.None))!.Data.Should().Be(replacement);
     }
 
+    [Fact]
+    public async Task SetDomainAsync_single_document_stays_readable_by_the_old_snapshot_shape()
+    {
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        var runId = Guid.NewGuid();
+        await store.SetDomainAsync(runId, "schedule", "payload", CancellationToken.None);
+
+        var raw = await _fixture.Database.GetCollection<BsonDocument>("automation_snapshots")
+            .Find(Builders<BsonDocument>.Filter.Eq("RunId", runId.ToString()))
+            .SingleAsync();
+        raw.Names.Should().NotContain("WriteClock");
+        raw.Names.Should().NotContain("ChunkIndex");
+        raw.Names.Should().NotContain("ChunkCount");
+        raw.Names.Should().NotContain("Revision");
+
+        var legacy = MongoDB.Bson.Serialization.BsonSerializer.Deserialize<LegacyDomainSnapshotDocument>(raw);
+        legacy.Data.Should().Be("\"payload\"");
+        legacy.Domain.Should().Be("schedule");
+    }
+
     private Task<List<DomainSnapshotDocument>> Docs(Guid runId)
         => _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots")
             .Find(doc => doc.RunId == runId && doc.Domain == "entries")
             .ToListAsync();
+
+    private Task SetClock(Guid runId, string domain, DateTimeOffset clock)
+    {
+        var id = MongoSnapshotStore.SnapshotClockId(runId, domain);
+        return _fixture.Database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks")
+            .ReplaceOneAsync(
+                c => c.Id == id,
+                new SnapshotWriteClockDocument
+                {
+                    Id = id,
+                    RunId = runId,
+                    Domain = domain,
+                    WriteClock = clock
+                },
+                new ReplaceOptions { IsUpsert = true });
+    }
+
+    private Task<SnapshotWriteClockDocument> Clock(Guid runId, string domain)
+    {
+        var id = MongoSnapshotStore.SnapshotClockId(runId, domain);
+        return _fixture.Database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks")
+            .Find(c => c.Id == id)
+            .SingleAsync();
+    }
+
+    /// <summary>
+    /// The snapshot fields a build from before the writer clock knew about.
+    /// No <c>BsonIgnoreExtraElements</c>, matching that driver default.
+    /// </summary>
+    private sealed class LegacyDomainSnapshotDocument
+    {
+        public ObjectId Id { get; set; }
+
+        [MongoDB.Bson.Serialization.Attributes.BsonRepresentation(BsonType.String)]
+        public Guid RunId { get; set; }
+
+        public string Domain { get; set; } = string.Empty;
+
+        public string Data { get; set; } = string.Empty;
+
+        public DateTimeOffset UpdatedAt { get; set; }
+    }
 }

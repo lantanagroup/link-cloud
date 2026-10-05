@@ -14,9 +14,10 @@ namespace Automation.UI.Services.Persistence;
 /// Cosmos DB for MongoDB API (deployed environments).
 ///
 /// Collections:
-///   automation_runs       — lightweight run metadata
-///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
-///   automation_logs       — full log output per run
+///   automation_runs            — lightweight run metadata
+///   automation_snapshots       — per-run, per-domain polling data (upsert on RunId+Domain)
+///   automation_snapshot_clocks — writer clock per run and domain, kept off the snapshot document
+///   automation_logs            — full log output per run
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
@@ -38,6 +39,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
+    private readonly IMongoCollection<SnapshotWriteClockDocument> _writeClocks;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
@@ -84,6 +86,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        _writeClocks = database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -123,6 +126,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // Clear stale domain snapshot data so milestones/entries from a prior report
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
@@ -429,6 +433,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
+        await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
 
@@ -739,14 +744,38 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     /// <summary>
     /// True when the stored header was written by a clock later than this write.
-    /// <see cref="DomainSnapshotDocument.WriteClock"/> is that clock. Older documents
-    /// only have <see cref="DomainSnapshotDocument.UpdatedAt"/>, which also moves
-    /// forward to keep compare-and-swap unique.
+    /// The clock lives in <c>automation_snapshot_clocks</c>. Older rows have no clock
+    /// document, so <see cref="DomainSnapshotDocument.UpdatedAt"/> is the fallback.
+    /// That timestamp also moves forward to keep compare-and-swap unique.
     /// </summary>
-    internal static bool StoredHeaderIsNewerThan(DomainSnapshotDocument previous, DateTimeOffset now)
+    internal static bool StoredHeaderIsNewerThan(DomainSnapshotDocument previous, DateTimeOffset now, DateTimeOffset? writeClock)
     {
-        var clock = previous.WriteClock ?? previous.UpdatedAt;
+        var clock = writeClock ?? previous.UpdatedAt;
         return clock > now;
+    }
+
+    internal static string SnapshotClockId(Guid runId, string domain) => $"{runId:N}|{domain}";
+
+    private async Task<DateTimeOffset?> ReadWriteClockAsync(Guid runId, string domain, CancellationToken ct)
+    {
+        var doc = await _writeClocks.Find(c => c.Id == SnapshotClockId(runId, domain)).FirstOrDefaultAsync(ct);
+        return doc == null ? null : doc.WriteClock;
+    }
+
+    private Task RememberWriteClockAsync(Guid runId, string domain, DateTimeOffset now, CancellationToken ct)
+    {
+        var id = SnapshotClockId(runId, domain);
+        return _writeClocks.ReplaceOneAsync(
+            c => c.Id == id,
+            new SnapshotWriteClockDocument
+            {
+                Id = id,
+                RunId = runId,
+                Domain = domain,
+                WriteClock = now
+            },
+            new ReplaceOptions { IsUpsert = true },
+            ct);
     }
 
     private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, DateTimeOffset now, CancellationToken ct)
@@ -758,7 +787,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            if (previous != null && StoredHeaderIsNewerThan(previous, now))
+            var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
+            if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -775,7 +805,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     RunId = runId,
                     Domain = domain,
                     Data = storedJson,
-                    WriteClock = now,
                     UpdatedAt = stamp
                 };
                 try
@@ -794,7 +823,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             {
                 var update = Builders<DomainSnapshotDocument>.Update
                     .Set(d => d.Data, storedJson)
-                    .Set(d => d.WriteClock, now)
                     .Set(d => d.UpdatedAt, stamp)
                     .Unset(d => d.ChunkIndex)
                     .Unset(d => d.ChunkCount)
@@ -829,6 +857,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 return new SnapshotWrite(false, DisplacedPointer(previous));
             }
 
+            await RememberWriteClockAsync(runId, domain, now, ct);
             return new SnapshotWrite(true, DisplacedPointer(previous));
         }
 
@@ -854,7 +883,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             ct.ThrowIfCancellationRequested();
             var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            if (previous != null && StoredHeaderIsNewerThan(previous, now))
+            var writeClock = previous == null ? null : await ReadWriteClockAsync(runId, domain, ct);
+            if (previous != null && StoredHeaderIsNewerThan(previous, now, writeClock))
             {
                 LogDroppedNewerHeader(runId, domain);
                 return new SnapshotWrite(false, null);
@@ -904,7 +934,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         ChunkIndex = -1,
                         ChunkCount = slices.Count,
                         Revision = revision,
-                        WriteClock = now,
                         UpdatedAt = stamp
                     };
                     await _snapshots.InsertOneAsync(created, cancellationToken: ct);
@@ -917,7 +946,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         .Set(d => d.ChunkIndex, -1)
                         .Set(d => d.ChunkCount, slices.Count)
                         .Set(d => d.Revision, revision)
-                        .Set(d => d.WriteClock, now)
                         .Set(d => d.UpdatedAt, stamp);
                     var flip = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), headerUpdate, cancellationToken: ct);
                     if (flip.MatchedCount == 0)
@@ -983,6 +1011,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 return new SnapshotWrite(false, DisplacedPointer(previous));
             }
 
+            await RememberWriteClockAsync(runId, domain, now, ct);
             return new SnapshotWrite(true, DisplacedPointer(previous));
         }
 
