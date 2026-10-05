@@ -104,7 +104,6 @@ public sealed class AutomationRunInputDocument
 }
 
 /// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
-[BsonIgnoreExtraElements]
 public sealed class DomainSnapshotDocument
 {
     [BsonId]
@@ -123,21 +122,9 @@ public sealed class DomainSnapshotDocument
     public string Data { get; set; } = string.Empty;
 
     public DateTimeOffset UpdatedAt { get; set; }
-
-    /// <summary>
-    /// Changes on every header write. A compare-and-swap matches this value.
-    /// <see cref="UpdatedAt"/> is a wall clock and can repeat. Empty on a
-    /// document stored before this field existed.
-    /// </summary>
-    public string Revision { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// MongoDB document for an ordered chunk in automation_run_logs.
-/// Extra elements are ignored so a newer field does not break this build.
-/// An older build without that attribute still fails to read a chunk this build has written.
-/// </summary>
-[BsonIgnoreExtraElements]
+/// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>
 public sealed class RunLogDocument
 {
     [BsonId]
@@ -152,46 +139,6 @@ public sealed class RunLogDocument
     public List<string> Lines { get; set; } = [];
     public List<long> LineSequences { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; }
-
-    /// <summary>
-    /// Chunk number where a split of this document started writing replacements.
-    /// Set before the first replacement insert so a retry reuses the same ids.
-    /// </summary>
-    public int? SplitStart { get; set; }
-
-    /// <summary>Id of the source chunk this replacement was split from.</summary>
-    public string? SplitFromId { get; set; }
-
-    /// <summary>How many replacement chunks <see cref="SplitStart"/> reserves.</summary>
-    public int? SplitCount { get; set; }
-
-    /// <summary>
-    /// Process that owns an in-progress split. Another process takes over only
-    /// after <see cref="SplitClaimedAt"/> is older than the claim lease.
-    /// </summary>
-    public string? SplitOwner { get; set; }
-
-    /// <summary>
-    /// Id of one split attempt. Replacements written by that attempt carry the
-    /// same value. A stale attempt does not update a later attempt's rows.
-    /// </summary>
-    public string? SplitAttempt { get; set; }
-
-    /// <summary>
-    /// In-memory only. Set when a takeover adopts an attempt that is already
-    /// publishing, so the caller finishes that attempt instead of rewriting it.
-    /// </summary>
-    [BsonIgnore]
-    internal bool ResumePublishing { get; set; }
-
-    [BsonRepresentation(BsonType.DateTime)]
-    public DateTimeOffset? SplitClaimedAt { get; set; }
-
-    /// <summary>
-    /// 1 when <see cref="BsonByteCount"/> counts escaped JSON bytes.
-    /// A missing or zero value is a legacy raw UTF-8 count and is recomputed before another line is appended.
-    /// </summary>
-    public int ByteCountVersion { get; set; }
 }
 
 public sealed class RunLogSequenceDocument
@@ -201,123 +148,4 @@ public sealed class RunLogSequenceDocument
     public Guid RunId { get; set; }
 
     public long NextSequence { get; set; }
-}
-
-/// <summary>
-/// Lease for a log split whose source chunk cannot accept more fields without
-/// crossing the Cosmos 2 MB document cap. The source document is left unchanged.
-/// </summary>
-[BsonIgnoreExtraElements]
-public sealed class LogSplitClaimDocument
-{
-    public const string CollectionName = "automation_log_split_claims";
-
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    public string Owner { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.DateTime)]
-    public DateTimeOffset ClaimedAt { get; set; }
-
-    public int SplitStart { get; set; }
-
-    public int SplitCount { get; set; }
-
-    /// <summary>Id of the split attempt that holds this lease.</summary>
-    public string AttemptId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Set to <see cref="AttemptId"/> once that attempt's replacements are
-    /// durable and the source may be deleted. A takeover finishes this attempt
-    /// instead of deleting its rows.
-    /// </summary>
-    public string? PublishingAttempt { get; set; }
-
-    /// <summary>
-    /// Line count of the source when <see cref="PublishingAttempt"/> was recorded.
-    /// A resumed delete uses this count. A source that has grown since then is
-    /// split again instead of being removed.
-    /// </summary>
-    public int SourceLineCount { get; set; }
-}
-
-/// <summary>
-/// Line sequences for a log chunk that cannot store them without crossing the
-/// Cosmos 2 MB document cap. The chunk document is left unchanged.
-/// </summary>
-[BsonIgnoreExtraElements]
-public sealed class LogSequenceStampDocument
-{
-    public const string CollectionName = "automation_log_sequence_stamps";
-
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    public List<long> LineSequences { get; set; } = [];
-}
-
-/// <summary>
-/// One piece of a domain snapshot. The id includes the generation so a rewrite
-/// does not overwrite the generation a reader is still using.
-/// <see cref="GenerationId"/> must match the header before a reader accepts the piece.
-/// </summary>
-/// <summary>
-/// A committed generation whose parts still need to be removed. The sweep
-/// retries these after a writer crashes or a delete fails. A generation that
-/// is still the header is left alone.
-/// </summary>
-[BsonIgnoreExtraElements]
-public sealed class RetiredSnapshotGenerationDocument
-{
-    public const string CollectionName = "automation_snapshot_retired_generations";
-
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.String)]
-    public Guid RunId { get; set; }
-
-    public string Domain { get; set; } = string.Empty;
-
-    public string GenerationId { get; set; } = string.Empty;
-}
-
-[BsonIgnoreExtraElements]
-public sealed class SnapshotPartDocument
-{
-    public const string CollectionName = "automation_snapshot_parts";
-
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.String)]
-    public Guid RunId { get; set; }
-
-    public string Domain { get; set; } = string.Empty;
-
-    public string GenerationId { get; set; } = string.Empty;
-
-    public int Ordinal { get; set; }
-
-    public string Kind { get; set; } = string.Empty;
-
-    public string Path { get; set; } = string.Empty;
-
-    public int Index { get; set; }
-
-    public int Slice { get; set; }
-
-    public string? ItemKey { get; set; }
-
-    public string Data { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.DateTime)]
-    public DateTimeOffset UpdatedAt { get; set; }
-
-    /// <summary>
-    /// True once this part belongs to the committed header. The orphan sweep
-    /// skips settled parts so it does not reread every retained generation.
-    /// </summary>
-    public bool Settled { get; set; }
 }

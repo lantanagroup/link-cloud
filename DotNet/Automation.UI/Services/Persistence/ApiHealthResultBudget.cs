@@ -61,10 +61,10 @@ internal static class ApiHealthResultBudget
         if (string.IsNullOrEmpty(value))
             return value;
 
-        if (SnapshotPartitioner.EscapedContentBytes(value) <= MaxBodyBytes)
+        if (EscapedContentBytes(value) <= MaxBodyBytes)
             return value;
 
-        var suffixBytes = SnapshotPartitioner.EscapedContentBytes(Suffix);
+        var suffixBytes = EscapedContentBytes(Suffix);
         var keptBytes = 0;
         // The retained text is at most the escaped-byte budget, so a multi-megabyte
         // body must not allocate a builder the size of the input.
@@ -72,7 +72,7 @@ internal static class ApiHealthResultBudget
         foreach (var rune in value.EnumerateRunes())
         {
             var runeText = rune.ToString();
-            var runeBytes = SnapshotPartitioner.EscapedContentBytes(runeText);
+            var runeBytes = EscapedContentBytes(runeText);
             if (keptBytes + runeBytes + suffixBytes > MaxBodyBytes)
                 break;
 
@@ -82,5 +82,51 @@ internal static class ApiHealthResultBudget
 
         builder.Append(Suffix);
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// UTF-8 size of the value inside a JSON string written by the default
+    /// serializer. Quotes and non-ASCII count as escapes.
+    /// </summary>
+    private static int EscapedContentBytes(string value)
+    {
+        var bytes = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            switch (c)
+            {
+                case '"' or '&' or '\'' or '+' or '<' or '>' or '`':
+                    bytes += 6;
+                    break;
+                case '\\' or '\b' or '\f' or '\n' or '\r' or '\t':
+                    bytes += 2;
+                    break;
+                default:
+                    if (c is < (char)0x20 or (char)0x7F)
+                    {
+                        bytes += 6;
+                    }
+                    else if (c < 0x80)
+                    {
+                        bytes += 1;
+                    }
+                    else if (char.IsHighSurrogate(c)
+                             && i + 1 < value.Length
+                             && char.IsLowSurrogate(value[i + 1]))
+                    {
+                        bytes += 12;
+                        i++;
+                    }
+                    else
+                    {
+                        bytes += 6;
+                    }
+
+                    break;
+            }
+        }
+
+        return bytes;
     }
 }

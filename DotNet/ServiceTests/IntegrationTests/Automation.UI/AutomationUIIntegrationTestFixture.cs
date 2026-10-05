@@ -107,12 +107,8 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
         await DropCollectionIfExistsAsync("automation_runs");
         await DropCollectionIfExistsAsync("automation_run_inputs");
         await DropCollectionIfExistsAsync("automation_snapshots");
-        await DropCollectionIfExistsAsync(SnapshotPartDocument.CollectionName);
         await DropCollectionIfExistsAsync("automation_logs");
         await DropCollectionIfExistsAsync("automation_log_sequences");
-        await DropCollectionIfExistsAsync(LogSplitClaimDocument.CollectionName);
-        await DropCollectionIfExistsAsync(LogSequenceStampDocument.CollectionName);
-        await DropCollectionIfExistsAsync(RetiredSnapshotGenerationDocument.CollectionName);
     }
 
     private async Task DropCollectionIfExistsAsync(string collectionName)

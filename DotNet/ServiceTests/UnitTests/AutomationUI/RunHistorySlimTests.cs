@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Automation.UI.Models;
 using Automation.UI.Services;
 using FluentAssertions;
@@ -40,6 +39,31 @@ public class RunHistorySlimTests
         slim[0].ResourceTypes.Should().Equal("Observation");
         slim[0].Notes.Should().BeEmpty();
         slim[0].ResourceAcquiredIds.Should().BeEmpty();
+        slim[0].FhirQueries.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Acquisition_logs_keep_resource_types_that_were_only_on_the_query()
+    {
+        var slim = RunHistorySlim.SlimAcquisitionLogs(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                8,
+                "patient-2",
+                null,
+                null,
+                "Completed",
+                "Initial",
+                [],
+                [],
+                [
+                    new PipelineDataReader.FhirQueryInfo(["Patient"]),
+                    new PipelineDataReader.FhirQueryInfo(["observation"])
+                ],
+                ResourceTypes: ["Observation"])
+        ]);
+
+        slim[0].ResourceTypes.Should().Equal("Observation", "Patient");
         slim[0].FhirQueries.Should().BeEmpty();
     }
 
@@ -141,91 +165,5 @@ public class RunHistorySlimTests
         slim.OperationConfigs[0].Conditions.Should().BeEmpty();
         slim.OperationConfigs[0].CodeSystemMaps.Should().BeEmpty();
     }
-
-    [Fact]
-    public void Stored_acquisition_logs_drop_notes_ids_and_queries()
-    {
-        var slim = RunHistorySlim.TrySlimStoredJson(
-            "acquisitionLogs",
-            """[{"Id":7,"PatientId":"p1","Status":"Completed","QueryPhase":"Initial","Notes":["secret"],"ResourceAcquiredIds":["Patient/p1"],"FhirQueries":[{"ResourceTypes":["Observation"]}],"ResourceTypes":["Observation"]}]""");
-
-        slim.Should().NotBeNull();
-        var logs = JsonSerializer.Deserialize<List<PipelineDataReader.AcquisitionLogInfo>>(slim!);
-        logs.Should().ContainSingle();
-        logs![0].Notes.Should().BeEmpty();
-        logs[0].ResourceAcquiredIds.Should().BeEmpty();
-        logs[0].FhirQueries.Should().BeEmpty();
-        logs[0].ResourceTypes.Should().Equal("Observation");
-        RunHistorySlim.TrySlimStoredJson("acquisitionLogs", slim).Should().BeNull();
-    }
-
-    [Fact]
-    public void Stored_population_id_list_becomes_counts()
-    {
-        var slim = RunHistorySlim.TrySlimStoredJson(
-            "populations",
-            """[{"ReportType":"ACH","GroupPopulations":[{"PopulationCodeJson":"{}","MeasureReportPopulations":[{"MeasureReportId":"mr-1"}]}]}]""");
-
-        var counts = JsonSerializer.Deserialize<PipelineDataReader.PopulationCountSnapshot>(slim!);
-        counts!.ReportTypeCount.Should().Be(1);
-        counts.GroupCount.Should().Be(1);
-        counts.MeasureReportPopulationCount.Should().Be(1);
-        RunHistorySlim.TrySlimStoredJson("populations", slim).Should().BeNull();
-    }
-
-    [Fact]
-    public void Stored_item_array_on_a_populations_domain_is_left_alone()
-    {
-        RunHistorySlim.TrySlimStoredJson("populations", """[{"Id":"1","Note":"x"}]""").Should().BeNull();
-    }
-
-    [Fact]
-    public void Stored_measure_rows_roll_up_and_aggregated_rows_stay()
-    {
-        var slim = RunHistorySlim.TrySlimStoredJson(
-            "measureResources",
-            """[{"PatientId":"p1","ResourceType":"Observation","Count":2},{"PatientId":"p2","ResourceType":"Observation","Count":3}]""");
-
-        var rows = JsonSerializer.Deserialize<List<PipelineDataReader.PatientResourceTypeCount>>(slim!);
-        rows.Should().ContainSingle();
-        rows![0].PatientId.Should().BeEmpty();
-        rows[0].Count.Should().Be(5);
-        RunHistorySlim.TrySlimStoredJson("measureResources", slim).Should().BeNull();
-    }
-
-    [Fact]
-    public void Stored_org_location_rows_become_counts()
-    {
-        var slim = RunHistorySlim.TrySlimStoredJson(
-            "orgLocation",
-            """{"Configurations":[{"ConfigId":1,"IsActive":true,"ConditionsCount":0}],"LocationMappings":[],"EncounterMappings":[{"FacilityId":"f","PatientId":"p","EncounterId":"e","MappedToOrg":false,"EncounterLocations":[]}]}""");
-
-        var summary = JsonSerializer.Deserialize<OrgLocationSummary>(slim!);
-        summary!.ConfigurationCount.Should().Be(1);
-        summary.ActiveConfigurationCount.Should().Be(1);
-        summary.EncounterMappingCount.Should().Be(1);
-        summary.MappedToOrgCount.Should().Be(0);
-        RunHistorySlim.TrySlimStoredJson("orgLocation", slim).Should().BeNull();
-    }
-
-    [Fact]
-    public void Stored_normalization_lines_are_dropped_and_a_summary_stays()
-    {
-        var slim = RunHistorySlim.TrySlimStoredJson(
-            "normalizationEvidence",
-            """{"SuiteName":"Epic","CollectedLineCount":4,"EvidenceChunkCount":1,"SummaryLines":["raw"],"ParsedSteps":[{"ResourceId":"Patient/1"}],"OperationConfigs":[{"Name":"Copy","OperationType":"CopyLocation","ResourceTypes":["Encounter"],"Conditions":["long"]}]}""");
-
-        var evidence = JsonSerializer.Deserialize<NormalizationEvidenceSnapshot>(slim!);
-        evidence!.SuiteName.Should().Be("Epic");
-        evidence.CollectedLineCount.Should().Be(4);
-        evidence.EvidenceChunkCount.Should().Be(0);
-        evidence.StepsCollapsed.Should().BeFalse();
-        evidence.SummaryLines.Should().BeEmpty();
-        evidence.ParsedSteps.Should().BeEmpty();
-        evidence.OperationConfigs.Should().ContainSingle();
-        evidence.OperationConfigs[0].Conditions.Should().BeEmpty();
-        RunHistorySlim.TrySlimStoredJson("normalizationEvidence", slim).Should().BeNull();
-        RunHistorySlim.IsNormalizationEvidenceChunkDomain("normalizationEvidence-chunk-2").Should().BeTrue();
-        RunHistorySlim.IsNormalizationEvidenceChunkDomain("normalizationEvidence").Should().BeFalse();
-    }
 }
+
