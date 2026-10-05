@@ -940,14 +940,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         ObjectId keepId,
         string? previousRevision,
         DomainSnapshotDocument? previous,
-        long epoch)
+        long epoch,
+        DateTimeOffset publishedStamp)
     {
         try
         {
             if (AfterHeaderCommitted != null)
                 await AfterHeaderCommitted();
 
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous, epoch))
+            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous, epoch, publishedStamp))
             {
                 _logger.LogWarning(
                     "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
@@ -1054,7 +1055,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 }
             }
 
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch);
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch, stamp);
         }
 
         _logger.LogWarning(
@@ -1217,7 +1218,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 keepId = publishedHeader.Id;
             }
 
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch);
+            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch, stamp);
         }
 
         _logger.LogWarning(
@@ -1285,7 +1286,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// <summary>
     /// Drops headers this write displaced. Returns false when a newer header
     /// already won, in which case this write's own header is removed and its
-    /// slices go with it. Two first inserts can pass each other: the newer one
+    /// slices go with it. When the run epoch moved, only the timestamp this
+    /// write stored is removed, so a later writer that updated the same id stays.
+    /// Two first inserts can pass each other: the newer one
     /// may finish before the older header exists, so the older write has to
     /// drop itself when it finally sees that newer header. A revision this
     /// write already replaced is dropped too, once no header still names it.
@@ -1296,7 +1299,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         ObjectId keepId,
         string? previousRevision,
         DomainSnapshotDocument? previous,
-        long epoch)
+        long epoch,
+        DateTimeOffset publishedStamp)
     {
         if (BeforeDeleteDisplaced != null)
             await BeforeDeleteDisplaced();
@@ -1305,7 +1309,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var ct = timeout.Token;
         if (await RunEpochMovedAsync(runId, epoch, ct))
         {
-            var ownHeader = await _snapshots.Find(d => d.Id == keepId).FirstOrDefaultAsync(ct);
+            var ownHeader = await _snapshots
+                .Find(d => d.Id == keepId && d.UpdatedAt == publishedStamp)
+                .FirstOrDefaultAsync(ct);
             if (ownHeader != null)
                 await DeleteHeaderIfUnchangedAsync(runId, domain, ownHeader, ct);
             LogDroppedNewerHeader(runId, domain);
