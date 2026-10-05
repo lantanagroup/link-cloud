@@ -1925,6 +1925,83 @@ public class MongoSnapshotStoreDocumentSizeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Observed_snapshot_keeps_a_write_that_changes_only_data_and_timestamp()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            Revision = "rev-1",
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        MongoSnapshotStore.BeforePartitionHeaderPublishForTests = async _ =>
+        {
+            await snapshots.UpdateOneAsync(
+                d => d.Id == legacy.Id,
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(d => d.Data, "{\"name\":\"older-pod\"}")
+                    .Set(d => d.UpdatedAt, legacy.UpdatedAt.AddMinutes(1)));
+        };
+
+        try
+        {
+            (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        }
+        finally
+        {
+            MongoSnapshotStore.BeforePartitionHeaderPublishForTests = null;
+        }
+
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"name\":\"older-pod\"}");
+        stored.Revision.Should().Be("rev-1");
+    }
+
+    [Fact]
+    public async Task Retry_keeps_a_write_that_changes_only_data_and_timestamp()
+    {
+        var store = CreateGuardedStore();
+        var runId = Guid.NewGuid();
+        var snapshots = _fixture.Database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
+        var payload = JsonSerializerPayload(Enumerable.Range(0, 20).Select(i => new Item(i.ToString(), new string('q', 60_000))).ToList());
+        await snapshots.InsertOneAsync(new DomainSnapshotDocument
+        {
+            RunId = runId,
+            Domain = "populations",
+            Data = payload,
+            UpdatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+        var legacy = await snapshots.Find(d => d.RunId == runId && d.Domain == "populations").FirstAsync();
+        MongoSnapshotStore.AfterPartitionHeaderPublishForTests = async _ =>
+        {
+            var current = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+            await snapshots.UpdateOneAsync(
+                d => d.Id == legacy.Id,
+                Builders<DomainSnapshotDocument>.Update
+                    .Set(d => d.Data, "{\"name\":\"older-pod\"}")
+                    .Set(d => d.UpdatedAt, current.UpdatedAt.AddMinutes(1)));
+        };
+
+        try
+        {
+            (await store.TryUpgradeLegacyDomainAsync(legacy, CancellationToken.None)).Should().BeFalse();
+        }
+        finally
+        {
+            MongoSnapshotStore.AfterPartitionHeaderPublishForTests = null;
+        }
+
+        var stored = await snapshots.Find(d => d.Id == legacy.Id).FirstAsync();
+        stored.Data.Should().Be("{\"name\":\"older-pod\"}");
+    }
+
+    [Fact]
     public async Task Split_drops_a_pure_middle_copy_of_the_source()
     {
         var store = CreateGuardedStore();

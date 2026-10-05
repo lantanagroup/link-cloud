@@ -791,10 +791,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             payloadJson = slimmed;
 
         var plan = SnapshotPartitioner.Plan(payloadJson);
-        // Match the id and the revision. The legacy payload can already be near
-        // 2 MB, and putting it in the update filter makes the command exceed the
-        // cap. A document with no revision also has to carry the timestamp that
-        // was read, because an older writer changes the payload without a revision.
+        // Match the id, the revision, and the timestamp that was read. The legacy
+        // payload can already be near 2 MB, and putting it in the update filter
+        // makes the command exceed the cap. An older writer changes the payload
+        // and the timestamp and leaves the revision alone.
         var filter = ObservedSnapshot(legacy);
 
         if (plan is SnapshotPlan.Inline inline)
@@ -2004,13 +2004,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 continue;
             }
 
-            // The retry matches this revision, not the header JSON. A header near
-            // 1 MB plus the same JSON in the filter would cross the 2 MB request cap.
-            // UpdatedAt can be shared by two writers, so it is not the match.
+            // The retry matches this revision and the timestamp this attempt
+            // wrote, not the header JSON. A header near 1 MB plus the same JSON
+            // in the filter would cross the 2 MB request cap. An older writer
+            // changes the payload and the timestamp and leaves the revision.
             var publishedRevision = NewSnapshotRevision();
+            var publishedAt = preserveUpdatedAt ?? DateTimeOffset.UtcNow;
             var update = Builders<DomainSnapshotDocument>.Update
                 .Set(d => d.Data, headerJson)
-                .Set(d => d.UpdatedAt, preserveUpdatedAt ?? DateTimeOffset.UtcNow)
+                .Set(d => d.UpdatedAt, publishedAt)
                 .Set(d => d.Revision, publishedRevision)
                 .SetOnInsert(d => d.Id, headerId)
                 .SetOnInsert(d => d.RunId, runId)
@@ -2077,9 +2079,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 headerId, runId, domain, generationId, previousGeneration, ct);
 
             // The header we just published is incomplete because its parts were
-            // removed. The next attempt may replace that revision and no other.
+            // removed. The next attempt may replace that revision and timestamp
+            // and no other. An older writer that keeps the revision still moves
+            // the timestamp, so this filter does not match that payload.
             headerFilter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, headerId)
-                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, publishedRevision);
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, publishedRevision)
+                & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, publishedAt);
             await DeleteGenerationAsync(runId, domain, generationId, ct);
         }
 
@@ -2321,21 +2326,14 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private static string NewSnapshotRevision() => Guid.NewGuid().ToString("N");
 
     /// <summary>
-    /// Matches the snapshot that was read. A stored revision is enough, because
-    /// this build changes it on every write. A missing revision is not, so the
-    /// timestamp read with it has to match too.
+    /// Matches the snapshot that was read. The timestamp is always part of the
+    /// match. An older writer changes the payload and the timestamp and leaves
+    /// the revision untouched.
     /// </summary>
     private static FilterDefinition<DomainSnapshotDocument> ObservedSnapshot(DomainSnapshotDocument legacy)
-    {
-        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
-            & SameRevision(legacy.Revision);
-        if (string.IsNullOrEmpty(legacy.Revision))
-        {
-            filter &= Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, legacy.UpdatedAt);
-        }
-
-        return filter;
-    }
+        => Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Id, legacy.Id)
+            & SameRevision(legacy.Revision)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.UpdatedAt, legacy.UpdatedAt);
 
     /// <summary>
     /// A missing or empty revision is a document written before the field
