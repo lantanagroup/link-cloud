@@ -549,7 +549,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             throw;
         }
 
-        await DeleteReplacedPayloadAsync(runId, domain, previous, newPointer, ct);
+        // The header is already published. This cleanup has its own 15 second
+        // budget so a cancelled caller does not leave the replaced slices and
+        // blob for every later read to load.
+        await DeleteReplacedPayloadAsync(runId, domain, previous, newPointer, CancellationToken.None);
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
@@ -650,7 +653,15 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         var stored = current.PayloadText;
         var pointer = TryReadSnapshotPayloadPointer(stored);
         if (pointer != null)
+        {
+            // A different UTF-8 length cannot be the same JSON. An older pointer
+            // with no length still downloads so the text can be compared.
+            var nextBytes = Encoding.UTF8.GetByteCount(json);
+            if (pointer.Utf8Bytes > 0 && pointer.Utf8Bytes != nextBytes)
+                return false;
+
             stored = await _snapshotPayloadStore.ReadAsync(pointer, ct) ?? string.Empty;
+        }
 
         return string.Equals(stored, json, StringComparison.Ordinal);
     }
@@ -902,9 +913,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static CancellationTokenSource BoundCleanup(CancellationToken ct)
     {
-        // Rollback passes CancellationToken.None. The caller's token is already
-        // cancelled then, and a linked token would leave the unpublished slices
-        // in place. A 15 second budget still caps the call.
+        // Rollback and replaced-snapshot cleanup pass CancellationToken.None.
+        // The caller's token is already cancelled then, and a linked token would
+        // leave the slices in place. A 15 second budget still caps the call.
         if (!ct.CanBeCanceled)
             return new CancellationTokenSource(TimeSpan.FromSeconds(15));
 

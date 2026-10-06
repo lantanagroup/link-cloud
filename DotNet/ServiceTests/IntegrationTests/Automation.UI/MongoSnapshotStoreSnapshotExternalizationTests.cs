@@ -60,6 +60,27 @@ public class MongoSnapshotStoreSnapshotExternalizationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SetDomainAsync_skips_the_blob_read_when_the_new_payload_length_differs()
+    {
+        var payloadStore = new FakeSnapshotPayloadStore();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance, payloadStore);
+        var runId = Guid.NewGuid();
+
+        await store.SetDomainAsync(runId, "generationManifest", new string('a', 200), CancellationToken.None);
+        payloadStore.ReadCount.Should().Be(0);
+
+        await store.SetDomainAsync(runId, "generationManifest", new string('b', 240), CancellationToken.None);
+        payloadStore.ReadCount.Should().Be(0);
+
+        await store.SetDomainAsync(runId, "generationManifest", new string('c', 240), CancellationToken.None);
+        payloadStore.ReadCount.Should().Be(1);
+
+        var hydrated = await store.GetDomainAsync<string>(runId, "generationManifest", CancellationToken.None);
+        hydrated.Should().NotBeNull();
+        hydrated!.Data.Should().Be(new string('c', 240));
+    }
+
+    [Fact]
     public async Task GetDomainAsync_treats_inline_abs_shaped_payload_as_inline_not_external_pointer()
     {
         var payloadStore = new FakeSnapshotPayloadStore();
