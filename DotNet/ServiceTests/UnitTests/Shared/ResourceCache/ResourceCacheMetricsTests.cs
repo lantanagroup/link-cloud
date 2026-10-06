@@ -31,9 +31,9 @@ namespace UnitTests.Shared.ResourceCache
             Assert.Equal(DiagnosticNames.ResourceCacheReadDuration, read.Instrument);
             Assert.Equal(ResourceCacheOutcomes.Hit, read.Tags[DiagnosticNames.CacheOutcome]);
 
-            // Not "present and empty". An explicit null exports as a label with an empty value, which
-            // is a different Prometheus series from the absent label MeasureEval produces on a hit, so
-            // one query would silently miss the other.
+            // Not "present and empty". Prometheus alone would forgive it -- a selector of "" matches
+            // an absent label as well -- but OTLP carries the attribute set as given, so an empty
+            // value is a real dimension and no longer matches what MeasureEval emits for a hit.
             Assert.DoesNotContain(DiagnosticNames.CacheFallbackReason, read.Tags.Keys);
         }
 

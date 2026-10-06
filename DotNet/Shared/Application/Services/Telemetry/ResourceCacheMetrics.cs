@@ -41,9 +41,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
         /// <inheritdoc/>
         public void RecordRead(string outcome, string? fallbackReason, double milliseconds)
         {
-            // Omitted rather than recorded with a null value: an explicitly null tag exports as a
-            // present-but-empty label, and that is a different series from the absent one MeasureEval
-            // produces on a hit. Querying one would silently miss the other.
+            // Omitted rather than recorded with a null value. Not for Prometheus' sake -- there a
+            // selector of "" matches an absent label too -- but because OTLP carries the attribute
+            // set as given, so an empty value is a real dimension downstream and makes this a
+            // different metric stream from the one MeasureEval emits for the same condition.
             if (fallbackReason is null)
             {
                 _readDuration.Record(

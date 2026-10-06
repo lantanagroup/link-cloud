@@ -65,9 +65,10 @@ class MeasureEvalMetricsTest {
 
     // ----- the read instrument is shared with the .NET services -----
     //
-    // Both runtimes have to omit an absent tag rather than record it empty: an empty label exports as
-    // a different series from an absent one, so a query written against one runtime would silently
-    // miss the other. ResourceCacheReaderTest mocks this class, so nothing there proves it.
+    // Both runtimes have to omit an absent tag rather than record it empty, so that the same
+    // condition carries the same attribute set in both. Prometheus cannot tell empty from absent, but
+    // OTLP carries the attributes as given. ResourceCacheReaderTest mocks this class, so nothing
+    // there proves it.
 
     @Test
     void recordResourceCacheRead_hit_omitsTheFallbackReasonRatherThanRecordingItEmpty() {

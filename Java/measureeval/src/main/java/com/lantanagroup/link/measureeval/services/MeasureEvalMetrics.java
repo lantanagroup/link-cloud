@@ -35,8 +35,9 @@ public class MeasureEvalMetrics {
      * reason separates a partial entry rejected by the durable-count check from a plain miss or a
      * Redis outage, which is the distinction the check exists to make visible.
      *
-     * <p>Both runtimes omit the reason on a hit rather than recording it empty: an empty tag exports
-     * as a different series from an absent one, so a query written against one would miss the other.
+     * <p>Both runtimes omit the reason on a hit rather than recording it empty, so that the same
+     * condition carries the same attribute set in both. An empty value would survive into OTLP as a
+     * real dimension, even though Prometheus itself cannot tell it from an absent label.
      */
     static final String RESOURCE_CACHE_READ_DURATION = "link_resource_cache_read_duration";
     static final String CACHE_OUTCOME = "cache.outcome";
