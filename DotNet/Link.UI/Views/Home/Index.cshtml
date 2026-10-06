@@ -1,0 +1,36 @@
+﻿@model Link.UI.Models.AdminBffUser?
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="au-card card">
+    <div class="card-header">Welcome</div>
+    <div class="card-body">
+        <p class="mb-2">
+            Link.UI is the phase-1 merge shell for Admin (and later Automation) on the Automation.UI MVC stack.
+        </p>
+        <ul class="mb-3">
+            <li>Left-hand vertical navigation</li>
+            <li>Admin.BFF cookie auth via same-origin <code>/api</code> reverse proxy</li>
+            <li>Tenant list proof page via LinkSDK <code>IFacilityServiceClient</code></li>
+        </ul>
+        @if (Model?.IsAuthenticated == true)
+        {
+            <div class="alert alert-success mb-0">
+                Signed in as <strong>@(Model.UserName ?? Model.Email)</strong>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-secondary mb-0">
+                Not signed in. Use <strong>Login</strong> in the sidebar to hit Admin.BFF <code>/api/login</code>
+                (proxied through this host). Local Development allows anonymous browsing by default.
+            </div>
+        }
+        <div class="mt-3">
+            <a class="btn btn-au-action" asp-controller="Tenants" asp-action="Index">
+                <i class="bi bi-building me-1"></i>Open Tenants
+            </a>
+        </div>
+    </div>
+</div>

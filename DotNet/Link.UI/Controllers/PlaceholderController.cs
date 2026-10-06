@@ -1,0 +1,32 @@
+﻿using Microsoft.AspNetCore.Mvc;
+
+namespace Link.UI.Controllers;
+
+/// <summary>
+/// Placeholder sections for left-nav groups not yet ported (phase 1).
+/// </summary>
+public sealed class PlaceholderController : Controller
+{
+    [HttpGet]
+    public IActionResult Reports() => ComingSoon("Reports");
+
+    [HttpGet]
+    public IActionResult Configuration() => ComingSoon("Configuration");
+
+    [HttpGet]
+    public IActionResult Logs() => ComingSoon("Logs");
+
+    [HttpGet]
+    public IActionResult System() => ComingSoon("System");
+
+    [HttpGet]
+    public IActionResult Automation() => ComingSoon("Automation");
+
+    private IActionResult ComingSoon(string section)
+    {
+        ViewData["Title"] = section;
+        ViewData["Section"] = section;
+        return View("~/Views/Shared/ComingSoon.cshtml");
+    }
+}
+
