@@ -28,8 +28,7 @@ public class StoreBackedServicePollerTests
             {
                 RunId = runId,
                 FacilityId = "facility",
-                ReportId = Guid.NewGuid().ToString(),
-                SnapshotEpoch = 4
+                ReportId = Guid.NewGuid().ToString()
             });
 
         var poller = new StoreBackedServicePoller(
@@ -50,7 +49,7 @@ public class StoreBackedServicePollerTests
             r => r.GetReportScheduleAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
         store.Verify(
-            s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()),
+            s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 }

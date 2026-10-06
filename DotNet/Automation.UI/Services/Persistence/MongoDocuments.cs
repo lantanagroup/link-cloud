@@ -16,7 +16,10 @@ public sealed class AutomationRunDocument
     public bool AutomationCreatedFacility { get; set; }
     public string ReportId { get; set; } = string.Empty;
 
-    /// <summary>Incremented when the run switches reports. Missing on older rows, which read as 0.</summary>
+    /// <summary>
+    /// Older rows stored a report-generation counter here. This build does not
+    /// increment it. The property stays so those rows still deserialize.
+    /// </summary>
     public long SnapshotEpoch { get; set; }
 
     public string RunName { get; set; } = string.Empty;
@@ -53,38 +56,6 @@ public sealed class AutomationRunDocument
     public int? GeneratedTemplateCacheVersionNumber { get; set; }
     public string? GeneratedTemplateCacheScenarioKey { get; set; }
     public string? GeneratedTemplateSetHash { get; set; }
-}
-
-/// <summary>
-/// Report generation for one snapshot header. Kept off <see cref="DomainSnapshotDocument"/>
-/// so a single-document snapshot stays readable by a build that does not know this field.
-/// A header with no row still ranks by timestamp.
-/// </summary>
-public sealed class SnapshotHeaderEpochDocument
-{
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.String)]
-    public Guid RunId { get; set; }
-
-    public string Domain { get; set; } = string.Empty;
-
-    public long Epoch { get; set; }
-}
-
-/// <summary>
-/// A run whose summary was deleted. A late snapshot write must not recreate rows
-/// after that. No marker is not a deleted run: a snapshot can still be stored
-/// before the run summary exists.
-/// </summary>
-public sealed class SnapshotRunTombstoneDocument
-{
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
-    public Guid RunId { get; set; }
-
-    public DateTimeOffset DeletedAt { get; set; }
 }
 
 /// <summary>Facility Automation created whose run summary was deleted before teardown.</summary>
@@ -171,27 +142,13 @@ public sealed class DomainSnapshotDocument
     [BsonIgnoreIfNull]
     public string? Revision { get; set; }
 
+    /// <summary>
+    /// New writes use BSON ISODate. Older rows may still be the driver array
+    /// form [ticks, offsetMinutes]. The DateTimeOffset serializer reads both.
+    /// BSON dates are millisecond precision.
+    /// </summary>
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset UpdatedAt { get; set; }
-}
-
-/// <summary>
-/// Writer clock for one snapshot domain. Kept off <see cref="DomainSnapshotDocument"/>
-/// so a single-document snapshot stays readable by a build that does not know this field.
-/// </summary>
-public sealed class SnapshotWriteClockDocument
-{
-    [BsonId]
-    public string Id { get; set; } = string.Empty;
-
-    [BsonRepresentation(BsonType.String)]
-    public Guid RunId { get; set; }
-
-    public string Domain { get; set; } = string.Empty;
-
-    public DateTimeOffset WriteClock { get; set; }
-
-    /// <summary>Report generation that owns this domain. A lower epoch cannot replace a higher one.</summary>
-    public long Epoch { get; set; }
 }
 
 /// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>

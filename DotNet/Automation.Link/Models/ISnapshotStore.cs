@@ -20,12 +20,6 @@ public sealed record RunSnapshotMeta
     public DateTimeOffset StartedAt { get; init; }
     public bool IsActive { get; init; } = true;
     public bool IsMetricsRun { get; init; }
-
-    /// <summary>
-    /// Bumped when the run switches to another report. A poller publishes with the
-    /// epoch it read before the fetch, so a slower replica cannot overwrite the new report.
-    /// </summary>
-    public long SnapshotEpoch { get; init; }
 }
 
 /// <summary>An Automation-owned facility whose run summary was deleted before teardown.</summary>
@@ -77,12 +71,6 @@ public interface ISnapshotStore
 
     // --- Domain snapshots (per-run, per-service polling data) ---
     Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default);
-
-    /// <summary>
-    /// Writes a domain snapshot for <paramref name="snapshotEpoch"/>. A stored clock
-    /// from a later epoch rejects this write even when this clock time is newer.
-    /// </summary>
-    Task SetDomainAsync<T>(Guid runId, string domain, T data, long snapshotEpoch, CancellationToken ct = default);
     Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default);
 
     // --- Logs ---
