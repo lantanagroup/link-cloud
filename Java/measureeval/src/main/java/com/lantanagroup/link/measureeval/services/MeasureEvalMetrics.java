@@ -29,20 +29,24 @@ public class MeasureEvalMetrics {
     private final LongCounter durableCountReadFailureCounter;
 
     /**
-     * Same instrument name and {@code cache.outcome} values as the .NET resource cache
-     * (DiagnosticNames.ResourceCacheReadDuration, ResourceCacheOutcomes), so one panel covers
-     * every service that reads the cache. {@code cache.fallback.reason} is MeasureEval's own
-     * addition: it separates a partial entry rejected by the durable-count check from a plain miss
-     * or a Redis outage, which is the distinction the check exists to make visible.
+     * Same instrument name, {@code cache.outcome} values and {@code cache.fallback.reason} values as
+     * the .NET resource cache (DiagnosticNames.ResourceCacheReadDuration, ResourceCacheOutcomes,
+     * ResourceCacheFallbackReasons), so one panel covers every service that reads the cache. The
+     * reason separates a partial entry rejected by the durable-count check from a plain miss or a
+     * Redis outage, which is the distinction the check exists to make visible.
+     *
+     * <p>Both runtimes omit the reason on a hit rather than recording it empty: an empty tag exports
+     * as a different series from an absent one, so a query written against one would miss the other.
      */
     static final String RESOURCE_CACHE_READ_DURATION = "link_resource_cache_read_duration";
     static final String CACHE_OUTCOME = "cache.outcome";
     static final String CACHE_FALLBACK_REASON = "cache.fallback.reason";
 
     /**
-     * Counts reads whose recorded durable count did not parse, so the cache entry was trusted
-     * without the partial-entry check. The count is read with the resources in one HGETALL, so an
-     * unparseable value is the only way left for it to be unusable. Should stay at zero.
+     * Counts reads whose recorded durable count could not be used, so the cache entry was trusted
+     * without the partial-entry check. Here that means an unparseable value, because the count is
+     * read with the resources in one HGETALL; the .NET services increment the same counter when
+     * their separate count read fails outright. Should stay at zero.
      */
     static final String DURABLE_COUNT_READ_FAILURE_COUNT = "link_resource_cache_durable_count_read_failure_count";
 
