@@ -172,6 +172,47 @@ advertises independently**. Nothing waits for both. By the time SUPPLEMENTAL rea
 are durable, because every INITIAL log drained before going terminal and the INITIAL tail could not
 have fired otherwise.
 
+#### A log's terminal status and its acquired ids must commit together
+
+What opens the gate and what fills the event are two different writes to two different tables. The
+gate is `DataAcquisitionLog.Status`; the event's `CacheKeys` are built by `TryCompleteTailAsync`
+querying `DataAcquisitionLogResourceIds` and projecting `{correlationId}:{type}` from the rows it
+finds. `DataAcquisitionLogManager.UpdateAsync` writes both, and writes the **ids first** precisely
+because the tail reads them separately.
+
+With the status first, sibling logs running concurrently mean one of them finishes while another has
+flipped its status but not yet saved its ids. It sees the whole group terminal, queries an id table
+that does not yet hold those rows, and produces a `ResourcesAcquired` advertising **every resource
+type except that one**. Normalization is never pointed at the key, so those resources never reach the
+correlation entry, MeasureEval, Mongo or the submitted report.
+
+Nothing detects it, which is what makes the ordering load-bearing rather than tidy:
+
+- `ResourcesAcquiredTailFinalizer` drops keys that hold nothing, but the key is absent, not empty.
+- `ResourcesAcquiredListener` dead-letters a *listed* key that is empty; it cannot miss a key it was
+  never given.
+- The durable count recorded for `{correlationId}` matches what was actually copied into it, so the
+  partial-entry check above sees agreement and every read is a legitimate `hit`.
+
+It costs the resource type whose log goes terminal last, because that log's own status write is what
+opens the gate.
+
+Ordering rather than one transaction, because the context is configured with
+`SqlServerRetryingExecutionStrategy`: EF refuses a user-initiated transaction under a retrying
+strategy unless the whole unit runs inside `CreateExecutionStrategy().ExecuteAsync(...)`, and
+wrapping it threw on every call. Ordering needs neither, and is sufficient -- only the status opens
+the gate, so ids written before it are always visible to whoever the gate lets through. A failure
+between the two writes leaves ids recorded against a log that is not terminal, which the delete-then-
+insert on the next attempt simply replaces.
+
+`IDatabase.ExecuteInTransactionAsync` does wrap a unit correctly for that strategy, and would give
+true atomicity, but it calls `ChangeTracker.Clear()` on each attempt. `UpdateAsync` runs on a scoped
+context that other work in the same scope has staged changes on, so clearing it would discard their
+pending writes. Ordering needs none of that.
+
+Note that the integration-test fixture does **not** enable retry on failure, so a user-initiated
+transaction passes there and fails in every deployed environment.
+
 ### Who waits on what
 
 A durability failure is recorded **per resource**, against the key it was written to, and it is
