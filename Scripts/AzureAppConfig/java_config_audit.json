@@ -15,7 +15,7 @@
     "This is NOT a subset of app-config.yaml and must not be derived from it. The catalog",
     "records what should be provisioned per environment; this records what the code actually",
     "binds. Phase 2 compares the two, so deriving either from the other makes the comparison",
-    "circular. Today 21 of these 31 keys are absent from the catalog.",
+    "circular. Today 18 of these 32 keys are absent from the catalog.",
     "",
     "Possible improvement: spring-boot-configuration-processor is not currently declared in",
     "any pom. Adding it would make Maven emit META-INF/spring-configuration-metadata.json for",
@@ -107,6 +107,13 @@
     },
     {
       "key": "telemetry.exporter-endpoint",
+      "runtime": "java",
+      "consumers": ["MeasureEval", "Validation"],
+      "derived": true,
+      "evidence": [{"file": "Java/shared/src/main/java/com/lantanagroup/link/shared/config/TelemetryConfig.java", "line": 7, "kind": "ConfigurationProperties", "type": "TelemetryConfig"}]
+    },
+    {
+      "key": "telemetry.deploymentEnvironment",
       "runtime": "java",
       "consumers": ["MeasureEval", "Validation"],
       "derived": true,
