@@ -429,6 +429,73 @@ public class RunSnapshotOrchestratorTests
         PollerCount(orchestrator).Should().Be(0);
     }
 
+    [Fact]
+    public async Task QuiesceForDeleteAsync_stops_the_poller_and_a_later_domain_write_does_not_land()
+    {
+        var runId = Guid.NewGuid();
+        var writes = 0;
+        var metaReads = 0;
+        var insideWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.CompleteRunAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                Interlocked.Increment(ref metaReads);
+                return Task.FromResult<RunSnapshotMeta?>(null);
+            });
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(new InvocationFunc(invocation =>
+            {
+                var domain = (string)invocation.Arguments[1];
+                return OnWriteAsync(domain);
+            }));
+
+        var orchestrator = CreateOrchestrator(store);
+        await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
+
+        var writing = orchestrator.WriteDomainAsync(runId, "generationManifest", "during-cancel", CancellationToken.None);
+        await insideWrite.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var quiescing = orchestrator.QuiesceForDeleteAsync(runId);
+        await Task.Delay(200);
+        quiescing.IsCompleted.Should().BeFalse("an in-flight domain write holds the run gate");
+
+        releaseWrite.TrySetResult();
+        await writing.WaitAsync(TimeSpan.FromSeconds(10));
+        await quiescing.WaitAsync(TimeSpan.FromSeconds(10));
+
+        writes.Should().Be(1);
+        PollerCount(orchestrator).Should().Be(0);
+        var metaReadsAfterDelete = Volatile.Read(ref metaReads);
+
+        await orchestrator.WriteDomainAsync(runId, "generationManifest", "after-delete", CancellationToken.None);
+        await orchestrator.CompleteRunAsync(runId);
+        await Task.Delay(300);
+
+        writes.Should().Be(1);
+        Volatile.Read(ref metaReads).Should().Be(metaReadsAfterDelete);
+        PollerCount(orchestrator).Should().Be(0);
+
+        async Task OnWriteAsync(string domain)
+        {
+            if (domain == "generationManifest")
+            {
+                insideWrite.TrySetResult();
+                await releaseWrite.Task;
+            }
+
+            Interlocked.Increment(ref writes);
+        }
+    }
+
     private static int PollerCount(RunSnapshotOrchestrator orchestrator)
     {
         var pollers = typeof(RunSnapshotOrchestrator)

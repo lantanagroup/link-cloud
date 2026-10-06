@@ -19,6 +19,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly ConcurrentDictionary<Guid, RunPollerHandle> _activePollers = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _runGates = new();
     private readonly ConcurrentDictionary<Guid, Task> _completions = new();
+    private readonly ConcurrentDictionary<Guid, byte> _writesClosed = new();
     private int _shuttingDown;
     private CancellationToken _stopToken;
 
@@ -107,6 +108,80 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
 
         _logger.LogInformation("Registered run {RunId} for snapshot polling", runId);
+    }
+
+    /// <summary>
+    /// Stops this run's poller before its snapshots are deleted.
+    /// The run gate is the same one a domain write holds, so an in-flight write
+    /// finishes first and a write that arrives later sees the run closed.
+    /// There is no final poll. That write would be deleted immediately, and a
+    /// completion that runs after this finds no poller.
+    /// </summary>
+    public async Task QuiesceForDeleteAsync(Guid runId, CancellationToken ct = default)
+    {
+        var gate = Gate(runId);
+        await gate.WaitAsync(ct);
+        try
+        {
+            _writesClosed[runId] = 0;
+            if (!_activePollers.TryGetValue(runId, out var handle))
+                return;
+
+            TryRemoveExact(_activePollers, runId, handle);
+            try
+            {
+                await handle.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Stopping the poller before deleting run {RunId} failed", runId);
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Domain write from the run itself (the execution task, live provisioner, or live inject).
+    /// The poller does not use this. Completion already holds the gate across its final poll,
+    /// and the poller must be able to finish a write while that gate is held.
+    /// </summary>
+    public async Task WriteDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct)
+    {
+        if (_writesClosed.ContainsKey(runId))
+            return;
+
+        var gate = Gate(runId);
+        try
+        {
+            await gate.WaitAsync(ct);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Delete finished and a later completion pruned the gate.
+            return;
+        }
+
+        try
+        {
+            if (_writesClosed.ContainsKey(runId))
+                return;
+
+            await _store.SetDomainAsync(runId, domain, data, ct);
+        }
+        finally
+        {
+            try
+            {
+                gate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The gate was pruned after this write released its turn.
+            }
+        }
     }
 
     /// <summary>
@@ -430,6 +505,9 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private async Task<bool> StartPollerAsync(RunSnapshotMeta meta, CancellationToken ct)
     {
         if (Volatile.Read(ref _shuttingDown) != 0)
+            return false;
+
+        if (_writesClosed.ContainsKey(meta.RunId))
             return false;
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
