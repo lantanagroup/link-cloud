@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Interfaces
@@ -186,13 +187,14 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// A cache write is a merge that recreates a key the cache has evicted, so an entry holding only
         /// the most recent batch is non-empty and otherwise indistinguishable from a whole one. Comparing
         /// the count this returns against <see cref="GetResourceCountAsync"/> is what tells them apart.
-        /// Null when nothing has recorded a count, which a reader must treat as unknown rather than as
-        /// agreement. See docs-dev/resource-cache.md.
+        /// A count nothing has recorded yet is unknown rather than agreement, and a count that cannot be
+        /// read is a fault rather than an absence -- both serve the entry, but only one is worth
+        /// counting, so they are distinct statuses rather than one null. See docs-dev/resource-cache.md.
         /// </remarks>
         /// <param name="cacheKey">The key to read the recorded count for.</param>
         /// <param name="cancellationToken">Cancels the read.</param>
-        /// <returns>The recorded durable count, or null when none has been recorded.</returns>
-        Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default);
+        /// <returns>The recorded count, or the status saying why there is none to compare against.</returns>
+        Task<DurableResourceCount> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Whether a read of <paramref name="cacheKey"/> would be served the whole record without
