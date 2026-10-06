@@ -1,0 +1,1374 @@
+{
+  "title": "Link Resource Cache",
+  "uid": "link-resource-cache",
+  "description": "Resource cache reads (Acquisition Worker, Normalization, MeasureEval) and .NET durable writes.",
+  "tags": [
+    "link",
+    "resource-cache"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "timezone": "browser",
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Datasource",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "refresh": 1,
+        "regex": "",
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "environment",
+        "label": "Environment",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "description": "deployment.environment.name, from Telemetry:DeploymentEnvironment. Single-select: a hit ratio or quantile across environments means nothing.",
+        "definition": "label_values(target_info, deployment_environment_name)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(target_info, deployment_environment_name)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": false,
+        "multi": false,
+        "current": {},
+        "refresh": 2,
+        "sort": 1,
+        "regex": "",
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "service",
+        "label": "Service",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(link_resource_cache_read_duration_milliseconds_count, exported_job)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(link_resource_cache_read_duration_milliseconds_count, exported_job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "refresh": 2,
+        "sort": 1,
+        "regex": "",
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Reads — every reader, both runtimes",
+      "id": 1,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "",
+      "id": 2,
+      "transparent": true,
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "All three readers record `link_resource_cache_read_duration` under the same name and tags, so these panels group by service rather than repeating per service. `DataAcquisitionWorker` and `Normalization` are .NET; `measureeval` is Java and also tags `phase`, which every query here aggregates away. Counts of rare events treat a series that did not exist yet as zero, because `increase()` reads a newly created series' first observations as no change. See `docs-dev/resource-cache.md`, *Instrumentation*."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Hit ratio",
+      "description": "Hits over hits plus fallbacks, for the selected time range. `empty` reads are left out: nothing held the key in either store, so Redis could not have served them (the Acquisition Worker's Encounter probe produces one per correlation by design).",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job) ((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"hit\"}[$__range]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"hit\"} offset $__range or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"hit\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) / sum by (exported_job) ((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=~\"hit|fallback\"}[$__range]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=~\"hit|fallback\"} offset $__range or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=~\"hit|fallback\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          },
+          "noValue": "0",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Hit ratio over time",
+      "description": "The same ratio as the stat, per scrape window. A dip means reads are going to blob storage: see the fallback panel for why.",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 8,
+        "y": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job) ((rate(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"hit\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) / sum by (exported_job) ((rate(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=~\"hit|fallback\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Untrusted empty reads",
+      "description": "`empty` + `unavailable`: Redis could not be asked and blob storage held nothing, so the caller got an empty answer nobody should trust. The first alert candidate. Should be zero.",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\",cache_fallback_reason=\"unavailable\"}[$__range]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\",cache_fallback_reason=\"unavailable\"} offset $__range or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\",cache_fallback_reason=\"unavailable\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) or vector(0)",
+          "legendFormat": "empty + unavailable",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Partial entries",
+      "description": "Reads that found an incomplete Redis entry (fewer keys than the durable count says were written) and fell back to blob. Non-zero means entries are being recreated after eviction.",
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_fallback_reason=\"partial\"}[$__range]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_fallback_reason=\"partial\"} offset $__range or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_fallback_reason=\"partial\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) or vector(0)",
+          "legendFormat": "partial",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Reads without the partial-entry check",
+      "description": "`durable_count_read_failure_count`: the durable count was unreadable, so an entry was served without checking it was whole. Should be zero. A counter that was never incremented is not exported at all, so no series here is the healthy state.",
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum((clamp_min(max_over_time(link_resource_cache_durable_count_read_failure_count_total{exported_job=~\"$service\"}[$__range]) - (link_resource_cache_durable_count_read_failure_count_total{exported_job=~\"$service\"} offset $__range or max_over_time(link_resource_cache_durable_count_read_failure_count_total{exported_job=~\"$service\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) or vector(0)",
+          "legendFormat": "unchecked reads",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Writes that exhausted retries",
+      "description": "Durable writes abandoned after the last retry (.NET writers only). `interrupted` is a shutdown draining the queue and is excluded. Should be zero.",
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum((clamp_min(max_over_time(link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome=\"exhausted\"}[$__range]) - (link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome=\"exhausted\"} offset $__range or max_over_time(link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome=\"exhausted\"}[$__range]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})) or vector(0)",
+          "legendFormat": "exhausted",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Reads per second by outcome",
+      "description": "Every read, by service and outcome.",
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job, cache_outcome) ((rate(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}} · {{cache_outcome}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fallback reads by reason",
+      "description": "Reads served from blob storage. `miss`: Redis did not have the key. `partial`: Redis had an incomplete entry. `unavailable`: Redis could not be reached.",
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job, cache_fallback_reason) ((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"fallback\"}[$__interval]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"fallback\"} offset $__interval or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"fallback\"}[$__interval]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}} · {{cache_fallback_reason}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*unavailable.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*partial.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "interval": "1m"
+    },
+    {
+      "type": "timeseries",
+      "title": "Empty reads by reason",
+      "description": "Reads where neither store held the key. `DataAcquisitionWorker` · `miss` at about one per correlation is expected: `LocationMappingService` probes `{correlationId}:Encounter` and treats nothing cached as nothing to resolve. Do not alert on `empty` alone. `unavailable` is the one that matters.",
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job, cache_fallback_reason) ((clamp_min(max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\"}[$__interval]) - (link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\"} offset $__interval or max_over_time(link_resource_cache_read_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"empty\"}[$__interval]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}} · {{cache_fallback_reason}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*unavailable.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*partial.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "interval": "1m"
+    },
+    {
+      "type": "timeseries",
+      "title": "Read duration by service",
+      "description": "p50 and p95 across every outcome.",
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job) ((rate(link_resource_cache_read_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p95",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le, exported_job) ((rate(link_resource_cache_read_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p50",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Read duration p95 by outcome",
+      "description": "What a fallback costs against a hit.",
+      "id": 13,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job, cache_outcome) ((rate(link_resource_cache_read_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} · {{cache_outcome}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Writes — .NET writers only",
+      "id": 14,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "",
+      "id": 15,
+      "transparent": true,
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "MeasureEval never writes the cache, so expect only `DataAcquisitionWorker` and `Normalization` here."
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Drain wait",
+      "description": "Time spent waiting for queued durable writes to finish before the work is advertised downstream. The only part of the blob write not overlapped with other work: the honest cost of durability.",
+      "id": 16,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job) ((rate(link_resource_cache_drain_wait_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p95",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le, exported_job) ((rate(link_resource_cache_drain_wait_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p50",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Durable write queue depth",
+      "description": "Writes queued for blob storage. A depth that keeps climbing means durable storage is not keeping up.",
+      "id": 17,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job) (link_resource_cache_queue_depth{exported_job=~\"$service\"} * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})",
+          "legendFormat": "{{exported_job}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue wait",
+      "description": "Time a write sat in the queue before a worker picked it up: a backlog, as distinct from storage having slowed down.",
+      "id": 18,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 51
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job) ((rate(link_resource_cache_queue_wait_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p95",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le, exported_job) ((rate(link_resource_cache_queue_wait_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} p50",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Write duration p95 by store",
+      "description": "Inline Redis cost against background blob cost.",
+      "id": 19,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 51
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, exported_job, cache_store) ((rate(link_resource_cache_write_duration_milliseconds_bucket{exported_job=~\"$service\"}[$__rate_interval]) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"})))",
+          "legendFormat": "{{exported_job}} · {{cache_store}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Failed writes by store",
+      "description": "Writes recorded with `cache.outcome=failed`.",
+      "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 59
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job, cache_store) ((clamp_min(max_over_time(link_resource_cache_write_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"failed\"}[$__interval]) - (link_resource_cache_write_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"failed\"} offset $__interval or max_over_time(link_resource_cache_write_duration_milliseconds_count{exported_job=~\"$service\",cache_outcome=\"failed\"}[$__interval]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}} · {{cache_store}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "interval": "1m"
+    },
+    {
+      "type": "timeseries",
+      "title": "Write retries by outcome",
+      "description": "`retried` and `exhausted` only. `interrupted` is a shutdown draining the queue, not storage misbehaving, and is left out.",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 59
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (exported_job, cache_outcome) ((clamp_min(max_over_time(link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome!=\"interrupted\"}[$__interval]) - (link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome!=\"interrupted\"} offset $__interval or max_over_time(link_resource_cache_write_retry_count_total{exported_job=~\"$service\",cache_outcome!=\"interrupted\"}[$__interval]) * 0), 0) * on (exported_job, exported_instance) group_left() target_info{deployment_environment_name=~\"$environment\"}))",
+          "legendFormat": "{{exported_job}} · {{cache_outcome}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*exhausted.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "interval": "1m"
+    }
+  ]
+}
