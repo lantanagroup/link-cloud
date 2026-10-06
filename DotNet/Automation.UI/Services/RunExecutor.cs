@@ -471,7 +471,7 @@ internal sealed class RunExecutor
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             var facilityClient = services.GetRequiredService<IFacilityServiceClient>();
@@ -614,7 +614,7 @@ internal sealed class RunExecutor
                         $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
                 }
 
-                await _snapshotStore.SetDomainAsync(
+                await _orchestrator.WriteDomainAsync(
                     state.RunId,
                     "dmrp",
                     new
@@ -881,7 +881,7 @@ internal sealed class RunExecutor
 
                 // Persist the submitted-patient override before validators run so the
                 // dashboard reflects prediction scope even when a later validator fails.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -982,7 +982,7 @@ internal sealed class RunExecutor
             try
             {
                 var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -996,7 +996,7 @@ internal sealed class RunExecutor
             try
             {
                 var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
@@ -1016,7 +1016,7 @@ internal sealed class RunExecutor
             // localise a discrepancy. Results are persisted after each validator so partial results
             // stay visible in the dashboard even when a later validator fails.
             var validatorRunner = new ValidatorRunner((results, ct) =>
-                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
+                _orchestrator.WriteDomainAsync(state.RunId, "validatorResults", results, ct));
 
             Task RunValidator(string name, Func<Task> action) =>
                 validatorRunner.RunAsync(name, action, cancellationToken);
@@ -1043,7 +1043,7 @@ internal sealed class RunExecutor
             // snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             if (isLiveSimulation)
@@ -1169,7 +1169,7 @@ internal sealed class RunExecutor
             {
                 try
                 {
-                    await _snapshotStore.SetDomainAsync(
+                    await _orchestrator.WriteDomainAsync(
                         state.RunId,
                         NormalizationEvidenceSnapshot.Domain,
                         RunHistorySlim.SlimNormalizationEvidence(evidence),
@@ -1897,7 +1897,8 @@ internal sealed class RunExecutor
                 _snapshotStore,
                 _generatedTemplateCache,
                 liveShape,
-                state.Options.MeasureBundleJsons);
+                state.Options.MeasureBundleJsons,
+                _orchestrator);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,
