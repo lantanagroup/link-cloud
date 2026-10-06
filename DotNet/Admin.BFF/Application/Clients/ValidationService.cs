@@ -14,7 +14,6 @@ public class ValidationService
     private readonly ILogger<ValidationService> _logger;
     private readonly HttpClient _client;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
-    private const string HealthUp = "UP";
     private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
 
 
@@ -75,9 +74,7 @@ public class ValidationService
                 return new LinkServiceHealthReport { Service = "Validation", Status = HealthStatus.Unhealthy };
             }
 
-            var status = health?.Status?.Equals(HealthUp, StringComparison.OrdinalIgnoreCase) == true
-                ? HealthStatus.Healthy
-                : HealthStatus.Unhealthy;
+            var status = SpringHealthStatusMap.ToHealthStatus(health?.Status);
 
             report.Status = status;
 
@@ -86,9 +83,7 @@ public class ValidationService
             {
                 foreach (var component in health.Components)
                 {
-                    var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
-                        ? HealthStatus.Healthy
-                        : HealthStatus.Unhealthy;
+                    var componentStatus = SpringHealthStatusMap.ToHealthStatus(component.Value?.Status);
 
                     report.Entries[component.Key] = new LinkServiceHealthReportEntry
                     {

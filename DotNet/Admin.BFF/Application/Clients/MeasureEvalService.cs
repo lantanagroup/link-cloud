@@ -13,7 +13,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly ILogger<MeasureEvalService> _logger;
         private readonly HttpClient _client;
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
-        private const string HealthUp = "UP";
         private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
 
         public MeasureEvalService(ILogger<MeasureEvalService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
@@ -69,9 +68,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                     return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
                 }
 
-                var status = health?.Status?.Equals(HealthUp, StringComparison.OrdinalIgnoreCase) == true
-                    ? HealthStatus.Healthy
-                    : HealthStatus.Unhealthy;
+                var status = SpringHealthStatusMap.ToHealthStatus(health?.Status);
 
                 report.Status = status;
 
@@ -80,9 +77,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 {
                     foreach (var component in health.Components)
                     {
-                        var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
-                            ? HealthStatus.Healthy
-                            : HealthStatus.Unhealthy;
+                        var componentStatus = SpringHealthStatusMap.ToHealthStatus(component.Value?.Status);
 
                         report.Entries[component.Key] = new LinkServiceHealthReportEntry
                         {
