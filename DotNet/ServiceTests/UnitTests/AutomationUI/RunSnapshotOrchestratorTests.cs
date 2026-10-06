@@ -340,6 +340,88 @@ public class RunSnapshotOrchestratorTests
         PollerCount(orchestrator).Should().Be(0);
     }
 
+    [Fact]
+    public async Task StopAllPollersAsync_waits_for_an_open_final_fetch_before_disposing_the_scope()
+    {
+        var runId = Guid.NewGuid();
+        var reportId = Guid.NewGuid().ToString();
+        var meta = new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = reportId,
+            StartedAt = DateTimeOffset.UtcNow,
+            IsActive = true
+        };
+        var inFinalFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFinalFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finalReads = 0;
+        var order = new List<string>();
+        var orderGate = new object();
+
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(It.IsAny<Guid>(), "schedule", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DomainSnapshot<PipelineDataReader.ReportScheduleInfo>?)null);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(async (Guid _, CancellationToken ct) =>
+            {
+                if (ct.CanBeCanceled)
+                    return meta;
+
+                if (Interlocked.Increment(ref finalReads) > 1)
+                    return null;
+
+                inFinalFetch.TrySetResult();
+                await releaseFinalFetch.Task;
+                return meta;
+            });
+        store.Setup(s => s.CompleteRunAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                lock (orderGate)
+                    order.Add("complete");
+                return Task.CompletedTask;
+            });
+
+        var disposed = 0;
+        var scope = new Mock<IServiceScope>();
+        scope.Setup(s => s.Dispose()).Callback(() =>
+        {
+            Interlocked.Increment(ref disposed);
+            lock (orderGate)
+                order.Add("dispose");
+        });
+        var orchestrator = CreateOrchestrator(store, scope);
+        await orchestrator.RegisterRunAsync(runId, "facility", reportId);
+
+        var completing = orchestrator.CompleteRunAsync(runId);
+        await inFinalFetch.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var stopAll = typeof(RunSnapshotOrchestrator).GetMethod("StopAllPollersAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var stopping = (Task)stopAll.Invoke(orchestrator, null)!;
+        await Task.Delay(200);
+
+        stopping.IsCompleted.Should().BeFalse();
+        disposed.Should().Be(0);
+
+        releaseFinalFetch.TrySetResult();
+        await completing.WaitAsync(TimeSpan.FromSeconds(10));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10));
+
+        disposed.Should().Be(1);
+        lock (orderGate)
+            order.Should().ContainInOrder("complete", "dispose");
+        PollerCount(orchestrator).Should().Be(0);
+    }
+
     private static int PollerCount(RunSnapshotOrchestrator orchestrator)
     {
         var pollers = typeof(RunSnapshotOrchestrator)
@@ -357,7 +439,7 @@ public class RunSnapshotOrchestratorTests
         return (string)handle.GetType().GetProperty("ReportId")!.GetValue(handle)!;
     }
 
-    private static RunSnapshotOrchestrator CreateOrchestrator(Mock<ISnapshotStore> store)
+    private static RunSnapshotOrchestrator CreateOrchestrator(Mock<ISnapshotStore> store, Mock<IServiceScope>? scope = null)
     {
         var reader = new PipelineDataReader(
             Mock.Of<IReportServiceClient>(),
@@ -366,7 +448,7 @@ public class RunSnapshotOrchestratorTests
             Mock.Of<IFacilityServiceClient>());
         var scopeProvider = new Mock<IServiceProvider>();
         scopeProvider.Setup(provider => provider.GetService(typeof(PipelineDataReader))).Returns(reader);
-        var scope = new Mock<IServiceScope>();
+        scope ??= new Mock<IServiceScope>();
         scope.SetupGet(s => s.ServiceProvider).Returns(scopeProvider.Object);
         var scopeFactory = new Mock<IServiceScopeFactory>();
         scopeFactory.Setup(factory => factory.CreateScope()).Returns(scope.Object);
