@@ -1109,11 +1109,20 @@ internal sealed class RunExecutor
             {
                 var logs = new List<string>();
 
+                // Each Loki call stamps its own end time. Refresh coverage here so a
+                // later resource type does not start after the run began.
+                TimeSpan LookbackForThisRequest() =>
+                    LokiEvidenceQuery.LookbackForRequest(
+                        lookback,
+                        LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+
                 Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
                     lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
-                        lookback,
+                        LookbackForThisRequest(),
                         additionalContainsFilters: filters,
                         limit: limit,
                         maxPages: maxPages,

@@ -518,17 +518,22 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         foreach (var (_, handle) in pending)
             handle.Cancel();
 
-        if (stoppingToken.IsCancellationRequested)
-            return;
-
+        // The host calls this after stoppingToken is already cancelled, so waiting
+        // on that token returns before the scopes are disposed. Drain the cancelled
+        // pollers for a few seconds instead. A caller that is not cancelled still
+        // waits on its own token.
+        using var drain = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var waitToken = stoppingToken.CanBeCanceled && !stoppingToken.IsCancellationRequested
+            ? stoppingToken
+            : drain.Token;
         try
         {
             await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value)))
-                .WaitAsync(stoppingToken);
+                .WaitAsync(waitToken);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (waitToken.IsCancellationRequested)
         {
-            // Host shutdown wins. Do not wait out a final poll.
+            // The drain window ended. Do not wait out a stuck poll.
         }
     }
 
@@ -556,7 +561,20 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
         private int _stopped;
 
-        public void Cancel() => cts.Cancel();
+        public void Cancel()
+        {
+            if (Volatile.Read(ref _stopped) != 0)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // StopAsync already disposed this handle.
+            }
+        }
 
         public Task FinalPollAsync(CancellationToken cancellationToken) => poller.FinalPollAsync(cancellationToken);
 
