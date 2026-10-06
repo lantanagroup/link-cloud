@@ -5,6 +5,7 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
@@ -237,13 +238,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// <remarks>
         /// This store is the durable one, so its own count is the answer and there is nothing recorded.
         /// </remarks>
-        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        public async Task<DurableResourceCount> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             // Awaited rather than continued. OnlyOnRanToCompletion turns a faulted read into a
             // *cancelled* task, so a storage fault reached callers as an OperationCanceledException
             // -- past every handler written to treat a failed count read as "unknown", and
             // indistinguishable from the caller cancelling.
-            return await GetResourceCountAsync(cacheKey, cancellationToken);
+            // Always Recorded: this store is the durable one, so whatever it holds is the count.
+            return DurableResourceCount.Of(await GetResourceCountAsync(cacheKey, cancellationToken));
         }
 
         /// <inheritdoc/>

@@ -485,8 +485,8 @@ public sealed class RunMetricsSnapshotService : IRunMetricsSnapshotService
         $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",cache_outcome=\"{outcome}\"}}[{windowSeconds}s]))";
 
     /// <summary>
-    /// One service's fallback reads for one reason. Only MeasureEval tags the reason, as
-    /// <c>cache.fallback.reason</c>: miss, partial or unavailable.
+    /// One service's fallback reads for one reason, tagged <c>cache.fallback.reason</c>: miss,
+    /// partial or unavailable. Every reader in both runtimes emits it; the caller picks the service.
     /// </summary>
     internal static string CacheFallbackReasonCountQuery(string reason, int windowSeconds, string exportedJob) =>
         $"sum(increase(link_resource_cache_read_duration_milliseconds_count{{exported_job=\"{EscapePromLabel(exportedJob)}\",cache_outcome=\"fallback\",cache_fallback_reason=\"{reason}\"}}[{windowSeconds}s]))";

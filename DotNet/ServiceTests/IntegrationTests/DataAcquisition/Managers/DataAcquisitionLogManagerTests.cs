@@ -216,6 +216,104 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
+    public async Task UpdateAsync_ResourceIdWriteFails_LeavesTheStatusUnchanged()
+    {
+        // The status write is what opens the tail gate, and TryCompleteTailAsync builds the
+        // ResourcesAcquired cache keys from DataAcquisitionLogResourceIds. Written after the status,
+        // the status becomes visible while the ids are not yet there, and a sibling completing in that
+        // window produces a tail that advertises every resource type except this log's -- losing a
+        // whole type for the patient with nothing logged anywhere. A failed id write leaving the status
+        // untouched is the observable proof that the ids are written first.
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
+            CorrelationId = Guid.NewGuid().ToString(),
+            QueryPhase = QueryPhase.Supplemental,
+            SiblingCount = 2,
+            Status = RequestStatus.Processing
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var manager = CreateManager(scope);
+
+        // ResourceId is nvarchar(512), so this insert is rejected by the database rather than by EF.
+        var updateModel = new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed,
+            CompletionDate = DateTime.UtcNow,
+            ResourceAcquiredIds = ["Observation/" + new string('x', 600)]
+        };
+
+        await Assert.ThrowsAnyAsync<Exception>(() => manager.UpdateAsync(updateModel));
+
+        // A fresh context, because the failed attempt leaves the tracked entity holding the status it
+        // tried to write.
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var persisted = await verifyContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .FirstAsync(l => l.Id == log.Id);
+
+        Assert.Equal(RequestStatus.Processing, persisted.Status);
+        Assert.Empty(await verifyContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(r => r.DataAcquisitionLogId == log.Id)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_TerminalStatusAndResourceIds_PersistsBoth()
+    {
+        // The happy path of the same rule: once the status is terminal, the ids the tail will read are
+        // already there.
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
+            CorrelationId = Guid.NewGuid().ToString(),
+            QueryPhase = QueryPhase.Supplemental,
+            SiblingCount = 2,
+            Status = RequestStatus.Processing
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var manager = CreateManager(scope);
+
+        await manager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        {
+            Id = log.Id,
+            Status = RequestStatus.Completed,
+            CompletionDate = DateTime.UtcNow,
+            ResourceAcquiredIds = ["Observation/obs-1", "Observation/obs-2"]
+        });
+
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var persisted = await verifyContext.DataAcquisitionLogs
+            .AsNoTracking()
+            .FirstAsync(l => l.Id == log.Id);
+
+        var ids = await verifyContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(r => r.DataAcquisitionLogId == log.Id)
+            .Select(r => r.ResourceId)
+            .ToListAsync();
+
+        Assert.Equal(RequestStatus.Completed, persisted.Status);
+        Assert.Equal(["Observation/obs-1", "Observation/obs-2"], ids.Order());
+    }
+
+    [Fact]
     public async Task DeleteAsync_ValidId_DeletesLog()
     {
         // Arrange

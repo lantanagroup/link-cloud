@@ -1,6 +1,7 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -156,7 +157,9 @@ public class RedisResourceCacheReplaceTests : IAsyncLifetime
         // reader treats a missing count as unknown and trusts the entry, rather than comparing
         // against the pre-replace figure and calling the entry partial. The caller that needs the
         // count to survive records it again; HybridResourceCache does exactly that.
-        Assert.Null(await _cache.GetDurableResourceCountAsync(cacheKey));
+        Assert.Equal(
+            DurableCountStatus.NotRecorded,
+            (await _cache.GetDurableResourceCountAsync(cacheKey)).Status);
         Assert.Equal(1, await _cache.GetResourceCountAsync(cacheKey));
     }
 

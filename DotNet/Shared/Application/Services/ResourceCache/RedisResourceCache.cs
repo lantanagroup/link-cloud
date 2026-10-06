@@ -3,7 +3,9 @@ using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -256,13 +258,31 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public async Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
+        public async Task<DurableResourceCount> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             var value = await _redisDatabase.Database
                 .HashGetAsync(cacheKey, DurableResourceCountField)
                 .WaitAsync(cancellationToken);
 
-            return value.HasValue && int.TryParse(value.ToString(), out var count) ? count : null;
+            if (!value.HasValue)
+            {
+                return DurableResourceCount.NotRecorded;
+            }
+
+            if (!int.TryParse(value.ToString(), out var count))
+            {
+                // Only this writer records the field, so a value that will not parse means something
+                // overwrote it. Said out loud rather than silently treated as absent: the entry is
+                // still served, but nothing checked whether it was whole.
+                _logger.LogWarning(
+                    "The recorded durable resource count for {CacheKey} could not be read as a number, "
+                    + "so the entry was served without the partial-entry check.",
+                    cacheKey.SanitizeForLog());
+
+                return DurableResourceCount.Unusable;
+            }
+
+            return DurableResourceCount.Of(count);
         }
 
         /// <inheritdoc/>

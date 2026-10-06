@@ -70,9 +70,16 @@
         public const string ResourceCacheDrainWaitDuration = "link_resource_cache_drain_wait_duration";
         public const string ResourceCacheQueueDepth = "link_resource_cache_queue_depth";
         public const string ResourceCacheWriteRetryCount = "link_resource_cache_write_retry_count";
+        public const string ResourceCacheDurableCountReadFailureCount = "link_resource_cache_durable_count_read_failure_count";
 
         public const string CacheStore = "cache.store";
         public const string CacheOutcome = "cache.outcome";
+
+        /// <summary>
+        /// Why the cache did not serve a read. MeasureEval emits the same key on the same instrument,
+        /// so one query shape covers every service that reads the resource cache.
+        /// </summary>
+        public const string CacheFallbackReason = "cache.fallback.reason";
 
         public static string NormalizePhase(string? phase)
         {
