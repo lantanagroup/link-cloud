@@ -151,7 +151,7 @@ public static class RunHistorySlim
 
     private static AcquisitionLogFailure FailureSample(PipelineDataReader.AcquisitionLogInfo log, string status)
     {
-        var note = log.Notes?.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        var note = log.Notes?.LastOrDefault(value => !string.IsNullOrWhiteSpace(value));
         if (note != null && note.Length > 200)
             note = note[..200];
 

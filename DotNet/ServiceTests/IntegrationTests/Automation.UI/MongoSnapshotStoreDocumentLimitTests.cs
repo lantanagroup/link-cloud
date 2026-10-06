@@ -964,6 +964,54 @@ public class MongoSnapshotStoreDocumentLimitTests : IAsyncLifetime
         (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
     }
 
+    [Fact]
+    public async Task SetDomainAsync_current_report_survives_when_an_older_header_is_inserted_first()
+    {
+        var runId = Guid.NewGuid();
+        var store = new MongoSnapshotStore(_fixture.Database, NullLogger<MongoSnapshotStore>.Instance);
+        await store.RegisterRunAsync(runId, new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = "facility",
+            ReportId = "old-report",
+            StartedAt = DateTimeOffset.UtcNow
+        }, CancellationToken.None);
+
+        var started = DateTimeOffset.UtcNow;
+        var current = StoreAt(started);
+        var stale = StoreAt(started.AddMinutes(5));
+        var staleReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var currentReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleInserted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseStale = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        stale.BeforeHeaderInsert = () =>
+        {
+            staleReady.TrySetResult();
+            return currentReady.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        };
+        stale.AfterHeaderInserted = () =>
+        {
+            staleInserted.TrySetResult();
+            return releaseStale.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        };
+        current.BeforeHeaderInsert = async () =>
+        {
+            currentReady.TrySetResult();
+            await staleInserted.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            await MoveEpochAsync(runId);
+        };
+
+        var staleWrite = Task.Run(() => stale.SetDomainAsync(runId, "schedule", "old-schedule", 0L, CancellationToken.None));
+        await staleReady.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        var currentWrite = Task.Run(() => current.SetDomainAsync(runId, "schedule", "new-schedule", 1L, CancellationToken.None));
+        await currentWrite.WaitAsync(TimeSpan.FromSeconds(20));
+        releaseStale.TrySetResult();
+        await staleWrite.WaitAsync(TimeSpan.FromSeconds(20));
+
+        (await store.GetDomainAsync<string>(runId, "schedule", CancellationToken.None))!.Data.Should().Be("new-schedule");
+    }
+
     private Task MoveEpochAsync(Guid runId)
         => _fixture.Database.GetCollection<AutomationRunDocument>("automation_runs")
             .UpdateOneAsync(

@@ -86,6 +86,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     /// </summary>
     internal Func<Task>? AfterHeaderCommitted { get; set; }
 
+    /// <summary>
+    /// Test seam. Runs after a new header is inserted and before cleanup ranks it.
+    /// The generation row for that header is stored before the insert.
+    /// </summary>
+    internal Func<Task>? AfterHeaderInserted { get; set; }
+
     /// <summary>Test seam. Replaces <see cref="DateTimeOffset.UtcNow"/> for one store.</summary>
     internal Func<DateTimeOffset>? Clock { get; set; }
 
@@ -1079,17 +1085,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                     Data = storedJson,
                     UpdatedAt = stamp
                 };
-                try
-                {
-                    await _snapshots.InsertOneAsync(created, cancellationToken: ct);
-                }
-                catch (Exception)
-                {
-                    if (!await DocumentExistsAsync(created.Id))
-                        throw;
-                }
-
-                keepId = created.Id;
+                keepId = await InsertNewHeaderAsync(created, runId, domain, epoch, ct);
             }
             else
             {
@@ -1217,8 +1213,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                         Revision = revision,
                         UpdatedAt = stamp
                     };
-                    await _snapshots.InsertOneAsync(created, cancellationToken: ct);
-                    keepId = created.Id;
+                    keepId = await InsertNewHeaderAsync(created, runId, domain, epoch, ct);
                 }
                 else
                 {
@@ -1465,10 +1460,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await DeleteSlicesAsync(runId, domain, header.Revision, ct);
     }
 
-    private Task RememberHeaderEpochAsync(ObjectId headerId, Guid runId, string domain, long epoch)
+    private async Task RememberHeaderEpochAsync(ObjectId headerId, Guid runId, string domain, long epoch)
     {
         using var timeout = StartCleanupLookupTimeout();
-        return _headerEpochs.ReplaceOneAsync(
+        await _headerEpochs.ReplaceOneAsync(
             row => row.Id == headerId.ToString(),
             new SnapshotHeaderEpochDocument
             {
@@ -1479,6 +1474,70 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             },
             new ReplaceOptions { IsUpsert = true },
             timeout.Token);
+    }
+
+    /// <summary>
+    /// Stores the generation row before the header is visible. A concurrent cleanup
+    /// then sees this write's epoch instead of ranking a missing row with its own.
+    /// </summary>
+    private async Task<ObjectId> InsertNewHeaderAsync(
+        DomainSnapshotDocument created,
+        Guid runId,
+        string domain,
+        long epoch,
+        CancellationToken ct)
+    {
+        await RememberHeaderEpochAsync(created.Id, runId, domain, epoch);
+        try
+        {
+            await _snapshots.InsertOneAsync(created, cancellationToken: ct);
+        }
+        catch (Exception)
+        {
+            var exists = await HeaderDocumentExistsAsync(created.Id);
+            if (exists != true)
+            {
+                if (exists == false)
+                    await DeleteHeaderEpochQuietlyAsync(created.Id);
+                throw;
+            }
+        }
+
+        if (AfterHeaderInserted != null)
+            await AfterHeaderInserted();
+
+        return created.Id;
+    }
+
+    private async Task<bool?> HeaderDocumentExistsAsync(ObjectId id)
+    {
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            var found = await _snapshots.Find(d => d.Id == id).Limit(1).FirstOrDefaultAsync(timeout.Token);
+            return found != null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Snapshot header lookup by id failed.");
+            return null;
+        }
+    }
+
+    private async Task DeleteHeaderEpochQuietlyAsync(ObjectId headerId)
+    {
+        try
+        {
+            using var timeout = StartCleanupLookupTimeout();
+            await _headerEpochs.DeleteOneAsync(row => row.Id == headerId.ToString(), timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Snapshot header generation cleanup failed for header {HeaderId}.",
+                headerId.ToString().SanitizeForLog());
+        }
     }
 
     private async Task<Dictionary<string, long>> ReadHeaderEpochsAsync(

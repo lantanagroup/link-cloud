@@ -310,4 +310,152 @@ public class PipelineDataReaderCancellationTests
 
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
+
+    [Fact]
+    public async Task GetAcquisitionLogsAsync_rejects_a_bodyless_page_without_returning_earlier_pages()
+    {
+        var calls = 0;
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.SearchAcquisitionLogsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    var records = Enumerable.Range(0, 100)
+                        .Select(index => new DataAcquisitionLogApiModel { Id = index })
+                        .ToList();
+                    return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                    {
+                        StatusCode = 200,
+                        Body = new PagedConfigModel<DataAcquisitionLogApiModel>(
+                            records,
+                            new PaginationMetadata(100, 1, 200))
+                    });
+                }
+
+                return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                {
+                    StatusCode = 500
+                });
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+
+        var act = () => reader.GetAcquisitionLogsAsync("facility", "report");
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetAcquisitionLogsAsync_stops_after_a_successful_empty_page()
+    {
+        var calls = 0;
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.SearchAcquisitionLogsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    var records = Enumerable.Range(0, 100)
+                        .Select(index => new DataAcquisitionLogApiModel { Id = index + 1 })
+                        .ToList();
+                    return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                    {
+                        StatusCode = 200,
+                        Body = new PagedConfigModel<DataAcquisitionLogApiModel>(
+                            records,
+                            new PaginationMetadata(100, 1, 150))
+                    });
+                }
+
+                return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                {
+                    StatusCode = 200,
+                    Body = new PagedConfigModel<DataAcquisitionLogApiModel>(
+                        [],
+                        new PaginationMetadata(100, 2, 1))
+                });
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+
+        var logs = await reader.GetAcquisitionLogsAsync("facility", "report");
+
+        logs.Should().HaveCount(100);
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task AttachFailureNotesAsync_reuses_a_successful_lookup_and_retries_a_failed_one()
+    {
+        var calls = 0;
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(1, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    return Task.FromResult(new LinkApiResponse<List<string>>
+                    {
+                        StatusCode = 500
+                    });
+                }
+
+                return Task.FromResult(new LinkApiResponse<List<string>>
+                {
+                    StatusCode = 200,
+                    Body = ["kept"]
+                });
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+        var logs = new List<PipelineDataReader.AcquisitionLogInfo>
+        {
+            new(1, null, null, null, "Failed", null, [], [], [])
+        };
+
+        var first = await reader.AttachFailureNotesAsync(logs, [1]);
+        var second = await reader.AttachFailureNotesAsync(logs, [1]);
+        var third = await reader.AttachFailureNotesAsync(logs, [1]);
+
+        first.Single().Notes.Should().BeEmpty();
+        second.Single().Notes.Should().Equal("kept");
+        third.Single().Notes.Should().Equal("kept");
+        calls.Should().Be(2);
+    }
 }

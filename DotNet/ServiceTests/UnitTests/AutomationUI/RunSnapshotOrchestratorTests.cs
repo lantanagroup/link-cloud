@@ -85,11 +85,28 @@ public class RunSnapshotOrchestratorTests
     public async Task StopAsync_a_second_call_waits_for_the_first()
     {
         var store = new Mock<ISnapshotStore>();
+        var inPoll = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePoll = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                inPoll.TrySetResult();
+                await releasePoll.Task;
+                return (RunSnapshotMeta?)null;
+            });
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         var orchestrator = CreateOrchestrator(store);
         var runId = Guid.NewGuid();
         await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
+
+        await inPoll.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         var pollers = typeof(RunSnapshotOrchestrator)
             .GetField("_activePollers", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -99,7 +116,11 @@ public class RunSnapshotOrchestratorTests
         var first = (Task)stop.Invoke(handle, null)!;
         var second = (Task)stop.Invoke(handle, null)!;
 
-        await Task.WhenAll(first, second);
+        first.IsCompleted.Should().BeFalse();
+        second.IsCompleted.Should().BeFalse();
+
+        releasePoll.TrySetResult();
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]

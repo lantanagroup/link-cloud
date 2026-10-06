@@ -163,6 +163,27 @@ public class RunHistorySlimTests
         alreadyReported.Errors.Should().Equal("loki");
     }
 
+    [Fact]
+    public void Acquisition_chart_keeps_the_latest_failure_note()
+    {
+        var chart = RunHistorySlim.ToAcquisitionChart(
+        [
+            new PipelineDataReader.AcquisitionLogInfo(
+                4,
+                "patient-9",
+                null,
+                null,
+                "MaxRetriesReached",
+                "Initial",
+                ["Retrying. Attempt 1", " ", "Maximum retry attempts reached"],
+                [],
+                [],
+                ResourceTypes: ["Observation"])
+        ]);
+
+        chart.Failures.Should().ContainSingle().Which.Message.Should().Be("Maximum retry attempts reached");
+    }
+
     private static PipelineDataReader.AcquisitionLogInfo Log(
         long id,
         string patientId,
