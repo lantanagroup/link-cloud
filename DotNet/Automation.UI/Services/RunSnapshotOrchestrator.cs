@@ -489,14 +489,38 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     private async Task StopAllPollersAsync()
     {
-        var tasks = new List<Task>();
-        foreach (var (_, handle) in _activePollers)
-        {
-            tasks.Add(handle.StopAsync());
-        }
+        // Completion holds this run's gate across the final poll, and that poll
+        // still uses the handle's scoped clients. Wait for the gate, then detach
+        // and remove this exact handle before stopping it.
+        var stops = new List<Task>();
+        foreach (var (runId, handle) in _activePollers.ToArray())
+            stops.Add(StopPollerForShutdownAsync(runId, handle));
 
-        await Task.WhenAll(tasks);
-        _activePollers.Clear();
+        await Task.WhenAll(stops);
+    }
+
+    private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle)
+    {
+        var gate = Gate(runId);
+        await gate.WaitAsync();
+        try
+        {
+            if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
+                return;
+
+            // A finalizing handle is only marked while completion holds this gate,
+            // so a failed detach means another shutdown pass already claimed it.
+            if (!current.TryDetach())
+                return;
+
+            TryRemoveExact(_activePollers, runId, current);
+            await current.StopAsync();
+            _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     private sealed class RunPollerHandle(
