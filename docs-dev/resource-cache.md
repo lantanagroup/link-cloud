@@ -509,6 +509,11 @@ the same labels, so the read contract is fixed in both runtimes:
   before writing a query against it -- but OTLP carries the attribute set as given, so an empty value
   is a real dimension to anything reading it before Prometheus flattens it.
 - A blob read that throws, and a cancelled caller, record **nothing**. Neither is a cache outcome.
+- **Description and unit are identical too**, word for word, on both shared instruments. Prometheus
+  serves one HELP line per metric name, so when the runtimes disagree the collector's exporter keeps
+  whichever it sees first and drops the other's series from that scrape. Which runtime vanishes
+  changes from scrape to scrape, so each series flaps in and out and `rate()` and `offset` read across
+  the gaps. `ResourceCacheMetricsTests` and `MeasureEvalMetricsTest` pin the same literals.
 - `link_resource_cache_durable_count_read_failure_count` counts reads that served an entry without
   comparing it to the durable count -- the count was unreadable or unparseable. Those reads are
   recorded as a `hit`, because the entry was served; the counter is what says the partial-entry check
