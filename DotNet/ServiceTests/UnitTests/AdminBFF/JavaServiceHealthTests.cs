@@ -18,6 +18,10 @@ public class JavaServiceHealthTests
     [InlineData(false, "UP", HttpStatusCode.OK, HealthStatus.Healthy)]
     [InlineData(true, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
     [InlineData(false, "DOWN", HttpStatusCode.ServiceUnavailable, HealthStatus.Unhealthy)]
+    // DEGRADED is the custom Spring status the Java services return when a cache is unreachable but
+    // the durable store behind it is fine; it must not collapse to Unhealthy. It serves 200, not 503.
+    [InlineData(true, "DEGRADED", HttpStatusCode.OK, HealthStatus.Degraded)]
+    [InlineData(false, "DEGRADED", HttpStatusCode.OK, HealthStatus.Degraded)]
     public async Task HealthCheck_PreservesAllDetailsInDescription(
         bool measureEval, string status, HttpStatusCode statusCode, HealthStatus expectedStatus)
     {

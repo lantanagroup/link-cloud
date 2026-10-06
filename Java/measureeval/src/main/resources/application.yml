@@ -10,6 +10,19 @@ management:
   endpoint:
     health:
       show-details: always
+      status:
+        # DEGRADED is a custom status (ResourceCacheHealthIndicator): the durable store is fine but the
+        # cache in front of it is not. The default aggregator does not know the code and would sort it
+        # last, leaving the overall status UP, so rank it explicitly between DOWN and UP.
+        order: DOWN,OUT_OF_SERVICE,DEGRADED,UP,UNKNOWN
+        http-mapping:
+          # Supplying any mapping REPLACES Spring's defaults outright (SimpleHttpCodeStatusMapper),
+          # so down and out-of-service have to be restated or /health answers 200 while the service
+          # is broken -- invisible to the container healthcheck and to Kubernetes probes.
+          down: 503
+          out-of-service: 503
+          # 200 for degraded: a Redis outage must not get the service restarted.
+          degraded: 200
   health:
     discover-composite:
       enabled: false
