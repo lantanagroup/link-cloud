@@ -25,7 +25,8 @@ namespace LantanaGroup.Link.Shared.Application.Interfaces
         /// <see cref="ResourceCacheOutcomes.Fallback"/>, because an empty result that followed a Redis
         /// outage is not the same answer as one that followed a plain miss. MeasureEval tags the same
         /// instrument the same way; the one rule both runtimes must keep is that the tag is *omitted*
-        /// on a hit rather than recorded empty, since those export as different series.
+        /// on a hit rather than recorded empty, so that the same condition carries the same attribute
+        /// set in both runtimes.
         /// </param>
         /// <param name="milliseconds">Elapsed time for the whole read, including any fallback.</param>
         void RecordRead(string outcome, string? fallbackReason, double milliseconds);

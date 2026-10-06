@@ -462,9 +462,11 @@ the same labels, so the read contract is fixed in both runtimes:
   is the combination worth alerting on -- an empty answer that nothing should trust -- and without
   the reason on the empty read it is indistinguishable from the routine case of a key that simply
   does not exist anywhere.
-- On a `hit` the tag is **omitted**, not recorded empty. An explicitly null tag exports as a
-  present-but-empty label, which is a different Prometheus series from an absent one, so a query
-  written against one runtime would silently miss the other.
+- On a `hit` the tag is **omitted**, not recorded empty, so that the same condition carries the same
+  attribute set in both runtimes. Prometheus would forgive the difference -- a selector of
+  `cache_fallback_reason=""` matches series that do not carry the label at all, which is worth knowing
+  before writing a query against it -- but OTLP carries the attribute set as given, so an empty value
+  is a real dimension to anything reading it before Prometheus flattens it.
 - A blob read that throws, and a cancelled caller, record **nothing**. Neither is a cache outcome.
 - `link_resource_cache_durable_count_read_failure_count` counts reads that served an entry without
   comparing it to the durable count -- the count was unreadable or unparseable. Those reads are
