@@ -325,6 +325,8 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
       - .docker/grafana.yml:/etc/grafana/provisioning/datasources/ds.yaml
+      - .docker/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/link.yaml
+      - ./dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - link-nw
       
