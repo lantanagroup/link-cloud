@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -142,7 +143,7 @@ public class HybridResourceCacheTests
         // otherwise indistinguishable from the whole record. Only the recorded durable count separates
         // them, which is the whole reason it is recorded.
         _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
-        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(9);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(DurableResourceCount.Of(9));
 
         var whole = Enumerable.Range(0, 9).Select(i => (DomainResource)new Patient { Id = i.ToString() }).ToList();
         _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(whole);
@@ -151,19 +152,19 @@ public class HybridResourceCacheTests
         var result = await CreateSut().GetAsync(CacheKey);
 
         result.Should().HaveCount(9);
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<double>()), Times.Once);
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Never);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<string?>(), It.IsAny<double>()), Times.Never);
     }
 
     [Fact]
     public async Task GetAsync_cache_entry_matching_durable_storage_is_served_from_the_cache()
     {
         _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
-        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(DurableResourceCount.Of(1));
 
         await CreateSut().GetAsync(CacheKey);
 
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
         _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -173,11 +174,11 @@ public class HybridResourceCacheTests
         // No count means no durable write has landed for this key, so durable storage has nothing more
         // to offer. Falling back would turn a usable entry into an empty read.
         _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(Resources());
-        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync((int?)null);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(DurableResourceCount.NotRecorded);
 
         await CreateSut().GetAsync(CacheKey);
 
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
         _abs.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -281,11 +282,222 @@ public class HybridResourceCacheTests
             Times.Once);
     }
 
+    // ----- read parity with MeasureEval (same instrument, same conditions) -----
+    //
+    // These mirror Java's ResourceCacheReaderTest case for case, so the two matrices can be lined up
+    // by eye. The shared rule they both keep: cache.fallback.reason rides every fallback and every
+    // empty read, never a hit, and is omitted rather than recorded empty.
+
+    private void GivenCache(params DomainResource[] resources) =>
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([.. resources]);
+
+    private void GivenCacheUnavailable() =>
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+
+    private void GivenDurableCount(DurableResourceCount count) =>
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(count);
+
+    private void GivenDurable(params DomainResource[] resources) =>
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync([.. resources]);
+
+    private void ThenRead(string outcome, string? reason) =>
+        _metrics.Verify(m => m.RecordRead(outcome, reason, It.IsAny<double>()), Times.Once);
+
+    [Fact]
+    public async Task metrics_redisHit_recordsHit_withNoFallbackReason()
+    {
+        GivenCache(new Patient { Id = "1" });
+        GivenDurableCount(DurableResourceCount.Of(1));
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Hit, null);
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Never);
+    }
+
+    [Fact]
+    public async Task metrics_redisHitExceedingTheDurableCount_recordsHit()
+    {
+        GivenCache(new Patient { Id = "1" }, new Patient { Id = "2" });
+        GivenDurableCount(DurableResourceCount.Of(1));
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Hit, null);
+    }
+
+    [Fact]
+    public async Task metrics_noRecordedCount_recordsHit_andIsNotAFailure()
+    {
+        GivenCache(new Patient { Id = "1" });
+        GivenDurableCount(DurableResourceCount.NotRecorded);
+
+        await CreateSut().GetAsync(CacheKey);
+
+        // Nothing has completed a durable write for this key, so there is nothing to disagree with.
+        ThenRead(ResourceCacheOutcomes.Hit, null);
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Never);
+    }
+
+    [Fact]
+    public async Task metrics_redisMiss_recordsFallback_withMissReason()
+    {
+        GivenCache();
+        GivenDurable(new Patient { Id = "1" });
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Fallback, ResourceCacheFallbackReasons.Miss);
+    }
+
+    [Fact]
+    public async Task metrics_partialEntry_recordsFallback_withPartialReason()
+    {
+        GivenCache(new Patient { Id = "1" });
+        GivenDurableCount(DurableResourceCount.Of(9));
+        GivenDurable(new Patient { Id = "1" }, new Patient { Id = "2" });
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Fallback, ResourceCacheFallbackReasons.Partial);
+    }
+
+    [Fact]
+    public async Task metrics_redisUnavailable_recordsFallback_withUnavailableReason()
+    {
+        GivenCacheUnavailable();
+        GivenDurable(new Patient { Id = "1" });
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Fallback, ResourceCacheFallbackReasons.Unavailable);
+    }
+
+    [Fact]
+    public async Task metrics_bothStoresEmpty_recordsEmpty_withTheReasonRedisMissed()
+    {
+        GivenCache();
+        GivenDurable();
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Empty, ResourceCacheFallbackReasons.Miss);
+    }
+
+    [Fact]
+    public async Task metrics_partialEntryAndDurableEmpty_recordsEmpty_withPartialReason()
+    {
+        GivenCache(new Patient { Id = "1" });
+        GivenDurableCount(DurableResourceCount.Of(9));
+        GivenDurable();
+
+        await CreateSut().GetAsync(CacheKey);
+
+        ThenRead(ResourceCacheOutcomes.Empty, ResourceCacheFallbackReasons.Partial);
+    }
+
+    [Fact]
+    public async Task metrics_redisUnavailableAndDurableEmpty_recordsEmpty_withUnavailableReason()
+    {
+        GivenCacheUnavailable();
+        GivenDurable();
+
+        await CreateSut().GetAsync(CacheKey);
+
+        // The combination worth alerting on: an empty answer that nothing should trust, as against an
+        // empty answer after a plain miss, which is routine. Only the reason separates them.
+        ThenRead(ResourceCacheOutcomes.Empty, ResourceCacheFallbackReasons.Unavailable);
+    }
+
+    [Fact]
+    public async Task metrics_unusableDurableCount_isCounted_andTheHitIsStillServed()
+    {
+        GivenCache(new Patient { Id = "1" });
+        GivenDurableCount(DurableResourceCount.Unusable);
+
+        var resources = await CreateSut().GetAsync(CacheKey);
+
+        resources.Should().HaveCount(1);
+        ThenRead(ResourceCacheOutcomes.Hit, null);
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Once);
+    }
+
+    [Fact]
+    public async Task metrics_durableCountReadThrowing_isCounted_andTheHitIsStillServed()
+    {
+        GivenCache(new Patient { Id = "1" });
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("cache down"));
+
+        var resources = await CreateSut().GetAsync(CacheKey);
+
+        // The other way .NET can fail to use the count. Java reaches this only via an unusable value,
+        // because its count rides the same round trip as the resources; the counter means the same
+        // thing either way -- an entry served without the partial-entry check.
+        resources.Should().HaveCount(1);
+        ThenRead(ResourceCacheOutcomes.Hit, null);
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Once);
+    }
+
+    [Fact]
+    public async Task metrics_durableStorageThrowing_recordsNothing_andStillPropagates()
+    {
+        GivenCache();
+        _abs.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("blob down"));
+
+        var act = () => CreateSut().GetAsync(CacheKey);
+
+        // Matches Java: the read failed, so it is not reported as any outcome. The caller retries.
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        _metrics.Verify(m => m.RecordRead(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<double>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task metrics_cancellationDuringTheCacheRead_recordsNothing()
+    {
+        _redis.Setup(c => c.GetAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
+        var act = () => CreateSut().GetAsync(CacheKey);
+
+        // Cancellation is not a cache outcome, and the catch filters exist to let it through.
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _metrics.Verify(m => m.RecordRead(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<double>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task metrics_cancellationDuringTheCountRead_recordsNothing_andIsNotAFailure()
+    {
+        GivenCache(new Patient { Id = "1" });
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+
+        var act = () => CreateSut().GetAsync(CacheKey);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        _metrics.Verify(m => m.RecordRead(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<double>()), Times.Never);
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Never);
+    }
+
+    [Fact]
+    public async Task IsEntryCompleteAsync_withAnUnusableCount_trustsTheEntry_andCountsNothing()
+    {
+        _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(3);
+        GivenDurableCount(DurableResourceCount.Unusable);
+
+        // Only a partial entry is incomplete. An unusable count serves the entry, as it did when the
+        // shared helper returned a bool -- and this is not a read, so it must not touch the counter.
+        (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeTrue();
+        _metrics.Verify(m => m.IncrementDurableCountReadFailure(), Times.Never);
+    }
+
     [Fact]
     public async Task IsEntryCompleteAsync_is_false_when_the_entry_holds_fewer_than_durable_storage()
     {
         _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(3);
-        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(DurableResourceCount.Of(10));
 
         (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeFalse();
     }
@@ -294,7 +506,7 @@ public class HybridResourceCacheTests
     public async Task IsEntryCompleteAsync_is_true_when_the_entry_holds_the_whole_record()
     {
         _redis.Setup(c => c.GetResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
-        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(10);
+        _redis.Setup(c => c.GetDurableResourceCountAsync(CacheKey, It.IsAny<CancellationToken>())).ReturnsAsync(DurableResourceCount.Of(10));
 
         (await CreateSut().IsEntryCompleteAsync(CacheKey)).Should().BeTrue();
 
@@ -362,8 +574,8 @@ public class HybridResourceCacheTests
         await sut.GetAsync("hit-key");
         await sut.GetAsync("miss-key");
 
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<double>()), Times.Once);
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Hit, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Fallback, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
     }
 
     [Fact]
@@ -374,7 +586,7 @@ public class HybridResourceCacheTests
 
         await CreateSut().GetAsync(CacheKey);
 
-        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Empty, It.IsAny<double>()), Times.Once);
+        _metrics.Verify(m => m.RecordRead(ResourceCacheOutcomes.Empty, It.IsAny<string?>(), It.IsAny<double>()), Times.Once);
     }
 
     [Fact]

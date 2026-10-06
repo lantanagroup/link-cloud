@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -123,22 +124,52 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             var readStart = Stopwatch.GetTimestamp();
 
+            // Assigned on every path that reaches durable storage, so the compiler enforces that a
+            // fallback or an empty read always says why the cache did not serve it.
+            string fallbackReason;
+
             var cached = await TryReadCacheAsync(cacheKey, cancellationToken);
-            if (cached.Count > 0 && await IsCacheEntryWholeAsync(cacheKey, cached.Count, cancellationToken))
+            if (cached.Unavailable)
             {
-                _metrics.RecordRead(ResourceCacheOutcomes.Hit, Elapsed(readStart));
-                return cached;
+                // Tested first, so an outage does not also pay for a count read that cannot succeed.
+                fallbackReason = ResourceCacheFallbackReasons.Unavailable;
+            }
+            else if (cached.Resources.Count == 0)
+            {
+                fallbackReason = ResourceCacheFallbackReasons.Miss;
+            }
+            else
+            {
+                var state = await GetCacheEntryStateAsync(cacheKey, cached.Resources.Count, cancellationToken);
+
+                if (state == CacheEntryState.CountUnusable)
+                {
+                    // Counted here rather than inside the helper, which IsEntryCompleteAsync also
+                    // calls: this counts reads that served an entry unchecked, one increment per read.
+                    _metrics.IncrementDurableCountReadFailure();
+                }
+
+                if (state != CacheEntryState.Partial)
+                {
+                    _metrics.RecordRead(ResourceCacheOutcomes.Hit, fallbackReason: null, Elapsed(readStart));
+                    return cached.Resources;
+                }
+
+                fallbackReason = ResourceCacheFallbackReasons.Partial;
             }
 
             var durable = await _absCache.GetAsync(cacheKey, cancellationToken) ?? [];
             if (durable.Count == 0)
             {
-                _metrics.RecordRead(ResourceCacheOutcomes.Empty, Elapsed(readStart));
+                // The reason rides the empty read too. Empty after an outage is a result nothing
+                // should trust; empty after a plain miss is routine, and the tag is what separates
+                // them.
+                _metrics.RecordRead(ResourceCacheOutcomes.Empty, fallbackReason, Elapsed(readStart));
                 return durable;
             }
 
             await TryRepopulateCacheAsync(cacheKey, durable, cancellationToken);
-            _metrics.RecordRead(ResourceCacheOutcomes.Fallback, Elapsed(readStart));
+            _metrics.RecordRead(ResourceCacheOutcomes.Fallback, fallbackReason, Elapsed(readStart));
             return durable;
         }
 
@@ -270,7 +301,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+        public Task<DurableResourceCount> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             _redisCache.GetDurableResourceCountAsync(cacheKey, cancellationToken);
 
         /// <inheritdoc/>
@@ -297,7 +328,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             // Nothing cached is not the whole record unless durable storage holds nothing either, and
             // that costs the same read the caller is trying to avoid. Reading through settles it.
-            return cachedCount > 0 && await IsCacheEntryWholeAsync(cacheKey, cachedCount, cancellationToken);
+            //
+            // Only Partial rejects the entry. An unusable count serves it, exactly as it did when this
+            // helper returned a bool -- and is deliberately not counted here, because this is not a
+            // read and counting it would decouple the counter from the reads it describes.
+            return cachedCount > 0
+                   && await GetCacheEntryStateAsync(cacheKey, cachedCount, cancellationToken) != CacheEntryState.Partial;
         }
 
         /// <summary>
@@ -310,9 +346,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         /// durable write for that key, so durable storage has no more to offer and falling back would
         /// turn a usable entry into an empty read.
         /// </remarks>
-        private async Task<bool> IsCacheEntryWholeAsync(string cacheKey, int cachedCount, CancellationToken cancellationToken)
+        private async Task<CacheEntryState> GetCacheEntryStateAsync(string cacheKey, int cachedCount, CancellationToken cancellationToken)
         {
-            int? durableCount;
+            DurableResourceCount durableCount;
 
             try
             {
@@ -322,14 +358,21 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             {
                 _logger.LogWarning(
                     ex,
-                    "Could not read the durable resource count for {CacheKey}; treating the cache entry as whole.",
+                    "Could not read the durable resource count for {CacheKey}; serving the cache entry unchecked.",
                     cacheKey.SanitizeForLog());
-                return true;
+                return CacheEntryState.CountUnusable;
             }
 
-            if (durableCount is null || cachedCount >= durableCount.Value)
+            // Serving it either way, but the two reasons are not the same event: nothing has counted
+            // this key yet, against something having corrupted the count that was there.
+            if (durableCount.Status == DurableCountStatus.Unusable)
             {
-                return true;
+                return CacheEntryState.CountUnusable;
+            }
+
+            if (durableCount.Status == DurableCountStatus.NotRecorded || cachedCount >= durableCount.Count)
+            {
+                return CacheEntryState.Whole;
             }
 
             _logger.LogWarning(
@@ -337,21 +380,24 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 + "recreated after an eviction and is not the whole record. Reading durable storage instead.",
                 cacheKey.SanitizeForLog(),
                 cachedCount,
-                durableCount.Value);
+                durableCount.Count);
 
-            return false;
+            return CacheEntryState.Partial;
         }
 
-        private async Task<List<DomainResource>> TryReadCacheAsync(string cacheKey, CancellationToken cancellationToken)
+        private async Task<CacheRead> TryReadCacheAsync(string cacheKey, CancellationToken cancellationToken)
         {
             try
             {
-                return await _redisCache.GetAsync(cacheKey, cancellationToken) ?? [];
+                return new CacheRead(await _redisCache.GetAsync(cacheKey, cancellationToken) ?? [], Unavailable: false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "Cache unavailable reading {CacheKey}; falling back to durable storage.", cacheKey.SanitizeForLog());
-                return [];
+
+                // Distinct from an absent key. Both read through, but only one of them says the cache
+                // is in trouble, and a reader that cannot tell them apart cannot say which happened.
+                return new CacheRead([], Unavailable: true);
             }
         }
 

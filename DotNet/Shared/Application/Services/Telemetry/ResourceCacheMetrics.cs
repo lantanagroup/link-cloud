@@ -13,6 +13,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
         private readonly Histogram<double> _queueWaitDuration;
         private readonly Histogram<double> _drainWaitDuration;
         private readonly Counter<long> _writeRetryCounter;
+        private readonly Counter<long> _durableCountReadFailureCounter;
 
         private Func<int>? _queueDepth;
 
@@ -29,6 +30,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
             _queueWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheQueueWaitDuration, "ms");
             _drainWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.ResourceCacheDrainWaitDuration, "ms");
             _writeRetryCounter = meter.CreateCounter<long>(DiagnosticNames.ResourceCacheWriteRetryCount);
+            _durableCountReadFailureCounter =
+                meter.CreateCounter<long>(DiagnosticNames.ResourceCacheDurableCountReadFailureCount);
 
             meter.CreateObservableGauge(
                 DiagnosticNames.ResourceCacheQueueDepth,
@@ -36,9 +39,29 @@ namespace LantanaGroup.Link.Shared.Application.Services.Telemetry
         }
 
         /// <inheritdoc/>
-        public void RecordRead(string outcome, double milliseconds)
+        public void RecordRead(string outcome, string? fallbackReason, double milliseconds)
         {
-            _readDuration.Record(milliseconds, new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome));
+            // Omitted rather than recorded with a null value: an explicitly null tag exports as a
+            // present-but-empty label, and that is a different series from the absent one MeasureEval
+            // produces on a hit. Querying one would silently miss the other.
+            if (fallbackReason is null)
+            {
+                _readDuration.Record(
+                    milliseconds,
+                    new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome));
+                return;
+            }
+
+            _readDuration.Record(
+                milliseconds,
+                new KeyValuePair<string, object?>(DiagnosticNames.CacheOutcome, outcome),
+                new KeyValuePair<string, object?>(DiagnosticNames.CacheFallbackReason, fallbackReason));
+        }
+
+        /// <inheritdoc/>
+        public void IncrementDurableCountReadFailure()
+        {
+            _durableCountReadFailureCounter.Add(1);
         }
 
         /// <inheritdoc/>

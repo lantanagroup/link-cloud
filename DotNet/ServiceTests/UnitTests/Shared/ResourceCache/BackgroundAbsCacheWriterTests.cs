@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
+using LantanaGroup.Link.Shared.Application.Models.ResourceCache;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -1152,8 +1153,10 @@ public class BackgroundAbsCacheWriterTests : IAsyncLifetime
         public Task<int> GetResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(_writes.Where(write => write.CacheKey == cacheKey).Sum(write => write.Count));
 
-        public Task<int?> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
-            Task.FromResult(DurableCountsSet.TryGetValue(cacheKey, out var count) ? count : (int?)null);
+        public Task<DurableResourceCount> GetDurableResourceCountAsync(string cacheKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult(DurableCountsSet.TryGetValue(cacheKey, out var count)
+                ? DurableResourceCount.Of(count)
+                : DurableResourceCount.NotRecorded);
 
         public Task<bool> IsEntryCompleteAsync(string cacheKey, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
