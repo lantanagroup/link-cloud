@@ -606,7 +606,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             : drain.Token;
         try
         {
-            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value)))
+            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value, waitToken)))
                 .WaitAsync(waitToken);
         }
         catch (OperationCanceledException) when (waitToken.IsCancellationRequested)
@@ -615,18 +615,30 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
     }
 
-    private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle)
+    private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle, CancellationToken ct)
     {
         if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
             return;
 
-        // Completion holds this gate across the final poll. Waiting on it is how
-        // shutdown hung. If it is taken, that caller stops the handle after the
-        // poll. Take it only when it is free, so the scope is not disposed under
-        // the fetch.
+        // Completion holds this gate across the final poll and stops the handle
+        // itself. A domain write holds it too, and that write does not stop the
+        // poller. Wait for the write inside the shutdown drain, then stop. If
+        // the drain ends first, leave the handle to completion.
         var gate = Gate(runId);
-        if (!await gate.WaitAsync(0))
+        var acquired = false;
+        try
+        {
+            acquired = await gate.WaitAsync(0, ct);
+            if (!acquired)
+            {
+                await gate.WaitAsync(ct);
+                acquired = true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
             return;
+        }
 
         try
         {
@@ -639,8 +651,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
         finally
         {
-            gate.Release();
-            PruneGate(runId);
+            if (acquired)
+            {
+                gate.Release();
+                PruneGate(runId);
+            }
         }
     }
 
