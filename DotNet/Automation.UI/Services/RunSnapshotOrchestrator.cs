@@ -20,6 +20,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _runGates = new();
     private readonly ConcurrentDictionary<Guid, Task> _completions = new();
     private int _shuttingDown;
+    private CancellationToken _stopToken;
 
     private readonly IAutomationUiMetrics? _metrics;
 
@@ -43,6 +44,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        _stopToken = stoppingToken;
         _logger.LogInformation("RunSnapshotOrchestrator started");
 
         while (!stoppingToken.IsCancellationRequested)
@@ -71,7 +73,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
 
         // Shutdown: stop all pollers
-        await StopAllPollersAsync();
+        await StopAllPollersAsync(stoppingToken);
         _logger.LogInformation("RunSnapshotOrchestrator stopped");
     }
 
@@ -130,27 +132,16 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     private async Task UpdateRunCoreAsync(Guid runId, string facilityId, string reportId, CancellationToken ct)
     {
-        // Stop the existing poller before clearing snapshots. A finalizing poller is
-        // still the last writer for the old report, so wait until that flush stops.
+        // Stop the existing poller before clearing snapshots. Completion holds
+        // this same gate through the final poll, so this stop cannot dispose
+        // a scope that flush is still using.
         var isMetricsRun = false;
-        while (_activePollers.TryGetValue(runId, out var existingHandle))
+        if (_activePollers.TryGetValue(runId, out var existingHandle))
         {
-            if (existingHandle.TryDetach())
-            {
-                isMetricsRun = existingHandle.IsMetricsRun;
-                TryRemoveExact(_activePollers, runId, existingHandle);
-                await existingHandle.StopAsync();
-                _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
-                break;
-            }
-
-            _logger.LogInformation("Waiting for the poller for run {RunId} to stop before changing its report", runId);
-            await existingHandle.WhenReleased.WaitAsync(ct);
-            if (_activePollers.TryGetValue(runId, out var stillThere) && ReferenceEquals(stillThere, existingHandle))
-            {
-                TryRemoveExact(_activePollers, runId, existingHandle);
-                break;
-            }
+            isMetricsRun = existingHandle.IsMetricsRun;
+            TryRemoveExact(_activePollers, runId, existingHandle);
+            await existingHandle.StopAsync();
+            _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
         // No writer for this run is still flushing. Clear the old report snapshots.
@@ -166,11 +157,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 return;
             }
 
-            if (registered.TryDetach())
-            {
-                TryRemoveExact(_activePollers, runId, registered);
-                await registered.StopAsync();
-            }
+            TryRemoveExact(_activePollers, runId, registered);
+            await registered.StopAsync();
         }
 
         if (_activePollers.ContainsKey(runId))
@@ -233,6 +221,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         {
             gate.Release();
             _completions.TryRemove(new KeyValuePair<Guid, Task>(runId, work.Task));
+            PruneGate(runId);
         }
     }
 
@@ -240,11 +229,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     {
         // Stop the loop before the final flush. The loop and the final poll
         // write the same domains, and the final poll has to be the last writer.
-        // This method takes no caller token. Cancelling here would skip that flush.
-        // DrainAsync already cancels the polling loop.
+        // DrainAsync already cancels the polling loop. The host stop token
+        // cancels the final poll so shutdown does not wait on it.
         RunPollerHandle? activeHandle = null;
         var ownsHandle = false;
-        if (_activePollers.TryGetValue(runId, out var candidate) && candidate.TryBeginFinalizing())
+        if (_activePollers.TryGetValue(runId, out var candidate))
         {
             activeHandle = candidate;
             ownsHandle = true;
@@ -263,7 +252,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
             try
             {
-                await activeHandle.FinalPollAsync();
+                await activeHandle.FinalPollAsync(_stopToken);
             }
             catch (Exception ex)
             {
@@ -336,17 +325,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 if (meta == null || !meta.IsActive)
                     continue;
 
-                if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsFinalizing)
-                    continue;
-
-                if (_activePollers.TryGetValue(meta.RunId, out existingHandle) && existingHandle.IsCompleted)
+                if (_activePollers.TryGetValue(meta.RunId, out var existingHandle) && existingHandle.IsCompleted)
                 {
-                    if (existingHandle.TryDetach())
-                    {
-                        TryRemoveExact(_activePollers, meta.RunId, existingHandle);
-                        await existingHandle.StopAsync();
-                        _logger.LogWarning("Restarting completed poller task for still-active run {RunId}", meta.RunId);
-                    }
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
+                    await existingHandle.StopAsync();
+                    _logger.LogWarning("Restarting completed poller task for still-active run {RunId}", meta.RunId);
                 }
 
                 // If run identifiers changed (e.g., regenerate switched to a new reportId),
@@ -355,20 +338,17 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                     && (!string.Equals(existingHandle.FacilityId, meta.FacilityId, StringComparison.Ordinal)
                         || !string.Equals(existingHandle.ReportId, meta.ReportId, StringComparison.Ordinal)))
                 {
-                    if (existingHandle.TryDetach())
-                    {
-                        var oldFacilityId = existingHandle.FacilityId;
-                        var oldReportId = existingHandle.ReportId;
-                        TryRemoveExact(_activePollers, meta.RunId, existingHandle);
-                        await existingHandle.StopAsync();
-                        _logger.LogInformation(
-                            "Restarting poller for run {RunId} due to context change (facility: {OldFacility}->{NewFacility}, report: {OldReport}->{NewReport})",
-                            meta.RunId,
-                            oldFacilityId,
-                            meta.FacilityId,
-                            oldReportId,
-                            meta.ReportId);
-                    }
+                    var oldFacilityId = existingHandle.FacilityId;
+                    var oldReportId = existingHandle.ReportId;
+                    TryRemoveExact(_activePollers, meta.RunId, existingHandle);
+                    await existingHandle.StopAsync();
+                    _logger.LogInformation(
+                        "Restarting poller for run {RunId} due to context change (facility: {OldFacility}->{NewFacility}, report: {OldReport}->{NewReport})",
+                        meta.RunId,
+                        oldFacilityId,
+                        meta.FacilityId,
+                        oldReportId,
+                        meta.ReportId);
                 }
 
                 if (!_activePollers.ContainsKey(meta.RunId))
@@ -408,9 +388,6 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 if (meta is { IsActive: true })
                     continue;
 
-                if (!current.TryDetach())
-                    continue;
-
                 TryRemoveExact(_activePollers, runId, current);
                 await current.StopAsync();
                 _logger.LogInformation("Removed stale poller for run {RunId}", runId);
@@ -418,8 +395,29 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             finally
             {
                 gate.Release();
+                PruneGate(runId);
             }
         }
+    }
+
+    private void PruneGate(Guid runId)
+    {
+        if (_activePollers.ContainsKey(runId) || _completions.ContainsKey(runId))
+            return;
+
+        if (!_runGates.TryRemove(runId, out var gate))
+            return;
+
+        // A report switch may already be waiting on this gate. Leave it in place
+        // then. Dispose only when nobody holds it and nobody is queued.
+        if (!gate.Wait(0))
+        {
+            _runGates.TryAdd(runId, gate);
+            return;
+        }
+
+        gate.Release();
+        gate.Dispose();
     }
 
     private SemaphoreSlim Gate(Guid runId)
@@ -453,7 +451,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
         // Shutdown can begin after the check above. Stop this handle before
         // the caller releases the run gate, so the sweep cannot miss it.
-        if (Volatile.Read(ref _shuttingDown) != 0 && handle.TryDetach())
+        if (Volatile.Read(ref _shuttingDown) != 0)
         {
             TryRemoveExact(_activePollers, meta.RunId, handle);
             await handle.StopAsync();
@@ -506,82 +504,43 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
     }
 
-    private async Task StopAllPollersAsync()
+    private async Task StopAllPollersAsync(CancellationToken stoppingToken)
     {
-        // A report switch removes the old handle before it adds the replacement.
-        // Pause here so that switch can land, then refuse any later registration
-        // and stop whatever handle is current. The stop takes the run gate, so
-        // it cannot dispose a scope a final poll is still using.
+        // A report switch can still replace the handle during this hook.
+        // The flag after it refuses any later registration, and the stop
+        // below covers the handle that is current, including that replacement.
         if (AfterShutdownSnapshot != null)
             await AfterShutdownSnapshot();
 
         Volatile.Write(ref _shuttingDown, 1);
-        await WaitForInProgressRunsAsync();
 
-        while (true)
-        {
-            var pending = _activePollers.ToArray();
-            if (pending.Length == 0)
-                return;
+        var pending = _activePollers.ToArray();
+        foreach (var (_, handle) in pending)
+            handle.Cancel();
 
-            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value)));
-
-            var stillThere = pending.Any(pair =>
-                _activePollers.TryGetValue(pair.Key, out var current) && ReferenceEquals(current, pair.Value));
-            if (!stillThere)
-                continue;
-
+        if (stoppingToken.IsCancellationRequested)
             return;
-        }
-    }
 
-    private async Task WaitForInProgressRunsAsync()
-    {
-        var seen = new HashSet<Guid>();
-        while (true)
+        try
         {
-            var pending = new List<Guid>();
-            foreach (var runId in _runGates.Keys)
-            {
-                if (seen.Add(runId))
-                    pending.Add(runId);
-            }
-
-            if (pending.Count == 0)
-                return;
-
-            foreach (var runId in pending)
-            {
-                var gate = Gate(runId);
-                await gate.WaitAsync();
-                gate.Release();
-            }
+            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value)))
+                .WaitAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Host shutdown wins. Do not wait out a final poll.
         }
     }
 
     private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle)
     {
-        var gate = Gate(runId);
-        await gate.WaitAsync();
-        try
-        {
-            if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
-                return;
+        if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
+            return;
 
-            // TryDetach fails when completion already marked this handle finalizing,
-            // or when another pass detached it. Completion stops that handle
-            // before it releases this gate, so this pass leaves it alone.
-            if (!current.TryDetach())
-                return;
-
-            TryRemoveExact(_activePollers, runId, current);
-            await current.StopAsync();
-            _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
-        }
-        finally
-        {
-            gate.Release();
-        }
+        TryRemoveExact(_activePollers, runId, current);
+        await current.StopAsync();
+        _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
+        PruneGate(runId);
     }
 
     private sealed class RunPollerHandle(
@@ -595,20 +554,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         public bool IsMetricsRun => poller.IsMetricsRun;
         public bool IsCompleted => pollerTask.IsCompleted;
 
-        private readonly PollerSlot _slot = new();
-
-        public bool IsFinalizing => _slot.IsFinalizing;
-
-        public bool TryBeginFinalizing() => _slot.TryBeginFinalizing();
-
-        public bool TryDetach() => _slot.TryDetach();
-
-        private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _stopped;
 
-        public Task WhenReleased => _released.Task;
+        public void Cancel() => cts.Cancel();
 
-        public Task FinalPollAsync() => poller.FinalPollAsync();
+        public Task FinalPollAsync(CancellationToken cancellationToken) => poller.FinalPollAsync(cancellationToken);
 
         public async Task DrainAsync()
         {
@@ -626,74 +576,20 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         public async Task StopAsync()
         {
             if (Interlocked.Exchange(ref _stopped, 1) == 1)
-            {
-                await _released.Task;
                 return;
-            }
 
+            await cts.CancelAsync();
             try
             {
-                await cts.CancelAsync();
-                try
-                {
-                    await pollerTask;
-                }
-                catch (OperationCanceledException)
-                {
-                    // Expected
-                }
-
-                scope.Dispose();
-                cts.Dispose();
+                await pollerTask;
             }
-            finally
+            catch (OperationCanceledException)
             {
-                _released.TrySetResult();
+                // Expected
             }
-        }
-    }
-}
 
-/// <summary>
-/// One running poller can be finalized or detached, not both.
-/// Finalizing keeps the handle for the last flush. Detaching lets reconcile stop it.
-/// </summary>
-internal sealed class PollerSlot
-{
-    private readonly object _gate = new();
-    private bool _finalizing;
-    private bool _detached;
-
-    public bool IsFinalizing
-    {
-        get
-        {
-            lock (_gate)
-                return _finalizing;
-        }
-    }
-
-    public bool TryBeginFinalizing()
-    {
-        lock (_gate)
-        {
-            if (_detached || _finalizing)
-                return false;
-
-            _finalizing = true;
-            return true;
-        }
-    }
-
-    public bool TryDetach()
-    {
-        lock (_gate)
-        {
-            if (_finalizing || _detached)
-                return false;
-
-            _detached = true;
-            return true;
+            scope.Dispose();
+            cts.Dispose();
         }
     }
 }

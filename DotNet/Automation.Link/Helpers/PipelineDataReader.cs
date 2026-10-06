@@ -120,6 +120,157 @@ public class PipelineDataReader
     /// </summary>
     public record PopulationCountSnapshot(int ReportTypeCount, int GroupCount, int MeasureReportPopulationCount);
 
+    /// <summary>
+    /// Chart data for report entries. Per-patient rows stay in Report.
+    /// </summary>
+    public sealed record ReportEntryRollup
+    {
+        public int EntryCount { get; init; }
+        public List<StatusCountInfo> SubmissionStatuses { get; init; } = [];
+        public List<StatusCountInfo> ReportingStatuses { get; init; } = [];
+        public int ReadyForValidationCount { get; init; }
+        public int NotReportableMeasureCount { get; init; }
+        public int NoMeasureReportCount { get; init; }
+        public int EntriesWithMeasureReport { get; init; }
+        public bool AllMeasureReportsTerminal { get; init; }
+        public bool AllReportingTerminal { get; init; }
+        public int ValidatedCount { get; init; }
+        public DateTime? ValidationWindowStart { get; init; }
+        public DateTime? ValidationWindowEnd { get; init; }
+        public List<StatusCountInfo> ValidationBuckets { get; init; } = [];
+
+        public static ReportEntryRollup From(IReadOnlyList<ReportEntryInfo>? entries)
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                return new ReportEntryRollup
+                {
+                    AllMeasureReportsTerminal = true,
+                    AllReportingTerminal = true
+                };
+            }
+
+            var submission = new Dictionary<string, int>(StringComparer.Ordinal);
+            var reporting = new Dictionary<string, int>(StringComparer.Ordinal);
+            var ready = 0;
+            var notReportable = 0;
+            var withMeasure = 0;
+            var allMeasureTerminal = true;
+            var allReportingTerminal = true;
+            var validated = 0;
+            var times = new List<DateTimeOffset>();
+
+            foreach (var entry in entries)
+            {
+                var submissionStatus = string.IsNullOrWhiteSpace(entry.SubmissionStatus) ? "Unknown" : entry.SubmissionStatus!;
+                submission[submissionStatus] = submission.GetValueOrDefault(submissionStatus) + 1;
+
+                var reportingStatus = string.IsNullOrWhiteSpace(entry.ReportingStatus) ? "Unknown" : entry.ReportingStatus!;
+                reporting[reportingStatus] = reporting.GetValueOrDefault(reportingStatus) + 1;
+
+                var reports = entry.MeasureReports ?? [];
+                var hasReady = false;
+                var hasNotReportable = false;
+                foreach (var report in reports)
+                {
+                    if (string.Equals(report.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase))
+                        hasReady = true;
+                    else if (string.Equals(report.Status, "NotReportable", StringComparison.OrdinalIgnoreCase))
+                        hasNotReportable = true;
+                }
+
+                if (reports.Count > 0)
+                    withMeasure++;
+                if (hasReady)
+                    ready++;
+                else if (hasNotReportable)
+                    notReportable++;
+
+                var measureTerminal = false;
+                foreach (var report in reports)
+                {
+                    if (string.Equals(report.Status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(report.Status, "NotReportable", StringComparison.OrdinalIgnoreCase))
+                    {
+                        measureTerminal = true;
+                        break;
+                    }
+                }
+
+                if (!measureTerminal)
+                    allMeasureTerminal = false;
+
+                if (string.Equals(entry.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase))
+                {
+                    // terminal
+                }
+                else
+                {
+                    allReportingTerminal = false;
+                }
+
+                if (string.Equals(entry.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
+                {
+                    validated++;
+                    var stamp = entry.ModifyDate ?? entry.CreateDate;
+                    if (stamp is DateTime value && value.Year >= 2000)
+                        times.Add(AsUtc(value));
+                }
+            }
+
+            DateTime? windowStart = null;
+            DateTime? windowEnd = null;
+            var buckets = new List<StatusCountInfo>();
+            if (times.Count > 0)
+            {
+                var origin = times.Min();
+                windowStart = origin.UtcDateTime;
+                windowEnd = times.Max().UtcDateTime;
+                buckets = times
+                    .GroupBy(time => (int)Math.Floor(Math.Max(0, (time - origin).TotalSeconds) / 10))
+                    .OrderBy(group => group.Key)
+                    .Select(group => new StatusCountInfo($"{group.Key * 10}s", group.Count()))
+                    .ToList();
+            }
+
+            return new ReportEntryRollup
+            {
+                EntryCount = entries.Count,
+                SubmissionStatuses = OrderCounts(submission),
+                ReportingStatuses = OrderCounts(reporting),
+                ReadyForValidationCount = ready,
+                NotReportableMeasureCount = notReportable,
+                NoMeasureReportCount = Math.Max(0, entries.Count - ready - notReportable),
+                EntriesWithMeasureReport = withMeasure,
+                AllMeasureReportsTerminal = allMeasureTerminal,
+                AllReportingTerminal = allReportingTerminal,
+                ValidatedCount = validated,
+                ValidationWindowStart = windowStart,
+                ValidationWindowEnd = windowEnd,
+                ValidationBuckets = buckets
+            };
+        }
+
+        private static List<StatusCountInfo> OrderCounts(Dictionary<string, int> counts)
+            => counts
+                .Select(pair => new StatusCountInfo(pair.Key, pair.Value))
+                .OrderByDescending(item => item.Count)
+                .ToList();
+
+        private static DateTimeOffset AsUtc(DateTime value)
+        {
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => new DateTimeOffset(value),
+                DateTimeKind.Local => new DateTimeOffset(value).ToUniversalTime(),
+                _ => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc))
+            };
+        }
+    }
+
     public record AcquisitionLogInfo(
         long Id,
         string? PatientId,

@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Automation.UI.Services;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Models;
@@ -26,8 +26,6 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -82,7 +80,7 @@ public class RunSnapshotOrchestratorTests
     }
 
     [Fact]
-    public async Task StopAsync_a_second_call_waits_for_the_first()
+    public async Task StopAsync_a_second_call_returns_without_waiting()
     {
         var store = new Mock<ISnapshotStore>();
         var inPoll = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -97,8 +95,6 @@ public class RunSnapshotOrchestratorTests
                 return (RunSnapshotMeta?)null;
             });
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -117,10 +113,10 @@ public class RunSnapshotOrchestratorTests
         var second = (Task)stop.Invoke(handle, null)!;
 
         first.IsCompleted.Should().BeFalse();
-        second.IsCompleted.Should().BeFalse();
+        second.IsCompleted.Should().BeTrue();
 
         releasePoll.TrySetResult();
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        await first.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -153,8 +149,6 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -207,8 +201,6 @@ public class RunSnapshotOrchestratorTests
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetActiveRunsAsync(It.IsAny<CancellationToken>()))
@@ -233,8 +225,6 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -323,8 +313,6 @@ public class RunSnapshotOrchestratorTests
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
@@ -362,140 +350,6 @@ public class RunSnapshotOrchestratorTests
     }
 
     [Fact]
-    public async Task StopAllPollersAsync_waits_for_an_open_final_fetch_before_disposing_the_scope()
-    {
-        var runId = Guid.NewGuid();
-        var reportId = Guid.NewGuid().ToString();
-        var meta = new RunSnapshotMeta
-        {
-            RunId = runId,
-            FacilityId = "facility",
-            ReportId = reportId,
-            StartedAt = DateTimeOffset.UtcNow,
-            IsActive = true
-        };
-        var inFinalFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseFinalFetch = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var finalReads = 0;
-        var order = new List<string>();
-        var orderGate = new object();
-
-        var store = new Mock<ISnapshotStore>();
-        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(It.IsAny<Guid>(), "schedule", It.IsAny<CancellationToken>()))
-            .ReturnsAsync((DomainSnapshot<PipelineDataReader.ReportScheduleInfo>?)null);
-        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .Returns(async (Guid _, CancellationToken ct) =>
-            {
-                if (ct.CanBeCanceled)
-                    return meta;
-
-                if (Interlocked.Increment(ref finalReads) > 1)
-                    return null;
-
-                inFinalFetch.TrySetResult();
-                await releaseFinalFetch.Task;
-                return meta;
-            });
-        store.Setup(s => s.CompleteRunAsync(It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
-            .Returns(() =>
-            {
-                lock (orderGate)
-                    order.Add("complete");
-                return Task.CompletedTask;
-            });
-
-        var disposed = 0;
-        var scope = new Mock<IServiceScope>();
-        scope.Setup(s => s.Dispose()).Callback(() =>
-        {
-            Interlocked.Increment(ref disposed);
-            lock (orderGate)
-                order.Add("dispose");
-        });
-        var orchestrator = CreateOrchestrator(store, scope);
-        await orchestrator.RegisterRunAsync(runId, "facility", reportId);
-
-        var completing = orchestrator.CompleteRunAsync(runId);
-        await inFinalFetch.Task.WaitAsync(TimeSpan.FromSeconds(10));
-
-        var stopAll = typeof(RunSnapshotOrchestrator).GetMethod("StopAllPollersAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var stopping = (Task)stopAll.Invoke(orchestrator, null)!;
-        await Task.Delay(200);
-
-        stopping.IsCompleted.Should().BeFalse();
-        disposed.Should().Be(0);
-
-        releaseFinalFetch.TrySetResult();
-        await completing.WaitAsync(TimeSpan.FromSeconds(10));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(10));
-
-        disposed.Should().Be(1);
-        lock (orderGate)
-            order.Should().ContainInOrder("complete", "dispose");
-        PollerCount(orchestrator).Should().Be(0);
-    }
-
-    [Fact]
-    public async Task StopAllPollersAsync_waits_for_a_report_switch_and_does_not_keep_its_replacement()
-    {
-        var runId = Guid.NewGuid();
-        var inMeta = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseMeta = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var created = 0;
-        var disposed = 0;
-
-        var store = new Mock<ISnapshotStore>();
-        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RunSnapshotMeta?)null);
-        store.Setup(s => s.UpdateRunMetaAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(async () =>
-            {
-                inMeta.TrySetResult();
-                await releaseMeta.Task;
-            });
-
-        var scope = new Mock<IServiceScope>();
-        scope.Setup(s => s.Dispose()).Callback(() => Interlocked.Increment(ref disposed));
-        var orchestrator = CreateOrchestrator(store, scope, () => Interlocked.Increment(ref created));
-        await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
-        created.Should().Be(1);
-
-        var updating = orchestrator.UpdateRunAsync(runId, "facility", Guid.NewGuid().ToString());
-        await inMeta.Task.WaitAsync(TimeSpan.FromSeconds(10));
-
-        var stopAll = typeof(RunSnapshotOrchestrator).GetMethod("StopAllPollersAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var stopping = (Task)stopAll.Invoke(orchestrator, null)!;
-        await Task.Delay(200);
-
-        stopping.IsCompleted.Should().BeFalse();
-        created.Should().Be(1);
-
-        releaseMeta.TrySetResult();
-        await updating.WaitAsync(TimeSpan.FromSeconds(10));
-        await stopping.WaitAsync(TimeSpan.FromSeconds(10));
-
-        created.Should().Be(1);
-        disposed.Should().Be(1);
-        PollerCount(orchestrator).Should().Be(0);
-    }
-
-    [Fact]
     public async Task StopAllPollersAsync_stops_a_replacement_added_after_shutdown_sees_the_old_poller()
     {
         var runId = Guid.NewGuid();
@@ -508,8 +362,6 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<long>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -529,7 +381,7 @@ public class RunSnapshotOrchestratorTests
         await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
 
         var stopAll = typeof(RunSnapshotOrchestrator).GetMethod("StopAllPollersAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var stopping = (Task)stopAll.Invoke(orchestrator, null)!;
+        var stopping = (Task)stopAll.Invoke(orchestrator, new object[] { CancellationToken.None })!;
         await sawOldPoller.Task.WaitAsync(TimeSpan.FromSeconds(10));
         PollerCount(orchestrator).Should().Be(1);
 

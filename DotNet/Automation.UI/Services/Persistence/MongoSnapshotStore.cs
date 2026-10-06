@@ -16,7 +16,6 @@ namespace Automation.UI.Services.Persistence;
 /// Collections:
 ///   automation_runs            — lightweight run metadata
 ///   automation_snapshots       — per-run, per-domain polling data (upsert on RunId+Domain)
-///   automation_snapshot_clocks — writer clock per run and domain, kept off the snapshot document
 ///   automation_logs            — full log output per run
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
@@ -39,9 +38,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
-    private readonly IMongoCollection<SnapshotWriteClockDocument> _writeClocks;
-    private readonly IMongoCollection<SnapshotRunTombstoneDocument> _runTombstones;
-    private readonly IMongoCollection<SnapshotHeaderEpochDocument> _headerEpochs;
     private readonly IMongoCollection<RunLogDocument> _logs;
     private readonly IMongoCollection<RunLogSequenceDocument> _logSequences;
     private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
@@ -50,80 +46,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     private readonly ISnapshotPayloadStore _snapshotPayloadStore;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
-    /// <summary>
-    /// Test seam. Runs after a single-document header update has been sent
-    /// and before this write treats that update as acknowledged.
-    /// </summary>
-    internal Func<Task>? AfterSingleHeaderUpdate { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after a chunked header flip has been sent and before
-    /// this write treats that flip as acknowledged.
-    /// </summary>
-    internal Func<Task>? AfterChunkedHeaderUpdate { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after this write's header is stored and before the
-    /// displaced-header lookup.
-    /// </summary>
-    internal Func<Task>? BeforeDeleteDisplaced { get; set; }
-
-    /// <summary>Test seam. Runs before this write stores a header.</summary>
-    internal Func<Task>? BeforeHeaderWrite { get; set; }
-
-    /// <summary>Test seam. Runs after each chunk slice is inserted. The argument is the slice index.</summary>
-    internal Func<int, Task>? AfterSliceInserted { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after this write's clock is stored and before the header
-    /// is published, so a test can run another writer in that window.
-    /// </summary>
-    internal Func<Task>? AfterClockClaimed { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after the header is published and before displaced
-    /// documents are removed. A throw here still drops the blob that header replaced.
-    /// </summary>
-    internal Func<Task>? AfterHeaderCommitted { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after a new header is inserted and before cleanup ranks it.
-    /// The generation row for that header is stored before the insert.
-    /// </summary>
-    internal Func<Task>? AfterHeaderInserted { get; set; }
-
-    /// <summary>Test seam. Replaces <see cref="DateTimeOffset.UtcNow"/> for one store.</summary>
-    internal Func<DateTimeOffset>? Clock { get; set; }
-
-    /// <summary>Test seam. The next header lookup throws once.</summary>
-    internal bool FailNextHeaderLookup { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after slices are stored and before the header is inserted,
-    /// so a test can move the report epoch in that window.
-    /// </summary>
-    internal Func<Task>? BeforeHeaderInsert { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after the epoch check has accepted this write and before
-    /// the header is inserted.
-    /// </summary>
-    internal Func<Task>? AfterEpochAccepted { get; set; }
-
-    /// <summary>
-    /// Test seam. Runs after a lost acknowledgement has been confirmed as
-    /// published and before the follow-up header lookup.
-    /// </summary>
-    internal Func<Task>? AfterPublishConfirmed { get; set; }
-
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger, ISnapshotPayloadStore? snapshotPayloadStore = null)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
         _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
-        _writeClocks = database.GetCollection<SnapshotWriteClockDocument>("automation_snapshot_clocks");
-        _runTombstones = database.GetCollection<SnapshotRunTombstoneDocument>("automation_run_tombstones");
-        _headerEpochs = database.GetCollection<SnapshotHeaderEpochDocument>("automation_snapshot_header_epochs");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logSequences = database.GetCollection<RunLogSequenceDocument>("automation_log_sequences");
         _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
@@ -156,16 +83,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.FacilityId, facilityId)
-            .Set(r => r.ReportId, reportId)
-            .Inc(r => r.SnapshotEpoch, 1);
+            .Set(r => r.ReportId, reportId);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
 
         // Clear stale domain snapshot data so milestones/entries from a prior report
         // (e.g., initial report before regeneration) don't bleed into the UI.
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
-        await _headerEpochs.DeleteManyAsync(epoch => epoch.RunId == runId, ct);
-        await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _snapshotPayloadStore.DeleteRunPayloadsAsync(runId, ct);
     }
 
@@ -468,21 +392,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         if (run != null && retainOwnedFacilities)
             await RetainOwnedFacilitiesAsync(ToSummary(run), ct);
 
-        // The marker lands before the summary is removed, so a write already in
-        // flight can see that this run is gone instead of treating a missing
-        // summary as epoch 0.
-        await _runTombstones.ReplaceOneAsync(
-            tombstone => tombstone.RunId == runId,
-            new SnapshotRunTombstoneDocument { RunId = runId, DeletedAt = DateTimeOffset.UtcNow },
-            new ReplaceOptions { IsUpsert = true },
-            ct);
-
         // Drop child history first and the run summary last. A failure after the
         // summary is gone would leave history that the next purge can no longer select.
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
-        await _headerEpochs.DeleteManyAsync(epoch => epoch.RunId == runId, ct);
-        await _writeClocks.DeleteManyAsync(c => c.RunId == runId, ct);
         await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
         await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
 
@@ -556,8 +469,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         ReportId = doc.ReportId,
         StartedAt = doc.StartedAt,
         IsActive = doc.IsActive,
-        IsMetricsRun = doc.IsMetricsRun,
-        SnapshotEpoch = doc.SnapshotEpoch
+        IsMetricsRun = doc.IsMetricsRun
     };
 
     private static AutomationRunSummary ToSummary(AutomationRunDocument doc)
@@ -603,19 +515,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     // --- Domain snapshots ---
 
-    public Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
-        => SetDomainCoreAsync(runId, domain, data, snapshotEpoch: null, ct);
-
-    public Task SetDomainAsync<T>(Guid runId, string domain, T data, long snapshotEpoch, CancellationToken ct = default)
-        => SetDomainCoreAsync(runId, domain, data, snapshotEpoch, ct);
-
-    private async Task SetDomainCoreAsync<T>(Guid runId, string domain, T data, long? snapshotEpoch, CancellationToken ct)
+    public async Task SetDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct = default)
     {
-        var epoch = snapshotEpoch ?? await ReadSnapshotEpochAsync(runId, ct);
         var json = JsonSerializer.Serialize(data);
-        var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
-        var now = Clock?.Invoke() ?? DateTimeOffset.UtcNow;
+        if (await PayloadUnchangedAsync(runId, domain, json, ct))
+            return;
 
+        var payloadUtf8Bytes = Encoding.UTF8.GetByteCount(json);
         SnapshotPayloadPointer? newPointer = null;
         var storedJson = json;
         if (_snapshotPayloadStore.ShouldExternalize(domain, payloadUtf8Bytes))
@@ -627,119 +533,65 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             });
         }
 
-        var storedBytes = Encoding.UTF8.GetByteCount(storedJson);
-        SnapshotWrite write;
+        var now = DateTimeOffset.UtcNow;
+        DomainSnapshotDocument? previous;
         try
         {
-            write = storedBytes <= SnapshotChunkBytes
-                ? await WriteSingleAsync(runId, domain, storedJson, epoch, now, ct)
-                : await WriteChunkedAsync(runId, domain, storedJson, epoch, now, ct);
+            var storedBytes = Encoding.UTF8.GetByteCount(storedJson);
+            previous = storedBytes <= SnapshotChunkBytes
+                ? await WriteSingleAsync(runId, domain, storedJson, now, ct)
+                : await WriteChunkedAsync(runId, domain, storedJson, now, ct);
         }
         catch
         {
             if (newPointer != null)
-                await DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, newPointer);
+                await DeleteBlobQuietlyAsync(newPointer);
             throw;
         }
 
-        if (!write.Wrote)
-        {
-            if (newPointer != null)
-                await DeleteUnusedSnapshotBlobAsync(runId, domain, newPointer);
-            if (write.Displaced != null && (newPointer == null || !string.Equals(write.Displaced.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
-                await DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, write.Displaced);
-            return;
-        }
-
-        if (write.Displaced != null && (newPointer == null || !string.Equals(write.Displaced.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
-            await DeleteUnusedSnapshotBlobAsync(runId, domain, write.Displaced);
+        await DeleteReplacedPayloadAsync(runId, domain, previous, newPointer);
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
     {
-        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
-            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
+        var payload = await ReadPayloadAsync(runId, domain, ct);
+        if (payload == null)
+            return null;
 
-        for (var attempt = 0; attempt < 3; attempt++)
+        try
         {
-            var docs = await _snapshots.Find(filter).ToListAsync(ct);
-            if (docs.Count == 0)
+            var payloadJson = payload.PayloadText;
+            var pointer = TryReadSnapshotPayloadPointer(payloadJson);
+            if (pointer != null)
             {
-                _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
-                return null;
-            }
-
-            var chosen = docs.Where(d => d.ChunkIndex is null or -1)
-                .OrderByDescending(d => d.UpdatedAt)
-                .ThenByDescending(d => d.Id)
-                .FirstOrDefault();
-            string payloadJson;
-            DateTimeOffset updatedAt;
-            if (chosen?.ChunkIndex == -1 && chosen.ChunkCount is > 0 && !string.IsNullOrEmpty(chosen.Revision))
-            {
-                var chunks = docs
-                    .Where(d => d.ChunkIndex >= 0 && d.Revision == chosen.Revision)
-                    .OrderBy(d => d.ChunkIndex)
-                    .ToList();
-                var expected = chosen.ChunkCount.Value;
-                var complete = chunks.Count == expected
-                    && chunks.Select((chunk, index) => chunk.ChunkIndex == index).All(match => match);
-                if (!complete)
+                payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct) ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(payloadJson))
                 {
-                    if (attempt < 2)
-                        continue;
-
                     _logger.LogWarning(
-                        "[Store] GetDomain: incomplete chunks for run={RunId} domain={Domain} revision={Revision} expected={Expected} found={Found}",
-                        runId, domain, chosen.Revision, chosen.ChunkCount, chunks.Count);
+                        "[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}",
+                        runId.ToString().SanitizeForLog(),
+                        domain.SanitizeForLog(),
+                        pointer.BlobName.SanitizeForLog());
                     return null;
                 }
-
-                payloadJson = string.Concat(chunks.Select(c => c.Data));
-                updatedAt = chosen.UpdatedAt;
-            }
-            else
-            {
-                if (chosen == null || string.IsNullOrEmpty(chosen.Data))
-                    return null;
-
-                payloadJson = chosen.Data;
-                updatedAt = chosen.UpdatedAt;
             }
 
-            try
+            var data = JsonSerializer.Deserialize<T>(payloadJson);
+            if (data == null)
             {
-                var pointer = TryReadSnapshotPayloadPointer(payloadJson);
-                if (pointer != null)
-                {
-                    payloadJson = await _snapshotPayloadStore.ReadAsync(pointer, ct) ?? string.Empty;
-                    if (string.IsNullOrWhiteSpace(payloadJson))
-                    {
-                        var sanitizedRunId = runId.ToString().SanitizeForLog();
-                        var sanitizedDomain = domain.SanitizeForLog();
-                        var sanitizedBlobName = pointer.BlobName.SanitizeForLog();
-                        _logger.LogWarning("[Store] GetDomain: externalized payload missing for run={RunId} domain={Domain} blob={Blob}", sanitizedRunId, sanitizedDomain, sanitizedBlobName);
-                        return null;
-                    }
-                }
-
-                var data = JsonSerializer.Deserialize<T>(payloadJson);
-                if (data == null)
-                {
-                    _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, payloadJson.Length);
-                    return null;
-                }
-
-                return new DomainSnapshot<T> { UpdatedAt = updatedAt, Data = data };
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, payloadJson.Length);
+                _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, payloadJson.Length);
                 return null;
             }
-        }
 
-        return null;
+            return new DomainSnapshot<T> { UpdatedAt = payload.Stamp, Data = data };
+        }
+        catch (JsonException ex)
+        {
+            // A legacy row can be a different shape than the type this caller asked for.
+            // The caller falls back. Debug keeps that probe off the warning stream.
+            _logger.LogDebug(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, payload?.PayloadText.Length ?? 0);
+            return null;
+        }
     }
 
     /// <summary>
@@ -759,6 +611,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             var width = char.IsHighSurrogate(json[i]) && i + 1 < json.Length ? 2 : 1;
             var charBytes = Encoding.UTF8.GetByteCount(json.AsSpan(i, width));
+            if (charBytes > maxBytes)
+                throw new InvalidOperationException($"A single character is {charBytes} UTF-8 bytes, over the {maxBytes} byte snapshot slice limit.");
+
             if (bytes > 0 && bytes + charBytes > maxBytes)
             {
                 slices.Add(json.Substring(start, i - start));
@@ -776,927 +631,230 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return slices;
     }
 
-    private FilterDefinition<DomainSnapshotDocument> SingleOrHeaderFilter(Guid runId, string domain)
+    private async Task<bool> PayloadUnchangedAsync(Guid runId, string domain, string json, CancellationToken ct)
+    {
+        var current = await ReadPayloadAsync(runId, domain, ct);
+        if (current == null || string.IsNullOrEmpty(current.PayloadText))
+            return false;
+
+        var stored = current.PayloadText;
+        var pointer = TryReadSnapshotPayloadPointer(stored);
+        if (pointer != null)
+            stored = await _snapshotPayloadStore.ReadAsync(pointer, ct) ?? string.Empty;
+
+        return string.Equals(stored, json, StringComparison.Ordinal);
+    }
+
+    private async Task<StoredPayload?> ReadPayloadAsync(Guid runId, string domain, CancellationToken ct)
+    {
+        var filter = Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+            & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain);
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var docs = await _snapshots.Find(filter).ToListAsync(ct);
+            if (docs.Count == 0)
+            {
+                _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
+                return null;
+            }
+
+            var chosen = docs.Where(d => d.ChunkIndex is null or -1)
+                .OrderByDescending(d => d.UpdatedAt)
+                .ThenByDescending(d => d.Id)
+                .FirstOrDefault();
+            if (chosen == null)
+                return null;
+
+            if (chosen.ChunkIndex == -1 && chosen.ChunkCount is > 0 && !string.IsNullOrEmpty(chosen.Revision))
+            {
+                var chunks = docs
+                    .Where(d => d.ChunkIndex >= 0 && d.Revision == chosen.Revision)
+                    .OrderBy(d => d.ChunkIndex)
+                    .ToList();
+                var expected = chosen.ChunkCount.Value;
+                var complete = chunks.Count == expected
+                    && chunks.Select((chunk, index) => chunk.ChunkIndex == index).All(match => match);
+                if (!complete)
+                {
+                    if (attempt < 2)
+                        continue;
+
+                    _logger.LogWarning(
+                        "[Store] GetDomain: incomplete chunks for run={RunId} domain={Domain} revision={Revision} expected={Expected} found={Found}",
+                        runId, domain, chosen.Revision, chosen.ChunkCount, chunks.Count);
+                    return null;
+                }
+
+                return new StoredPayload(string.Concat(chunks.Select(c => c.Data)), chosen.UpdatedAt);
+            }
+
+            if (string.IsNullOrEmpty(chosen.Data))
+                return null;
+
+            return new StoredPayload(chosen.Data, chosen.UpdatedAt);
+        }
+
+        return null;
+    }
+
+    private async Task<DomainSnapshotDocument?> WriteSingleAsync(
+        Guid runId,
+        string domain,
+        string storedJson,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (Encoding.UTF8.GetByteCount(storedJson) > SnapshotChunkBytes)
+            throw new InvalidOperationException($"Snapshot domain {domain} is over the {SnapshotChunkBytes} byte document limit.");
+
+        var update = Builders<DomainSnapshotDocument>.Update
+            .Set(d => d.RunId, runId)
+            .Set(d => d.Domain, domain)
+            .Set(d => d.Data, storedJson)
+            .Set(d => d.UpdatedAt, now)
+            .Unset(d => d.ChunkIndex)
+            .Unset(d => d.ChunkCount)
+            .Unset(d => d.Revision);
+
+        return await _snapshots.FindOneAndUpdateAsync(
+            HeaderFilter(runId, domain),
+            update,
+            new FindOneAndUpdateOptions<DomainSnapshotDocument>
+            {
+                IsUpsert = true,
+                ReturnDocument = ReturnDocument.Before
+            },
+            ct);
+    }
+
+    private async Task<DomainSnapshotDocument?> WriteChunkedAsync(
+        Guid runId,
+        string domain,
+        string storedJson,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var slices = SplitUtf8(storedJson, SnapshotChunkBytes);
+        if (slices.Count == 0)
+            return await WriteSingleAsync(runId, domain, storedJson, now, ct);
+
+        var revision = Guid.NewGuid().ToString("N");
+        try
+        {
+            for (var index = 0; index < slices.Count; index++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var slice = slices[index];
+                var bytes = Encoding.UTF8.GetByteCount(slice);
+                if (bytes > SnapshotChunkBytes)
+                    throw new InvalidOperationException($"Snapshot slice {index} for {domain} is {bytes} bytes, over the {SnapshotChunkBytes} byte document limit.");
+
+                await _snapshots.InsertOneAsync(new DomainSnapshotDocument
+                {
+                    RunId = runId,
+                    Domain = domain,
+                    Data = slice,
+                    ChunkIndex = index,
+                    ChunkCount = slices.Count,
+                    Revision = revision,
+                    UpdatedAt = now
+                }, cancellationToken: ct);
+            }
+        }
+        catch
+        {
+            await DeleteSlicesQuietlyAsync(runId, domain, revision);
+            throw;
+        }
+
+        var update = Builders<DomainSnapshotDocument>.Update
+            .Set(d => d.RunId, runId)
+            .Set(d => d.Domain, domain)
+            .Set(d => d.Data, string.Empty)
+            .Set(d => d.UpdatedAt, now)
+            .Set(d => d.ChunkIndex, -1)
+            .Set(d => d.ChunkCount, slices.Count)
+            .Set(d => d.Revision, revision);
+
+        try
+        {
+            return await _snapshots.FindOneAndUpdateAsync(
+                HeaderFilter(runId, domain),
+                update,
+                new FindOneAndUpdateOptions<DomainSnapshotDocument>
+                {
+                    IsUpsert = true,
+                    ReturnDocument = ReturnDocument.Before
+                },
+                ct);
+        }
+        catch
+        {
+            await DeleteSlicesQuietlyAsync(runId, domain, revision);
+            throw;
+        }
+    }
+
+    private static FilterDefinition<DomainSnapshotDocument> HeaderFilter(Guid runId, string domain)
     {
         var filter = Builders<DomainSnapshotDocument>.Filter;
         return filter.Eq(d => d.RunId, runId)
             & filter.Eq(d => d.Domain, domain)
-            & (filter.Eq(d => d.ChunkIndex, null) | filter.Eq(d => d.ChunkIndex, -1));
+            & (filter.Eq(d => d.ChunkIndex, (int?)null) | filter.Eq(d => d.ChunkIndex, -1));
     }
 
-    private readonly record struct SnapshotWrite(bool Wrote, SnapshotPayloadPointer? Displaced);
-
-    /// <summary>
-    /// BSON datetimes keep milliseconds. A stored header must be strictly newer
-    /// than the one this write observed, or a same-millisecond update still matches
-    /// <see cref="ObservedHeaderFilter"/>.
-    /// </summary>
-    internal static DateTimeOffset NextSnapshotTimestamp(DateTimeOffset now, DateTimeOffset? previous)
-    {
-        if (previous == null || now > previous.Value)
-            return now;
-
-        return previous.Value.AddMilliseconds(1);
-    }
-
-    /// <summary>
-    /// True when the stored header was written by a clock later than this write.
-    /// The clock lives in <c>automation_snapshot_clocks</c>. Older rows have no clock
-    /// document, so <see cref="DomainSnapshotDocument.UpdatedAt"/> is the fallback.
-    /// That timestamp also moves forward to keep compare-and-swap unique.
-    /// </summary>
-    internal static bool StoredHeaderIsNewerThan(DomainSnapshotDocument previous, DateTimeOffset now, DateTimeOffset? writeClock)
-    {
-        var clock = writeClock ?? previous.UpdatedAt;
-        return clock > now;
-    }
-
-    internal static string SnapshotClockId(Guid runId, string domain) => $"{runId:N}|{domain}";
-
-    private async Task<long> ReadSnapshotEpochAsync(Guid runId, CancellationToken ct)
-    {
-        var doc = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
-        return doc?.SnapshotEpoch ?? 0;
-    }
-
-    /// <summary>
-    /// True only after <see cref="DeleteRunAsync"/> marked the run. A missing run
-    /// summary with no marker is still epoch 0 and may accept a snapshot.
-    /// </summary>
-    private async Task<bool> IsRunDeletedAsync(Guid runId, CancellationToken ct)
-    {
-        var marker = await _runTombstones.Find(tombstone => tombstone.RunId == runId).Limit(1).FirstOrDefaultAsync(ct);
-        return marker != null;
-    }
-
-    /// <summary>
-    /// The run document is the generation fence. It stays when domain clocks are deleted.
-    /// </summary>
-    private async Task<bool> RunEpochMovedAsync(Guid runId, long epoch, CancellationToken ct)
-        => await ReadSnapshotEpochAsync(runId, ct) > epoch;
-
-    /// <summary>
-    /// Drops this write when the run moved on. Deletes slices this attempt already stored.
-    /// Does not touch another generation's header.
-    /// </summary>
-    private async Task<bool> AbandonForMovedEpochAsync(
+    private async Task DeleteReplacedPayloadAsync(
         Guid runId,
         string domain,
-        long epoch,
-        string? revision,
-        CancellationToken ct)
-    {
-        var hook = BeforeHeaderInsert;
-        BeforeHeaderInsert = null;
-        if (hook != null)
-            await hook();
-
-        bool deleted;
-        bool blocked;
-        try
-        {
-            deleted = await IsRunDeletedAsync(runId, ct);
-            blocked = deleted || await RunEpochMovedAsync(runId, epoch, ct);
-        }
-        catch
-        {
-            // Slices are already stored. A failed epoch read must not leave them behind.
-            if (!string.IsNullOrEmpty(revision))
-                await DeleteSlicesQuietlyAsync(runId, domain, revision);
-            throw;
-        }
-
-        if (!blocked)
-        {
-            if (AfterEpochAccepted != null)
-            {
-                try
-                {
-                    await AfterEpochAccepted();
-                }
-                catch
-                {
-                    if (!string.IsNullOrEmpty(revision))
-                        await DeleteSlicesQuietlyAsync(runId, domain, revision);
-                    throw;
-                }
-            }
-
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(revision))
-            await DeleteSlicesQuietlyAsync(runId, domain, revision);
-        if (deleted)
-            await DeleteClockQuietlyAsync(runId, domain);
-
-        LogDroppedNewerHeader(runId, domain);
-        return true;
-    }
-
-    private async Task<SnapshotWriteClockDocument?> ReadClockAsync(Guid runId, string domain, CancellationToken ct)
-        => await _writeClocks.Find(c => c.Id == SnapshotClockId(runId, domain)).FirstOrDefaultAsync(ct);
-
-    /// <summary>
-    /// A later report epoch wins even when its clock time is earlier. The same epoch
-    /// still loses to a later clock. No clock document falls back to the header time.
-    /// </summary>
-    private static bool DropForNewerGeneration(
-        SnapshotWriteClockDocument? clock,
-        long epoch,
         DomainSnapshotDocument? previous,
-        DateTimeOffset now)
+        SnapshotPayloadPointer? newPointer)
     {
-        if (clock != null && clock.Epoch > epoch)
-            return true;
         if (previous == null)
-            return false;
-        if (clock != null && clock.Epoch < epoch)
-            return false;
-        return StoredHeaderIsNewerThan(previous, now, clock?.WriteClock);
-    }
-
-    private static FilterDefinition<SnapshotWriteClockDocument> EpochStill(long epoch)
-    {
-        var equal = Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.Epoch, epoch);
-        if (epoch != 0)
-            return equal;
-
-        return Builders<SnapshotWriteClockDocument>.Filter.Or(
-            equal,
-            Builders<SnapshotWriteClockDocument>.Filter.Exists(c => c.Epoch, false));
-    }
-
-    private enum ClockGate
-    {
-        Proceed,
-        Drop,
-        Retry
-    }
-
-    /// <summary>
-    /// Moves the clock forward to <paramref name="now"/> only when the stored
-    /// clock is still the value just read. A slower writer cannot replace a
-    /// later clock. Returns null when another writer won the compare-and-swap.
-    /// </summary>
-    private async Task<bool?> ClaimWriteClockAsync(Guid runId, string domain, long epoch, DateTimeOffset now, CancellationToken ct)
-    {
-        var observed = await ReadClockAsync(runId, domain, ct);
-        if (observed != null && observed.Epoch > epoch)
-            return false;
-        if (observed != null && observed.Epoch == epoch && observed.WriteClock > now)
-            return false;
-        if (observed != null && observed.Epoch == epoch && observed.WriteClock == now)
-            return true;
-
-        var id = SnapshotClockId(runId, domain);
-        if (observed == null)
-        {
-            try
-            {
-                await _writeClocks.InsertOneAsync(new SnapshotWriteClockDocument
-                {
-                    Id = id,
-                    RunId = runId,
-                    Domain = domain,
-                    Epoch = epoch,
-                    WriteClock = now
-                }, cancellationToken: ct);
-                return true;
-            }
-            catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
-            {
-                return null;
-            }
-        }
-
-        var updated = await _writeClocks.UpdateOneAsync(
-            Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.Id, id)
-                & Builders<SnapshotWriteClockDocument>.Filter.Eq(c => c.WriteClock, observed.WriteClock)
-                & EpochStill(observed.Epoch),
-            Builders<SnapshotWriteClockDocument>.Update
-                .Set(c => c.WriteClock, now)
-                .Set(c => c.Epoch, epoch),
-            cancellationToken: ct);
-        return updated.MatchedCount == 1 ? true : null;
-    }
-
-    /// <summary>
-    /// Stores this write's clock before the header is published. A clock that
-    /// moves past <paramref name="now"/> before the header write drops this attempt.
-    /// </summary>
-    private async Task<ClockGate> AdvanceClockBeforePublishAsync(Guid runId, string domain, long epoch, DateTimeOffset now, CancellationToken ct)
-    {
-        var claim = await ClaimWriteClockAsync(runId, domain, epoch, now, ct);
-        if (claim == null)
-            return ClockGate.Retry;
-        if (claim == false)
-            return ClockGate.Drop;
-
-        if (AfterClockClaimed != null)
-            await AfterClockClaimed();
-
-        var raced = await ReadClockAsync(runId, domain, ct);
-        if (raced == null || raced.Epoch < epoch)
-            return ClockGate.Retry;
-        if (raced.Epoch > epoch || raced.WriteClock > now)
-            return ClockGate.Drop;
-        return ClockGate.Proceed;
-    }
-
-    private async Task<SnapshotWrite> FinishPublishedWriteAsync(
-        Guid runId,
-        string domain,
-        ObjectId keepId,
-        string? previousRevision,
-        DomainSnapshotDocument? previous,
-        long epoch,
-        DateTimeOffset publishedStamp)
-    {
-        try
-        {
-            await RememberHeaderEpochAsync(keepId, runId, domain, epoch);
-            if (AfterHeaderCommitted != null)
-                await AfterHeaderCommitted();
-
-            if (!await DeleteDisplacedAsync(runId, domain, keepId, previousRevision, previous, epoch, publishedStamp))
-            {
-                _logger.LogWarning(
-                    "Snapshot domain {Domain} for run {RunId} dropped this write because a newer snapshot header won.",
-                    domain.SanitizeForLog(),
-                    runId.ToString().SanitizeForLog());
-                return new SnapshotWrite(false, DisplacedPointer(previous));
-            }
-
-            return new SnapshotWrite(true, DisplacedPointer(previous));
-        }
-        catch
-        {
-            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-            await ReclaimDisplacedBlobAsync(runId, domain, previous);
-            throw;
-        }
-    }
-
-    private async Task<SnapshotWrite> WriteSingleAsync(Guid runId, string domain, string storedJson, long epoch, DateTimeOffset now, CancellationToken ct)
-    {
-        if (BeforeHeaderWrite != null)
-            await BeforeHeaderWrite();
-
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (await DropBecauseRunDeletedAsync(runId, domain, ct) || await RunEpochMovedAsync(runId, epoch, ct))
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            var clock = await ReadClockAsync(runId, domain, ct);
-            if (DropForNewerGeneration(clock, epoch, previous, now))
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var gate = await AdvanceClockBeforePublishAsync(runId, domain, epoch, now, ct);
-            if (gate == ClockGate.Retry)
-                continue;
-            if (gate == ClockGate.Drop)
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
-            var stamp = NextSnapshotTimestamp(now, previous?.UpdatedAt);
-            if (await AbandonForMovedEpochAsync(runId, domain, epoch, revision: null, ct))
-                return new SnapshotWrite(false, null);
-
-            ObjectId keepId;
-            if (previous == null)
-            {
-                var created = new DomainSnapshotDocument
-                {
-                    Id = ObjectId.GenerateNewId(),
-                    RunId = runId,
-                    Domain = domain,
-                    Data = storedJson,
-                    UpdatedAt = stamp
-                };
-                keepId = await InsertNewHeaderAsync(created, runId, domain, epoch, ct);
-            }
-            else
-            {
-                var update = Builders<DomainSnapshotDocument>.Update
-                    .Set(d => d.Data, storedJson)
-                    .Set(d => d.UpdatedAt, stamp)
-                    .Unset(d => d.ChunkIndex)
-                    .Unset(d => d.ChunkCount)
-                    .Unset(d => d.Revision);
-                try
-                {
-                    var result = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), update, cancellationToken: ct);
-                    if (result.MatchedCount == 0)
-                        continue;
-
-                    keepId = previous.Id;
-                    if (AfterSingleHeaderUpdate != null)
-                        await AfterSingleHeaderUpdate();
-                }
-                catch (Exception)
-                {
-                    // The update may have landed even though the acknowledgement did not.
-                    // The header no longer carries the old revision or the old blob pointer,
-                    // so a later write cannot find them. Drop each only when nothing still names it.
-                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
-                    throw;
-                }
-            }
-
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch, stamp);
-        }
-
-        _logger.LogWarning(
-            "Snapshot domain {Domain} for run {RunId} kept its previous document after a concurrent write.",
-            domain.SanitizeForLog(),
-            runId.ToString().SanitizeForLog());
-        return new SnapshotWrite(false, null);
-    }
-
-    private async Task<SnapshotWrite> WriteChunkedAsync(Guid runId, string domain, string json, long epoch, DateTimeOffset now, CancellationToken ct)
-    {
-        if (BeforeHeaderWrite != null)
-            await BeforeHeaderWrite();
-
-        return await WriteChunkedCoreAsync(runId, domain, json, epoch, now, ct);
-    }
-
-    private async Task<SnapshotWrite> WriteChunkedCoreAsync(Guid runId, string domain, string json, long epoch, DateTimeOffset now, CancellationToken ct)
-    {
-        var slices = SplitUtf8(json, SnapshotChunkBytes);
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (await DropBecauseRunDeletedAsync(runId, domain, ct) || await RunEpochMovedAsync(runId, epoch, ct))
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var previous = await FindNewestHeaderAsync(runId, domain, ct);
-            var clock = await ReadClockAsync(runId, domain, ct);
-            if (DropForNewerGeneration(clock, epoch, previous, now))
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var gate = await AdvanceClockBeforePublishAsync(runId, domain, epoch, now, ct);
-            if (gate == ClockGate.Retry)
-                continue;
-            if (gate == ClockGate.Drop)
-            {
-                LogDroppedNewerHeader(runId, domain);
-                return new SnapshotWrite(false, null);
-            }
-
-            var previousRevision = previous is { ChunkIndex: -1 } ? previous.Revision : null;
-            var stamp = NextSnapshotTimestamp(now, previous?.UpdatedAt);
-            var revision = Guid.NewGuid().ToString("N");
-
-            try
-            {
-                for (var i = 0; i < slices.Count; i++)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    await _snapshots.InsertOneAsync(new DomainSnapshotDocument
-                    {
-                        Id = ObjectId.GenerateNewId(),
-                        RunId = runId,
-                        Domain = domain,
-                        Data = slices[i],
-                        ChunkIndex = i,
-                        ChunkCount = slices.Count,
-                        Revision = revision,
-                        UpdatedAt = now
-                    }, cancellationToken: ct);
-                    if (AfterSliceInserted != null)
-                        await AfterSliceInserted(i);
-                }
-            }
-            catch (Exception)
-            {
-                // The header is written only after every slice insert succeeds.
-                await DeleteSlicesQuietlyAsync(runId, domain, revision);
-                throw;
-            }
-
-            if (await AbandonForMovedEpochAsync(runId, domain, epoch, revision, ct))
-                return new SnapshotWrite(false, null);
-
-            ObjectId keepId;
-            try
-            {
-                if (previous == null)
-                {
-                    var created = new DomainSnapshotDocument
-                    {
-                        Id = ObjectId.GenerateNewId(),
-                        RunId = runId,
-                        Domain = domain,
-                        Data = string.Empty,
-                        ChunkIndex = -1,
-                        ChunkCount = slices.Count,
-                        Revision = revision,
-                        UpdatedAt = stamp
-                    };
-                    keepId = await InsertNewHeaderAsync(created, runId, domain, epoch, ct);
-                }
-                else
-                {
-                    var headerUpdate = Builders<DomainSnapshotDocument>.Update
-                        .Set(d => d.Data, string.Empty)
-                        .Set(d => d.ChunkIndex, -1)
-                        .Set(d => d.ChunkCount, slices.Count)
-                        .Set(d => d.Revision, revision)
-                        .Set(d => d.UpdatedAt, stamp);
-                    var flip = await _snapshots.UpdateOneAsync(ObservedHeaderFilter(previous), headerUpdate, cancellationToken: ct);
-                    if (flip.MatchedCount == 0)
-                    {
-                        await DeleteSlicesAsync(runId, domain, revision, ct);
-                        continue;
-                    }
-
-                    keepId = previous.Id;
-                    if (AfterChunkedHeaderUpdate != null)
-                        await AfterChunkedHeaderUpdate();
-                }
-            }
-            catch (Exception)
-            {
-                var published = await HeaderHasRevisionAsync(runId, domain, revision);
-                if (published != true)
-                {
-                    if (published == false)
-                        await DeleteSlicesQuietlyAsync(runId, domain, revision);
-
-                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
-                    throw;
-                }
-
-                if (AfterPublishConfirmed != null)
-                    await AfterPublishConfirmed();
-
-                DomainSnapshotDocument? publishedHeader;
-                try
-                {
-                    using var timeout = StartCleanupLookupTimeout();
-                    publishedHeader = (await FindHeadersAsync(runId, domain, timeout.Token))
-                        .FirstOrDefault(header => header.ChunkIndex == -1 && header.Revision == revision);
-                }
-                catch (Exception lookupEx)
-                {
-                    _logger.LogWarning(
-                        lookupEx,
-                        "Snapshot header lookup failed for domain {Domain} run {RunId}.",
-                        domain.SanitizeForLog(),
-                        runId.ToString().SanitizeForLog());
-                    publishedHeader = null;
-                }
-                if (publishedHeader == null)
-                {
-                    await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-                    await ReclaimUnreferencedRevisionAsync(runId, domain, revision);
-                    await ReclaimDisplacedBlobAsync(runId, domain, previous);
-                    throw;
-                }
-
-                keepId = publishedHeader.Id;
-            }
-
-            return await FinishPublishedWriteAsync(runId, domain, keepId, previousRevision, previous, epoch, stamp);
-        }
-
-        _logger.LogWarning(
-            "Snapshot domain {Domain} for run {RunId} kept its previous revision after a concurrent write.",
-            domain.SanitizeForLog(),
-            runId.ToString().SanitizeForLog());
-        return new SnapshotWrite(false, null);
-    }
-
-    private async Task<DomainSnapshotDocument?> FindNewestHeaderAsync(Guid runId, string domain, CancellationToken ct)
-    {
-        var headers = await FindHeadersAsync(runId, domain, ct);
-        return headers.OrderByDescending(header => header.UpdatedAt).ThenByDescending(header => header.Id).FirstOrDefault();
-    }
-
-    private Task<List<DomainSnapshotDocument>> FindHeadersAsync(Guid runId, string domain, CancellationToken ct)
-    {
-        if (FailNextHeaderLookup)
-        {
-            FailNextHeaderLookup = false;
-            throw new IOException("lookup failed");
-        }
-
-        return _snapshots.Find(SingleOrHeaderFilter(runId, domain)).ToListAsync(ct);
-    }
-
-    private async Task<bool> DocumentExistsAsync(ObjectId id)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            var found = await _snapshots.Find(d => d.Id == id).Limit(1).FirstOrDefaultAsync(timeout.Token);
-            return found != null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Snapshot header lookup by id failed.");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// True when a header for <paramref name="revision"/> is stored, false when it is not,
-    /// and null when the lookup itself failed. A null result must not delete that revision.
-    /// </summary>
-    private async Task<bool?> HeaderHasRevisionAsync(Guid runId, string domain, string revision)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            var headers = await FindHeadersAsync(runId, domain, timeout.Token);
-            return headers.Any(header => header.ChunkIndex == -1 && header.Revision == revision);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Snapshot header lookup failed for domain {Domain} run {RunId}.",
-                domain.SanitizeForLog(),
-                runId.ToString().SanitizeForLog());
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Drops headers this write displaced. Returns false when a newer header
-    /// already won, in which case this write's own header is removed and its
-    /// slices go with it. When the run epoch moved, only the timestamp this
-    /// write stored is removed, so a later writer that updated the same id stays.
-    /// Two first inserts can pass each other: the newer one
-    /// may finish before the older header exists, so the older write has to
-    /// drop itself when it finally sees that newer header. A revision this
-    /// write already replaced is dropped too, once no header still names it.
-    /// </summary>
-    private async Task<bool> DeleteDisplacedAsync(
-        Guid runId,
-        string domain,
-        ObjectId keepId,
-        string? previousRevision,
-        DomainSnapshotDocument? previous,
-        long epoch,
-        DateTimeOffset publishedStamp)
-    {
-        if (BeforeDeleteDisplaced != null)
-            await BeforeDeleteDisplaced();
-
-        using var timeout = StartCleanupLookupTimeout();
-        var ct = timeout.Token;
-        if (await IsRunDeletedAsync(runId, ct))
-        {
-            var retiredHeader = await _snapshots
-                .Find(d => d.Id == keepId && d.UpdatedAt == publishedStamp)
-                .FirstOrDefaultAsync(ct);
-            if (retiredHeader != null)
-                await DeleteHeaderIfUnchangedAsync(runId, domain, retiredHeader, ct);
-            await DeleteClockQuietlyAsync(runId, domain);
-            LogDroppedNewerHeader(runId, domain);
-            return false;
-        }
-
-        if (await RunEpochMovedAsync(runId, epoch, ct))
-        {
-            var ownHeader = await _snapshots
-                .Find(d => d.Id == keepId && d.UpdatedAt == publishedStamp)
-                .FirstOrDefaultAsync(ct);
-            if (ownHeader != null)
-                await DeleteHeaderIfUnchangedAsync(runId, domain, ownHeader, ct);
-            LogDroppedNewerHeader(runId, domain);
-            return false;
-        }
-
-        List<DomainSnapshotDocument> headers;
-        try
-        {
-            headers = await FindHeadersAsync(runId, domain, ct);
-        }
-        catch (Exception)
-        {
-            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-            await ReclaimDisplacedBlobAsync(runId, domain, previous);
-            throw;
-        }
-        var me = headers.FirstOrDefault(header => header.Id == keepId);
-        if (me == null)
-        {
-            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-            return false;
-        }
-
-        var epochByHeader = await ReadHeaderEpochsAsync(headers, ct);
-        long? EpochOf(DomainSnapshotDocument header)
-            => epochByHeader.TryGetValue(header.Id.ToString(), out var headerEpoch) ? headerEpoch : null;
-        var mine = EpochOf(me);
-
-        foreach (var olderGeneration in headers.Where(header => mine != null && EpochOf(header) != null && EpochOf(header) < mine))
-            await DeleteHeaderIfUnchangedAsync(runId, domain, olderGeneration, ct);
-
-        var newest = headers
-            .Where(header => mine == null || EpochOf(header) == null || EpochOf(header) >= mine)
-            .OrderByDescending(header => EpochOf(header) ?? mine ?? 0)
-            .ThenByDescending(header => header.UpdatedAt)
-            .ThenByDescending(header => header.Id)
-            .First();
-        if (newest.Id != keepId)
-        {
-            await DeleteHeaderIfUnchangedAsync(runId, domain, me, ct);
-            await ReclaimUnreferencedRevisionAsync(runId, domain, previousRevision);
-            return false;
-        }
-
-        foreach (var loser in headers.Where(header => header.Id != keepId && LosesTo(header, keepId, me.UpdatedAt)))
-            await DeleteHeaderIfUnchangedAsync(runId, domain, loser, ct);
-
-        if (!string.IsNullOrEmpty(previousRevision))
-            await DeleteSlicesAsync(runId, domain, previousRevision, ct);
-
-        return true;
-    }
-
-    private async Task DeleteHeaderIfUnchangedAsync(
-        Guid runId,
-        string domain,
-        DomainSnapshotDocument header,
-        CancellationToken ct)
-    {
-        var removed = await _snapshots.DeleteOneAsync(ObservedHeaderFilter(header), ct);
-        if (removed.DeletedCount == 0)
-            return;
-
-        var pointer = TryReadSnapshotPayloadPointer(header.Data);
-        if (pointer != null)
-            await DeleteUnusedSnapshotBlobAsync(runId, domain, pointer);
-
-        await _headerEpochs.DeleteOneAsync(epoch => epoch.Id == header.Id.ToString(), ct);
-
-        if (string.IsNullOrEmpty(header.Revision))
-            return;
-
-        await DeleteSlicesAsync(runId, domain, header.Revision, ct);
-    }
-
-    private async Task RememberHeaderEpochAsync(ObjectId headerId, Guid runId, string domain, long epoch)
-    {
-        using var timeout = StartCleanupLookupTimeout();
-        await _headerEpochs.ReplaceOneAsync(
-            row => row.Id == headerId.ToString(),
-            new SnapshotHeaderEpochDocument
-            {
-                Id = headerId.ToString(),
-                RunId = runId,
-                Domain = domain,
-                Epoch = epoch
-            },
-            new ReplaceOptions { IsUpsert = true },
-            timeout.Token);
-    }
-
-    /// <summary>
-    /// Stores the generation row before the header is visible. A concurrent cleanup
-    /// then sees this write's epoch instead of ranking a missing row with its own.
-    /// </summary>
-    private async Task<ObjectId> InsertNewHeaderAsync(
-        DomainSnapshotDocument created,
-        Guid runId,
-        string domain,
-        long epoch,
-        CancellationToken ct)
-    {
-        await RememberHeaderEpochAsync(created.Id, runId, domain, epoch);
-        try
-        {
-            await _snapshots.InsertOneAsync(created, cancellationToken: ct);
-        }
-        catch (Exception)
-        {
-            var exists = await HeaderDocumentExistsAsync(created.Id);
-            if (exists != true)
-            {
-                if (exists == false)
-                    await DeleteHeaderEpochQuietlyAsync(created.Id);
-                throw;
-            }
-        }
-
-        if (AfterHeaderInserted != null)
-            await AfterHeaderInserted();
-
-        return created.Id;
-    }
-
-    private async Task<bool?> HeaderDocumentExistsAsync(ObjectId id)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            var found = await _snapshots.Find(d => d.Id == id).Limit(1).FirstOrDefaultAsync(timeout.Token);
-            return found != null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Snapshot header lookup by id failed.");
-            return null;
-        }
-    }
-
-    private async Task DeleteHeaderEpochQuietlyAsync(ObjectId headerId)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            await _headerEpochs.DeleteOneAsync(row => row.Id == headerId.ToString(), timeout.Token);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Snapshot header generation cleanup failed for header {HeaderId}.",
-                headerId.ToString().SanitizeForLog());
-        }
-    }
-
-    private async Task<Dictionary<string, long>> ReadHeaderEpochsAsync(
-        IReadOnlyCollection<DomainSnapshotDocument> headers,
-        CancellationToken ct)
-    {
-        var ids = headers.Select(header => header.Id.ToString()).ToList();
-        var rows = await _headerEpochs.Find(row => ids.Contains(row.Id)).ToListAsync(ct);
-        return rows.ToDictionary(row => row.Id, row => row.Epoch);
-    }
-
-    internal static FilterDefinition<DomainSnapshotDocument> ObservedHeaderFilter(DomainSnapshotDocument previous)
-    {
-        var filter = Builders<DomainSnapshotDocument>.Filter;
-        var revision = previous.ChunkIndex == -1 ? previous.Revision : null;
-        int? chunkIndex = previous.ChunkIndex == -1 ? -1 : null;
-        return filter.Eq(d => d.Id, previous.Id)
-            & filter.Eq(d => d.UpdatedAt, previous.UpdatedAt)
-            & filter.Eq(d => d.ChunkIndex, chunkIndex)
-            & (revision == null
-                ? filter.Eq(d => d.Revision, null)
-                : filter.Eq(d => d.Revision, revision));
-    }
-
-    private static SnapshotPayloadPointer? DisplacedPointer(DomainSnapshotDocument? previous)
-        => previous == null ? null : TryReadSnapshotPayloadPointer(previous.Data);
-
-    private Task ReclaimDisplacedBlobAsync(Guid runId, string domain, DomainSnapshotDocument? previous)
-    {
-        var displaced = DisplacedPointer(previous);
-        return displaced == null
-            ? Task.CompletedTask
-            : DeleteDisplacedBlobIfUnreferencedAsync(runId, domain, displaced);
-    }
-
-    private void LogDroppedNewerHeader(Guid runId, string domain)
-    {
-        _logger.LogWarning(
-            "Snapshot domain {Domain} for run {RunId} dropped this write because the stored header is newer.",
-            domain.SanitizeForLog(),
-            runId.ToString().SanitizeForLog());
-    }
-
-    private async Task DeleteDisplacedBlobIfUnreferencedAsync(Guid runId, string domain, SnapshotPayloadPointer pointer)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            var filter = Builders<DomainSnapshotDocument>.Filter;
-            var docs = await _snapshots.Find(filter.Eq(d => d.RunId, runId) & filter.Eq(d => d.Domain, domain))
-                .ToListAsync(timeout.Token);
-            var referenced = docs.Any(doc =>
-            {
-                var found = TryReadSnapshotPayloadPointer(doc.Data);
-                return found != null && string.Equals(found.BlobName, pointer.BlobName, StringComparison.Ordinal);
-            });
-            if (referenced)
-                return;
-
-            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, timeout.Token);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Snapshot blob cleanup failed for domain {Domain} run {RunId}.",
-                domain.SanitizeForLog(),
-                runId.ToString().SanitizeForLog());
-        }
-    }
-
-    private async Task DeleteUnusedSnapshotBlobAsync(Guid runId, string domain, SnapshotPayloadPointer pointer)
-    {
-        try
-        {
-            using var timeout = StartCleanupLookupTimeout();
-            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, timeout.Token);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Deleting an unused snapshot blob for domain {Domain} run {RunId} failed.",
-                domain.SanitizeForLog(),
-                runId.ToString().SanitizeForLog());
-        }
-    }
-
-    /// <summary>
-    /// Cleanup after a failed header write keeps going when the caller cancels.
-    /// The timeout is the only bound, so a hung lookup cannot sit forever.
-    /// </summary>
-    private static CancellationTokenSource StartCleanupLookupTimeout()
-        => new(TimeSpan.FromSeconds(15));
-
-    private static bool LosesTo(DomainSnapshotDocument header, ObjectId keepId, DateTimeOffset now)
-        => header.UpdatedAt < now || (header.UpdatedAt == now && header.Id.CompareTo(keepId) < 0);
-
-    /// <summary>
-    /// Deletes slices for <paramref name="revision"/> when no header still
-    /// references it. A failed lookup deletes nothing.
-    /// </summary>
-    private async Task ReclaimUnreferencedRevisionAsync(Guid runId, string domain, string? revision)
-    {
-        if (string.IsNullOrEmpty(revision))
             return;
 
         try
         {
-            using var timeout = StartCleanupLookupTimeout();
-            var headers = await FindHeadersAsync(runId, domain, timeout.Token);
-            if (headers.Any(header => header.ChunkIndex == -1 && header.Revision == revision))
-                return;
+            string? oldJson = previous.Data;
+            if (previous.ChunkIndex == -1 && !string.IsNullOrEmpty(previous.Revision))
+            {
+                var slices = await _snapshots.Find(
+                    Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
+                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
+                    & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, previous.Revision)
+                    & Builders<DomainSnapshotDocument>.Filter.Gte(d => d.ChunkIndex, 0))
+                    .ToListAsync();
+                slices.Sort((a, b) => Nullable.Compare(a.ChunkIndex, b.ChunkIndex));
+                oldJson = string.Concat(slices.Select(slice => slice.Data));
+                await DeleteSlicesQuietlyAsync(runId, domain, previous.Revision);
+            }
 
-            await DeleteSlicesAsync(runId, domain, revision, timeout.Token);
+            var oldPointer = TryReadSnapshotPayloadPointer(oldJson);
+            if (oldPointer != null
+                && (newPointer == null || !string.Equals(oldPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
+            {
+                await DeleteBlobQuietlyAsync(oldPointer);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
-                "Snapshot revision cleanup failed for domain {Domain} run {RunId}.",
+                "Snapshot cleanup failed for domain {Domain} run {RunId}.",
                 domain.SanitizeForLog(),
                 runId.ToString().SanitizeForLog());
         }
     }
 
-    private Task DeleteSlicesAsync(Guid runId, string domain, string revision, CancellationToken ct)
-    {
-        var filter = Builders<DomainSnapshotDocument>.Filter;
-        var slices = filter.Eq(d => d.RunId, runId)
-            & filter.Eq(d => d.Domain, domain)
-            & filter.Gte(d => d.ChunkIndex, 0)
-            & filter.Eq(d => d.Revision, revision);
-        return _snapshots.DeleteManyAsync(slices, ct);
-    }
-
-    private async Task<bool> DropBecauseRunDeletedAsync(Guid runId, string domain, CancellationToken ct)
-    {
-        if (!await IsRunDeletedAsync(runId, ct))
-            return false;
-
-        await DeleteClockQuietlyAsync(runId, domain);
-        return true;
-    }
-
-    private async Task DeleteClockQuietlyAsync(Guid runId, string domain)
+    private async Task DeleteBlobQuietlyAsync(SnapshotPayloadPointer pointer)
     {
         try
         {
-            using var timeout = StartCleanupLookupTimeout();
-            await _writeClocks.DeleteOneAsync(clock => clock.Id == SnapshotClockId(runId, domain), timeout.Token);
+            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer);
         }
-        catch (Exception cleanupEx)
+        catch (Exception ex)
         {
-            _logger.LogWarning(
-                cleanupEx,
-                "Snapshot clock cleanup failed for domain {Domain} run {RunId}.",
-                domain.SanitizeForLog(),
-                runId.ToString().SanitizeForLog());
+            _logger.LogWarning(ex, "Snapshot blob cleanup failed for {Blob}.", pointer.BlobName.SanitizeForLog());
         }
     }
 
@@ -1704,19 +862,35 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     {
         try
         {
-            using var timeout = StartCleanupLookupTimeout();
-            await DeleteSlicesAsync(runId, domain, revision, timeout.Token);
+            var filter = Builders<DomainSnapshotDocument>.Filter;
+            var slices = filter.Eq(d => d.RunId, runId)
+                & filter.Eq(d => d.Domain, domain)
+                & filter.Gte(d => d.ChunkIndex, 0)
+                & filter.Eq(d => d.Revision, revision);
+            await _snapshots.DeleteManyAsync(slices);
         }
-        catch (Exception cleanupEx)
+        catch (Exception ex)
         {
             _logger.LogWarning(
-                cleanupEx,
+                ex,
                 "Snapshot chunk cleanup failed for domain {Domain} run {RunId}.",
                 domain.SanitizeForLog(),
                 runId.ToString().SanitizeForLog());
         }
     }
 
+    private sealed class StoredPayload
+    {
+        public StoredPayload(string payloadText, DateTimeOffset stamp)
+        {
+            PayloadText = payloadText;
+            Stamp = stamp;
+        }
+
+        public string PayloadText { get; }
+
+        public DateTimeOffset Stamp { get; }
+    }
     private static SnapshotPayloadPointer? TryReadSnapshotPayloadPointer(string? payload)
     {
         if (string.IsNullOrWhiteSpace(payload))

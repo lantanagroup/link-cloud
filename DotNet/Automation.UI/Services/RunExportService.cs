@@ -273,19 +273,33 @@ public sealed class RunExportService : IRunExportService
             }
         }
 
-        var entriesSnap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default);
-        var entries = entriesSnap?.Data;
-        if (entries is { Count: > 0 })
+        var entryRollup = (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", default))?.Data;
+        if (entryRollup is { EntryCount: > 0 })
         {
             sb.AppendLine();
-            WriteSubHeader(sb, "Report entry status vs prediction");
-            foreach (var entry in entries)
+            WriteSubHeader(sb, "Report entry status");
+            sb.AppendLine($"  Entries                      : {entryRollup.EntryCount}");
+            foreach (var status in entryRollup.ReportingStatuses)
+                sb.AppendLine($"  reporting {status.Status,-22} {status.Count,8:N0}");
+            foreach (var status in entryRollup.SubmissionStatuses)
+                sb.AppendLine($"  submission {status.Status,-21} {status.Count,8:N0}");
+            sb.AppendLine("  Per-patient rows stay in Report.");
+        }
+        else
+        {
+            var entries = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default))?.Data;
+            if (entries is { Count: > 0 })
             {
-                var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
-                var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
-                sb.AppendLine(
-                    $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
-                    (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
+                sb.AppendLine();
+                WriteSubHeader(sb, "Report entry status vs prediction");
+                foreach (var entry in entries)
+                {
+                    var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
+                    var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
+                    sb.AppendLine(
+                        $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
+                        (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
+                }
             }
         }
 
@@ -830,7 +844,8 @@ public sealed class RunExportService : IRunExportService
             object? data = domain switch
             {
                 "schedule"           => (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, domain, ct))?.Data,
-                "entries"            => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
+                "entries"            => (object?)(await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, domain, ct))?.Data
+                    ?? (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
                 "populations"        => (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, domain, ct))?.Data,
                 "acquisitionSummary" => (await _snapshotStore.GetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, domain, ct))?.Data,
                 "measureResources"   => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, domain, ct))?.Data,

@@ -33,8 +33,6 @@ public sealed class MongoIndexManager
         EnsureRunIndexes();
         EnsureRunInputIndexes();
         EnsureSnapshotIndexes();
-        EnsureSnapshotClockIndexes();
-        EnsureSnapshotHeaderEpochIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
         EnsureGeneratedTemplateCacheVersionIndexes();
@@ -146,20 +144,6 @@ public sealed class MongoIndexManager
 
         // Compound key used for upserts and lookups (RunId + Domain)
         CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: false, "idx_runId_domain");
-    }
-
-    private void EnsureSnapshotClockIndexes()
-    {
-        var collection = _database.GetCollection<BsonDocument>("automation_snapshot_clocks");
-        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 } }, unique: false, "idx_runId");
-    }
-
-    private void EnsureSnapshotHeaderEpochIndexes()
-    {
-        var collection = _database.GetCollection<BsonDocument>("automation_snapshot_header_epochs");
-        // Report switches and run deletion delete these rows by RunId. The id is the
-        // snapshot header id, so RunId is not the primary key.
-        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 } }, unique: false, "idx_runId");
     }
 
     // --- automation_scenarios ---

@@ -1109,18 +1109,11 @@ internal sealed class RunExecutor
             {
                 var logs = new List<string>();
 
-                TimeSpan LookbackNow()
-                {
-                    var started = state.StartedAt ?? state.CreatedAt;
-                    var coverage = LokiEvidenceQuery.CoverageSince(started, DateTimeOffset.UtcNow);
-                    return LokiEvidenceQuery.LookbackForRequest(lookback, coverage);
-                }
-
                 Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
                     lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
-                        LookbackNow(),
+                        lookback,
                         additionalContainsFilters: filters,
                         limit: limit,
                         maxPages: maxPages,

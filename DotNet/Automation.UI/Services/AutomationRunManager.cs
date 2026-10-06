@@ -444,7 +444,10 @@ public class AutomationRunManager : IAutomationRunManager
             var builder = new PipelineSummarySnapshotBuilder(async (scheduleId, fId) =>
             {
                 var schedule = await SafeGetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule", cancellationToken);
-                var entries = await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? [];
+                var entryRollup = await SafeGetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", cancellationToken);
+                var entries = entryRollup == null
+                    ? await SafeGetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", cancellationToken) ?? []
+                    : [];
                 var populationCounts = await ReadPopulationCountsAsync(runId, cancellationToken);
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
                 acquisitionChart = await SafeGetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", cancellationToken);
@@ -458,7 +461,7 @@ public class AutomationRunManager : IAutomationRunManager
                     "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}",
                     runId,
                     schedule != null,
-                    entries.Count,
+                    entryRollup?.EntryCount ?? entries.Count,
                     populationCounts?.ReportTypeCount ?? 0,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
@@ -468,6 +471,7 @@ public class AutomationRunManager : IAutomationRunManager
                 {
                     Schedule = schedule,
                     Entries = entries,
+                    EntryRollup = entryRollup,
                     PopulationCounts = populationCounts,
                     AcquisitionSummary = acquisitionSummary,
                     AcquisitionLogs = acquisitionLogs,
