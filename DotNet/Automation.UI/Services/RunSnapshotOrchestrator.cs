@@ -542,10 +542,28 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
             return;
 
-        TryRemoveExact(_activePollers, runId, current);
-        await current.StopAsync();
-        _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
-        PruneGate(runId);
+        // Completion holds this gate across the final poll. Waiting on it is how
+        // shutdown hung. If it is taken, that caller stops the handle after the
+        // poll. Take it only when it is free, so the scope is not disposed under
+        // the fetch.
+        var gate = Gate(runId);
+        if (!await gate.WaitAsync(0))
+            return;
+
+        try
+        {
+            if (!_activePollers.TryGetValue(runId, out current) || !ReferenceEquals(current, handle))
+                return;
+
+            TryRemoveExact(_activePollers, runId, current);
+            await current.StopAsync();
+            _logger.LogInformation("Stopped poller for run {RunId} during shutdown", runId);
+        }
+        finally
+        {
+            gate.Release();
+            PruneGate(runId);
+        }
     }
 
     private sealed class RunPollerHandle(
