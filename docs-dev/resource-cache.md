@@ -397,9 +397,16 @@ than having its data purged. Telling the two apart in that one shape needs an ex
 | `ResourceCache:BlobStorage:ConnectionString` / `:BlobContainerName` / `:BlobRoot` | ABS container |
 | `ResourceCache:AbsWriter:QueueCapacity` | bounded queue size; a full queue makes writers await |
 | `ResourceCache:AbsWriter:MaxConcurrency` | concurrent blob writes, across distinct keys |
+| `ResourceCache:AbsWriter:MaxCoalescedResources` | ceiling on a hand-off batch merged from several writes to one key |
 | `ResourceCache:AbsWriter:MaxRetryAttempts` | retries before a write is a permanent failure |
 | `ResourceCache:AbsWriter:RetryBaseDelayMilliseconds` | delay before the first retry, doubling on each attempt |
 | `ResourceCache:AbsWriter:DrainTimeoutSeconds` | how long shutdown waits for queued writes to finish |
+
+`MaxCoalescedResources` exists because a batch that has been dequeued no longer occupies a queue
+slot. A worker that finds a key already being written hands its batch to the holder rather than
+waiting, and successive hand-offs merge into one, so without a ceiling that merged batch would grow
+outside what `QueueCapacity` bounds. At the ceiling a worker waits for the key instead, which is the
+behaviour every worker had before hand-off existed.
 
 `DrainTimeoutSeconds` bounds graceful shutdown only. The durability barrier itself has no timeout:
 `WaitForDurableAsync` waits until the key is durable, the write is abandoned as permanently failed,
