@@ -443,7 +443,13 @@ public class RunSnapshotOrchestratorTests
         store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((RunSnapshotMeta?)null);
+            .ReturnsAsync(new RunSnapshotMeta
+            {
+                RunId = runId,
+                FacilityId = "other",
+                ReportId = "other",
+                IsActive = true
+            });
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(new InvocationFunc(_ =>
             {
@@ -484,8 +490,16 @@ public class RunSnapshotOrchestratorTests
         var runId = Guid.NewGuid();
         var writes = 0;
         var metaReads = 0;
+        var runDeleted = 0;
         var insideWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        RunSnapshotMeta? meta = new()
+        {
+            RunId = runId,
+            FacilityId = "other",
+            ReportId = "other",
+            IsActive = true
+        };
 
         var store = new Mock<ISnapshotStore>();
         store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
@@ -498,7 +512,7 @@ public class RunSnapshotOrchestratorTests
             .Returns(() =>
             {
                 Interlocked.Increment(ref metaReads);
-                return Task.FromResult<RunSnapshotMeta?>(null);
+                return Task.FromResult(meta);
             });
         store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
             .Returns(new InvocationFunc(invocation =>
@@ -513,7 +527,12 @@ public class RunSnapshotOrchestratorTests
         var writing = orchestrator.WriteDomainAsync(runId, "generationManifest", "during-cancel", CancellationToken.None);
         await insideWrite.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        var quiescing = orchestrator.QuiesceForDeleteAsync(runId);
+        var quiescing = orchestrator.QuiesceForDeleteAsync(runId, _ =>
+        {
+            meta = null;
+            Interlocked.Increment(ref runDeleted);
+            return Task.CompletedTask;
+        });
         await Task.Delay(200);
         quiescing.IsCompleted.Should().BeFalse("an in-flight domain write holds the run gate");
 
@@ -522,6 +541,7 @@ public class RunSnapshotOrchestratorTests
         await quiescing.WaitAsync(TimeSpan.FromSeconds(10));
 
         writes.Should().Be(1);
+        runDeleted.Should().Be(1);
         PollerCount(orchestrator).Should().Be(0);
         var metaReadsAfterDelete = Volatile.Read(ref metaReads);
 
@@ -530,8 +550,9 @@ public class RunSnapshotOrchestratorTests
         await Task.Delay(300);
 
         writes.Should().Be(1);
-        Volatile.Read(ref metaReads).Should().Be(metaReadsAfterDelete);
+        Volatile.Read(ref metaReads).Should().BeGreaterThan(metaReadsAfterDelete);
         PollerCount(orchestrator).Should().Be(0);
+        GateCount(orchestrator).Should().Be(0);
 
         async Task OnWriteAsync(string domain)
         {
@@ -543,6 +564,14 @@ public class RunSnapshotOrchestratorTests
 
             Interlocked.Increment(ref writes);
         }
+    }
+
+    private static int GateCount(RunSnapshotOrchestrator orchestrator)
+    {
+        var gates = typeof(RunSnapshotOrchestrator)
+            .GetField("_runGates", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(orchestrator)!;
+        return (int)gates.GetType().GetProperty("Count")!.GetValue(gates)!;
     }
 
     private static int PollerCount(RunSnapshotOrchestrator orchestrator)
