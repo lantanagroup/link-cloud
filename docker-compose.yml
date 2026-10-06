@@ -454,6 +454,7 @@ services:
     container_name: link-account
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433; Initial Catalog=link-account;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -483,6 +484,7 @@ services:
     container_name: link-admin-bff
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       Authentication__EnableAnonymousAccess: ${LOCAL_AUTH_ENABLE_ANONYMOUS_ACCESS:-true}
       Authentication__DefaultChallengeScheme: "link_cookie"
       Authentication__Schemas__Oauth2__Enabled: ${LOCAL_AUTH_ENABLE_OAUTH2:-false}
@@ -533,6 +535,7 @@ services:
     container_name: link-audit
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-audit;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -562,6 +565,7 @@ services:
     container_name: link-census
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-census;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -593,6 +597,7 @@ services:
     container_name: link-dataacquisition
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -637,6 +642,7 @@ services:
      container_name: link-dataacquisitionworker
      environment:
        ASPNETCORE_ENVIRONMENT: Docker
+       Telemetry__DeploymentEnvironment: local
        KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -707,6 +713,7 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       Automation__LokiBaseUrl: http://loki:3100
       ServiceRegistry__MockDmrpApiUrl: http://mock-dmrp-api:8080
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
@@ -758,6 +765,7 @@ services:
     container_name: link-measureeval
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      telemetry.deploymentEnvironment: local
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
@@ -794,6 +802,7 @@ services:
     container_name: link-normalization
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -839,6 +848,7 @@ services:
     container_name: link-querydispatch
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-querydispatch;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -871,6 +881,7 @@ services:
     container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       PatientAggregator__IncludeOrganizationResource: ${PATIENT_AGGREGATOR_INCLUDE_ORGANIZATION_RESOURCE:-true}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
@@ -911,6 +922,7 @@ services:
     container_name: link-submission
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-submission;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -952,6 +964,7 @@ services:
     container_name: link-tenant
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
@@ -988,6 +1001,7 @@ services:
     container_name: link-validation
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      telemetry.deploymentEnvironment: local
       # 75% of the container cgroup limit (mem_limit below, or the platform memory
       # limit in deployed environments). Do not set -Xmx here; it would cap production.
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0"
@@ -1027,6 +1041,7 @@ services:
     container_name: mock-fhir-server
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       MockFhirServer__PreGeneratedPatientCount: 10
       MockFhirServer__ResourcesPerPatient: 10
       MockFhirServer__ClinicalPeriodStart: "2026-01-01"
@@ -1054,6 +1069,7 @@ services:
     container_name: mock-dmrp-api
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       MockDmrpApi__Enabled: "true"
       MockDmrpApi__AuthClientId: ${MOCK_DMRP_CLIENT_ID:-link-cloud-dev}
       MockDmrpApi__AuthClientSecret: ${MOCK_DMRP_CLIENT_SECRET:-link-cloud-dev-secret}
@@ -1084,6 +1100,7 @@ services:
     container_name: link-terminology
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Telemetry__DeploymentEnvironment: local
       Terminology__Path: "/data"
       ServiceInformation__Name: Link Terminology
       Serilog__WriteTo__0__Args__uri: http://loki:3100
