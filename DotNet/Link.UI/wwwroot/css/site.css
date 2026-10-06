@@ -1,0 +1,1548 @@
+﻿/* ===================================================================
+   Link.UI / Automation.UI — Design System (--au-* tokens)
+   =================================================================== */
+
+/* --- Tokens --- */
+:root {
+  --au-dark:        #111;
+  --au-dark-soft:   #1a1a1a;
+  --au-accent:      #4da3ff;
+  --au-accent-soft: #e8f3ff;
+  --au-success:     #28a745;
+  --au-danger:      #dc3545;
+  --au-warning:     #ffc107;
+  --au-muted:       #6c757d;
+  --au-bg:          #f3f5f8;
+  --au-text:        #1c2430;
+  --au-border:      #e2e6ec;
+  --au-card-shadow: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
+  --au-radius:      .5rem;
+}
+
+/* --- Base --- */
+html { font-size: 14px; position: relative; min-height: 100%; }
+@media (min-width: 768px) { html { font-size: 15px; } }
+
+body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
+
+/* Nested page containers sit inside _Layout's container-xl â€” drop the extra gutters. */
+.container .container {
+  max-width: 100%;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* --- Focus ring --- */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 .1rem #fff, 0 0 0 .25rem var(--au-accent);
+}
+
+/* --- Footer --- */
+.footer { font-size: .85rem; }
+
+/* ===================================================================
+   Navbar
+   =================================================================== */
+.au-navbar {
+  background: var(--au-dark) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+.au-navbar .navbar-brand,
+.au-navbar .nav-link { color: #fff !important; font-weight: 500; }
+.au-navbar .nav-link:hover { color: var(--au-accent) !important; }
+.au-navbar .nav-link.active,
+.au-navbar .nav-link.active:hover,
+.au-navbar .nav-item.dropdown.show > .nav-link {
+  color: var(--au-accent) !important;
+}
+.au-navbar .nav-link.active {
+  position: relative;
+}
+.au-navbar .nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: .7rem;
+  right: .7rem;
+  bottom: .15rem;
+  height: 2px;
+  background: var(--au-accent);
+  border-radius: 2px;
+}
+.au-navbar .navbar-text { color: rgba(255,255,255,.7); }
+
+.au-navbar .au-nav-admin {
+  margin-left: auto;
+}
+.au-navbar .au-nav-admin-label {
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45) !important;
+  padding-right: .65rem;
+  margin-right: .15rem;
+  border-right: 1px solid rgba(255,255,255,.2);
+  line-height: 1;
+}
+
+.au-navbar .au-nav-dropdown-menu {
+  background: var(--au-dark);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--au-radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  padding: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item {
+  color: #fff;
+  border-radius: .35rem;
+}
+
+.au-navbar .au-nav-dropdown-menu .dropdown-item:hover,
+.au-navbar .au-nav-dropdown-menu .dropdown-item:focus {
+  background: var(--au-dark-soft);
+  color: #fff;
+}
+
+/* ===================================================================
+   Cards â€” the core container
+   =================================================================== */
+.au-card {
+  border: none;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  margin-bottom: 1.25rem;
+  overflow: hidden;          /* so header corners clip */
+  background: #fff;
+}
+.au-card .card-header {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border-bottom: none;
+  padding: .65rem 1rem;
+  font-size: .95rem;
+}
+.au-card .card-body { padding: 1rem; }
+
+/* ===================================================================
+   Buttons â€” colour vocabulary
+   =================================================================== */
+.btn-au-action {
+  background: var(--au-accent); color: #fff; border: none;
+}
+.btn-au-action:hover { background: #3991ee; color: #fff; }
+
+.btn-au-run {
+  background: var(--au-dark); color: #fff; border: none;
+  padding: .5rem 2rem; font-weight: 600;
+}
+.btn-au-run:hover { background: #333; color: #fff; }
+.btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
+
+/* overrides for bootstrap btn-success / danger / warning */
+.btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
+.btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
+.btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
+
+/* ===================================================================
+   Status badges
+   =================================================================== */
+.au-badge-success  { background: var(--au-success) !important; }
+.au-badge-danger   { background: var(--au-danger)  !important; }
+.au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.au-badge-active   { background: var(--au-accent)  !important; }
+.au-badge-muted    { background: var(--au-muted)   !important; }
+.au-badge-skip     { background: #6c757d !important; color: #fff !important; }
+
+/* ===================================================================
+   Tables
+   =================================================================== */
+.au-table {
+  font-size: .875rem;
+}
+.au-table thead th {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+  padding: .55rem .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.au-table tbody td {
+  vertical-align: middle;
+  padding: .5rem .75rem;
+}
+.au-table tbody tr:hover { background: rgba(77,163,255,.06); }
+
+/* Sort header anchors inside .au-table thead th. The default user-agent +
+   Bootstrap link color (blue/purple) clashes with the white header text;
+   inheriting color while keeping the underline and arrow indicator preserves
+   the dark/white theme and still signals the link is clickable. */
+.au-sort-header,
+.au-sort-header:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.au-sort-header:hover,
+.au-sort-header:focus {
+  color: #fff;
+  text-decoration: underline;
+  filter: brightness(1.15); /* subtle affordance without changing the palette */
+}
+
+/* Loading overlay used while the recent-runs table is being refreshed via
+   the partial-view fetch path. Sits over the card body without disturbing
+   layout â€” the card keeps its height so the page doesn't reflow. */
+.au-card-loading {
+  position: relative;
+}
+.au-card-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.65);
+  z-index: 5;
+}
+.au-card-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid #ccc;
+  border-top-color: var(--au-dark, #1f2937);
+  border-radius: 50%;
+  animation: au-card-spin .8s linear infinite;
+  z-index: 6;
+}
+@keyframes au-card-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   Cohort builder
+   =================================================================== */
+.au-cohort-card {
+  border: 1px solid #dee2e6;
+  border-radius: var(--au-radius);
+  background: #fafbfc;
+}
+.au-cohort-card .card-body { padding: .75rem 1rem; }
+
+.au-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.au-cohort-table {
+  min-width: 1080px;
+}
+
+.au-imported-table {
+  min-width: 860px;
+}
+
+.au-cohort-table td .form-control,
+.au-cohort-table td .form-select,
+.au-imported-table td .form-control,
+.au-imported-table td .form-select {
+  max-width: 100%;
+}
+
+/* ===================================================================
+   Scenario header bar (inside the form)
+   =================================================================== */
+.au-scenario-header {
+  background: var(--au-dark);
+  color: #fff;
+  border-radius: var(--au-radius);
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
+}
+.au-modal-panel.au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
+}
+
+/* ===================================================================
+   Details â€” run summary grid
+   =================================================================== */
+.au-metrics-waterfall {
+  height: 1.25rem;
+}
+.au-metrics-waterfall .progress-bar {
+  background: var(--au-accent);
+  font-size: .7rem;
+  overflow: visible;
+}
+
+.au-summary-item {
+  display: flex;
+  flex-direction: column;
+  font-size: .875rem;
+}
+.au-summary-item .au-label {
+  color: var(--au-muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .15rem;
+}
+.au-summary-item .au-value { font-weight: 600; }
+.au-summary-item code { font-size: .82rem; }
+
+/* ===================================================================
+   Live simulation panel (Run Details)
+   =================================================================== */
+.au-live-panel .au-live-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.au-live-panel .au-live-log {
+  max-height: 16rem;
+  overflow: auto;
+  font-size: .8125rem;
+}
+.au-live-panel .au-live-log-time {
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-live-panel .au-live-actions-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .au-live-panel .au-live-actions-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.au-live-panel .au-live-metric-accent {
+  border-left: 3px solid var(--au-accent);
+  padding-left: .6rem;
+}
+.au-live-panel .au-live-pool-wrap {
+  max-height: 22rem;
+  overflow: auto;
+}
+.au-live-panel details > summary {
+  cursor: pointer;
+}
+
+/* ===================================================================
+   Cohort summary table (Details page)
+   =================================================================== */
+.au-cohort-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+.au-cohort-summary-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+  padding: .35rem .6rem;
+  border-bottom: 2px solid #ddd;
+}
+.au-cohort-summary-table td {
+  padding: .3rem .6rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* ===================================================================
+   Stat tiles (data-acq / norm / measure / validation)
+   =================================================================== */
+.au-stat-tile {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .6rem .8rem;
+  background: #fff;
+  text-align: center;
+}
+.au-stat-tile .au-stat-value { font-size: 1.35rem; font-weight: 700; }
+.au-stat-tile .au-stat-label { font-size: .75rem; color: var(--au-muted); }
+
+/* ===================================================================
+   Log console
+   =================================================================== */
+.au-log-console {
+  height: 500px;
+  overflow: auto;
+  background: var(--au-dark);
+  color: #ddd;
+  padding: 12px;
+  font-size: .82rem;
+  border-radius: 0;
+}
+
+/* ===================================================================
+   System-scenario overlay
+   =================================================================== */
+.au-system-overlay {
+  background: rgba(255,255,255,.38);
+  z-index: 5;
+  cursor: not-allowed;
+}
+
+/* ===================================================================
+   Tooltips â€” rely on Bootstrap but ensure dark style
+   =================================================================== */
+
+/* Info-icon tooltips: subtle (?) indicators for contextual help */
+.au-info-icon {
+  color: var(--au-muted);
+  font-size: .8em;
+  cursor: help;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.au-info-icon:hover { opacity: 1; color: var(--au-accent); }
+
+.au-info-toggle {
+  border: 0;
+  background: none;
+  padding: 0 .2rem;
+  margin: 0;
+  color: var(--au-muted);
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  opacity: .75;
+}
+.au-info-toggle:hover,
+.au-info-toggle[aria-expanded="true"] {
+  color: var(--au-accent);
+  opacity: 1;
+}
+.au-info-toggle:focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.au-info-toggle-on-dark {
+  color: rgba(255, 255, 255, .85);
+  opacity: 1;
+}
+.au-info-toggle-on-dark:hover,
+.au-info-toggle-on-dark[aria-expanded="true"] {
+  color: #fff;
+}
+.btn.au-info-toggle {
+  padding: .15rem .4rem;
+  opacity: 1;
+}
+.pc-section-reset { flex-shrink: 0; }
+.au-help-text {
+  font-size: .78rem;
+  line-height: 1.4;
+  color: #3d4753;
+  background: #f3f7fc;
+  border-left: 3px solid var(--au-accent);
+  padding: .45rem .7rem;
+  margin: .35rem 0 .1rem;
+  border-radius: 0 var(--au-radius) var(--au-radius) 0;
+}
+.au-help-text p { margin: 0 0 .4rem; }
+.au-help-text p:last-child,
+.au-help-text ul:last-child { margin-bottom: 0; }
+.au-help-text ul {
+  margin: .2rem 0 0;
+  padding-left: 1.1rem;
+}
+.au-help-text li { margin-bottom: .15rem; }
+.au-help-panel {
+  background: #f7f9fc;
+  border: 1px solid #e3e8ef;
+  border-radius: var(--au-radius);
+  padding: .6rem .85rem;
+  margin-bottom: 1rem;
+}
+.au-help-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #2f3a46;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+.au-help-panel > summary::-webkit-details-marker { display: none; }
+.au-help-panel > summary .bi { color: var(--au-accent); }
+.au-help-panel[open] > summary { margin-bottom: .5rem; }
+.au-help-panel .au-help-body {
+  font-size: .82rem;
+  color: #3d4753;
+  line-height: 1.45;
+}
+.au-help-panel .au-help-body p { margin: 0 0 .5rem; }
+.au-help-panel .au-help-body p:last-child,
+.au-help-panel .au-help-body ul:last-child { margin-bottom: 0; }
+.au-help-panel .au-help-body ul {
+  margin: 0 0 .5rem;
+  padding-left: 1.15rem;
+}
+.au-help-panel .au-help-body li { margin-bottom: .2rem; }
+
+/* ===================================================================
+   Responsive helpers
+   =================================================================== */
+.au-cleanup-section,
+.au-cleanup-phase {
+  padding-bottom: 1.15rem;
+  margin-bottom: 1.15rem;
+  border-bottom: 1px solid #eceff3;
+}
+.au-cleanup-section:last-of-type,
+.au-cleanup-phase-last {
+  border-bottom: none;
+  margin-bottom: .75rem;
+  padding-bottom: .5rem;
+}
+.au-cleanup-page .au-cleanup-activity .card-body {
+  padding: 1.1rem 1.15rem;
+}
+.au-cleanup-reports th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.au-cleanup-activity.is-running .progress-bar {
+  background: var(--au-accent);
+}
+.au-cleanup-activity .progress {
+  height: .55rem;
+}
+
+@media (max-width: 767.98px) {
+  .au-card .card-body { padding: .75rem; }
+  .au-table { font-size: .8rem; }
+  .au-summary-item { font-size: .8rem; }
+  .au-scenario-modal-dialog { max-width: 96vw; }
+}
+
+/* ===================================================================
+   Suggest-from-patient-data wizard
+   =================================================================== */
+.au-cfggen-dialog {
+  width: 100%;
+  max-width: 760px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.au-cfggen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.au-cfggen-kicker {
+  display: block;
+  font-size: .72rem;
+  font-weight: 500;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .7;
+  margin-bottom: .15rem;
+}
+.au-cfggen-title { font-size: 1.05rem; }
+.au-cfggen-sub {
+  font-size: .8rem;
+  font-weight: 400;
+  opacity: .78;
+  margin-top: .2rem;
+}
+.au-cfggen-steps {
+  display: flex;
+  gap: .35rem;
+  padding: .75rem 1rem 0;
+  background: #fff;
+  border-bottom: 1px solid #eef0f3;
+}
+.au-cfggen-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  border: 0;
+  background: transparent;
+  padding: .45rem .35rem .7rem;
+  color: var(--au-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: left;
+}
+.au-cfggen-step-num {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9ecef;
+  color: #555;
+  font-size: .72rem;
+  flex: 0 0 auto;
+}
+.au-cfggen-step.is-active { color: #111; }
+.au-cfggen-step.is-active .au-cfggen-step-num {
+  background: var(--au-accent);
+  color: #fff;
+}
+.au-cfggen-step.is-done { color: #111; }
+.au-cfggen-step.is-done .au-cfggen-step-num {
+  background: var(--au-success);
+  color: #fff;
+}
+.au-cfggen-body {
+  padding: 1.1rem 1.15rem 1.25rem;
+  overflow: auto;
+}
+.au-cfggen-intro {
+  font-size: .92rem;
+  margin-bottom: .9rem;
+}
+.au-cfggen-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 576px) {
+  .au-cfggen-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.au-cfggen-choice {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .85rem .95rem;
+  background: #fff;
+  margin-bottom: .65rem;
+}
+.au-cfggen-choice.is-recommended {
+  border-color: #b8d9ff;
+  background: #f5f9ff;
+}
+.au-cfggen-choice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: flex-start;
+}
+.au-cfggen-choice-actions { margin-top: .7rem; }
+.au-cfggen-op {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: 1px solid #f0f2f4;
+}
+.au-cfggen-op:last-child { border-bottom: 0; }
+.au-cfggen-op-type {
+  display: inline-block;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--au-accent);
+  margin-bottom: .1rem;
+}
+.au-cfggen-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1.15rem;
+  border-top: 1px solid #eef0f3;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+.au-cfggen-loading {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--au-muted);
+}
+.au-cfggen-error {
+  display: none;
+  margin: 0 1.15rem 0;
+}
+.au-cfggen-details {
+  margin-top: .65rem;
+  font-size: .8rem;
+}
+.au-cfggen-details summary {
+  cursor: pointer;
+  color: var(--au-muted);
+}
+.au-cfggen-pre {
+  max-height: 7.5rem;
+  overflow: auto;
+  margin: .4rem 0 0;
+  padding: .55rem .7rem;
+  background: #f7f8fa;
+  border: 1px solid #e9ecef;
+  border-radius: .35rem;
+  font-size: .75rem;
+}
+.au-cfggen-selected {
+  font-size: .8rem;
+  color: var(--au-success);
+  margin-bottom: .75rem;
+}
+
+/* ===================================================================
+   KPI dashboard cards
+   =================================================================== */
+.au-kpi-card {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1rem 1.1rem;
+  text-align: left;
+  border-top: 3px solid var(--au-accent);
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+a.au-kpi-link:hover {
+  border-top-color: #2b86e6;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  color: inherit;
+}
+.au-kpi-value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-kpi-label {
+  font-size: .75rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .25rem;
+}
+.au-kpi-note {
+  font-size: .7rem;
+  color: var(--au-muted);
+  margin-top: .2rem;
+}
+
+.au-service-chip {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .75rem .8rem;
+  height: 100%;
+}
+.au-service-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.au-service-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: .15rem 0;
+}
+.au-service-hint {
+  font-size: .72rem;
+  color: var(--au-muted);
+}
+
+.au-live-gauge-card {
+  background: #f7f8fa;
+  border-radius: var(--au-radius);
+  padding: .85rem .7rem .7rem;
+  height: 100%;
+  border: 1px solid transparent;
+}
+.au-live-gauge-pipeline {
+  background: #fff;
+  border-color: rgba(77,163,255,.28);
+  box-shadow: var(--au-card-shadow);
+}
+.au-live-gauge-name {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--au-muted);
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: .35rem;
+}
+.au-live-gauge-row {
+  display: flex;
+  justify-content: space-around;
+  gap: .4rem;
+}
+.au-gauge {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+}
+.au-gauge-svg {
+  width: 100%;
+  max-width: 108px;
+  height: auto;
+  display: block;
+  margin: 0 auto -0.35rem;
+}
+.au-gauge-track {
+  stroke: #e6e8ee;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.au-gauge-arc {
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .6s ease, stroke .6s ease;
+}
+.au-gauge-readout {
+  font-size: .95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-top: .1rem;
+}
+.au-gauge-unit {
+  font-size: .68rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.au-live-api {
+  font-size: .72rem;
+  color: var(--au-muted);
+  text-align: center;
+  margin-top: .45rem;
+  font-weight: 600;
+}
+
+a.au-scenario-card {
+  display: block;
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1rem 1.1rem;
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+  border: 1px solid transparent;
+}
+a.au-scenario-card:hover {
+  border-color: rgba(77,163,255,.45);
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  color: inherit;
+}
+.au-scenario-card-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.au-scenario-card-metric {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-trend {
+  width: 100%;
+  height: 160px;
+  display: block;
+}
+.au-trend-axis {
+  font-size: 10px;
+  fill: #6b7280;
+  font-family: inherit;
+}
+.au-trend a:hover circle { fill: #2b86e6; }
+.au-sparkline {
+  color: var(--au-accent);
+  flex-shrink: 0;
+}
+
+/* ===================================================================
+   Patient configuration editor
+   =================================================================== */
+.pc-picker {
+  position: relative;
+}
+.pc-picker-toggle {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pc-picker-menu {
+  min-width: 100%;
+  max-width: 100%;
+  position: static !important;
+  transform: none !important;
+}
+.pc-picker-list {
+  max-height: 220px;
+  overflow: auto;
+}
+.pc-picker-item {
+  display: flex;
+  gap: .4rem;
+  align-items: flex-start;
+  padding: .2rem .15rem;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.pc-picker-item:hover {
+  background: #f4f6f8;
+}
+.pc-picker-add {
+  font-size: .82rem;
+}
+.pc-section-badge {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  border-radius: 999px;
+  padding: .15rem .5rem;
+}
+.pc-cohort-only { display: none; }
+.pc-cohort-config-cell {
+  min-width: 240px;
+}
+.pc-cohort-config-cell .form-select {
+  min-width: 150px;
+}
+.au-cohort-table {
+  min-width: 1280px;
+}
+
+/* ===================================================================
+   Page chrome
+   =================================================================== */
+.au-page-head { margin-bottom: 1rem; }
+.au-page-head h2 { letter-spacing: -.015em; }
+.au-page-head p { max-width: 52rem; }
+
+.form-control, .form-select {
+  border-color: var(--au-border);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--au-accent);
+  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
+}
+
+.nav-tabs .nav-link {
+  color: var(--au-muted);
+  font-weight: 600;
+}
+.nav-tabs .nav-link.active {
+  color: var(--au-text);
+  border-color: var(--au-border) var(--au-border) #fff;
+}
+
+.au-empty {
+  text-align: center;
+  padding: 2.4rem 1rem;
+  color: var(--au-muted);
+}
+
+/* ===================================================================
+   Modals â€” shared overlay / panel (replaces repeated inline styles)
+   =================================================================== */
+.au-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  overflow-y: auto;
+  background: rgba(17, 17, 17, .48);
+}
+.au-modal-frame {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.au-modal-panel {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,.3);
+  width: 100%;
+  max-width: 980px;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.au-modal-header {
+  background: var(--au-dark);
+  color: #fff;
+  padding: .75rem 1rem;
+  border-radius: var(--au-radius) var(--au-radius) 0 0;
+  flex-shrink: 0;
+}
+.au-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+/* ===================================================================
+   Data tables â€” search, sort, filter, dense scrolling
+   =================================================================== */
+.au-table-shell,
+.au-card .table-responsive {
+  max-height: min(70vh, 740px);
+  overflow: auto;
+}
+.au-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem .65rem;
+  align-items: center;
+  padding: .7rem .9rem;
+  background: #fafbfc;
+  border-bottom: 1px solid var(--au-border);
+}
+.au-table-toolbar .form-control,
+.au-table-toolbar .form-select {
+  max-width: 16rem;
+}
+.au-table-count {
+  margin-left: auto;
+  font-size: .78rem;
+  color: var(--au-muted);
+  white-space: nowrap;
+}
+.au-table thead th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+.au-table thead th[data-sort]:hover {
+  filter: brightness(1.12);
+}
+.au-table thead th[data-sort]::after {
+  content: ' \2195';
+  font-size: .7em;
+  opacity: .45;
+  font-weight: 400;
+}
+.au-table thead th[data-sort-dir='asc']::after { content: ' \2191'; opacity: 1; }
+.au-table thead th[data-sort-dir='desc']::after { content: ' \2193'; opacity: 1; }
+.au-table tbody tr.au-row-hidden { display: none; }
+@media (max-width: 767.98px) {
+  .au-table td.text-nowrap,
+  .au-table th:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    box-shadow: -8px 0 8px -8px rgba(0,0,0,.18);
+    z-index: 1;
+  }
+  .au-table thead th:last-child { background: #111; }
+}
+
+/* ===================================================================
+   Live service pulse (Performance dashboard)
+   =================================================================== */
+.au-pulse {
+  background: linear-gradient(180deg, #171a20 0%, #111 100%);
+  color: #e8edf4;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  overflow: hidden;
+}
+.au-pulse-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .55rem .9rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.au-pulse-kicker {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.5);
+}
+.au-pulse-title {
+  font-weight: 700;
+  font-size: .95rem;
+  line-height: 1.2;
+}
+.au-pulse-status {
+  font-size: .75rem;
+  color: rgba(255,255,255,.55);
+}
+.au-pulse-hottest {
+  font-size: .78rem;
+  color: #ffd39a;
+  font-weight: 600;
+}
+.au-pulse-hottest.is-idle {
+  color: rgba(255,255,255,.55);
+  font-weight: 500;
+}
+.au-pulse-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+}
+.au-pulse-seg {
+  display: inline-flex;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 999px;
+  padding: .12rem;
+}
+.au-pulse-seg button {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.7);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: .22rem .65rem;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+.au-pulse-seg button.is-on {
+  background: var(--au-accent);
+  color: #fff;
+}
+.au-pulse-seg button:focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 1px;
+}
+.au-pulse-strip {
+  display: flex;
+  gap: .35rem;
+  padding: .7rem .75rem .8rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.au-pulse-cell {
+  flex: 1 0 64px;
+  min-width: 64px;
+  max-width: 110px;
+  scroll-snap-align: start;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: .4rem;
+  padding: .4rem .28rem .35rem;
+  cursor: pointer;
+  text-align: center;
+  color: inherit;
+}
+.au-pulse-cell:hover,
+.au-pulse-cell.is-selected {
+  border-color: var(--au-accent);
+  background: rgba(77,163,255,.14);
+}
+.au-pulse-cell.is-pipeline {
+  border-color: rgba(77,163,255,.28);
+}
+.au-pulse-cell.is-hot {
+  box-shadow: 0 0 0 1px rgba(220,53,69,.5), 0 0 14px rgba(220,53,69,.28);
+  animation: au-pulse-glow 1.8s ease-in-out infinite;
+}
+@keyframes au-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(220,53,69,.4), 0 0 10px rgba(220,53,69,.18); }
+  50% { box-shadow: 0 0 0 1px rgba(255,120,130,.7), 0 0 18px rgba(220,53,69,.4); }
+}
+.au-pulse-meters {
+  display: flex;
+  justify-content: center;
+  gap: .22rem;
+  height: 52px;
+  align-items: flex-end;
+  margin-bottom: .28rem;
+}
+.au-pulse-bar {
+  width: 9px;
+  height: 100%;
+  background: rgba(255,255,255,.08);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+.au-pulse-bar > i {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: var(--h, 0%);
+  background: var(--c, var(--au-success));
+  border-radius: 99px;
+  transition: height .45s ease, background .45s ease;
+}
+.au-pulse-label {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.au-pulse-read {
+  font-size: .62rem;
+  color: rgba(255,255,255,.45);
+  font-variant-numeric: tabular-nums;
+}
+.au-pulse-read span {
+  color: rgba(255,255,255,.32);
+  font-weight: 700;
+  margin-right: .15rem;
+}
+.au-pulse-detail {
+  background: #fff;
+  color: var(--au-text);
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: .85rem 1rem 1rem;
+}
+.au-pulse-detail-empty {
+  font-size: .82rem;
+  color: var(--au-muted);
+  margin: 0;
+}
+.au-pulse-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: .9rem 1.25rem;
+  align-items: center;
+}
+@media (max-width: 767.98px) {
+  .au-pulse-detail-grid { grid-template-columns: 1fr; }
+}
+.au-pulse-h-meter {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 4.2rem;
+  gap: .45rem;
+  align-items: center;
+  margin-bottom: .4rem;
+  font-size: .78rem;
+}
+.au-pulse-h-meter .au-pulse-h-track {
+  height: 8px;
+  background: #e8eaef;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.au-pulse-h-meter .au-pulse-h-fill {
+  height: 100%;
+  width: var(--h, 0%);
+  background: var(--c, var(--au-success));
+  border-radius: 99px;
+  transition: width .45s ease, background .45s ease;
+}
+.au-pulse-spark {
+  color: var(--au-accent);
+  width: 100%;
+  height: 36px;
+}
+.au-pulse-expanded {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: .55rem;
+  padding: .75rem;
+  background: #f7f8fa;
+}
+.au-pulse-mini {
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  padding: .55rem .65rem .5rem;
+  cursor: pointer;
+  text-align: left;
+}
+.au-pulse-mini:hover,
+.au-pulse-mini.is-selected { border-color: var(--au-accent); }
+.au-pulse-mini.is-hot { border-color: var(--au-danger); }
+.au-pulse-mini-name {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--au-muted);
+  margin-bottom: .35rem;
+}
+
+/* ===================================================================
+   Patient configuration â€” shape strip + intent chips
+   =================================================================== */
+.pc-shape {
+  background: linear-gradient(180deg, #f7fbff 0%, #fff 100%);
+  border: 1px solid #d7e6f7;
+  border-radius: var(--au-radius);
+  padding: .75rem .9rem;
+  margin: 1rem 0 .75rem;
+}
+.pc-shape-top {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.pc-shape-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+.pc-fact {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: 999px;
+  padding: .18rem .55rem;
+  font-size: .75rem;
+  font-weight: 600;
+}
+.pc-fact .au-muted, .pc-fact-k {
+  color: var(--au-muted);
+  font-weight: 600;
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.pc-intents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: .65rem;
+}
+.pc-intent-chip {
+  border: 1px solid #c9daf0;
+  background: #fff;
+  color: #234;
+  font-size: .75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: .28rem .7rem;
+  line-height: 1.2;
+}
+.pc-intent-chip:hover:not(:disabled) {
+  border-color: var(--au-accent);
+  color: #0b5cab;
+  background: var(--au-accent-soft);
+}
+.pc-intent-chip.is-on {
+  background: var(--au-accent);
+  border-color: var(--au-accent);
+  color: #fff;
+}
+.pc-intent-chip:disabled { opacity: .55; cursor: not-allowed; }
+.pc-intent-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+  margin-right: .15rem;
+  align-self: center;
+}
+
+/* ===================================================================
+   API Health accordion (shared with page-level styles)
+   =================================================================== */
+.au-health-accordion {
+  border: none;
+  border-radius: var(--au-radius);
+  overflow: hidden;
+  box-shadow: var(--au-card-shadow);
+}
+.au-health-header { background: #fff; padding: 0; }
+.au-health-toggle {
+  background: #fff !important;
+  color: #111 !important;
+  font-weight: 600;
+  border: none;
+  box-shadow: none !important;
+  padding: .65rem 1rem;
+}
+.au-health-toggle:not(.collapsed) { background: #fff !important; color: #111 !important; }
+.au-health-table { font-size: .875rem; }
+.au-health-table thead th {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+  padding: .45rem .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.au-health-table tbody td { vertical-align: middle; padding: .45rem .75rem; }
+.au-health-table tbody tr:hover { background: rgba(77,163,255,.06); }
+
+/* ===================================================================
+   Accordion polish (patient config + elsewhere)
+   =================================================================== */
+.accordion-item {
+  border-color: var(--au-border);
+}
+.accordion-button:not(.collapsed) {
+  background: var(--au-accent-soft);
+  color: var(--au-text);
+  box-shadow: none;
+}
+.accordion-button:focus {
+  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
+}
+/* ===================================================================
+   Link.UI â€” left-hand vertical shell (phase 1)
+   Keeps Automation.UI --au-* tokens; adds sidebar layout.
+   =================================================================== */
+.lu-body {
+  margin: 0;
+  margin-bottom: 0;
+  min-height: 100vh;
+  background: var(--au-bg);
+  color: var(--au-text);
+}
+
+.lu-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.lu-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--au-dark);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 1030;
+  box-shadow: 2px 0 8px rgba(0,0,0,.2);
+}
+
+.lu-brand {
+  padding: 1rem 1rem .75rem;
+  border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.lu-brand-link {
+  color: #fff !important;
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 1.1rem;
+}
+
+.lu-brand-link:hover { color: var(--au-accent) !important; }
+
+.lu-nav {
+  display: flex;
+  flex-direction: column;
+  padding: .75rem .6rem;
+  gap: .15rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.lu-nav-section-label {
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+  padding: .35rem .65rem .2rem;
+}
+
+.lu-nav-link {
+  display: flex;
+  align-items: center;
+  color: rgba(255,255,255,.88) !important;
+  text-decoration: none;
+  border-radius: .4rem;
+  padding: .55rem .7rem;
+  font-weight: 500;
+}
+
+.lu-nav-link:hover {
+  background: var(--au-dark-soft);
+  color: #fff !important;
+}
+
+.lu-nav-link.active {
+  background: rgba(77,163,255,.18);
+  color: var(--au-accent) !important;
+}
+
+.lu-nav-link-muted {
+  color: rgba(255,255,255,.55) !important;
+}
+
+.lu-sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,.12);
+  padding: .6rem;
+}
+
+.lu-user-chip {
+  font-size: .8rem;
+  color: rgba(255,255,255,.65);
+  padding: .25rem .7rem .45rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lu-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lu-topbar {
+  padding: 1rem 1.25rem .25rem;
+}
+
+.lu-page-title {
+  font-size: 1.35rem;
+  font-weight: 650;
+  margin: 0;
+}
+
+.lu-content {
+  padding: .5rem 1.25rem 1.5rem;
+  flex: 1;
+}
+
+.lu-footer {
+  padding: .75rem 1.25rem 1.25rem;
+  font-size: .85rem;
+}
+
+@media (max-width: 767.98px) {
+  .lu-shell { flex-direction: column; }
+  .lu-sidebar {
+    width: 100%;
+    height: auto;
+    position: relative;
+  }
+  .lu-nav { flex-direction: row; flex-wrap: wrap; }
+  .lu-nav-section-label { width: 100%; }
+}
+

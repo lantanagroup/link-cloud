@@ -1,0 +1,53 @@
+﻿@model Link.UI.Models.TenantListViewModel
+@{
+    ViewData["Title"] = "Tenants";
+}
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Tenants</span>
+        <span class="badge text-bg-secondary">read-only</span>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-6">
+                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-au-action">Search</button>
+            </div>
+        </form>
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-warning">@Model.ErrorMessage</div>
+        }
+        else if (Model.LoadedSuccessfully && Model.Tenants.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No tenants found.</div>
+        }
+        else if (Model.LoadedSuccessfully)
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Facility Id</th>
+                            <th>Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var tenant in Model.Tenants)
+                    {
+                        <tr>
+                            <td><code>@tenant.FacilityId</code></td>
+                            <td>@tenant.DisplayName</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small mt-2 mb-0">@Model.Tenants.Count tenant(s) loaded via LinkSDK.</p>
+        }
+    </div>
+</div>
