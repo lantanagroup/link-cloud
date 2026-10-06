@@ -348,7 +348,12 @@ public class PipelineDataReader
             // look like the last page of a list the caller already started.
             cancellationToken.ThrowIfCancellationRequested();
             var page = response.Body;
-            var records = page?.Records ?? [];
+            // A failed or bodyless page is not the end of the list. Returning the
+            // pages already read would replace the stored chart with a partial one.
+            if (!response.IsSuccessStatusCode || page == null)
+                throw new HttpRequestException($"Acquisition log search returned HTTP {response.StatusCode} without a page.");
+
+            var records = page.Records ?? [];
             if (records.Count == 0)
                 break;
 
@@ -398,6 +403,15 @@ public class PipelineDataReader
         foreach (var id in failureIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var cacheKey = $"acqNotes:{id}";
+            if (_cache.TryGetValue(cacheKey, out var cached)
+                && DateTime.UtcNow < cached.ExpiresAt
+                && cached.Value is List<string> cachedNotes)
+            {
+                notesById[id] = cachedNotes;
+                continue;
+            }
+
             try
             {
                 var response = await _dataAcqClient.GetAcquisitionLogNotesAsync(id, cancellationToken);
@@ -407,6 +421,7 @@ public class PipelineDataReader
                     continue;
 
                 notesById[id] = response.Body;
+                _cache[cacheKey] = (response.Body, DateTime.UtcNow.Add(CacheTtl));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

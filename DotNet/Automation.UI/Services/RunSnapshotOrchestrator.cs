@@ -568,8 +568,9 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             if (!_activePollers.TryGetValue(runId, out var current) || !ReferenceEquals(current, handle))
                 return;
 
-            // A finalizing handle is only marked while completion holds this gate,
-            // so a failed detach means another shutdown pass already claimed it.
+            // TryDetach fails when completion already marked this handle finalizing,
+            // or when another pass detached it. Completion stops that handle
+            // before it releases this gate, so this pass leaves it alone.
             if (!current.TryDetach())
                 return;
 
