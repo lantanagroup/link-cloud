@@ -68,7 +68,36 @@ namespace UnitTests.Shared.ResourceCache
             Assert.Equal(1d, failure.Value);
         }
 
-        private sealed record Measurement(string Instrument, double Value, Dictionary<string, string?> Tags);
+        // The same literals MeasureEvalMetricsTest pins on the Java side. Prometheus serves one HELP per
+        // metric name, so a description that differs between runtimes makes the collector's exporter drop
+        // one runtime's series on every scrape -- which one changes from scrape to scrape.
+        [Theory]
+        [InlineData(DiagnosticNames.ResourceCacheReadDuration,
+                    "ms",
+                    "Duration of a resource cache read, tagged by where the resources came from")]
+        [InlineData(DiagnosticNames.ResourceCacheDurableCountReadFailureCount,
+                    null,
+                    "Reads that trusted the cache entry because its recorded durable count did not parse")]
+        public void Instruments_shared_with_MeasureEval_carry_its_description_and_unit(string instrument,
+                                                                                       string? unit,
+                                                                                       string description)
+        {
+            using var recorder = new Recorder();
+            var metrics = new ResourceCacheMetrics(recorder.Factory, NormalizationLike);
+
+            metrics.RecordRead(ResourceCacheOutcomes.Hit, fallbackReason: null, 12.5);
+            metrics.IncrementDurableCountReadFailure();
+
+            var recorded = Assert.Single(recorder.Measurements, m => m.Instrument == instrument);
+            Assert.Equal(description, recorded.Description);
+            Assert.Equal(unit, recorded.Unit);
+        }
+
+        private sealed record Measurement(string Instrument,
+                                          string? Description,
+                                          string? Unit,
+                                          double Value,
+                                          Dictionary<string, string?> Tags);
 
         /// <summary>
         /// Listens to the meter the host subscribes to and flattens every measurement, whatever its
@@ -115,7 +144,11 @@ namespace UnitTests.Shared.ResourceCache
                     flattened[tag.Key] = tag.Value?.ToString();
                 }
 
-                Measurements.Add(new Measurement(instrument.Name, value, flattened));
+                Measurements.Add(new Measurement(instrument.Name,
+                                                 instrument.Description,
+                                                 instrument.Unit,
+                                                 value,
+                                                 flattened));
             }
         }
 

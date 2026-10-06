@@ -110,6 +110,30 @@ class MeasureEvalMetricsTest {
         assertTrue(point.getAttributes().isEmpty(), "an unphased failure carries no tags");
     }
 
+    // The same literals ResourceCacheMetricsTests pins on the .NET side. Prometheus serves one HELP per
+    // metric name, so a description that differs between runtimes makes the collector's exporter drop
+    // one runtime's series on every scrape -- which one changes from scrape to scrape.
+
+    @Test
+    void recordResourceCacheRead_sharedInstrument_carriesTheDotNetDescriptionAndUnit() {
+        metrics.recordResourceCacheRead("hit", null, "Initial", 12.5);
+
+        MetricData metric = exported(MeasureEvalMetrics.RESOURCE_CACHE_READ_DURATION);
+        assertEquals("Duration of a resource cache read, tagged by where the resources came from",
+                metric.getDescription());
+        assertEquals("ms", metric.getUnit());
+    }
+
+    @Test
+    void incrementDurableCountReadFailure_sharedInstrument_carriesTheDotNetDescriptionAndUnit() {
+        metrics.incrementDurableCountReadFailure(null);
+
+        MetricData metric = exported(MeasureEvalMetrics.DURABLE_COUNT_READ_FAILURE_COUNT);
+        assertEquals("Reads that trusted the cache entry because its recorded durable count did not parse",
+                metric.getDescription());
+        assertEquals("", metric.getUnit());
+    }
+
     private Attributes singleReadAttributes() {
         MetricData metric = exported(MeasureEvalMetrics.RESOURCE_CACHE_READ_DURATION);
         var points = metric.getHistogramData().getPoints();
