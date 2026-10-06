@@ -545,11 +545,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         catch
         {
             if (newPointer != null)
-                await DeleteBlobQuietlyAsync(newPointer);
+                await DeleteBlobQuietlyAsync(newPointer, ct);
             throw;
         }
 
-        await DeleteReplacedPayloadAsync(runId, domain, previous, newPointer);
+        await DeleteReplacedPayloadAsync(runId, domain, previous, newPointer, ct);
     }
 
     public async Task<DomainSnapshot<T>?> GetDomainAsync<T>(Guid runId, string domain, CancellationToken ct = default)
@@ -579,7 +579,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var data = JsonSerializer.Deserialize<T>(payloadJson);
             if (data == null)
             {
-                _logger.LogDebug("[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})", runId, domain, payloadJson.Length);
+                _logger.LogDebug(
+                    "[Store] GetDomain: deserialized to null for run={RunId} domain={Domain} (json length={Len})",
+                    runId.ToString().SanitizeForLog(),
+                    domain.SanitizeForLog(),
+                    payloadJson.Length);
                 return null;
             }
 
@@ -589,7 +593,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         {
             // A legacy row can be a different shape than the type this caller asked for.
             // The caller falls back. Debug keeps that probe off the warning stream.
-            _logger.LogDebug(ex, "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})", runId, domain, typeof(T).Name, payload?.PayloadText.Length ?? 0);
+            _logger.LogDebug(
+                ex,
+                "[Store] GetDomain: deserialization failed for run={RunId} domain={Domain} type={Type} (json length={Len})",
+                runId.ToString().SanitizeForLog(),
+                domain.SanitizeForLog(),
+                typeof(T).Name,
+                payload?.PayloadText.Length ?? 0);
             return null;
         }
     }
@@ -655,7 +665,10 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             var docs = await _snapshots.Find(filter).ToListAsync(ct);
             if (docs.Count == 0)
             {
-                _logger.LogDebug("[Store] GetDomain: no document for run={RunId} domain={Domain}", runId, domain);
+                _logger.LogDebug(
+                    "[Store] GetDomain: no document for run={RunId} domain={Domain}",
+                    runId.ToString().SanitizeForLog(),
+                    domain.SanitizeForLog());
                 return null;
             }
 
@@ -682,7 +695,11 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
                     _logger.LogWarning(
                         "[Store] GetDomain: incomplete chunks for run={RunId} domain={Domain} revision={Revision} expected={Expected} found={Found}",
-                        runId, domain, chosen.Revision, chosen.ChunkCount, chunks.Count);
+                        runId.ToString().SanitizeForLog(),
+                        domain.SanitizeForLog(),
+                        chosen.Revision.SanitizeForLog(),
+                        chosen.ChunkCount,
+                        chunks.Count);
                     return null;
                 }
 
@@ -764,7 +781,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch
         {
-            await DeleteSlicesQuietlyAsync(runId, domain, revision);
+            await DeleteSlicesQuietlyAsync(runId, domain, revision, ct);
             throw;
         }
 
@@ -791,7 +808,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch
         {
-            await DeleteSlicesQuietlyAsync(runId, domain, revision);
+            await DeleteSlicesQuietlyAsync(runId, domain, revision, ct);
             throw;
         }
     }
@@ -808,7 +825,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         Guid runId,
         string domain,
         DomainSnapshotDocument? previous,
-        SnapshotPayloadPointer? newPointer)
+        SnapshotPayloadPointer? newPointer,
+        CancellationToken ct)
     {
         if (previous == null)
             return;
@@ -818,22 +836,23 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             string? oldJson = previous.Data;
             if (previous.ChunkIndex == -1 && !string.IsNullOrEmpty(previous.Revision))
             {
+                using var bound = BoundCleanup(ct);
                 var slices = await _snapshots.Find(
                     Builders<DomainSnapshotDocument>.Filter.Eq(d => d.RunId, runId)
                     & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Domain, domain)
                     & Builders<DomainSnapshotDocument>.Filter.Eq(d => d.Revision, previous.Revision)
                     & Builders<DomainSnapshotDocument>.Filter.Gte(d => d.ChunkIndex, 0))
-                    .ToListAsync();
+                    .ToListAsync(bound.Token);
                 slices.Sort((a, b) => Nullable.Compare(a.ChunkIndex, b.ChunkIndex));
                 oldJson = string.Concat(slices.Select(slice => slice.Data));
-                await DeleteSlicesQuietlyAsync(runId, domain, previous.Revision);
+                await DeleteSlicesQuietlyAsync(runId, domain, previous.Revision, ct);
             }
 
             var oldPointer = TryReadSnapshotPayloadPointer(oldJson);
             if (oldPointer != null
                 && (newPointer == null || !string.Equals(oldPointer.BlobName, newPointer.BlobName, StringComparison.Ordinal)))
             {
-                await DeleteBlobQuietlyAsync(oldPointer);
+                await DeleteBlobQuietlyAsync(oldPointer, ct);
             }
         }
         catch (Exception ex)
@@ -846,11 +865,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
     }
 
-    private async Task DeleteBlobQuietlyAsync(SnapshotPayloadPointer pointer)
+    private async Task DeleteBlobQuietlyAsync(SnapshotPayloadPointer pointer, CancellationToken ct)
     {
         try
         {
-            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer);
+            using var bound = BoundCleanup(ct);
+            await _snapshotPayloadStore.DeleteIfExistsAsync(pointer, bound.Token);
         }
         catch (Exception ex)
         {
@@ -858,7 +878,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
     }
 
-    private async Task DeleteSlicesQuietlyAsync(Guid runId, string domain, string revision)
+    private async Task DeleteSlicesQuietlyAsync(Guid runId, string domain, string revision, CancellationToken ct)
     {
         try
         {
@@ -867,7 +887,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 & filter.Eq(d => d.Domain, domain)
                 & filter.Gte(d => d.ChunkIndex, 0)
                 & filter.Eq(d => d.Revision, revision);
-            await _snapshots.DeleteManyAsync(slices);
+            using var bound = BoundCleanup(ct);
+            await _snapshots.DeleteManyAsync(slices, bound.Token);
         }
         catch (Exception ex)
         {
@@ -877,6 +898,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 domain.SanitizeForLog(),
                 runId.ToString().SanitizeForLog());
         }
+    }
+
+    private static CancellationTokenSource BoundCleanup(CancellationToken ct)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        source.CancelAfter(TimeSpan.FromSeconds(15));
+        return source;
     }
 
     private sealed class StoredPayload

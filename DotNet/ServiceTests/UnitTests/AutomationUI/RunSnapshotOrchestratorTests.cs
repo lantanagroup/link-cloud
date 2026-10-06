@@ -397,6 +397,38 @@ public class RunSnapshotOrchestratorTests
         PollerCount(orchestrator).Should().Be(0);
     }
 
+    [Fact]
+    public async Task StopAllPollersAsync_disposes_pollers_when_the_host_token_is_already_cancelled()
+    {
+        var runId = Guid.NewGuid();
+        var disposed = 0;
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RunSnapshotMeta?)null);
+
+        var scope = new Mock<IServiceScope>();
+        scope.Setup(s => s.Dispose()).Callback(() => Interlocked.Increment(ref disposed));
+        var orchestrator = CreateOrchestrator(store, scope);
+        await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var stopAll = typeof(RunSnapshotOrchestrator).GetMethod(
+            "StopAllPollersAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var stopping = (Task)stopAll.Invoke(orchestrator, new object[] { cancelled.Token })!;
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10));
+
+        disposed.Should().Be(1);
+        PollerCount(orchestrator).Should().Be(0);
+    }
+
     private static int PollerCount(RunSnapshotOrchestrator orchestrator)
     {
         var pollers = typeof(RunSnapshotOrchestrator)
