@@ -344,6 +344,9 @@ public class PipelineDataReader
                 pageSize: pageSize,
                 pageNumber: pageNumber,
                 cancellationToken: cancellationToken);
+            // A cancelled call can come back as a bodyless response. That must not
+            // look like the last page of a list the caller already started.
+            cancellationToken.ThrowIfCancellationRequested();
             var page = response.Body;
             var records = page?.Records ?? [];
             if (records.Count == 0)
@@ -398,6 +401,8 @@ public class PipelineDataReader
             try
             {
                 var response = await _dataAcqClient.GetAcquisitionLogNotesAsync(id, cancellationToken);
+                // A cancelled call can come back as a bodyless response instead of throwing.
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!response.IsSuccessStatusCode || response.Body == null)
                     continue;
 

@@ -58,6 +58,58 @@ public class PipelineDataReaderCancellationTests
     }
 
     [Fact]
+    public async Task GetAcquisitionLogsAsync_does_not_return_earlier_pages_when_a_later_page_is_cancelled()
+    {
+        var calls = 0;
+        using var cts = new CancellationTokenSource();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.SearchAcquisitionLogsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    var records = Enumerable.Range(0, 100)
+                        .Select(index => new DataAcquisitionLogApiModel { Id = index })
+                        .ToList();
+                    return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                    {
+                        StatusCode = 200,
+                        Body = new PagedConfigModel<DataAcquisitionLogApiModel>(
+                            records,
+                            new PaginationMetadata(100, 1, 200))
+                    });
+                }
+
+                cts.Cancel();
+                return Task.FromResult(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
+                {
+                    StatusCode = 0
+                });
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+
+        var act = () => reader.GetAcquisitionLogsAsync("facility", "report", cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        calls.Should().Be(2);
+    }
+
+    [Fact]
     public async Task GetDataAcquisitionReportSummaryAsync_does_not_cache_a_result_after_cancellation()
     {
         var calls = 0;
@@ -211,6 +263,37 @@ public class PipelineDataReaderCancellationTests
             {
                 cts.Cancel();
                 return Task.FromException<LinkApiResponse<List<string>>>(new OperationCanceledException(token));
+            });
+
+        var reader = new PipelineDataReader(
+            Mock.Of<IReportServiceClient>(),
+            dataAcq.Object,
+            Mock.Of<INormalizationServiceClient>(),
+            Mock.Of<IFacilityServiceClient>());
+        var logs = new List<PipelineDataReader.AcquisitionLogInfo>
+        {
+            new(1, null, null, null, "Failed", null, [], [], [])
+        };
+
+        var act = () => reader.AttachFailureNotesAsync(logs, [1], cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task AttachFailureNotesAsync_stops_when_a_cancelled_lookup_returns_no_body()
+    {
+        using var cts = new CancellationTokenSource();
+        var dataAcq = new Mock<IDataAcquisitionServiceClient>();
+        dataAcq
+            .Setup(client => client.GetAcquisitionLogNotesAsync(1, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                cts.Cancel();
+                return Task.FromResult(new LinkApiResponse<List<string>>
+                {
+                    StatusCode = 0
+                });
             });
 
         var reader = new PipelineDataReader(

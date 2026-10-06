@@ -19,8 +19,15 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly ConcurrentDictionary<Guid, RunPollerHandle> _activePollers = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _runGates = new();
     private readonly ConcurrentDictionary<Guid, Task> _completions = new();
+    private int _shuttingDown;
 
     private readonly IAutomationUiMetrics? _metrics;
+
+    /// <summary>
+    /// Test seam. Runs after shutdown starts and before it blocks new pollers,
+    /// so a report switch can still replace the handle shutdown has already seen.
+    /// </summary>
+    internal Func<Task>? AfterShutdownSnapshot;
 
     public RunSnapshotOrchestrator(
         ISnapshotStore store,
@@ -90,7 +97,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         try
         {
             if (!_activePollers.ContainsKey(runId))
-                StartPoller(meta, CancellationToken.None);
+                await StartPollerAsync(meta, CancellationToken.None);
         }
         finally
         {
@@ -183,9 +190,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             IsActive = true,
             IsMetricsRun = isMetricsRun
         };
-        StartPoller(meta, ct);
-
-        _logger.LogInformation("Updated run {RunId} to track new report {ReportId} and started new poller", runId, reportId);
+        if (await StartPollerAsync(meta, ct))
+            _logger.LogInformation("Updated run {RunId} to track new report {ReportId} and started new poller", runId, reportId);
     }
 
     /// <summary>
@@ -373,7 +379,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                         continue;
                     }
 
-                    StartPoller(meta, ct);
+                    await StartPollerAsync(meta, ct);
                 }
             }
             finally
@@ -423,8 +429,11 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         where T : class
         => pollers.TryRemove(new KeyValuePair<Guid, T>(runId, expected));
 
-    private void StartPoller(RunSnapshotMeta meta, CancellationToken ct)
+    private async Task<bool> StartPollerAsync(RunSnapshotMeta meta, CancellationToken ct)
     {
+        if (Volatile.Read(ref _shuttingDown) != 0)
+            return false;
+
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
         // Build a scoped service provider for the poller's API clients
@@ -435,15 +444,25 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         var task = poller.RunAsync(cts.Token);
         var handle = new RunPollerHandle(cts, task, scope, poller);
 
-        if (_activePollers.TryAdd(meta.RunId, handle))
-        {
-            _logger.LogInformation("Started poller for run {RunId} (facility={FacilityId})", meta.RunId, meta.FacilityId);
-        }
-        else
+        if (!_activePollers.TryAdd(meta.RunId, handle))
         {
             cts.Cancel();
-            _ = DisposeUnregisteredPollerAsync(task, cts, scope);
+            await DisposeUnregisteredPollerAsync(task, cts, scope);
+            return false;
         }
+
+        // Shutdown can begin after the check above. Stop this handle before
+        // the caller releases the run gate, so the sweep cannot miss it.
+        if (Volatile.Read(ref _shuttingDown) != 0 && handle.TryDetach())
+        {
+            TryRemoveExact(_activePollers, meta.RunId, handle);
+            await handle.StopAsync();
+            _logger.LogInformation("Stopped poller for run {RunId} because shutdown started", meta.RunId);
+            return false;
+        }
+
+        _logger.LogInformation("Started poller for run {RunId} (facility={FacilityId})", meta.RunId, meta.FacilityId);
+        return true;
     }
 
     private async Task DisposeUnregisteredPollerAsync(Task task, CancellationTokenSource cts, IServiceScope scope)
@@ -489,14 +508,55 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
 
     private async Task StopAllPollersAsync()
     {
-        // Completion holds this run's gate across the final poll, and that poll
-        // still uses the handle's scoped clients. Wait for the gate, then detach
-        // and remove this exact handle before stopping it.
-        var stops = new List<Task>();
-        foreach (var (runId, handle) in _activePollers.ToArray())
-            stops.Add(StopPollerForShutdownAsync(runId, handle));
+        // A report switch removes the old handle before it adds the replacement.
+        // Pause here so that switch can land, then refuse any later registration
+        // and stop whatever handle is current. The stop takes the run gate, so
+        // it cannot dispose a scope a final poll is still using.
+        if (AfterShutdownSnapshot != null)
+            await AfterShutdownSnapshot();
 
-        await Task.WhenAll(stops);
+        Volatile.Write(ref _shuttingDown, 1);
+        await WaitForInProgressRunsAsync();
+
+        while (true)
+        {
+            var pending = _activePollers.ToArray();
+            if (pending.Length == 0)
+                return;
+
+            await Task.WhenAll(pending.Select(pair => StopPollerForShutdownAsync(pair.Key, pair.Value)));
+
+            var stillThere = pending.Any(pair =>
+                _activePollers.TryGetValue(pair.Key, out var current) && ReferenceEquals(current, pair.Value));
+            if (!stillThere)
+                continue;
+
+            return;
+        }
+    }
+
+    private async Task WaitForInProgressRunsAsync()
+    {
+        var seen = new HashSet<Guid>();
+        while (true)
+        {
+            var pending = new List<Guid>();
+            foreach (var runId in _runGates.Keys)
+            {
+                if (seen.Add(runId))
+                    pending.Add(runId);
+            }
+
+            if (pending.Count == 0)
+                return;
+
+            foreach (var runId in pending)
+            {
+                var gate = Gate(runId);
+                await gate.WaitAsync();
+                gate.Release();
+            }
+        }
     }
 
     private async Task StopPollerForShutdownAsync(Guid runId, RunPollerHandle handle)
