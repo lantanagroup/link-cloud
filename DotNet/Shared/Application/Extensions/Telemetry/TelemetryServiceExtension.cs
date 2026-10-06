@@ -46,6 +46,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     options.Environment = initTelemetryOptions.Environment;
                     options.ServiceName = initTelemetryOptions.ServiceName;
                     options.ServiceVersion = initTelemetryOptions.ServiceVersion;
+                    options.DeploymentEnvironment = telemetryConfig.DeploymentEnvironment;
                     options.EnableTracing = telemetryConfig.EnableTracing;
                     options.EnableMetrics = telemetryConfig.EnableMetrics;
                     options.MeterName = $"Link.{initTelemetryOptions.ServiceName}";
@@ -81,12 +82,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
 
             var otel = services.AddOpenTelemetry();
 
-            //configure OpenTelemetry resources with application name
-            otel.ConfigureResource(resource => resource
-                .AddService(
-                    serviceName: telemetryServiceOptions.ServiceName,
-                    serviceVersion: telemetryServiceOptions.ServiceVersion
-                ));
+            otel.ConfigureResource(resource => ConfigureLinkResource(resource, telemetryServiceOptions));
 
             //Add Tracing if enabled
             if (telemetryServiceOptions.EnableTracing)
@@ -197,6 +193,24 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     Boundaries = LinkDurationHistogramBuckets.Milliseconds
                 });
             }
+        }
+
+        /// <summary>
+        /// Names the service, and its environment when one is configured, on everything the process exports.
+        /// </summary>
+        public static ResourceBuilder ConfigureLinkResource(ResourceBuilder resource, TelemetryServiceOptions options)
+        {
+            resource.AddService(serviceName: options.ServiceName, serviceVersion: options.ServiceVersion);
+
+            if (string.IsNullOrWhiteSpace(options.DeploymentEnvironment))
+            {
+                return resource;
+            }
+
+            // The test environments share one Prometheus, and nothing else on a series says which one it came from.
+            return resource.AddAttributes(
+                [new KeyValuePair<string, object>(DiagnosticNames.DeploymentEnvironmentName,
+                                                  options.DeploymentEnvironment)]);
         }
 
         public class TelemetryServiceOptions : TelemetrySettings
