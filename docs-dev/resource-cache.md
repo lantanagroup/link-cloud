@@ -251,7 +251,14 @@ usable entry into an empty read. An entry holding *more* than the recorded count
 the cache is ahead of a durable write still in flight, which is the ordinary state between the two
 writes and not a partial entry.
 
-Both runtimes apply the same rule. On the .NET side it is `HybridResourceCache.IsCacheEntryWholeAsync`;
+A count that is present but cannot be parsed is also trusted, and is the one leniency that is not
+routine: something wrote a value no reader can use. Both runtimes log it and increment
+`link_resource_cache_durable_count_read_failure_count`, so an entry served without the check is
+visible rather than indistinguishable from a clean hit.
+
+Both runtimes apply the same rule. On the .NET side it is `HybridResourceCache.GetCacheEntryStateAsync`,
+which returns whole / partial / count-unusable rather than a bool, because serving an entry unchecked
+and serving one that agrees with the durable count are not the same event even though both serve;
 MeasureEval reads the same hash for its evaluation, so `ResourceCacheReader` reads
 `__durableResourceCount` on every non-empty Redis hit and falls back to ABS when the hit holds fewer,
 with the same leniencies: no recorded count, a count the hit meets or exceeds, or a failure to read
@@ -424,20 +431,56 @@ memory threshold, and the deployed `maxmemory-policy` must evict rather than rej
 
 | Instrument | Type | Tags | Answers |
 |---|---|---|---|
-| `link_resource_cache_read_duration` | histogram, ms | `cache.outcome` = hit \| fallback \| empty | how often the cache serves the read, and what a fallback costs |
+| `link_resource_cache_read_duration` | histogram, ms | `cache.outcome` = hit \| fallback \| empty, `cache.fallback.reason` = miss \| partial \| unavailable | how often the cache serves the read, and what a fallback costs |
 | `link_resource_cache_write_duration` | histogram, ms | `cache.store` = redis \| blob, `cache.outcome` = ok \| failed | inline cache cost against background durable cost |
 | `link_resource_cache_queue_depth` | observable gauge | — | whether durable storage is keeping up |
 | `link_resource_cache_queue_wait_duration` | histogram, ms | — | a backlog, as distinct from storage having slowed down |
 | `link_resource_cache_drain_wait_duration` | histogram, ms | — | **what the durability barrier actually costs** |
-| `link_resource_cache_write_retry_count` | counter | `cache.outcome` = retried \| exhausted | storage instability |
+| `link_resource_cache_write_retry_count` | counter | `cache.outcome` = retried \| exhausted \| interrupted | storage instability |
+| `link_resource_cache_durable_count_read_failure_count` | counter | — | how often an entry was served without the partial-entry check |
 
 The service each series came from is already on every metric as `service.name`, so the two barriers
 -- per log in the Acquisition Worker, per correlation in Normalization -- are separable without a tag
 of their own.
 
+`interrupted` on the retry counter is a shutdown draining the queue, not storage misbehaving. It is
+on the same counter because it is the same abandoned write from the caller's point of view, and the
+tag is what keeps it out of an instability alert.
+
 `link_resource_cache_drain_wait_duration` is the one to watch after a change: it is the only part of
 the ABS write that is not overlapped with other work, so it is the honest measure of what durability
 costs the pipeline.
+
+### The read instrument is shared with MeasureEval
+
+Three services read the cache across two runtimes -- the Acquisition Worker and Normalization in
+.NET, MeasureEval in Java -- and all three record `link_resource_cache_read_duration` under the same
+name deliberately, so one panel covers every reader. That only works if the same conditions produce
+the same labels, so the read contract is fixed in both runtimes:
+
+- `cache.fallback.reason` rides every `fallback` **and every `empty`** read. `empty` + `unavailable`
+  is the combination worth alerting on -- an empty answer that nothing should trust -- and without
+  the reason on the empty read it is indistinguishable from the routine case of a key that simply
+  does not exist anywhere.
+- On a `hit` the tag is **omitted**, not recorded empty. An explicitly null tag exports as a
+  present-but-empty label, which is a different Prometheus series from an absent one, so a query
+  written against one runtime would silently miss the other.
+- A blob read that throws, and a cancelled caller, record **nothing**. Neither is a cache outcome.
+- `link_resource_cache_durable_count_read_failure_count` counts reads that served an entry without
+  comparing it to the durable count -- the count was unreadable or unparseable. Those reads are
+  recorded as a `hit`, because the entry was served; the counter is what says the partial-entry check
+  did not happen. It is incremented once per read, in the read path itself rather than in the shared
+  state helper, so `IsEntryCompleteAsync` -- which is not a read -- cannot inflate it.
+
+One asymmetry stays by design: MeasureEval also tags both instruments with `phase`
+(`Initial` / `Supplemental`). The .NET read path has no phase concept, and `IResourceCache.GetAsync`
+knows nothing of the two passes, so threading one through purely to tag a metric would invert the
+dependency. Queries that span runtimes aggregate over `phase`.
+
+`Automation.UI`'s run metrics read `cache_fallback_reason` directly (Prometheus mangles the dots to
+underscores) for its miss / partial / unavailable counts. Those queries are scoped to MeasureEval
+deliberately -- the question they answer is about the evaluation read -- but the same query shape now
+returns comparable series for the two .NET jobs as well.
 
 ## Why the previous design was replaced
 
