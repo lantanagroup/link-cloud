@@ -545,7 +545,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         catch
         {
             if (newPointer != null)
-                await DeleteBlobQuietlyAsync(newPointer, ct);
+                await DeleteBlobQuietlyAsync(newPointer, CancellationToken.None);
             throw;
         }
 
@@ -781,7 +781,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch
         {
-            await DeleteSlicesQuietlyAsync(runId, domain, revision, ct);
+            await DeleteSlicesQuietlyAsync(runId, domain, revision, CancellationToken.None);
             throw;
         }
 
@@ -808,7 +808,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch
         {
-            await DeleteSlicesQuietlyAsync(runId, domain, revision, ct);
+            await DeleteSlicesQuietlyAsync(runId, domain, revision, CancellationToken.None);
             throw;
         }
     }
@@ -902,6 +902,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static CancellationTokenSource BoundCleanup(CancellationToken ct)
     {
+        // Rollback passes CancellationToken.None. The caller's token is already
+        // cancelled then, and a linked token would leave the unpublished slices
+        // in place. A 15 second budget still caps the call.
+        if (!ct.CanBeCanceled)
+            return new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
         var source = CancellationTokenSource.CreateLinkedTokenSource(ct);
         source.CancelAfter(TimeSpan.FromSeconds(15));
         return source;
