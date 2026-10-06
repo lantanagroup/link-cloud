@@ -19,7 +19,6 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private readonly ConcurrentDictionary<Guid, RunPollerHandle> _activePollers = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _runGates = new();
     private readonly ConcurrentDictionary<Guid, Task> _completions = new();
-    private readonly ConcurrentDictionary<Guid, byte> _writesClosed = new();
     private int _shuttingDown;
     private CancellationToken _stopToken;
 
@@ -111,35 +110,36 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     }
 
     /// <summary>
-    /// Stops this run's poller before its snapshots are deleted.
-    /// The run gate is the same one a domain write holds, so an in-flight write
-    /// finishes first and a write that arrives later sees the run closed.
-    /// There is no final poll. That write would be deleted immediately, and a
-    /// completion that runs after this finds no poller.
+    /// Stops this run's poller and deletes its rows while holding the run gate.
+    /// An in-flight domain write finishes first. There is no final poll, and the
+    /// gate is dropped when the delete returns so a deleted run does not stay
+    /// in this singleton. A later write sees that the run row is gone.
     /// </summary>
-    public async Task QuiesceForDeleteAsync(Guid runId, CancellationToken ct = default)
+    public async Task QuiesceForDeleteAsync(Guid runId, Func<CancellationToken, Task> deleteRows, CancellationToken ct = default)
     {
         var gate = Gate(runId);
         await gate.WaitAsync(ct);
         try
         {
-            _writesClosed[runId] = 0;
-            if (!_activePollers.TryGetValue(runId, out var handle))
-                return;
+            if (_activePollers.TryGetValue(runId, out var handle))
+            {
+                TryRemoveExact(_activePollers, runId, handle);
+                try
+                {
+                    await handle.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Stopping the poller before deleting run {RunId} failed", runId);
+                }
+            }
 
-            TryRemoveExact(_activePollers, runId, handle);
-            try
-            {
-                await handle.StopAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Stopping the poller before deleting run {RunId} failed", runId);
-            }
+            await deleteRows(ct);
         }
         finally
         {
             gate.Release();
+            PruneGate(runId);
         }
     }
 
@@ -150,9 +150,6 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// </summary>
     public async Task WriteDomainAsync<T>(Guid runId, string domain, T data, CancellationToken ct)
     {
-        if (_writesClosed.ContainsKey(runId))
-            return;
-
         var gate = Gate(runId);
         try
         {
@@ -160,14 +157,20 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         }
         catch (ObjectDisposedException)
         {
-            // Delete finished and a later completion pruned the gate.
+            // Delete finished and pruned the gate.
             return;
         }
 
+        var runGone = false;
         try
         {
-            if (_writesClosed.ContainsKey(runId))
+            // Delete holds this gate across the row removal, so a write that
+            // arrives afterwards sees no run and does not recreate the documents.
+            if (await _store.GetRunMetaAsync(runId, ct) == null)
+            {
+                runGone = true;
                 return;
+            }
 
             await _store.SetDomainAsync(runId, domain, data, ct);
         }
@@ -181,6 +184,9 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             {
                 // The gate was pruned after this write released its turn.
             }
+
+            if (runGone)
+                PruneGate(runId);
         }
     }
 
@@ -505,9 +511,6 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     private async Task<bool> StartPollerAsync(RunSnapshotMeta meta, CancellationToken ct)
     {
         if (Volatile.Read(ref _shuttingDown) != 0)
-            return false;
-
-        if (_writesClosed.ContainsKey(meta.RunId))
             return false;
 
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

@@ -397,12 +397,13 @@ public class AutomationRunManager : IAutomationRunManager
                 return false;
         }
 
-        // Stop the poller and close domain writes before the rows are removed.
-        // A write that already holds the gate finishes, then this delete removes it.
-        // A write that arrives afterwards, including the execution unwind, sees the
-        // run closed and does not recreate the documents.
-        await _orchestrator.QuiesceForDeleteAsync(runId, cancellationToken);
-        await _snapshotStore.DeleteRunAsync(runId, cancellationToken);
+        // Stop the poller and remove the rows while holding the run gate.
+        // A write that already holds the gate finishes first. A write that
+        // arrives afterwards sees no run row and does not recreate the documents.
+        await _orchestrator.QuiesceForDeleteAsync(
+            runId,
+            token => _snapshotStore.DeleteRunAsync(runId, token),
+            cancellationToken);
         return true;
     }
 
