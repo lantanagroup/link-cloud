@@ -430,6 +430,55 @@ public class RunSnapshotOrchestratorTests
     }
 
     [Fact]
+    public async Task StopAllPollersAsync_disposes_the_poller_after_a_domain_write_releases_the_gate()
+    {
+        var runId = Guid.NewGuid();
+        var disposed = 0;
+        var insideWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var store = new Mock<ISnapshotStore>();
+        store.Setup(s => s.RegisterRunAsync(It.IsAny<Guid>(), It.IsAny<RunSnapshotMeta>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.AppendLogsAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        store.Setup(s => s.GetRunMetaAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RunSnapshotMeta?)null);
+        store.Setup(s => s.SetDomainAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<It.IsAnyType>(), It.IsAny<CancellationToken>()))
+            .Returns(new InvocationFunc(_ =>
+            {
+                insideWrite.TrySetResult();
+                return releaseWrite.Task;
+            }));
+
+        var scope = new Mock<IServiceScope>();
+        scope.Setup(s => s.Dispose()).Callback(() => Interlocked.Increment(ref disposed));
+        var orchestrator = CreateOrchestrator(store, scope);
+        await orchestrator.RegisterRunAsync(runId, "facility", Guid.NewGuid().ToString());
+
+        var writing = orchestrator.WriteDomainAsync(runId, "generationManifest", "during-shutdown", CancellationToken.None);
+        await insideWrite.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var stopAll = typeof(RunSnapshotOrchestrator).GetMethod(
+            "StopAllPollersAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var stopping = (Task)stopAll.Invoke(orchestrator, new object[] { cancelled.Token })!;
+
+        await Task.WhenAny(stopping, Task.Delay(500));
+        stopping.IsCompleted.Should().BeFalse("shutdown waits for the domain write to release the gate");
+        disposed.Should().Be(0);
+
+        releaseWrite.TrySetResult();
+        await writing.WaitAsync(TimeSpan.FromSeconds(10));
+        await stopping.WaitAsync(TimeSpan.FromSeconds(10));
+
+        disposed.Should().Be(1);
+        PollerCount(orchestrator).Should().Be(0);
+    }
+
+    [Fact]
     public async Task QuiesceForDeleteAsync_stops_the_poller_and_a_later_domain_write_does_not_land()
     {
         var runId = Guid.NewGuid();
