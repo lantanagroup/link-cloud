@@ -8,7 +8,7 @@ server:
 spring:
   data:
     mongodb:
-      uri: mongodb://mongo:27017
+      uri: mongodb://mongo:27017/?serverSelectionTimeoutMS=4000  # bound server selection; see management.health.mongo.timeout-ms
       database: link-measureeval
     redis:
       host: redis_cache
