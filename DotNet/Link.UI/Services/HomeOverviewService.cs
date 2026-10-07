@@ -1,3 +1,5 @@
+using System.Globalization;
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
 using Link.UI.Models;
@@ -26,6 +28,7 @@ public sealed class HomeOverviewService : IHomeOverview
     private readonly AutomationRunReader _runs;
     private readonly LogsService _logs;
     private readonly IApiHealthRunStore? _apiHealth;
+    private readonly ILiveProcessUtilizationService? _pulse;
     private readonly IMemoryCache _cache;
     private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly ILogger<HomeOverviewService> _logger;
@@ -38,6 +41,7 @@ public sealed class HomeOverviewService : IHomeOverview
         AutomationRunReader runs,
         LogsService logs,
         IApiHealthRunStore? apiHealth,
+        ILiveProcessUtilizationService? pulse,
         IMemoryCache cache,
         IOptions<LinkUiFeatureOptions> features,
         ILogger<HomeOverviewService> logger)
@@ -49,6 +53,7 @@ public sealed class HomeOverviewService : IHomeOverview
         _runs = runs;
         _logs = logs;
         _apiHealth = apiHealth;
+        _pulse = pulse;
         _cache = cache;
         _features = features;
         _logger = logger;
@@ -62,6 +67,7 @@ public sealed class HomeOverviewService : IHomeOverview
         services.GetRequiredService<AutomationRunReader>(),
         services.GetRequiredService<LogsService>(),
         services.GetService<IApiHealthRunStore>(),
+        services.GetService<ILiveProcessUtilizationService>(),
         services.GetRequiredService<IMemoryCache>(),
         services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
         services.GetRequiredService<ILogger<HomeOverviewService>>());
@@ -73,23 +79,46 @@ public sealed class HomeOverviewService : IHomeOverview
         if (_cache.TryGetValue(cacheKey, out HomeOverviewModel? cached) && cached is not null)
             return cached;
 
-        var facilities = LoadFacilitiesAsync(cancellationToken, automationOn);
-        var reports = LoadReportsAsync(cancellationToken, automationOn);
-        var health = LoadHealthAsync(cancellationToken, automationOn);
-        var runs = automationOn
+        var facilitiesTask = LoadFacilitiesAsync(cancellationToken, automationOn);
+        var reportsTask = LoadReportsAsync(cancellationToken, automationOn);
+        var healthTask = LoadHealthAsync(cancellationToken, automationOn);
+        var logsTask = LoadLogsAsync(cancellationToken);
+        var activityTask = LoadActivityAsync(cancellationToken);
+        var pulseTask = automationOn
+            ? LoadPulseAsync(cancellationToken)
+            : Task.FromResult(new ServicePulseCard { Reachable = true });
+        var runsTask = automationOn
             ? LoadRunsAsync(cancellationToken)
             : Task.FromResult(new RunCard { Reachable = true });
-        var logs = LoadLogsAsync(cancellationToken, automationOn);
-        await Task.WhenAll(facilities, reports, health, runs, logs);
+        await Task.WhenAll(facilitiesTask, reportsTask, healthTask, logsTask, activityTask, pulseTask, runsTask);
 
+        var loadedAt = DateTimeOffset.UtcNow;
+        var facilities = await facilitiesTask;
+        var health = await healthTask;
+        var logs = await logsTask;
+        var activity = await activityTask;
+        var pulse = await pulseTask;
+        var ownershipKnown = !automationOn || facilities.Regular is int;
         var model = new HomeOverviewModel
         {
-            Facilities = await facilities,
-            Reports = await reports,
-            Health = await health,
-            Runs = await runs,
-            Logs = await logs,
-            LoadedAt = DateTimeOffset.UtcNow
+            Facilities = facilities,
+            Reports = await reportsTask,
+            Health = health,
+            Runs = automationOn ? await runsTask : new RunCard { Reachable = true },
+            Logs = logs,
+            Activity = activity,
+            Pulse = pulse,
+            Issues = HomeOverviewRules.Issues(
+                facilities.Reachable,
+                ownershipKnown,
+                automationOn,
+                activity,
+                health,
+                logs,
+                pulse,
+                loadedAt),
+            AutomationVisible = automationOn,
+            LoadedAt = loadedAt
         };
         cancellationToken.ThrowIfCancellationRequested();
         _cache.Set(cacheKey, model, TimeSpan.FromSeconds(HomeOverviewRules.CacheSeconds));
@@ -128,7 +157,8 @@ public sealed class HomeOverviewService : IHomeOverview
                 : "Tenant service call failed.",
             true,
             null,
-            null), cancellationToken);
+            null,
+            classify), cancellationToken);
 
     private Task<ReportCard> LoadReportsAsync(CancellationToken cancellationToken, bool stamp) =>
         Guard("reports", async token =>
@@ -219,7 +249,7 @@ public sealed class HomeOverviewService : IHomeOverview
             null,
             null), cancellationToken);
 
-    private async Task<LogCard> LoadLogsAsync(CancellationToken cancellationToken, bool stamp)
+    private async Task<LogCard> LoadLogsAsync(CancellationToken cancellationToken)
     {
         var acquisitionTask = Guard("acquisition-logs", token => _logs.LoadAcquisitionAsync(new AcquisitionQuery
         {
@@ -239,28 +269,96 @@ public sealed class HomeOverviewService : IHomeOverview
         await Task.WhenAll(acquisitionTask, auditTask);
         var acquisition = await acquisitionTask;
         var audit = await auditTask;
-        AutomationOwnershipIndex? ownership = null;
-        if (stamp && acquisition is { LoadError: null })
-            ownership = (await _ownership.GetSnapshotAsync(cancellationToken)).Index;
-        var rows = acquisition is { LoadError: null }
-            ? acquisition.Logs.Take(HomeOverviewRules.RowLimit).Select(row => new HomeLogLine
-            {
-                Id = row.Id,
-                FacilityId = row.FacilityId,
-                Status = row.Status,
-                Badge = HomeOverviewRules.LogBadge(row.Status),
-                When = row.Created,
-                AutomationRunId = ownership?.RunIdFor(row.FacilityId)
-            })
-            : null;
         return HomeOverviewRules.Logs(
             acquisition is { LoadError: null },
             acquisition?.LoadError ?? "Data acquisition could not be reached.",
             acquisition?.Paging.TotalCount ?? 0,
-            rows,
+            null,
             audit is { LoadError: null },
             audit?.LoadError);
     }
+
+    private Task<ActivityCard> LoadActivityAsync(CancellationToken cancellationToken) =>
+        Guard("activity", async token =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var days = HomeOverviewRules.TrendDays(today);
+            var inFlight = CountReportsAsync(HomeOverviewRules.InFlightStatuses, null, "asc", token);
+            var submitted = CountReportsAsync([HomeOverviewRules.SubmittedStatus], null, "desc", token);
+            var completed = CountReportsAsync([HomeOverviewRules.CompletedStatus], null, "desc", token);
+            var trend = days
+                .Select(day => CountReportsAsync(null, day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "desc", token))
+                .ToArray();
+            await Task.WhenAll(new[] { inFlight, submitted, completed }.Concat(trend));
+
+            var inFlightCount = await inFlight;
+            var submittedCount = await submitted;
+            var completedCount = await completed;
+            var trendDays = new TrendDay[days.Count];
+            for (var i = 0; i < days.Count; i++)
+            {
+                var dayCount = await trend[i];
+                trendDays[i] = new TrendDay
+                {
+                    Day = days[i].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    Reachable = dayCount.Ok,
+                    Count = dayCount.Ok ? dayCount.Total : 0
+                };
+            }
+
+            return HomeOverviewRules.Activity(
+                inFlightCount.Ok,
+                inFlightCount.Total,
+                inFlightCount.Ok ? HomeOverviewRules.ParseIso(inFlightCount.FirstCreated) : null,
+                submittedCount.Ok,
+                submittedCount.Total,
+                completedCount.Ok,
+                completedCount.Total,
+                trendDays);
+        }, _ => new ActivityCard(), cancellationToken);
+
+    private async Task<ReportCount> CountReportsAsync(
+        IReadOnlyList<string>? statuses,
+        string? created,
+        string sortDir,
+        CancellationToken cancellationToken)
+    {
+        var page = await _reports.LoadListAsync(new ReportsListQuery
+        {
+            Page = 1,
+            PageSize = HomeOverviewRules.RowLimit,
+            SortBy = "CreateDate",
+            SortDir = sortDir,
+            Status = statuses?.ToList(),
+            Created = created
+        }, cancellationToken);
+        if (page.LoadError is not null)
+            return new ReportCount(false, 0, null);
+        var first = page.Reports.Count > 0 ? page.Reports[0].Created : null;
+        return new ReportCount(true, page.Paging.TotalCount, first);
+    }
+
+    private Task<ServicePulseCard> LoadPulseAsync(CancellationToken cancellationToken) =>
+        Guard("pulse", async token =>
+        {
+            if (_pulse is null)
+                return HomeOverviewRules.Pulse(false, "Service metrics are not configured.", null);
+
+            var live = await _pulse.GetAsync(token);
+            var samples = live.Services.Select(item =>
+                new PulseSample(item.Name, item.Group, item.CpuPercent, item.ApiP95Ms));
+            return HomeOverviewRules.Pulse(
+                live.Reachable,
+                live.Reachable ? null : "Service metrics could not be read.",
+                samples);
+        }, failure => HomeOverviewRules.Pulse(
+            false,
+            failure == HomeOverviewRules.CardFailure.Timeout
+                ? "Service metrics could not be read."
+                : "Service metrics could not be read.",
+            null), cancellationToken);
+
+    private sealed record ReportCount(bool Ok, long Total, string? FirstCreated);
 
     private Task<T> Guard<T>(
         string card,

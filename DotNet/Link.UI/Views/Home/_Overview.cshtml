@@ -3,8 +3,12 @@
     var facilities = Model.Facilities;
     var reports = Model.Reports;
     var health = Model.Health;
-    var runs = Model.Runs;
     var logs = Model.Logs;
+    var activity = Model.Activity;
+    var pulse = Model.Pulse;
+    var trendMax = activity.Trend.Where(day => day.Reachable).Select(day => day.Count).DefaultIfEmpty(0).Max();
+    var trendTotal = activity.Trend.Where(day => day.Reachable).Sum(day => day.Count);
+    var trendKnown = activity.Trend.Any(day => day.Reachable);
 }
 
 <div id="homeOverview">
@@ -13,41 +17,45 @@
         <div class="alert alert-warning">@facilities.Message</div>
     }
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-            <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index">
-                <div class="au-kpi-value">@facilities.TotalText</div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index" asp-route-scope="@Model.RealScope">
+                <div class="au-kpi-value">@HomeOverviewRules.PrimaryFacilityText(facilities, Model.AutomationVisible)</div>
                 <div class="au-kpi-label">Facilities</div>
-                @if (LinkUiFeatures.Value.AutomationEnabled && facilities.Reachable && facilities.Automation is int automation && facilities.Regular is int regular)
+                @if (facilities.Reachable)
                 {
-                    <div class="au-kpi-note">@automation automation · @regular regular</div>
-                }
-                else if (facilities.Reachable && facilities.Message is not null)
-                {
-                    <div class="au-kpi-note">@facilities.Message</div>
+                    <div class="au-kpi-note">Open the facility list</div>
                 }
             </a>
         </div>
-        @if (LinkUiFeatures.Value.AutomationEnabled)
-        {
-            <div class="col-6 col-md-3">
-                <a class="au-kpi-card au-kpi-link au-kpi-auto" asp-controller="Tenants" asp-action="Index" asp-route-scope="automation">
-                    <div class="au-kpi-value">@facilities.AutomationText</div>
-                    <div class="au-kpi-label">Automation</div>
-                    <div class="au-kpi-note">Owned facilities</div>
-                </a>
-            </div>
-        }
-        @if (LinkUiFeatures.Value.AutomationEnabled)
-        {
-            <div class="col-6 col-md-3">
-                <a class="au-kpi-card au-kpi-link" asp-controller="Automation" asp-action="Index">
-                    <div class="au-kpi-value">@runs.ActiveText</div>
-                    <div class="au-kpi-label">Active runs</div>
-                    <div class="au-kpi-note">Open the runs dashboard</div>
-                </a>
-            </div>
-        }
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="New,Scheduled,EndOfPeriod">
+                <div class="au-kpi-value">@activity.InFlightText</div>
+                <div class="au-kpi-label">In flight</div>
+                <div class="au-kpi-note">New, scheduled, or end of period</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="Submitted">
+                <div class="au-kpi-value">@activity.SubmittedText</div>
+                <div class="au-kpi-label">Submitted</div>
+                <div class="au-kpi-note">Reports that were submitted</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="au-kpi-card au-kpi-link @(activity.CompletedReachable && activity.CompletedNotSubmitted > 0 ? "au-kpi-auto" : "")" asp-controller="Reports" asp-action="Index" asp-route-status="CompletedNotSubmitted">
+                <div class="au-kpi-value">@activity.CompletedText</div>
+                <div class="au-kpi-label">Not submitted</div>
+                <div class="au-kpi-note">Completed, still to send</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <a class="au-kpi-card au-kpi-link @(logs.Reachable && logs.Total > 0 ? "au-kpi-bad" : "")" asp-controller="Logs" asp-action="Acquisition" asp-route-status="Failed,MaxRetriesReached">
+                <div class="au-kpi-value">@logs.TotalText</div>
+                <div class="au-kpi-label">Failed acquisition</div>
+                <div class="au-kpi-note">Open the filtered logs</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
             <a class="au-kpi-card au-kpi-link @(health.Reachable && health.Unhealthy > 0 ? "au-kpi-bad" : "")" asp-controller="System" asp-action="Health">
                 <div class="au-kpi-value">@health.UnhealthyText</div>
                 <div class="au-kpi-label">Unhealthy</div>
@@ -57,10 +65,138 @@
     </div>
 
     <div class="row g-3">
+        <div class="col-12 col-lg-7">
+            <div class="au-card card h-100 mb-0">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <a class="home-card-link" asp-controller="Reports" asp-action="Index">Reports created</a>
+                    <a class="home-card-link small" asp-controller="Reports" asp-action="Index">Open</a>
+                </div>
+                <div class="card-body">
+                    @if (!trendKnown)
+                    {
+                        <p class="mb-0 text-muted">Report counts could not be read for these days.</p>
+                    }
+                    else
+                    {
+                        @if (trendTotal == 0)
+                        {
+                            <p class="text-muted">No reports were created in the last seven days.</p>
+                        }
+                        <div class="home-trend">
+                            @foreach (var day in activity.Trend)
+                            {
+                                var percent = day.Reachable ? HomeOverviewRules.BarPercent(day.Count, trendMax) : 0;
+                                <a class="home-trend-link" asp-controller="Reports" asp-action="Index" asp-route-created="@day.Day">
+                                    <span class="home-trend-plot" aria-hidden="true">
+                                        <span class="home-trend-bar" style="height:@(percent)%"></span>
+                                    </span>
+                                    <span class="home-trend-count">@day.CountText</span>
+                                    <span class="home-trend-day">@day.Day</span>
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-5">
+            <div class="au-card card h-100 mb-0">
+                <div class="card-header">Needs attention</div>
+                <div class="card-body">
+                    @if (Model.Issues.Count == 0)
+                    {
+                        <p class="mb-0 text-muted">Nothing needs attention right now.</p>
+                    }
+                    else
+                    {
+                        foreach (var issue in Model.Issues)
+                        {
+                            <a class="home-issue" href="@issue.Href">
+                                <span class="home-issue-title">@issue.Title</span>
+                                @if (!string.IsNullOrWhiteSpace(issue.Detail))
+                                {
+                                    <span class="home-issue-detail">@issue.Detail</span>
+                                }
+                            </a>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="au-card card mb-0">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    @if (Model.AutomationVisible)
+                    {
+                        <a class="home-card-link" asp-controller="Metrics" asp-action="Index">Service health</a>
+                        <a class="home-card-link small" asp-controller="Metrics" asp-action="Index">Open</a>
+                    }
+                    else
+                    {
+                        <a class="home-card-link" asp-controller="System" asp-action="Health">Service health</a>
+                        <a class="home-card-link small" asp-controller="System" asp-action="Health">Open</a>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (Model.AutomationVisible)
+                    {
+                        @if (!pulse.Reachable)
+                        {
+                            <div class="alert alert-warning">@(string.IsNullOrWhiteSpace(pulse.Message) ? "Service metrics could not be read." : pulse.Message)</div>
+                        }
+                        else if (pulse.Chips.Count == 0)
+                        {
+                            <p class="text-muted">No pipeline metrics yet.</p>
+                        }
+                        else
+                        {
+                            <div class="row g-2 mb-3">
+                                @foreach (var chip in pulse.Chips)
+                                {
+                                    var slow = chip.ApiP95Ms is > HomeOverviewRules.SlowApiMs;
+                                    <div class="col-6 col-md-4 col-xl-2">
+                                        <a class="au-service-chip @(slow ? "home-chip-slow" : "")" asp-controller="Metrics" asp-action="Index" title="@chip.Name API latency and CPU">
+                                            <div class="au-service-name">@chip.Name</div>
+                                            <div class="au-service-value">@HomeOverviewRules.LatencyText(chip.ApiP95Ms)</div>
+                                            <div class="au-service-hint">CPU @HomeOverviewRules.CpuText(chip.CpuPercent)</div>
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    <p class="mb-2">
+                        @if (health.Reachable)
+                        {
+                            <a asp-controller="System" asp-action="Health">@health.Healthy healthy · @health.Unhealthy unhealthy</a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">@health.Message</span>
+                        }
+                    </p>
+                    @if (Model.AutomationVisible)
+                    {
+                        <p class="mb-0">
+                            @if (health.ApiHealthReachable)
+                            {
+                                <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@health.ApiHealthText</span>
+                            }
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+
         <div class="col-12 col-lg-6">
             <div class="au-card card h-100 mb-0">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="Reports" asp-action="Index">Recent reports</a>
+                    <a class="home-card-link" asp-controller="Reports" asp-action="Index">Latest reports</a>
                     <a class="home-card-link small" asp-controller="Reports" asp-action="Index">Open</a>
                 </div>
                 <div class="card-body">
@@ -70,7 +206,7 @@
                     }
                     else if (reports.Rows.Count == 0)
                     {
-                        <p class="mb-0 text-muted">No reports.</p>
+                        <p class="mb-0 text-muted">No reports yet.</p>
                     }
                     else
                     {
@@ -89,82 +225,45 @@
             </div>
         </div>
 
-        <div class="col-12 col-lg-6">
-            <div class="au-card card h-100 mb-0">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="System" asp-action="Health">Service health</a>
-                    <a class="home-card-link small" asp-controller="System" asp-action="Health">Open</a>
-                </div>
-                <div class="card-body">
-                    @if (!health.Reachable)
-                    {
-                        <div class="alert alert-warning">@health.Message</div>
-                    }
-                    else if (health.Healthy == 0 && health.Unhealthy == 0)
-                    {
-                        <p class="text-muted">No service reports.</p>
-                    }
-                    else
-                    {
-                        <p class="mb-2">@health.Healthy healthy · @health.Unhealthy unhealthy</p>
-                        @if (health.UnhealthyNames.Count == 0)
+        @if (Model.AutomationVisible)
+        {
+            var runs = Model.Runs;
+            <div class="col-12 col-lg-6">
+                <div class="au-card card h-100 mb-0">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <a class="home-card-link" asp-controller="Automation" asp-action="Index">Automation</a>
+                        <a class="home-card-link small" asp-controller="Automation" asp-action="Index">Open</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <a class="au-kpi-card au-kpi-link au-kpi-auto" asp-controller="Tenants" asp-action="Index" asp-route-scope="automation">
+                                    <div class="au-kpi-value">@facilities.AutomationText</div>
+                                    <div class="au-kpi-label">Owned facilities</div>
+                                    @if (facilities.Reachable && facilities.Message is not null)
+                                    {
+                                        <div class="au-kpi-note">@facilities.Message</div>
+                                    }
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a class="au-kpi-card au-kpi-link" asp-controller="Automation" asp-action="Index">
+                                    <div class="au-kpi-value">@runs.ActiveText</div>
+                                    <div class="au-kpi-label">Active runs</div>
+                                </a>
+                            </div>
+                        </div>
+                        @if (!runs.Reachable)
                         {
-                            <p class="mb-2 text-muted">Every reported service is healthy.</p>
+                            <div class="alert alert-warning mb-0">@runs.Message</div>
+                        }
+                        else if (runs.Active.Count == 0 && runs.Recent.Count == 0)
+                        {
+                            <p class="mb-0 text-muted">No runs yet.</p>
                         }
                         else
                         {
-                            <ul class="mb-2 ps-3">
-                                @foreach (var name in health.UnhealthyNames)
-                                {
-                                    <li>@name</li>
-                                }
-                            </ul>
-                            @if (health.HiddenUnhealthy > 0)
-                            {
-                                <p class="small text-muted mb-2">@health.HiddenUnhealthy more</p>
-                            }
-                        }
-                    }
-                    @if (LinkUiFeatures.Value.AutomationEnabled)
-                    {
-                        <p class="mb-0">
-                            @if (health.ApiHealthReachable)
-                            {
-                                <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
-                            }
-                            else
-                            {
-                                <span class="text-muted">@health.ApiHealthText</span>
-                            }
-                        </p>
-                    }
-                </div>
-            </div>
-        </div>
-
-        @if (LinkUiFeatures.Value.AutomationEnabled)
-        {
-        <div class="col-12 col-lg-6">
-            <div class="au-card card h-100 mb-0">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="Automation" asp-action="Index">Automation runs</a>
-                    <a class="home-card-link small" asp-controller="Automation" asp-action="Index">Open</a>
-                </div>
-                <div class="card-body">
-                    @if (!runs.Reachable)
-                    {
-                        <div class="alert alert-warning mb-0">@runs.Message</div>
-                    }
-                    else if (runs.Active.Count == 0 && runs.Recent.Count == 0)
-                    {
-                        <p class="mb-0 text-muted">No runs yet.</p>
-                    }
-                    else
-                    {
-                        @if (runs.Active.Count > 0)
-                        {
-                            <div class="small text-uppercase text-muted fw-semibold mb-1">Active</div>
-                            foreach (var run in runs.Active)
+                            foreach (var run in runs.Active.Concat(runs.Recent).Take(HomeOverviewRules.RowLimit))
                             {
                                 <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id">
                                     <span class="badge @run.Badge">@run.Status</span>
@@ -173,58 +272,10 @@
                                 </a>
                             }
                         }
-                        @if (runs.Recent.Count > 0)
-                        {
-                            <div class="small text-uppercase text-muted fw-semibold mt-3 mb-1">Recent</div>
-                            foreach (var run in runs.Recent)
-                            {
-                                <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id">
-                                    <span class="badge @run.Badge">@run.Status</span>
-                                    <span class="home-name">@run.Name</span>
-                                    <span class="text-muted small">@run.When</span>
-                                </a>
-                            }
-                        }
-                    }
+                    </div>
                 </div>
             </div>
-        </div>
         }
-
-        <div class="col-12 col-lg-6">
-            <div class="au-card card h-100 mb-0">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="Logs" asp-action="Acquisition" asp-route-status="Failed,MaxRetriesReached">Failed acquisition logs</a>
-                    <a class="home-card-link small" asp-controller="Logs" asp-action="Acquisition" asp-route-status="Failed,MaxRetriesReached">Open</a>
-                </div>
-                <div class="card-body">
-                    @if (!logs.Reachable)
-                    {
-                        <div class="alert alert-warning">@logs.Message</div>
-                    }
-                    else if (logs.Rows.Count == 0)
-                    {
-                        <p class="text-muted">No failed acquisition logs.</p>
-                    }
-                    else
-                    {
-                        foreach (var row in logs.Rows)
-                        {
-                            <a class="home-row" asp-controller="Logs" asp-action="AcquisitionDetail" asp-route-id="@row.Id">
-                                <span class="badge @row.Badge">@row.Status</span>
-                                <code class="lu-facility-id">@row.FacilityId</code>
-                                <partial name="_AutomationBadge" model="row.AutomationRunId" />
-                                <span class="text-muted small">@row.When</span>
-                            </a>
-                        }
-                        <p class="small text-muted mt-2 mb-0">@logs.Total failed</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(logs.AuditMessage))
-                    {
-                        <div class="alert alert-warning mb-0 @(logs.Reachable && logs.Rows.Count == 0 ? "" : "mt-3")">@logs.AuditMessage</div>
-                    }
-                </div>
-            </div>
-        </div>
     </div>
+    <p class="small text-muted mt-3 mb-0">Checked @LinkUiTime.IsoUtc(Model.LoadedAt)</p>
 </div>
