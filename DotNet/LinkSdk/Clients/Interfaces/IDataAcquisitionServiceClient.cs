@@ -9,6 +9,12 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(CreateFhirQueryConfigurationRequestApiModel request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Creates a FHIR query configuration, including authentication when the body carries it.
+    /// <c>POST /api/data/fhirQueryConfiguration</c>.
+    /// </summary>
+    Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(object request, CancellationToken cancellationToken = default);
+
     /// <summary>Saves/updates the FHIR server connection settings: <c>PUT /api/data/fhirQueryConfiguration</c>.</summary>
     Task<LinkApiResponse> UpdateFhirQueryConfigurationAsync(object request, CancellationToken cancellationToken = default);
 
@@ -123,6 +129,12 @@ public interface IDataAcquisitionServiceClient
 
     // Organization location configuration (update)
     Task<LinkApiResponse> UpdateOrganizationLocationConfigurationAsync(string facilityId, object request, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates one reporting-organization configuration: <c>PUT /api/data/location-config/{id}</c>.</summary>
+    Task<LinkApiResponse> UpdateOrganizationLocationConfigurationByIdAsync(int id, object request, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes one reporting-organization configuration: <c>DELETE /api/data/location-config/{id}</c>.</summary>
+    Task<LinkApiResponse> DeleteOrganizationLocationConfigurationByIdAsync(int id, CancellationToken cancellationToken = default);
 
     // Organization location mappings
     /// <summary>Reads one organization/location mapping: <c>GET /api/data/location-mappings/{id}</c>.</summary>

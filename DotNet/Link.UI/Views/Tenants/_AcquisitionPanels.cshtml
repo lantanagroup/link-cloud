@@ -1,0 +1,794 @@
+@using Link.UI.Services
+@model FacilityHubViewModel
+@{
+    string Collapse(string? error, bool readFailed) =>
+        string.IsNullOrWhiteSpace(error) && !readFailed ? "accordion-collapse collapse" : "accordion-collapse collapse show";
+    string Button(string? error, bool readFailed) =>
+        string.IsNullOrWhiteSpace(error) && !readFailed ? "accordion-button collapsed" : "accordion-button";
+    string Expanded(string? error, bool readFailed) =>
+        string.IsNullOrWhiteSpace(error) && !readFailed ? "false" : "true";
+    string SetupLabel(string method) => method switch
+    {
+        "identifier" => "Location identifier",
+        "managingOrg" => "Managing organization",
+        "locationType" => "Location type",
+        _ => "Manual FHIRPath"
+    };
+}
+
+@if (!Model.DataAcquisitionConfigured)
+{
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="acquisitionHeading">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#acquisitionPanel" aria-expanded="true" aria-controls="acquisitionPanel">
+                Data acquisition
+            </button>
+        </h2>
+        <div id="acquisitionPanel" class="accordion-collapse collapse show" aria-labelledby="acquisitionHeading">
+            <div class="accordion-body">
+                <p class="text-muted mb-0">Data acquisition service URL is not configured (ServiceRegistry:DataAcquisitionServiceUrl).</p>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    var query = Model.FhirQuery;
+    var list = Model.FhirList;
+    var plan = Model.QueryPlan;
+    var org = Model.ReportingOrg;
+    var sftp = Model.Sftp;
+
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="fhirQueryHeading">
+            <button class="@Button(Model.FhirQueryError, query.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#fhirQueryPanel" aria-expanded="@Expanded(Model.FhirQueryError, query.ReadFailed)" aria-controls="fhirQueryPanel">
+                FHIR query
+            </button>
+        </h2>
+        <div id="fhirQueryPanel" class="@Collapse(Model.FhirQueryError, query.ReadFailed)" aria-labelledby="fhirQueryHeading">
+            <div class="accordion-body">
+                @if (!string.IsNullOrWhiteSpace(Model.FhirQueryError))
+                {
+                    <div class="alert alert-warning">@Model.FhirQueryError</div>
+                }
+                else if (query.ReadFailed)
+                {
+                    <div class="alert alert-warning">The FHIR query configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                }
+                else if (!query.Exists)
+                {
+                    <div class="alert alert-info">No FHIR query configuration for this facility.</div>
+                }
+                @if (!query.ReadFailed)
+                {
+                    <form method="post" asp-action="SaveFhirQuery" asp-route-id="@Model.FacilityId" id="fhirQueryForm">
+                        <input type="hidden" name="Exists" value="@(query.Exists ? "true" : "false")" />
+                        <input type="hidden" name="Id" value="@query.Id" />
+                        <div class="mb-3">
+                            <label class="form-label" for="fhirServerBaseUrl">FHIR server base URL</label>
+                            <input id="fhirServerBaseUrl" name="FhirServerBaseUrl" value="@query.FhirServerBaseUrl" class="form-control" placeholder="https://fhir.example.org/api/FHIR/R4" />
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="maxConcurrent">Max concurrent requests</label>
+                                <input id="maxConcurrent" name="MaxConcurrentRequests" value="@query.MaxConcurrentRequests" type="number" min="1" max="16" class="form-control" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="maxRetries">Max retries</label>
+                                <input id="maxRetries" name="MaxRetries" value="@query.MaxRetries" type="number" min="0" max="10" class="form-control" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="minPull">Min pull time</label>
+                                <input id="minPull" name="MinPull" value="@query.MinPull" class="form-control" placeholder="06:00:00" />
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label" for="maxPull">Max pull time</label>
+                                <input id="maxPull" name="MaxPull" value="@query.MaxPull" class="form-control" placeholder="18:00:00" />
+                            </div>
+                        </div>
+                        <p class="form-text">Pull times are the facility local time of day. Enter both, or leave both empty. The facility timezone is @Model.TimeZone.</p>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="fhirAuthEnabled" name="AuthEnabled" value="true" @(query.AuthEnabled ? "checked" : null) />
+                            <label class="form-check-label" for="fhirAuthEnabled">Authentication</label>
+                        </div>
+                        <div id="fhirAuthFields">
+                            <div class="mb-3">
+                                <label class="form-label" for="fhirAuthType">Auth type</label>
+                                <select id="fhirAuthType" name="AuthType" class="form-select">
+                                    @foreach (var authType in FacilityAcquisitionRules.FhirAuthTypes)
+                                    {
+                                        <option value="@authType" selected="@(string.Equals(authType, query.AuthType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@authType</option>
+                                    }
+                                </select>
+                            </div>
+                            <div data-auth-panel="Basic">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirUserName">User name secret name</label>
+                                        <input id="fhirUserName" name="UserName" value="@query.UserName" class="form-control" autocomplete="off" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirPassword">Password secret name</label>
+                                        <input id="fhirPassword" name="Password" value="@query.Password" class="form-control" autocomplete="off" />
+                                    </div>
+                                </div>
+                                <p class="form-text">Key Vault secret names. Do not enter the secret itself.</p>
+                            </div>
+                            <div data-auth-panel="Epic">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirAuthKey">Key secret name</label>
+                                        <input id="fhirAuthKey" name="AuthKey" value="@query.AuthKey" class="form-control" autocomplete="off" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirTokenUrl">Token URL</label>
+                                        <input id="fhirTokenUrl" name="TokenUrl" value="@query.TokenUrl" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirAudience">Audience</label>
+                                        <input id="fhirAudience" name="Audience" value="@query.Audience" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="fhirClientId">Client id secret name</label>
+                                        <input id="fhirClientId" name="ClientId" value="@query.ClientId" class="form-control" autocomplete="off" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div data-auth-panel="OAuth">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="oauthTokenUrl">Token URL</label>
+                                        <input id="oauthTokenUrl" name="TokenUrl" value="@query.TokenUrl" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="oauthClientId">Client id secret name</label>
+                                        <input id="oauthClientId" name="ClientId" value="@query.ClientId" class="form-control" autocomplete="off" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="oauthClientSecret">Client secret name</label>
+                                        <input id="oauthClientSecret" name="ClientSecret" value="@query.ClientSecret" class="form-control" autocomplete="off" />
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label" for="oauthScope">Scope</label>
+                                        <input id="oauthScope" name="Scope" value="@query.Scope" class="form-control" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div data-auth-panel="CustomHeaders">
+                                @for (var i = 0; i < query.CustomHeaders.Count; i++)
+                                {
+                                    <div class="row g-2 align-items-end mb-2">
+                                        <div class="col-12 col-md-5">
+                                            <label class="form-label" for="header-key-@i">Header</label>
+                                            <input id="header-key-@i" name="CustomHeaders[@i].Key" value="@query.CustomHeaders[i].Key" class="form-control" />
+                                        </div>
+                                        <div class="col-12 col-md-5">
+                                            <label class="form-label" for="header-value-@i">Secret name</label>
+                                            <input id="header-value-@i" name="CustomHeaders[@i].Value" value="@query.CustomHeaders[i].Value" class="form-control" autocomplete="off" />
+                                        </div>
+                                        <div class="col-12 col-md-2">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="header-remove-@i" name="CustomHeaders[@i].Remove" value="true" />
+                                                <label class="form-check-label" for="header-remove-@i">Remove</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                <p class="form-text">Leave the last header row blank to ignore it. Values are Key Vault secret names.</p>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-au-action">@(query.Exists ? "Save FHIR query" : "Add FHIR query")</button>
+                    </form>
+                    @if (query.Exists)
+                    {
+                        <form method="post" asp-action="DeleteFhirQuery" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR query configuration?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete FHIR query</button>
+                        </form>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="fhirListHeading">
+            <button class="@Button(Model.FhirListError, list.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#fhirListPanel" aria-expanded="@Expanded(Model.FhirListError, list.ReadFailed)" aria-controls="fhirListPanel">
+                FHIR list
+            </button>
+        </h2>
+        <div id="fhirListPanel" class="@Collapse(Model.FhirListError, list.ReadFailed)" aria-labelledby="fhirListHeading">
+            <div class="accordion-body">
+                @if (!string.IsNullOrWhiteSpace(Model.FhirListError))
+                {
+                    <div class="alert alert-warning">@Model.FhirListError</div>
+                }
+                else if (list.ReadFailed)
+                {
+                    <div class="alert alert-warning">The FHIR list configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                }
+                else if (!list.Exists)
+                {
+                    <div class="alert alert-info">No FHIR list configuration for this facility.</div>
+                }
+                @if (!list.ReadFailed)
+                {
+                    <form method="post" asp-action="SaveFhirList" asp-route-id="@Model.FacilityId">
+                        <input type="hidden" name="Exists" value="@(list.Exists ? "true" : "false")" />
+                        <div class="mb-3">
+                            <label class="form-label" for="fhirListBaseUrl">FHIR server base URL</label>
+                            <input id="fhirListBaseUrl" name="FhirBaseServerUrl" value="@list.FhirBaseServerUrl" class="form-control" />
+                        </div>
+                        @for (var i = 0; i < list.Lists.Count; i++)
+                        {
+                            var row = list.Lists[i];
+                            var slot = FacilityAcquisitionRules.PatientListSlots.FirstOrDefault(item =>
+                                string.Equals(item.Status, row.Status, StringComparison.OrdinalIgnoreCase)
+                                && string.Equals(item.TimeFrame, row.TimeFrame, StringComparison.OrdinalIgnoreCase));
+                            var label = string.IsNullOrWhiteSpace(slot.Label) ? $"{row.Status}, {row.TimeFrame}" : slot.Label;
+                            <div class="row g-2 align-items-end mb-2">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="list-id-@i">@label</label>
+                                    <input id="list-id-@i" name="Lists[@i].FhirId" value="@row.FhirId" class="form-control" />
+                                    <input type="hidden" name="Lists[@i].Status" value="@row.Status" />
+                                    <input type="hidden" name="Lists[@i].TimeFrame" value="@row.TimeFrame" />
+                                </div>
+                            </div>
+                        }
+                        <p class="form-text">Six lists, one for each admit and discharge window. Each FHIR id must be unique. Authentication on an existing list is kept.</p>
+                        <button type="submit" class="btn btn-au-action">@(list.Exists ? "Save FHIR list" : "Add FHIR list")</button>
+                    </form>
+                    @if (list.Exists)
+                    {
+                        <form method="post" asp-action="DeleteFhirList" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR list configuration?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete FHIR list</button>
+                        </form>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="queryPlanHeading">
+            <button class="@Button(Model.QueryPlanError, plan.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#queryPlanPanel" aria-expanded="@Expanded(Model.QueryPlanError, plan.ReadFailed)" aria-controls="queryPlanPanel">
+                Query plan
+                @if (Model.ExistingQueryPlanTypes.Count > 0)
+                {
+                    <span class="badge text-bg-secondary ms-2">@Model.ExistingQueryPlanTypes.Count saved</span>
+                }
+            </button>
+        </h2>
+        <div id="queryPlanPanel" class="@Collapse(Model.QueryPlanError, plan.ReadFailed)" aria-labelledby="queryPlanHeading">
+            <div class="accordion-body">
+                @if (!string.IsNullOrWhiteSpace(Model.QueryPlanError))
+                {
+                    <div class="alert alert-warning">@Model.QueryPlanError</div>
+                }
+                else if (plan.ReadFailed)
+                {
+                    <div class="alert alert-warning">This query plan could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                }
+                else if (!plan.Exists)
+                {
+                    <div class="alert alert-info">No @plan.Type query plan for this facility.</div>
+                }
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var planType in FacilityAcquisitionRules.QueryPlanTypes)
+                    {
+                        var selectedType = string.Equals(planType, plan.Type, StringComparison.OrdinalIgnoreCase);
+                        var saved = Model.ExistingQueryPlanTypes.Contains(planType, StringComparer.OrdinalIgnoreCase);
+                        <a class="btn btn-sm @(selectedType ? "btn-au-action" : "btn-outline-secondary")"
+                           asp-action="Facility"
+                           asp-route-id="@Model.FacilityId"
+                           asp-route-planType="@planType"
+                           asp-route-orgConfig="@org.ConfigId">
+                            @planType
+                            @if (saved)
+                            {
+                                <span class="badge text-bg-light ms-1">Saved</span>
+                            }
+                        </a>
+                    }
+                </div>
+                @if (!plan.ReadFailed)
+                {
+                    <form method="post" asp-action="SaveQueryPlan" asp-route-id="@Model.FacilityId" id="queryPlanForm">
+                        <input type="hidden" name="Exists" value="@(plan.Exists ? "true" : "false")" />
+                        <input type="hidden" name="Type" value="@plan.Type" />
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="planName">Plan name</label>
+                                <input id="planName" name="PlanName" value="@plan.PlanName" class="form-control" maxlength="200" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="lookBack">Look back</label>
+                                <input id="lookBack" name="LookBack" value="@plan.LookBack" class="form-control" placeholder="P30D" maxlength="50" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="ehrDescription">EHR description</label>
+                                <input id="ehrDescription" name="EhrDescription" value="@plan.EhrDescription" class="form-control" maxlength="500" />
+                            </div>
+                        </div>
+                        @{
+                            var groups = new (string Label, string Prefix, List<QueryRowInput> Rows)[]
+                            {
+                                ("Initial", "InitialQueries", plan.InitialQueries),
+                                ("Supplemental", "SupplementalQueries", plan.SupplementalQueries)
+                            };
+                        }
+                        @foreach (var group in groups)
+                        {
+                            <h3 class="h6 mt-3">@group.Label queries</h3>
+                            @for (var i = 0; i < group.Rows.Count; i++)
+                            {
+                                var row = group.Rows[i];
+                                <div class="border rounded p-2 mb-2" data-query-row>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label" for="@(group.Prefix)-resource-@i">Resource type</label>
+                                            <input id="@(group.Prefix)-resource-@i" name="@(group.Prefix)[@i].ResourceType" value="@row.ResourceType" class="form-control" placeholder="Patient" />
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label" for="@(group.Prefix)-config-@i">Query type</label>
+                                            <select id="@(group.Prefix)-config-@i" name="@(group.Prefix)[@i].QueryConfigType" class="form-select" data-query-type>
+                                                @foreach (var configType in FacilityAcquisitionRules.QueryConfigTypes)
+                                                {
+                                                    <option value="@configType" selected="@(string.Equals(configType, row.QueryConfigType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@configType</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label" for="@(group.Prefix)-op-@i">Operation</label>
+                                            <select id="@(group.Prefix)-op-@i" name="@(group.Prefix)[@i].OperationType" class="form-select">
+                                                @foreach (var operation in FacilityAcquisitionRules.OperationTypes)
+                                                {
+                                                    <option value="@operation" selected="@(string.Equals(operation, row.OperationType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@operation</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-2" data-query-paged>
+                                            <label class="form-label" for="@(group.Prefix)-paged-@i">Page size</label>
+                                            <input id="@(group.Prefix)-paged-@i" name="@(group.Prefix)[@i].Paged" value="@row.Paged" type="number" min="1" class="form-control" />
+                                        </div>
+                                        <div class="col-6 col-md-1">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="@(group.Prefix)-remove-@i" name="@(group.Prefix)[@i].Remove" value="true" />
+                                                <label class="form-check-label" for="@(group.Prefix)-remove-@i">Remove</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2" data-query-parameters>
+                                        @for (var p = 0; p < row.Parameters.Count; p++)
+                                        {
+                                            var parameter = row.Parameters[p];
+                                            <div class="row g-2 align-items-end mb-2">
+                                                <div class="col-12 col-md-3">
+                                                    <label class="form-label" for="@(group.Prefix)-pname-@i-@p">Parameter</label>
+                                                    <input id="@(group.Prefix)-pname-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Name" value="@parameter.Name" class="form-control" />
+                                                </div>
+                                                <div class="col-6 col-md-2">
+                                                    <label class="form-label" for="@(group.Prefix)-ptype-@i-@p">Type</label>
+                                                    <select id="@(group.Prefix)-ptype-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].ParameterType" class="form-select">
+                                                        @foreach (var parameterType in FacilityAcquisitionRules.ParameterTypes)
+                                                        {
+                                                            <option value="@parameterType" selected="@(string.Equals(parameterType, parameter.ParameterType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@parameterType</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 col-md-2">
+                                                    <label class="form-label" for="@(group.Prefix)-plit-@i-@p">Literal</label>
+                                                    <input id="@(group.Prefix)-plit-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Literal" value="@parameter.Literal" class="form-control" />
+                                                </div>
+                                                <div class="col-6 col-md-2">
+                                                    <label class="form-label" for="@(group.Prefix)-pvar-@i-@p">Variable</label>
+                                                    <select id="@(group.Prefix)-pvar-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Variable" class="form-select">
+                                                        @foreach (var variable in FacilityAcquisitionRules.Variables)
+                                                        {
+                                                            <option value="@variable" selected="@(string.Equals(variable, parameter.Variable, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@variable</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 col-md-1">
+                                                    <label class="form-label" for="@(group.Prefix)-pfmt-@i-@p">Format</label>
+                                                    <input id="@(group.Prefix)-pfmt-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Format" value="@parameter.Format" class="form-control" />
+                                                </div>
+                                                <div class="col-6 col-md-1">
+                                                    <label class="form-label" for="@(group.Prefix)-pres-@i-@p">Resource</label>
+                                                    <input id="@(group.Prefix)-pres-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Resource" value="@parameter.Resource" class="form-control" />
+                                                </div>
+                                                <div class="col-6 col-md-1">
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input" type="checkbox" id="@(group.Prefix)-prem-@i-@p" name="@(group.Prefix)[@i].Parameters[@p].Remove" value="true" />
+                                                        <label class="form-check-label" for="@(group.Prefix)-prem-@i-@p">Remove</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <input type="hidden" name="@(group.Prefix)[@i].Parameters[@p].Paged" value="@parameter.Paged" />
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            <p class="form-text">Leave the last @group.Label.ToLowerInvariant() resource row blank to ignore it. Initial queries cannot repeat a resource type. Reference queries use page size. Parameter queries use the parameter rows.</p>
+                        }
+                        <button type="submit" class="btn btn-au-action">@(plan.Exists ? "Save query plan" : "Add query plan")</button>
+                    </form>
+                    @if (plan.Exists)
+                    {
+                        <form method="post" asp-action="DeleteQueryPlan" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this query plan?');">
+                            <input type="hidden" name="type" value="@plan.Type" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete @plan.Type query plan</button>
+                        </form>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="reportingOrgHeading">
+            <button class="@Button(Model.ReportingOrgError, org.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#reportingOrgPanel" aria-expanded="@Expanded(Model.ReportingOrgError, org.ReadFailed)" aria-controls="reportingOrgPanel">
+                Reporting organization
+            </button>
+        </h2>
+        <div id="reportingOrgPanel" class="@Collapse(Model.ReportingOrgError, org.ReadFailed)" aria-labelledby="reportingOrgHeading">
+            <div class="accordion-body">
+                @if (!string.IsNullOrWhiteSpace(Model.ReportingOrgError))
+                {
+                    <div class="alert alert-warning">@Model.ReportingOrgError</div>
+                }
+                else if (org.ReadFailed)
+                {
+                    <div class="alert alert-warning">The reporting organization configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                }
+                else if (!org.Exists)
+                {
+                    <div class="alert alert-info">No reporting organization configuration for this facility.</div>
+                }
+                @if (org.Choices.Count > 1)
+                {
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @foreach (var choice in org.Choices)
+                        {
+                            var choiceLabel = string.IsNullOrWhiteSpace(choice.Description) ? $"Configuration {choice.Id}" : choice.Description;
+                            if (choice.Id == org.ConfigId)
+                            {
+                                <span class="btn btn-sm btn-au-action disabled">@choiceLabel</span>
+                            }
+                            else
+                            {
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   asp-action="Facility"
+                                   asp-route-id="@Model.FacilityId"
+                                   asp-route-orgConfig="@choice.Id"
+                                   asp-route-planType="@plan.Type">@choiceLabel</a>
+                            }
+                        }
+                    </div>
+                }
+                @if (!org.ReadFailed)
+                {
+                    <form method="post" asp-action="SaveReportingOrg" asp-route-id="@Model.FacilityId" id="reportingOrgForm">
+                        <input type="hidden" name="Exists" value="@(org.Exists ? "true" : "false")" />
+                        <input type="hidden" name="ConfigId" value="@org.ConfigId" />
+                        <div class="mb-3">
+                            <label class="form-label" for="orgDescription">Description</label>
+                            <input id="orgDescription" name="Description" value="@org.Description" class="form-control" maxlength="500" />
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="orgActive" name="IsActive" value="true" @(org.IsActive ? "checked" : null) />
+                            <input type="hidden" name="IsActive" value="false" />
+                            <label class="form-check-label" for="orgActive">Active</label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="orgSetupMethod">Setup</label>
+                            <select id="orgSetupMethod" name="SetupMethod" class="form-select">
+                                @foreach (var method in FacilityAcquisitionRules.SetupMethods)
+                                {
+                                    <option value="@method" selected="@(string.Equals(method, org.SetupMethod, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@SetupLabel(method)</option>
+                                }
+                            </select>
+                        </div>
+                        <div data-setup-panel="manual">
+                            <label class="form-label" for="orgFhirPath">FHIRPath</label>
+                            <textarea id="orgFhirPath" name="FhirPath" class="form-control" rows="3">@org.FhirPath</textarea>
+                        </div>
+                        <div data-setup-panel="identifier">
+                            @for (var i = 0; i < org.Matches.Count; i++)
+                            {
+                                <div class="row g-2 align-items-end mb-2">
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label" for="org-system-@i">Identifier system</label>
+                                        <input id="org-system-@i" name="Matches[@i].IdentifierSystem" value="@org.Matches[i].IdentifierSystem" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <label class="form-label" for="org-code-@i">Identifier value</label>
+                                        <input id="org-code-@i" name="Matches[@i].IdentifierCode" value="@org.Matches[i].IdentifierCode" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="org-id-remove-@i" name="Matches[@i].Remove" value="true" />
+                                            <label class="form-check-label" for="org-id-remove-@i">Remove</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            <p class="form-text">Leave the last row blank. Several rows are combined with or.</p>
+                        </div>
+                        <div data-setup-panel="managingOrg">
+                            @for (var i = 0; i < org.Matches.Count; i++)
+                            {
+                                <div class="row g-2 align-items-end mb-2">
+                                    <div class="col-12 col-md-10">
+                                        <label class="form-label" for="org-managing-@i">Organization id</label>
+                                        <input id="org-managing-@i" name="Matches[@i].OrganizationId" value="@org.Matches[i].OrganizationId" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="org-org-remove-@i" name="Matches[@i].Remove" value="true" />
+                                            <label class="form-check-label" for="org-org-remove-@i">Remove</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div data-setup-panel="locationType">
+                            @for (var i = 0; i < org.Matches.Count; i++)
+                            {
+                                <div class="row g-2 align-items-end mb-2">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="org-type-@i">Location type code</label>
+                                        <input id="org-type-@i" name="Matches[@i].LocationTypeCode" value="@org.Matches[i].LocationTypeCode" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="org-alias-@i">Alias</label>
+                                        <input id="org-alias-@i" name="Matches[@i].LocationAlias" value="@org.Matches[i].LocationAlias" class="form-control" />
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="org-type-remove-@i" name="Matches[@i].Remove" value="true" />
+                                            <label class="form-check-label" for="org-type-remove-@i">Remove</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            <p class="form-text">Alias is optional. Leave the last row blank.</p>
+                        </div>
+                        <button type="submit" class="btn btn-au-action mt-2">@(org.Exists ? "Save reporting organization" : "Add reporting organization")</button>
+                    </form>
+                    @if (org.Exists && org.ConfigId is int configId)
+                    {
+                        <form method="post" asp-action="DeleteReportingOrg" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this reporting organization configuration?');">
+                            <input type="hidden" name="configId" value="@configId" />
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete reporting organization</button>
+                        </form>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="sftpHeading">
+            <button class="@Button(Model.SftpError, sftp.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#sftpPanel" aria-expanded="@Expanded(Model.SftpError, sftp.ReadFailed)" aria-controls="sftpPanel">
+                SFTP
+            </button>
+        </h2>
+        <div id="sftpPanel" class="@Collapse(Model.SftpError, sftp.ReadFailed)" aria-labelledby="sftpHeading">
+            <div class="accordion-body">
+                @if (!string.IsNullOrWhiteSpace(Model.SftpError))
+                {
+                    <div class="alert alert-warning">@Model.SftpError</div>
+                }
+                else if (sftp.ReadFailed)
+                {
+                    <div class="alert alert-warning">The SFTP configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                }
+                else if (!sftp.Exists)
+                {
+                    <div class="alert alert-info">No SFTP configuration for this facility.</div>
+                }
+                @if (!sftp.ReadFailed)
+                {
+                    @if (sftp.CredentialsSaved == true)
+                    {
+                        <p class="text-muted">Credentials are saved.</p>
+                    }
+                    else if (sftp.CredentialsSaved == false)
+                    {
+                        <p class="text-muted">Credentials are not saved.</p>
+                    }
+                    <form method="post" asp-action="SaveSftp" asp-route-id="@Model.FacilityId" autocomplete="off">
+                        <input type="hidden" name="Exists" value="@(sftp.Exists ? "true" : "false")" />
+                        <input type="hidden" name="ConfigurationId" value="@sftp.ConfigurationId" />
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpHost">Host</label>
+                                <input id="sftpHost" name="Host" value="@sftp.Host" class="form-control" maxlength="256" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <label class="form-label" for="sftpPort">Port</label>
+                                <input id="sftpPort" name="Port" value="@sftp.Port" type="number" min="1" max="65535" class="form-control" />
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label" for="sftpTimeout">Timeout</label>
+                                <input id="sftpTimeout" name="Timeout" value="@sftp.Timeout" class="form-control" placeholder="00:01:00" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="sftpDirectory">Remote directory</label>
+                                <input id="sftpDirectory" name="RemoteDirectory" value="@sftp.RemoteDirectory" class="form-control" maxlength="4096" />
+                            </div>
+                        </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="sftpRemoveAfter" name="RemoveAfterProcessing" value="true" @(sftp.RemoveAfterProcessing ? "checked" : null) />
+                            <label class="form-check-label" for="sftpRemoveAfter">Remove after processing</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="sftpBenchmark" name="EnableBenchmarking" value="true" @(sftp.EnableBenchmarking ? "checked" : null) />
+                            <label class="form-check-label" for="sftpBenchmark">Enable benchmarking</label>
+                        </div>
+                        <h3 class="h6">Acquisition types</h3>
+                        @for (var i = 0; i < sftp.Acquisitions.Count; i++)
+                        {
+                            var row = sftp.Acquisitions[i];
+                            <div class="row g-2 align-items-end mb-2">
+                                <div class="col-6 col-md-2">
+                                    <label class="form-label" for="sftp-type-@i">Type</label>
+                                    <select id="sftp-type-@i" name="Acquisitions[@i].AcquisitionType" class="form-select">
+                                        <option value=""></option>
+                                        @foreach (var acquisitionType in FacilityAcquisitionRules.AcquisitionTypes)
+                                        {
+                                            <option value="@acquisitionType" selected="@(string.Equals(acquisitionType, row.AcquisitionType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@acquisitionType</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-6 col-md-2">
+                                    <label class="form-label" for="sftp-sub-@i">Sub type</label>
+                                    <select id="sftp-sub-@i" name="Acquisitions[@i].SubType" class="form-select">
+                                        @foreach (var subType in FacilityAcquisitionRules.AcquisitionSubTypes)
+                                        {
+                                            <option value="@subType" selected="@(string.Equals(subType, row.SubType, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@subType</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <label class="form-label" for="sftp-remote-@i">Remote directory</label>
+                                    <input id="sftp-remote-@i" name="Acquisitions[@i].RemoteDirectory" value="@row.RemoteDirectory" class="form-control" placeholder="Inherit" />
+                                </div>
+                                <div class="col-12 col-md-2">
+                                    <label class="form-label" for="sftp-processed-@i">Processed directory</label>
+                                    <input id="sftp-processed-@i" name="Acquisitions[@i].ProcessedDirectory" value="@row.ProcessedDirectory" class="form-control" />
+                                </div>
+                                <div class="col-12 col-md-2">
+                                    <label class="form-label" for="sftp-pattern-@i">File name pattern</label>
+                                    <input id="sftp-pattern-@i" name="Acquisitions[@i].FileNamePattern" value="@row.FileNamePattern" class="form-control" />
+                                </div>
+                                <div class="col-12 col-md-1">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="sftp-remove-@i" name="Acquisitions[@i].Remove" value="true" />
+                                        <label class="form-check-label" for="sftp-remove-@i">Remove</label>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        <p class="form-text">Leave the last acquisition row blank. A blank directory inherits the connection directory.</p>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpUsername">Username</label>
+                                <input id="sftpUsername" name="Username" value="@sftp.Username" class="form-control" autocomplete="off" maxlength="256" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpPassword">Password</label>
+                                <input id="sftpPassword" name="Password" type="password" value="" class="form-control" autocomplete="new-password" maxlength="1024" />
+                            </div>
+                        </div>
+                        <p class="form-text">The password is not shown again. Leave the username and password blank to keep the saved credentials. Enter both to replace them.</p>
+                        <button type="submit" class="btn btn-au-action">@(sftp.Exists ? "Save SFTP" : "Add SFTP")</button>
+                    </form>
+                    @if (sftp.Exists)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <form method="post" asp-action="TestSavedSftp" asp-route-id="@Model.FacilityId">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Test saved connection</button>
+                            </form>
+                            @if (sftp.CredentialsSaved == true)
+                            {
+                                <form method="post" asp-action="DeleteSftpCredentials" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the saved SFTP credentials?');">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete credentials</button>
+                                </form>
+                            }
+                            <form method="post" asp-action="DeleteSftp" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the SFTP configuration?');">
+                                <input type="hidden" name="configurationId" value="@sftp.ConfigurationId" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete SFTP</button>
+                            </form>
+                        </div>
+                    }
+                    <form method="post" asp-action="TestSftp" asp-route-id="@Model.FacilityId" class="mt-3" autocomplete="off">
+                        <h3 class="h6">Test these details</h3>
+                        <p class="form-text">This test uses the password you type and does not store it.</p>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpTestHost">Host</label>
+                                <input id="sftpTestHost" name="Host" value="@sftp.Host" class="form-control" maxlength="256" />
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label" for="sftpTestPort">Port</label>
+                                <input id="sftpTestPort" name="Port" value="@sftp.Port" type="number" min="1" max="65535" class="form-control" />
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label class="form-label" for="sftpTestTimeout">Timeout</label>
+                                <input id="sftpTestTimeout" name="Timeout" value="@sftp.Timeout" class="form-control" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="sftpTestDirectory">Remote directory</label>
+                                <input id="sftpTestDirectory" name="RemoteDirectory" value="@sftp.RemoteDirectory" class="form-control" maxlength="4096" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpTestUsername">Username</label>
+                                <input id="sftpTestUsername" name="Username" value="" class="form-control" autocomplete="off" />
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label" for="sftpTestPassword">Password</label>
+                                <input id="sftpTestPassword" name="Password" type="password" value="" class="form-control" autocomplete="new-password" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-outline-secondary btn-sm mt-3">Test these details</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            function syncAuth() {
+                var enabled = document.getElementById("fhirAuthEnabled");
+                var type = document.getElementById("fhirAuthType");
+                var root = document.getElementById("fhirAuthFields");
+                if (!enabled || !type || !root) return;
+                root.hidden = !enabled.checked;
+                root.querySelectorAll("[data-auth-panel]").forEach(function (panel) {
+                    var on = enabled.checked && panel.getAttribute("data-auth-panel") === type.value;
+                    panel.hidden = !on;
+                    panel.querySelectorAll("input, select, textarea").forEach(function (field) {
+                        field.disabled = !on;
+                    });
+                });
+            }
+
+            function syncOrg() {
+                var method = document.getElementById("orgSetupMethod");
+                if (!method) return;
+                document.querySelectorAll("[data-setup-panel]").forEach(function (panel) {
+                    var on = panel.getAttribute("data-setup-panel") === method.value;
+                    panel.hidden = !on;
+                    panel.querySelectorAll("input, select, textarea").forEach(function (field) {
+                        field.disabled = !on;
+                    });
+                });
+            }
+
+            function syncQueries() {
+                document.querySelectorAll("[data-query-row]").forEach(function (row) {
+                    var type = row.querySelector("[data-query-type]");
+                    if (!type) return;
+                    var reference = type.value === "Reference";
+                    row.querySelectorAll("[data-query-parameters]").forEach(function (panel) { panel.hidden = reference; });
+                    row.querySelectorAll("[data-query-paged]").forEach(function (panel) { panel.hidden = !reference; });
+                });
+            }
+
+            var authEnabled = document.getElementById("fhirAuthEnabled");
+            var authType = document.getElementById("fhirAuthType");
+            var setup = document.getElementById("orgSetupMethod");
+            if (authEnabled) authEnabled.addEventListener("change", syncAuth);
+            if (authType) authType.addEventListener("change", syncAuth);
+            if (setup) setup.addEventListener("change", syncOrg);
+            document.querySelectorAll("[data-query-type]").forEach(function (select) {
+                select.addEventListener("change", syncQueries);
+            });
+            syncAuth();
+            syncOrg();
+            syncQueries();
+        })();
+    </script>
+}

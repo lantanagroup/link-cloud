@@ -275,6 +275,18 @@ public class FacilityHubServiceTests
         page.FacilityName.Should().Be("Hub");
         page.CensusConfigured.Should().BeFalse();
         page.QueryDispatchConfigured.Should().BeFalse();
+        page.DataAcquisitionConfigured.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_missing_data_acquisition_url_does_not_save()
+    {
+        var hub = Hub(Facility("hub-1"), census: null, queryDispatch: null, dmrp: true);
+
+        var result = await hub.SaveFhirQueryAsync("hub-1", new FhirQueryPanel(), CancellationToken.None);
+
+        result.RedirectFacilityId.Should().BeNull();
+        result.Page!.FhirQueryError.Should().Contain("DataAcquisitionServiceUrl");
     }
 
     private static FacilityHubService Hub(

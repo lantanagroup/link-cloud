@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Link.UI.Controllers;
 
 /// <summary>
-/// Tenant list and the facility hub (identity, census, query dispatch) via LinkSDK.
+/// Tenant list and the facility hub (identity, census, query dispatch, data acquisition) via LinkSDK.
 /// </summary>
 public sealed class TenantsController : Controller
 {
@@ -116,16 +116,16 @@ public sealed class TenantsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Facility(string? id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Facility([FromRoute] string? id, string? planType, int? orgConfig, CancellationToken cancellationToken)
     {
-        var page = await _hub.LoadEditAsync(id, cancellationToken);
+        var page = await _hub.LoadEditAsync(id, planType, orgConfig, cancellationToken);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveFacility(string? id, FacilityEditInput input, CancellationToken cancellationToken)
+    public async Task<IActionResult> SaveFacility([FromRoute] string? id, FacilityEditInput input, CancellationToken cancellationToken)
     {
         var result = await _hub.UpdateAsync(id, input, cancellationToken);
         return FromResult(result, input.FacilityName ?? id ?? "Facility");
@@ -134,7 +134,7 @@ public sealed class TenantsController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveCensus(
-        string? id,
+        [FromRoute] string? id,
         bool enabled,
         string? scheduledTrigger,
         bool censusExists,
@@ -146,7 +146,7 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteCensus(string? id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteCensus([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteCensusAsync(id, cancellationToken);
         return FromResult(result, id ?? "Facility");
@@ -155,7 +155,7 @@ public sealed class TenantsController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveQueryDispatch(
-        string? id,
+        [FromRoute] string? id,
         List<DispatchScheduleInput>? schedules,
         bool queryDispatchExists,
         CancellationToken cancellationToken)
@@ -166,7 +166,7 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteQueryDispatch(string? id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteQueryDispatch([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteQueryDispatchAsync(id, cancellationToken);
         return FromResult(result, id ?? "Facility");
@@ -174,7 +174,111 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Remove(string? id, CancellationToken cancellationToken)
+    public async Task<IActionResult> SaveFhirQuery([FromRoute] string? id, FhirQueryPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveFhirQueryAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteFhirQuery([FromRoute] string? id, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteFhirQueryAsync(id, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveFhirList([FromRoute] string? id, FhirListPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveFhirListAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteFhirList([FromRoute] string? id, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteFhirListAsync(id, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveQueryPlan([FromRoute] string? id, QueryPlanPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveQueryPlanAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteQueryPlan([FromRoute] string? id, string? type, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteQueryPlanAsync(id, type, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveReportingOrg([FromRoute] string? id, ReportingOrgPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveReportingOrgAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteReportingOrg([FromRoute] string? id, int? configId, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteReportingOrgAsync(id, configId, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveSftp([FromRoute] string? id, SftpPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveSftpAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteSftp([FromRoute] string? id, string? configurationId, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteSftpAsync(id, configurationId, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteSftpCredentials([FromRoute] string? id, CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteSftpCredentialsAsync(id, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestSavedSftp([FromRoute] string? id, CancellationToken cancellationToken)
+    {
+        var result = await _hub.TestSavedSftpAsync(id, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestSftp([FromRoute] string? id, SftpPanel input, CancellationToken cancellationToken)
+    {
+        var result = await _hub.TestSftpAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Remove([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.SoftDeleteAsync(id, cancellationToken);
         return FromResult(result, id ?? "Facility");
@@ -191,7 +295,12 @@ public sealed class TenantsController : Controller
         if (result.RedirectFacilityId is not null)
         {
             TempData["Message"] = result.RedirectMessage;
-            return RedirectToAction(nameof(Facility), new { id = result.RedirectFacilityId });
+            return RedirectToAction(nameof(Facility), new
+            {
+                id = result.RedirectFacilityId,
+                planType = result.RedirectPlanType,
+                orgConfig = result.RedirectReportingOrgId
+            });
         }
 
         ViewData["Title"] = title;
