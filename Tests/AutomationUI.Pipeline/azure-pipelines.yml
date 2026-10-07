@@ -1,7 +1,7 @@
 # =========================================
-#  Azure DevOps - Automation.UI Multi-Suite Smoke Pipeline
+#  Azure DevOps - Link.UI Multi-Suite Smoke Pipeline
 #
-#  Triggers one or more Automation.UI system sanity suites via HTTP after
+#  Triggers one or more Link.UI system sanity suites via HTTP after
 #  deployments (or on a schedule / manual run), polls each to completion,
 #  and posts a consolidated result to the testautomation Slack channel.
 #
@@ -24,9 +24,12 @@
 #       Services:  dev-scale | scale-test | scale-qa
 #     - These are normalized internally to canonical keys (dev / test / qa)
 #       for base-URL lookup. To add a new environment:
-#         a. Add AUTOMATION_UI_BASE_URL_<canonical> under variables.
+#         a. Add LINK_UI_BASE_URL_<canonical> under variables.
 #         b. Add the K8s-style name to the targetEnvironment values list.
 #         c. Extend Normalize-EnvironmentName if the name needs aliasing.
+#       Host override for one run: set LINK_UI_BASE_URL (pipeline variable,
+#       variable group, or queue-time). Do not add that name to this file.
+#       See the variables block for the full precedence.
 #
 #  2. Which suites to run
 #     - Five boolean parameters control the suites. Defaults are all true.
@@ -53,7 +56,7 @@
 #     - App Config may store a Key Vault reference JSON; the fetch step
 #       resolves it to the https webhook URL before notifying Slack.
 #     - Results include per-suite status, duration, error (if any), and deep
-#       links into Automation.UI (Runs/Details for scenarios, ApiHealth for
+#       links into Link.UI (/Automation/Runs/{id} for scenarios, /ApiHealth for
 #       the stability suite). Failed suites are called out explicitly.
 #
 #  6. Timeouts / polling
@@ -128,19 +131,57 @@ parameters:
     default: 45
 
 variables:
-  # Per-environment Automation.UI base URL.
-  # Keys are the *canonical* names produced by Normalize-EnvironmentName
+  # Link.UI base URL. Canonical env keys come from Normalize-EnvironmentName
   # (dev-scale → dev, scale-test → test, scale-qa → qa).
-  # Confirm the actual hostnames for dev and qa before first use.
+  #
+  # Precedence, first non-empty wins. The resolve step reads these before it
+  # publishes anything, then sets LINK_UI_BASE_URL to the winner for later
+  # steps. It does not copy AUTOMATION_UI_BASE_URL_<env> into
+  # AUTOMATION_UI_BASE_URL: that runtime variable would hide the Link.UI host.
+  #
+  # 1. LINK_UI_BASE_URL
+  #    Not defined in this file. A pipeline variable, variable group, or
+  #    queue-time value is therefore visible to the script. A YAML value
+  #    outranks both a queue-time value and a variable group of the same name,
+  #    so this override has to stay out of the file.
+  # 2. LINK_UI_BASE_URL_<canonical> below.
+  #    Because these are defined here, a variable group or queue-time value of
+  #    the same name does not replace them. Set LINK_UI_BASE_URL to point a
+  #    run at a different host.
+  # 3. AUTOMATION_UI_BASE_URL
+  #    Only when that unsuffixed name is already set (pipeline variable,
+  #    variable group, or queue-time). The AUTOMATION_UI_BASE_URL_<env>
+  #    entries are not a fallback.
+  #
+  # Token, same shape. An already-set LINK_UI_API_ACCESS_TOKEN is kept and
+  # acquisition is skipped. Otherwise the acquire step requests a token for
+  # LINK_UI_API_AUDIENCE when that is non-empty, else AUTOMATION_UI_API_AUDIENCE,
+  # and publishes it as LINK_UI_API_ACCESS_TOKEN (secret). The execute step
+  # uses that token, then AUTOMATION_UI_API_ACCESS_TOKEN when the new name is
+  # empty. LINK_UI_API_AUDIENCE is not defined here. Set it on the pipeline
+  # when the deployed Link.UI app registration differs. This file does not
+  # invent an audience.
+  #
+  # API Health status (/api/api-health-runs/{id}/status) is not a bearer
+  # route. That poll needs anonymous access enabled behind the proxy, as with
+  # Automation.UI today. /api/runs/{id}/status and the start routes are
+  # bearer routes.
+  LINK_UI_BASE_URL_test: "https://test-link.nhsnlink.org"
+  LINK_UI_BASE_URL_dev:  "https://dev-link.nhsnlink.org"
+  LINK_UI_BASE_URL_qa:   "https://qa-link.nhsnlink.org"
+
+  # Previous Automation.UI hosts. Resolution does not read these names.
+  # They remain so an older variable group that still sets them has the
+  # YAML default underneath it until that group is updated.
   AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
   AUTOMATION_UI_BASE_URL_dev:  "https://dev-automation.nhsnlink.org"
   AUTOMATION_UI_BASE_URL_qa:   "https://qa-automation.nhsnlink.org"
 
-  # Automation.UI API audience (App Registration expose API URI).
-  # The pipeline acquires an app-only token for "{audience}/.default".
+  # Audience used when LINK_UI_API_AUDIENCE is not set. The acquire step
+  # requests an app-only token for "{audience}/.default".
   AUTOMATION_UI_API_AUDIENCE: "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a"
 
-  # System scenario IDs are deterministic and seeded by Automation.UI's
+  # System scenario IDs are deterministic and seeded by Link.UI's
   # ScenarioSeedService -- same value in every environment.
   SCENARIO_ID_AdHocReport:            "00000000-0000-0000-0000-000000000001"
   SCENARIO_ID_AdHocDailyAchReport:    "00000000-0000-0000-0000-000000000009"
@@ -160,7 +201,7 @@ variables:
 
 stages:
   - stage: TriggerAutomationSuites
-    displayName: "Trigger Automation.UI suites"
+    displayName: "Trigger Link.UI suites"
     jobs:
       - job: Trigger
         displayName: "Start selected suites, poll, notify Slack"
@@ -194,17 +235,45 @@ stages:
                 $envName = Normalize-EnvironmentName $envNameRaw
                 Write-Host "Selected environment : $envNameRaw  (canonical: $envName)"
 
-                # Per-env base URL lookup (avoid macro expansion against undefined names)
-                $baseVar = "AUTOMATION_UI_BASE_URL_$envName"
-                $base    = (Get-Item -Path "env:$baseVar" -ErrorAction SilentlyContinue).Value
+                # Base URL precedence. Read env inputs before any setvariable in this
+                # step, and publish the winner as LINK_UI_BASE_URL. Do not set
+                # AUTOMATION_UI_BASE_URL here: later steps would treat that as the host.
+                function Get-DefinedValue([string]$Name) {
+                  $item = Get-Item -Path "env:$Name" -ErrorAction SilentlyContinue
+                  if (-not $item) { return $null }
+                  $value = [string]$item.Value
+                  if ([string]::IsNullOrWhiteSpace($value)) { return $null }
+                  return $value.Trim()
+                }
+
+                $base = $null
+                $baseSource = $null
+                $explicitLink = Get-DefinedValue "LINK_UI_BASE_URL"
+                if ($explicitLink) {
+                  $base = $explicitLink
+                  $baseSource = "LINK_UI_BASE_URL"
+                } else {
+                  $perEnvName = "LINK_UI_BASE_URL_$envName"
+                  $perEnvLink = Get-DefinedValue $perEnvName
+                  if ($perEnvLink) {
+                    $base = $perEnvLink
+                    $baseSource = $perEnvName
+                  } else {
+                    $legacyOverride = Get-DefinedValue "AUTOMATION_UI_BASE_URL"
+                    if ($legacyOverride) {
+                      $base = $legacyOverride
+                      $baseSource = "AUTOMATION_UI_BASE_URL"
+                    }
+                  }
+                }
 
                 if (-not $base) {
-                  Write-Error "Variable '$baseVar' is not defined. Add the base URL for environment '$envNameRaw' (canonical '$envName')."
+                  Write-Error "No Link.UI base URL for '$envNameRaw' (canonical '$envName'). Set LINK_UI_BASE_URL, or LINK_UI_BASE_URL_$envName. An explicit AUTOMATION_UI_BASE_URL override is also accepted."
                   exit 1
                 }
 
-                Write-Host "Target base URL : $base"
-                Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_BASE_URL]$base"
+                Write-Host "Target base URL : $base (from $baseSource)"
+                Write-Host "##vso[task.setvariable variable=LINK_UI_BASE_URL]$base"
                 Write-Host "##vso[task.setvariable variable=TARGET_ENV_RAW]$envNameRaw"
                 Write-Host "##vso[task.setvariable variable=TARGET_ENV_CANONICAL]$envName"
 
@@ -305,20 +374,33 @@ stages:
                 Write-Host "  Scheduled Report       : ${{ parameters.runScheduledReportSuite }}"
 
           # -------------------------------------------------------------
-          # Acquire an app-only AAD token for Automation.UI API.
+          # Acquire an app-only AAD token for the Link.UI API.
           # Uses the Azure DevOps service connection identity.
+          # Macro names are split below so a defined value is not compared
+          # with a second expansion of itself.
           # -------------------------------------------------------------
           - task: AzureCLI@2
-            displayName: "Acquire Automation.UI API access token"
+            displayName: "Acquire Link.UI API access token"
             condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
             inputs:
               azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
               scriptType: "pscore"
               scriptLocation: "inlineScript"
               inlineScript: |
-                $audience = "$(AUTOMATION_UI_API_AUDIENCE)"
-                if (-not $audience) {
-                  Write-Error "AUTOMATION_UI_API_AUDIENCE variable is not set or empty."
+                $unsetLinkToken = '$' + '(LINK_UI_API_ACCESS_TOKEN)'
+                $unsetLinkAudience = '$' + '(LINK_UI_API_AUDIENCE)'
+                $presetToken = "$(LINK_UI_API_ACCESS_TOKEN)"
+                if (-not [string]::IsNullOrWhiteSpace($presetToken) -and $presetToken -ne $unsetLinkToken) {
+                  Write-Host "LINK_UI_API_ACCESS_TOKEN is already set. Skipping token acquisition."
+                  exit 0
+                }
+
+                $audience = "$(LINK_UI_API_AUDIENCE)"
+                if ([string]::IsNullOrWhiteSpace($audience) -or $audience -eq $unsetLinkAudience) {
+                  $audience = "$(AUTOMATION_UI_API_AUDIENCE)"
+                }
+                if ([string]::IsNullOrWhiteSpace($audience)) {
+                  Write-Error "LINK_UI_API_AUDIENCE and AUTOMATION_UI_API_AUDIENCE are not set."
                   exit 1
                 }
 
@@ -335,7 +417,7 @@ stages:
                 }
 
                 $accessToken = $rawOutput.Trim()
-                Write-Host "Successfully acquired Automation.UI access token."
+                Write-Host "Successfully acquired Link.UI access token."
 
                 # --- Immediate verification & diagnostics ---
                 function Get-JwtPayloadObject {
@@ -379,13 +461,13 @@ stages:
                   Write-Warning "Acquired token but could not decode JWT payload for diagnostics."
                 }
 
-                Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
+                Write-Host "##vso[task.setvariable variable=LINK_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
 
           # -------------------------------------------------------------
           # Execute every selected suite sequentially, collect results.
           # -------------------------------------------------------------
           - task: PowerShell@2
-            displayName: "Execute selected Automation.UI suites"
+            displayName: "Execute selected Link.UI suites"
             condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
             inputs:
               targetType: "inline"
@@ -475,14 +557,37 @@ stages:
                   }
                 }
 
-                $base        = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
-                $token       = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
+                # The resolve step already collapsed tiers 1-3 into LINK_UI_BASE_URL.
+                # The unsuffixed legacy names are only a fallback if that publish
+                # did not happen. Markers are split so a defined value is not
+                # compared with a second expansion of itself.
+                $unsetLinkBase = '$' + '(LINK_UI_BASE_URL)'
+                $unsetLegacyBase = '$' + '(AUTOMATION_UI_BASE_URL)'
+                $unsetLinkToken = '$' + '(LINK_UI_API_ACCESS_TOKEN)'
+                $unsetLegacyToken = '$' + '(AUTOMATION_UI_API_ACCESS_TOKEN)'
+
+                $base = "$(LINK_UI_BASE_URL)"
+                if ([string]::IsNullOrWhiteSpace($base) -or $base -eq $unsetLinkBase) {
+                  $base = "$(AUTOMATION_UI_BASE_URL)"
+                }
+                if ([string]::IsNullOrWhiteSpace($base) -or $base -eq $unsetLegacyBase) {
+                  Write-Error "LINK_UI_BASE_URL is missing and AUTOMATION_UI_BASE_URL is not set."
+                  exit 1
+                }
+                $base = $base.Trim().TrimEnd('/')
+
+                $token = "$(LINK_UI_API_ACCESS_TOKEN)"
+                if ([string]::IsNullOrWhiteSpace($token) -or $token -eq $unsetLinkToken) {
+                  $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
+                }
+                if ([string]::IsNullOrWhiteSpace($token) -or $token -eq $unsetLegacyToken) {
+                  Write-Error "LINK_UI_API_ACCESS_TOKEN is missing and AUTOMATION_UI_API_ACCESS_TOKEN is not set."
+                  exit 1
+                }
                 $commitShort = "$(COMMIT_SHORT)"
                 $envName     = "${{ parameters.targetEnvironment }}"
                 $pollSeconds = ${{ parameters.pollIntervalSeconds }}
                 $timeoutMin  = ${{ parameters.completionTimeoutMinutes }}
-
-                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
 
                 # Quick token diagnostics
                 $claims = Get-JwtPayloadObject -Jwt $token
@@ -504,7 +609,7 @@ stages:
                     Type     = "ApiHealth"
                     ScenarioId = $null
                     StartPath  = "/api/api-health-runs/start-all-for-pipeline"
-                    StatusPathTemplate = "/api/api-health-runs/{0}/status"
+                    StatusPathTemplate = "/api/api-health-runs/{0}/status" # not a bearer route; needs anonymous access
                     DetailsPathTemplate = "/ApiHealth"   # UI landing page for API Health
                   }
                 }
@@ -515,7 +620,7 @@ stages:
                     ScenarioId = "$(SCENARIO_ID_AdHocReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
-                    DetailsPathTemplate = "/Runs/Details/{0}"
+                    DetailsPathTemplate = "/Automation/Runs/{0}"
                   }
                 }
                 if ("${{ parameters.runAdHocDailyAchReportSuite }}" -eq "True") {
@@ -525,7 +630,7 @@ stages:
                     ScenarioId = "$(SCENARIO_ID_AdHocDailyAchReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
-                    DetailsPathTemplate = "/Runs/Details/{0}"
+                    DetailsPathTemplate = "/Automation/Runs/{0}"
                   }
                 }
                 if ("${{ parameters.runRegenerateReportSuite }}" -eq "True") {
@@ -535,7 +640,7 @@ stages:
                     ScenarioId = "$(SCENARIO_ID_RegenerateReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
-                    DetailsPathTemplate = "/Runs/Details/{0}"
+                    DetailsPathTemplate = "/Automation/Runs/{0}"
                   }
                 }
                 if ("${{ parameters.runScheduledReportSuite }}" -eq "True") {
@@ -545,7 +650,7 @@ stages:
                     ScenarioId = "$(SCENARIO_ID_ScheduledReport)"
                     StartPath  = "/api/runs/start"
                     StatusPathTemplate = "/api/runs/{0}/status"
-                    DetailsPathTemplate = "/Runs/Details/{0}"
+                    DetailsPathTemplate = "/Automation/Runs/{0}"
                   }
                 }
 
@@ -800,7 +905,6 @@ stages:
               OVERALL_STATUS: $(OVERALL_STATUS)
               COMMIT_SHORT: $(COMMIT_SHORT)
               SKIP_RUN: $(SKIP_RUN)
-              AUTOMATION_UI_BASE_URL: $(AUTOMATION_UI_BASE_URL)
               SLACK_WEBHOOK_URL: $(SLACK_WEBHOOK_URL)
             inputs:
               targetType: "inline"
@@ -820,7 +924,6 @@ stages:
                 $skipped   = "$env:SKIP_RUN"
                 $overall   = "$env:OVERALL_STATUS"
                 $adoUrl    = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
-                $automation = "$env:AUTOMATION_UI_BASE_URL".TrimEnd('/')
 
                 if ($skipped -eq "true") {
                   $overall = "Skipped (no Deploy_All_Services build)"
@@ -865,7 +968,7 @@ stages:
                       $lines += $line
 
                       if ($s.DetailsUrl) {
-                        $lines += "    <$($s.DetailsUrl)|Open in Automation.UI>"
+                        $lines += "    <$($s.DetailsUrl)|Open in Link.UI>"
                       }
                       if ($s.Error) {
                         $errPreview = if ($s.Error.Length -gt 300) { $s.Error.Substring(0,300) + "..." } else { $s.Error }
@@ -905,7 +1008,7 @@ stages:
             inputs:
               targetType: "inline"
               script: |
-                Write-Host "##[section]Automation.UI multi-suite run summary"
+                Write-Host "##[section]Link.UI multi-suite run summary"
                 Write-Host "Environment : ${{ parameters.targetEnvironment }}"
                 Write-Host "Overall     : $env:OVERALL_STATUS"
                 Write-Host "Commit      : $env:COMMIT_SHORT"
