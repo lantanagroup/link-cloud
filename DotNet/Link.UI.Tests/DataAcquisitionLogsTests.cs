@@ -113,7 +113,7 @@ public class DataAcquisitionLogsTests
         foreach (var searchPage in new[] { "Acquisition", "Audit", "Sftp" })
         {
             Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
-                .Should().Contain("btn btn-au-neutral\">Search");
+                .Should().Contain("btn btn-au-neutral\"><i class=\"bi bi-search me-1\"></i>Search");
         }
 
         Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain(".btn-danger:hover");

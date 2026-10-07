@@ -43,20 +43,25 @@ public class AutomationMarkRulesTests
     }
 
     [Fact]
-    public void An_unowned_guid_is_not_marked_and_the_filter_defaults_to_real()
+    public void An_unowned_guid_is_not_marked_and_the_filter_defaults_to_all()
     {
         var index = AutomationMarkRules.Build([], []);
         index.Contains(Guid.NewGuid().ToString()).Should().BeFalse();
-        AutomationMarkRules.NormalizeScope(null).Should().Be("real");
+        AutomationMarkRules.NormalizeScope(null).Should().Be("all");
         AutomationMarkRules.NormalizeScope(" AUTOMATION ").Should().Be("automation");
-        AutomationMarkRules.NormalizeScope(" all ").Should().Be("all");
-        AutomationMarkRules.NormalizeScope("<script>").Should().Be("real");
+        AutomationMarkRules.NormalizeScope(" real ").Should().Be("real");
+        AutomationMarkRules.NormalizeScope("<script>").Should().Be("all");
         AutomationMarkRules.ScopeForQuery(null).Should().BeNull();
-        AutomationMarkRules.ScopeForQuery("all").Should().Be("all");
+        AutomationMarkRules.ScopeForQuery("all").Should().BeNull();
+        AutomationMarkRules.ScopeForQuery("real").Should().Be("real");
         AutomationMarkRules.Visible("real", owned: true).Should().BeFalse();
         AutomationMarkRules.Visible("real", owned: false).Should().BeTrue();
         AutomationMarkRules.Visible("automation", owned: true).Should().BeTrue();
         AutomationMarkRules.Visible("all", owned: false).Should().BeTrue();
+
+        var filter = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_AutomationScope.cshtml"));
+        filter.Should().Contain("Facility type");
+        filter.Should().NotContain(">Show<");
     }
 
     [Fact]
@@ -138,6 +143,8 @@ public class AutomationMarkRulesTests
         automation.Should().BeGreaterThan(real);
         scope.Should().NotContain("Non-automation");
         scope.Should().Contain("AutomationEnabled");
+        scope.Should().Contain("Facility type");
+        scope.Should().NotContain(">Show<");
 
         var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
         layout.Should().Contain("LinkUiFeatures.Value.AutomationEnabled");

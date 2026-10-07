@@ -2,7 +2,7 @@
 @if (LinkUiFeatures.Value.AutomationEnabled)
 {
     var scope = AutomationMarkRules.NormalizeScope(Model);
-    <label class="form-label" for="automationScope">Show</label>
+    <label class="form-label" for="automationScope">Facility type</label>
     <select id="automationScope" name="scope" class="form-select">
         @if (scope == AutomationMarkRules.Automation)
         {
@@ -10,16 +10,16 @@
             <option value="real">Real</option>
             <option value="automation" selected>Automation</option>
         }
-        else if (scope == AutomationMarkRules.All)
+        else if (scope == AutomationMarkRules.Real)
         {
-            <option value="all" selected>All</option>
-            <option value="real">Real</option>
+            <option value="all">All</option>
+            <option value="real" selected>Real</option>
             <option value="automation">Automation</option>
         }
         else
         {
-            <option value="all">All</option>
-            <option value="real" selected>Real</option>
+            <option value="all" selected>All</option>
+            <option value="real">Real</option>
             <option value="automation">Automation</option>
         }
     </select>
