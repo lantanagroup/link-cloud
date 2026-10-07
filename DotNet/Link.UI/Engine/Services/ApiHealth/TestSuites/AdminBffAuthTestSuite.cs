@@ -138,6 +138,15 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             results.Add(SkipStepAsync(StepNames.CrossApiTokenReuseGet401, tokenConfigError!));
         }
 
+        if (await AdminBffAllowsAnonymousAsync(endpointUrl, ct))
+        {
+            results.Add(SkipStepAsync(StepNames.EmptyBearerGet401, AnonymousAccessSkipReason));
+            results.Add(SkipStepAsync(StepNames.MalformedBearerGet401, AnonymousAccessSkipReason));
+            results.Add(SkipStepAsync(StepNames.MissingAuthHeaderGet401, AnonymousAccessSkipReason));
+            results.Add(SkipStepAsync(StepNames.InvalidAuthSchemeGet401, AnonymousAccessSkipReason));
+            return results;
+        }
+
         results.Add(await CallEndpointAsync(StepNames.EmptyBearerGet401, endpointUrl, 401, Header("Bearer", string.Empty), true, ct));
         results.Add(await CallEndpointAsync(StepNames.MalformedBearerGet401, endpointUrl, 401, Header("Bearer", "malformed.token.value"), true, ct));
         results.Add(await CallEndpointAsync(StepNames.MissingAuthHeaderGet401, endpointUrl, 401, null, true, ct));
@@ -146,6 +155,15 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
         results.Add(await CallEndpointAsync(StepNames.InvalidAuthSchemeGet401, endpointUrl, 401, Header("Basic", basicCredential), true, ct));
 
         return results;
+    }
+
+    public const string AnonymousAccessSkipReason =
+        "Admin BFF allows anonymous access (Authentication:EnableAnonymousAccess=true)";
+
+    private async Task<bool> AdminBffAllowsAnonymousAsync(string endpointUrl, CancellationToken ct)
+    {
+        var probe = await CallEndpointAsync(StepNames.MissingAuthHeaderGet401, endpointUrl, 200, null, false, ct);
+        return probe.ActualStatusCode == 200;
     }
 
     private async Task<ApiTestRunResult> CallEndpointAsync(
