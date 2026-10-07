@@ -146,7 +146,8 @@ public static class LogsRules
             SortBy = OneOf(query.SortBy, AcquisitionSorts) ?? "ExecutionDate",
             SortDir = query.SortDir?.Equals("asc", StringComparison.OrdinalIgnoreCase) == true ? "asc" : "desc",
             Page = FacilityViewRules.ClampPage(query.Page),
-            PageSize = ClampPageSize(query.PageSize)
+            PageSize = ClampPageSize(query.PageSize),
+            SearchTerm = Limit(query.SearchTerm)
         };
 
         var statuses = Tokens(query.Status, Statuses);
@@ -250,6 +251,7 @@ public static class LogsRules
         Add(body, "queryPhase", search.QueryPhase);
         Add(body, "queryType", search.QueryType);
         Add(body, "priority", search.Priority);
+        Add(body, "searchTerm", search.SearchTerm);
         if (search.Statuses.Count > 0)
             body["statuses"] = search.Statuses.ToList();
         if (search.IncludeDeleted)
@@ -272,7 +274,7 @@ public static class LogsRules
 
     private static string? FirstError(AcquisitionQuery query, AcquisitionSearch search, bool numericOnlyFacilityId)
     {
-        if (Overlong(query.FacilityId) || Overlong(query.PatientId) || Overlong(query.ReportId) || Overlong(query.ResourceId))
+        if (Overlong(query.FacilityId) || Overlong(query.PatientId) || Overlong(query.ReportId) || Overlong(query.ResourceId) || Overlong(query.SearchTerm))
             return $"Filters must be {MaxFilterLength} characters or fewer.";
         if (search.FacilityId is not null && !FacilityFormRules.IsValidFacilityId(search.FacilityId, numericOnlyFacilityId))
             return FacilityFormRules.FacilityIdRule(numericOnlyFacilityId);

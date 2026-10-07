@@ -2,7 +2,7 @@ namespace Link.UI.Services;
 
 /// <summary>
 /// Which facilities an automation run owns, and how the Tenants, Reports, and Logs
-/// pages turn that into a badge and a Real / Automation / All filter.
+/// pages turn that into a badge and an All / Real / Automation filter.
 /// Real is the default. The lookup is one cached read. These rules do not call a service per row.
 /// </summary>
 public static class AutomationMarkRules

@@ -95,10 +95,12 @@
         if (actions) {
             actions.replaceChildren();
             if (run.facilityId) {
-                var acquisition = document.createElement("a");
+                var acquisition = document.createElement("button");
+                acquisition.type = "button";
                 acquisition.className = "btn btn-sm btn-outline-secondary";
-                acquisition.href = "/Logs/Acquisition?facilityId=" + encodeURIComponent(run.facilityId);
-                acquisition.textContent = "Acquisition log";
+                acquisition.setAttribute("data-bs-toggle", "modal");
+                acquisition.setAttribute("data-bs-target", "#dataAcqLogModal");
+                acquisition.textContent = "Data acquisition logs";
                 actions.append(acquisition);
             }
         }

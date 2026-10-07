@@ -345,9 +345,8 @@
 
             <div class="au-card">
                 <div class="card-header" role="button" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal" style="cursor:pointer;">
-                    <i class="bi bi-download me-2"></i>Data Acquisition
+                    <i class="bi bi-download me-2"></i>Data acquisition logs
                     <span class="badge bg-light text-dark ms-2" id="dataAcqTotalLogs">0</span>
-                    <span class="small ms-1" style="opacity:.7;">logs (click to drill down)</span>
                 </div>
                 <div class="card-body">
                     <div class="row g-3 mb-3">
@@ -518,62 +517,3 @@
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content au-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-download me-2"></i><span id="dataAcqLogModalLabel">Data Acquisition Logs</span></span>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
-                    <input type="search"
-                           id="daLogSearch"
-                           class="form-control form-control-sm"
-                           style="max-width:360px;"
-                           placeholder="Filter all logs (Id, patient, status, phase, resource types…)"
-                           autocomplete="off" />
-                    <span class="small text-muted" id="daLogFilterInfo"></span>
-                </div>
-                <div class="table-responsive">
-                    <table class="table au-table mb-0" id="dataAcqLogTable">
-                        <thead>
-                            <tr>
-                                <th role="button" class="user-select-none" data-sortby="Id">Id <span id="sortIconId" class="text-white-50"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="PatientId">Patient <span id="sortIconPatientId" class="text-white-50"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="Status">Status <span id="sortIconStatus" class="text-white-50"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="QueryPhase">Phase <span id="sortIconQueryPhase" class="text-white-50"></span></th>
-                                <th>Reference</th>
-                                <th>Resource Types</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="dataAcqLogTableBody">
-                        </tbody>
-                    </table>
-                </div>
-
-<div id="daLogFlyout" class="au-card" style="position:fixed; top:0; right:-720px; width:700px; max-width:96vw; height:100%; z-index:1060; transition:right .2s ease; border-radius:0; margin-bottom:0;">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-            <div id="daLogFlyoutTitle"><i class="bi bi-file-text me-2"></i>Data Acquisition Log Details</div>
-            <div class="small" id="daLogFlyoutSubtitle" style="opacity:.85;font-weight:400;"></div>
-        </div>
-        <button type="button" class="btn-close btn-close-white" id="closeDaLogFlyout" aria-label="Close"></button>
-    </div>
-    <div class="p-3" id="daLogFlyoutBody" style="overflow:auto; height: calc(100% - 56px); background:#fff;"></div>
-</div>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <span class="small text-muted" id="dataAcqLogPaginationInfo"></span>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-au-action" id="dataAcqLogPrev" disabled>Previous</button>
-                        <button class="btn btn-au-action" id="dataAcqLogNext" disabled>Next</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-

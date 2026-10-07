@@ -28,6 +28,7 @@ public sealed class AcquisitionQuery
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
     public string? Scope { get; set; }
+    public string? SearchTerm { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
 
@@ -48,6 +49,7 @@ public sealed class AcquisitionQuery
         SortBy = SortBy,
         SortDir = SortDir,
         Scope = Scope,
+        SearchTerm = SearchTerm,
         Page = page,
         PageSize = pageSize
     };
@@ -66,7 +68,8 @@ public sealed class AcquisitionQuery
         MinAgeHours.ToString(),
         Status is null ? "" : string.Join(',', Status),
         SortBy,
-        SortDir
+        SortDir,
+        SearchTerm
     });
 
     public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
@@ -87,6 +90,7 @@ public sealed class AcquisitionQuery
         if (CancellableOnly)
             route["cancellableOnly"] = "true";
         AutomationMarkRules.AddScope(route, Scope);
+        Add(route, "searchTerm", SearchTerm);
         if (MinAgeHours != LogsRules.DefaultMinAgeHours)
             route["minAgeHours"] = MinAgeHours.ToString();
         Add(route, "sortBy", sortBy ?? SortBy);
@@ -128,6 +132,7 @@ public sealed class AcquisitionSearch
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
     public string? Error { get; set; }
     public bool HasFilter { get; set; }
+    public string? SearchTerm { get; set; }
 }
 
 public sealed class AcquisitionLogListPage
@@ -140,6 +145,14 @@ public sealed class AcquisitionLogListPage
     public PageBar Paging { get; set; } = new();
     public IReadOnlyList<AcquisitionListRow> Logs { get; set; } = [];
     public string? ScopeNote { get; set; }
+    public bool Embedded { get; set; }
+    public Guid? RunId { get; set; }
+}
+
+public sealed class DataAcquisitionLogsModal
+{
+    public Guid? RunId { get; init; }
+    public string? FacilityId { get; init; }
 }
 
 public sealed class AcquisitionListRow

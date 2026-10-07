@@ -105,7 +105,7 @@ else
                 <div class="mt-3 d-flex flex-wrap gap-2" id="runActions">
                     @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Logs" asp-action="Acquisition" asp-route-facilityId="@run.FacilityId">Acquisition log</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
                     }
                 </div>
             </div>
@@ -118,6 +118,14 @@ else
             </div>
         </div>
     </div>
+}
+
+@{
+    var modalRunId = detail?.RunId ?? run?.RunId;
+}
+@if (modalRunId is Guid openRunId && openRunId != Guid.Empty)
+{
+    <partial name="_DataAcquisitionLogsModal" model="@(new DataAcquisitionLogsModal { RunId = openRunId })" />
 }
 
 @section Scripts {
