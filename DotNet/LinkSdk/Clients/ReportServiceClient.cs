@@ -71,6 +71,12 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
         return SendAsync<PagedConfigModel<ReportScheduleApiModel>>(() => request.GetAsync(cancellationToken: cancellationToken));
     }
 
+    public Task<LinkApiResponse<ReportActivityCounts>> GetActivityCountsAsync(
+        ReportActivityCountRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<ReportActivityCounts>(() => Request("/schedules/counts")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(
         string? facilityId = null,
         ReportStatus? status = null,

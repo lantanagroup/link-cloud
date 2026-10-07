@@ -216,6 +216,34 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         /// <summary>
+        /// Counts facilities. An optional id set reports how many of those ids exist.
+        /// </summary>
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FacilityCounts))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [HttpPost("counts")]
+        public async Task<IActionResult> CountFacilities(
+            [FromBody] FacilityCountRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (!AggregateCountLimits.TryFacilityIds(request?.FacilityIds, out var ids, out var error))
+                return BadRequest(error);
+
+            try
+            {
+                var counts = await _facilityQueries.CountAsync(ids, cancellationToken);
+                return Ok(counts);
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                Activity.Current?.AddException(ex);
+                _logger.LogError(ex, "Exception encountered in FacilityController.CountFacilities");
+                return Problem("An error occurred while counting facilities", null, 500);
+            }
+        }
+
+        /// <summary>
         /// Creates a facility configuration.
         /// </summary>
         /// <param name="newFacility"></param>

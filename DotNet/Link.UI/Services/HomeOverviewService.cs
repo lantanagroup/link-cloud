@@ -1,7 +1,9 @@
-using System.Globalization;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Link.UI.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -126,39 +128,81 @@ public sealed class HomeOverviewService : IHomeOverview
     }
 
     private Task<FacilityCard> LoadFacilitiesAsync(CancellationToken cancellationToken, bool classify) =>
-        Guard("facilities", async token =>
-        {
-            var listTask = _facilities.GetFacilityListAsync(cancellationToken: token);
-            Task<(AutomationOwnershipIndex Index, bool Reachable)>? ownershipTask = classify
-                ? _ownership.GetSnapshotAsync(token)
-                : null;
-            if (ownershipTask is null)
-                await listTask;
-            else
-                await Task.WhenAll(listTask, ownershipTask);
-            var list = await listTask;
-            var ownershipReachable = false;
-            AutomationOwnershipIndex? index = null;
-            if (ownershipTask is not null)
-                (index, ownershipReachable) = await ownershipTask;
-            if (!HomeOverviewRules.TryReadFacilities(list.StatusCode, list.IsSuccessStatusCode, list.Body, out var ids))
-            {
-                var message = list.StatusCode == 0
-                    ? "Tenant service could not be reached."
-                    : $"Tenant service returned HTTP {list.StatusCode}.";
-                return HomeOverviewRules.Facilities(false, message, ownershipReachable, null, null, classify);
-            }
-
-            return HomeOverviewRules.Facilities(true, null, ownershipReachable, ids, index, classify);
-        }, failure => HomeOverviewRules.Facilities(
+        Guard("facilities", token => LoadFacilityCountsAsync(token, classify), failure => HomeOverviewRules.FacilitiesFromCounts(
             false,
             failure == HomeOverviewRules.CardFailure.Timeout
                 ? "Tenant service could not be reached."
                 : "Tenant service call failed.",
+            0,
+            null,
             true,
-            null,
-            null,
             classify), cancellationToken);
+
+    private async Task<FacilityCard> LoadFacilityCountsAsync(CancellationToken cancellationToken, bool classify)
+    {
+        if (!classify)
+            return await ReadFacilityTotalAsync(cancellationToken, ownershipReachable: true, classify: false);
+
+        var (index, ownershipReachable) = await _ownership.GetSnapshotAsync(cancellationToken);
+        if (!ownershipReachable)
+            return await ReadFacilityTotalAsync(cancellationToken, ownershipReachable: false, classify: true);
+
+        var matched = 0;
+        var total = 0;
+        var first = true;
+        foreach (var batch in HomeOverviewRules.FacilityIdBatches(index.FacilityIds))
+        {
+            var response = await _facilities.GetFacilityCountsAsync(
+                new FacilityCountRequest { FacilityIds = batch.ToList() },
+                cancellationToken);
+            if (!TryCount(response, out var body, out var message) || body.Matched is not int batchMatched)
+            {
+                return HomeOverviewRules.FacilitiesFromCounts(
+                    false,
+                    message ?? "Tenant service returned an incomplete count.",
+                    0,
+                    null,
+                    true,
+                    true);
+            }
+
+            if (first)
+            {
+                total = body.Total;
+                first = false;
+            }
+
+            matched += batchMatched;
+        }
+
+        return HomeOverviewRules.FacilitiesFromCounts(true, null, total, matched, true, true);
+    }
+
+    private async Task<FacilityCard> ReadFacilityTotalAsync(
+        CancellationToken cancellationToken,
+        bool ownershipReachable,
+        bool classify)
+    {
+        var response = await _facilities.GetFacilityCountsAsync(new FacilityCountRequest(), cancellationToken);
+        if (!TryCount(response, out var body, out var message))
+            return HomeOverviewRules.FacilitiesFromCounts(false, message, 0, null, ownershipReachable, classify);
+        return HomeOverviewRules.FacilitiesFromCounts(true, null, body.Total, null, ownershipReachable, classify);
+    }
+
+    private static bool TryCount<T>(LinkApiResponse<T> response, out T body, out string? message)
+        where T : class
+    {
+        if (response.IsSuccessStatusCode && response.Body is not null)
+        {
+            body = response.Body;
+            message = null;
+            return true;
+        }
+
+        body = null!;
+        message = FacilityFormRules.ServiceMessage("Tenant", response.StatusCode, response.RawBody);
+        return false;
+    }
 
     private Task<ReportCard> LoadReportsAsync(CancellationToken cancellationToken, bool stamp) =>
         Guard("reports", async token =>
@@ -251,92 +295,62 @@ public sealed class HomeOverviewService : IHomeOverview
 
     private async Task<LogCard> LoadLogsAsync(CancellationToken cancellationToken)
     {
-        var acquisitionTask = Guard("acquisition-logs", token => _logs.LoadAcquisitionAsync(new AcquisitionQuery
-        {
-            Status = HomeOverviewRules.ErrorLogStatuses.ToList(),
-            Page = 1,
-            PageSize = LogsRules.DefaultPageSize,
-            SortBy = "ExecutionDate",
-            SortDir = "desc"
-        }, token), _ => (AcquisitionLogListPage?)null, cancellationToken);
-
-        var auditTask = Guard("audit", token => _logs.LoadAuditAsync(new AuditQuery
-        {
-            Page = 1,
-            PageSize = LogsRules.DefaultPageSize
-        }, token), _ => (AuditListPage?)null, cancellationToken);
+        var acquisitionTask = Guard(
+            "acquisition-logs",
+            token => _logs.LoadAcquisitionCountsAsync(HomeOverviewRules.TrendLength, token),
+            _ => (AcquisitionCountLoad?)null,
+            cancellationToken);
+        var auditTask = Guard(
+            "audit",
+            token => _logs.LoadAuditErrorsAsync(AggregateCountLimits.DefaultAuditHours, token),
+            _ => (AuditErrorLoad?)null,
+            cancellationToken);
 
         await Task.WhenAll(acquisitionTask, auditTask);
         var acquisition = await acquisitionTask;
         var audit = await auditTask;
+        var acquisitionOk = acquisition is { Ok: true };
+        var auditOk = audit is { Ok: true };
         return HomeOverviewRules.Logs(
-            acquisition is { LoadError: null },
-            acquisition?.LoadError ?? "Data acquisition could not be reached.",
-            acquisition?.Paging.TotalCount ?? 0,
+            acquisitionOk,
+            acquisition?.Error ?? "Data acquisition could not be reached.",
+            acquisition?.FailedTotal ?? 0,
             null,
-            audit is { LoadError: null },
-            audit?.LoadError);
+            auditOk,
+            audit?.Error,
+            acquisitionOk,
+            acquisition?.Days,
+            auditOk,
+            audit?.Errors ?? 0);
     }
 
     private Task<ActivityCard> LoadActivityAsync(CancellationToken cancellationToken) =>
         Guard("activity", async token =>
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var days = HomeOverviewRules.TrendDays(today);
-            var inFlight = CountReportsAsync(HomeOverviewRules.InFlightStatuses, null, "asc", token);
-            var submitted = CountReportsAsync([HomeOverviewRules.SubmittedStatus], null, "desc", token);
-            var completed = CountReportsAsync([HomeOverviewRules.CompletedStatus], null, "desc", token);
-            var trend = days
-                .Select(day => CountReportsAsync(null, day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "desc", token))
-                .ToArray();
-            await Task.WhenAll(new[] { inFlight, submitted, completed }.Concat(trend));
+            var load = await _reports.LoadActivityCountsAsync(HomeOverviewRules.TrendLength, token);
+            if (!load.Ok || load.Counts is null)
+                return new ActivityCard();
 
-            var inFlightCount = await inFlight;
-            var submittedCount = await submitted;
-            var completedCount = await completed;
-            var trendDays = new TrendDay[days.Count];
-            for (var i = 0; i < days.Count; i++)
+            var counts = load.Counts;
+            DateTimeOffset? oldest = counts.OldestInFlightUtc is DateTime value
+                ? new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc))
+                : null;
+            var trend = counts.CreatedPerDay.Select(day => new TrendDay
             {
-                var dayCount = await trend[i];
-                trendDays[i] = new TrendDay
-                {
-                    Day = days[i].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    Reachable = dayCount.Ok,
-                    Count = dayCount.Ok ? dayCount.Total : 0
-                };
-            }
-
+                Day = day.Day,
+                Reachable = true,
+                Count = day.Count
+            }).ToList();
             return HomeOverviewRules.Activity(
-                inFlightCount.Ok,
-                inFlightCount.Total,
-                inFlightCount.Ok ? HomeOverviewRules.ParseIso(inFlightCount.FirstCreated) : null,
-                submittedCount.Ok,
-                submittedCount.Total,
-                completedCount.Ok,
-                completedCount.Total,
-                trendDays);
+                true,
+                counts.InFlight,
+                oldest,
+                true,
+                counts.Submitted,
+                true,
+                counts.NotSubmitted,
+                trend);
         }, _ => new ActivityCard(), cancellationToken);
-
-    private async Task<ReportCount> CountReportsAsync(
-        IReadOnlyList<string>? statuses,
-        string? created,
-        string sortDir,
-        CancellationToken cancellationToken)
-    {
-        var page = await _reports.LoadListAsync(new ReportsListQuery
-        {
-            Page = 1,
-            PageSize = HomeOverviewRules.RowLimit,
-            SortBy = "CreateDate",
-            SortDir = sortDir,
-            Status = statuses?.ToList(),
-            Created = created
-        }, cancellationToken);
-        if (page.LoadError is not null)
-            return new ReportCount(false, 0, null);
-        var first = page.Reports.Count > 0 ? page.Reports[0].Created : null;
-        return new ReportCount(true, page.Paging.TotalCount, first);
-    }
 
     private Task<ServicePulseCard> LoadPulseAsync(CancellationToken cancellationToken) =>
         Guard("pulse", async token =>
@@ -357,8 +371,6 @@ public sealed class HomeOverviewService : IHomeOverview
                 ? "Service metrics could not be read."
                 : "Service metrics could not be read.",
             null), cancellationToken);
-
-    private sealed record ReportCount(bool Ok, long Total, string? FirstCreated);
 
     private Task<T> Guard<T>(
         string card,

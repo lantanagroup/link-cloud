@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Audit;
 using LantanaGroup.Link.Audit.Domain.Entities;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
@@ -105,6 +106,32 @@ namespace LantanaGroup.Link.Audit.Presentation.Controllers
                 Activity.Current?.AddException(ex);
                 AuditSearchFilterRecord searchFilter = new(searchText, facility, correlationId, service, action, user, sortBy, sortOrder, pageSize, pageNumber);
                 _logger.LogAuditEventListQueryException(ex.Message, searchFilter);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Counts audit rows in a recent UTC window whose notes record a failure.
+        /// </summary>
+        [HttpGet("errors")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuditErrorCount))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<AuditErrorCount>> CountErrors(int hours = AggregateCountLimits.DefaultAuditHours)
+        {
+            if (!AggregateCountLimits.TryHours(hours, out var error))
+                return BadRequest(error);
+
+            try
+            {
+                var counts = await _searchRepository.CountErrorsAsync(hours, DateTime.UtcNow, HttpContext.RequestAborted);
+                return Ok(counts);
+            }
+            catch (Exception ex)
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
+                Activity.Current?.AddException(ex);
+                _logger.LogError(ex, "An exception occurred while counting audit errors");
                 throw;
             }
         }

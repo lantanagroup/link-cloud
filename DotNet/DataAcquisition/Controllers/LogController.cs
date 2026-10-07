@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -394,6 +395,33 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportStatistics"), ex, "An exception occurred while attempting to get report statistics with a report id of {id}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Log totals per UTC day, plus the failed total. Failed is Failed and MaxRetriesReached.
+    /// </summary>
+    [HttpPost("counts")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AcquisitionActivityCounts))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<AcquisitionActivityCounts>> Counts(
+        [FromBody] AcquisitionActivityCountRequest? request,
+        CancellationToken cancellationToken)
+    {
+        request ??= new AcquisitionActivityCountRequest();
+        if (!AggregateCountLimits.TryDays(request.Days, out var error))
+            return BadRequest(error);
+
+        try
+        {
+            var counts = await _logQueries.GetActivityCountsAsync(request.Days, DateTime.UtcNow, cancellationToken);
+            return Ok(counts);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "Counts"), ex, "An exception occurred while counting acquisition logs");
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Audit.Application.Queries;
 using LantanaGroup.Link.Audit.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Audit;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
@@ -113,5 +115,8 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
 
             return sortExpression;
         }
+
+        public Task<AuditErrorCount> CountErrorsAsync(int hours, DateTime utcNow, CancellationToken cancellationToken = default) =>
+            AuditErrorCountQuery.ExecuteAsync(_dbContext.AuditLogs.AsNoTracking(), hours, utcNow, cancellationToken);
     }
 }

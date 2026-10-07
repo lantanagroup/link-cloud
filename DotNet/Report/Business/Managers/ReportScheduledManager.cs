@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Business.Queries;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.Models;
@@ -37,6 +38,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             bool includeDeleted, string? sortBy, SortOrder? sortOrder,
             int pageSize, int pageNumber, CancellationToken cancellationToken = default,
             DateOnly? createDate = null, Guid? id = null);
+
+        Task<ReportActivityCounts> GetActivityCountsAsync(
+            int days,
+            DateTime utcNow,
+            IReadOnlyCollection<string>? includeFacilityIds,
+            IReadOnlyCollection<string>? excludeFacilityIds,
+            CancellationToken cancellationToken = default);
 
         Task UpdateReportsDeletedStatusForFacility(
             string facilityId, bool deleted, CancellationToken cancellationToken = default);
@@ -331,6 +339,20 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             var metadata = new PaginationMetadata(pageSize, pageNumber, totalCount);
 
             return new PagedConfigModel<ReportScheduleModel>(results, metadata);
+        }
+
+        public Task<ReportActivityCounts> GetActivityCountsAsync(
+            int days,
+            DateTime utcNow,
+            IReadOnlyCollection<string>? includeFacilityIds,
+            IReadOnlyCollection<string>? excludeFacilityIds,
+            CancellationToken cancellationToken = default)
+        {
+            var query = ReportActivityCountQuery.Apply(
+                _context.ReportSchedule.AsNoTracking(),
+                includeFacilityIds,
+                excludeFacilityIds);
+            return ReportActivityCountQuery.ExecuteAsync(query, days, utcNow, cancellationToken);
         }
 
         public async Task UpdateReportsDeletedStatusForFacility(

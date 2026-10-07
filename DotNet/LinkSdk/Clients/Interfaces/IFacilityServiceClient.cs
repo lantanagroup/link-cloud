@@ -25,6 +25,9 @@ public interface IFacilityServiceClient
     Task<LinkApiResponse> RestoreAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SearchFacilitiesAsync(string? facilityId = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
+
+    /// <summary>Facility totals, and how many of an optional id set exist: <c>POST /api/Facility/counts</c>.</summary>
+    Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(FacilityCountRequest request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default);
 }

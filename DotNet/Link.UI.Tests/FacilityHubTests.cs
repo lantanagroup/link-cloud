@@ -380,6 +380,7 @@ sealed class FakeFacilities : IFacilityServiceClient
     public Task<LinkApiResponse> RestoreAsync(string facilityId, CancellationToken cancellationToken = default) => Unused();
     public Task<LinkApiResponse> SearchFacilitiesAsync(string? facilityId = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default) => Unused();
     public Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default) => Unused<Dictionary<string, string>>();
+    public Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(FacilityCountRequest request, CancellationToken cancellationToken = default) => Unused<FacilityCounts>();
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default) => Unused<GenerateAdhocReportResponseApiModel>();
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default) => Unused<GenerateAdhocReportResponseApiModel>();
 

@@ -19,6 +19,17 @@ namespace Link.UI.Services;
 /// </summary>
 public sealed record ReportCountRow(string Id, int? Census, int? Population);
 
+public sealed class ReportActivityLoad
+{
+    public bool Ok { get; init; }
+    public string? Error { get; init; }
+    public ReportActivityCounts? Counts { get; init; }
+
+    public static ReportActivityLoad Failed(string error) => new() { Error = error };
+
+    public static ReportActivityLoad Ready(ReportActivityCounts counts) => new() { Ok = true, Counts = counts };
+}
+
 public sealed class ReportsService
 {
     public const string ReportNotConfigured =
@@ -77,6 +88,31 @@ public sealed class ReportsService
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<ReportsService>>());
+    }
+
+    public async Task<ReportActivityLoad> LoadActivityCountsAsync(int days, CancellationToken cancellationToken)
+    {
+        if (_reports is null)
+            return ReportActivityLoad.Failed(ReportNotConfigured);
+
+        try
+        {
+            var response = await _reports.GetActivityCountsAsync(
+                new ReportActivityCountRequest { Days = days },
+                cancellationToken);
+            if (!response.IsSuccessStatusCode || response.Body is null)
+                return ReportActivityLoad.Failed(FacilityFormRules.ServiceMessage("Report", response.StatusCode, response.RawBody));
+            return ReportActivityLoad.Ready(response.Body);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report activity counts failed");
+            return ReportActivityLoad.Failed("Report service call failed.");
+        }
     }
 
     public async Task<ReportsListModel> LoadListAsync(ReportsListQuery? query, CancellationToken cancellationToken)

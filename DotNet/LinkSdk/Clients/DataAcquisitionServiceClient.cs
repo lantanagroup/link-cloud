@@ -241,6 +241,12 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         });
     }
 
+    public Task<LinkApiResponse<AcquisitionActivityCounts>> GetActivityCountsAsync(
+        AcquisitionActivityCountRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<AcquisitionActivityCounts>(() => Request("data/acquisition-logs/counts")
+            .PostJsonAsync(request ?? new AcquisitionActivityCountRequest(), cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(
         long id,
         CancellationToken cancellationToken = default) =>

@@ -1,4 +1,5 @@
 using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models.Audit;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
@@ -20,4 +21,7 @@ public interface IAuditServiceClient
 
     /// <summary>Reads one audit event: <c>GET /api/audit/{id}</c>.</summary>
     Task<LinkApiResponse<AuditEventApiModel>> GetAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Failure notes in a recent window: <c>GET /api/audit/errors</c>.</summary>
+    Task<LinkApiResponse<AuditErrorCount>> GetErrorCountAsync(int hours, CancellationToken cancellationToken = default);
 }

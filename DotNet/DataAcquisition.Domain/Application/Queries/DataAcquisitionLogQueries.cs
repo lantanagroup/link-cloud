@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using AcquisitionActivityCounts = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.AcquisitionActivityCounts;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -108,6 +109,8 @@ public interface IDataAcquisitionLogQueries
     /// stale claims (lease expired, TailSent still false) are included.
     /// </summary>
     Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default);
+
+    Task<AcquisitionActivityCounts> GetActivityCountsAsync(int days, DateTime utcNow, CancellationToken cancellationToken = default);
 
 }
 
@@ -1256,4 +1259,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         return orphanedGroups;
     }
+
+    public Task<AcquisitionActivityCounts> GetActivityCountsAsync(
+        int days,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default) =>
+        AcquisitionActivityCountQuery.ExecuteAsync(
+            _dbContext.DataAcquisitionLogs.AsNoTracking(),
+            days,
+            utcNow,
+            cancellationToken);
 }
