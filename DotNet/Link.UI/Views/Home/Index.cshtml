@@ -7,12 +7,12 @@
     <div class="card-header">Welcome</div>
     <div class="card-body">
         <p class="mb-2">
-            Link.UI is the phase-1 merge shell for Admin (and later Automation) on the Automation.UI MVC stack.
+            Link.UI is the Admin console on the Automation.UI MVC stack. Automation testing is a later phase.
         </p>
         <ul class="mb-3">
             <li>Left-hand vertical navigation</li>
             <li>Admin.BFF cookie auth via same-origin <code>/api</code> reverse proxy</li>
-            <li>Tenant list proof page via LinkSDK <code>IFacilityServiceClient</code></li>
+            <li>Tenant list and facility hub (identity, census, query dispatch) via LinkSDK</li>
         </ul>
         @if (Model?.IsAuthenticated == true)
         {

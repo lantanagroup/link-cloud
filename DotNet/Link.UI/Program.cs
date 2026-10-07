@@ -31,6 +31,12 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
+builder.Services.Configure<LinkUiFeatureOptions>(options =>
+{
+    options.DmrpEnabled = builder.Configuration.GetValue<bool>("DMRP:Enabled");
+    options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
+});
+builder.Services.AddScoped(FacilityHubService.Create);
 
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 
