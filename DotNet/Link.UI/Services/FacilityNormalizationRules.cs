@@ -14,6 +14,8 @@ public static class FacilityNormalizationRules
     public const int PageSize = 20;
     public const int MaxImportCharacters = 64 * 1024;
     public const int MaxImportUrls = 200;
+    public const int MaxPasteRows = 200;
+    public const int MaxVendorOwners = 40;
     public const int SequencePageSize = 200;
     public const string HslocSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
     public const string HslocName = "HSLOC Location Mapping";
@@ -552,6 +554,18 @@ public static class FacilityNormalizationRules
             if (row.Remove)
                 continue;
 
+            if (!TryParseCodeMapPaste(row.PasteRows, out var pasted, out error))
+                return false;
+
+            if (pasted.Count > 0)
+            {
+                row.Entries ??= [];
+                if (row.Entries.Count > 0 && IsBlankEntry(row.Entries[^1]))
+                    row.Entries.RemoveAt(row.Entries.Count - 1);
+                row.Entries.AddRange(pasted);
+                row.PasteRows = null;
+            }
+
             var source = row.SourceSystem?.Trim() ?? string.Empty;
             var target = hsloc ? HslocSystem : row.TargetSystem?.Trim() ?? string.Empty;
             var entries = (row.Entries ?? [])
@@ -687,7 +701,8 @@ public static class FacilityNormalizationRules
             {
                 SourceSystem = row.SourceSystem,
                 TargetSystem = hsloc ? HslocSystem : row.TargetSystem,
-                Entries = WithBlankEntry(row.Entries)
+                Entries = WithBlankEntry(row.Entries),
+                PasteRows = row.PasteRows
             })
             .ToList();
         if (list.Count == 0 || !IsBlankMap(list[^1], hsloc))
@@ -949,6 +964,127 @@ public static class FacilityNormalizationRules
         }
 
         vendorVersionIds = chosen;
+        error = null;
+        return true;
+    }
+
+    public static bool TryVendorOwners(
+        bool posted,
+        bool loaded,
+        IEnumerable<string>? postedIds,
+        IEnumerable<Guid> catalogIds,
+        IEnumerable<Guid> existingIds,
+        out List<Guid>? ids,
+        out string? error)
+    {
+        ids = null;
+        if (!posted || !loaded)
+        {
+            error = "Vendor versions could not be loaded, so the operation was not saved.";
+            return false;
+        }
+
+        var allowed = new HashSet<Guid>();
+        foreach (var id in catalogIds.Concat(existingIds))
+        {
+            if (id != Guid.Empty)
+                allowed.Add(id);
+        }
+
+        var chosen = new List<Guid>();
+        foreach (var raw in postedIds ?? [])
+        {
+            var text = raw?.Trim();
+            if (string.IsNullOrEmpty(text))
+                continue;
+            if (!Guid.TryParse(text, out var id) || id == Guid.Empty || !allowed.Contains(id))
+            {
+                error = "Each vendor preset must be a vendor version on this page.";
+                return false;
+            }
+
+            if (!chosen.Contains(id))
+                chosen.Add(id);
+        }
+
+        if (chosen.Count == 0)
+        {
+            error = "Select at least one vendor version.";
+            return false;
+        }
+
+        if (chosen.Count > MaxVendorOwners)
+        {
+            error = "Select at most 40 vendor versions.";
+            return false;
+        }
+
+        ids = chosen;
+        error = null;
+        return true;
+    }
+
+    public static bool TryParseCodeMapPaste(string? text, out List<CodeMapEntryInput> rows, out string? error)
+    {
+        rows = [];
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            error = null;
+            return true;
+        }
+
+        if (text.Length > MaxImportCharacters)
+        {
+            error = "Pasted code maps must be 64 KB or smaller.";
+            return false;
+        }
+
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        var tsv = lines.Any(line => !string.IsNullOrWhiteSpace(line) && line.Contains('\t'));
+        foreach (var rawLine in lines)
+        {
+            if (string.IsNullOrWhiteSpace(rawLine))
+                continue;
+
+            List<string> fields;
+            if (tsv)
+            {
+                fields = rawLine.Split('\t').Select(field => field.Trim()).ToList();
+            }
+            else if (!TrySplitCsv(rawLine, out fields))
+            {
+                error = "A pasted row has an unmatched quote.";
+                return false;
+            }
+
+            if (fields.Count < 2)
+                continue;
+
+            var source = fields[0].Trim().TrimStart('\uFEFF');
+            var target = fields[1].Trim();
+            if (source.Length == 0 || target.Length == 0)
+                continue;
+
+            var display = fields.Count >= 3 && !string.IsNullOrWhiteSpace(fields[2]) ? fields[2].Trim() : target;
+            rows.Add(new CodeMapEntryInput
+            {
+                SourceCode = source,
+                Code = target,
+                Display = display
+            });
+            if (rows.Count > MaxPasteRows)
+            {
+                error = "Paste at most 200 code map rows.";
+                return false;
+            }
+        }
+
+        if (rows.Count == 0)
+        {
+            error = "No code map rows could be read. Each row needs a source code and a target code.";
+            return false;
+        }
+
         error = null;
         return true;
     }

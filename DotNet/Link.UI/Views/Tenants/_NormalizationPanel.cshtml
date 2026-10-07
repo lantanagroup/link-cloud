@@ -2,7 +2,8 @@
 @model FacilityHubViewModel
 @{
     var panel = Model.Normalization;
-    var open = !string.IsNullOrWhiteSpace(Model.NormalizationError)
+    var open = panel.VendorOwned
+        || !string.IsNullOrWhiteSpace(Model.NormalizationError)
         || panel.ReadFailed
         || panel.EditorOpen
         || !string.IsNullOrWhiteSpace(panel.TestResult);
@@ -17,7 +18,7 @@
 <div class="accordion-item" id="normalizationPanel">
     <h2 class="accordion-header" id="normalizationHeading">
         <button class="@button" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationBody" aria-expanded="@expanded" aria-controls="normalizationBody">
-            Normalization operations
+            @(panel.VendorOwned ? "Vendor operation" : "Normalization operations")
         </button>
     </h2>
     <div id="normalizationBody" class="@collapse" aria-labelledby="normalizationHeading">
@@ -32,6 +33,14 @@
                 {
                     <div class="alert alert-warning">@Model.NormalizationError</div>
                 }
+                @if (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.FormError))
+                {
+                    <div class="alert alert-warning" id="vendor-operation-error">@Model.FormError</div>
+                }
+                @if (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.VendorWarning))
+                {
+                    <div class="alert alert-info">@Model.VendorWarning</div>
+                }
                 @if (!string.IsNullOrWhiteSpace(panel.ResourceWarning))
                 {
                     <div class="alert alert-info">@panel.ResourceWarning</div>
@@ -42,6 +51,8 @@
                 }
                 else
                 {
+                    @if (!panel.VendorOwned)
+                    {
                     @if (panel.Operations.Count == 0)
                     {
                         <div class="alert alert-info">No normalization operations for this facility.</div>
@@ -97,13 +108,22 @@
                             }
                         </div>
                     }
+                    }
 
                     @if (!panel.EditorOpen)
                     {
                         <div class="d-flex flex-wrap gap-2 mb-3">
                             @foreach (var operationType in FacilityNormalizationRules.OperationTypes)
                             {
-                                <a class="btn btn-outline-primary btn-sm" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                var skipVendorType = panel.VendorOwned && operationType == "HSLOCMap";
+                                if (!skipVendorType && panel.VendorOwned)
+                                {
+                                    <a class="btn btn-outline-primary btn-sm" asp-controller="Configuration" asp-action="Operations" asp-route-editType="@operationType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                }
+                                else if (!skipVendorType)
+                                {
+                                    <a class="btn btn-outline-primary btn-sm" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                }
                             }
                         </div>
                     }
@@ -112,7 +132,14 @@
                         <div class="border rounded p-3 mb-3" id="normalization-editor">
                             <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
                                 <h3 class="h6 mb-0">@(editing ? "Edit" : "Add") @FacilityNormalizationRules.Label(type)</h3>
-                                <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-sequenceType="@panel.SequenceType">Close</a>
+                                @if (panel.VendorOwned)
+                                {
+                                    <a asp-controller="Configuration" asp-action="Operations">Close</a>
+                                }
+                                else
+                                {
+                                    <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-sequenceType="@panel.SequenceType">Close</a>
+                                }
                             </div>
                             @if (editor.ParseFailed)
                             {
@@ -120,7 +147,11 @@
                             }
                             else
                             {
-                                <form method="post" asp-action="SaveOperation" asp-route-id="@Model.FacilityId" id="normalizationOperationForm">
+                                <form method="post"
+                                      asp-controller="@(panel.VendorOwned ? "Configuration" : "Tenants")"
+                                      asp-action="@(panel.VendorOwned ? "SaveVendorOperation" : "SaveOperation")"
+                                      asp-route-id="@Model.FacilityId"
+                                      id="normalizationOperationForm">
                                     <input type="hidden" name="OperationId" value="@editor.OperationId" />
                                     <input type="hidden" name="OperationType" value="@type" />
                                     <div class="row g-3">
@@ -296,13 +327,41 @@
                                                                 </div>
                                                             </div>
                                                         }
+                                                        <div class="mt-2">
+                                                            <label class="form-label" for="map-paste-@i">Paste codes</label>
+                                                            <textarea id="map-paste-@i" name="Maps[@i].PasteRows" class="form-control" rows="3">@map.PasteRows</textarea>
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-code-map-paste="@i">Paste from clipboard</button>
+                                                            <div id="map-paste-note-@i" class="form-text"></div>
+                                                        </div>
                                                         <div class="form-check mt-2">
                                                             <input class="form-check-input" type="checkbox" id="map-remove-@i" name="Maps[@i].Remove" value="true" />
                                                             <label class="form-check-label" for="map-remove-@i">Remove this map</label>
                                                         </div>
                                                     </div>
                                                 }
-                                                <p class="form-text">Leave the last map and the last code row blank to ignore them. Save once to add another row.</p>
+                                                <p class="form-text">Leave the last map and the last code row blank to ignore them. Save once to add another row. Paste CSV or tab-separated rows (source code, target code, optional display), then save.</p>
+                                                <script>
+                                                    (function () {
+                                                        document.querySelectorAll("[data-code-map-paste]").forEach(function (button) {
+                                                            button.addEventListener("click", function () {
+                                                                var index = button.getAttribute("data-code-map-paste");
+                                                                var area = document.getElementById("map-paste-" + index);
+                                                                var note = document.getElementById("map-paste-note-" + index);
+                                                                var blocked = "Clipboard access is blocked. Paste into the box instead.";
+                                                                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                                                                    if (note) note.textContent = blocked;
+                                                                    return;
+                                                                }
+                                                                navigator.clipboard.readText().then(function (text) {
+                                                                    if (area) area.value = text;
+                                                                    if (note) note.textContent = "Clipboard text is in the box. Save the operation to add the rows.";
+                                                                }).catch(function () {
+                                                                    if (note) note.textContent = blocked;
+                                                                });
+                                                            });
+                                                        });
+                                                    })();
+                                                </script>
                                             </div>
                                         }
                                         else if (type == "CopyLocationAliasToTypeIteratively")
@@ -358,10 +417,17 @@
                                         <div class="mt-3">
                                             <input type="hidden" name="VendorPresetsPosted" value="true" />
                                             <fieldset>
-                                                <legend class="form-label">Vendor presets</legend>
+                                                <legend class="form-label">@(panel.VendorOwned ? "Vendor versions" : "Vendor presets")</legend>
                                                 @if (vendorOptions.Count == 0)
                                                 {
-                                                    <p class="text-muted mb-0">No vendor versions are available. Saving clears presets on this operation.</p>
+                                                    @if (panel.VendorOwned)
+                                                    {
+                                                        <p class="text-muted mb-0">No vendor versions are available. Select at least one vendor version before saving.</p>
+                                                    }
+                                                    else
+                                                    {
+                                                        <p class="text-muted mb-0">No vendor versions are available. Saving clears presets on this operation.</p>
+                                                    }
                                                 }
                                                 else
                                                 {
@@ -384,8 +450,19 @@
                                                     }
                                                 }
                                             </fieldset>
-                                            <p class="form-text">Checked versions keep this operation as a preset. Clearing every box removes the presets.</p>
+                                            @if (panel.VendorOwned)
+                                            {
+                                                <p class="form-text">This operation is saved for every checked vendor version. At least one is required.</p>
+                                            }
+                                            else
+                                            {
+                                                <p class="form-text">Checked versions keep this operation as a preset. Clearing every box removes the presets.</p>
+                                            }
                                         </div>
+                                    }
+                                    else if (panel.VendorOwned)
+                                    {
+                                        <p class="form-text">Vendor versions could not be loaded, so the operation was not saved.</p>
                                     }
                                     else if (editing)
                                     {
@@ -398,7 +475,7 @@
                                     <button type="submit" class="btn btn-au-action mt-3">@(editing ? "Save operation" : "Add operation")</button>
                                 </form>
 
-                                @if (editing)
+                                @if (editing && !panel.VendorOwned)
                                 {
                                     <form method="post" asp-action="TestOperation" asp-route-id="@Model.FacilityId" class="mt-3">
                                         <input type="hidden" name="operationId" value="@editor.OperationId" />
@@ -421,15 +498,61 @@
                     {
                         <div class="border rounded p-3 mb-3" id="extension-url-import">
                             <h3 class="h6">Import extension URLs</h3>
-                            <p class="text-muted">CSV with two columns: resource type and extension URL. One remove-extensions operation is created for each resource type on this facility. Vendor-wide import is not on this page.</p>
-                            <form method="post" asp-action="ImportExtensionUrls" asp-route-id="@Model.FacilityId" enctype="multipart/form-data">
-                                <label class="form-label" for="extensionCsv">CSV file</label>
-                                <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
-                                <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
-                            </form>
+                            @if (panel.VendorOwned)
+                            {
+                                <p class="text-muted">CSV with two columns: resource type and extension URL. One remove-extensions operation is created for each resource type and assigned to the vendor versions you check.</p>
+                                <form method="post" asp-controller="Configuration" asp-action="ImportVendorExtensions" enctype="multipart/form-data">
+                                    @if (!Model.VendorListLoaded)
+                                    {
+                                        <p class="text-muted">Vendor versions could not be loaded, so nothing can be imported.</p>
+                                    }
+                                    else if (Model.Vendors.Count == 0)
+                                    {
+                                        <p class="text-muted">No vendor versions are available.</p>
+                                    }
+                                    else
+                                    {
+                                        var importSelected = new HashSet<string>(panel.ImportVendorIds, StringComparer.OrdinalIgnoreCase);
+                                        var importIndex = 0;
+                                        <fieldset class="mb-2">
+                                            <legend class="form-label">Vendor versions</legend>
+                                            @foreach (var vendor in Model.Vendors)
+                                            {
+                                                var importId = "import-vendor-" + importIndex++;
+                                                var importValue = vendor.Id.ToString();
+                                                <div class="form-check">
+                                                    @if (importSelected.Contains(importValue))
+                                                    {
+                                                        <input class="form-check-input" type="checkbox" id="@importId" name="vendorVersionIds" value="@importValue" checked />
+                                                    }
+                                                    else
+                                                    {
+                                                        <input class="form-check-input" type="checkbox" id="@importId" name="vendorVersionIds" value="@importValue" />
+                                                    }
+                                                    <label class="form-check-label" for="@importId">@vendor.Label</label>
+                                                </div>
+                                            }
+                                        </fieldset>
+                                    }
+                                    <label class="form-label" for="extensionCsv">CSV file</label>
+                                    <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
+                                    <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <p class="text-muted">CSV with two columns: resource type and extension URL. One remove-extensions operation is created for each resource type on this facility. Vendor-wide import is not on this page.</p>
+                                <form method="post" asp-action="ImportExtensionUrls" asp-route-id="@Model.FacilityId" enctype="multipart/form-data">
+                                    <label class="form-label" for="extensionCsv">CSV file</label>
+                                    <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
+                                    <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
+                                </form>
+                            }
                         </div>
                     }
 
+                    @if (!panel.VendorOwned)
+                    {
                     <div class="border rounded p-3" id="normalization-sequence">
                         <h3 class="h6">Operation sequence</h3>
                         @if (panel.SequenceResourceTypes.Count == 0)
@@ -515,6 +638,7 @@
                             }
                         }
                     </div>
+                    }
                 }
             }
         </div>
