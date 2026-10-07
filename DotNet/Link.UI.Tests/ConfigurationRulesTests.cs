@@ -71,6 +71,110 @@ public class ConfigurationRulesTests
     }
 
     [Fact]
+    public void Package_name_bulk_import_and_matchers_follow_the_validation_contract()
+    {
+        ConfigurationRules.CheckPackageName("nhsn.ig", out var name).Should().BeNull();
+        name.Should().Be("nhsn.ig");
+        ConfigurationRules.CheckPackageName("bad name", out _).Should().Contain("Package name");
+        ConfigurationRules.CheckBulkImport("[]").Should().Contain("No categories");
+        ConfigurationRules.CheckBulkImport("{").Should().Contain("JSON");
+        ConfigurationRules.CheckBulkImport("[{\"id\":\"uncategorized\",\"title\":\"t\",\"severity\":\"ERROR\",\"guidance\":\"g\",\"matcher\":{\"field\":\"CODE\",\"regex\":\"a\",\"inverted\":false}}]")
+            .Should().Contain("reserved");
+
+        var duplicate = "[" + Snapshot("same") + "," + Snapshot("same") + "]";
+        ConfigurationRules.CheckBulkImport(duplicate).Should().Contain("Duplicate");
+        ConfigurationRules.CheckBulkImport("[" + Snapshot("lab.rule") + "]").Should().BeNull();
+        ConfigurationRules.CheckBulkImport("[{\"id\":\"lab.rule\",\"title\":\"t\",\"severity\":\"ERROR\",\"guidance\":\"g\",\"matcher\":{\"children\":[]}}]")
+            .Should().Contain("at least one child");
+
+        ConfigurationRules.CheckRule("code", "^abc", false, null, out var built).Should().BeNull();
+        built.Should().Contain("\"field\":\"CODE\"");
+        built.Should().Contain("\"regex\":\"^abc\"");
+        ConfigurationRules.CheckRule("CODE", "[", false, null, out _).Should().Contain("valid pattern");
+        ConfigurationRules.CheckRule(null, null, false, "{\"field\":\"nope\",\"regex\":\"a\"}", out _).Should().Contain("Field");
+        ConfigurationRules.CheckRule(null, null, false, "{\"children\":[{\"field\":\"MESSAGE\",\"regex\":\"x\",\"inverted\":false}],\"requiresAllChildren\":true,\"inverted\":false}", out var composite)
+            .Should().BeNull();
+        composite.Should().Contain("children");
+        ConfigurationRules.CheckRule(null, null, false, "{\"field\":\"CODE\",\"regex\":\"a\",\"children\":[{\"field\":\"CODE\",\"regex\":\"b\"}]}", out _)
+            .Should().Contain("not both");
+    }
+
+    [Fact]
+    public void Cql_range_parameters_and_notification_send_are_checked_before_a_call()
+    {
+        ConfigurationRules.CheckCql("Lib_1", "37:1-38:22", out var library, out var range).Should().BeNull();
+        library.Should().Be("Lib_1");
+        range.Should().Be("37:1-38:22");
+        ConfigurationRules.CheckCql("Lib_1", "37-38", out _, out _).Should().Contain("37:1-38:22");
+        ConfigurationRules.CheckCql(" ", null, out _, out _).Should().Contain("Library");
+
+        ConfigurationRules.CheckEvaluate("{\"resourceType\":\"Parameters\"}", "groups,expressions", out var debug).Should().BeNull();
+        debug.Should().Be("groups,expressions");
+        ConfigurationRules.CheckEvaluate("{\"resourceType\":\"Bundle\"}", null, out _).Should().Contain("Parameters");
+        ConfigurationRules.CheckEvaluate("{", null, out _).Should().Contain("JSON");
+        ConfigurationRules.CheckEvaluate("{\"resourceType\":\"Parameters\"}", "groups,nope", out _).Should().Contain("Debug");
+        ConfigurationRules.CheckEvaluate("{\"resourceType\":\"Parameters\"}", "ALL", out var all).Should().BeNull();
+        all.Should().Be("all");
+
+        ConfigurationRules.CheckSend(new NotificationSendForm
+        {
+            NotificationType = "Test Notification",
+            Subject = "Hello",
+            Body = "Body",
+            Recipients = "a@example.com"
+        }, numericOnly: false, out var sent, out var recipients, out _).Should().BeNull();
+        sent.NotificationType.Should().Be("Test Notification");
+        recipients.Should().Equal("a@example.com");
+        ConfigurationRules.CheckSend(new NotificationSendForm
+        {
+            NotificationType = "Test Notification",
+            Subject = "Hello",
+            Body = "Body"
+        }, numericOnly: false, out _, out _, out _).Should().Contain("recipient");
+        ConfigurationRules.CheckSend(new NotificationSendForm
+        {
+            NotificationType = "Other",
+            Subject = "Hello",
+            Body = "Body",
+            Recipients = "a@example.com"
+        }, numericOnly: false, out _, out _, out _).Should().Contain("Type");
+    }
+
+    [Fact]
+    public void Library_ids_dependencies_and_rules_are_read_from_service_json()
+    {
+        const string measure = """
+            {"bundle":{"entry":[
+              {"resource":{"resourceType":"Library","url":"http://example.org/Library/NHSN"}},
+              {"resource":{"resourceType":"Measure","url":"http://example.org/Measure/NHSN"}}
+            ]}}
+            """;
+        using var document = System.Text.Json.JsonDocument.Parse(measure);
+        ConfigurationRules.LibraryIds(document.RootElement).Should().Equal("NHSN");
+
+        var dependencies = ConfigurationRules.ReadDependencies(
+            "[{\"url\":\"http://example.org/vs\",\"version\":\"1\",\"resourceExists\":true,\"versionExists\":false,\"sourceProfile\":[{\"url\":\"http://example.org/p\"}]}]",
+            out var shortened);
+        shortened.Should().BeFalse();
+        dependencies.Should().ContainSingle();
+        dependencies![0].ResourceExists.Should().BeTrue();
+        dependencies[0].VersionExists.Should().BeFalse();
+        dependencies[0].SourceCount.Should().Be(1);
+        ConfigurationRules.ReadDependencies("{", out _).Should().BeNull();
+
+        var rules = ConfigurationRules.ReadRules("[{\"id\":12,\"timestamp\":\"2024-01-02T03:04:05Z\",\"matcher\":{\"field\":\"CODE\",\"regex\":\"^a\",\"inverted\":true}}]");
+        rules.Should().ContainSingle();
+        rules![0].Id.Should().Be(12);
+        rules[0].Inverted.Should().BeTrue();
+        rules[0].Summary.Should().Contain("CODE");
+        ConfigurationRules.ReadCreatedId("{\"id\":\"8d8c6e5a-1b2c-4d3e-9f70-1234567890ab\"}").Should().NotBeNull();
+        ConfigurationRules.ReadCreatedId("{\"id\":\"not an id\"}").Should().BeNull();
+    }
+
+    private static string Snapshot(string id) =>
+        "{\"id\":\"" + id + "\",\"title\":\"Title\",\"severity\":\"ERROR\",\"guidance\":\"Look\",\"matcher\":{\"field\":\"CODE\",\"regex\":\"^a\",\"inverted\":false}}";
+
+    [Fact]
     public void Page_size_stays_on_the_offered_list()
     {
         ConfigurationRules.ListedPageSize(15, ConfigurationRules.PageSizes).Should().Be(10);

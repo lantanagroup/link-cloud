@@ -1,0 +1,26 @@
+@model DependencyPage
+
+<div class="mb-3">
+    <a asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
+</div>
+<h1 class="h3">Terminology dependencies</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Dependencies reported by every stored artifact.</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(Model.ListNote))
+    {
+        <p class="text-muted">@Model.ListNote</p>
+    }
+    <div class="au-card card">
+        <div class="card-body">
+            <partial name="_Dependencies" model="Model.Dependencies" />
+        </div>
+    </div>
+}

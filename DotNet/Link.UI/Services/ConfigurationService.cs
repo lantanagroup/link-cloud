@@ -15,6 +15,7 @@ namespace Link.UI.Services;
 /// <summary>
 /// Configuration pages: measure definitions, vendors, validation, query plans, terminology,
 /// HSLOC, the global normalization search, notifications, and DMRP measure mappings.
+/// Package upload, category rules, CQL, evaluation, and sending a notification use the same clients.
 /// Reads and writes go through LinkSDK. Query-plan and normalization editors stay on the facility page.
 /// </summary>
 public sealed class ConfigurationService
@@ -493,6 +494,7 @@ public sealed class ConfigurationService
             return page;
         }
 
+        page.ShowForm = true;
         if (_validation is null)
         {
             page.LoadError = ValidationNotConfigured;
@@ -525,6 +527,7 @@ public sealed class ConfigurationService
                 Review = response.Body.Review,
                 Guidance = response.Body.Guidance
             };
+            await LoadRulesAsync(page, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -533,6 +536,416 @@ public sealed class ConfigurationService
         }
 
         return page;
+    }
+
+    public async Task<ConfigurationAction> UploadPackageAsync(string? name, Stream? content, long length, CancellationToken cancellationToken)
+    {
+        var nameError = ConfigurationRules.CheckPackageName(name, out var packageName);
+        if (nameError is not null)
+            return ConfigurationAction.Fail(nameError);
+        var read = await ReadBytesAsync(content, length, "A package file is required.", cancellationToken);
+        if (read.Error is not null)
+            return ConfigurationAction.Fail(read.Error);
+        if (_validation is null)
+            return ConfigurationAction.Fail(ValidationNotConfigured);
+
+        try
+        {
+            var response = await _validation.UploadPackageAsync(packageName, read.Bytes!, cancellationToken);
+            return Ok(response)
+                ? ConfigurationAction.Ok("Package " + packageName + " was uploaded.")
+                : ConfigurationAction.Fail(Fail("Validation", response.StatusCode, response.RawBody));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation package upload failed");
+            return ConfigurationAction.Fail("Validation service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<PackagePage> LoadPackageAsync(string? name, CancellationToken cancellationToken)
+    {
+        var page = new PackagePage { Configured = _validation is not null };
+        var nameError = ConfigurationRules.CheckPackageName(name, out var packageName);
+        page.Name = packageName;
+        if (nameError is not null)
+        {
+            page.LoadError = nameError;
+            return page;
+        }
+
+        if (_validation is null)
+        {
+            page.LoadError = ValidationNotConfigured;
+            return page;
+        }
+
+        try
+        {
+            var detailTask = _validation.GetPackageDetailsAsync(packageName, cancellationToken);
+            var dependencyTask = _validation.GetPackageDependenciesAsync(packageName, cancellationToken);
+            await Task.WhenAll(detailTask, dependencyTask);
+            var details = await detailTask;
+            var dependencies = await dependencyTask;
+            if (details.StatusCode == 404)
+                page.LoadError = "That package was not found.";
+            else if (!Ok(details))
+                page.LoadError = Fail("Validation", details.StatusCode, details.RawBody);
+            else
+                ConfigurationRules.ReadPackage(details.Body, page);
+
+            if (dependencies.StatusCode == 404)
+                page.DependencyError = "That package was not found.";
+            else if (!Ok(dependencies))
+                page.DependencyError = Fail("Validation", dependencies.StatusCode, dependencies.RawBody);
+            else
+            {
+                var rows = ConfigurationRules.ReadDependencies(dependencies.Body, out var shortened);
+                if (rows is null)
+                    page.DependencyError = "Terminology dependencies were not a list.";
+                else
+                {
+                    page.Dependencies = rows;
+                    if (shortened)
+                        page.ListNote = "Showing the first 200 dependencies.";
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation package load failed");
+            page.LoadError = "Validation service call failed: " + ex.Message;
+        }
+
+        return page;
+    }
+
+    public async Task<DependencyPage> LoadDependenciesAsync(CancellationToken cancellationToken)
+    {
+        var page = new DependencyPage { Configured = _validation is not null };
+        if (_validation is null)
+        {
+            page.LoadError = ValidationNotConfigured;
+            return page;
+        }
+
+        try
+        {
+            var response = await _validation.GetAllDependenciesAsync(cancellationToken);
+            if (!Ok(response))
+            {
+                page.LoadError = Fail("Validation", response.StatusCode, response.RawBody);
+                return page;
+            }
+
+            var rows = ConfigurationRules.ReadDependencies(response.Body, out var shortened);
+            if (rows is null)
+            {
+                page.LoadError = "Terminology dependencies were not a list.";
+                return page;
+            }
+
+            page.Dependencies = rows;
+            if (shortened)
+                page.ListNote = "Showing the first 200 dependencies.";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation dependency load failed");
+            page.LoadError = "Validation service call failed: " + ex.Message;
+        }
+
+        return page;
+    }
+
+    public async Task<(byte[]? Bytes, string? Error)> ExportCategoriesAsync(CancellationToken cancellationToken)
+    {
+        if (_validation is null)
+            return (null, ValidationNotConfigured);
+
+        try
+        {
+            var response = await _validation.ExportCategoriesAsync(cancellationToken);
+            if (!Ok(response))
+                return (null, Fail("Validation", response.StatusCode, response.RawBody));
+            return (Encoding.UTF8.GetBytes(response.Body ?? "[]"), null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation category export failed");
+            return (null, "Validation service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<ConfigurationAction> ImportCategoriesAsync(Stream? content, long length, CancellationToken cancellationToken)
+    {
+        var read = await ReadTextUploadAsync(content, length, "A category export file is required.", cancellationToken);
+        if (read.Error is not null)
+            return ConfigurationAction.Fail(read.Error);
+        var error = ConfigurationRules.CheckBulkImport(read.Text);
+        if (error is not null)
+            return ConfigurationAction.Fail(error);
+        if (_validation is null)
+            return ConfigurationAction.Fail(ValidationNotConfigured);
+
+        try
+        {
+            var response = await _validation.ImportCategoriesAsync(read.Text!, cancellationToken);
+            return Ok(response)
+                ? ConfigurationAction.Ok("Categories were imported. Categories that were not in the file were removed.")
+                : ConfigurationAction.Fail(Fail("Validation", response.StatusCode, response.RawBody));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation category import failed");
+            return ConfigurationAction.Fail("Validation service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<ConfigurationAction> SaveRuleAsync(string? id, string? field, string? regex, bool inverted, string? matcher, CancellationToken cancellationToken)
+    {
+        if (string.Equals(id?.Trim(), ConfigurationRules.ReservedCategory, StringComparison.OrdinalIgnoreCase))
+            return ConfigurationAction.Fail("uncategorized is reserved and cannot be edited.");
+        var idError = ConfigurationRules.CheckCategory(
+            new CategoryForm { Id = id, Title = "placeholder", Severity = "ERROR", Guidance = "placeholder" },
+            out var category);
+        if (idError is not null)
+            return ConfigurationAction.Fail(idError);
+        var ruleError = ConfigurationRules.CheckRule(field, regex, inverted, matcher, out var json);
+        if (ruleError is not null)
+            return ConfigurationAction.Fail(ruleError);
+        if (_validation is null)
+            return ConfigurationAction.Fail(ValidationNotConfigured);
+
+        try
+        {
+            var response = await _validation.SaveCategoryRuleAsync(category.Id!, json, cancellationToken);
+            return Ok(response)
+                ? ConfigurationAction.Ok("Category rule was saved.")
+                : ConfigurationAction.Fail(Fail("Validation", response.StatusCode, response.RawBody));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation category rule save failed");
+            return ConfigurationAction.Fail("Validation service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<ConfigurationAction> DeleteRuleAsync(long ruleId, CancellationToken cancellationToken)
+    {
+        if (ruleId <= 0)
+            return ConfigurationAction.Fail("Rule id is not a valid id.");
+        if (_validation is null)
+            return ConfigurationAction.Fail(ValidationNotConfigured);
+
+        try
+        {
+            var response = await _validation.DeleteCategoryRuleAsync(ruleId, cancellationToken);
+            return Ok(response)
+                ? ConfigurationAction.Ok("Category rule was deleted.")
+                : ConfigurationAction.Fail(Fail("Validation", response.StatusCode, response.RawBody));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation category rule delete failed");
+            return ConfigurationAction.Fail("Validation service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<MeasureCqlPage> LoadMeasureCqlAsync(string? id, string? libraryId, string? range, bool submitted, CancellationToken cancellationToken)
+    {
+        var page = new MeasureCqlPage
+        {
+            Configured = _measures is not null,
+            Id = id?.Trim() ?? string.Empty,
+            LibraryId = libraryId?.Trim(),
+            Range = range?.Trim()
+        };
+        var idError = ConfigurationRules.CheckMeasureId(page.Id);
+        if (idError is not null)
+        {
+            page.LoadError = idError;
+            return page;
+        }
+
+        if (submitted)
+        {
+            var cqlError = ConfigurationRules.CheckCql(page.LibraryId, page.Range, out var library, out var cleanRange);
+            page.LibraryId = library;
+            page.Range = cleanRange;
+            if (cqlError is not null)
+                page.CqlError = cqlError;
+        }
+
+        if (_measures is null)
+        {
+            page.LoadError = MeasuresNotConfigured;
+            return page;
+        }
+
+        try
+        {
+            var measure = await _measures.GetMeasureDefinitionAsync(page.Id, cancellationToken);
+            if (measure.StatusCode == 404)
+                page.LibraryError = "That measure definition was not found.";
+            else if (!Ok(measure))
+                page.LibraryError = Fail("MeasureEval", measure.StatusCode, measure.RawBody);
+            else
+            {
+                var detail = new MeasureDetailPage();
+                ConfigurationRules.ReadMeasure(measure.Body, detail);
+                page.Libraries = detail.Libraries;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Measure library lookup failed");
+            page.LibraryError = "MeasureEval service call failed: " + ex.Message;
+        }
+
+        if (!submitted || page.CqlError is not null)
+            return page;
+
+        try
+        {
+            var response = await _measures.GetMeasureCqlAsync(page.Id, page.LibraryId!, page.Range, cancellationToken);
+            if (response.StatusCode == 404)
+            {
+                page.CqlError = "CQL was not found for that library.";
+                return page;
+            }
+
+            if (!Ok(response))
+            {
+                page.CqlError = Fail("MeasureEval", response.StatusCode, response.RawBody);
+                return page;
+            }
+
+            page.Cql = ConfigurationRules.Cap(response.Body);
+            page.Truncated = (response.Body?.Length ?? 0) > ConfigurationRules.PreviewLength;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Measure CQL load failed");
+            page.CqlError = "MeasureEval service call failed: " + ex.Message;
+        }
+
+        return page;
+    }
+
+    public Task<MeasureEvalPage> LoadMeasureEvaluateAsync(string? id, CancellationToken cancellationToken)
+    {
+        var page = new MeasureEvalPage { Configured = _measures is not null, Id = id?.Trim() ?? string.Empty };
+        var idError = ConfigurationRules.CheckMeasureId(page.Id);
+        if (idError is not null)
+            page.LoadError = idError;
+        else if (_measures is null)
+            page.LoadError = MeasuresNotConfigured;
+        return Task.FromResult(page);
+    }
+
+    public async Task<MeasureEvalPage> EvaluateMeasureAsync(string? id, string? parameters, string? debug, Stream? file, long length, CancellationToken cancellationToken)
+    {
+        var page = new MeasureEvalPage { Configured = _measures is not null, Id = id?.Trim() ?? string.Empty, Debug = debug?.Trim() };
+        var idError = ConfigurationRules.CheckMeasureId(page.Id);
+        if (idError is not null)
+        {
+            page.LoadError = idError;
+            return page;
+        }
+
+        string? text = parameters;
+        if (file is not null && length > 0)
+        {
+            var read = await ReadTextUploadAsync(file, length, "Parameters are required.", cancellationToken);
+            if (read.Error is not null)
+            {
+                page.ResultError = read.Error;
+                return page;
+            }
+
+            text = read.Text;
+            page.ParametersOmitted = true;
+        }
+        else if ((text?.Length ?? 0) <= 8000)
+        {
+            page.Parameters = text;
+        }
+        else
+        {
+            page.ParametersOmitted = true;
+        }
+
+        var error = ConfigurationRules.CheckEvaluate(text, debug, out var cleanDebug);
+        page.Debug = cleanDebug ?? (string.IsNullOrWhiteSpace(debug) ? null : debug.Trim());
+        if (error is not null)
+        {
+            page.ResultError = error;
+            return page;
+        }
+
+        if (_measures is null)
+        {
+            page.LoadError = MeasuresNotConfigured;
+            return page;
+        }
+
+        try
+        {
+            var response = await _measures.EvaluateMeasureAsync(page.Id, text!, cleanDebug, cancellationToken);
+            if (response.StatusCode == 404)
+            {
+                page.ResultError = "That measure definition was not found.";
+                return page;
+            }
+
+            if (!Ok(response))
+            {
+                page.ResultError = Fail("MeasureEval", response.StatusCode, response.RawBody);
+                return page;
+            }
+
+            page.Result = ConfigurationRules.Cap(response.Body);
+            page.Truncated = (response.Body?.Length ?? 0) > ConfigurationRules.PreviewLength;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Measure evaluation failed");
+            page.ResultError = "MeasureEval service call failed: " + ex.Message;
+        }
+
+        return page;
+    }
+
+    public async Task<ConfigurationAction> SendNotificationAsync(NotificationSendForm form, CancellationToken cancellationToken)
+    {
+        var error = ConfigurationRules.CheckSend(form, _options.NumericOnlyFacilityId, out var clean, out var recipients, out var bcc);
+        if (error is not null)
+            return ConfigurationAction.Fail(error);
+        if (_notification is null)
+            return ConfigurationAction.Fail(NotificationNotConfigured);
+
+        try
+        {
+            var response = await _notification.CreateNotificationAsync(new NotificationMessageApiModel
+            {
+                NotificationType = clean.NotificationType,
+                FacilityId = clean.FacilityId,
+                Subject = clean.Subject,
+                Body = clean.Body,
+                Recipients = recipients,
+                Bcc = bcc
+            }, cancellationToken);
+            if (!Ok(response))
+                return ConfigurationAction.Fail(Fail("Notification", response.StatusCode, response.RawBody));
+            var created = ConfigurationRules.ReadCreatedId(response.Body);
+            return ConfigurationAction.Ok(created is null ? "Notification was sent." : "Notification " + created + " was sent.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Notification send failed");
+            return ConfigurationAction.Fail("Notification service call failed: " + ex.Message);
+        }
     }
 
     public async Task<ConfigurationAction> SaveCategoryAsync(CategoryForm form, CancellationToken cancellationToken)
@@ -1324,6 +1737,38 @@ public sealed class ConfigurationService
             metadata?.TotalCount ?? count,
             metadata?.TotalPages > 0 ? (int)metadata.TotalPages : null);
 
+    private async Task LoadRulesAsync(CategoryPage page, CancellationToken cancellationToken)
+    {
+        if (_validation is null || string.IsNullOrWhiteSpace(page.Form.Id))
+            return;
+
+        try
+        {
+            var response = await _validation.GetCategoryRuleHistoryAsync(page.Form.Id, cancellationToken);
+            if (response.StatusCode == 404)
+                return;
+            if (!Ok(response))
+            {
+                page.RuleError = Fail("Validation", response.StatusCode, response.RawBody);
+                return;
+            }
+
+            var rows = ConfigurationRules.ReadRules(response.Body);
+            if (rows is null)
+            {
+                page.RuleError = "Category rules were not a list.";
+                return;
+            }
+
+            page.Rules = rows;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Validation category rule history failed");
+            page.RuleError = "Validation service call failed: " + ex.Message;
+        }
+    }
+
     private static async Task<(string? Text, string? Error)> ReadUploadAsync(Stream? stream, long length, CancellationToken cancellationToken)
     {
         if (stream is null || length <= 0)
@@ -1336,6 +1781,36 @@ public sealed class ConfigurationService
         if (text.Length > ConfigurationRules.MaxUploadBytes)
             return (null, "The bundle is larger than 8 MB.");
         return (text, null);
+    }
+
+    private static async Task<(string? Text, string? Error)> ReadTextUploadAsync(Stream? stream, long length, string missing, CancellationToken cancellationToken)
+    {
+        if (stream is null || length <= 0)
+            return (null, missing);
+        if (length > ConfigurationRules.MaxUploadBytes)
+            return (null, "The file is larger than 8 MB.");
+
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
+        var text = await reader.ReadToEndAsync(cancellationToken);
+        if (text.Length > ConfigurationRules.MaxUploadBytes)
+            return (null, "The file is larger than 8 MB.");
+        return (text, null);
+    }
+
+    private static async Task<(byte[]? Bytes, string? Error)> ReadBytesAsync(Stream? stream, long length, string missing, CancellationToken cancellationToken)
+    {
+        if (stream is null || length <= 0)
+            return (null, missing);
+        if (length > ConfigurationRules.MaxUploadBytes)
+            return (null, "The file is larger than 8 MB.");
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        if (buffer.Length == 0)
+            return (null, missing);
+        if (buffer.Length > ConfigurationRules.MaxUploadBytes)
+            return (null, "The file is larger than 8 MB.");
+        return (buffer.ToArray(), null);
     }
 
     private static string SafeFileName(string? fileName)

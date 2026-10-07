@@ -36,4 +36,21 @@ public class MeasureEvalServiceClient : LinkApiClientBase, IMeasureEvalServiceCl
     public Task<LinkApiResponse<string>> GetPatientBundleAsync(string facilityId, string reportId, string patientId, CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"measureeval/patient/{Uri.EscapeDataString(facilityId)}/{Uri.EscapeDataString(reportId)}/{Uri.EscapeDataString(patientId)}")
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetMeasureCqlAsync(string measureId, string libraryId, string? range = null, CancellationToken cancellationToken = default)
+    {
+        var request = Request($"measureeval/measure-definition/{Uri.EscapeDataString(measureId)}/{Uri.EscapeDataString(libraryId)}/$cql");
+        if (!string.IsNullOrWhiteSpace(range))
+            request = request.SetQueryParam("range", range);
+        return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> EvaluateMeasureAsync(string measureId, string parametersJson, string? debug = null, CancellationToken cancellationToken = default)
+    {
+        var request = Request($"measureeval/measure-definition/{Uri.EscapeDataString(measureId)}/$evaluate")
+            .WithHeader("Content-Type", "application/json");
+        if (!string.IsNullOrWhiteSpace(debug))
+            request = request.SetQueryParam("debug", debug);
+        return SendStringAsync(() => request.PostStringAsync(parametersJson, cancellationToken: cancellationToken));
+    }
 }

@@ -124,6 +124,106 @@ public sealed class ConfigurationController : Controller
             : RedirectToAction(nameof(Category), new { id = form.Id.Trim() });
     }
 
+    [HttpPost("Validation/packages")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(ConfigurationRules.MaxUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ConfigurationRules.MaxUploadBytes)]
+    public async Task<IActionResult> UploadPackage(string? name, IFormFile? package, CancellationToken cancellationToken)
+    {
+        await using var stream = package?.OpenReadStream();
+        Temp(await _configuration.UploadPackageAsync(name, stream, package?.Length ?? 0, cancellationToken));
+        return RedirectToAction(nameof(Validation));
+    }
+
+    [HttpGet("Validation/packages/{name}")]
+    public async Task<IActionResult> Package(string name, CancellationToken cancellationToken)
+    {
+        Section("validation", "Validation package");
+        return View(await _configuration.LoadPackageAsync(name, cancellationToken));
+    }
+
+    [HttpGet("Validation/dependencies")]
+    public async Task<IActionResult> Dependencies(CancellationToken cancellationToken)
+    {
+        Section("validation", "Terminology dependencies");
+        return View(await _configuration.LoadDependenciesAsync(cancellationToken));
+    }
+
+    [HttpGet("Validation/category-export")]
+    public async Task<IActionResult> ExportCategories(CancellationToken cancellationToken)
+    {
+        var file = await _configuration.ExportCategoriesAsync(cancellationToken);
+        if (file.Bytes is null)
+        {
+            Temp(ConfigurationAction.Fail(file.Error ?? "The category export failed."));
+            return RedirectToAction(nameof(Validation));
+        }
+
+        return File(file.Bytes, "application/json", "validation-categories.json");
+    }
+
+    [HttpPost("Validation/category-import")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(ConfigurationRules.MaxUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ConfigurationRules.MaxUploadBytes)]
+    public async Task<IActionResult> ImportCategories(IFormFile? file, CancellationToken cancellationToken)
+    {
+        await using var stream = file?.OpenReadStream();
+        Temp(await _configuration.ImportCategoriesAsync(stream, file?.Length ?? 0, cancellationToken));
+        return RedirectToAction(nameof(Validation));
+    }
+
+    [HttpPost("Validation/categories/{id}/rules")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveRule(string id, string? field, string? regex, bool inverted, string? matcher, CancellationToken cancellationToken)
+    {
+        Temp(await _configuration.SaveRuleAsync(id, field, regex, inverted, matcher, cancellationToken));
+        return RedirectToAction(nameof(Category), new { id });
+    }
+
+    [HttpPost("Validation/rules/{ruleId:long}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteRule(long ruleId, string? id, CancellationToken cancellationToken)
+    {
+        Temp(await _configuration.DeleteRuleAsync(ruleId, cancellationToken));
+        return string.IsNullOrWhiteSpace(id)
+            ? RedirectToAction(nameof(Validation))
+            : RedirectToAction(nameof(Category), new { id = id.Trim() });
+    }
+
+    [HttpGet("Measures/{id}/cql")]
+    public async Task<IActionResult> MeasureCql(string id, string? libraryId, string? range, bool submitted, CancellationToken cancellationToken)
+    {
+        Section("measures", "Measure CQL");
+        return View(await _configuration.LoadMeasureCqlAsync(id, libraryId, range, submitted, cancellationToken));
+    }
+
+    [HttpGet("Measures/{id}/evaluate")]
+    public async Task<IActionResult> MeasureEvaluate(string id, CancellationToken cancellationToken)
+    {
+        Section("measures", "Evaluate measure");
+        return View(await _configuration.LoadMeasureEvaluateAsync(id, cancellationToken));
+    }
+
+    [HttpPost("Measures/{id}/evaluate")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(ConfigurationRules.MaxUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = ConfigurationRules.MaxUploadBytes)]
+    public async Task<IActionResult> EvaluateMeasure(string id, string? parameters, string? debug, IFormFile? parametersFile, CancellationToken cancellationToken)
+    {
+        Section("measures", "Evaluate measure");
+        await using var stream = parametersFile?.OpenReadStream();
+        return View("MeasureEvaluate", await _configuration.EvaluateMeasureAsync(id, parameters, debug, stream, parametersFile?.Length ?? 0, cancellationToken));
+    }
+
+    [HttpPost("Notifications")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SendNotification(NotificationSendForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _configuration.SendNotificationAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Notifications));
+    }
+
     [HttpGet("QueryPlans")]
     public async Task<IActionResult> QueryPlans(string? facilityId, CancellationToken cancellationToken)
     {

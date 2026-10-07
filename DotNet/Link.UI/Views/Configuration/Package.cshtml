@@ -1,0 +1,96 @@
+@model PackagePage
+@using Link.UI.Services
+
+<div class="mb-3">
+    <a asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
+</div>
+<h1 class="h3">Validation package</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+<div class="au-card card mb-3">
+    <div class="card-header"><code>@Model.Name</code></div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.LoadError))
+        {
+            <div class="alert alert-warning">@Model.LoadError</div>
+        }
+        else
+        {
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Title</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Title) ? "—" : Model.Title)</dd>
+                <dt class="col-sm-3">Version</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Version) ? "—" : Model.Version)</dd>
+            </dl>
+        }
+    </div>
+</div>
+
+@if (string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="au-card card mb-3">
+        <div class="card-header">Resources</div>
+        <div class="card-body">
+            @if (Model.Resources.Count == 0)
+            {
+                <p class="mb-0">No resources in this package.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Type</th>
+                                <th scope="col">Id</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">URL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Resources)
+                        {
+                            <tr>
+                                <td>@row.ResourceType</td>
+                                <td><code>@row.Id</code></td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Name) ? "—" : row.Name)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                                <td>
+                                    @if (ConfigurationRules.TryHttpUrl(row.Url, out var url))
+                                    {
+                                        <a href="@url" rel="noopener noreferrer">@url</a>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Terminology dependencies</div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.DependencyError))
+        {
+            <div class="alert alert-warning">@Model.DependencyError</div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(Model.ListNote))
+            {
+                <p class="text-muted">@Model.ListNote</p>
+            }
+            <partial name="_Dependencies" model="Model.Dependencies" />
+        }
+    </div>
+</div>

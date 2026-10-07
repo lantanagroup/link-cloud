@@ -10,6 +10,7 @@ internal sealed class CapturedRequest
     public string Path { get; init; } = string.Empty;
     public string Query { get; init; } = string.Empty;
     public string Body { get; init; } = string.Empty;
+    public string ContentType { get; init; } = string.Empty;
 }
 
 /// <summary>

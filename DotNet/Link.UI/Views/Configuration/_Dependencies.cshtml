@@ -1,0 +1,44 @@
+@model IReadOnlyList<DependencyRow>
+@using Link.UI.Services
+
+@if (Model.Count == 0)
+{
+    <p class="mb-0">No terminology dependencies.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 lu-wide-table">
+            <thead>
+                <tr>
+                    <th scope="col">URL</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Resource</th>
+                    <th scope="col">Version found</th>
+                    <th scope="col">Sources</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>
+                        @if (ConfigurationRules.TryHttpUrl(row.Url, out var url))
+                        {
+                            <a href="@url" rel="noopener noreferrer">@url</a>
+                        }
+                        else
+                        {
+                            @(string.IsNullOrWhiteSpace(row.Url) ? "—" : row.Url)
+                        }
+                    </td>
+                    <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                    <td>@(row.ResourceExists ? "Yes" : "No")</td>
+                    <td>@(row.VersionExists ? "Yes" : "No")</td>
+                    <td>@row.SourceCount</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

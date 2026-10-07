@@ -61,6 +61,31 @@ public class NotificationServiceClientTests
         Assert.Equal("/api/notification/configuration/bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee", request.Path);
     }
 
+    [Fact]
+    public async Task CreateNotificationAsync_PostsTheAdminBody()
+    {
+        using var http = new FakeHttpBoundary("{\"id\":\"8d8c6e5a-1b2c-4d3e-9f70-1234567890ab\"}", 201);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.CreateNotificationAsync(new NotificationMessageApiModel
+        {
+            NotificationType = "Test Notification",
+            Subject = "Hello",
+            Body = "Body",
+            Recipients = ["a@example.com"],
+            Bcc = []
+        });
+        var request = http.SingleRequest();
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal("/api/notification", request.Path);
+        Assert.Contains("\"notificationType\":\"Test Notification\"", request.Body);
+        Assert.Contains("\"recipients\":[\"a@example.com\"]", request.Body);
+        Assert.Contains("\"bcc\":[]", request.Body);
+        Assert.DoesNotContain("facilityId", request.Body);
+        Assert.DoesNotContain("NotificationType", request.Body);
+    }
+
     private static NotificationServiceClient CreateClient(string? baseUrl) => new(
         Options.Create(new ServiceRegistry { NotificationServiceUrl = baseUrl }),
         Options.Create(new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }),

@@ -1,0 +1,77 @@
+@model MeasureEvalPage
+@using Link.UI.Services
+
+<div class="mb-3">
+    <a asp-action="Measure" asp-route-id="@Model.Id"><i class="bi bi-arrow-left me-1"></i>Measure definition</a>
+</div>
+<h1 class="h3">Evaluate measure</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" class="row g-3">
+            <div class="col-12">
+                <label class="form-label" for="parameters">Parameters</label>
+                <textarea id="parameters" name="parameters" class="form-control" rows="8">@Model.Parameters</textarea>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="parametersFile">Or a parameters file</label>
+                <input id="parametersFile" name="parametersFile" type="file" accept="application/json,.json" class="form-control" />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="debug">Debug</label>
+                <select id="debug" name="debug" class="form-select">
+                    <option value="">None</option>
+                    @if (string.Equals(Model.Debug, "all", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="all" selected>all</option>
+                    }
+                    else
+                    {
+                        <option value="all">all</option>
+                    }
+                    @foreach (var debugSection in ConfigurationRules.DebugSections)
+                    {
+                        if (string.Equals(debugSection, Model.Debug, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@debugSection" selected>@debugSection</option>
+                        }
+                        else
+                        {
+                            <option value="@debugSection">@debugSection</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Evaluate</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The body must be a FHIR Parameters resource. A file replaces the text above. The result shown here is shortened after 4000 characters.</p>
+        @if (Model.ParametersOmitted)
+        {
+            <p class="text-muted small mb-0">The parameters file was not shown again.</p>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ResultError))
+{
+    <div class="alert alert-warning mt-3">@Model.ResultError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Result))
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Result@(Model.Truncated ? " (shortened)" : "")</div>
+        <div class="card-body">
+            <pre class="lu-json mb-0">@Model.Result</pre>
+        </div>
+    </div>
+}

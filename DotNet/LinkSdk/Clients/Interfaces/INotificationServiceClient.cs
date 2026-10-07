@@ -36,4 +36,10 @@ public interface INotificationServiceClient
     Task<LinkApiResponse> UpdateConfigurationAsync(NotificationConfigurationApiModel request, CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> DeleteConfigurationAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Asks the notification service to create and send one message:
+    /// <c>POST /api/notification</c>.
+    /// </summary>
+    Task<LinkApiResponse<string>> CreateNotificationAsync(NotificationMessageApiModel message, CancellationToken cancellationToken = default);
 }

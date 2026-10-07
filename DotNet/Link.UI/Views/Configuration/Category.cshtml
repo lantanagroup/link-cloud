@@ -20,7 +20,7 @@
     <div class="alert alert-warning">@Model.LoadError</div>
 }
 
-@if (!Model.Reserved && string.IsNullOrWhiteSpace(Model.LoadError))
+@if (Model.ShowForm)
 {
     <div class="au-card card">
         <div class="card-header"><code>@form.Id</code></div>
@@ -73,4 +73,89 @@
             </form>
         </div>
     </div>
+
+    @if (Model.Missing)
+    {
+        <p class="text-muted mt-3">Save the category before adding a rule.</p>
+    }
+    else
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Rules</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.RuleError))
+                {
+                    <div class="alert alert-warning">@Model.RuleError</div>
+                }
+                @if (Model.Rules.Count == 0)
+                {
+                    <p>No rules yet. Saving a matcher adds a new latest rule.</p>
+                }
+                else
+                {
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm align-middle mb-0 lu-wide-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Id</th>
+                                    <th scope="col">When</th>
+                                    <th scope="col">Matcher</th>
+                                    <th scope="col">Inverted</th>
+                                    <th scope="col"><span class="visually-hidden">Delete</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var rule in Model.Rules)
+                            {
+                                <tr>
+                                    <td>@rule.Id</td>
+                                    <td class="text-nowrap">@(string.IsNullOrWhiteSpace(rule.Timestamp) ? "—" : rule.Timestamp)</td>
+                                    <td>@rule.Summary</td>
+                                    <td>@(rule.Inverted ? "Yes" : "No")</td>
+                                    <td>
+                                        <form method="post" asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
+                                            <input type="hidden" name="id" value="@form.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <form method="post" asp-action="SaveRule" asp-route-id="@form.Id" class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="field">Field</label>
+                        <select id="field" name="field" class="form-select">
+                            @foreach (var field in ConfigurationRules.ResultFields)
+                            {
+                                <option value="@field">@field</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-8">
+                        <label class="form-label" for="regex">Regex</label>
+                        <input id="regex" name="regex" class="form-control" maxlength="500" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="inverted" name="inverted" value="true" />
+                            <input type="hidden" name="inverted" value="false" />
+                            <label class="form-check-label" for="inverted">Inverted</label>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="matcher">Matcher JSON</label>
+                        <textarea id="matcher" name="matcher" class="form-control" rows="5" placeholder='{"field":"CODE","regex":"^abc","inverted":false}'></textarea>
+                        <p class="text-muted small mb-0">Leave this blank to save the field and regex above. A composite uses children, for example {"children":[{"field":"CODE","regex":"^a","inverted":false}],"requiresAllChildren":true,"inverted":false}.</p>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-au-action">Save rule</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
 }

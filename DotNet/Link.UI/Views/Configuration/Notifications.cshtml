@@ -24,9 +24,51 @@
 <h1 class="h3">Notifications</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">Notifications are sent by the pipeline. This page searches them. It does not send one.</p>
+<p class="text-muted">Search notifications already sent, or send one. A facility id is optional. Recipients are always required. When a facility is set, its saved addresses are added as well.</p>
 <div class="mb-3">
     <a class="btn btn-outline-secondary" asp-action="Configurations">Email configuration</a>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Send a notification</div>
+    <div class="card-body">
+        <form method="post" class="row g-2" onsubmit="return confirm('Send this notification?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="sendType">Type</label>
+                <select id="sendType" name="NotificationType" class="form-select" required>
+                    <option value="">Choose</option>
+                    @foreach (var type in ConfigurationRules.NotificationTypes)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="sendFacility">Facility</label>
+                <input id="sendFacility" name="FacilityId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="subject">Subject</label>
+                <input id="subject" name="Subject" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="recipients">Recipients</label>
+                <textarea id="recipients" name="Recipients" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="bcc">Bcc</label>
+                <textarea id="bcc" name="Bcc" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label" for="body">Message</label>
+                <textarea id="body" name="Body" class="form-control" rows="4" maxlength="4000" required></textarea>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Send</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Separate addresses with commas or new lines. This posts to the notification service.</p>
+    </div>
 </div>
 
 <div class="au-card card">

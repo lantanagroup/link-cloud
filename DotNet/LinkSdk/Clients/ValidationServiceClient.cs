@@ -1,4 +1,5 @@
-﻿using Flurl.Http;
+﻿using System.Net.Http.Headers;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -62,6 +63,48 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
         SendAsync(() => Request($"validation/artifact/RESOURCE/{artifactId}")
             .WithHeader("Content-Type", "application/json")
             .PutStringAsync(resourceJson, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UploadPackageAsync(string packageName, byte[] content, CancellationToken cancellationToken = default)
+    {
+        var payload = new ByteArrayContent(content);
+        payload.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return SendAsync(() => Request($"validation/artifact/PACKAGE/{Uri.EscapeDataString(packageName)}")
+            .PutAsync(payload, cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse<string>> GetPackageDetailsAsync(string packageName, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"validation/artifact/PACKAGE/{Uri.EscapeDataString(packageName)}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetPackageDependenciesAsync(string packageName, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"validation/artifact/PACKAGE/{Uri.EscapeDataString(packageName)}/tx-dependencies")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetAllDependenciesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("validation/artifact/tx-dependencies")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> ExportCategoriesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("validation/category/$bulk-export")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> ImportCategoriesAsync(string snapshotsJson, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("validation/category/$bulk-import")
+            .WithHeader("Content-Type", "application/json")
+            .PostStringAsync(snapshotsJson, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetCategoryRuleHistoryAsync(string id, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"validation/category/{Uri.EscapeDataString(id)}/rule/history")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> SaveCategoryRuleAsync(string id, string matcherJson, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"validation/category/{Uri.EscapeDataString(id)}/rule")
+            .WithHeader("Content-Type", "application/json")
+            .PutStringAsync(matcherJson, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteCategoryRuleAsync(long ruleId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"validation/category/{ruleId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<string>> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));

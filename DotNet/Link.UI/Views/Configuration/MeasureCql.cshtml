@@ -1,0 +1,62 @@
+@model MeasureCqlPage
+
+<div class="mb-3">
+    <a asp-action="Measure" asp-route-id="@Model.Id"><i class="bi bi-arrow-left me-1"></i>Measure definition</a>
+</div>
+<h1 class="h3">Measure CQL</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-body">
+        @if (Model.Libraries.Count > 0)
+        {
+            <p class="mb-2">Libraries in this definition</p>
+            <ul>
+                @foreach (var library in Model.Libraries)
+                {
+                    <li><a asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-libraryId="@library" asp-route-submitted="true">@library</a></li>
+                }
+            </ul>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.LibraryError))
+        {
+            <div class="alert alert-warning">@Model.LibraryError</div>
+        }
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="submitted" value="true" />
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="libraryId">Library id</label>
+                <input id="libraryId" name="libraryId" value="@Model.LibraryId" class="form-control" maxlength="64" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="range">Range</label>
+                <input id="range" name="range" value="@Model.Range" class="form-control" placeholder="37:1-38:22" maxlength="32" />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">View CQL</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The library id is the last segment of the library URL. Leave the range blank to show the whole library.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.CqlError))
+{
+    <div class="alert alert-warning mt-3">@Model.CqlError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Cql))
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">CQL@(Model.Truncated ? " (shortened)" : "")</div>
+        <div class="card-body">
+            <pre class="lu-json mb-0">@Model.Cql</pre>
+        </div>
+    </div>
+}
