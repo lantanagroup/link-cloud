@@ -5,7 +5,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Sftp"><i class="bi bi-arrow-left me-1"></i>SFTP logs</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Sftp")!, "SFTP logs"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">SFTP acquisition log</h1>
@@ -23,6 +23,7 @@ else
             @if (Model.CanReset)
             {
                 <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
+                    <partial name="_ReturnField" />
                     <button type="submit" class="btn btn-sm btn-success">Reset</button>
                 </form>
             }

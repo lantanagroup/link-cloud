@@ -18,7 +18,7 @@
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="badge @(node.Mapped ? "text-bg-success" : "text-bg-secondary")">@(node.Mapped ? "Mapped" : "Unmapped")</span>
-                <a asp-action="View" asp-route-id="@ViewData["FacilityId"]" asp-route-section="hsloc" asp-route-hsloc="@node.LocationId">Mappings</a>
+                <a asp-action="View" asp-route-id="@ViewData["FacilityId"]" asp-route-section="hsloc" asp-route-hsloc="@node.LocationId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Mappings</a>
             </div>
         </div>
         @if (node.Children.Count > 0)

@@ -57,7 +57,7 @@
                     <tr data-type="@run.StatusLabel" data-name="@run.RunName" data-search="@($"{run.RunName} {run.RunId} {run.Seed} {run.StatusLabel}")">
                         <td>
                             <div class="fw-semibold">@run.RunName</div>
-                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Run", Value = run.RunId.ToString(), Compact = true, CopyLabel = "Copy run id", LinkHref = Url.Action("Run", "Automation", new { id = run.RunId }) })" />
+                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Run", Value = run.RunId.ToString(), Compact = true, CopyLabel = "Copy run id", LinkHref = Url.Action("Run", "Automation", new { id = run.RunId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                         </td>
                         <td>@run.PatientCount</td>
                         <td>@run.Seed</td>
@@ -69,7 +69,7 @@
                         <td>@(run.FinishedAt is null ? "—" : LinkUiTime.Display(run.FinishedAt.Value))</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
-                                <a asp-action="Run" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral lu-icon-btn" title="View details" aria-label="View details"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                <a asp-action="Run" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="View details" aria-label="View details"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
                                 @if (AutomationRules.IsCancellable(run.Status))
                                 {
                                     <button type="button" class="btn btn-sm btn-au-neutral btn-cancel-run lu-icon-btn" data-run-id="@run.RunId" title="Cancel" aria-label="Cancel"><i class="bi bi-x-circle" aria-hidden="true"></i></button>

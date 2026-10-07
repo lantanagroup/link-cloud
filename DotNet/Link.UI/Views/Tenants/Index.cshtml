@@ -92,12 +92,12 @@
                     {
                         <tr>
                             <td>
-                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = tenant.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", new { id = tenant.FacilityId }) })" />
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = tenant.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", new { id = tenant.FacilityId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                                 <partial name="_AutomationBadge" model="tenant.AutomationRunId" />
                             </td>
                             <td>
-                                <a asp-action="View" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a>
-                                <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId">Configuration</a></div>
+                                <a asp-action="View" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@tenant.DisplayName</a>
+                                <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Configuration</a></div>
                             </td>
                             <td>
                                 @if (tenant.IsDeleted)

@@ -5,10 +5,10 @@
 }
 
 <div class="mb-3 d-flex flex-wrap gap-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
     @if (!Model.NotFound && Model.LoadError is null)
     {
-        <a asp-action="Facility" asp-route-id="@Model.FacilityId"><i class="bi bi-gear me-1"></i>Configuration</a>
+        <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)"><i class="bi bi-gear me-1"></i>Configuration</a>
         <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
@@ -75,12 +75,12 @@ else
         @foreach (var section in new[] { ("reports", "Reports", "bi-file-earmark"), ("hsloc", "HSLOC locations", "bi-geo-alt"), ("locations", "Org locations", "bi-building"), ("encounters", "Encounters", "bi-person") })
         {
             <a class="btn btn-sm @(Model.Section == section.Item1 ? "lu-nav-current" : "btn-au-neutral")"
-               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1)"><i class="bi @(section.Item3) me-1"></i>@(section.Item2)</a>
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1).WithOrigin(ReturnUrlRules.FromQuery(Context.Request))"><i class="bi @(section.Item3) me-1"></i>@(section.Item2)</a>
         }
         @if (Model.DmrpEnabled)
         {
             <a class="btn btn-sm @(Model.Section == "plans" ? "lu-nav-current" : "btn-au-neutral")"
-               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans")"><i class="bi bi-calendar3 me-1"></i>Reporting plans</a>
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans").WithOrigin(ReturnUrlRules.FromQuery(Context.Request))"><i class="bi bi-calendar3 me-1"></i>Reporting plans</a>
         }
     </nav>
 

@@ -89,7 +89,7 @@
             <h2 class="fw-bold mb-1">Compare two runs</h2>
             <p class="text-muted mb-0">@Model.Left.ScenarioName</p>
         </div>
-        <a asp-action="Scenario" asp-route-id="@Model.Left.ScenarioId" class="btn btn-sm btn-au-neutral">Back to history</a>
+        <partial name="_BackButton" model="@(new BackLink(Url.Action("Scenario", new { id = Model.Left.ScenarioId })!, "Back to history"))" />
     </div>
 
     <div class="row g-3 mb-4">

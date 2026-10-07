@@ -140,7 +140,7 @@ else
                                         }
                                     </td>
                                     <td>
-                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }) })" />
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }), ReturnUrl = Model.Embedded ? null : ReturnUrlRules.Here(Context.Request) })" />
                                         @(row.Deleted ? " (deleted)" : "")
                                     </td>
                                     <td>

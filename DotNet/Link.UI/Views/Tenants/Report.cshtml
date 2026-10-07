@@ -2,11 +2,9 @@
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
     var bar = Model.Paging;
-    Dictionary<string, string> PageRoute(int page)
-    {
-        var route = Model.Query.ToRoute(Model.ReportId, page);
-        return route;
-    }
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+    Dictionary<string, string> PageRoute(int page) =>
+        Model.Query.ToRoute(Model.ReportId, page).WithOrigin(origin);
 }
 
 @{
@@ -16,7 +14,7 @@
     ViewData["ReportSection"] = "report";
 }
 <div class="mb-3 d-flex flex-wrap gap-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("View", new { id = Model.FacilityId, section = "reports" })!, "Back to facility"))" />
 </div>
 
 @if (TempData["Message"] is string saved)
@@ -69,7 +67,7 @@ else
                     }
                     else
                     {
-                        <a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a>
+                        <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@Model.FacilityName</a>
                     }
                 </dd>
                 <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
@@ -91,13 +89,14 @@ else
             }
             <form method="get" asp-action="Report" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
                 <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <partial name="_ReturnField" />
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="patientId">Patient ID</label>
                     <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
                 </div>
                 <div class="col-12 d-flex gap-2">
                     <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                    <a class="btn btn-au-neutral" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
+                    <a class="btn btn-au-neutral" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-returnUrl="@origin">Clear</a>
                 </div>
             </form>
 
@@ -106,7 +105,7 @@ else
                 <div class="alert alert-light border">
                     <div class="d-flex justify-content-between gap-2">
                         <strong>Patient @patient.PatientId</strong>
-                        <a asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.Query.PatientId">Close</a>
+                        <a asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.Query.PatientId" asp-route-returnUrl="@origin">Close</a>
                     </div>
                     @if (!string.IsNullOrWhiteSpace(patient.Error))
                     {
@@ -172,7 +171,7 @@ else
                             <tr>
                                 <td>
                                     @{
-                                        var patientRoute = Model.Query.ToRoute(Model.ReportId, patient: row.PatientId);
+                                        var patientRoute = Model.Query.ToRoute(Model.ReportId, patient: row.PatientId).WithOrigin(origin);
                                         var patientHref = Url.Action("Report", new { id = Model.FacilityId });
                                         if (patientRoute.Count > 0)
                                             patientHref += "?" + string.Join("&", patientRoute.Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
@@ -185,8 +184,8 @@ else
                                 <td>@row.EncounterMapping</td>
                                 <td>@row.Hsloc</td>
                                 <td>
-                                    <a asp-controller="Reports" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId">Measure</a>
-                                    <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId">Log</a>
+                                    <a asp-controller="Reports" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Measure</a>
+                                    <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId" asp-route-returnUrl="@origin">Log</a>
                                 </td>
                             </tr>
                         }

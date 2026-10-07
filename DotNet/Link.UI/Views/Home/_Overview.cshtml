@@ -278,10 +278,10 @@
                             <div class="home-row">
                                 <span class="badge @report.Badge">@report.Status</span>
                                 <span class="home-row-main">
-                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }) })" />
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                                     <partial name="_AutomationBadge" model="report.AutomationRunId" />
                                 </span>
-                                <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">@report.When</a>
+                                <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@report.When</a>
                             </div>
                         }
                         <p class="small text-muted mt-2 mb-0">@reports.Total total</p>
@@ -330,7 +330,7 @@
                         {
                             foreach (var run in runs.Active.Concat(runs.Recent).Take(HomeOverviewRules.RowLimit))
                             {
-                                <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id">
+                                <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">
                                     <span class="badge @run.Badge">@run.Status</span>
                                     <span class="home-row-main"><span class="home-name">@run.Name</span></span>
                                     <span class="home-row-time text-muted small">@run.When</span>

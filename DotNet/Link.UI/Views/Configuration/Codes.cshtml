@@ -12,12 +12,12 @@
         if (!string.IsNullOrWhiteSpace(query.ValueSet)) route["valueSet"] = query.ValueSet;
         if (!string.IsNullOrWhiteSpace(query.Version)) route["version"] = query.Version;
         if (query.ExcludeInactive) route["excludeInactive"] = "true";
-        return route;
+        return route.WithOrigin(ReturnUrlRules.FromQuery(Context.Request));
     }
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Terminology"><i class="bi bi-arrow-left me-1"></i>Terminology</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Terminology")!, "Terminology"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Terminology codes</h1>
@@ -28,6 +28,7 @@
     <div class="card-body">
         <form method="get" class="row g-2 align-items-end">
             <input type="hidden" name="submitted" value="true" />
+            <partial name="_ReturnField" />
             <div class="col-12 col-md-4">
                 <label class="form-label" for="search">Search</label>
                 <input id="search" name="search" value="@query.Search" class="form-control" maxlength="255" />
@@ -68,7 +69,7 @@
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="Codes">Clear</a>
+                <a class="btn btn-au-neutral" asp-action="Codes" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Clear</a>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Enter a search of at least 3 characters, or one code system, or one value set. A version belongs with a system or a set.</p>

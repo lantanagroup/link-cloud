@@ -17,7 +17,7 @@
         <input type="hidden" name="categories" value="true" />
         <button type="submit" class="btn btn-au-neutral">Initialize categories</button>
     </form>
-    <a class="btn btn-au-neutral" asp-action="Dependencies">All dependencies</a>
+    <a class="btn btn-au-neutral" asp-action="Dependencies" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">All dependencies</a>
     <a class="btn btn-au-neutral" asp-action="ExportCategories">Export categories</a>
 </div>
 
@@ -93,7 +93,7 @@
                             <td>
                                 @if (string.Equals(row.Type, "PACKAGE", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <a asp-action="Package" asp-route-name="@row.Name">Open</a>
+                                    <a asp-action="Package" asp-route-name="@row.Name" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
                                 }
                             </td>
                         </tr>
@@ -161,7 +161,7 @@
                                 }
                                 else
                                 {
-                                    <a asp-action="Category" asp-route-id="@row.Id">Edit</a>
+                                    <a asp-action="Category" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Edit</a>
                                 }
                             </td>
                         </tr>

@@ -74,7 +74,7 @@
                                     <button type="button" class="btn btn-sm btn-au-neutral" data-lu-cancel>Cancel</button>
                                 </form>
                             </td>
-                            <td><a asp-action="Versions" asp-route-vendorId="@row.Id">Versions</a></td>
+                            <td><a asp-action="Versions" asp-route-vendorId="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Versions</a></td>
                             <td>
                                 <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
                                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>

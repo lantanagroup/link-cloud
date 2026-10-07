@@ -1,7 +1,7 @@
 @model VendorVersionPage
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Vendors"><i class="bi bi-arrow-left me-1"></i>Vendors</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Vendors")!, "Vendors"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Vendor versions</h1>

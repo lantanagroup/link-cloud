@@ -19,9 +19,7 @@
             <code class="ms-1">@runId</code>
         </div>
     </div>
-    <a asp-action="Run" asp-route-id="@runId" class="btn btn-sm btn-au-neutral">
-        <i class="bi bi-arrow-left me-1"></i>Back to Run
-    </a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Run", new { id = runId })!, "Back to run"))" />
 </div>
 
 <!-- ── Summary Stat Tiles ── -->
