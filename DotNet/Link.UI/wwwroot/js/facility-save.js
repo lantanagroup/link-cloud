@@ -11,6 +11,7 @@
         "SaveQueryPlan",
         "SaveReportingOrg",
         "SaveSftp",
+        "SaveNotification",
         "SaveOperation",
         "SaveOperationSequence"
     ];
@@ -23,7 +24,8 @@
         "DeleteFhirList",
         "DeleteFhirQuery",
         "DeleteQueryDispatch",
-        "DeleteCensus"
+        "DeleteCensus",
+        "DeleteNotification"
     ];
     var immediate = {
         Remove: true,
@@ -41,7 +43,8 @@
         SaveFhirList: true,
         SaveQueryPlan: true,
         SaveReportingOrg: true,
-        SaveSftp: true
+        SaveSftp: true,
+        SaveNotification: true
     };
     var labels = {
         SaveFacility: "Facility",
@@ -59,6 +62,8 @@
         DeleteReportingOrg: "Reporting organization",
         SaveSftp: "SFTP",
         DeleteSftp: "SFTP",
+        SaveNotification: "Notification email",
+        DeleteNotification: "Notification email",
         SaveOperation: "Normalization operation",
         DeleteOperation: "Normalization operation",
         SaveOperationSequence: "Operation sequence",
@@ -79,6 +84,8 @@
         DeleteReportingOrg: "reportingOrgPanel",
         SaveSftp: "sftpPanel",
         DeleteSftp: "sftpPanel",
+        SaveNotification: "notificationPanel",
+        DeleteNotification: "notificationPanel",
         SaveOperation: "normalizationPanel",
         DeleteOperation: "normalizationPanel",
         SaveOperationSequence: "normalizationPanel",
@@ -201,6 +208,12 @@
     function collapseEmpty(form) {
         form.classList.add("d-none");
         var body = form.closest(".accordion-body") || form.parentElement;
+        if (body && body.querySelector(":scope > .alert-warning")) {
+            var blocked = form.querySelector("button[type='submit'], input[type='submit']");
+            if (blocked) blocked.classList.add("d-none");
+            setExpanded(sectionItem(form), true);
+            return;
+        }
         if (body) {
             body.querySelectorAll(":scope > .alert-info").forEach(function (alert) {
                 alert.classList.add("d-none");
@@ -438,7 +451,7 @@
     }
 
     function classify(form) {
-        var action = actionName(form);
+        var action = form.getAttribute("data-facility-action") || actionName(form);
         form.setAttribute("data-facility-action", action);
         if (immediate[action] || (saveOrder.indexOf(action) < 0 && removeOrder.indexOf(action) < 0)) {
             form.setAttribute("data-facility-immediate", "1");

@@ -14,6 +14,7 @@ public sealed class TenantsController : Controller
     private readonly IFacilityServiceClient _facilityServiceClient;
     private readonly FacilityHubService _hub;
     private readonly FacilityViewService _view;
+    private readonly ConfigurationService _configuration;
     private readonly AutomationOwnershipLookup _ownership;
     private readonly ILogger<TenantsController> _logger;
 
@@ -21,12 +22,14 @@ public sealed class TenantsController : Controller
         IFacilityServiceClient facilityServiceClient,
         FacilityHubService hub,
         FacilityViewService view,
+        ConfigurationService configuration,
         AutomationOwnershipLookup ownership,
         ILogger<TenantsController> logger)
     {
         _facilityServiceClient = facilityServiceClient;
         _hub = hub;
         _view = view;
+        _configuration = configuration;
         _ownership = ownership;
         _logger = logger;
     }
@@ -189,6 +192,8 @@ public sealed class TenantsController : Controller
             operationType.Sanitize(),
             sequenceType.Sanitize(),
             operationPage ?? 1);
+        if (!page.IsCreate && !page.NotFound && string.IsNullOrWhiteSpace(page.LoadError) && !string.IsNullOrWhiteSpace(page.FacilityId))
+            page.Notification = await _configuration.LoadFacilityNotificationAsync(page.FacilityId, cancellationToken);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }

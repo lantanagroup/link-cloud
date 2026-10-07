@@ -1403,6 +1403,36 @@ public sealed partial class ConfigurationService
         return page;
     }
 
+    public async Task<FacilityNotificationSection> LoadFacilityNotificationAsync(string facilityId, CancellationToken cancellationToken)
+    {
+        var section = new FacilityNotificationSection { Configured = _notification is not null };
+        if (_notification is null)
+            return section;
+
+        var page = await LoadConfigurationsAsync(
+            new NotificationConfigQuery { FacilityId = facilityId, Page = 1, PageSize = 20 },
+            cancellationToken);
+        if (!string.IsNullOrWhiteSpace(page.LoadError) && page.Configurations.Count == 0)
+        {
+            section.Error = page.LoadError;
+            return section;
+        }
+
+        var match = page.Configurations.FirstOrDefault(row =>
+            string.Equals(row.FacilityId, facilityId, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return section;
+
+        section.Exists = true;
+        section.Id = match.Id;
+        section.Emails = match.Emails;
+        section.EmailEnabled = match.EmailEnabled;
+        return section;
+    }
+
+    public bool AcceptFacilityReturn(string? facilityId) =>
+        FacilityFormRules.IsValidFacilityId(facilityId, _options.NumericOnlyFacilityId);
+
     public async Task<NotificationConfigPage> LoadConfigurationsAsync(NotificationConfigQuery? query, CancellationToken cancellationToken)
     {
         var page = new NotificationConfigPage { Configured = _notification is not null, Query = query ?? new NotificationConfigQuery() };

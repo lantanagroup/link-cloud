@@ -91,11 +91,14 @@ else
     else
     {
         <div class="au-card card mb-3">
-            <div class="card-header">Mappings</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Mappings</span>
+                <button type="button" class="btn btn-sm btn-success" data-lu-reveal="mappingCreate">+ Add</button>
+            </div>
             <div class="card-body">
                 @if (Model.Mappings.Count == 0)
                 {
-                    <p class="mb-0">No measure mappings found.</p>
+                    <p class="mb-0">No measure mappings yet. Add one to connect a measure with a dQM.</p>
                 }
                 else
                 {
@@ -137,9 +140,10 @@ else
                                         </select>
                                     </td>
                                     <td>
-                                        <form id="@formId" method="post" asp-action="SaveMapping">
+                                        <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveMapping">
                                             <input type="hidden" name="Id" value="@row.Id" />
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                            <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" data-lu-cancel>Cancel</button>
                                         </form>
                                     </td>
                                     <td>
@@ -179,7 +183,7 @@ else
 
     @if (Model.Configured)
     {
-        <div class="au-card card">
+        <div class="au-card card d-none" id="mappingCreate" data-lu-panel data-lu-hide-on-cancel>
             <div class="card-header">New mapping</div>
             <div class="card-body">
                 <form method="post" data-au-save asp-action="SaveMapping" class="row g-2 align-items-end">
@@ -201,7 +205,8 @@ else
                         </select>
                     </div>
                     <div class="col-12 col-md-2">
-                        <button type="submit" class="btn btn-au-action">Create</button>
+                        <button type="submit" class="btn btn-success">Save</button>
+                        <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
                     </div>
                 </form>
             </div>

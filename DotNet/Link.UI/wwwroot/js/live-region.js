@@ -292,4 +292,40 @@
 
     scanRefresh();
     document.addEventListener("au-refreshed", scanRefresh);
+
+    document.addEventListener("click", function (event) {
+        var opener = event.target && event.target.closest ? event.target.closest("[data-lu-reveal]") : null;
+        if (!opener) return;
+        var panel = document.getElementById(opener.getAttribute("data-lu-reveal") || "");
+        if (!panel) return;
+        event.preventDefault();
+        panel.classList.remove("d-none");
+        var focus = panel.querySelector("input:not([type='hidden']), select, textarea");
+        if (focus) focus.focus();
+    });
+
+    document.addEventListener("click", function (event) {
+        var closer = event.target && event.target.closest ? event.target.closest("[data-lu-cancel]") : null;
+        if (!closer) return;
+        event.preventDefault();
+        var panel = closer.closest("[data-lu-panel]");
+        var named = closer.getAttribute("data-lu-cancel");
+        if (named) panel = document.getElementById(named) || panel;
+        if (!panel) return;
+        panel.querySelectorAll("input, textarea, select").forEach(function (field) {
+            if (field.type === "hidden" || field.type === "file") return;
+            if (field.tagName === "SELECT") {
+                Array.prototype.forEach.call(field.options, function (option) {
+                    option.selected = option.defaultSelected;
+                });
+                return;
+            }
+            if (field.type === "checkbox" || field.type === "radio") {
+                field.checked = field.defaultChecked;
+                return;
+            }
+            field.value = field.defaultValue;
+        });
+        if (panel.hasAttribute("data-lu-hide-on-cancel")) panel.classList.add("d-none");
+    });
 })();
