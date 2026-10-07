@@ -17,7 +17,7 @@
             <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index">
                 <div class="au-kpi-value">@facilities.TotalText</div>
                 <div class="au-kpi-label">Facilities</div>
-                @if (facilities.Reachable && facilities.Automation is int automation && facilities.Regular is int regular)
+                @if (LinkUiFeatures.Value.AutomationEnabled && facilities.Reachable && facilities.Automation is int automation && facilities.Regular is int regular)
                 {
                     <div class="au-kpi-note">@automation automation · @regular regular</div>
                 }
@@ -27,13 +27,16 @@
                 }
             </a>
         </div>
-        <div class="col-6 col-md-3">
-            <a class="au-kpi-card au-kpi-link au-kpi-auto" asp-controller="Tenants" asp-action="Index" asp-route-scope="automation">
-                <div class="au-kpi-value">@facilities.AutomationText</div>
-                <div class="au-kpi-label">Automation</div>
-                <div class="au-kpi-note">Owned facilities</div>
-            </a>
-        </div>
+        @if (LinkUiFeatures.Value.AutomationEnabled)
+        {
+            <div class="col-6 col-md-3">
+                <a class="au-kpi-card au-kpi-link au-kpi-auto" asp-controller="Tenants" asp-action="Index" asp-route-scope="automation">
+                    <div class="au-kpi-value">@facilities.AutomationText</div>
+                    <div class="au-kpi-label">Automation</div>
+                    <div class="au-kpi-note">Owned facilities</div>
+                </a>
+            </div>
+        }
         <div class="col-6 col-md-3">
             <a class="au-kpi-card au-kpi-link" asp-controller="Automation" asp-action="Index">
                 <div class="au-kpi-value">@runs.ActiveText</div>
@@ -73,6 +76,7 @@
                             <a class="home-row" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">
                                 <span class="badge @report.Badge">@report.Status</span>
                                 <code class="lu-facility-id">@report.FacilityId</code>
+                                <partial name="_AutomationBadge" model="report.AutomationRunId" />
                                 <span class="text-muted small">@report.When</span>
                             </a>
                         }
@@ -118,20 +122,25 @@
                             }
                         }
                     }
-                    <p class="mb-0">
-                        @if (health.ApiHealthReachable)
-                        {
-                            <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
-                        }
-                        else
-                        {
-                            <span class="text-muted">@health.ApiHealthText</span>
-                        }
-                    </p>
+                    @if (LinkUiFeatures.Value.AutomationEnabled)
+                    {
+                        <p class="mb-0">
+                            @if (health.ApiHealthReachable)
+                            {
+                                <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@health.ApiHealthText</span>
+                            }
+                        </p>
+                    }
                 </div>
             </div>
         </div>
 
+        @if (LinkUiFeatures.Value.AutomationEnabled)
+        {
         <div class="col-12 col-lg-6">
             <div class="au-card card h-100 mb-0">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -177,6 +186,7 @@
                 </div>
             </div>
         </div>
+        }
 
         <div class="col-12 col-lg-6">
             <div class="au-card card h-100 mb-0">
@@ -200,6 +210,7 @@
                             <a class="home-row" asp-controller="Logs" asp-action="AcquisitionDetail" asp-route-id="@row.Id">
                                 <span class="badge @row.Badge">@row.Status</span>
                                 <code class="lu-facility-id">@row.FacilityId</code>
+                                <partial name="_AutomationBadge" model="row.AutomationRunId" />
                                 <span class="text-muted small">@row.When</span>
                             </a>
                         }

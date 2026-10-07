@@ -3,7 +3,7 @@
 }
 
 <h1 class="h3 mb-1">Home</h1>
-<p class="text-muted mb-2">Facilities, reports, service health, automation runs, and failed acquisition logs.</p>
+<p class="text-muted mb-2">@(LinkUiFeatures.Value.AutomationEnabled ? "Facilities, reports, service health, automation runs, and failed acquisition logs." : "Facilities, reports, service health, and failed acquisition logs.")</p>
 <p class="lu-live-label mb-3">This overview updates on its own.</p>
 
 <div id="homeOverview" data-au-refresh="15000" data-au-refresh-url="@Url.Action("Overview", "Home")">

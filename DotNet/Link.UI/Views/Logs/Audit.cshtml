@@ -120,7 +120,11 @@ else
         <div class="card-body">
             @if (Model.Events.Count == 0)
             {
-                <p class="au-empty mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation audit events." : "No audit events found.")</p>
+                <p class="au-empty mb-0">@(
+                    !LinkUiFeatures.Value.AutomationEnabled ? "No audit events found."
+                    : Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation audit events."
+                    : Link.UI.Services.AutomationMarkRules.IsReal(query.Scope) ? "No real audit events."
+                    : "No audit events found.")</p>
             }
             else
             {

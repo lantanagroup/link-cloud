@@ -76,7 +76,8 @@ public static class HomeOverviewRules
         string? listMessage,
         bool ownershipReachable,
         IEnumerable<string>? facilityIds,
-        AutomationOwnershipIndex? ownership)
+        AutomationOwnershipIndex? ownership,
+        bool classify = true)
     {
         if (!listReachable)
         {
@@ -97,7 +98,7 @@ public static class HomeOverviewRules
 
         int? automation = null;
         int? regular = null;
-        if (ownershipReachable && ownership is not null)
+        if (classify && ownershipReachable && ownership is not null)
         {
             var owned = distinct.Count(ownership.Contains);
             automation = owned;
@@ -110,11 +111,16 @@ public static class HomeOverviewRules
             Total = distinct.Count,
             Automation = automation,
             Regular = regular,
-            Message = ownershipReachable ? null : "Automation ownership could not be read."
+            Message = classify && !ownershipReachable ? "Automation ownership could not be read." : null
         };
     }
 
-    public static ReportCard Reports(bool reachable, string? message, long total, IEnumerable<FacilityReportRow>? rows)
+    public static ReportCard Reports(
+        bool reachable,
+        string? message,
+        long total,
+        IEnumerable<FacilityReportRow>? rows,
+        AutomationOwnershipIndex? ownership = null)
     {
         if (!reachable)
         {
@@ -134,7 +140,8 @@ public static class HomeOverviewRules
                 FacilityId = row.FacilityId,
                 Status = row.StatusLabel,
                 Badge = FacilityViewRules.StatusBadge(row.Status),
-                When = row.Created
+                When = row.Created,
+                AutomationRunId = ownership?.RunIdFor(row.FacilityId)
             }).ToList()
         };
     }
