@@ -334,7 +334,28 @@
         if (copy) {
             event.preventDefault();
             var value = copy.getAttribute("data-lu-copy") || "";
-            var done = function () { copy.textContent = "Copied"; setTimeout(function () { copy.textContent = "Copy"; }, 1200); };
+            var shown = copy.parentElement && copy.parentElement.querySelector
+                ? copy.parentElement.querySelector(".lu-facility-id, .lu-clip")
+                : null;
+            if (shown && shown.textContent && shown.textContent.trim()) value = shown.textContent.trim();
+            var icon = copy.querySelector("i");
+            var label = copy.getAttribute("aria-label") || "Copy";
+            var done = function () {
+                if (icon) {
+                    icon.classList.remove("bi-copy");
+                    icon.classList.add("bi-check2");
+                }
+                copy.setAttribute("title", "Copied");
+                copy.setAttribute("aria-label", "Copied");
+                setTimeout(function () {
+                    if (icon) {
+                        icon.classList.remove("bi-check2");
+                        icon.classList.add("bi-copy");
+                    }
+                    copy.setAttribute("title", label);
+                    copy.setAttribute("aria-label", label);
+                }, 1200);
+            };
             if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(value).then(done);
             return;
         }

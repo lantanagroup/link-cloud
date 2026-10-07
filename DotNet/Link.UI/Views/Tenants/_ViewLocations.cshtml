@@ -74,7 +74,7 @@
                     {
                         <tr class="@(!row.IsActive ? "table-secondary" : null)">
                             <td>@row.Id</td>
-                            <td><code class="lu-facility-id">@row.LocationId</code></td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = row.LocationId, Compact = true, CopyLabel = "Copy location id" })" /></td>
                             <td>@row.Name</td>
                             <td>@row.Alias</td>
                             <td>@(string.IsNullOrWhiteSpace(row.PartOf) ? "—" : row.PartOf)</td>

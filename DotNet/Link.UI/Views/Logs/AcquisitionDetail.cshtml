@@ -9,7 +9,8 @@
 <div class="mb-3">
     <a class="btn btn-sm btn-au-neutral" asp-action="Acquisition"><i class="bi bi-arrow-left me-1"></i>Acquisition logs</a>
 </div>
-<h1 class="h3">Acquisition log @Model.Id</h1>
+<h1 class="h3">Acquisition log</h1>
+<partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = Model.Id.ToString(), CopyLabel = "Copy log id" })" />
 <partial name="_Nav" />
 <partial name="_Alerts" />
 
@@ -40,19 +41,12 @@ else
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></dd>
                 <dt class="col-sm-3">Patient</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.PatientId) ? "—" : Model.PatientId)</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = Model.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></dd>
                 <dt class="col-sm-3">Report</dt>
                 <dd class="col-sm-9">
-                    @if (Model.ReportLink)
-                    {
-                        <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">@Model.ReportId</a>
-                    }
-                    else
-                    {
-                        @(string.IsNullOrWhiteSpace(Model.ReportId) ? "—" : Model.ReportId)
-                    }
+                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = Model.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = Model.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = Model.FacilityId, reportId = Model.ReportId }) : null })" />
                 </dd>
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9">@Model.Status</dd>

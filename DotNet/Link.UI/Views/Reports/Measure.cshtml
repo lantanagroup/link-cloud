@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Measure report";
     ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "report";
 }
@@ -16,6 +17,7 @@
 }
 
 <h1 class="h3">Measure report</h1>
+<partial name="_ReportIdentity" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
@@ -30,12 +32,8 @@ else
     <div class="au-card card mb-3">
         <div class="card-body">
             <dl class="row mb-0">
-                <dt class="col-sm-3">Report</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@Model.ReportId</code></dd>
-                <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@Model.FacilityId</code></dd>
                 <dt class="col-sm-3">Patient</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@Model.PatientId</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = Model.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></dd>
                 <dt class="col-sm-3">Validation status</dt>
                 <dd class="col-sm-9">@Model.ReportingStatus</dd>
                 <dt class="col-sm-3">Submission status</dt>
@@ -74,7 +72,7 @@ else
                         @foreach (var measure in Model.Measures)
                         {
                             <tr>
-                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(measure.Id) ? "—" : measure.Id)</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Measure", Value = measure.Id, Compact = true, CopyLabel = "Copy measure id" })" /></td>
                                 <td>@measure.Type</td>
                                 <td>@measure.Status</td>
                                 <td>@measure.Resources</td>

@@ -9,7 +9,7 @@
             <div>
                 <strong>@label</strong>
                 <div class="small text-muted">
-                    <code class="lu-facility-id">@node.LocationId</code>
+                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = node.LocationId, Compact = true, CopyLabel = "Copy location id" })" />
                     @if (!string.IsNullOrWhiteSpace(node.Alias))
                     {
                         <span> · @node.Alias</span>

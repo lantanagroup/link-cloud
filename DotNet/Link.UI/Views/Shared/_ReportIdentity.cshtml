@@ -1,0 +1,21 @@
+@{
+    var facilityId = ViewData["FacilityId"] as string;
+    var reportId = ViewData["ReportId"] as string;
+    var facilityName = ViewData["FacilityName"] as string;
+    string? facilityHref = null;
+    if (!string.IsNullOrWhiteSpace(facilityId))
+        facilityHref = Url.Action("View", "Tenants", new { id = facilityId });
+}
+@if (!string.IsNullOrWhiteSpace(facilityId) || !string.IsNullOrWhiteSpace(reportId))
+{
+    <div class="lu-id-strip mb-3">
+        @if (!string.IsNullOrWhiteSpace(facilityId))
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Name = facilityName, Value = facilityId, CopyLabel = "Copy facility id", LinkHref = facilityHref })" />
+        }
+        @if (!string.IsNullOrWhiteSpace(reportId))
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = reportId, CopyLabel = "Copy report id" })" />
+        }
+    </div>
+}

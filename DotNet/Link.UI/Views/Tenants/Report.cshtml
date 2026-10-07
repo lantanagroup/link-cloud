@@ -11,6 +11,7 @@
 
 @{
     ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "report";
 }
@@ -29,6 +30,7 @@
 
 @if (!string.IsNullOrWhiteSpace(Model.ReportId))
 {
+    <partial name="_ReportIdentity" />
     <partial name="_ReportNav" />
 }
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
@@ -54,7 +56,7 @@ else
     <div class="au-card card mb-3">
         <div class="card-header d-flex justify-content-between flex-wrap gap-2">
             <span>Report</span>
-            <code class="lu-facility-id">@report.Id</code>
+            <partial name="_AutomationBadge" model="Model.AutomationRunId" />
         </div>
         <div class="card-body">
             <dl class="row mb-0">
@@ -68,8 +70,6 @@ else
                     {
                         <a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a>
                     }
-                    <code class="lu-facility-id">@report.FacilityId</code>
-                    <partial name="_AutomationBadge" model="Model.AutomationRunId" />
                 </dd>
                 <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
                 <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
@@ -169,7 +169,15 @@ else
                         @foreach (var row in Model.Patients)
                         {
                             <tr>
-                                <td><a asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(Model.ReportId, patient: row.PatientId)"><code class="lu-facility-id">@row.PatientId</code></a></td>
+                                <td>
+                                    @{
+                                        var patientRoute = Model.Query.ToRoute(Model.ReportId, patient: row.PatientId);
+                                        var patientHref = Url.Action("Report", new { id = Model.FacilityId });
+                                        if (patientRoute.Count > 0)
+                                            patientHref += "?" + string.Join("&", patientRoute.Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+                                    }
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id", LinkHref = patientHref })" />
+                                </td>
                                 <td>@row.ReportingStatus</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.SubmissionStatus) ? "—" : row.SubmissionStatus)</td>
                                 <td>@row.LocationOrg</td>

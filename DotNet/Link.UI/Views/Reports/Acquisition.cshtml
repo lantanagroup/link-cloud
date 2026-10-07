@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Acquisition log";
     ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "acquisition";
     var bar = Model.Paging;
@@ -26,6 +27,7 @@
 </div>
 
 <h1 class="h3">Acquisition log</h1>
+<partial name="_ReportIdentity" />
 <p class="mb-2"><a asp-controller="Logs" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open in Logs</a></p>
 <partial name="_ReportNav" />
 
@@ -101,7 +103,7 @@ else
                         {
                             <tr>
                                 <td>@row.Id</td>
-                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.PatientId) ? "—" : row.PatientId)</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                                 <td>@row.Status</td>
                                 <td>@row.Phase</td>
                                 <td>@row.Priority</td>

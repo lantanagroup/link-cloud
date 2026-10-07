@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Validation";
     ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "validation";
 }
@@ -11,6 +12,7 @@
 </div>
 
 <h1 class="h3">Validation</h1>
+<partial name="_ReportIdentity" />
 <partial name="_ReportNav" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))

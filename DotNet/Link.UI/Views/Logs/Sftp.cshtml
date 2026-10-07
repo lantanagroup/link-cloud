@@ -153,7 +153,7 @@ else
                         {
                             <tr>
                                 <td>
-                                    <code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code>
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
                                     <partial name="_AutomationBadge" model="row.AutomationRunId" />
                                 </td>
                                 <td>@row.AcquisitionType</td>
