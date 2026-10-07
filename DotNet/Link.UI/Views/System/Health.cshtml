@@ -1,5 +1,15 @@
 @model HealthPage
 @using Link.UI.Services
+@{
+    string HealthBadge(string? status)
+    {
+        var value = status?.Trim().ToLowerInvariant();
+        return value is "healthy" or "ok" ? "au-badge-success"
+            : value is "degraded" or "warning" ? "au-badge-warning"
+            : value is "unhealthy" or "error" or "failed" ? "au-badge-danger"
+            : "au-badge-muted";
+    }
+}
 
 <div class="mb-3">
     <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
@@ -37,17 +47,23 @@
     </div>
 </div>
 
-<div class="au-card card mb-3">
-    <div class="card-header">Health</div>
+<div class="au-card card mb-3" id="healthCard" data-health-url="@Url.Action("HealthStatus", new { service = Model.Service })">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Health</span>
+        <span class="lu-live-label" id="healthLive">Checking on its own</span>
+    </div>
     <div class="card-body">
+        <p class="text-danger small mb-2" id="healthError" @(string.IsNullOrWhiteSpace(Model.HealthError) ? "hidden" : null)>@Model.HealthError</p>
         @if (Model.Reports.Count == 0)
         {
-            <p class="mb-0">No health reports.</p>
+            <p class="mb-0" id="healthEmpty">No health reports.</p>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0 lu-wide-table">
+            <p class="mb-0" id="healthEmpty" hidden>No health reports.</p>
+        }
+        <div class="table-responsive" id="healthTable" @(Model.Reports.Count == 0 ? "hidden" : null)>
+                <table class="table au-table table-sm align-middle mb-0 lu-wide-table">
                     <thead>
                         <tr>
                             <th scope="col">Service</th>
@@ -56,12 +72,12 @@
                             <th scope="col">Checks</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="healthBody">
                     @foreach (var report in Model.Reports)
                     {
                         <tr>
                             <td>@report.Service</td>
-                            <td>@report.Status</td>
+                            <td><span class="badge @HealthBadge(report.Status)">@report.Status</span></td>
                             <td>@report.Duration</td>
                             <td>
                                 @if (report.Entries.Count == 0)
@@ -87,9 +103,94 @@
                     </tbody>
                 </table>
             </div>
-        }
     </div>
 </div>
+<script>
+    (function () {
+        var card = document.getElementById("healthCard");
+        if (!card) return;
+        var url = card.getAttribute("data-health-url");
+        function badge(status) {
+            var value = String(status || "").toLowerCase();
+            if (value === "healthy" || value === "ok") return "au-badge-success";
+            if (value === "degraded" || value === "warning") return "au-badge-warning";
+            if (value === "unhealthy" || value === "error" || value === "failed") return "au-badge-danger";
+            return "au-badge-muted";
+        }
+        function text(value) {
+            return document.createTextNode(value == null ? "" : String(value));
+        }
+        function paint(data) {
+            var error = document.getElementById("healthError");
+            var empty = document.getElementById("healthEmpty");
+            var table = document.getElementById("healthTable");
+            var body = document.getElementById("healthBody");
+            var label = document.getElementById("healthLive");
+            if (error) {
+                error.textContent = data.error || "";
+                error.hidden = !data.error;
+            }
+            var reports = data.reports || [];
+            if (empty) empty.hidden = reports.length > 0;
+            if (table) table.hidden = reports.length === 0;
+            if (!body) return;
+            body.replaceChildren();
+            reports.forEach(function (report) {
+                var row = document.createElement("tr");
+                var service = document.createElement("td");
+                service.append(text(report.service));
+                var statusCell = document.createElement("td");
+                var chip = document.createElement("span");
+                chip.className = "badge " + badge(report.status);
+                chip.append(text(report.status));
+                statusCell.append(chip);
+                var duration = document.createElement("td");
+                duration.append(text(report.duration));
+                var checks = document.createElement("td");
+                var entries = report.entries || [];
+                if (!entries.length) {
+                    var none = document.createElement("span");
+                    none.className = "text-muted";
+                    none.textContent = "None";
+                    checks.append(none);
+                } else {
+                    var list = document.createElement("ul");
+                    list.className = "mb-0";
+                    entries.forEach(function (entry) {
+                        var item = document.createElement("li");
+                        item.textContent = [entry.name, entry.status, entry.duration, entry.description].filter(Boolean).join(" ");
+                        list.append(item);
+                    });
+                    checks.append(list);
+                    if (report.hidden > 0) {
+                        var more = document.createElement("span");
+                        more.className = "text-muted small";
+                        more.textContent = report.hidden + " more";
+                        checks.append(more);
+                    }
+                }
+                row.append(service, statusCell, duration, checks);
+                body.append(row);
+            });
+            if (label) label.textContent = "Updated just now";
+        }
+        async function tick() {
+            if (document.hidden) return;
+            try {
+                var res = await fetch(url, { headers: { "X-Requested-With": "fetch" } });
+                if (!res.ok) return;
+                paint(await res.json());
+            } catch (e) { /* keep the last table */ }
+        }
+        // The health call talks to every service. Wait until it finishes, then
+        // wait again, so a slow report cannot stack on top of itself.
+        async function loop() {
+            await tick();
+            setTimeout(loop, 20000);
+        }
+        setTimeout(loop, 20000);
+    })();
+</script>
 
 @if (string.IsNullOrWhiteSpace(Model.Service))
 {

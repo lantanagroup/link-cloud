@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace Link.UI.Services;
@@ -16,6 +17,8 @@ namespace Link.UI.Services;
 /// Reports list, ad-hoc generate, download, prequalification, validation, measure-report JSON,
 /// and the report's acquisition log. Reads go through LinkSDK.
 /// </summary>
+public sealed record ReportCountRow(string Id, int? Census, int? Population);
+
 public sealed class ReportsService
 {
     public const string ReportNotConfigured =
@@ -36,6 +39,7 @@ public sealed class ReportsService
     private readonly IMeasureEvalServiceClient? _measure;
     private readonly IDataAcquisitionServiceClient? _acquisition;
     private readonly LinkUiFeatureOptions _options;
+    private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
 
     public ReportsService(
@@ -46,6 +50,7 @@ public sealed class ReportsService
         IMeasureEvalServiceClient? measure,
         IDataAcquisitionServiceClient? acquisition,
         IOptions<LinkUiFeatureOptions> options,
+        IMemoryCache counts,
         ILogger<ReportsService> logger)
     {
         _facilities = facilities;
@@ -55,6 +60,7 @@ public sealed class ReportsService
         _measure = measure;
         _acquisition = acquisition;
         _options = options.Value;
+        _counts = counts;
         _logger = logger;
     }
 
@@ -69,6 +75,7 @@ public sealed class ReportsService
             Blank(registry.MeasureServiceUrl) ? null : services.GetRequiredService<IMeasureEvalServiceClient>(),
             Blank(registry.DataAcquisitionServiceUrl) ? null : services.GetRequiredService<IDataAcquisitionServiceClient>(),
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
+            services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<ReportsService>>());
     }
 
@@ -134,10 +141,9 @@ public sealed class ReportsService
             }
 
             var records = response.Body.Records;
-            var counts = await Task.WhenAll(records.Select(record => CountsAsync(record.Id, cancellationToken)));
             page.Paging = Bar(response.Body.Metadata, pageNumber, pageSize, records.Count);
-            page.Reports = records.Select((record, index) =>
-                FacilityViewService.ToReportRow(record, counts[index].Census, counts[index].Population)).ToList();
+            page.Reports = records.Select(record =>
+                FacilityViewService.ToReportRow(record, null, null)).ToList();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -699,6 +705,45 @@ public sealed class ReportsService
         var counts = await CountsAsync(schedule.Body.Id, cancellationToken);
         page.Report = FacilityViewService.ToReportRow(schedule.Body, counts.Census, counts.Population);
         return (page, schedule.Body);
+    }
+
+    public async Task<IReadOnlyList<ReportCountRow>> LoadCountsAsync(string? ids, CancellationToken cancellationToken)
+    {
+        var parsed = (ids ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => Guid.TryParse(value, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .Take(FacilityViewRules.PageSizes.Max())
+            .ToList();
+        if (parsed.Count == 0 || _reports is null)
+            return Array.Empty<ReportCountRow>();
+
+        var rows = new ReportCountRow[parsed.Count];
+        var pending = new List<Task>();
+        for (var index = 0; index < parsed.Count; index++)
+        {
+            var id = parsed[index];
+            var slot = index;
+            var key = "report-counts:" + id.ToString("N");
+            if (_counts.TryGetValue(key, out (int? Census, int? Population) cached))
+            {
+                rows[slot] = new ReportCountRow(id.ToString(), cached.Census, cached.Population);
+                continue;
+            }
+
+            pending.Add(LoadOne());
+
+            async Task LoadOne()
+            {
+                var counts = await CountsAsync(id, cancellationToken);
+                _counts.Set(key, counts, TimeSpan.FromSeconds(15));
+                rows[slot] = new ReportCountRow(id.ToString(), counts.Census, counts.Population);
+            }
+        }
+
+        await Task.WhenAll(pending);
+        return rows;
     }
 
     private async Task<(int? Census, int? Population)> CountsAsync(Guid reportId, CancellationToken cancellationToken)

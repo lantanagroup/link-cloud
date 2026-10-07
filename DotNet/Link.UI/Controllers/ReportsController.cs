@@ -25,6 +25,12 @@ public sealed class ReportsController : Controller
     }
 
     [HttpGet]
+    public async Task<IActionResult> Counts(string? ids, CancellationToken cancellationToken)
+    {
+        return Json(await _reports.LoadCountsAsync(ids, cancellationToken));
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Generate(CancellationToken cancellationToken)
     {
         var page = await _reports.LoadGenerateAsync(cancellationToken);

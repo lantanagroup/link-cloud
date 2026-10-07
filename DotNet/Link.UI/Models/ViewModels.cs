@@ -23,4 +23,8 @@ public sealed class TenantListViewModel
     public string? DeletedNote { get; init; }
     public string? ErrorMessage { get; init; }
     public bool LoadedSuccessfully { get; init; }
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 25;
+    public int TotalCount { get; init; }
+    public int TotalPages { get; init; }
 }
