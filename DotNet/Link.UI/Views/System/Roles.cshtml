@@ -13,7 +13,7 @@
     <div class="alert alert-warning">@Model.LoadError</div>
 }
 
-<div class="au-card card mb-3">
+<div class="au-card card mb-3 d-none" id="roleCreate" data-lu-panel data-lu-hide-on-cancel>
     <div class="card-header">New role</div>
     <div class="card-body">
         <form method="post" data-au-save asp-action="SaveRole" class="row g-2 align-items-end">
@@ -25,19 +25,27 @@
                 <label class="form-label" for="description">Description</label>
                 <input id="description" name="description" class="form-control" maxlength="1000" />
             </div>
-            <div class="col-12 col-md-2">
-                <button type="submit" class="btn btn-au-action">Create role</button>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
 </div>
 
 <div class="au-card card">
-    <div class="card-header">Roles</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Roles</span>
+        <span class="d-flex align-items-center gap-2">
+            <span class="lu-live-label">This list updates on its own.</span>
+            <button type="button" class="btn btn-sm btn-success" data-lu-reveal="roleCreate">+ Add</button>
+        </span>
+    </div>
     <div class="card-body">
+        <div id="roleResults" data-au-refresh="20000">
         @if (Model.Roles.Count == 0)
         {
-            <p class="mb-0">No roles found.</p>
+            <p class="mb-0">No roles yet. Add one to assign claims.</p>
         }
         else
         {
@@ -79,6 +87,7 @@
                 </table>
             </div>
         }
+        </div>
     </div>
 </div>
 

@@ -86,11 +86,11 @@ else
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Started</div>
-                        <div id="runStarted">@(run?.StartedAt?.ToString("u") ?? "—")</div>
+                        <div id="runStarted">@(run?.StartedAt is null ? "—" : LinkUiTime.IsoUtc(run.StartedAt.Value))</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Finished</div>
-                        <div id="runFinished">@(run?.FinishedAt?.ToString("u") ?? "—")</div>
+                        <div id="runFinished">@(run?.FinishedAt is null ? "—" : LinkUiTime.IsoUtc(run.FinishedAt.Value))</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Duration</div>

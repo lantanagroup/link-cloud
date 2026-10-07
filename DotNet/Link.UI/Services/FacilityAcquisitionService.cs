@@ -42,7 +42,8 @@ public sealed class FacilityAcquisitionService
         page.FhirList = await ReadFhirListAsync(facilityId, listTask);
         page.ReportingOrg = await ReadReportingOrgAsync(facilityId, reportingOrgId, orgTask);
         page.Sftp = await ReadSftpAsync(facilityId, sftpTask, credentialTask);
-        (page.QueryPlan, page.ExistingQueryPlanTypes) = await ReadQueryPlansAsync(facilityId, selectedType, planTasks);
+        (page.QueryPlan, page.ExistingQueryPlanTypes, page.QueryPlanSummaries) =
+            await ReadQueryPlansAsync(facilityId, selectedType, planTasks);
     }
 
     public async Task<string?> SaveFhirQueryAsync(FacilityHubViewModel page, FhirQueryPanel input, CancellationToken cancellationToken)
@@ -376,12 +377,13 @@ public sealed class FacilityAcquisitionService
         }
     }
 
-    private async Task<(QueryPlanPanel Panel, IReadOnlyList<string> Existing)> ReadQueryPlansAsync(
+    private async Task<(QueryPlanPanel Panel, IReadOnlyList<string> Existing, IReadOnlyList<QueryPlanSummary> Summaries)> ReadQueryPlansAsync(
         string facilityId,
         string selectedType,
         Dictionary<string, Task<LinkApiResponse>> tasks)
     {
         var existing = new List<string>();
+        var summaries = new List<QueryPlanSummary>();
         QueryPlanPanel? selected = null;
         foreach (var type in FacilityAcquisitionRules.QueryPlanTypes)
         {
@@ -407,9 +409,16 @@ public sealed class FacilityAcquisitionService
                     continue;
                 }
 
+                var parsed = FacilityAcquisitionRules.ParseQueryPlan(response.RawBody, type);
                 existing.Add(type);
+                summaries.Add(new QueryPlanSummary
+                {
+                    Type = parsed.Type ?? type,
+                    PlanName = parsed.PlanName,
+                    LookBack = parsed.LookBack
+                });
                 if (type == selectedType)
-                    selected = FacilityAcquisitionRules.ParseQueryPlan(response.RawBody, type);
+                    selected = parsed;
             }
             catch (OperationCanceledException) when (task.IsCanceled)
             {
@@ -426,7 +435,7 @@ public sealed class FacilityAcquisitionService
             }
         }
 
-        return (selected ?? FacilityAcquisitionRules.EmptyQueryPlan(selectedType), existing);
+        return (selected ?? FacilityAcquisitionRules.EmptyQueryPlan(selectedType), existing, summaries);
     }
 
     private async Task<ReportingOrgPanel> ReadReportingOrgAsync(

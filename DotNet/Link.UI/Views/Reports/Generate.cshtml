@@ -92,10 +92,19 @@
             <textarea id="patients" name="patients" class="form-control" rows="4" placeholder="One id per line">@input.Patients</textarea>
         </div>
         <div class="col-12">
-            <label class="form-check-label">
-                <input class="form-check-input me-1" type="checkbox" name="bypassSubmission" value="true" @(input.BypassSubmission ? "checked" : null) />
-                Bypass submission
-            </label>
+            <fieldset>
+                <legend class="form-label">After the report is generated</legend>
+                <div class="d-flex flex-wrap gap-3">
+                    <label class="form-check-label">
+                        <input class="form-check-input me-1" type="radio" name="bypassSubmission" value="false" @(input.BypassSubmission ? null : "checked") />
+                        Generate and submit
+                    </label>
+                    <label class="form-check-label">
+                        <input class="form-check-input me-1" type="radio" name="bypassSubmission" value="true" @(input.BypassSubmission ? "checked" : null) />
+                        Generate without submitting
+                    </label>
+                </div>
+            </fieldset>
         </div>
         <div class="col-12">
             <button type="submit" class="btn btn-au-action">Generate</button>
