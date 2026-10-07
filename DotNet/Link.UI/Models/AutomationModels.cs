@@ -39,6 +39,8 @@ public sealed class AutomationRunRow
 
     public string? Error { get; init; }
 
+    public string? RetentionNotice { get; init; }
+
     public string? Duration { get; init; }
 
     public string? FacilityId { get; init; }

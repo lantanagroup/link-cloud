@@ -37,12 +37,13 @@ public class TestScenarioConfig
     public List<string> PatientIds { get; set; } = ["207727"];
 
     /// <summary>
-    /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
+    /// After a successful run, remove service data for a facility this run created.
     /// </summary>
     public bool CleanupServiceData { get; set; }
 
     /// <summary>
-    /// Expunge all data from the FHIR server after the run.
+    /// After a successful run, delete only the FHIR resources this run created.
+    /// Defaults to true, so a caller that builds a fresh config must set it explicitly.
     /// </summary>
     public bool CleanupFhirData { get; set; } = true;
     public int PollingIntervalSeconds { get; set; } = 3;

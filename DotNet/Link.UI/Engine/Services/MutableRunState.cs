@@ -38,6 +38,7 @@ internal sealed class MutableRunState(
     public string? ReportId { get; set; }
     public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
     public string? Error { get; set; }
+    public string? RetentionNotice { get; set; }
     public List<string> Logs { get; } = [];
     public CancellationTokenSource RunCancellation { get; } = new();
     public bool CancelRequested { get; set; }

@@ -305,16 +305,213 @@ public class HomeOverviewTests
         js.Should().Contain("setTimeout(function () { refresh(node); }, 0);");
         js.Should().Contain("regionUrl(node)");
 
+        index.Should().NotContain("automation");
+        index.Should().Contain("lu-live-label");
+
         var overview = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Home/_Overview.cshtml"));
         overview.Should().Contain("asp-controller=\"Tenants\"");
-        overview.Should().Contain("asp-route-scope=\"automation\"");
+        overview.Should().Contain("asp-route-status=\"New,Scheduled,EndOfPeriod\"");
+        overview.Should().Contain("asp-route-status=\"Submitted\"");
+        overview.Should().Contain("asp-route-status=\"CompletedNotSubmitted\"");
+        overview.Should().Contain("asp-route-created=\"@day.Day\"");
         overview.Should().Contain("asp-controller=\"Reports\"");
         overview.Should().Contain("asp-controller=\"System\" asp-action=\"Health\"");
         overview.Should().Contain("asp-controller=\"ApiHealth\"");
-        overview.Should().Contain("asp-controller=\"Automation\" asp-action=\"Run\"");
-        overview.Should().Contain("asp-controller=\"Logs\" asp-action=\"AcquisitionDetail\"");
+        overview.Should().Contain("asp-controller=\"Metrics\"");
+        overview.Should().Contain("asp-controller=\"Logs\" asp-action=\"Acquisition\"");
+        overview.Should().Contain("asp-route-status=\"Failed,MaxRetriesReached\"");
         overview.Should().Contain("au-kpi-card");
+        overview.Should().Contain("au-service-chip");
         overview.Should().Contain("id=\"homeOverview\"");
+        overview.Should().Contain("Nothing needs attention right now.");
+
+        var gate = overview.IndexOf("@if (Model.AutomationVisible)", StringComparison.Ordinal);
+        var scope = overview.IndexOf("asp-route-scope=\"automation\"", StringComparison.Ordinal);
+        var run = overview.IndexOf("asp-controller=\"Automation\" asp-action=\"Run\"", StringComparison.Ordinal);
+        gate.Should().BeGreaterThan(0);
+        scope.Should().BeGreaterThan(gate);
+        run.Should().BeGreaterThan(gate);
+        overview[..gate].Should().NotContain("automation");
+
+        var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/HomeOverviewService.cs"));
+        service.Should().Contain("_features.Value.AutomationEnabled");
+        service.Should().Contain("CacheKey + \":off\"");
+        service.Should().Contain("AutomationOwnershipLookup");
+        var options = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/LinkUiFeatureOptions.cs"));
+        options.Should().Contain("bool AutomationEnabled");
+    }
+
+    [Fact]
+    public void Thousands_of_facilities_and_reports_stay_counts()
+    {
+        var ids = Enumerable.Range(0, 4000).Select(i => "facility-" + i).ToArray();
+        var owned = ids.Take(250).ToArray();
+        var index = new AutomationOwnershipIndex(
+            owned,
+            owned.ToDictionary(id => id, _ => "run", StringComparer.OrdinalIgnoreCase));
+
+        var card = HomeOverviewRules.Facilities(true, null, true, ids, index);
+        card.Total.Should().Be(4000);
+        card.Automation.Should().Be(250);
+        card.Regular.Should().Be(3750);
+        card.GetType().GetProperties().Should().NotContain(property =>
+            property.PropertyType != typeof(string)
+            && typeof(System.Collections.IEnumerable).IsAssignableFrom(property.PropertyType));
+
+        var rows = Enumerable.Range(0, 4000).Select(i => new FacilityReportRow
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = "facility-" + i,
+            Status = ScheduleStatus.New,
+            StatusLabel = "New",
+            Created = "2026-10-01T00:00:00Z"
+        });
+        var reports = HomeOverviewRules.Reports(true, null, 9000, rows);
+        reports.Rows.Should().HaveCount(HomeOverviewRules.RowLimit);
+        reports.Total.Should().Be(9000);
+        reports.Rows.Should().OnlyContain(row => row.FacilityId.StartsWith("facility-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Hidden_automation_keeps_the_total_and_drops_the_split()
+    {
+        var known = HomeOverviewRules.Facilities(
+            true,
+            null,
+            true,
+            ["owned", "real-a", "real-b"],
+            new AutomationOwnershipIndex(
+                ["owned"],
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["owned"] = "run" }));
+        known.Regular.Should().Be(2);
+        HomeOverviewRules.PrimaryFacilityText(known, true).Should().Be("2");
+
+        var hidden = HomeOverviewRules.Facilities(
+            true,
+            null,
+            false,
+            ["owned", "real-a", "real-b"],
+            AutomationOwnershipIndex.Empty,
+            classify: false);
+        hidden.Automation.Should().BeNull();
+        hidden.Regular.Should().BeNull();
+        hidden.Total.Should().Be(3);
+        hidden.Message.Should().BeNull();
+        HomeOverviewRules.PrimaryFacilityText(hidden, false).Should().Be("3");
+
+        var now = DateTimeOffset.Parse("2026-10-07T15:00:00Z");
+        var quietActivity = HomeOverviewRules.Activity(true, 1, now.AddHours(-1), true, 0, true, 0, []);
+        var quietHealth = HomeOverviewRules.Health(true, null, [("account", "Healthy")], true, null, null, null, null, null);
+        var quietLogs = HomeOverviewRules.Logs(true, null, 0, null, true, null);
+        HomeOverviewRules.Issues(
+            true,
+            false,
+            false,
+            quietActivity,
+            quietHealth,
+            quietLogs,
+            HomeOverviewRules.Pulse(false, "Service metrics could not be read.", null),
+            now).Should().BeEmpty();
+        HomeOverviewRules.Issues(
+            true,
+            false,
+            true,
+            quietActivity,
+            quietHealth,
+            quietLogs,
+            HomeOverviewRules.Pulse(true, null, []),
+            now).Should().ContainSingle(issue =>
+                issue.Title == "Automation ownership could not be read"
+                && issue.Href == HomeOverviewRules.AutomationTenantsHref);
+    }
+
+    [Fact]
+    public void Issues_name_the_problem_and_stay_a_short_list()
+    {
+        var now = DateTimeOffset.Parse("2026-10-07T15:00:00Z");
+        var activity = HomeOverviewRules.Activity(
+            true,
+            40,
+            now.AddHours(-30),
+            false,
+            0,
+            true,
+            3,
+            Enumerable.Range(0, 7).Select(i => new TrendDay
+            {
+                Day = "2026-10-0" + (i + 1),
+                Reachable = false,
+                Count = 9000
+            }).ToList());
+        var health = HomeOverviewRules.Health(
+            true,
+            null,
+            Enumerable.Range(0, 4000).Select(i => ("service-" + i, "Unhealthy")),
+            true,
+            null,
+            Guid.NewGuid(),
+            "All",
+            null,
+            "2026-10-07T14:00:00Z");
+        var logs = HomeOverviewRules.Logs(true, null, 4000, null, false, "Audit could not be reached.");
+        var pulse = HomeOverviewRules.Pulse(true, null,
+        [
+            new PulseSample("platform-db", "platform", 90, 9000),
+            new PulseSample("Report", "pipeline", 10, 1500),
+            new PulseSample("Submission", "pipeline", 12, 3400),
+            new PulseSample("Normalization", "pipeline", 8, 2600)
+        ]);
+
+        pulse.Chips.Should().HaveCount(3);
+        pulse.Chips.Should().NotContain(chip => chip.Name == "platform-db");
+
+        var issues = HomeOverviewRules.Issues(false, false, true, activity, health, logs, pulse, now);
+        issues.Should().HaveCount(HomeOverviewRules.IssueLimit);
+        issues.Select(issue => issue.Title).Should().Equal(
+            "Facilities could not be read",
+            "Report counts could not be read",
+            "A report has been in flight for more than a day",
+            "Report trend could not be read",
+            "4000 unhealthy services",
+            "4000 failed acquisition logs",
+            "Audit could not be read",
+            "Submission API is slower than 2 seconds");
+        issues.Should().OnlyContain(issue => !issue.Title.Contains("facility-", StringComparison.Ordinal));
+        issues[2].Href.Should().Be(HomeOverviewRules.InFlightHref);
+        issues[2].Detail.Should().Be("2026-10-06T09:00:00Z");
+        issues[4].Href.Should().Be(HomeOverviewRules.HealthHref);
+        issues[4].Detail.Should().NotContain("service-4");
+        issues[5].Href.Should().Be(HomeOverviewRules.FailedLogsHref);
+        issues[7].Href.Should().Be(HomeOverviewRules.MetricsHref);
+        issues[7].Detail.Should().Be("3400 ms");
+
+        var quiet = HomeOverviewRules.Issues(
+            true,
+            true,
+            false,
+            HomeOverviewRules.Activity(true, 1, now.AddHours(-2), true, 4, true, 0, [new TrendDay { Day = "2026-10-07", Reachable = true, Count = 9000 }]),
+            HomeOverviewRules.Health(true, null, [("account", "Healthy")], true, null, null, null, null, null),
+            HomeOverviewRules.Logs(true, null, 0, null, true, null),
+            HomeOverviewRules.Pulse(true, null, [new PulseSample("Report", "pipeline", 1, 20)]),
+            now);
+        quiet.Should().BeEmpty();
+
+        var fresh = HomeOverviewRules.Activity(true, 1, now.AddHours(-1), true, 0, true, 0, [new TrendDay { Day = "2026-10-07", Reachable = true, Count = 0 }]);
+        HomeOverviewRules.Issues(
+            true,
+            true,
+            true,
+            fresh,
+            HomeOverviewRules.Health(true, null, [("account", "ok")], true, null, null, null, null, null),
+            HomeOverviewRules.Logs(true, null, 0, null, true, null),
+            HomeOverviewRules.Pulse(false, "Service metrics could not be read.", null),
+            now).Should().ContainSingle(issue => issue.Href == HomeOverviewRules.MetricsHref && issue.Title == "Service metrics could not be read");
+
+        HomeOverviewRules.CreatedHref("2026-10-07").Should().Be("/Reports?created=2026-10-07");
+        HomeOverviewRules.BarPercent(9000, 9000).Should().Be(100);
+        HomeOverviewRules.BarPercent(0, 9000).Should().Be(0);
+        fresh.InFlightText.Should().Be("1");
+        HomeOverviewRules.Activity(false, 80, now, true, 1, true, 2, []).InFlightText.Should().Be("—");
     }
 
     private static string RepoFile(string relative)

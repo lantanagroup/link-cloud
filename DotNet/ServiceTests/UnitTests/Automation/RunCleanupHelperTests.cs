@@ -346,7 +346,7 @@ public class RunCleanupHelperTests
     }
 
     [Fact]
-    public async Task CleanupCancelledRun_still_expunges_when_quiesce_fails()
+    public async Task CleanupCancelledRun_keeps_schedules_and_does_not_throw_when_quiesce_fails()
     {
         var da = new Mock<IDataAcquisitionServiceClient>();
         da.Setup(c => c.CancelAcquisitionLogsByFilterAsync(It.IsAny<object>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -354,11 +354,7 @@ public class RunCleanupHelperTests
         var census = new Mock<ICensusServiceClient>();
         census.Setup(c => c.DisableFacilityJobsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
-        var report = new Mock<IReportServiceClient>();
-        report.Setup(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
-        report.Setup(c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new LinkApiResponse { StatusCode = 200 });
+        var report = new Mock<IReportServiceClient>(MockBehavior.Strict);
 
         var act = async () => await RunCleanupHelper.CleanupCancelledRunAsync(
             da.Object,
@@ -373,6 +369,35 @@ public class RunCleanupHelperTests
             CancellationToken.None);
 
         await act.Should().NotThrowAsync();
+        report.Verify(
+            c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            Times.Never);
+        report.Verify(
+            c => c.SetReportsDeletedStatusForFacilityAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CleanupAfterRun_does_not_delete_when_the_run_did_not_succeed()
+    {
+        var facility = new Mock<IFacilityServiceClient>(MockBehavior.Strict);
+        var normalization = new Mock<INormalizationServiceClient>(MockBehavior.Strict);
+        var da = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        var query = new Mock<IQueryDispatchServiceClient>(MockBehavior.Strict);
+        var report = new Mock<IReportServiceClient>(MockBehavior.Strict);
+
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            new TestScenarioConfig { CleanupServiceData = true, CleanupFhirData = true },
+            facility.Object,
+            normalization.Object,
+            da.Object,
+            query.Object,
+            report.Object,
+            new FhirDataLoader("http://localhost"),
+            new NullOutput(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            runSucceeded: false);
     }
 
     [Fact]
