@@ -1,4 +1,7 @@
 using Automation.UI.Services;
+using Automation.UI.Services.ApiHealth;
+using Automation.UI.Services.ApiHealth.Seeding;
+using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.ConfigurationGeneration;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -185,8 +188,33 @@ public static class LinkAutomationEngine
             client.Timeout = TimeSpan.FromSeconds(10);
         });
         services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
+        services.AddTransient<IRunMetricsSnapshotService, RunMetricsSnapshotService>();
         services.AddSingleton<MetricsRunPresenter>();
         services.AddSingleton<IRunExportService, RunExportService>();
+
+        services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
+        services.AddSingleton<IServiceTestSuite, AdminBffTestSuite>();
+        services.AddSingleton<IServiceTestSuite, AccountServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, AuditServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, CensusServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, DataAcquisitionTestSuite>();
+        services.AddSingleton<IServiceTestSuite, DmrpTestSuite>();
+        services.AddSingleton<IServiceTestSuite, MeasureEvalTestSuite>();
+        services.AddSingleton<IServiceTestSuite, NormalizationTestSuite>();
+        services.AddSingleton<IServiceTestSuite, QueryDispatchTestSuite>();
+        services.AddSingleton<IServiceTestSuite, ReportServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, SubmissionServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, TenantServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, TerminologyServiceTestSuite>();
+        services.AddSingleton<IServiceTestSuite, ValidationServiceTestSuite>();
+        if (configuration.GetValue<bool>("ApiHealth:EnableAdminBffAuthSuite"))
+            services.AddSingleton<IServiceTestSuite, AdminBffAuthTestSuite>();
+        services.AddSingleton<ApiEndpointRegistry>();
+        services.AddSingleton<ApiHealthExecutionRunManager>();
+        services.AddSingleton<IApiHealthSeedContextAccessor, ApiHealthSeedContextAccessor>();
+        services.AddSingleton<IApiHealthSeedOrchestrator, ApiHealthSeedOrchestrator>();
+        services.AddHostedService<ApiHealthStartupRecoveryService>();
+        services.AddHttpClient("ApiHealthTest");
 
         return new LinkAutomationEngineStatus { Ready = true };
     }
