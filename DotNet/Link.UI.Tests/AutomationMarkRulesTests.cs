@@ -114,11 +114,14 @@ public class AutomationMarkRulesTests
         var development = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.Development.json"));
         development.Should().Contain("\"IncludeOrganizationResource\": true");
 
+        var shipped = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.json"));
+        shipped.Should().NotContain("IncludeOrganizationResource");
+
+        var docker = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.Docker.json"));
+        docker.Should().Contain("\"IncludeOrganizationResource\": true");
+
         var executor = File.ReadAllText(RepoFile("DotNet/Link.UI/Engine/Services/RunExecutor.cs"));
         executor.Should().Contain("return (false, \"default(false)\")");
-        Directory.GetFiles(RepoFile("DotNet/Link.UI"), "appsettings*.json")
-            .Select(Path.GetFileName)
-            .Should().NotContain("appsettings.Docker.json");
     }
 
     private static string RepoFile(string relative)

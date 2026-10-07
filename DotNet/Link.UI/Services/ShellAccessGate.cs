@@ -67,6 +67,33 @@ public static class ShellAccessGate
         path.StartsWithSegments("/health") || path.StartsWithSegments("/api");
 
     /// <summary>
+    /// Link.UI routes that Automation.UI served under /api. The Admin.BFF proxy is not one of them.
+    /// </summary>
+    public static bool IsNativeAutomationApi(PathString path) =>
+        path.StartsWithSegments("/api/runs") || path.StartsWithSegments("/api/api-health-runs");
+
+    /// <summary>
+    /// Routes whose controller or action requires ApiBearerPolicy.
+    /// Status, results, and the antiforgery start are not in this set.
+    /// </summary>
+    public static bool IsBearerProtectedApi(PathString path) =>
+        path.StartsWithSegments("/api/runs")
+        || path.StartsWithSegments("/api/api-health-runs/start-all-for-pipeline");
+
+    /// <summary>
+    /// When anonymous access is off, native automation API routes are closed unless bearer
+    /// auth is enabled and the route is one of the bearer routes. A shell session does not
+    /// open them: no Link.UI page calls these routes.
+    /// </summary>
+    public static bool IsClosedNativeApi(bool allowAnonymousAccess, bool apiBearerEnabled, PathString path)
+    {
+        if (allowAnonymousAccess || !IsNativeAutomationApi(path))
+            return false;
+
+        return !(apiBearerEnabled && IsBearerProtectedApi(path));
+    }
+
+    /// <summary>
     /// Paths that must render or redirect without a session: login/logout endpoints,
     /// the post-logout landing, and static files. Hubs use the same sign-in rule as pages.
     /// </summary>
