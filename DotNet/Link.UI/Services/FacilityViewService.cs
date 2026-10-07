@@ -163,17 +163,19 @@ public sealed class FacilityViewService
             var facility = await _facilities.GetAsync(page.FacilityId!, cancellationToken);
             if (facility.StatusCode == StatusCodes.Status404NotFound)
             {
-                page.NotFound = true;
-                return page;
+                // The schedule is the page. A removed facility record is an empty name, not a missing report.
+                page.FacilityMissing = true;
             }
-
-            if (!facility.IsSuccessStatusCode || facility.Body is null)
+            else if (!facility.IsSuccessStatusCode || facility.Body is null)
             {
                 page.LoadError = FacilityFormRules.ServiceMessage("Tenant", facility.StatusCode, facility.RawBody);
                 return page;
             }
+            else
+            {
+                page.FacilityName = facility.Body.FacilityName;
+            }
 
-            page.FacilityName = facility.Body.FacilityName;
             var schedule = await _reports.GetScheduleAsync(page.ReportId, cancellationToken);
             if (schedule.StatusCode == StatusCodes.Status404NotFound || schedule.Body is null)
             {

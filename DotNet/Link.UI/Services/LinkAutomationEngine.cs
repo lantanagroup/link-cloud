@@ -211,6 +211,7 @@ public static class LinkAutomationEngine
             services.AddSingleton<IServiceTestSuite, AdminBffAuthTestSuite>();
         services.AddSingleton<ApiEndpointRegistry>();
         services.AddSingleton<ApiHealthExecutionRunManager>();
+        services.AddSingleton<IApiHealthExecutionRunManager>(sp => sp.GetRequiredService<ApiHealthExecutionRunManager>());
         services.AddSingleton<IApiHealthSeedContextAccessor, ApiHealthSeedContextAccessor>();
         services.AddSingleton<IApiHealthSeedOrchestrator, ApiHealthSeedOrchestrator>();
         services.AddHostedService<ApiHealthStartupRecoveryService>();
