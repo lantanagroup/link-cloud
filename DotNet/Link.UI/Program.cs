@@ -109,7 +109,7 @@ builder.Services.AddReverseProxy()
         // Admin.BFF login builds its post-auth RedirectUri from Referer by stripping the
         // last path segment and appending "/dashboard". A page such as /Placeholder/Reports
         // would otherwise land on /Placeholder/dashboard. Force the origin root so the
-        // redirect is always {origin}/dashboard, which this host maps to Home.
+        // redirect is always {origin}/dashboard, which this host maps to the dashboard.
         transformBuilder.AddRequestTransform(transformContext =>
         {
             var request = transformContext.HttpContext.Request;

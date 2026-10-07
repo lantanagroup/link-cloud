@@ -14,12 +14,12 @@ public sealed class HomeController : Controller
 
     public IActionResult Index()
     {
-        ViewData["Title"] = "Home";
+        ViewData["Title"] = "Dashboard";
         return View();
     }
 
     /// <summary>
-    /// Admin.BFF login sets RedirectUri to {origin}/dashboard. Land on Home.
+    /// Admin.BFF login sets RedirectUri to {origin}/dashboard. Land on the dashboard.
     /// </summary>
     [HttpGet("/dashboard")]
     public IActionResult Dashboard() => RedirectToAction(nameof(Index));
