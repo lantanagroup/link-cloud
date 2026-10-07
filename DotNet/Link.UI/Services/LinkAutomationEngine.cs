@@ -1,12 +1,13 @@
 using Automation.UI.Services;
 using Automation.UI.Services.ConfigurationGeneration;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Options;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Normalization.Engine;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using MongoDB.Bson;
@@ -168,6 +169,24 @@ public static class LinkAutomationEngine
         services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
         services.AddSingleton<PatientReplacementManager>();
         services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+        services.AddSingleton<IAutomationUiMetrics, AutomationUiServiceMetrics>();
+        services.AddSingleton<IRunMetricsStore, MongoRunMetricsStore>();
+        services.AddSingleton<IMetricsBenchmarkStore, MongoMetricsBenchmarkStore>();
+        services.Configure<TelemetrySettings>(configuration.GetSection("Telemetry"));
+        services.PostConfigure<TelemetrySettings>(settings =>
+        {
+            settings.PrometheusQueryEndpoint = PrometheusHistogramClient.ResolveQueryEndpoint(settings.PrometheusQueryEndpoint);
+        });
+        services.AddHttpClient<IPrometheusHistogramClient, PrometheusHistogramClient>((sp, client) =>
+        {
+            var endpoint = sp.GetRequiredService<IOptions<TelemetrySettings>>().Value.PrometheusQueryEndpoint;
+            if (!string.IsNullOrWhiteSpace(endpoint))
+                client.BaseAddress = new Uri(endpoint.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        services.AddTransient<ILiveProcessUtilizationService, LiveProcessUtilizationService>();
+        services.AddSingleton<MetricsRunPresenter>();
+        services.AddSingleton<IRunExportService, RunExportService>();
 
         return new LinkAutomationEngineStatus { Ready = true };
     }

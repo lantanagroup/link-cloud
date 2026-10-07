@@ -1,3 +1,5 @@
+using LantanaGroup.Link.Automation.Link.Models;
+
 namespace Link.UI.Models;
 
 public sealed class AutomationRunQuery
@@ -113,6 +115,10 @@ public sealed class AutomationDashboardPage
     public string SortBy { get; init; } = "createdAt";
 
     public string SortDir { get; init; } = "desc";
+
+    public bool EngineReady { get; set; }
+
+    public IReadOnlyList<AutomationScenarioChoice> Scenarios { get; set; } = [];
 }
 
 public sealed class AutomationScenarioChoice
@@ -120,6 +126,14 @@ public sealed class AutomationScenarioChoice
     public Guid Id { get; init; }
 
     public string Name { get; init; } = string.Empty;
+
+    public string Description { get; init; } = string.Empty;
+
+    public string ReportMethod { get; init; } = string.Empty;
+
+    public string Measures { get; init; } = string.Empty;
+
+    public long UpdatedAtUnixMs { get; init; }
 
     public bool IsSystemScenario { get; init; }
 }
@@ -178,4 +192,9 @@ public sealed class AutomationRunPage
     public Guid RequestedId { get; init; }
 
     public AutomationRunRow? Run { get; init; }
+
+    /// <summary>
+    /// Engine summary for the run page. Logs stay empty here; the page reads them a page at a time.
+    /// </summary>
+    public AutomationRunSummary? Detail { get; set; }
 }

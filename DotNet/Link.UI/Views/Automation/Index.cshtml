@@ -6,10 +6,6 @@
     var success = (stats.Succeeded + stats.Failed) == 0
         ? "—"
         : $"{stats.SuccessRate}%";
-    string SortDirFor(string column) =>
-        Model.SortBy == column && Model.SortDir == "asc" ? "desc" : "asc";
-    string SortMark(string column) =>
-        Model.SortBy != column ? "" : Model.SortDir == "asc" ? " ↑" : " ↓";
 }
 @await Html.PartialAsync("_Nav")
 
@@ -19,7 +15,7 @@
         <p class="text-muted mb-0">Dashboard overview and run history. A new run stands up a throwaway facility, runs, and tears it down.</p>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-center">
-        <a class="btn btn-au-action" asp-action="New">New run</a>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="New">Ad hoc</a>
         <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured ? "yes" : "no")">@(Model.LiveConfigured ? "Connecting" : "Live updates are off")</span>
     </div>
 </div>
@@ -77,19 +73,22 @@
 </div>
 
 <div class="au-card card mb-3" id="activeCard" style="@(Model.ActiveRuns.Count == 0 ? "display:none" : "")">
-    <div class="card-header"><i class="bi bi-activity me-2"></i>Active Runs</div>
+    <div class="card-header bg-primary text-white"><i class="bi bi-activity me-2"></i>Active Runs</div>
     <div class="card-body">
         <div class="row g-2" id="activeRuns">
             @foreach (var run in Model.ActiveRuns)
             {
                 <div class="col-12 col-md-4">
-                    <div class="border rounded p-2 h-100">
-                        <a class="fw-semibold" asp-action="Run" asp-route-id="@run.RunId">@run.RunName</a>
-                        <div class="small text-muted">@run.PatientCount patients · seed @run.Seed</div>
-                        <div class="d-flex justify-content-between gap-2 mt-1">
-                            <span class="badge bg-primary">@run.StatusLabel</span>
+                    <div class="border rounded p-3 h-100">
+                        <div class="fw-semibold">@run.RunName</div>
+                        <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <span class="badge au-badge-active">@run.StatusLabel</span>
                             <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")"></span>
                         </div>
+                        <a class="btn btn-sm btn-au-action mt-2 w-100" asp-action="Run" asp-route-id="@run.RunId">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>View Details
+                        </a>
                     </div>
                 </div>
             }
@@ -98,65 +97,103 @@
     </div>
 </div>
 
-<div class="au-card card">
-    <div class="card-header d-flex justify-content-between">
-        <span><i class="bi bi-clock-history me-2"></i>Recent Runs</span>
-        <span class="text-muted" id="historyCount">@Model.TotalCount</span>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table au-table table-sm align-middle mb-2">
-                <thead>
-                    <tr>
-                        <th><a href="@Url.Action("Index", new { sortBy = "runName", sortDir = SortDirFor("runName"), pageSize = Model.PageSize })">Run@(SortMark("runName"))</a></th>
-                        <th><a href="@Url.Action("Index", new { sortBy = "status", sortDir = SortDirFor("status"), pageSize = Model.PageSize })">Status@(SortMark("status"))</a></th>
-                        <th><a href="@Url.Action("Index", new { sortBy = "patientCount", sortDir = SortDirFor("patientCount"), pageSize = Model.PageSize })">Patients@(SortMark("patientCount"))</a></th>
-                        <th><a href="@Url.Action("Index", new { sortBy = "createdAt", sortDir = SortDirFor("createdAt"), pageSize = Model.PageSize })">Created@(SortMark("createdAt"))</a></th>
-                        <th>Facility</th>
-                    </tr>
-                </thead>
-                <tbody id="historyBody">
-                    @foreach (var run in Model.RecentRuns)
-                    {
-                        <tr>
-                            <td><a asp-action="Run" asp-route-id="@run.RunId">@run.RunName</a></td>
-                            <td>@run.StatusLabel</td>
-                            <td>@run.PatientCount</td>
-                            <td>@run.CreatedAt.ToString("u")</td>
-                            <td>
-                                @if (!string.IsNullOrWhiteSpace(run.FacilityId))
+@if (Model.EngineReady)
+{
+    var customScenarios = Model.Scenarios.Where(s => !s.IsSystemScenario).OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    var systemScenarios = Model.Scenarios.Where(s => s.IsSystemScenario).OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    <div class="au-card card mb-3" id="quickLaunchCard">
+        <div class="card-header"><i class="bi bi-play-circle me-2"></i>Quick Launch</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-6">
+                    <label class="form-label fw-bold" for="quickLaunchDropdownButton">Select a saved scenario to run</label>
+                    <div class="dropdown" id="quickLaunchDropdown">
+                        <button class="form-select text-start" type="button" id="quickLaunchDropdownButton" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="dynamic" aria-expanded="false">
+                            -- Select a scenario --
+                        </button>
+                        <div class="dropdown-menu w-100 p-2" aria-labelledby="quickLaunchDropdownButton" style="max-height: 360px; overflow-y: auto;">
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="quickLaunchTypeFilter">Type</label>
+                                    <select id="quickLaunchTypeFilter" class="form-select form-select-sm">
+                                        <option value="">All types</option>
+                                        <option value="Custom">Custom</option>
+                                        <option value="System">System</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1" for="quickLaunchSort">Sort</label>
+                                    <select id="quickLaunchSort" class="form-select form-select-sm">
+                                        <option value="name">Alphabetical</option>
+                                        <option value="updated">Recently Modified</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <input type="text" id="quickLaunchSearch" class="form-control mb-2" placeholder="Search scenarios..." autocomplete="off" />
+                            <div id="quickLaunchNoResults" class="text-muted text-center py-2" hidden>No matching scenarios found.</div>
+                            <div class="quick-launch-group" data-group="Custom">
+                                <h6 class="dropdown-header px-2">Custom</h6>
+                                @foreach (var scenario in customScenarios)
                                 {
-                                    <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@run.FacilityId">@run.FacilityId</a>
+                                    <button type="button" class="dropdown-item quick-launch-option" data-id="@scenario.Id" data-name="@scenario.Name" data-description="@scenario.Description" data-method="@scenario.ReportMethod" data-type="Custom" data-measures="@scenario.Measures" data-updated="@scenario.UpdatedAtUnixMs">@scenario.Name</button>
                                 }
-                                else
+                            </div>
+                            <div class="quick-launch-group" data-group="System">
+                                <h6 class="dropdown-header px-2">System</h6>
+                                @foreach (var scenario in systemScenarios)
                                 {
-                                    <span class="text-muted">—</span>
+                                    <button type="button" class="dropdown-item quick-launch-option" data-id="@scenario.Id" data-name="@scenario.Name" data-description="@scenario.Description" data-method="@scenario.ReportMethod" data-type="System" data-measures="@scenario.Measures" data-updated="@scenario.UpdatedAtUnixMs">@scenario.Name <span class="text-muted">[System]</span></button>
                                 }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <p id="historyEmpty" class="text-muted mb-2 @(Model.RecentRuns.Count == 0 ? "" : "d-none")">No runs yet. Start one from New run.</p>
-        <div class="d-flex flex-wrap gap-2 align-items-center" id="historyPager">
-            @if (Model.PageNumber > 1)
-            {
-                <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { pageNumber = Model.PageNumber - 1, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir })">Previous</a>
-            }
-            <span class="small text-muted">Page @Model.PageNumber of @Model.TotalPages</span>
-            @if (Model.PageNumber < Model.TotalPages)
-            {
-                <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { pageNumber = Model.PageNumber + 1, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir })">Next</a>
-            }
+                            </div>
+                        </div>
+                    </div>
+                    <select id="quickLaunchSelect" hidden>
+                        <option value="">-- Select a scenario --</option>
+                        @foreach (var scenario in customScenarios.Concat(systemScenarios))
+                        {
+                            <option value="@scenario.Id" data-name="@scenario.Name" data-description="@scenario.Description" data-method="@scenario.ReportMethod" data-type="@(scenario.IsSystemScenario ? "System" : "Custom")" data-measures="@scenario.Measures" data-updated="@scenario.UpdatedAtUnixMs">@scenario.Name@(scenario.IsSystemScenario ? " [System]" : "")</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-2">
+                    <form asp-action="New" method="post" id="quickLaunchForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="choice" id="qlChoice" value="" />
+                        <input type="hidden" name="runName" value="" />
+                        <button type="submit" class="btn btn-au-run w-100" id="qlRunButton" disabled>
+                            <i class="bi bi-play-fill me-1"></i> Run
+                        </button>
+                    </form>
+                </div>
+                <div class="col-6 col-md-2">
+                    <button type="button" class="btn btn-success w-100" id="btnNewScenarioFromRuns">
+                        <i class="bi bi-plus-lg me-1"></i> New Scenario
+                    </button>
+                </div>
+                <div class="col-6 col-md-2">
+                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100" id="btnManageScenario">
+                        <i class="bi bi-journal-text me-1"></i> Manage
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
+}
+
+<div id="recentRunsHost">
+    @await Html.PartialAsync("_RecentRuns", Model)
 </div>
+
+@if (Model.EngineReady)
+{
+    @await Html.PartialAsync("_ScenarioEditorModal")
+}
 
 <script id="automation-stats" type="application/json">@Html.Raw(JsonSerializer.Serialize(stats, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))</script>
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script src="~/js/au-data-table.js" asp-append-version="true"></script>
     <script src="~/js/automation-dashboard.js" asp-append-version="true"></script>
 }

@@ -59,6 +59,12 @@ public static class AutomationRules
     public static bool IsActiveCard(string? status) =>
         status is "Queued" || IsInProgress(status);
 
+    public static bool IsCancellable(string? status) =>
+        status is "Queued" || IsInProgress(status) || status is "CollectingMetrics";
+
+    public static bool IsTerminal(string? status) =>
+        status is "Succeeded" or "Failed" or "Cancelled";
+
     public static string StatusLabel(string? status)
     {
         var name = (status ?? string.Empty).Trim();

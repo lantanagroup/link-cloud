@@ -76,7 +76,21 @@ public interface ISnapshotStore
     // --- Logs ---
     Task AppendLogsAsync(Guid runId, IReadOnlyList<string> newLines, CancellationToken ct = default);
     Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default);
+
+    /// <summary>
+    /// One page of stored log lines. Does not assemble the whole run log.
+    /// <paramref name="pageNumber"/> of 0 selects the last page.
+    /// </summary>
+    Task<RunLogPage> GetLogPageAsync(Guid runId, int pageNumber, int pageSize, CancellationToken ct = default);
 }
+
+/// <summary>One page of a run's stored console log.</summary>
+public sealed record RunLogPage(
+    IReadOnlyList<string> Lines,
+    int PageNumber,
+    int PageSize,
+    int TotalLines,
+    int TotalPages);
 
 public sealed record PagedRunResult(
     IReadOnlyList<AutomationRunSummary> Items,

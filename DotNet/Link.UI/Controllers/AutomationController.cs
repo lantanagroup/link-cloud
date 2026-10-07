@@ -8,20 +8,25 @@ using Microsoft.AspNetCore.Mvc;
 namespace Link.UI.Controllers;
 
 [Route("Automation")]
-public sealed class AutomationController : Controller
+public sealed partial class AutomationController : Controller
 {
     private readonly AutomationRunReader _runs;
     private readonly LinkAutomationEngineStatus _engine;
+    private readonly IServiceProvider _services;
+    private readonly ILogger<AutomationController> _logger;
     private readonly IAutomationRunManager? _manager;
     private readonly IScenarioStore? _scenarios;
 
     public AutomationController(
         AutomationRunReader runs,
         LinkAutomationEngineStatus engine,
-        IServiceProvider services)
+        IServiceProvider services,
+        ILogger<AutomationController> logger)
     {
         _runs = runs;
         _engine = engine;
+        _services = services;
+        _logger = logger;
         _manager = services.GetService<IAutomationRunManager>();
         _scenarios = services.GetService<IScenarioStore>();
     }
@@ -31,7 +36,17 @@ public sealed class AutomationController : Controller
     {
         ViewData["Title"] = "Automation";
         ViewData["AutomationSection"] = "runs";
-        return View(await _runs.LoadDashboardAsync(query, cancellationToken));
+        var page = await _runs.LoadDashboardAsync(query, cancellationToken);
+        page.EngineReady = _engine.Ready && _manager is not null;
+        if (page.EngineReady)
+            await FillScenarioEditorCatalogsAsync(cancellationToken);
+        return View(page);
+    }
+
+    [HttpGet("recent")]
+    public async Task<IActionResult> Recent(AutomationRunQuery query, CancellationToken cancellationToken)
+    {
+        return PartialView("_RecentRuns", await _runs.LoadDashboardAsync(query, cancellationToken));
     }
 
     [HttpGet("data")]
@@ -125,7 +140,15 @@ public sealed class AutomationController : Controller
     {
         ViewData["Title"] = "Automation run";
         ViewData["AutomationSection"] = "runs";
-        return View(await _runs.LoadRunAsync(id, cancellationToken));
+        var page = await _runs.LoadRunAsync(id, cancellationToken);
+        if (page.Found && _manager is not null)
+        {
+            page.Detail = await _manager.GetRunForDisplayAsync(id, cancellationToken);
+            if (page.Detail is not null)
+                await FillRunDetailAsync(page.Detail, cancellationToken);
+        }
+
+        return View(page);
     }
 
     [HttpGet("Runs/{id:guid}/status")]

@@ -376,6 +376,17 @@ public class AutomationRunManager : IAutomationRunManager
         return summary;
     }
 
+    public async Task<AutomationRunSummary?> GetRunForDisplayAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        if (_runs.TryGetValue(runId, out var state))
+            return ToSummary(state, includeLogs: false);
+
+        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+        if (summary != null)
+            summary.Logs = [];
+        return summary;
+    }
+
     public async Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
         AutomationRunSummary? summary;
@@ -531,7 +542,7 @@ public class AutomationRunManager : IAutomationRunManager
         // Snapshot live in-memory runs so the aggregator can merge any that
         // haven't yet been persisted (brand-new runs round-trip through Mongo
         // on the next BroadcastStatus tick).
-        var inMemory = _runs.Values.Select(ToSummary).ToList();
+        var inMemory = _runs.Values.Select(state => ToSummary(state)).ToList();
         return _dashboardAggregator.BuildAsync(inMemory, cancellationToken);
     }
 
@@ -793,7 +804,7 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    private static AutomationRunSummary ToSummary(MutableRunState state)
+    private static AutomationRunSummary ToSummary(MutableRunState state, bool includeLogs = true)
     {
         lock (state.Sync)
         {
@@ -824,7 +835,7 @@ public class AutomationRunManager : IAutomationRunManager
                 GeneratedTemplateCacheVersionNumber = state.GeneratedTemplateCacheVersionNumber,
                 GeneratedTemplateCacheScenarioKey = state.GeneratedTemplateCacheScenarioKey,
                 GeneratedTemplateSetHash = state.GeneratedTemplateSetHash,
-                Logs = state.Logs.ToList()
+                Logs = includeLogs ? state.Logs.ToList() : []
             };
         }
     }

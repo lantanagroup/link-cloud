@@ -33,6 +33,17 @@
         var title = document.getElementById("runTitle");
         if (title) title.textContent = run.runName || "Run";
         text("runStatus", run.statusLabel);
+        var statusNode = document.getElementById("status");
+        if (statusNode && run.statusLabel) statusNode.textContent = run.statusLabel;
+        text("runName", run.runName);
+        text("facilityId", run.facilityId);
+        text("scheduleFacilityId", run.facilityId);
+        text("headerReportId", run.reportId);
+        text("started", run.startedAt ? new Date(run.startedAt).toISOString().replace(".000Z", "Z") : "");
+        text("finished", run.finishedAt ? new Date(run.finishedAt).toISOString().replace(".000Z", "Z") : "");
+        text("pipelineDuration", run.duration);
+        var detailError = document.getElementById("error");
+        if (detailError) detailError.textContent = run.error || "-";
         text("runScenario", run.scenario);
         text("runPatients", String(run.patientCount || 0));
         text("runSeed", String(run.seed || 0));
@@ -103,6 +114,8 @@
             .then(function (page) {
                 if (ticket !== refreshTicket) return;
                 apply(page);
+                if (typeof window.refreshStoredLogs === "function") window.refreshStoredLogs();
+                if (typeof window.refreshRunPanels === "function") window.refreshRunPanels();
             })
             .catch(function () { });
     }
@@ -147,7 +160,7 @@
     // A status broadcast can land before this page subscribes, and later summary
     // writes do not always broadcast. Keep reading the stored run until it ends.
     var poll = setInterval(function () {
-        var node = document.getElementById("runStatus");
+        var node = document.getElementById("runStatus") || document.getElementById("status");
         var label = node ? node.textContent : "";
         if (label === "Succeeded" || label === "Failed" || label === "Cancelled") {
             clearInterval(poll);

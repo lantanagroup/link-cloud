@@ -11,6 +11,11 @@ public interface IAutomationRunManager
     Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default);
     Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Summary for the run page. Stored and in-memory logs are not copied onto it.
+    /// </summary>
+    Task<AutomationRunSummary?> GetRunForDisplayAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<GenerationManifestSnapshot?> GetGenerationManifestAsync(Guid runId, CancellationToken cancellationToken = default);
