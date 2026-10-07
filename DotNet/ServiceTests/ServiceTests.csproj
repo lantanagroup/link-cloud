@@ -152,6 +152,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\Admin.BFF\appsettings.json" Link="Resources\Admin.BFF\appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\Admin.BFF\appsettings.Development.json" Link="Resources\Admin.BFF\appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="IntegrationTests\DataAcquisition\Controllers\" />
   </ItemGroup>
 
