@@ -25,8 +25,79 @@
         schedule(form);
     });
 
-    function selectionHeld(node) {
-        return !!node.querySelector("input[type=checkbox]:checked");
+    function checkedKeys(node) {
+        return Array.prototype.map.call(node.querySelectorAll("input[type=checkbox][name=ids]:checked"), function (box) {
+            return box.value;
+        });
+    }
+
+    function restoreChecked(node, values) {
+        if (!values || !values.length) return;
+        Array.prototype.forEach.call(node.querySelectorAll("input[type=checkbox][name=ids]"), function (box) {
+            if (values.indexOf(box.value) >= 0) box.checked = true;
+        });
+    }
+
+    function bulkCount(form, flag) {
+        var count = 0;
+        Array.prototype.forEach.call(form.querySelectorAll("input[type=checkbox][name=ids]:checked"), function (box) {
+            if (box.getAttribute(flag) === "yes") count += 1;
+        });
+        return count;
+    }
+
+    function paintBulk(form) {
+        var process = bulkCount(form, "data-can-process");
+        var cancel = bulkCount(form, "data-can-cancel");
+        var processButton = form.querySelector("[data-au-bulk=process]");
+        var cancelButton = form.querySelector("[data-au-bulk=cancel]");
+        if (processButton) {
+            processButton.disabled = process === 0;
+            processButton.textContent = process === 0 ? "Process selected" : "Process " + process + " selected";
+        }
+        if (cancelButton) {
+            cancelButton.disabled = cancel === 0;
+            cancelButton.textContent = cancel === 0 ? "Cancel selected" : "Cancel " + cancel + " selected";
+        }
+        var pageBox = form.querySelector("[data-au-select-page]");
+        var enabled = form.querySelectorAll("input[type=checkbox][name=ids]");
+        if (pageBox) {
+            var checked = form.querySelectorAll("input[type=checkbox][name=ids]:checked").length;
+            pageBox.disabled = enabled.length === 0;
+            pageBox.checked = enabled.length > 0 && checked === enabled.length;
+            pageBox.indeterminate = checked > 0 && checked < enabled.length;
+        }
+    }
+
+    function wireBulk(form) {
+        if (!form || form.getAttribute("data-au-bulk-wired") === "yes") return;
+        form.setAttribute("data-au-bulk-wired", "yes");
+        form.addEventListener("change", function (event) {
+            var target = event.target;
+            if (!target || target.type !== "checkbox") return;
+            if (target.hasAttribute("data-au-select-page")) {
+                var on = target.checked;
+                Array.prototype.forEach.call(form.querySelectorAll("input[type=checkbox][name=ids]"), function (box) {
+                    box.checked = on;
+                });
+            }
+            paintBulk(form);
+        });
+        form.addEventListener("click", function (event) {
+            var button = event.target && event.target.closest ? event.target.closest("[data-au-bulk]") : null;
+            if (!button || button.disabled) return;
+            var kind = button.getAttribute("data-au-bulk");
+            var count = bulkCount(form, kind === "cancel" ? "data-can-cancel" : "data-can-process");
+            var message = kind === "cancel"
+                ? "Cancel " + count + " selected logs that are old enough? This cannot be undone."
+                : "Process " + count + " selected acquisition logs?";
+            if (!window.confirm(message)) event.preventDefault();
+        });
+        paintBulk(form);
+    }
+
+    function wireBulkForms(root) {
+        (root || document).querySelectorAll("form#acquisition-logs").forEach(wireBulk);
     }
 
     function focusedIn(node) {
@@ -49,11 +120,13 @@
             if (!res.ok) return;
             return res.text().then(function (html) {
                 if (!node.isConnected) return;
-                if (!push && (selectionHeld(node) || focusedIn(node) || document.hidden)) return;
+                if (!push && (focusedIn(node) || document.hidden)) return;
+                var held = checkedKeys(node);
                 var doc = new DOMParser().parseFromString(html, "text/html");
                 var fresh = doc.getElementById(node.id);
                 if (!fresh) return;
                 if (fresh.innerHTML !== node.innerHTML) node.innerHTML = fresh.innerHTML;
+                restoreChecked(node, held);
                 if (push) history.replaceState(null, "", url);
                 document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: node.id } }));
             });
@@ -303,7 +376,7 @@
             node._auWatch = false;
             return;
         }
-        if (document.hidden || focusedIn(node) || selectionHeld(node) || node._auBusy) return;
+        if (document.hidden || focusedIn(node) || node._auBusy) return;
         node._auBusy = true;
         replaceRegion(node, regionUrl(node), false).finally(function () { node._auBusy = false; });
     }
@@ -324,9 +397,11 @@
 
     liftDialogs();
     scanRefresh();
+    wireBulkForms(document);
     document.addEventListener("au-refreshed", function () {
         liftDialogs();
         scanRefresh();
+        wireBulkForms(document);
     });
 
     document.addEventListener("click", function (event) {
