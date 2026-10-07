@@ -121,6 +121,30 @@ public sealed class SystemController : Controller
         return View(await _system.LoadHealthAsync(service, cancellationToken));
     }
 
+    [HttpGet("Health/status")]
+    public async Task<IActionResult> HealthStatus(string? service, CancellationToken cancellationToken)
+    {
+        var page = await _system.LoadHealthAsync(service, includeServiceInfo: false, cancellationToken);
+        return Json(new
+        {
+            error = page.HealthError,
+            reports = page.Reports.Select(report => new
+            {
+                service = report.Service,
+                status = report.Status,
+                duration = report.Duration,
+                hidden = report.HiddenEntries,
+                entries = report.Entries.Select(entry => new
+                {
+                    name = entry.Name,
+                    status = entry.Status,
+                    duration = entry.Duration,
+                    description = entry.Description
+                })
+            })
+        });
+    }
+
     [HttpGet("AppConfiguration")]
     public IActionResult AppConfiguration()
     {

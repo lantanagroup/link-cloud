@@ -28,7 +28,12 @@ public sealed class TenantsController : Controller
         _logger = logger;
     }
 
-    public async Task<IActionResult> Index(string? search, bool includeDeleted, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? search,
+        bool includeDeleted,
+        int page = 1,
+        int pageSize = 0,
+        CancellationToken cancellationToken = default)
     {
         ViewData["Title"] = "Tenants";
 
@@ -48,21 +53,24 @@ public sealed class TenantsController : Controller
                 return View(FacilityListError(search, includeDeleted, activeResponse.StatusCode));
             }
 
-            var allResponse = await _facilityServiceClient.GetFacilityListAsync(
-                search: search,
-                includeDeleted: true,
-                cancellationToken: cancellationToken);
             string? deletedNote = null;
-            Dictionary<string, string> all;
-            if (!TryMapFacilities(allResponse, out all))
+            Dictionary<string, string> all = active;
+            if (includeDeleted)
             {
-                all = active;
-                deletedNote = "Deleted facilities could not be loaded.";
-                _logger.LogWarning(
-                    "Deleted facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
-                    allResponse.StatusCode,
-                    allResponse.RequestUrl,
-                    allResponse.TraceId);
+                var allResponse = await _facilityServiceClient.GetFacilityListAsync(
+                    search: search,
+                    includeDeleted: true,
+                    cancellationToken: cancellationToken);
+                if (!TryMapFacilities(allResponse, out all))
+                {
+                    all = active;
+                    deletedNote = "Deleted facilities could not be loaded.";
+                    _logger.LogWarning(
+                        "Deleted facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
+                        allResponse.StatusCode,
+                        allResponse.RequestUrl,
+                        allResponse.TraceId);
+                }
             }
 
             var activeKeys = new HashSet<string>(active.Keys, StringComparer.OrdinalIgnoreCase);
@@ -77,14 +85,19 @@ public sealed class TenantsController : Controller
                 .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(item => item.FacilityId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var slice = TenantListRules.Slice(tenants, page, pageSize);
 
             return View(new TenantListViewModel
             {
                 Search = search,
                 IncludeDeleted = includeDeleted,
-                Tenants = tenants,
+                Tenants = slice.Items,
                 LoadedSuccessfully = true,
-                DeletedNote = deletedNote
+                DeletedNote = deletedNote,
+                Page = slice.PageNumber,
+                PageSize = slice.PageSize,
+                TotalCount = slice.TotalCount,
+                TotalPages = slice.TotalPages
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -106,7 +119,13 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Restore(string? id, string? search, bool includeDeleted, CancellationToken cancellationToken)
+    public async Task<IActionResult> Restore(
+        string? id,
+        string? search,
+        bool includeDeleted,
+        int page = 1,
+        int pageSize = 0,
+        CancellationToken cancellationToken = default)
     {
         var result = await _view.RestoreFacilityAsync(id, cancellationToken);
         if (result.Succeeded)
@@ -114,7 +133,7 @@ public sealed class TenantsController : Controller
         else
             TempData["Error"] = result.Message;
 
-        return RedirectToAction(nameof(Index), new { search, includeDeleted });
+        return RedirectToAction(nameof(Index), new { search, includeDeleted, page, pageSize });
     }
 
     [HttpGet]
