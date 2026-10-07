@@ -166,6 +166,7 @@ public static class LinkAutomationEngine
         services.AddSingleton<ILeftoverRunCleanup>(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
         services.AddHostedService(sp => sp.GetRequiredService<LeftoverRunCleanupService>());
         services.AddSingleton<ILivePatientEventInjector, LivePatientEventInjector>();
+        services.AddSingleton<PatientReplacementManager>();
         services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 
         return new LinkAutomationEngineStatus { Ready = true };
