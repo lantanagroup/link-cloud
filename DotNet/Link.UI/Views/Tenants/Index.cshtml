@@ -6,7 +6,7 @@
 
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Tenants</span>
+        <span>All facilities</span>
         <a class="btn btn-sm btn-au-action" asp-action="Create">New facility</a>
     </div>
     <div class="card-body">
@@ -88,7 +88,7 @@
                                 @if (tenant.IsDeleted)
                                 {
                                     <span class="badge au-badge-muted">Deleted</span>
-                                    <form method="post" asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2" onsubmit="return confirm('Restore this facility, its reports, and its logs?');">
+                                    <form method="post" data-au-save asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2" onsubmit="return confirm('Restore this facility, its reports, and its logs?');">
                                         <input type="hidden" name="search" value="@Model.Search" />
                                         <input type="hidden" name="page" value="@Model.Page" />
                                         <input type="hidden" name="pageSize" value="@Model.PageSize" />

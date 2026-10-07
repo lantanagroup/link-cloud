@@ -154,6 +154,9 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 .au-badge-success  { background: var(--au-success) !important; }
 .au-badge-danger   { background: var(--au-danger)  !important; }
 .au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.badge.bg-success { background-color: var(--au-success) !important; }
+.badge.bg-danger { background-color: var(--au-danger) !important; }
+.badge.bg-warning { background-color: var(--au-warning) !important; color: #111 !important; }
 .au-badge-active   { background: var(--au-accent)  !important; }
 .au-badge-muted    { background: var(--au-muted)   !important; }
 .au-badge-skip     { background: #6c757d !important; color: #fff !important; }
@@ -1536,6 +1539,17 @@ a.au-scenario-card:hover {
   margin: 0;
 }
 
+/* The shell title repeats a page that already has its own heading. */
+.lu-main:has(.lu-content h1) .lu-topbar {
+  display: none;
+}
+
+.lu-content h1.h3 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -.015em;
+}
+
 .lu-content {
   padding: .5rem 1.25rem 1.5rem;
   flex: 1;
@@ -1564,11 +1578,32 @@ a.au-scenario-card:hover {
 .lu-section-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: .35rem;
+  gap: 0;
+  border-bottom: 1px solid var(--au-border);
 }
 .lu-section-nav a {
-  border-radius: 999px;
+  border-radius: .25rem .25rem 0 0;
   text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: .5rem 1rem !important;
+  margin-bottom: -1px;
+  background: transparent !important;
+  color: var(--au-muted) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none;
+}
+.lu-section-nav a:hover,
+.lu-section-nav a:focus {
+  color: var(--au-text) !important;
+  border-color: var(--au-border) var(--au-border) transparent !important;
+}
+.lu-section-nav a.btn-au-action,
+.lu-section-nav a.btn-au-action:hover {
+  color: var(--au-text) !important;
+  background: #fff !important;
+  border-color: var(--au-border) var(--au-border) #fff !important;
 }
 .lu-live-label {
   font-size: .75rem;
@@ -1597,6 +1632,57 @@ a.au-scenario-card:hover {
 
 .lu-row-actions form { margin-bottom: .35rem; }
 .lu-row-actions form:last-child { margin-bottom: 0; }
+
+/* The scenario grid matches Automation.UI. The sidebar leaves less room, so these widths keep every column readable without a horizontal scrollbar. */
+@media (min-width: 768px) {
+  #scenarioTable {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .au-card .table-responsive:has(#scenarioTable) {
+    overflow-x: hidden;
+  }
+  #scenarioTable th:nth-child(1),
+  #scenarioTable td:nth-child(1) { width: 16% !important; }
+  #scenarioTable th:nth-child(2),
+  #scenarioTable td:nth-child(2) { width: 12% !important; }
+  #scenarioTable th:nth-child(3),
+  #scenarioTable td:nth-child(3) { width: 13% !important; }
+  #scenarioTable th:nth-child(4),
+  #scenarioTable td:nth-child(4) { width: 9% !important; }
+  #scenarioTable th:nth-child(5),
+  #scenarioTable td:nth-child(5) { width: 10% !important; }
+  #scenarioTable th:nth-child(6),
+  #scenarioTable td:nth-child(6) { width: 9% !important; }
+  #scenarioTable th:nth-child(7),
+  #scenarioTable td:nth-child(7) { width: 7% !important; }
+  #scenarioTable th:nth-child(8),
+  #scenarioTable td:nth-child(8) { width: 10% !important; }
+  #scenarioTable th:nth-child(9),
+  #scenarioTable td:nth-child(9) { width: 14% !important; }
+}
+#scenarioTable th,
+#scenarioTable td {
+  padding-left: .4rem;
+  padding-right: .4rem;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+#scenarioTable th {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+#scenarioTable .badge {
+  white-space: normal;
+  text-align: left;
+}
+
+.au-toast {
+  background: var(--au-dark);
+  color: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+}
 
 .lu-hsloc {
   display: grid;

@@ -22,7 +22,7 @@ else
             <span class="me-auto">Log</span>
             @if (Model.CanReset)
             {
-                <form method="post" asp-action="ResetSftp" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
+                <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
                     <button type="submit" class="btn btn-sm btn-au-action">Reset</button>
                 </form>
             }
