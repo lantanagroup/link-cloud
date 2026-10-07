@@ -1,0 +1,164 @@
+@model NotificationConfigPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var form = Model.Form;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page, string? edit = null)
+    {
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(edit)) route["edit"] = edit;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-action="Notifications"><i class="bi bi-arrow-left me-1"></i>Notifications</a>
+</div>
+<h1 class="h3">Notification configuration</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Each facility has one email list. Saving an existing configuration keeps its other channels.</p>
+
+<div class="au-card card mb-3">
+    <div class="card-header">@(string.IsNullOrWhiteSpace(form.Id) ? "New configuration" : "Edit configuration")</div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.FormError))
+        {
+            <div class="alert alert-warning">@Model.FormError</div>
+        }
+        <form method="post" asp-action="SaveConfiguration" class="row g-2">
+            <input type="hidden" name="Id" value="@form.Id" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="configFacility">Facility</label>
+                <input id="configFacility" name="FacilityId" value="@form.FacilityId" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="emails">Email addresses</label>
+                <textarea id="emails" name="Emails" class="form-control" rows="4">@form.Emails</textarea>
+                <div class="form-text">One address per line, or separate them with commas. At most 20.</div>
+            </div>
+            <div class="col-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="emailEnabled" name="EmailEnabled" value="true" @(form.EmailEnabled ? "checked" : null) />
+                    <input type="hidden" name="EmailEnabled" value="false" />
+                    <label class="form-check-label" for="emailEnabled">Email channel enabled</label>
+                </div>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Save configuration</button>
+                @if (!string.IsNullOrWhiteSpace(form.Id))
+                {
+                    <a class="btn btn-outline-secondary" asp-action="Configurations">Clear</a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="searchText">Text</label>
+                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="pageSize">Page size</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var option in ConfigurationRules.NotificationPageSizes)
+                    {
+                        if (size == option)
+                        {
+                            <option value="@option" selected>@option</option>
+                        }
+                        else
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Configurations">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Configurations</div>
+        <div class="card-body">
+            @if (Model.Configurations.Count == 0)
+            {
+                <p class="mb-0">No notification configurations found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Facility</th>
+                                <th scope="col">Email</th>
+                                <th scope="col">Enabled</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Configurations)
+                        {
+                            <tr>
+                                <td><code class="lu-facility-id">@row.FacilityId</code></td>
+                                <td class="text-break">@row.Emails</td>
+                                <td>@(row.EmailEnabled ? "Yes" : "No")</td>
+                                <td class="text-nowrap">
+                                    <a asp-all-route-data="@Route(bar.Page, row.Id)">Edit</a>
+                                    <form method="post" asp-action="DeleteConfiguration" class="d-inline" onsubmit="return confirm('Delete this notification configuration?');">
+                                        <input type="hidden" name="id" value="@row.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Configuration pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1, query.Edit)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1, query.Edit)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

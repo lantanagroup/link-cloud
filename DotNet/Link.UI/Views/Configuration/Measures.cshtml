@@ -1,0 +1,65 @@
+@model MeasureListPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Measure definitions</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Definitions</div>
+    <div class="card-body">
+        @if (Model.Measures.Count == 0)
+        {
+            <p class="mb-0">No measure definitions found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Id</th>
+                            <th scope="col">Version</th>
+                            <th scope="col">Modified</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Measures)
+                    {
+                        <tr>
+                            <td><code>@row.Id</code></td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                            <td class="text-nowrap">@(string.IsNullOrWhiteSpace(row.Modified) ? "—" : row.Modified)</td>
+                            <td><a asp-action="Measure" asp-route-id="@row.Id">Open</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Save a bundle</div>
+    <div class="card-body">
+        <p class="text-muted">Upload a FHIR Bundle JSON file. Bundle.id is the measure id. The file must be 8 MB or smaller.</p>
+        <form method="post" asp-action="SaveMeasure" enctype="multipart/form-data" class="row g-2 align-items-end">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="bundle">Bundle file</label>
+                <input id="bundle" name="bundle" type="file" accept=".json,application/json" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-au-action">Save bundle</button>
+            </div>
+        </form>
+    </div>
+</div>

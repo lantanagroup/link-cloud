@@ -29,6 +29,10 @@ public class MeasureEvalServiceClient : LinkApiClientBase, IMeasureEvalServiceCl
     public Task<LinkApiResponse<string>> GetAllMeasureDefinitionsAsync(CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request("measureeval/measure-definition").GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<string>> GetRelatedArtifactsAsync(string measureId, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"measureeval/measure-definition/{Uri.EscapeDataString(measureId)}/relatedArtifact")
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<string>> GetPatientBundleAsync(string facilityId, string reportId, string patientId, CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"measureeval/patient/{Uri.EscapeDataString(facilityId)}/{Uri.EscapeDataString(reportId)}/{Uri.EscapeDataString(patientId)}")
             .GetAsync(cancellationToken: cancellationToken));

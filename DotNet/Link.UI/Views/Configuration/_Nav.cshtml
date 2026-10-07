@@ -1,0 +1,21 @@
+@using Link.UI.Services
+@inject Microsoft.Extensions.Options.IOptions<LinkUiFeatureOptions> Features
+@{
+    var active = ViewData["ConfigurationSection"] as string ?? "";
+    var dmrp = Features.Value.DmrpEnabled;
+    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+}
+<nav class="lu-section-nav mb-3" aria-label="Configuration">
+    <a class="@Btn("measures")" asp-controller="Configuration" asp-action="Measures">Measures</a>
+    <a class="@Btn("vendors")" asp-controller="Configuration" asp-action="Vendors">Vendors</a>
+    <a class="@Btn("validation")" asp-controller="Configuration" asp-action="Validation">Validation</a>
+    <a class="@Btn("plans")" asp-controller="Configuration" asp-action="QueryPlans">Query plans</a>
+    <a class="@Btn("terminology")" asp-controller="Configuration" asp-action="Terminology">Terminology</a>
+    <a class="@Btn("hsloc")" asp-controller="Configuration" asp-action="Hsloc">HSLOC</a>
+    <a class="@Btn("operations")" asp-controller="Configuration" asp-action="Operations">Operations</a>
+    <a class="@Btn("notifications")" asp-controller="Configuration" asp-action="Notifications">Notifications</a>
+    @if (dmrp)
+    {
+        <a class="@Btn("mappings")" asp-controller="Configuration" asp-action="MeasureMappings">Mappings</a>
+    }
+</nav>

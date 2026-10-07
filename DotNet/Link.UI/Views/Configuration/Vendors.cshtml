@@ -1,0 +1,85 @@
+@model VendorListPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Vendors</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">New vendor</div>
+    <div class="card-body">
+        <form method="post" asp-action="SaveVendor" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="name">Name</label>
+                <input id="name" name="name" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="secret">Signing key secret name</label>
+                <input id="secret" name="secret" class="form-control" maxlength="127" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">Create vendor</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The secret name is a Key Vault secret name. Leave it blank when the vendor has no signing key.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Vendors</div>
+    <div class="card-body">
+        @if (Model.Vendors.Count == 0)
+        {
+            <p class="mb-0">No vendors found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Signing key secret name</th>
+                            <th scope="col"><span class="visually-hidden">Save</span></th>
+                            <th scope="col">Versions</th>
+                            <th scope="col"><span class="visually-hidden">Delete</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Vendors)
+                    {
+                        var formId = "vendor-" + row.Id;
+                        <tr>
+                            <td>
+                                <input form="@formId" name="name" value="@row.Name" class="form-control form-control-sm" maxlength="255" required aria-label="Name for @row.Name" />
+                            </td>
+                            <td>
+                                <input form="@formId" name="secret" value="@row.SecretId" class="form-control form-control-sm" maxlength="127" autocomplete="off" aria-label="Signing key secret name for @row.Name" />
+                            </td>
+                            <td>
+                                <form id="@formId" method="post" asp-action="SaveVendor">
+                                    <input type="hidden" name="id" value="@row.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                </form>
+                            </td>
+                            <td><a asp-action="Versions" asp-route-vendorId="@row.Id">Versions</a></td>
+                            <td>
+                                <form method="post" asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

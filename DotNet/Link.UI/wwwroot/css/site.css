@@ -1598,9 +1598,12 @@ a.au-scenario-card:hover {
 
 .lu-json {
   max-width: 100%;
+  max-height: 24rem;
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: .8rem;
 }
+
+.lu-wide-table { min-width: 48rem; }
 

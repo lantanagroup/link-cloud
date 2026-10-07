@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISubmissionServiceClient, SubmissionServiceClient>();
         services.AddSingleton<ITerminologyServiceClient, TerminologyServiceClient>();
         services.AddSingleton<IAuditServiceClient, AuditServiceClient>();
+        services.AddSingleton<INotificationServiceClient, NotificationServiceClient>();
 
         return services;
     }

@@ -1,0 +1,76 @@
+@model CategoryPage
+@using Link.UI.Services
+@{
+    var form = Model.Form;
+}
+
+<div class="mb-3">
+    <a asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
+</div>
+<h1 class="h3">Validation category</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (Model.Missing)
+{
+    <div class="alert alert-info">This category is not saved yet. Saving creates it.</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (!Model.Reserved && string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="au-card card">
+        <div class="card-header"><code>@form.Id</code></div>
+        <div class="card-body">
+            <form method="post" asp-action="SaveCategory" class="row g-3">
+                <input type="hidden" name="Id" value="@form.Id" />
+                <div class="col-12">
+                    <label class="form-label" for="title">Title</label>
+                    <input id="title" name="Title" value="@form.Title" class="form-control" maxlength="500" required />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="severity">Severity</label>
+                    <select id="severity" name="Severity" class="form-select">
+                        @foreach (var severity in ConfigurationRules.Severities)
+                        {
+                            if (string.Equals(severity, form.Severity, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@severity" selected>@severity</option>
+                            }
+                            else
+                            {
+                                <option value="@severity">@severity</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-md-8 d-flex flex-wrap align-items-end gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="acceptable" name="Acceptable" value="true" @(form.Acceptable ? "checked" : null) />
+                        <label class="form-check-label" for="acceptable">Acceptable</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="submit" name="Submit" value="true" @(form.Submit ? "checked" : null) />
+                        <input type="hidden" name="Submit" value="false" />
+                        <label class="form-check-label" for="submit">Submit</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="review" name="Review" value="true" @(form.Review ? "checked" : null) />
+                        <input type="hidden" name="Review" value="false" />
+                        <label class="form-check-label" for="review">Review</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="guidance">Guidance</label>
+                    <textarea id="guidance" name="Guidance" class="form-control" rows="6" maxlength="1000" required>@form.Guidance</textarea>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-au-action">Save category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

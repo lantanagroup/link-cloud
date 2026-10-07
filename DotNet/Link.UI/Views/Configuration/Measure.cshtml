@@ -1,0 +1,78 @@
+@model MeasureDetailPage
+@using Link.UI.Services
+
+<div class="mb-3">
+    <a asp-action="Measures"><i class="bi bi-arrow-left me-1"></i>Measure definitions</a>
+</div>
+<h1 class="h3">Measure definition</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Version</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Version) ? "—" : Model.Version)</dd>
+            <dt class="col-sm-3">Created</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Created) ? "—" : Model.Created)</dd>
+            <dt class="col-sm-3">Modified</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Modified) ? "—" : Model.Modified)</dd>
+            <dt class="col-sm-3">Bundle entries</dt>
+            <dd class="col-sm-9">@(Model.EntryCount?.ToString() ?? "—")</dd>
+        </dl>
+        <p class="text-muted small mb-0 mt-3">Related artifacts are listed below. Opening CQL and running an evaluation stay on MeasureEval.</p>
+    </div>
+</div>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Related artifacts</div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.ArtifactError))
+        {
+            <div class="alert alert-warning">@Model.ArtifactError</div>
+        }
+        @if (Model.Artifacts.Count == 0)
+        {
+            <p class="mb-0">No related artifacts.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Version</th>
+                            <th scope="col">URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Artifacts)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                            <td>
+                                @if (ConfigurationRules.TryHttpUrl(row.Url, out var url))
+                                {
+                                    <a href="@url" rel="noopener noreferrer">@url</a>
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

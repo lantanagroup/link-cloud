@@ -7,6 +7,8 @@ public interface IValidationServiceClient
 {
     Task<LinkApiResponse<List<ValidationArtifactApiModel>>> GetArtifactsAsync(CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<ValidationCategoryApiModel>>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<ValidationCategoryApiModel>> GetCategoryAsync(string id, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpdateCategoryAsync(ValidationCategoryApiModel category, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> InitializeArtifactsAsync(CancellationToken cancellationToken = default);
     Task<LinkApiResponse> InitializeCategoriesAsync(CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default);

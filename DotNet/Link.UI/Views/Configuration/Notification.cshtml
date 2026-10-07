@@ -1,0 +1,39 @@
+@model NotificationDetailPage
+
+<div class="mb-3">
+    <a asp-action="Notifications"><i class="bi bi-arrow-left me-1"></i>Notifications</a>
+</div>
+<h1 class="h3">Notification</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Type</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Type) ? "—" : Model.Type)</dd>
+            <dt class="col-sm-3">Facility</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</dd>
+            <dt class="col-sm-3">Correlation</dt>
+            <dd class="col-sm-9 text-break">@(string.IsNullOrWhiteSpace(Model.CorrelationId) ? "—" : Model.CorrelationId)</dd>
+            <dt class="col-sm-3">Created</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.CreatedOn) ? "—" : Model.CreatedOn)</dd>
+            <dt class="col-sm-3">Sent</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.SentOn) ? "—" : Model.SentOn)</dd>
+            <dt class="col-sm-3">Recipients</dt>
+            <dd class="col-sm-9 text-break">@(string.IsNullOrWhiteSpace(Model.Recipients) ? "—" : Model.Recipients)</dd>
+            <dt class="col-sm-3">Bcc</dt>
+            <dd class="col-sm-9 text-break">@(string.IsNullOrWhiteSpace(Model.Bcc) ? "—" : Model.Bcc)</dd>
+            <dt class="col-sm-3">Subject</dt>
+            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Subject) ? "—" : Model.Subject)</dd>
+        </dl>
+        <h2 class="h6 mt-3">Body</h2>
+        <pre class="lu-json mb-0">@(string.IsNullOrWhiteSpace(Model.Body) ? "—" : Model.Body)</pre>
+    </div>
+</div>

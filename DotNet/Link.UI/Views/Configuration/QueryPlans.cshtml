@@ -1,0 +1,74 @@
+@model QueryPlanPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Query plans</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Query plans are saved on each facility. This page shows whether the four plan types exist, then opens the facility editor.</p>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Facility</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="facilityId">Facility id</label>
+                <input id="facilityId" name="facilityId" value="@Model.FacilityId" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">Look up</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (Model.Plans.Count > 0)
+{
+    <div class="au-card card">
+        <div class="card-header">Plans for <code>@Model.FacilityId</code></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Type</th>
+                            <th scope="col">Saved</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var plan in Model.Plans)
+                    {
+                        <tr>
+                            <td>@plan.Type</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(plan.Error))
+                                {
+                                    <span class="text-warning">@plan.Error</span>
+                                }
+                                else if (plan.Saved)
+                                {
+                                    <span>Saved</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Not saved</span>
+                                }
+                            </td>
+                            <td>
+                                <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@plan.Type">Open editor</a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}

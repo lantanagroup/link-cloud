@@ -1,0 +1,127 @@
+@model ConfigurationHomePage
+
+<h1 class="h3">Configuration</h1>
+<p class="text-muted">Shared measure, vendor, validation, terminology, and notification settings. Facility census, acquisition, and normalization editors stay on the facility.</p>
+
+<div class="row g-3">
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Measure definitions</div>
+            <div class="card-body">
+                <p>List measure definitions and save a FHIR Bundle.</p>
+                @if (!Model.MeasuresConfigured)
+                {
+                    <p class="text-muted">MeasureEval service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Measures">Open measures</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Vendors</div>
+            <div class="card-body">
+                <p>Vendors and the versions used by normalization operations.</p>
+                @if (!Model.TenantConfigured)
+                {
+                    <p class="text-muted">Tenant service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Vendors">Open vendors</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Validation</div>
+            <div class="card-body">
+                <p>Implementation guides, categories, and category guidance.</p>
+                @if (!Model.ValidationConfigured)
+                {
+                    <p class="text-muted">Validation service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Validation">Open validation</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Query plans</div>
+            <div class="card-body">
+                <p>Look up the discharge, daily, weekly, and monthly plans saved on a facility, then open that facility's editor.</p>
+                @if (!Model.AcquisitionConfigured)
+                {
+                    <p class="text-muted">Data acquisition service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="QueryPlans">Open query plans</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Terminology</div>
+            <div class="card-body">
+                <p>Value sets, code systems, and a code search.</p>
+                @if (!Model.TerminologyConfigured)
+                {
+                    <p class="text-muted">Terminology service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Terminology">Open terminology</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">HSLOC</div>
+            <div class="card-body">
+                <p>Search the HSLOC catalog, replace a version from a CSV, or delete one code.</p>
+                @if (!Model.NormalizationConfigured)
+                {
+                    <p class="text-muted">Normalization service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Hsloc">Open HSLOC</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Normalization operations</div>
+            <div class="card-body">
+                <p>Search operations across facilities. Edit a facility's operations from the facility page.</p>
+                @if (!Model.NormalizationConfigured)
+                {
+                    <p class="text-muted">Normalization service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Operations">Open operations</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Notifications</div>
+            <div class="card-body">
+                <p>Search sent notifications and the email configuration for each facility.</p>
+                @if (!Model.NotificationConfigured)
+                {
+                    <p class="text-muted">Notification service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Notifications">Open notifications</a>
+            </div>
+        </div>
+    </div>
+    @if (Model.DmrpEnabled)
+    {
+        <div class="col-12 col-md-6">
+            <div class="au-card card h-100">
+                <div class="card-header">Measure mappings</div>
+                <div class="card-body">
+                    <p>Map a measure to a dQM and a report frequency.</p>
+                    @if (!Model.TenantConfigured)
+                    {
+                        <p class="text-muted">Tenant service URL is not configured.</p>
+                    }
+                    <a class="btn btn-au-action" asp-action="MeasureMappings">Open mappings</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
