@@ -1,0 +1,176 @@
+@model AuditListPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Audit event log";
+    ViewData["LogsSection"] = "audit";
+    var query = Model.Query;
+    var search = Model.Search;
+    var bar = Model.Paging;
+    Dictionary<string, string> SortRoute(string column, bool dateColumn) => query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: LogsRules.NextSort(search.SortBy, search.SortDir, column, dateColumn));
+    string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
+        ? (search.SortDir == "asc" ? " ↑" : " ↓")
+        : "";
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+</div>
+<h1 class="h3">Audit event log</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="searchText">Text</label>
+                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="correlationId">Correlation id</label>
+                <input id="correlationId" name="correlationId" value="@query.CorrelationId" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="service">Service</label>
+                <select id="service" name="service" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var service in LogsRules.AuditServices)
+                    {
+                        if (string.Equals(service.Value, query.Service, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@service.Value" selected>@service.Label</option>
+                        }
+                        else
+                        {
+                            <option value="@service.Value">@service.Label</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="eventAction">Action</label>
+                <select id="eventAction" name="eventAction" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var action in LogsRules.AuditActions)
+                    {
+                        if (string.Equals(action, query.Action, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@action" selected>@action</option>
+                        }
+                        else
+                        {
+                            <option value="@action">@action</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="user">User</label>
+                <input id="user" name="user" value="@query.User" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="pageSize">Page size</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var size in LogsRules.AuditPageSizes)
+                    {
+                        if (search.PageSize == size)
+                        {
+                            <option value="@size" selected>@size</option>
+                        }
+                        else
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Audit">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Events</div>
+        <div class="card-body">
+            @if (Model.Events.Count == 0)
+            {
+                <p class="mb-0">No audit events found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                        <thead>
+                            <tr>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("CreatedOn", true)">When@(Mark("CreatedOn"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("FacilityId", false)">Facility@(Mark("FacilityId"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("ServiceName", false)">Service@(Mark("ServiceName"))</a></th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("Action", false)">Action@(Mark("Action"))</a></th>
+                                <th scope="col">User</th>
+                                <th scope="col"><a asp-all-route-data="@SortRoute("Resource", false)">Resource@(Mark("Resource"))</a></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Events)
+                        {
+                            <tr>
+                                <td class="text-nowrap">
+                                    @if (row.Link)
+                                    {
+                                        <a asp-action="AuditDetail" asp-route-id="@row.Id">@row.When</a>
+                                    }
+                                    else
+                                    {
+                                        @row.When
+                                    }
+                                </td>
+                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Service) ? "—" : row.Service)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Action) ? "—" : row.Action)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.User) ? "—" : row.User)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Resource) ? "—" : row.Resource)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Audit pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

@@ -1,0 +1,26 @@
+@model KafkaPage
+@{
+    ViewData["Title"] = "Kafka";
+    ViewData["LogsSection"] = "kafka";
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+</div>
+<h1 class="h3">Kafka</h1>
+<partial name="_Nav" />
+
+<div class="au-card card">
+    <div class="card-header">Kafka UI</div>
+    <div class="card-body">
+        <p>Kafka UI is a separate tool. This page links to it when the environment publishes an address. It is not embedded here.</p>
+        @if (string.IsNullOrWhiteSpace(Model.Url))
+        {
+            <p class="mb-0">Default Kafka UI is not available.</p>
+        }
+        else
+        {
+            <a class="btn btn-au-action" href="@Model.Url" target="_blank" rel="noopener noreferrer">Open Kafka UI</a>
+        }
+    </div>
+</div>

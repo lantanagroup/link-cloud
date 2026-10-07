@@ -203,6 +203,44 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("patientId", string.IsNullOrWhiteSpace(patientId) ? null : patientId)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<DataAcquisitionLogSummaryApiModel>>> SearchAcquisitionLogsAsync(
+        AcquisitionLogQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        query ??= new AcquisitionLogQuery();
+        return SendAsync<PagedConfigModel<DataAcquisitionLogSummaryApiModel>>(() =>
+        {
+            var request = Request("data/acquisition-logs")
+                .SetQueryParam("pageSize", query.PageSize)
+                .SetQueryParam("pageNumber", query.PageNumber)
+                .SetQueryParam("sortBy", string.IsNullOrWhiteSpace(query.SortBy) ? "ExecutionDate" : query.SortBy)
+                .SetQueryParam("sortOrder", string.IsNullOrWhiteSpace(query.SortOrder) ? "Descending" : query.SortOrder);
+            request = Text(request, "facilityId", query.FacilityId);
+            request = Text(request, "reportId", query.ReportId);
+            request = Text(request, "patientId", query.PatientId);
+            request = Text(request, "resourceId", query.ResourceId);
+            request = Text(request, "resourceType", query.ResourceType);
+            request = Text(request, "queryPhase", query.QueryPhase);
+            request = Text(request, "queryType", query.QueryType);
+            request = Text(request, "priority", query.Priority);
+            request = Text(request, "searchTerm", query.SearchTerm);
+            if (query.IncludeDeleted)
+                request = request.SetQueryParam("includeDeleted", true);
+            if (query.CreatedBefore is DateTime created)
+                request = request.SetQueryParam("createdBefore", AsUtc(created).ToString("o"));
+            if (query.Statuses is not null)
+            {
+                foreach (var status in query.Statuses)
+                {
+                    if (!string.IsNullOrWhiteSpace(status))
+                        request.Url.QueryParams.Add("statuses", status);
+                }
+            }
+
+            return request.GetAsync(cancellationToken: cancellationToken);
+        });
+    }
+
     public Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(
         long id,
         CancellationToken cancellationToken = default) =>
@@ -217,9 +255,15 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
 
     public Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(
         string reportId,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<DataAcquisitionLogStatusStatisticsApiModel>(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
-            .GetAsync(cancellationToken: cancellationToken));
+        CancellationToken cancellationToken = default,
+        string? patientId = null) =>
+        SendAsync<DataAcquisitionLogStatusStatisticsApiModel>(() =>
+        {
+            var request = Request($"data/acquisition-logs/report/{reportId}/status-counts");
+            if (!string.IsNullOrWhiteSpace(patientId))
+                request = request.SetQueryParam("patientId", patientId);
+            return request.GetAsync(cancellationToken: cancellationToken);
+        });
 
     public Task<LinkApiResponse> GetReportStatisticsAsync(
         string reportId,
@@ -543,9 +587,33 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync(() => Request($"data/{organizationId}/sftp-configurations/test-connection")
             .PostJsonAsync(new { }, cancellationToken: cancellationToken));
 
-    /// <summary>
-    /// Retrieves the paged/filterable sFTP acquisition logs: <c>GET /api/data/sftp-logs</c>.
-    /// </summary>
+    /// <summary>Reads one sFTP acquisition log: <c>GET /api/data/sftp-logs/{logId}</c>.</summary>
+    public Task<LinkApiResponse<SftpLogApiModel>> GetSftpLogAsync(
+        string logId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<SftpLogApiModel>(() => Request($"data/sftp-logs/{logId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> ResetSftpLogAsync(
+        string logId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/sftp-logs/{logId}/reset")
+            .PostJsonAsync(new { }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<SftpLogApiModel>>> SearchSftpAcquisitionLogsAsync(
+        string? facilityId = null,
+        string? status = null,
+        string? acquisitionType = null,
+        string? subType = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? sortBy = null,
+        string? sortOrder = null,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<SftpLogApiModel>>(() =>
+            SftpSearch(facilityId, status, acquisitionType, subType, pageNumber, pageSize, sortBy, sortOrder, includeDeleted: null)
+                .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> SearchSftpLogsAsync(
         string? facilityId = null,
         string? status = null,
@@ -579,4 +647,39 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request("data/sftp-logs")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    private IFlurlRequest SftpSearch(
+        string? facilityId,
+        string? status,
+        string? acquisitionType,
+        string? subType,
+        int pageNumber,
+        int pageSize,
+        string? sortBy,
+        string? sortOrder,
+        bool? includeDeleted)
+    {
+        var request = Request("data/sftp-logs")
+            .SetQueryParam("pageNumber", pageNumber)
+            .SetQueryParam("pageSize", pageSize);
+        request = Text(request, "facilityId", facilityId);
+        request = Text(request, "status", status);
+        request = Text(request, "acquisitionType", acquisitionType);
+        request = Text(request, "subType", subType);
+        request = Text(request, "sortBy", sortBy);
+        request = Text(request, "sortOrder", sortOrder);
+        if (includeDeleted.HasValue)
+            request = request.SetQueryParam("includeDeleted", includeDeleted.Value);
+        return request;
+    }
+
+    private static IFlurlRequest Text(IFlurlRequest request, string name, string? value) =>
+        string.IsNullOrWhiteSpace(value) ? request : request.SetQueryParam(name, value);
+
+    private static DateTime AsUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 }
