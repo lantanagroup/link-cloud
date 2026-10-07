@@ -168,7 +168,7 @@
                             <td class="lu-row-actions">
                                 @if (report.CanResubmit)
                                 {
-                                    <form method="post" asp-action="Resubmit" onsubmit="return confirm('Resubmit this report?');">
+                                    <form method="post" data-au-save asp-action="Resubmit" onsubmit="return confirm('Resubmit this report?');">
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
@@ -181,7 +181,7 @@
                                 }
                                 @if (report.CanAbort)
                                 {
-                                    <form method="post" asp-action="Abort" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
+                                    <form method="post" data-au-save asp-action="Abort" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
@@ -190,7 +190,7 @@
                                 }
                                 @if (report.CanCleanUp)
                                 {
-                                    <form method="post" asp-action="CleanUp" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
+                                    <form method="post" data-au-save asp-action="CleanUp" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
@@ -199,7 +199,7 @@
                                 }
                                 @if (report.CanRestore)
                                 {
-                                    <form method="post" asp-action="Restore" onsubmit="return confirm('Restore this report and its acquisition logs?');">
+                                    <form method="post" data-au-save asp-action="Restore" onsubmit="return confirm('Restore this report and its acquisition logs?');">
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />

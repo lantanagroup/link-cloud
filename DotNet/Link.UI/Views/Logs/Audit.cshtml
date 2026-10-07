@@ -25,7 +25,7 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" class="row g-2 align-items-end" data-au-filter="400" data-au-target="auditResults">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="searchText">Text</label>
                 <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" />
@@ -100,6 +100,8 @@
     </div>
 </div>
 
+<p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
+<div id="auditResults" data-au-refresh="15000">
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning mt-3">@Model.LoadError</div>
@@ -111,7 +113,7 @@ else
         <div class="card-body">
             @if (Model.Events.Count == 0)
             {
-                <p class="mb-0">No audit events found.</p>
+                <p class="au-empty mb-0">No audit events found.</p>
             }
             else
             {
@@ -174,3 +176,4 @@ else
         </div>
     </div>
 }
+</div>

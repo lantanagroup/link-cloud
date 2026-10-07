@@ -17,7 +17,7 @@
 <div class="au-card card">
     <div class="card-header">Facility reports</div>
     <div class="card-body">
-        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3" data-au-filter="400" data-au-target="facilityReportResults">
             <input type="hidden" name="section" value="reports" />
             <div class="col-12 col-md-4 col-xl-3">
                 <label class="form-label" for="reportId">Report ID</label>
@@ -91,6 +91,8 @@
             </div>
         </form>
 
+        <p class="lu-live-label mb-2">This list updates on its own.</p>
+        <div id="facilityReportResults" data-au-refresh="12000">
         @if (!string.IsNullOrWhiteSpace(Model.SectionNote))
         {
             <div class="alert alert-info">@Model.SectionNote</div>
@@ -98,7 +100,7 @@
 
         @if (Model.Reports.Count == 0)
         {
-            <p class="mb-0">No reports found.</p>
+            <p class="au-empty mb-0">No reports found.</p>
         }
         else
         {
@@ -154,7 +156,7 @@
                             <td class="lu-row-actions">
                                 @if (report.CanResubmit)
                                 {
-                                    <form method="post" asp-action="ResubmitReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Resubmit this report?');">
+                                    <form method="post" data-au-save asp-action="ResubmitReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Resubmit this report?');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
                                         <label class="form-check-label small d-block mb-1">
@@ -166,7 +168,7 @@
                                 }
                                 @if (report.CanAbort)
                                 {
-                                    <form method="post" asp-action="AbortReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
+                                    <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Abort</button>
@@ -174,7 +176,7 @@
                                 }
                                 @if (report.CanCleanUp)
                                 {
-                                    <form method="post" asp-action="CleanUpReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
+                                    <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Clean up</button>
@@ -182,7 +184,7 @@
                                 }
                                 @if (report.CanRestore)
                                 {
-                                    <form method="post" asp-action="RestoreReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Restore this report and its acquisition logs?');">
+                                    <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Restore this report and its acquisition logs?');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
                                         <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
@@ -196,5 +198,6 @@
             </div>
             <partial name="_ViewPager" model="Model" />
         }
+        </div>
     </div>
 </div>

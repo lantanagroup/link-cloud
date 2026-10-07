@@ -24,13 +24,13 @@ else
             <span class="me-auto">Log</span>
             @if (Model.CanProcess)
             {
-                <form method="post" asp-action="ProcessOne" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Process this acquisition log?');">
+                <form method="post" data-au-save asp-action="ProcessOne" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Process this acquisition log?');">
                     <button type="submit" class="btn btn-sm btn-au-action">Process</button>
                 </form>
             }
             @if (Model.CanCancel)
             {
-                <form method="post" asp-action="CancelOne" asp-route-id="@Model.Id" class="d-inline d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('Cancel this log if it is old enough? This cannot be undone.');">
+                <form method="post" data-au-save asp-action="CancelOne" asp-route-id="@Model.Id" class="d-inline d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('Cancel this log if it is old enough? This cannot be undone.');">
                     <label class="small text-muted mb-0" for="minAgeHours">Min age (hours)</label>
                     <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@Model.MinAgeHours" class="form-control form-control-sm" style="width: 6rem" />
                     <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
