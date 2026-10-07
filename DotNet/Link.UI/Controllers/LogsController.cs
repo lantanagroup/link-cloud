@@ -8,10 +8,12 @@ namespace Link.UI.Controllers;
 public sealed class LogsController : Controller
 {
     private readonly LogsService _logs;
+    private readonly AutomationOwnershipLookup _ownership;
 
-    public LogsController(LogsService logs)
+    public LogsController(LogsService logs, AutomationOwnershipLookup ownership)
     {
         _logs = logs;
+        _ownership = ownership;
     }
 
     [HttpGet("")]
@@ -26,7 +28,7 @@ public sealed class LogsController : Controller
     {
         ViewData["Title"] = "Acquisition log";
         ViewData["LogsSection"] = "acquisition";
-        return View(await _logs.LoadAcquisitionAsync(query, cancellationToken));
+        return View(await AcquisitionPage(query, cancellationToken));
     }
 
     [HttpGet("Acquisition/{id:long}")]
@@ -49,6 +51,9 @@ public sealed class LogsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ProcessMatching(AcquisitionQuery query, CancellationToken cancellationToken)
     {
+        var rejected = RejectWideAutomation(query);
+        if (rejected is not null)
+            return rejected;
         var result = await _logs.ProcessMatchingAsync(query, cancellationToken);
         return Back(query, result);
     }
@@ -65,6 +70,9 @@ public sealed class LogsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CancelMatching(AcquisitionQuery query, CancellationToken cancellationToken)
     {
+        var rejected = RejectWideAutomation(query);
+        if (rejected is not null)
+            return rejected;
         var result = await _logs.CancelMatchingAsync(query, cancellationToken);
         return Back(query, result);
     }
@@ -108,7 +116,7 @@ public sealed class LogsController : Controller
     {
         ViewData["Title"] = "SFTP acquisition log";
         ViewData["LogsSection"] = "sftp";
-        return View(await _logs.LoadSftpAsync(query, cancellationToken));
+        return View(await SftpPage(query, cancellationToken));
     }
 
     [HttpGet("Sftp/{id:guid}")]
@@ -133,7 +141,7 @@ public sealed class LogsController : Controller
     {
         ViewData["Title"] = "Audit event log";
         ViewData["LogsSection"] = "audit";
-        return View(await _logs.LoadAuditAsync(query, cancellationToken));
+        return View(await AuditPage(query, cancellationToken));
     }
 
     [HttpGet("Audit/{id:guid}")]
@@ -150,6 +158,117 @@ public sealed class LogsController : Controller
         ViewData["Title"] = "Kafka";
         ViewData["LogsSection"] = "kafka";
         return View(_logs.LoadKafka());
+    }
+
+    private IActionResult? RejectWideAutomation(AcquisitionQuery query)
+    {
+        if (!AutomationMarkRules.IsAutomation(query.Scope) || !string.IsNullOrWhiteSpace(query.FacilityId))
+            return null;
+
+        TempData["Error"] = "Choose one automation facility before changing every matching log.";
+        return RedirectToAction(nameof(Acquisition), query.ToRoute());
+    }
+
+    private async Task<AcquisitionLogListPage> AcquisitionPage(AcquisitionQuery query, CancellationToken cancellationToken)
+    {
+        query ??= new AcquisitionQuery();
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var ownership = await _ownership.GetAsync(cancellationToken);
+        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
+        AcquisitionLogListPage page;
+        if (!AutomationMarkRules.IsAutomation(query.Scope))
+            page = await _logs.LoadAcquisitionAsync(query, cancellationToken);
+        else if (facility is not null && !ownership.Contains(facility))
+            page = NotOwnedAcquisition(query);
+        else if (facility is null)
+        {
+            var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
+            page = await _logs.LoadAcquisitionForFacilitiesAsync(query, ids, truncated, cancellationToken);
+        }
+        else
+            page = await _logs.LoadAcquisitionAsync(query, cancellationToken);
+
+        foreach (var row in page.Logs)
+            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        return page;
+    }
+
+    private async Task<SftpLogListPage> SftpPage(SftpQuery query, CancellationToken cancellationToken)
+    {
+        query ??= new SftpQuery();
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var ownership = await _ownership.GetAsync(cancellationToken);
+        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
+        SftpLogListPage page;
+        if (!AutomationMarkRules.IsAutomation(query.Scope))
+            page = await _logs.LoadSftpAsync(query, cancellationToken);
+        else if (facility is not null && !ownership.Contains(facility))
+            page = new SftpLogListPage
+            {
+                Query = query,
+                Search = new SftpSearch { PageSize = LogsRules.ClampPageSize(query.PageSize) },
+                ScopeNote = AutomationMarkRules.NotOwnedNote,
+                Paging = new PageBar { Page = 1, PageSize = LogsRules.ClampPageSize(query.PageSize) }
+            };
+        else if (facility is null)
+        {
+            var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
+            page = await _logs.LoadSftpForFacilitiesAsync(query, ids, truncated, cancellationToken);
+        }
+        else
+            page = await _logs.LoadSftpAsync(query, cancellationToken);
+
+        foreach (var row in page.Logs)
+            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        return page;
+    }
+
+    private async Task<AuditListPage> AuditPage(AuditQuery query, CancellationToken cancellationToken)
+    {
+        query ??= new AuditQuery();
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var ownership = await _ownership.GetAsync(cancellationToken);
+        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
+        AuditListPage page;
+        if (!AutomationMarkRules.IsAutomation(query.Scope))
+            page = await _logs.LoadAuditAsync(query, cancellationToken);
+        else if (facility is not null && !ownership.Contains(facility))
+            page = new AuditListPage
+            {
+                Query = query,
+                Search = new AuditSearch { PageSize = LogsRules.ClampAuditPageSize(query.PageSize) },
+                ScopeNote = AutomationMarkRules.NotOwnedNote,
+                Paging = new PageBar { Page = 1, PageSize = LogsRules.ClampAuditPageSize(query.PageSize) }
+            };
+        else if (facility is null)
+        {
+            var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
+            page = await _logs.LoadAuditForFacilitiesAsync(query, ids, truncated, cancellationToken);
+        }
+        else
+            page = await _logs.LoadAuditAsync(query, cancellationToken);
+
+        foreach (var row in page.Events)
+            row.AutomationRunId = ownership.RunIdFor(row.FacilityId);
+        return page;
+    }
+
+    private static AcquisitionLogListPage NotOwnedAcquisition(AcquisitionQuery query)
+    {
+        var pageSize = LogsRules.ClampPageSize(query.PageSize);
+        return new AcquisitionLogListPage
+        {
+            Query = query,
+            Search = new AcquisitionSearch
+            {
+                PageSize = pageSize,
+                SortBy = string.IsNullOrWhiteSpace(query.SortBy) ? "ExecutionDate" : query.SortBy,
+                SortDir = string.Equals(query.SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc",
+                MinAgeHours = query.MinAgeHours < 0 ? LogsRules.DefaultMinAgeHours : query.MinAgeHours
+            },
+            ScopeNote = AutomationMarkRules.NotOwnedNote,
+            Paging = new PageBar { Page = 1, PageSize = pageSize }
+        };
     }
 
     private IActionResult Back(AcquisitionQuery query, LogsAction result)

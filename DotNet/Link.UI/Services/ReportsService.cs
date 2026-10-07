@@ -158,6 +158,48 @@ public sealed class ReportsService
         return page;
     }
 
+    public async Task<ReportsListModel> LoadForFacilitiesAsync(
+        ReportsListQuery query,
+        IReadOnlyList<string> facilityIds,
+        bool truncated,
+        CancellationToken cancellationToken)
+    {
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var pageSize = FacilityViewRules.ClampPageSize(query.PageSize);
+        var pageNumber = FacilityViewRules.ClampPage(query.Page);
+        var sortBy = FacilityViewRules.AllowedSort(query.SortBy, FacilityViewRules.ReportSorts) ?? "CreateDate";
+        var sortDir = FacilityViewRules.ParseSortDirection(query.SortDir) == SortOrder.Ascending ? "asc" : "desc";
+        var cached = await AutomationFacilitySearch.CachedAsync(
+            _counts,
+            "reports",
+            query.AutomationFingerprint(),
+            facilityIds,
+            async (facilityId, token) =>
+            {
+                var one = await LoadListAsync(query.WithFacility(facilityId, 1, FacilityViewRules.PageSizes[^1]), token);
+                return new FacilitySearchPage<FacilityReportRow>(one.Reports, one.Paging.TotalCount, one.LoadError);
+            },
+            cancellationToken);
+
+        var slice = AutomationMarkRules.Slice(cached.Rows, pageNumber, pageSize);
+        return new ReportsListModel
+        {
+            Query = query,
+            LoadError = cached.Error,
+            Reports = slice.Items,
+            Paging = new PageBar
+            {
+                Page = slice.Page,
+                PageSize = slice.Size,
+                TotalCount = slice.Total,
+                TotalPages = slice.Pages
+            },
+            SortBy = sortBy,
+            SortDir = sortDir,
+            ScopeNote = AutomationMarkRules.SearchNote(truncated, cached.Partial)
+        };
+    }
+
     public async Task<GenerateReportPage> LoadGenerateAsync(CancellationToken cancellationToken)
     {
         var page = new GenerateReportPage();

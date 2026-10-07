@@ -27,8 +27,47 @@ public sealed class AcquisitionQuery
     public int MinAgeHours { get; set; } = LogsRules.DefaultMinAgeHours;
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
+    public string? Scope { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
+
+    public AcquisitionQuery ForFacility(string facilityId, int page, int pageSize) => new()
+    {
+        FacilityId = facilityId,
+        PatientId = PatientId,
+        ReportId = ReportId,
+        ResourceId = ResourceId,
+        ResourceType = ResourceType,
+        QueryPhase = QueryPhase,
+        QueryType = QueryType,
+        Status = Status,
+        Priority = Priority,
+        IncludeDeleted = IncludeDeleted,
+        CancellableOnly = CancellableOnly,
+        MinAgeHours = MinAgeHours,
+        SortBy = SortBy,
+        SortDir = SortDir,
+        Scope = Scope,
+        Page = page,
+        PageSize = pageSize
+    };
+
+    public string AutomationFingerprint() => string.Join('\u001f', new[]
+    {
+        PatientId,
+        ReportId,
+        ResourceId,
+        ResourceType,
+        QueryPhase,
+        QueryType,
+        Priority,
+        IncludeDeleted ? "1" : "0",
+        CancellableOnly ? "1" : "0",
+        MinAgeHours.ToString(),
+        Status is null ? "" : string.Join(',', Status),
+        SortBy,
+        SortDir
+    });
 
     public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
     {
@@ -47,6 +86,8 @@ public sealed class AcquisitionQuery
             route["includeDeleted"] = "true";
         if (CancellableOnly)
             route["cancellableOnly"] = "true";
+        if (AutomationMarkRules.IsAutomation(Scope))
+            route["scope"] = AutomationMarkRules.Automation;
         if (MinAgeHours != LogsRules.DefaultMinAgeHours)
             route["minAgeHours"] = MinAgeHours.ToString();
         Add(route, "sortBy", sortBy ?? SortBy);
@@ -99,6 +140,7 @@ public sealed class AcquisitionLogListPage
     public IReadOnlyList<StatusCountRow> Counts { get; set; } = [];
     public PageBar Paging { get; set; } = new();
     public IReadOnlyList<AcquisitionListRow> Logs { get; set; } = [];
+    public string? ScopeNote { get; set; }
 }
 
 public sealed class AcquisitionListRow
@@ -118,6 +160,7 @@ public sealed class AcquisitionListRow
     public string ResourceId { get; init; } = string.Empty;
     public bool Deleted { get; init; }
     public bool CanProcess { get; init; }
+    public string? AutomationRunId { get; set; }
 }
 
 public sealed class StatusCountRow
@@ -184,8 +227,31 @@ public sealed class SftpQuery
     public string? SubType { get; set; }
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
+    public string? Scope { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
+
+    public SftpQuery ForFacility(string facilityId, int page, int pageSize) => new()
+    {
+        FacilityId = facilityId,
+        Status = Status,
+        AcquisitionType = AcquisitionType,
+        SubType = SubType,
+        SortBy = SortBy,
+        SortDir = SortDir,
+        Scope = Scope,
+        Page = page,
+        PageSize = pageSize
+    };
+
+    public string AutomationFingerprint() => string.Join('\u001f', new[]
+    {
+        Status,
+        AcquisitionType,
+        SubType,
+        SortBy,
+        SortDir
+    });
 
     public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
     {
@@ -194,6 +260,8 @@ public sealed class SftpQuery
         Add(route, "status", Status);
         Add(route, "acquisitionType", AcquisitionType);
         Add(route, "subType", SubType);
+        if (AutomationMarkRules.IsAutomation(Scope))
+            route["scope"] = AutomationMarkRules.Automation;
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
         var size = LogsRules.ClampPageSize(PageSize);
@@ -232,6 +300,7 @@ public sealed class SftpLogListPage
     public string? LoadError { get; set; }
     public PageBar Paging { get; set; } = new();
     public IReadOnlyList<SftpLogRow> Logs { get; set; } = [];
+    public string? ScopeNote { get; set; }
 }
 
 public sealed class SftpLogRow
@@ -246,6 +315,7 @@ public sealed class SftpLogRow
     public int RetryAttempts { get; init; }
     public int FileCount { get; init; }
     public bool CanReset { get; init; }
+    public string? AutomationRunId { get; set; }
 }
 
 public sealed class SftpDetailPage
@@ -290,8 +360,35 @@ public sealed class AuditQuery
     public string? User { get; set; }
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
+    public string? Scope { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
+
+    public AuditQuery ForFacility(string facilityId, int page, int pageSize) => new()
+    {
+        SearchText = SearchText,
+        FacilityId = facilityId,
+        CorrelationId = CorrelationId,
+        Service = Service,
+        Action = Action,
+        User = User,
+        SortBy = SortBy,
+        SortDir = SortDir,
+        Scope = Scope,
+        Page = page,
+        PageSize = pageSize
+    };
+
+    public string AutomationFingerprint() => string.Join('\u001f', new[]
+    {
+        SearchText,
+        CorrelationId,
+        Service,
+        Action,
+        User,
+        SortBy,
+        SortDir
+    });
 
     public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
     {
@@ -302,6 +399,8 @@ public sealed class AuditQuery
         Add(route, "service", Service);
         Add(route, "eventAction", Action);
         Add(route, "user", User);
+        if (AutomationMarkRules.IsAutomation(Scope))
+            route["scope"] = AutomationMarkRules.Automation;
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
         var size = LogsRules.ClampAuditPageSize(PageSize);
@@ -342,6 +441,7 @@ public sealed class AuditListPage
     public string? LoadError { get; set; }
     public PageBar Paging { get; set; } = new();
     public IReadOnlyList<AuditEventRow> Events { get; set; } = [];
+    public string? ScopeNote { get; set; }
 }
 
 public sealed class AuditEventRow
@@ -355,6 +455,7 @@ public sealed class AuditEventRow
     public string User { get; init; } = string.Empty;
     public string When { get; init; } = string.Empty;
     public string Resource { get; init; } = string.Empty;
+    public string? AutomationRunId { get; set; }
 }
 
 public sealed class AuditDetailPage

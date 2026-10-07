@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace Link.UI.Services;
@@ -23,6 +24,7 @@ public sealed class LogsService
     private readonly IAuditServiceClient? _audit;
     private readonly LinkUiFeatureOptions _options;
     private readonly LogsLinkOptions _links;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<LogsService> _logger;
 
     public LogsService(
@@ -30,12 +32,14 @@ public sealed class LogsService
         IAuditServiceClient? audit,
         IOptions<LinkUiFeatureOptions> options,
         IOptions<LogsLinkOptions> links,
+        IMemoryCache cache,
         ILogger<LogsService> logger)
     {
         _acquisition = acquisition;
         _audit = audit;
         _options = options.Value;
         _links = links.Value;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -47,6 +51,7 @@ public sealed class LogsService
             Blank(registry.AuditServiceUrl) ? null : services.GetRequiredService<IAuditServiceClient>(),
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IOptions<LogsLinkOptions>>(),
+            services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<LogsService>>());
     }
 
@@ -699,6 +704,166 @@ public sealed class LogsService
             _logger.LogError(ex, "Acquisition status counts failed. ReportId={ReportId}", search.ReportId.Sanitize());
             return "Status counts could not be loaded: " + ex.Message;
         }
+    }
+
+    public async Task<AcquisitionLogListPage> LoadAcquisitionForFacilitiesAsync(
+        AcquisitionQuery query,
+        IReadOnlyList<string> facilityIds,
+        bool truncated,
+        CancellationToken cancellationToken)
+    {
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var search = LogsRules.Prepare(query, _options.NumericOnlyFacilityId, DateTime.UtcNow);
+        var page = new AcquisitionLogListPage { Query = query, Search = search };
+        if (search.Error is not null)
+        {
+            page.LoadError = search.Error;
+            return page;
+        }
+
+        var cached = await AutomationFacilitySearch.CachedAsync(
+            _cache,
+            "acquisition",
+            query.AutomationFingerprint(),
+            facilityIds,
+            async (facilityId, token) =>
+            {
+                var one = await LoadAcquisitionAsync(
+                    query.ForFacility(facilityId, 1, LogsRules.PageSizes[^1]),
+                    token);
+                return new FacilitySearchPage<AcquisitionListRow>(one.Logs, one.Paging.TotalCount, one.LoadError);
+            },
+            cancellationToken);
+
+        var descending = search.SortDir != "asc";
+        var ordered = OrderAcquisition(cached.Rows, search.SortBy, descending);
+        var slice = AutomationMarkRules.Slice(ordered, search.Page, search.PageSize);
+        page.Logs = slice.Items;
+        page.Paging = new PageBar
+        {
+            Page = slice.Page,
+            PageSize = slice.Size,
+            TotalCount = slice.Total,
+            TotalPages = slice.Pages
+        };
+        page.LoadError = cached.Error;
+        page.ScopeNote = AutomationMarkRules.SearchNote(truncated, cached.Partial);
+        return page;
+    }
+
+    public async Task<SftpLogListPage> LoadSftpForFacilitiesAsync(
+        SftpQuery query,
+        IReadOnlyList<string> facilityIds,
+        bool truncated,
+        CancellationToken cancellationToken)
+    {
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var search = LogsRules.PrepareSftp(query, _options.NumericOnlyFacilityId);
+        var page = new SftpLogListPage { Query = query, Search = search };
+        if (search.Error is not null)
+        {
+            page.LoadError = search.Error;
+            return page;
+        }
+
+        var cached = await AutomationFacilitySearch.CachedAsync(
+            _cache,
+            "sftp",
+            query.AutomationFingerprint(),
+            facilityIds,
+            async (facilityId, token) =>
+            {
+                var one = await LoadSftpAsync(query.ForFacility(facilityId, 1, LogsRules.PageSizes[^1]), token);
+                return new FacilitySearchPage<SftpLogRow>(one.Logs, one.Paging.TotalCount, one.LoadError);
+            },
+            cancellationToken);
+
+        var slice = AutomationMarkRules.Slice(cached.Rows, search.Page, search.PageSize);
+        page.Logs = slice.Items;
+        page.Paging = new PageBar
+        {
+            Page = slice.Page,
+            PageSize = slice.Size,
+            TotalCount = slice.Total,
+            TotalPages = slice.Pages
+        };
+        page.LoadError = cached.Error;
+        page.ScopeNote = AutomationMarkRules.SearchNote(truncated, cached.Partial);
+        return page;
+    }
+
+    public async Task<AuditListPage> LoadAuditForFacilitiesAsync(
+        AuditQuery query,
+        IReadOnlyList<string> facilityIds,
+        bool truncated,
+        CancellationToken cancellationToken)
+    {
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var search = LogsRules.PrepareAudit(query, _options.NumericOnlyFacilityId);
+        var page = new AuditListPage { Query = query, Search = search };
+        if (search.Error is not null)
+        {
+            page.LoadError = search.Error;
+            return page;
+        }
+
+        var cached = await AutomationFacilitySearch.CachedAsync(
+            _cache,
+            "audit",
+            query.AutomationFingerprint(),
+            facilityIds,
+            async (facilityId, token) =>
+            {
+                var one = await LoadAuditAsync(
+                    query.ForFacility(facilityId, 1, LogsRules.AuditPageSizes[^1]),
+                    token);
+                return new FacilitySearchPage<AuditEventRow>(one.Events, one.Paging.TotalCount, one.LoadError);
+            },
+            cancellationToken);
+
+        var slice = AutomationMarkRules.Slice(cached.Rows, search.Page, search.PageSize);
+        page.Events = slice.Items;
+        page.Paging = new PageBar
+        {
+            Page = slice.Page,
+            PageSize = slice.Size,
+            TotalCount = slice.Total,
+            TotalPages = slice.Pages
+        };
+        page.LoadError = cached.Error;
+        page.ScopeNote = AutomationMarkRules.SearchNote(truncated, cached.Partial);
+        return page;
+    }
+
+    private static List<AcquisitionListRow> OrderAcquisition(
+        IReadOnlyList<AcquisitionListRow> rows,
+        string sortBy,
+        bool descending)
+    {
+        return sortBy switch
+        {
+            "FacilityId" => SortText(rows, row => row.FacilityId, descending),
+            "PatientId" => SortText(rows, row => row.PatientId, descending),
+            "QueryType" => SortText(rows, row => row.QueryType, descending),
+            "QueryPhase" => SortText(rows, row => row.Phase, descending),
+            "Status" => SortText(rows, row => row.Status, descending),
+            "Priority" => SortText(rows, row => row.Priority, descending),
+            "Id" => (descending ? rows.OrderByDescending(row => row.Id) : rows.OrderBy(row => row.Id)).ToList(),
+            _ => (descending
+                ? rows.OrderByDescending(row => row.CreatedUtc ?? DateTime.MinValue).ThenByDescending(row => row.Id)
+                : rows.OrderBy(row => row.CreatedUtc ?? DateTime.MinValue).ThenBy(row => row.Id)).ToList()
+        };
+    }
+
+    private static List<AcquisitionListRow> SortText(
+        IReadOnlyList<AcquisitionListRow> rows,
+        Func<AcquisitionListRow, string> key,
+        bool descending)
+    {
+        var ordered = descending
+            ? rows.OrderByDescending(key, StringComparer.OrdinalIgnoreCase)
+            : rows.OrderBy(key, StringComparer.OrdinalIgnoreCase);
+        return ordered.ToList();
     }
 
     private static AcquisitionLogQuery ToQuery(AcquisitionSearch search) => new()
