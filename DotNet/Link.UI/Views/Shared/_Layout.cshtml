@@ -7,6 +7,7 @@
 
     var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
         ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
+    var adminShell = Ctrl("Tenants") || Ctrl("Reports") || Ctrl("Logs") || Ctrl("Configuration") || Ctrl("System");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -18,7 +19,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body class="lu-body">
+<body class="lu-body@(adminShell ? " lu-admin" : "")">
     <div class="lu-shell">
         <aside class="lu-sidebar">
             <div class="lu-brand">
