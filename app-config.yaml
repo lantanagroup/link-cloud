@@ -64,6 +64,7 @@ serviceMeta:
   AdminBFF:              { label: "LinkAdminBFF",          runtime: "dotnet" }
   Audit:                 { label: "Audit",                 runtime: "dotnet" }
   AutomationUI:          { label: "Link Automation UI",    runtime: "dotnet" }
+  LinkUI:                { label: "Link UI",               runtime: "dotnet" }
   Census:                { label: "Census",                runtime: "dotnet" }
   DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
@@ -132,33 +133,36 @@ global:
     sensitive: true
     consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
 
-  # Automation.UI inbound-auth coordination note:
-  # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
-  # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
-  # every non-/health request is returned as 503 before bearer-token validation can run.
-  # To make ApiBearer-protected endpoints reachable, EnableAnonymousAccess and
-  # Authentication:ApiBearer:Enabled must be configured together for the target environment.
+  # Inbound-auth coordination note:
+  # Automation.UI short-circuits every non-/health request with 503 when
+  # Authentication:EnableAnonymousAccess is false, before bearer validation runs.
+  # ApiBearer endpoints there are reachable only when anonymous access and
+  # Authentication:ApiBearer:Enabled are both true.
+  # Link.UI keeps /health and the Admin.BFF /api proxy open. When anonymous access
+  # is false and ApiBearer is disabled, /api/runs and /api/api-health-runs return 503.
+  # When ApiBearer is enabled, those bearer routes stay on ApiBearer and the other
+  # native automation routes still return 503.
   # Canonical key path is Authentication:ApiBearer:* (not top-level ApiBearer:*).
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
     consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:EnableAnonymousAccess"
-    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI; see the note above."
+    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI. Link.UI uses the same flag for pages and hubs. When it is false and Authentication:ApiBearer:Enabled is false, Link.UI also returns 503 for /api/runs and /api/api-health-runs. When bearer auth is enabled, those bearer routes stay on ApiBearer and the other native automation routes still return 503. /health and the Admin.BFF /api proxy stay open. See the note above."
     required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "LinkUI", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:ApiBearer:Enabled"
-    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
+    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI and Link.UI for /api/runs and POST /api/api-health-runs/start-all-for-pipeline."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "Authentication:ApiBearer:Authority"
-    description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    description: "OIDC authority URL for validating inbound Automation.UI and Link.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true. No default; set per environment."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "Authentication:ApiBearer:Audience"
-    description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    description: "Expected audience for inbound Automation.UI and Link.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true. No default; set per environment."
     required: true
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
     required: true
@@ -191,9 +195,9 @@ global:
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Telemetry:PrometheusQueryEndpoint"
-    description: "Prometheus HTTP query base URL used by Automation.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
+    description: "Prometheus HTTP query base URL used by Automation.UI and Link.UI at Metrics-run completion for optional stage latency enrichment. Empty skips Prom queries and marks stages unavailable. Not the OTLP collector endpoint."
     required: false
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
     
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
@@ -291,21 +295,21 @@ global:
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
     sensitive: true
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:BlobRoot"
-    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI imported bundles default to automation/imported-bundles when this is unset."
+    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI and Link.UI imported bundles default to automation/imported-bundles when this is unset."
     required: false
     defaultValue: "automation/imported-bundles"
-    consumers: ["Report", "Submission", "AutomationUI"]
+    consumers: ["Report", "Submission", "AutomationUI", "LinkUI"]
   - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
-    description: "Optional blob-path prefix used by Automation.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
+    description: "Optional blob-path prefix used by Automation.UI and Link.UI for generated template cache blobs. When unset, generated templates are written at the container root under generated-patient-templates."
     required: false
     defaultValue: "automation/generated-bundles"
-    consumers: ["AutomationUI"]
+    consumers: ["AutomationUI", "LinkUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
@@ -543,16 +547,16 @@ services:
       description: "The MongoDB database name for automation data."
       required: true
     - key: "ApiHealth:EnableAdminBffAuthSuite"
-      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
+      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI and Link.UI."
       required: false
     - key: "Loki:Url"
-      description: "The Loki endpoint URL Automation.UI uses for run diagnostics scraping."
+      description: "The Loki endpoint URL Automation.UI and Link.UI use for run diagnostics scraping."
       required: true
     - key: "Loki:App"
-      description: "The Loki application label Automation.UI uses to scope diagnostics queries."
+      description: "The Loki application label Automation.UI and Link.UI use to scope diagnostics queries."
       required: true
     - key: "Authentication:UseBearerForServiceCalls"
-      description: "Whether Automation.UI uses Link bearer auth for service-to-service LinkSdk calls."
+      description: "Whether Automation.UI and Link.UI use Link bearer auth for service-to-service LinkSdk calls."
       required: false
       defaultValue: "true"
     - key: "Automation:SlackWebhookUrl"
@@ -560,7 +564,7 @@ services:
       required: true
       sensitive: true
     - key: "InternalBlobStorage:GeneratedTemplateBlobRoot"
-      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI. Defaults to automation/generated-bundles."
+      description: "Optional blob-path prefix for generated template cache blobs in Automation.UI and Link.UI. Defaults to automation/generated-bundles."
       required: false
       defaultValue: "automation/generated-bundles"
     - key: "DataProtection:ApplicationName"
@@ -570,7 +574,50 @@ services:
       description: "Mongo collection name used by Automation.UI to store Data Protection keys. Defaults to 'automation_data_protection_keys' when unset."
       required: false
     - key: "LeftoverRunCleanup:Enabled"
-      description: "Master switch for scheduled Automation.UI leftover cleanup. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
+      description: "Master switch for scheduled leftover cleanup in Automation.UI and Link.UI. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:QuiesceEnabled"
+      description: "Whether the daytime leftover quiesce pass is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off so a new environment does not abort pipeline work on a schedule."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:DailyTeardownEnabled"
+      description: "Whether the daily off-hours leftover facility teardown is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
+    - key: "LeftoverRunCleanup:WeeklyHistoryPurgeEnabled"
+      description: "Whether the weekly scenario-run history purge is allowed to run. Also requires LeftoverRunCleanup:Enabled. Defaults off."
+      required: false
+      defaultValue: "false"
+  LinkUI:
+    - key: "Automation:FhirServerBase"
+      description: "The base URL of the FHIR server the generator writes test data to."
+      required: true
+    - key: "Automation:FacilityFhirServerBase"
+      description: "The base URL of the FHIR server as the facility reaches it. Differs from Automation:FhirServerBase only when the consumer's network vantage point differs."
+      required: true
+    - key: "MongoDB:ConnectionString"
+      description: "The MongoDB connection string for automation data."
+      required: true
+      sensitive: true
+    - key: "MongoDB:DatabaseName"
+      description: "The MongoDB database name for automation data."
+      required: true
+    - key: "ApiHealth:EnableAdminBffAuthSuite"
+      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI and Link.UI."
+      required: false
+    - key: "Loki:Url"
+      description: "The Loki endpoint URL Automation.UI and Link.UI use for run diagnostics scraping."
+      required: true
+    - key: "Loki:App"
+      description: "The Loki application label Automation.UI and Link.UI use to scope diagnostics queries."
+      required: true
+    - key: "Authentication:UseBearerForServiceCalls"
+      description: "Whether Automation.UI and Link.UI use Link bearer auth for service-to-service LinkSdk calls."
+      required: false
+      defaultValue: "true"
+    - key: "LeftoverRunCleanup:Enabled"
+      description: "Master switch for scheduled leftover cleanup in Automation.UI and Link.UI. False keeps quiesce, daily teardown, and weekly history purge from starting after deploy until an operator turns cleanup on. A Cleanup page save overrides this for that environment."
       required: false
       defaultValue: "false"
     - key: "LeftoverRunCleanup:QuiesceEnabled"
