@@ -1,0 +1,81 @@
+@model AutomationNewRunPage
+@using Link.UI.Services
+@{
+    var ready = Model.EngineReady;
+}
+@await Html.PartialAsync("_Nav")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">New run</h1>
+        <p class="text-muted mb-0">Starts a run in this app. The new run opens when the start succeeds.</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Back to runs</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Message))
+{
+    <div class="alert alert-warning" id="startMessage">@Model.Message</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-danger" id="startError">@Model.Error</div>
+}
+
+<form method="post" class="au-card card">
+    <div class="card-body row g-3">
+        @Html.AntiForgeryToken()
+        <div class="col-12 col-md-8">
+            <label class="form-label" for="choice">Run</label>
+            <select id="choice" name="choice" class="form-select" required @(ready ? null : "disabled")>
+                <option value="">Select a run</option>
+                <optgroup label="Built-in">
+                    @foreach (var option in Model.BuiltIn)
+                    {
+                        if (string.Equals(Model.Choice, option.Value, StringComparison.Ordinal))
+                        {
+                            <option value="@option.Value" selected>@option.Label</option>
+                        }
+                        else
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    }
+                </optgroup>
+                @if (Model.Scenarios.Count > 0)
+                {
+                    <optgroup label="Saved scenarios">
+                        @foreach (var scenario in Model.Scenarios)
+                        {
+                            var value = LinkAutomationStartRules.ScenarioChoiceValue(scenario.Id);
+                            if (string.Equals(Model.Choice, value, StringComparison.Ordinal))
+                            {
+                                <option value="@value" selected>@LinkAutomationStartRules.ScenarioLabel(scenario)</option>
+                            }
+                            else
+                            {
+                                <option value="@value">@LinkAutomationStartRules.ScenarioLabel(scenario)</option>
+                            }
+                        }
+                    </optgroup>
+                }
+            </select>
+            @if (Model.Scenarios.Count == 0)
+            {
+                <div class="form-text">No saved scenarios are stored. A built-in run can still start.</div>
+            }
+            else if (Model.ScenariosTruncated)
+            {
+                <div class="form-text">Showing the first @LinkAutomationStartRules.ScenarioListLimit saved scenarios.</div>
+            }
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="runName">Name</label>
+            <input id="runName" name="runName" value="@Model.RunName" class="form-control" maxlength="@LinkAutomationStartRules.RunNameMaxLength" @(ready ? null : "disabled") />
+            <div class="form-text">Optional. Leave blank to keep the scenario name.</div>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-au-action" @(ready ? null : "disabled")>Start run</button>
+        </div>
+    </div>
+</form>

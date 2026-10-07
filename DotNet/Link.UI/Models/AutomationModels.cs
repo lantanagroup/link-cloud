@@ -115,6 +115,54 @@ public sealed class AutomationDashboardPage
     public string SortDir { get; init; } = "desc";
 }
 
+public sealed class AutomationScenarioChoice
+{
+    public Guid Id { get; init; }
+
+    public string Name { get; init; } = string.Empty;
+
+    public bool IsSystemScenario { get; init; }
+}
+
+public sealed class AutomationScenarioList
+{
+    public bool StorageConfigured { get; init; }
+
+    public bool StorageReachable { get; init; }
+
+    public string? Message { get; init; }
+
+    public bool Truncated { get; init; }
+
+    public IReadOnlyList<AutomationScenarioChoice> Scenarios { get; init; } = [];
+}
+
+public sealed class AutomationStartChoice
+{
+    public string Value { get; init; } = string.Empty;
+
+    public string Label { get; init; } = string.Empty;
+}
+
+public sealed class AutomationNewRunPage
+{
+    public bool EngineReady { get; init; }
+
+    public string? Message { get; init; }
+
+    public string? Error { get; init; }
+
+    public string? Choice { get; init; }
+
+    public string? RunName { get; init; }
+
+    public bool ScenariosTruncated { get; init; }
+
+    public IReadOnlyList<AutomationStartChoice> BuiltIn { get; init; } = [];
+
+    public IReadOnlyList<AutomationScenarioChoice> Scenarios { get; init; } = [];
+}
+
 public sealed class AutomationRunPage
 {
     public bool Found { get; init; }
