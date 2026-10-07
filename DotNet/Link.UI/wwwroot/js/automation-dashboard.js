@@ -37,7 +37,11 @@
             statusChart.data = statusData;
             statusChart.update();
         } else if (statusCanvas && total > 0) {
-            statusChart = new Chart(statusCanvas, { type: "doughnut", data: statusData, options: { plugins: { legend: { position: "bottom" } } } });
+            statusChart = new Chart(statusCanvas, {
+                type: "doughnut",
+                data: statusData,
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+            });
         }
 
         var days = stats.runsPerDay || [];
@@ -61,7 +65,12 @@
             dayChart = new Chart(dayCanvas, {
                 type: "bar",
                 data: dayData,
-                options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { position: "bottom" } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+                    plugins: { legend: { position: "bottom" } }
+                }
             });
         }
     }
