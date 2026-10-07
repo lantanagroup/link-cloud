@@ -229,7 +229,10 @@
         if ((form.method || "").toLowerCase() !== "post") return;
         event.preventDefault();
         var submitter = event.submitter;
-        var action = (submitter && submitter.formAction) || form.action;
+        // A submit button with no formaction reports the current document URL.
+        // Use that URL only when the button actually sets formaction.
+        var explicit = submitter && submitter.hasAttribute("formaction") ? submitter.formAction : "";
+        var action = explicit || form.action;
         var body = submitter ? new FormData(form, submitter) : new FormData(form);
         if (submitter) submitter.disabled = true;
         fetch(action, {
@@ -240,7 +243,9 @@
         }).then(function (res) {
             var type = res.headers.get("content-type") || "";
             if (!res.ok || type.indexOf("text/html") === -1) {
-                showToast("Could not save that change.");
+                showToast(!res.ok
+                    ? "Could not save that change. The server returned HTTP " + res.status + "."
+                    : "Could not save that change.");
                 return;
             }
             if (form.getAttribute("data-au-save") === "navigate") {
