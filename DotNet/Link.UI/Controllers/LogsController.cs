@@ -1,3 +1,4 @@
+using Automation.UI.Services;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +33,48 @@ public sealed class LogsController : Controller
         ViewData["Title"] = "Acquisition log";
         ViewData["LogsSection"] = "acquisition";
         return View(await AcquisitionPage(query, cancellationToken));
+    }
+
+    [HttpGet("Acquisition/panel")]
+    public async Task<IActionResult> AcquisitionPanel(AcquisitionQuery query, Guid? runId, CancellationToken cancellationToken)
+    {
+        query ??= new AcquisitionQuery();
+        if (runId is Guid id)
+        {
+            if (!AcquisitionLogPanelRules.AllowsRunEntry(_features.Value.AutomationEnabled))
+                return NotFound();
+
+            var manager = HttpContext.RequestServices.GetService<IAutomationRunManager>();
+            var run = manager is null ? null : await manager.GetRunForDisplayAsync(id, cancellationToken);
+            if (run is null)
+                return NotFound();
+
+            query.FacilityId = run.FacilityId;
+            if (!string.IsNullOrWhiteSpace(run.ReportId))
+                query.ReportId = run.ReportId;
+            query.Scope = AcquisitionLogPanelRules.ScopeForEntry(namedFacility: true);
+
+            if (string.IsNullOrWhiteSpace(query.FacilityId))
+            {
+                var empty = NotOwnedAcquisition(query);
+                empty.ScopeNote = "This run has no facility yet.";
+                empty.Embedded = true;
+                empty.RunId = id;
+                return PartialView("_AcquisitionLogList", empty);
+            }
+
+            var owned = await AcquisitionPage(query, cancellationToken);
+            owned.Embedded = true;
+            owned.RunId = id;
+            return PartialView("_AcquisitionLogList", owned);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.FacilityId))
+            query.Scope = AcquisitionLogPanelRules.ScopeForEntry(namedFacility: true);
+
+        var page = await AcquisitionPage(query, cancellationToken);
+        page.Embedded = true;
+        return PartialView("_AcquisitionLogList", page);
     }
 
     [HttpGet("Acquisition/{id:long}")]

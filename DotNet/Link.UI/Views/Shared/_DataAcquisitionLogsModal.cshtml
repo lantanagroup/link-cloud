@@ -1,0 +1,27 @@
+@model DataAcquisitionLogsModal
+<div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true"
+     data-panel-url="@Url.Action("AcquisitionPanel", "Logs")"
+     data-run-id="@Model.RunId"
+     data-facility-id="@Model.FacilityId">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-download me-2"></i><span id="dataAcqLogModalLabel">Data acquisition logs</span></span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="lu-live-label mb-2">This list updates on its own.</p>
+                <label class="visually-hidden" for="daLogSearch">Filter logs</label>
+                <input type="search"
+                       id="daLogSearch"
+                       class="form-control form-control-sm mb-2"
+                       placeholder="Filter by patient, id, status, phase, or resource"
+                       autocomplete="off" />
+                <div id="dataAcqLogList">
+                    <p class="text-muted mb-0">Loading logs…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="~/js/data-acquisition-logs.js" asp-append-version="true"></script>

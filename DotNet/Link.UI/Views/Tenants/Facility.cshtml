@@ -4,14 +4,18 @@
     ViewData["Title"] = heading;
 }
 
-<div class="mb-3">
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
     <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
+    @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
+    {
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+    }
 </div>
 
 @if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model.AutomationRunId))
 {
     <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
-        <span>This is an automation facility. Edits here change a throwaway facility, not a hospital.</span>
+        <span>This is an automation facility. Edits here change a throwaway facility.</span>
         <partial name="_AutomationBadge" model="Model.AutomationRunId" />
     </div>
 }
@@ -283,6 +287,11 @@ else
         </p>
     }
     </div>
+}
+
+@if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
+{
+    <partial name="_DataAcquisitionLogsModal" model="@(new DataAcquisitionLogsModal { FacilityId = Model.FacilityId })" />
 }
 
 @section Scripts {
