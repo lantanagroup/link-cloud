@@ -135,10 +135,11 @@ else
         <div class="accordion" id="facilityPanels">
             <partial name="_CensusEditor" model="Model" />
 
-            <div class="accordion-item">
+            <div class="accordion-item" id="dispatchItem" data-collection="dispatch">
                 <h2 class="accordion-header" id="dispatchHeading">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#dispatchPanel" aria-expanded="true" aria-controls="dispatchPanel">
-                        Query dispatch configuration
+                        Query dispatch
+                        <span class="badge text-bg-light ms-2" id="dispatchCount">@Model.Schedules.Count(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration))</span>
                     </button>
                 </h2>
                 <div id="dispatchPanel" class="accordion-collapse collapse show" aria-labelledby="dispatchHeading">
@@ -153,32 +154,36 @@ else
                             {
                                 <div class="alert alert-warning">@Model.QueryDispatchError</div>
                             }
-                            else if (!Model.QueryDispatchExists)
+                            else if (!Model.QueryDispatchExists || !Model.Schedules.Any(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration)))
                             {
-                                <div class="alert alert-info">No query dispatch configuration for this facility.</div>
+                                <p class="mb-3" id="dispatchEmpty">No query dispatch schedules for this facility.</p>
+                            }
+                            else
+                            {
+                                <p class="mb-3 d-none" id="dispatchEmpty">No query dispatch schedules for this facility.</p>
                             }
                             <form method="post" data-au-save asp-action="SaveQueryDispatch" asp-route-id="@Model.FacilityId">
                                 <input type="hidden" name="queryDispatchExists" value="@(Model.QueryDispatchExists ? "true" : "false")" />
                                 @for (var i = 0; i < Model.Schedules.Count; i++)
                                 {
-                                    <div class="row g-2 align-items-end mb-2">
-                                        <div class="col-12 col-md-5">
-                                            <label class="form-label" for="event-@i">Event</label>
-                                            <input id="event-@i" name="Schedules[@i].Event" value="@Model.Schedules[i].Event" class="form-control" />
-                                        </div>
-                                        <div class="col-12 col-md-5">
-                                            <label class="form-label" for="duration-@i">Duration</label>
-                                            <input id="duration-@i" name="Schedules[@i].Duration" value="@Model.Schedules[i].Duration" class="form-control" placeholder="PT10S" />
-                                        </div>
-                                        <div class="col-12 col-md-2">
-                                            <div class="form-check mb-2">
-                                                <input class="form-check-input" type="checkbox" id="remove-@i" name="Schedules[@i].Remove" value="true" />
-                                                <label class="form-check-label" for="remove-@i">Remove</label>
+                                    var blankRow = string.IsNullOrWhiteSpace(Model.Schedules[i].Event) && string.IsNullOrWhiteSpace(Model.Schedules[i].Duration);
+                                    <div class="border rounded p-2 mb-2@(blankRow ? " d-none" : "")" data-dispatch-row data-collection-row data-dispatch-blank="@(blankRow ? "true" : "false")">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label" for="event-@i">Event</label>
+                                                <input id="event-@i" name="Schedules[@i].Event" value="@Model.Schedules[i].Event" class="form-control" />
+                                            </div>
+                                            <div class="col-12 col-md-5">
+                                                <label class="form-label" for="duration-@i">Duration</label>
+                                                <input id="duration-@i" name="Schedules[@i].Duration" value="@Model.Schedules[i].Duration" class="form-control" placeholder="PT10S" />
+                                            </div>
+                                            <div class="col-12 col-md-2">
+                                                <input class="d-none" type="checkbox" id="remove-@i" name="Schedules[@i].Remove" value="true" />
+                                                <button type="button" class="btn btn-sm btn-danger" data-row-remove>Delete</button>
                                             </div>
                                         </div>
                                     </div>
                                 }
-                                <p class="form-text">Leave the last row blank to ignore it. Check Remove to drop a row on save.</p>
                                 <button type="submit" class="btn btn-au-action">@(Model.QueryDispatchExists ? "Save query dispatch" : "Add query dispatch")</button>
                             </form>
                             @if (Model.QueryDispatchExists)
@@ -192,10 +197,15 @@ else
                 </div>
             </div>
 
-            <div class="accordion-item" id="notificationItem">
+            <div class="accordion-item" id="notificationItem" data-collection="notification">
                 <h2 class="accordion-header" id="notificationHeading">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#notificationPanel" aria-expanded="false" aria-controls="notificationPanel">
                         Notification email
+                        @if (Model.Notification.Configured)
+                        {
+                            var emailCount = (Model.Notification.Emails ?? "").Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
+                            <span class="badge text-bg-light ms-2" id="notificationCount">@emailCount</span>
+                        }
                     </button>
                 </h2>
                 <div id="notificationPanel" class="accordion-collapse collapse" aria-labelledby="notificationHeading">
@@ -216,16 +226,34 @@ else
                             }
                             else if (!Model.Notification.Exists)
                             {
-                                <div class="alert alert-info">No notification email list for this facility.</div>
+                                <p class="mb-3" id="notificationEmpty">No notification addresses for this facility.</p>
+                            }
+                            else
+                            {
+                                <p class="mb-3 d-none" id="notificationEmpty">No notification addresses for this facility.</p>
                             }
                             <form method="post" data-au-save data-facility-action="SaveNotification" asp-controller="Configuration" asp-action="SaveConfiguration">
                                 <input type="hidden" name="Id" value="@Model.Notification.Id" />
                                 <input type="hidden" name="FacilityId" value="@Model.FacilityId" />
                                 <input type="hidden" name="ReturnFacility" value="@Model.FacilityId" />
-                                <div class="mb-3">
-                                    <label class="form-label" for="notificationEmails">Email addresses</label>
-                                    <textarea id="notificationEmails" name="Emails" class="form-control" rows="4">@Model.Notification.Emails</textarea>
-                                    <div class="form-text">One address per line, or separate them with commas. At most 20.</div>
+                                <div class="mb-3" id="notificationRows">
+                                    <label class="form-label">Email addresses</label>
+                                    @{
+                                        var emailRows = (Model.Notification.Emails ?? "").Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                                    }
+                                    @foreach (var address in emailRows)
+                                    {
+                                        <div class="row g-2 align-items-center mb-2" data-email-row data-collection-row>
+                                            <div class="col">
+                                                <input class="form-control" data-email-input value="@address" aria-label="Email address" maxlength="254" />
+                                            </div>
+                                            <div class="col-auto">
+                                                <button type="button" class="btn btn-sm btn-danger" data-email-remove>Delete</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    <textarea id="notificationEmails" name="Emails" class="d-none">@Model.Notification.Emails</textarea>
+                                    <div class="form-text">At most 20 addresses. A row is removed when you save the facility.</div>
                                 </div>
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="notificationEmailEnabled" name="EmailEnabled" value="true" @(Model.Notification.EmailEnabled ? "checked" : null) />

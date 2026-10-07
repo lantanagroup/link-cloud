@@ -51,6 +51,9 @@ jobs:
     # (one build, one up). API Stability runs first; the remaining
     # categories run concurrently. Each `dotnet test` log is rendered as
     # its own collapsible ::group:: in the Actions UI.
+    # UI calls go to Link.UI: LINK_UI_BASE_URL, then AUTOMATION_UI_BASE_URL,
+    # then http://localhost:5258 (the link-ui compose port). This job sets
+    # neither variable.
     name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
