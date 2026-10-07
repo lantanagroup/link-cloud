@@ -82,11 +82,12 @@
                         {
                             <p class="text-muted">No reports were created in the last seven days.</p>
                         }
+                        <p class="small text-muted mb-2">UTC days</p>
                         <div class="home-trend">
                             @foreach (var day in activity.Trend)
                             {
                                 var percent = day.Reachable ? HomeOverviewRules.BarPercent(day.Count, trendMax) : 0;
-                                <a class="home-trend-link" asp-controller="Reports" asp-action="Index" asp-route-created="@day.Day">
+                                <a class="home-trend-link" asp-controller="Reports" asp-action="Index" asp-route-created="@day.Day" title="@day.Day UTC">
                                     <span class="home-trend-plot" aria-hidden="true">
                                         <span class="home-trend-bar" style="height:@(percent)%"></span>
                                     </span>
@@ -119,6 +120,68 @@
                                 }
                             </a>
                         }
+                    }
+                </div>
+            </div>
+        </div>
+
+        @{
+            var acquisitionMax = logs.Trend.Where(day => day.Reachable).Select(day => day.Count).DefaultIfEmpty(0).Max();
+            var acquisitionTotal = logs.Trend.Where(day => day.Reachable).Sum(day => day.Count);
+        }
+        <div class="col-12 col-lg-7">
+            <div class="au-card card h-100 mb-0">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <a class="home-card-link" asp-controller="Logs" asp-action="Acquisition">Acquisition throughput</a>
+                    <a class="home-card-link small" asp-controller="Logs" asp-action="Acquisition">Open</a>
+                </div>
+                <div class="card-body">
+                    @if (!logs.TrendReachable)
+                    {
+                        <div class="alert alert-warning mb-0">@(string.IsNullOrWhiteSpace(logs.Message) ? "Acquisition counts could not be read." : logs.Message)</div>
+                    }
+                    else
+                    {
+                        @if (acquisitionTotal == 0)
+                        {
+                            <p class="text-muted">No acquisition logs in the last seven UTC days.</p>
+                        }
+                        <p class="small text-muted mb-2">UTC days</p>
+                        <div class="home-trend">
+                            @foreach (var day in logs.Trend)
+                            {
+                                var percent = day.Reachable ? HomeOverviewRules.BarPercent(day.Count, acquisitionMax) : 0;
+                                <a class="home-trend-link" asp-controller="Logs" asp-action="Acquisition" title="@day.Day UTC, @day.Failed failed">
+                                    <span class="home-trend-plot" aria-hidden="true">
+                                        <span class="home-trend-bar" style="height:@(percent)%"></span>
+                                    </span>
+                                    <span class="home-trend-count">@day.CountText</span>
+                                    <span class="home-trend-day">@day.Day</span>
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-5">
+            <div class="au-card card h-100 mb-0">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <a class="home-card-link" asp-controller="Logs" asp-action="Audit">Audit errors</a>
+                    <a class="home-card-link small" asp-controller="Logs" asp-action="Audit">Open</a>
+                </div>
+                <div class="card-body">
+                    @if (!logs.AuditCounted)
+                    {
+                        <div class="alert alert-warning mb-0">@(string.IsNullOrWhiteSpace(logs.AuditMessage) ? "Audit could not be reached." : logs.AuditMessage)</div>
+                    }
+                    else
+                    {
+                        <a class="au-kpi-card au-kpi-link @(logs.AuditErrors > 0 ? "au-kpi-bad" : "")" asp-controller="Logs" asp-action="Audit">
+                            <div class="au-kpi-value">@logs.AuditErrorsText</div>
+                            <div class="au-kpi-label">Last 24 hours</div>
+                            <div class="au-kpi-note">Notes that record a failure. UTC window.</div>
+                        </a>
                     }
                 </div>
             </div>

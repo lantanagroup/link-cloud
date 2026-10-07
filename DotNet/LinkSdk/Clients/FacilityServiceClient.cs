@@ -167,6 +167,12 @@ public class FacilityServiceClient : LinkApiClientBase, IFacilityServiceClient
         return SendAsync<Dictionary<string, string>>(() => req.GetAsync(cancellationToken: cancellationToken));
     }
 
+    public Task<LinkApiResponse<FacilityCounts>> GetFacilityCountsAsync(
+        FacilityCountRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<FacilityCounts>(() => Request("/Facility/counts")
+            .PostJsonAsync(request ?? new FacilityCountRequest(), cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(
         string facilityId,
         AdHocReportRequest request,

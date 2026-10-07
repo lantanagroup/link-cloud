@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
@@ -323,6 +324,47 @@ namespace LantanaGroup.Link.Report.Controllers
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.SearchPerformed, "Search"), ex,
                     "An exception occurred while attempting to search Report Schedule records");
 
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Status totals and reports created per UTC day. The facility set, when present, is a POST body.
+        /// </summary>
+        [HttpPost("counts")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ReportActivityCounts))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ReportActivityCounts>> Counts(
+            [FromBody] ReportActivityCountRequest? request,
+            CancellationToken cancellationToken)
+        {
+            request ??= new ReportActivityCountRequest();
+            if (!AggregateCountLimits.TryDays(request.Days, out var daysError))
+                return BadRequest(daysError);
+
+            if (request.FacilityIds is not null && request.ExcludeFacilityIds is not null)
+                return BadRequest("Provide facilityIds or excludeFacilityIds, not both.");
+
+            if (!AggregateCountLimits.TryFacilityIds(request.FacilityIds, out var include, out var includeError))
+                return BadRequest(includeError);
+            if (!AggregateCountLimits.TryFacilityIds(request.ExcludeFacilityIds, out var exclude, out var excludeError))
+                return BadRequest(excludeError);
+
+            try
+            {
+                var counts = await _reportScheduledManager.GetActivityCountsAsync(
+                    request.Days,
+                    DateTime.UtcNow,
+                    include,
+                    exclude,
+                    cancellationToken);
+                return Ok(counts);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.SearchPerformed, "Counts"), ex,
+                    "An exception occurred while counting report schedules");
                 throw;
             }
         }

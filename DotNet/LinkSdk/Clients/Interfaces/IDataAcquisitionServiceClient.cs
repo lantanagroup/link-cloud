@@ -82,6 +82,11 @@ public interface IDataAcquisitionServiceClient
         AcquisitionLogQuery query,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Day totals and the failed total: <c>POST /api/data/acquisition-logs/counts</c>.</summary>
+    Task<LinkApiResponse<AcquisitionActivityCounts>> GetActivityCountsAsync(
+        AcquisitionActivityCountRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<string>>> GetAcquisitionLogNotesAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(

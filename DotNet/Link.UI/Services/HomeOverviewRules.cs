@@ -1,4 +1,5 @@
 using System.Globalization;
+using LantanaGroup.Link.Shared.Application.Models;
 using Link.UI.Models;
 using Microsoft.AspNetCore.Http;
 
@@ -136,6 +137,69 @@ public static class HomeOverviewRules
         };
     }
 
+    /// <summary>
+    /// Facility tile from a count endpoint. The id set never enters the card.
+    /// </summary>
+    public static FacilityCard FacilitiesFromCounts(
+        bool reachable,
+        string? message,
+        int total,
+        int? matched,
+        bool ownershipReachable,
+        bool classify)
+    {
+        if (!reachable)
+        {
+            return new FacilityCard
+            {
+                Message = string.IsNullOrWhiteSpace(message)
+                    ? "Tenant service could not be reached."
+                    : message
+            };
+        }
+
+        int? automation = null;
+        int? regular = null;
+        string? note = null;
+        if (classify && ownershipReachable && matched is int owned)
+        {
+            automation = Math.Max(0, owned);
+            regular = Math.Max(0, total - automation.Value);
+        }
+        else if (classify && !ownershipReachable)
+        {
+            note = "Automation ownership could not be read.";
+        }
+
+        return new FacilityCard
+        {
+            Reachable = true,
+            Total = Math.Max(0, total),
+            Automation = automation,
+            Regular = regular,
+            Message = note
+        };
+    }
+
+    public static IReadOnlyList<IReadOnlyList<string>> FacilityIdBatches(IReadOnlyCollection<string> ids)
+    {
+        if (ids.Count == 0)
+            return [[]];
+
+        var list = ids as IReadOnlyList<string> ?? ids.ToList();
+        var batches = new List<IReadOnlyList<string>>();
+        for (var index = 0; index < list.Count; index += AggregateCountLimits.MaxFacilityIds)
+        {
+            var count = Math.Min(AggregateCountLimits.MaxFacilityIds, list.Count - index);
+            var batch = new string[count];
+            for (var offset = 0; offset < count; offset++)
+                batch[offset] = list[index + offset];
+            batches.Add(batch);
+        }
+
+        return batches;
+    }
+
     public static ReportCard Reports(
         bool reachable,
         string? message,
@@ -252,7 +316,11 @@ public static class HomeOverviewRules
         long total,
         IEnumerable<HomeLogLine>? rows,
         bool auditReachable,
-        string? auditMessage)
+        string? auditMessage,
+        bool acquisitionTrendReachable = true,
+        IReadOnlyList<TrendDay>? acquisitionTrend = null,
+        bool auditCounted = true,
+        long auditErrors = 0)
     {
         return new LogCard
         {
@@ -264,9 +332,15 @@ public static class HomeOverviewRules
                     : acquisitionMessage,
             Total = acquisitionReachable && total > 0 ? total : 0,
             Rows = acquisitionReachable ? (rows ?? []).Take(RowLimit).ToList() : [],
+            TrendReachable = acquisitionReachable && acquisitionTrendReachable,
+            Trend = acquisitionReachable && acquisitionTrendReachable
+                ? (acquisitionTrend ?? []).Take(TrendLength).ToList()
+                : [],
             AuditMessage = auditReachable
                 ? null
-                : string.IsNullOrWhiteSpace(auditMessage) ? "Audit could not be reached." : auditMessage
+                : string.IsNullOrWhiteSpace(auditMessage) ? "Audit could not be reached." : auditMessage,
+            AuditCounted = auditReachable && auditCounted,
+            AuditErrors = auditReachable && auditCounted ? Math.Max(0, auditErrors) : 0
         };
     }
 
@@ -488,6 +562,15 @@ public static class HomeOverviewRules
             {
                 Title = "Audit could not be read",
                 Detail = logs.AuditMessage,
+                Href = AuditHref
+            });
+        }
+        else if (logs.AuditCounted && logs.AuditErrors > 0)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = logs.AuditErrors.ToString(CultureInfo.InvariantCulture) + " audit errors in the last 24 hours",
+                Detail = "Notes in that window record a failure.",
                 Href = AuditHref
             });
         }
