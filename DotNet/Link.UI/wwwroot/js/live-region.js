@@ -175,6 +175,34 @@
         return chain;
     }
 
+    // Bootstrap appends its backdrop to document.body. A dialog left inside the
+    // scrolling shell paints under that backdrop, so dialogs live on the body.
+    function liftDialogs() {
+        document.querySelectorAll(".modal, .offcanvas").forEach(function (node) {
+            var id = node.id;
+            if (id) {
+                document.querySelectorAll("body > [data-lu-lifted]").forEach(function (old) {
+                    if (old !== node && old.id === id) old.remove();
+                });
+            }
+            if (node.parentElement !== document.body)
+                document.body.appendChild(node);
+            node.setAttribute("data-lu-lifted", "1");
+        });
+    }
+
+    function dropLiftedDialogs() {
+        document.querySelectorAll("body > [data-lu-lifted]").forEach(function (node) {
+            node.remove();
+        });
+        document.querySelectorAll(".modal-backdrop, .offcanvas-backdrop").forEach(function (node) {
+            node.remove();
+        });
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("overflow");
+        document.body.style.removeProperty("padding-right");
+    }
+
     function swapContent(doc, url, message, push) {
         var next = doc.querySelector(".lu-content");
         var current = document.querySelector(".lu-content");
@@ -182,6 +210,7 @@
             if (url) window.location.assign(url);
             return Promise.resolve();
         }
+        dropLiftedDialogs();
         var scroller = document.querySelector(".lu-main") || document.scrollingElement;
         var y = scroller ? scroller.scrollTop : window.scrollY;
         current.innerHTML = next.innerHTML;
@@ -190,6 +219,7 @@
         if (push && url && url !== window.location.href) history.pushState(null, "", url);
         if (message) showToast(message);
         return activateScripts(current).then(function () {
+            liftDialogs();
             scanRefresh();
             document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: "lu-content" } }));
         });
@@ -292,8 +322,12 @@
         document.querySelectorAll("[data-au-refresh]").forEach(watch);
     }
 
+    liftDialogs();
     scanRefresh();
-    document.addEventListener("au-refreshed", scanRefresh);
+    document.addEventListener("au-refreshed", function () {
+        liftDialogs();
+        scanRefresh();
+    });
 
     document.addEventListener("click", function (event) {
         var copy = event.target && event.target.closest ? event.target.closest("[data-lu-copy]") : null;

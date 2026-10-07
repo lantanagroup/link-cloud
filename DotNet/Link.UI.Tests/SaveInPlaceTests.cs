@@ -120,6 +120,13 @@ public class SaveInPlaceTests
         var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/live-region.js"));
         js.Should().Contain("new FormData(form, submitter)");
         js.Should().Contain("data-resubmit-open");
+        js.Should().Contain("function liftDialogs()");
+        js.Should().Contain("\".modal, .offcanvas\"");
+        js.Should().Contain("data-lu-lifted");
+        js.Should().Contain("function dropLiftedDialogs()");
+        var swap = js.IndexOf("function swapContent(", StringComparison.Ordinal);
+        swap.Should().BeGreaterThan(-1);
+        js.IndexOf("dropLiftedDialogs()", swap, StringComparison.Ordinal).Should().BeGreaterThan(swap);
     }
 
     [Fact]
@@ -169,6 +176,9 @@ public class SaveInPlaceTests
         plan.Should().NotContain("asp-route-planType=\"@planType\"");
 
         var facility = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Tenants/Facility.cshtml"));
+        facility.Should().Contain("class=\"text-muted small mt-3 mb-0 lu-facility-note\"");
+        facility.Should().Contain("each row has its own Delete");
+        facility.Should().Contain("A single setting shows + Add");
         facility.Should().Contain("id=\"dispatchCount\"");
         facility.Should().Contain("data-row-remove");
         facility.Should().Contain("id=\"notificationCount\"");
@@ -185,6 +195,9 @@ public class SaveInPlaceTests
 
         var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
         css.Should().Contain("#facilityPanels > .accordion-item > .accordion-header");
+        css.Should().Contain(".btn-success:disabled");
+        css.Should().Contain("background-color: var(--au-success)");
+        css.Should().Contain("#auToasts");
         css.Should().Contain(".btn-warning:hover");
     }
 
