@@ -146,4 +146,53 @@ public class ShellAccessGateTests
             .Should().Be(ShellAccessGate.Decision.Continue);
         message.Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("/api/runs")]
+    [InlineData("/api/runs/metrics")]
+    [InlineData("/api/runs/start")]
+    [InlineData("/api/api-health-runs/start-all")]
+    [InlineData("/api/api-health-runs/start-all-for-pipeline")]
+    [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/status")]
+    [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/results")]
+    public void Anonymous_off_closes_native_automation_apis_when_bearer_is_disabled(string path)
+    {
+        ShellAccessGate.IsClosedNativeApi(false, false, path).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("/api/runs/metrics")]
+    [InlineData("/api/api-health-runs/start-all-for-pipeline")]
+    public void Bearer_enabled_leaves_bearer_routes_to_the_auth_middleware(string path)
+    {
+        ShellAccessGate.IsClosedNativeApi(false, true, path).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("/api/api-health-runs/start-all")]
+    [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/status")]
+    [InlineData("/api/api-health-runs/22222222-2222-2222-2222-222222222222/results")]
+    public void Bearer_enabled_still_closes_routes_that_are_not_bearer_protected(string path)
+    {
+        ShellAccessGate.IsClosedNativeApi(false, true, path).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/api/login")]
+    [InlineData("/api/user")]
+    [InlineData("/Tenants")]
+    [InlineData("/hubs/runs")]
+    public void The_closure_does_not_apply_outside_the_native_automation_api(string path)
+    {
+        ShellAccessGate.IsClosedNativeApi(false, false, path).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Anonymous_on_leaves_the_native_automation_api_open()
+    {
+        ShellAccessGate.IsClosedNativeApi(true, false, "/api/runs/metrics").Should().BeFalse();
+        ShellAccessGate.IsClosedNativeApi(true, false, "/api/api-health-runs/start-all").Should().BeFalse();
+    }
 }
+
