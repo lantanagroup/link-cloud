@@ -92,7 +92,7 @@
                     {
                         <tr>
                             <td>
-                                <a asp-action="Facility" asp-route-id="@tenant.FacilityId"><code class="lu-facility-id">@tenant.FacilityId</code></a>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = tenant.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", new { id = tenant.FacilityId }) })" />
                                 <partial name="_AutomationBadge" model="tenant.AutomationRunId" />
                             </td>
                             <td>

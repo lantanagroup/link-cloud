@@ -38,7 +38,7 @@
     <div class="au-card card mt-3">
         <div class="card-header">This facility</div>
         <div class="card-body">
-            <p>These actions change every acquisition log for <code class="lu-facility-id">@search.FacilityId</code>, including logs outside this search.</p>
+            <p>These actions change every acquisition log for <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = search.FacilityId, CopyLabel = "Copy facility id" })" />, including logs outside this search.</p>
             <div class="d-flex flex-wrap gap-2">
                 <form method="post" data-au-save asp-action="DisableFacility" onsubmit="return confirm('Disable every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
@@ -139,21 +139,17 @@ else
                                             <input class="form-check-input" type="checkbox" name="ids" value="@row.Id" aria-label="Select log @row.Id" />
                                         }
                                     </td>
-                                    <td><a asp-action="AcquisitionDetail" asp-route-id="@row.Id">@row.Id</a>@(row.Deleted ? " (deleted)" : "")</td>
                                     <td>
-                                        <code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code>
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }) })" />
+                                        @(row.Deleted ? " (deleted)" : "")
+                                    </td>
+                                    <td>
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
                                         <partial name="_AutomationBadge" model="row.AutomationRunId" />
                                     </td>
-                                    <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.PatientId) ? "—" : row.PatientId)</code></td>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                                     <td>
-                                        @if (row.ReportLink)
-                                        {
-                                            <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@row.FacilityId" asp-route-reportId="@row.ReportId">@row.ReportId</a>
-                                        }
-                                        else
-                                        {
-                                            @(string.IsNullOrWhiteSpace(row.ReportId) ? "—" : row.ReportId)
-                                        }
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = row.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = row.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = row.FacilityId, reportId = row.ReportId }) : null })" />
                                     </td>
                                     <td>@row.Status</td>
                                     <td>@row.Phase</td>

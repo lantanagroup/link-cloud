@@ -30,9 +30,9 @@ else
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Id</dt>
-                <dd class="col-sm-9"><code>@Model.Id</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = Model.Id.ToString(), Compact = true, CopyLabel = "Copy log id" })" /></dd>
                 <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></dd>
                 <dt class="col-sm-3">Type</dt>
                 <dd class="col-sm-9">@Model.AcquisitionType</dd>
                 <dt class="col-sm-3">Subtype</dt>

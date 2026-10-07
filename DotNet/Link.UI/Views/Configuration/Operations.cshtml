@@ -188,7 +188,7 @@ else
                                     }
                                     else
                                     {
-                                        <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@row.FacilityId"><code class="lu-facility-id">@row.FacilityId</code></a>
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Facility", "Tenants", new { id = row.FacilityId }) })" />
                                     }
                                 </td>
                                 <td class="text-break">@(string.IsNullOrWhiteSpace(row.Resources) ? "—" : row.Resources)</td>
@@ -196,15 +196,15 @@ else
                                 <td>
                                     @if (string.IsNullOrWhiteSpace(row.FacilityId))
                                     {
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <a class="btn btn-au-neutral btn-sm" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor">Edit</a>
+                                        <div class="lu-row-actions">
+                                            <a class="btn btn-au-neutral btn-sm lu-icon-btn" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                                             <form method="post" data-au-save asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
                                                 @if (row.VendorVersionIds.Count > 0)
                                                 {
                                                     <input type="hidden" name="vendorVersionId" value="@row.VendorVersionIds[0]" />
                                                 }
-                                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                                <button type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </form>
                                         </div>
                                     }

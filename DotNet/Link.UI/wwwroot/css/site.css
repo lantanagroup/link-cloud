@@ -2124,13 +2124,80 @@ html:has(body.lu-body) {
   max-width: 16rem;
 }
 .lu-copy {
-  border: 0;
-  background: transparent;
-  color: var(--au-text);
-  font-size: .75rem;
-  text-decoration: underline;
-  padding: 0 .2rem;
-  vertical-align: bottom;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.lu-id-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.5rem;
+  align-items: flex-start;
+}
+.lu-labeled-id {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .15rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.lu-labeled-id-compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem;
+}
+.lu-id-label {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--au-muted);
+}
+.lu-id-name {
+  font-weight: 600;
+}
+.lu-id-value {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.lu-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+.lu-row-actions form,
+.lu-row-actions .lu-row-action {
+  display: inline-flex;
+  margin: 0;
+}
+.lu-icon-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+@media (max-width: 575.98px) {
+  .lu-row-actions {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
 }
 #resubmitDialog .modal-footer {
   flex-wrap: wrap;

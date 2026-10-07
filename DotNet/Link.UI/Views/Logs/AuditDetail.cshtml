@@ -22,11 +22,11 @@ else
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Id</dt>
-                <dd class="col-sm-9"><code>@Model.Id</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Audit event", Value = Model.Id, Compact = true, CopyLabel = "Copy audit id" })" /></dd>
                 <dt class="col-sm-3">When</dt>
                 <dd class="col-sm-9">@Model.When</dd>
                 <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></dd>
                 <dt class="col-sm-3">Service</dt>
                 <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Service) ? "—" : Model.Service)</dd>
                 <dt class="col-sm-3">Action</dt>
