@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddLinkSdk(this IServiceCollection services)
     {
         services.AddSingleton<IAdminBffIntegrationClient, AdminBffIntegrationClient>();
+        services.AddSingleton<IAccountServiceClient, AccountServiceClient>();
         services.AddSingleton<IFacilityServiceClient, FacilityServiceClient>();
         services.AddSingleton<ICensusServiceClient, CensusServiceClient>();
         services.AddSingleton<IDataAcquisitionServiceClient, DataAcquisitionServiceClient>();

@@ -1,0 +1,104 @@
+@model UserEditPage
+
+<div class="mb-3">
+    <a asp-action="Users"><i class="bi bi-arrow-left me-1"></i>Accounts</a>
+</div>
+<h1 class="h3">Account</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+@if (Model.Found)
+{
+    <div class="au-card card mb-3">
+        <div class="card-header">@Model.Form.Username</div>
+        <div class="card-body">
+            @if (Model.IsDeleted)
+            {
+                <p>This account is deleted. Restore is not on this page.</p>
+                <dl class="row mb-0">
+                    <dt class="col-12 col-md-3">Username</dt>
+                    <dd class="col-12 col-md-9">@Model.Form.Username</dd>
+                    <dt class="col-12 col-md-3">Name</dt>
+                    <dd class="col-12 col-md-9">@Model.Form.FirstName @Model.Form.MiddleName @Model.Form.LastName</dd>
+                    <dt class="col-12 col-md-3">Email</dt>
+                    <dd class="col-12 col-md-9">@Model.Form.Email</dd>
+                    <dt class="col-12 col-md-3">Roles</dt>
+                    <dd class="col-12 col-md-9">@string.Join(", ", Model.Form.Roles ?? [])</dd>
+                </dl>
+            }
+            else
+            {
+                var selected = new HashSet<string>(Model.Form.Roles ?? [], StringComparer.OrdinalIgnoreCase);
+                var roleIndex = 0;
+                if (!Model.IsActive)
+                {
+                    <p class="text-muted">This account is deactivated.</p>
+                }
+                <form method="post" asp-action="UpdateUser" asp-route-id="@Model.Id" class="row g-2">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="username">Username</label>
+                        <input id="username" name="username" value="@Model.Form.Username" class="form-control" maxlength="255" autocomplete="off" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="firstName">First name</label>
+                        <input id="firstName" name="firstName" value="@Model.Form.FirstName" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="middleName">Middle name</label>
+                        <input id="middleName" name="middleName" value="@Model.Form.MiddleName" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="lastName">Last name</label>
+                        <input id="lastName" name="lastName" value="@Model.Form.LastName" class="form-control" maxlength="255" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="email">Email</label>
+                        <input id="email" name="email" value="@Model.Form.Email" class="form-control" maxlength="255" autocomplete="off" />
+                    </div>
+                    <div class="col-12">
+                        <fieldset>
+                            <legend class="form-label">Roles</legend>
+                            @if (Model.KnownRoles.Count == 0)
+                            {
+                                <p class="text-muted mb-0">No roles are available.</p>
+                            }
+                            else
+                            {
+                                foreach (var role in Model.KnownRoles)
+                                {
+                                    var inputId = "role-" + roleIndex++;
+                                    <div class="form-check">
+                                        @if (selected.Contains(role))
+                                        {
+                                            <input class="form-check-input" type="checkbox" id="@inputId" name="roles" value="@role" checked />
+                                        }
+                                        else
+                                        {
+                                            <input class="form-check-input" type="checkbox" id="@inputId" name="roles" value="@role" />
+                                        }
+                                        <label class="form-check-label" for="@inputId">@role</label>
+                                    </div>
+                                }
+                            }
+                        </fieldset>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-au-action">Save account</button>
+                    </div>
+                </form>
+                <p class="text-muted small mt-2 mb-0">Saving keeps the account's existing claims. Claim assignment is not on this page.</p>
+            }
+        </div>
+    </div>
+    @if (!Model.IsDeleted)
+    {
+        <form method="post" asp-action="DeleteUser" asp-route-id="@Model.Id" onsubmit="return confirm('Delete this account?');">
+            <button type="submit" class="btn btn-outline-danger">Delete account</button>
+        </form>
+    }
+}

@@ -1,0 +1,46 @@
+@model AppConfigurationPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+</div>
+<h1 class="h3">App configuration</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p>These are the service addresses this process will call. Azure App Configuration is not edited here. The Admin app configuration screen has no editor, and this page does not write catalog values.</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.Missing))
+{
+    <div class="alert alert-warning">@Model.Missing</div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Addresses in use</div>
+    <div class="card-body">
+        @if (Model.Addresses.Count == 0)
+        {
+            <p class="mb-0">No service addresses are set.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Service</th>
+                            <th scope="col">Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Addresses)
+                    {
+                        <tr>
+                            <td>@row.Label</td>
+                            <td>@row.Url</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,171 @@
+@model UserListPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    Dictionary<string, string> Route(int page)
+    {
+        var route = new Dictionary<string, string>
+        {
+            ["page"] = page.ToString(),
+            ["pageSize"] = query.PageSize.ToString()
+        };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(query.Role)) route["role"] = query.Role;
+        if (!string.IsNullOrWhiteSpace(query.Claim)) route["claim"] = query.Claim;
+        if (query.IncludeDeactivated) route["includeDeactivated"] = "true";
+        if (query.IncludeDeleted) route["includeDeleted"] = "true";
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+</div>
+<h1 class="h3">Accounts</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Deleted accounts can be listed. Restore is not on this page.</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="searchText">Search</label>
+                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="role">Role</label>
+                <input id="role" name="role" value="@query.Role" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-2">
+                <label class="form-label" for="claim">Claim</label>
+                <input id="claim" name="claim" value="@query.Claim" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-1">
+                <label class="form-label" for="pageSize">Page size</label>
+                <input id="pageSize" name="pageSize" value="@query.PageSize" class="form-control" inputmode="numeric" />
+            </div>
+            <div class="col-12 col-md-1">
+                <button type="submit" class="btn btn-au-action">Search</button>
+            </div>
+            <div class="col-12">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="includeDeactivated" name="includeDeactivated" value="true" @(query.IncludeDeactivated ? "checked" : null) />
+                    <label class="form-check-label" for="includeDeactivated">Include deactivated</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
+                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">New account</div>
+    <div class="card-body">
+        <form method="post" asp-action="CreateUser" class="row g-2">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="username">Username</label>
+                <input id="username" name="username" class="form-control" maxlength="255" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="firstName">First name</label>
+                <input id="firstName" name="firstName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="lastName">Last name</label>
+                <input id="lastName" name="lastName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="email">Email</label>
+                <input id="email" name="email" class="form-control" maxlength="255" autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="middleName">Middle name</label>
+                <input id="middleName" name="middleName" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-au-action">Create account</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Roles are assigned from the account page after the account exists.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Accounts</div>
+    <div class="card-body">
+        @if (Model.Users.Count == 0)
+        {
+            <p class="mb-0">No accounts found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-2 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Username</th>
+                            <th scope="col">Name</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Roles</th>
+                            <th scope="col">Status</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var user in Model.Users)
+                    {
+                        <tr>
+                            <td>@user.Username</td>
+                            <td>@user.FirstName @user.LastName</td>
+                            <td>@user.Email</td>
+                            <td>@string.Join(", ", user.Roles)</td>
+                            <td>
+                                @if (user.IsDeleted)
+                                {
+                                    <span class="badge text-bg-secondary">Deleted</span>
+                                }
+                                else if (!user.IsActive)
+                                {
+                                    <span class="badge text-bg-warning">Deactivated</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-success">Active</span>
+                                }
+                            </td>
+                            <td><a asp-action="Account" asp-route-id="@user.Id">Open</a></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <nav aria-label="Accounts pages">
+                @if (bar.HasPrevious)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
+                }
+                @if (bar.HasNext)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
+                }
+                <span class="text-muted small ms-2">@bar.TotalCount accounts</span>
+            </nav>
+        }
+    </div>
+</div>

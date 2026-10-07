@@ -1,0 +1,133 @@
+@model HealthPage
+@using Link.UI.Services
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+</div>
+<h1 class="h3">Service health</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Admin.BFF collects each service health report. Leave the service blank to load every report.</p>
+
+@if (!string.IsNullOrWhiteSpace(Model.HealthError))
+{
+    <div class="alert alert-warning">@Model.HealthError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.InfoError))
+{
+    <div class="alert alert-warning">@Model.InfoError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Check one service</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="service">Service</label>
+                <input id="service" name="service" value="@Model.Service" class="form-control" maxlength="64" placeholder="account" />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">Check</button>
+            </div>
+            <div class="col-12 col-md-3">
+                <a class="btn btn-outline-secondary" asp-action="Health">All services</a>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">@string.Join(", ", SystemRules.HealthServices)</p>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Health</div>
+    <div class="card-body">
+        @if (Model.Reports.Count == 0)
+        {
+            <p class="mb-0">No health reports.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Service</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Duration</th>
+                            <th scope="col">Checks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var report in Model.Reports)
+                    {
+                        <tr>
+                            <td>@report.Service</td>
+                            <td>@report.Status</td>
+                            <td>@report.Duration</td>
+                            <td>
+                                @if (report.Entries.Count == 0)
+                                {
+                                    <span class="text-muted">None</span>
+                                }
+                                else
+                                {
+                                    <ul class="mb-0">
+                                        @foreach (var entry in report.Entries)
+                                        {
+                                            <li>@entry.Name: @entry.Status @entry.Duration @entry.Description</li>
+                                        }
+                                    </ul>
+                                    @if (report.HiddenEntries > 0)
+                                    {
+                                        <span class="text-muted small">@report.HiddenEntries more</span>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (string.IsNullOrWhiteSpace(Model.Service))
+{
+    <div class="au-card card">
+        <div class="card-header">Versions</div>
+        <div class="card-body">
+            @if (Model.Services.Count == 0)
+            {
+                <p class="mb-0">No service information.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Service</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">Product</th>
+                                <th scope="col">Commit</th>
+                                <th scope="col">Build</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var info in Model.Services)
+                        {
+                            <tr>
+                                <td>@info.ServiceName</td>
+                                <td>@info.Version</td>
+                                <td>@info.ProductVersion</td>
+                                <td>@info.Commit</td>
+                                <td>@info.Build</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
