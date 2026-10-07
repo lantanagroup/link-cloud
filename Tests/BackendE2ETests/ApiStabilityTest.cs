@@ -58,7 +58,7 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
         http.DefaultRequestHeaders.Remove("RequestVerificationToken");
         http.DefaultRequestHeaders.Add("RequestVerificationToken", requestVerificationToken);
 
-        Output.WriteLine($"Starting API Health run-all via Automation.UI at {TestConfig.AutomationUiBase}");
+        Output.WriteLine($"Starting API Health run-all via Link.UI at {TestConfig.AutomationUiBase}");
 
         // The ApiHealthScenario seed sometimes finishes with ServiceRequest or Observation
         // missing from ABS even when this test runs before the other categories. Retry only
