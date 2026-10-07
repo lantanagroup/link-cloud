@@ -29,6 +29,17 @@ public sealed class TenantsController : Controller
                 includeDeleted: false,
                 cancellationToken: cancellationToken);
 
+            // Tenant returns 204 when the facility list is empty.
+            if (response.StatusCode == StatusCodes.Status204NoContent
+                || (response.IsSuccessStatusCode && response.Body is { Count: 0 }))
+            {
+                return View(new TenantListViewModel
+                {
+                    Search = search,
+                    LoadedSuccessfully = true
+                });
+            }
+
             if (!response.IsSuccessStatusCode || response.Body is null)
             {
                 _logger.LogWarning(
@@ -37,11 +48,15 @@ public sealed class TenantsController : Controller
                     response.RequestUrl,
                     response.TraceId);
 
+                var detail = response.StatusCode == 0
+                    ? "Tenant service could not be reached."
+                    : $"Tenant service returned HTTP {response.StatusCode}.";
+
                 return View(new TenantListViewModel
                 {
                     Search = search,
                     LoadedSuccessfully = false,
-                    ErrorMessage = $"Unable to load tenants from Tenant service (HTTP {response.StatusCode}). " +
+                    ErrorMessage = $"Unable to load tenants. {detail} " +
                                    "Confirm ServiceRegistry:TenantService:TenantServiceUrl and Link token settings."
                 });
             }
@@ -62,6 +77,10 @@ public sealed class TenantsController : Controller
                 Tenants = tenants,
                 LoadedSuccessfully = true
             });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

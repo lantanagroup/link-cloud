@@ -57,7 +57,7 @@ public sealed class AdminBffUserService : IAdminBffUserService
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
                 || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
-                return new AdminBffUser { IsAuthenticated = false };
+                return Cache(httpContext, new AdminBffUser { IsAuthenticated = false });
             }
 
             if (!response.IsSuccessStatusCode)
@@ -68,8 +68,8 @@ public sealed class AdminBffUserService : IAdminBffUserService
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             var dto = await JsonSerializer.DeserializeAsync<AdminBffUserDto>(stream, JsonOptions, cancellationToken);
-            if (dto is null)
-                return new AdminBffUser { IsAuthenticated = false };
+            if (dto is null || !HasIdentity(dto))
+                return Cache(httpContext, new AdminBffUser { IsAuthenticated = false });
 
             var display = string.Join(' ', new[] { dto.FirstName, dto.LastName }
                 .Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -82,17 +82,35 @@ public sealed class AdminBffUserService : IAdminBffUserService
                 Roles = dto.Roles ?? Array.Empty<string>()
             };
 
-            if (httpContext is not null)
-                httpContext.Items[HttpContextItemKey] = user;
-
-            return user;
+            return Cache(httpContext, user);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
+            if (cancellationToken.IsCancellationRequested)
+                throw;
+
             _logger.LogDebug(ex, "Unable to resolve Admin.BFF user session");
             return null;
         }
     }
+
+    private static AdminBffUser Cache(HttpContext? httpContext, AdminBffUser user)
+    {
+        if (httpContext is not null)
+            httpContext.Items[HttpContextItemKey] = user;
+        return user;
+    }
+
+    /// <summary>
+    /// Development Admin.BFF with anonymous access returns 200 and an empty user.
+    /// That payload is not a signed-in principal.
+    /// </summary>
+    private static bool HasIdentity(AdminBffUserDto dto) =>
+        !string.IsNullOrWhiteSpace(dto.Email)
+        || !string.IsNullOrWhiteSpace(dto.FirstName)
+        || !string.IsNullOrWhiteSpace(dto.LastName)
+        || dto.Roles is { Length: > 0 }
+        || dto.Permissions is { Length: > 0 };
 
     private sealed class AdminBffUserDto
     {
@@ -101,5 +119,8 @@ public sealed class AdminBffUserService : IAdminBffUserService
         public string? Email { get; set; }
         [JsonPropertyName("roles")]
         public string[]? Roles { get; set; }
+
+        [JsonPropertyName("permissions")]
+        public string[]? Permissions { get; set; }
     }
 }

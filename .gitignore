@@ -5,6 +5,7 @@
 
 secrets.json
 .runsettings
+.playwright-mcp/
 
 # User-specific files
 *.rsuser

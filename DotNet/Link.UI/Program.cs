@@ -6,9 +6,11 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using Link.UI.Hubs;
+using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,20 +46,16 @@ var requireBffSession = builder.Configuration.GetValue<bool>("Authentication:Req
 builder.Services.AddLinkSdk();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((sp, client) =>
+
+// Browser proxy and the server-side user chip must share one Admin.BFF origin.
+// ServiceRegistry:AdminBffServiceUrl is that origin (LinkSDK / Automation.UI convention).
+var adminBffAddress = ResolveAdminBffAddress(builder.Configuration);
+
+builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((_, client) =>
 {
-    var registry = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServiceRegistry>>().Value;
-    var baseUrl = registry.AdminBffServiceUrl?.TrimEnd('/') ?? "http://localhost:8063";
-    client.BaseAddress = new Uri(baseUrl + "/");
+    client.BaseAddress = new Uri(adminBffAddress);
     client.Timeout = TimeSpan.FromSeconds(15);
 });
-
-var adminBffAddress = builder.Configuration["ReverseProxy:Clusters:admin-bff:Destinations:primary:Address"]
-    ?? builder.Configuration["ServiceRegistry:AdminBffServiceUrl"]
-    ?? "http://localhost:8063/";
-
-if (!adminBffAddress.EndsWith('/'))
-    adminBffAddress += "/";
 
 builder.Services.AddReverseProxy()
     .LoadFromMemory(
@@ -80,7 +78,26 @@ builder.Services.AddReverseProxy()
                     ["primary"] = new DestinationConfig { Address = adminBffAddress }
                 }
             }
+        })
+    .AddTransforms(transformBuilder =>
+    {
+        // Admin.BFF login builds its post-auth RedirectUri from Referer by stripping the
+        // last path segment and appending "/dashboard". A page such as /Placeholder/Reports
+        // would otherwise land on /Placeholder/dashboard. Force the origin root so the
+        // redirect is always {origin}/dashboard, which this host maps to Home.
+        transformBuilder.AddRequestTransform(transformContext =>
+        {
+            var request = transformContext.HttpContext.Request;
+            if (!request.Path.StartsWithSegments("/api/login"))
+                return default;
+
+            if (!request.Host.HasValue)
+                return default;
+
+            transformContext.ProxyRequest.Headers.Referrer = new Uri($"{request.Scheme}://{request.Host}/");
+            return default;
         });
+    });
 
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -130,56 +147,56 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 
-if (!allowAnonymousAccess)
+if (requireBffSession)
+{
+    app.Logger.LogInformation(
+        "Authentication:RequireBffSession is true. Pages without an Admin.BFF session redirect to /api/login.");
+}
+else if (!allowAnonymousAccess)
 {
     app.Logger.LogWarning(
-        "Authentication:EnableAnonymousAccess is false. Non-health, non-api requests require an upstream authenticating proxy or Admin.BFF session.");
-
-    app.Use(async (context, next) =>
-    {
-        if (context.Request.Path.StartsWithSegments("/health")
-            || context.Request.Path.StartsWithSegments("/api"))
-        {
-            await next();
-            return;
-        }
-
-        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-        context.Response.ContentType = "text/plain; charset=utf-8";
-        await context.Response.WriteAsync(
-            "Link UI is not configured to serve requests anonymously in this environment. " +
-            "Set Authentication:EnableAnonymousAccess to true when deploying behind an authenticating proxy, " +
-            "or enable Authentication:RequireBffSession with Admin.BFF available.");
-    });
+        "Authentication:EnableAnonymousAccess is false. Non-health, non-api requests will be rejected with 503. " +
+        "Set Authentication:RequireBffSession to true to require an Admin.BFF session instead.");
+}
+else
+{
+    app.Logger.LogInformation(
+        "Authentication:EnableAnonymousAccess is true. The shell is browsable without an Admin.BFF session.");
 }
 
-if (requireBffSession && allowAnonymousAccess)
+app.Use(async (context, next) =>
 {
-    app.Use(async (context, next) =>
+    AdminBffUser? user = null;
+    if (requireBffSession && !ShellAccessGate.IsSessionPublic(context.Request.Path))
     {
-        if (context.Request.Path.StartsWithSegments("/health")
-            || context.Request.Path.StartsWithSegments("/api")
-            || context.Request.Path.StartsWithSegments("/Auth")
-            || context.Request.Path.StartsWithSegments("/swagger")
-            || context.Request.Path.StartsWithSegments("/hubs")
-            || Path.HasExtension(context.Request.Path.Value))
-        {
+        var userService = context.RequestServices.GetRequiredService<IAdminBffUserService>();
+        user = await userService.GetCurrentUserAsync(context.RequestAborted);
+    }
+
+    var decision = ShellAccessGate.Evaluate(
+        allowAnonymousAccess,
+        requireBffSession,
+        context.Request.Path,
+        user,
+        out var message);
+
+    switch (decision)
+    {
+        case ShellAccessGate.Decision.Continue:
+            if (user is { IsAuthenticated: true })
+                context.Items[AdminBffUserService.HttpContextItemKey] = user;
             await next();
             return;
-        }
-
-        var userService = context.RequestServices.GetRequiredService<IAdminBffUserService>();
-        var user = await userService.GetCurrentUserAsync(context.RequestAborted);
-        if (user is null || !user.IsAuthenticated)
-        {
+        case ShellAccessGate.Decision.RedirectToLogin:
             context.Response.Redirect("/api/login");
             return;
-        }
-
-        context.Items[AdminBffUserService.HttpContextItemKey] = user;
-        await next();
-    });
-}
+        default:
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "text/plain; charset=utf-8";
+            await context.Response.WriteAsync(message ?? ShellAccessGate.AnonymousBlockedMessage, context.RequestAborted);
+            return;
+    }
+});
 
 if (!app.Environment.IsDevelopment())
 {
@@ -206,3 +223,12 @@ app.MapHealthChecks("/health");
 app.MapReverseProxy();
 
 app.Run();
+
+static string ResolveAdminBffAddress(IConfiguration configuration)
+{
+    var address = configuration["ServiceRegistry:AdminBffServiceUrl"];
+    if (string.IsNullOrWhiteSpace(address))
+        address = "http://localhost:8063";
+
+    return address.TrimEnd('/') + "/";
+}

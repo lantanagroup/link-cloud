@@ -9,7 +9,7 @@
         Ctrl("Placeholder") && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
 
     var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
-        ?? await UserService.GetCurrentUserAsync();
+        ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
 }
 <!DOCTYPE html>
 <html lang="en">
