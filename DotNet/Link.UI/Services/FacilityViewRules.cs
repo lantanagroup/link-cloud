@@ -176,15 +176,7 @@ public static class FacilityViewRules
         _ => status.ToString()
     };
 
-    public static string StatusBadge(ScheduleStatus status) => status switch
-    {
-        ScheduleStatus.New => "au-badge-active",
-        ScheduleStatus.Scheduled => "au-badge-active",
-        ScheduleStatus.EndOfPeriod => "au-badge-warning",
-        ScheduleStatus.Submitted => "au-badge-success",
-        ScheduleStatus.CompletedNotSubmitted => "au-badge-muted",
-        _ => "au-badge-muted"
-    };
+    public static string StatusBadge(ScheduleStatus status) => StatusPills.ForSchedule(status);
 
     public static bool CanResubmit(ScheduleStatus status, bool deleted) =>
         !deleted && status is ScheduleStatus.Submitted or ScheduleStatus.CompletedNotSubmitted;

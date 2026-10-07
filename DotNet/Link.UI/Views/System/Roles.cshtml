@@ -1,7 +1,7 @@
 @model RoleListPage
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
 </div>
 <h1 class="h3">Roles</h1>
 <partial name="_Nav" />
@@ -27,7 +27,7 @@
             </div>
             <div class="col-12 col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
@@ -73,12 +73,12 @@
                             <td>
                                 <form id="@formId" method="post" data-au-save asp-action="SaveRole">
                                     <input type="hidden" name="id" value="@role.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                    <button type="submit" class="btn btn-sm btn-au-neutral">Save</button>
                                 </form>
                             </td>
                             <td>
                                 <form method="post" data-au-save asp-action="DeleteRole" asp-route-id="@role.Id" onsubmit="return confirm('Delete this role?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                 </form>
                             </td>
                         </tr>
@@ -127,7 +127,7 @@
                             </div>
                         }
                     </fieldset>
-                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-2">Save claims</button>
+                    <button type="submit" class="btn btn-sm btn-au-neutral mt-2">Save claims</button>
                 </form>
             }
             <p class="text-muted small mb-0">Clear every box and save to remove that role's claims.</p>

@@ -91,7 +91,7 @@ public class SaveInPlaceTests
 
         var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
         css.Should().Contain(".badge.text-bg-light");
-        css.Should().Contain(".lu-admin .btn-outline-danger");
+        css.Should().Contain(".btn-au-neutral");
 
         var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
         layout.Should().Contain("lu-admin");

@@ -21,7 +21,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
 </div>
 <h1 class="h3">Accounts</h1>
 <partial name="_Nav" />
@@ -58,7 +58,7 @@
                 <input id="pageSize" name="pageSize" value="@query.PageSize" class="form-control" inputmode="numeric" />
             </div>
             <div class="col-12 col-md-1">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
             </div>
             <div class="col-12">
                 <div class="form-check form-check-inline">
@@ -100,7 +100,7 @@
             </div>
             <div class="col-12 col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Roles are assigned from the account page after the account exists.</p>
@@ -162,7 +162,7 @@
                                 @if (user.IsDeleted)
                                 {
                                     <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">Restore</button>
+                                        <button type="submit" class="btn btn-sm btn-au-neutral ms-2">Restore</button>
                                     </form>
                                 }
                             </td>
@@ -174,11 +174,11 @@
             <nav aria-label="Accounts pages">
                 @if (bar.HasPrevious)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
+                    <a class="btn btn-sm btn-au-neutral" asp-action="Users" asp-all-route-data="Route(bar.Page - 1)">Previous</a>
                 }
                 @if (bar.HasNext)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
+                    <a class="btn btn-sm btn-au-neutral" asp-action="Users" asp-all-route-data="Route(bar.Page + 1)">Next</a>
                 }
                 <span class="text-muted small ms-2">@bar.TotalCount accounts</span>
             </nav>

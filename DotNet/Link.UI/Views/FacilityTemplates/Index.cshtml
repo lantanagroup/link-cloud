@@ -68,11 +68,11 @@
                             }
                         </td>
                         <td class="text-nowrap">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-facility-clone" data-id="@t.Id">Clone</button>
+                            <button type="button" class="btn btn-sm btn-au-neutral btn-facility-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">@(t.IsSystem ? "View" : "Edit")</button>
+                            <button type="button" class="btn btn-sm btn-au-neutral btn-facility-clone" data-id="@t.Id">Clone</button>
                             @if (!t.IsSystem)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-danger btn-facility-delete" data-id="@t.Id">Delete</button>
+                                <button type="button" class="btn btn-sm btn-danger btn-facility-delete" data-id="@t.Id">Delete</button>
                             }
                         </td>
                     </tr>
@@ -159,7 +159,7 @@
         </div>
     </div>
     <div class="card-footer text-end">
-        <button type="button" class="btn btn-outline-secondary" id="facilityCancel">Cancel</button>
+        <button type="button" class="btn btn-au-neutral" id="facilityCancel">Cancel</button>
         <button type="button" class="btn btn-success" id="facilitySave">Save</button>
     </div>
 </div>

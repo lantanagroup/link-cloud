@@ -344,21 +344,9 @@ public static class HomeOverviewRules
         };
     }
 
-    public static string RunBadge(string? status)
-    {
-        if (status == "Succeeded")
-            return "au-badge-success";
-        if (status == "Failed")
-            return "au-badge-danger";
-        if (status == "Cancelled")
-            return "au-badge-warning";
-        if (AutomationRules.IsInProgress(status))
-            return "au-badge-active";
-        return "au-badge-muted";
-    }
+    public static string RunBadge(string? status) => StatusPills.ForRun(status);
 
-    public static string LogBadge(string? status) =>
-        status is "Failed" or "MaxRetriesReached" ? "au-badge-danger" : "au-badge-muted";
+    public static string LogBadge(string? status) => StatusPills.ForLog(status);
 
     public static string When(DateTimeOffset value) =>
         value == default ? "" : LinkUiTime.Display(value);

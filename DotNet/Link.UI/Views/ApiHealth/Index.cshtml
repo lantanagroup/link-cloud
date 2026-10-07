@@ -53,7 +53,7 @@
                 <span id="seedRunStatus" class="badge bg-secondary ms-2">Starting</span>
                 <div class="small text-muted" id="seedRunMeta"></div>
             </div>
-            <a id="seedRunLink" class="btn btn-sm btn-outline-secondary" target="_blank" style="display:none;">
+            <a id="seedRunLink" class="btn btn-sm btn-au-neutral" target="_blank" style="display:none;">
                 <i class="bi bi-box-arrow-up-right me-1"></i>Open Run
             </a>
         </div>
@@ -90,7 +90,7 @@
                         <strong>@service.ServiceName</strong>
                         <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@serviceBadgeText</span>
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-dark btn-run-service me-2" data-service="@service.ServiceName">
+                    <button type="button" class="btn btn-sm btn-au-neutral btn-run-service me-2" data-service="@service.ServiceName">
                         <i class="bi bi-play-fill"></i>
                     </button>
                 </div>
@@ -179,7 +179,7 @@
                                     <td>
                                         @if (!ep.Definition.IsInformational)
                                         {
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-history" data-key="@key" title="History">
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-history" data-key="@key" title="History">
                                                 <i class="bi bi-clock-history"></i>
                                             </button>
                                         }

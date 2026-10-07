@@ -9,7 +9,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
 </div>
 <h1 class="h3">Acquisition log</h1>
 <partial name="_Nav" />
@@ -153,8 +153,8 @@
                 <partial name="_AutomationScope" model="query.Scope" />
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
-                <a class="btn btn-outline-secondary" asp-action="Acquisition">Clear</a>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
+                <a class="btn btn-au-neutral" asp-action="Acquisition">Clear</a>
             </div>
         </form>
     </div>

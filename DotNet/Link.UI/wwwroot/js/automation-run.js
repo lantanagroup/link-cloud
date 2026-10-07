@@ -107,7 +107,7 @@
             if (run.facilityId) {
                 var acquisition = document.createElement("button");
                 acquisition.type = "button";
-                acquisition.className = "btn btn-sm btn-outline-secondary";
+                acquisition.className = "btn btn-sm btn-au-neutral";
                 acquisition.setAttribute("data-bs-toggle", "modal");
                 acquisition.setAttribute("data-bs-target", "#dataAcqLogModal");
                 acquisition.textContent = "Data acquisition logs";

@@ -113,7 +113,7 @@
             time.setAttribute("data-created-at", run.createdAt || "");
             row.append(badge, time);
             var details = document.createElement("a");
-            details.className = "btn btn-sm btn-outline-secondary mt-2 w-100";
+            details.className = "btn btn-sm btn-au-neutral mt-2 w-100";
             details.href = "/Automation/Runs/" + run.runId;
             details.textContent = "View Details";
             card.append(title, meta, row, details);

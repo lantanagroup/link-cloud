@@ -22,7 +22,7 @@
 }
 
 <div class="mb-3">
-    <a asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
+    <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
 </div>
 
 <h1 class="h3">Acquisition log</h1>
@@ -66,8 +66,8 @@ else
                     </select>
                 </div>
                 <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-outline-secondary">Search</button>
-                    <a class="btn btn-outline-secondary" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
+                    <button type="submit" class="btn btn-au-neutral">Search</button>
+                    <a class="btn btn-au-neutral" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
                 </div>
             </form>
 
@@ -117,20 +117,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Log pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }
