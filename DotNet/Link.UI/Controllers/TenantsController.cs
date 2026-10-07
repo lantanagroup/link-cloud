@@ -14,28 +14,34 @@ public sealed class TenantsController : Controller
     private readonly IFacilityServiceClient _facilityServiceClient;
     private readonly FacilityHubService _hub;
     private readonly FacilityViewService _view;
+    private readonly AutomationOwnershipLookup _ownership;
     private readonly ILogger<TenantsController> _logger;
 
     public TenantsController(
         IFacilityServiceClient facilityServiceClient,
         FacilityHubService hub,
         FacilityViewService view,
+        AutomationOwnershipLookup ownership,
         ILogger<TenantsController> logger)
     {
         _facilityServiceClient = facilityServiceClient;
         _hub = hub;
         _view = view;
+        _ownership = ownership;
         _logger = logger;
     }
 
     public async Task<IActionResult> Index(
         string? search,
         bool includeDeleted,
+        string? scope,
         int page = 1,
         int pageSize = 0,
         CancellationToken cancellationToken = default)
     {
         ViewData["Title"] = "Tenants";
+        var normalized = AutomationMarkRules.NormalizeScope(scope);
+        var ownership = await _ownership.GetAsync(cancellationToken);
 
         try
         {
@@ -50,7 +56,7 @@ public sealed class TenantsController : Controller
                     activeResponse.StatusCode,
                     activeResponse.RequestUrl,
                     activeResponse.TraceId);
-                return View(FacilityListError(search, includeDeleted, activeResponse.StatusCode));
+                return View(FacilityListError(search, includeDeleted, normalized, activeResponse.StatusCode));
             }
 
             string? deletedNote = null;
@@ -79,9 +85,11 @@ public sealed class TenantsController : Controller
                 {
                     FacilityId = kvp.Key,
                     DisplayName = string.IsNullOrWhiteSpace(kvp.Value) ? kvp.Key : kvp.Value,
-                    IsDeleted = !activeKeys.Contains(kvp.Key)
+                    IsDeleted = !activeKeys.Contains(kvp.Key),
+                    AutomationRunId = ownership.RunIdFor(kvp.Key)
                 })
                 .Where(item => includeDeleted || !item.IsDeleted)
+                .Where(item => !AutomationMarkRules.IsAutomation(normalized) || item.AutomationRunId is not null)
                 .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(item => item.FacilityId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -90,6 +98,7 @@ public sealed class TenantsController : Controller
             return View(new TenantListViewModel
             {
                 Search = search,
+                Scope = normalized,
                 IncludeDeleted = includeDeleted,
                 Tenants = slice.Items,
                 LoadedSuccessfully = true,
@@ -110,6 +119,7 @@ public sealed class TenantsController : Controller
             return View(new TenantListViewModel
             {
                 Search = search,
+                Scope = normalized,
                 IncludeDeleted = includeDeleted,
                 LoadedSuccessfully = false,
                 ErrorMessage = "Tenant service call failed: " + ex.Message
@@ -123,6 +133,7 @@ public sealed class TenantsController : Controller
         string? id,
         string? search,
         bool includeDeleted,
+        string? scope,
         int page = 1,
         int pageSize = 0,
         CancellationToken cancellationToken = default)
@@ -133,7 +144,14 @@ public sealed class TenantsController : Controller
         else
             TempData["Error"] = result.Message;
 
-        return RedirectToAction(nameof(Index), new { search, includeDeleted, page, pageSize });
+        return RedirectToAction(nameof(Index), new
+        {
+            search,
+            includeDeleted,
+            page,
+            pageSize,
+            scope = AutomationMarkRules.IsAutomation(scope) ? AutomationMarkRules.Automation : null
+        });
     }
 
     [HttpGet]
@@ -493,7 +511,7 @@ public sealed class TenantsController : Controller
         return true;
     }
 
-    private TenantListViewModel FacilityListError(string? search, bool includeDeleted, int statusCode)
+    private TenantListViewModel FacilityListError(string? search, bool includeDeleted, string scope, int statusCode)
     {
         var detail = statusCode == 0
             ? "Tenant service could not be reached."
@@ -501,6 +519,7 @@ public sealed class TenantsController : Controller
         return new TenantListViewModel
         {
             Search = search,
+            Scope = scope,
             IncludeDeleted = includeDeleted,
             LoadedSuccessfully = false,
             ErrorMessage = "Unable to load tenants. " + detail +

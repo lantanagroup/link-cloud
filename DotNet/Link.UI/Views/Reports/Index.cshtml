@@ -103,6 +103,9 @@
                     </label>
                 </div>
             </div>
+            <div class="col-6 col-md-3 col-xl-2">
+                <partial name="_AutomationScope" model="Model.Query.Scope" />
+            </div>
             <div class="col-12 d-flex gap-2">
                 <button type="submit" class="btn btn-au-action">Search</button>
                 <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
@@ -111,9 +114,13 @@
 
         <p class="lu-live-label mb-2" data-au-refresh-label>This list updates on its own.</p>
         <div id="reportResults" data-au-refresh="12000">
+        @if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+        {
+            <p class="small text-muted">@Model.ScopeNote</p>
+        }
         @if (Model.Reports.Count == 0)
         {
-            <p class="mb-0">No reports found.</p>
+            <p class="mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Query.Scope) ? "No automation reports." : "No reports found.")</p>
         }
         else
         {
@@ -148,7 +155,10 @@
                                     <a asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id"><code class="lu-facility-id">@report.Id</code></a>
                                 }
                             </td>
-                            <td><a asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId"><code class="lu-facility-id">@report.FacilityId</code></a></td>
+                            <td>
+                                <a asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId"><code class="lu-facility-id">@report.FacilityId</code></a>
+                                <partial name="_AutomationBadge" model="report.AutomationRunId" />
+                            </td>
                             <td class="text-nowrap">
                                 <div>Start @report.PeriodStart</div>
                                 <div>End @report.PeriodEnd</div>

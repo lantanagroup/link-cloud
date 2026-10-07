@@ -157,6 +157,9 @@
                     <label class="form-check-label" for="cancellableOnly">Cancellable only</label>
                 </div>
             </div>
+            <div class="col-6 col-md-3">
+                <partial name="_AutomationScope" model="query.Scope" />
+            </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-action">Search</button>
                 <a class="btn btn-outline-secondary" asp-action="Acquisition">Clear</a>
@@ -167,6 +170,10 @@
 
 <p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
 <div id="acquisitionResults" data-au-refresh="12000">
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
 @if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
 {
     <div class="au-card card mt-3">
@@ -222,7 +229,7 @@ else
     <div class="au-card card mt-3">
         <div class="card-header d-flex flex-wrap gap-2 align-items-center">
             <span class="me-auto">Logs</span>
-            @if (search.HasFilter)
+            @if (search.HasFilter && !(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) && string.IsNullOrWhiteSpace(query.FacilityId)))
             {
                 <form method="post" data-au-save asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
                     <partial name="_AcquisitionFields" model="query" />
@@ -237,7 +244,7 @@ else
         <div class="card-body">
             @if (Model.Logs.Count == 0)
             {
-                <p class="au-empty mb-0">No acquisition logs found.</p>
+                <p class="au-empty mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation acquisition logs." : "No acquisition logs found.")</p>
             }
             else
             {
@@ -270,7 +277,10 @@ else
                                         }
                                     </td>
                                     <td><a asp-action="AcquisitionDetail" asp-route-id="@row.Id">@row.Id</a>@(row.Deleted ? " (deleted)" : "")</td>
-                                    <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                    <td>
+                                        <code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code>
+                                        <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                    </td>
                                     <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.PatientId) ? "—" : row.PatientId)</code></td>
                                     <td>
                                         @if (row.ReportLink)

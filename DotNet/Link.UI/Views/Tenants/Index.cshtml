@@ -47,6 +47,9 @@
                 </select>
             </div>
             <div class="col-auto">
+                <partial name="_AutomationScope" model="Model.Scope" />
+            </div>
+            <div class="col-auto">
                 <button type="submit" class="btn btn-au-action">Search</button>
             </div>
         </form>
@@ -62,7 +65,7 @@
         }
         else if (Model.LoadedSuccessfully && Model.Tenants.Count == 0)
         {
-            <div class="alert alert-info mb-0">No tenants found.</div>
+            <div class="alert alert-info mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "No automation facilities." : "No tenants found.")</div>
         }
         else if (Model.LoadedSuccessfully)
         {
@@ -79,7 +82,10 @@
                     @foreach (var tenant in Model.Tenants)
                     {
                         <tr>
-                            <td><a asp-action="Facility" asp-route-id="@tenant.FacilityId"><code class="lu-facility-id">@tenant.FacilityId</code></a></td>
+                            <td>
+                                <a asp-action="Facility" asp-route-id="@tenant.FacilityId"><code class="lu-facility-id">@tenant.FacilityId</code></a>
+                                <partial name="_AutomationBadge" model="tenant.AutomationRunId" />
+                            </td>
                             <td>
                                 <a asp-action="View" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a>
                                 <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId">Configuration</a></div>
@@ -95,6 +101,10 @@
                                         @if (Model.IncludeDeleted)
                                         {
                                             <input type="hidden" name="includeDeleted" value="true" />
+                                        }
+                                        @if (Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope))
+                                        {
+                                            <input type="hidden" name="scope" value="automation" />
                                         }
                                         <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
                                     </form>
@@ -112,7 +122,7 @@
             <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Tenant pages">
                 @if (Model.Page > 1)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize })">Previous</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "automation" : null })">Previous</a>
                 }
                 else
                 {
@@ -121,7 +131,7 @@
                 <span class="small text-muted">Page @Model.Page of @(Model.TotalPages == 0 ? 1 : Model.TotalPages) (@Model.TotalCount)</span>
                 @if (Model.Page < Model.TotalPages)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize })">Next</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "automation" : null })">Next</a>
                 }
                 else
                 {

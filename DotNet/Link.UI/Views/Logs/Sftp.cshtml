@@ -97,6 +97,9 @@
                     }
                 </select>
             </div>
+            <div class="col-6 col-md-3">
+                <partial name="_AutomationScope" model="query.Scope" />
+            </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-action">Search</button>
                 <a class="btn btn-outline-secondary" asp-action="Sftp">Clear</a>
@@ -107,6 +110,10 @@
 
 <p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
 <div id="sftpResults" data-au-refresh="12000">
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning mt-3">@Model.LoadError</div>
@@ -118,7 +125,7 @@ else
         <div class="card-body">
             @if (Model.Logs.Count == 0)
             {
-                <p class="au-empty mb-0">No SFTP logs found.</p>
+                <p class="au-empty mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation SFTP logs." : "No SFTP logs found.")</p>
             }
             else
             {
@@ -141,7 +148,10 @@ else
                         @foreach (var row in Model.Logs)
                         {
                             <tr>
-                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                <td>
+                                    <code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code>
+                                    <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                </td>
                                 <td>@row.AcquisitionType</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.SubType) ? "—" : row.SubType)</td>
                                 <td>@row.Status</td>
