@@ -59,6 +59,41 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Save_posts_the_form_action_unless_the_button_sets_one()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/live-region.js"));
+        js.Should().Contain("submitter.hasAttribute(\"formaction\")");
+        js.Should().NotContain("submitter.formAction) || form.action");
+    }
+
+    [Fact]
+    public void Facility_editor_saves_once_and_drops_the_sdk_label()
+    {
+        var page = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Tenants/Facility.cshtml"));
+        page.Should().Contain("id=\"facilitySaveBar\"");
+        page.Should().Contain("btn-light");
+        page.Should().NotContain("LinkSDK");
+
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        var saveFacility = js.IndexOf("\"SaveFacility\"", StringComparison.Ordinal);
+        var saveCensus = js.IndexOf("\"SaveCensus\"", StringComparison.Ordinal);
+        var deleteCensus = js.IndexOf("\"DeleteCensus\"", StringComparison.Ordinal);
+        saveFacility.Should().BeGreaterThan(-1);
+        saveCensus.Should().BeGreaterThan(saveFacility);
+        deleteCensus.Should().BeGreaterThan(saveCensus);
+        js.Should().Contain("beforeunload");
+        js.Should().Contain("show.bs.tab");
+        js.Should().Contain("form.action");
+
+        var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
+        css.Should().Contain(".badge.text-bg-light");
+        css.Should().Contain(".lu-admin .btn-outline-danger");
+
+        var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
+        layout.Should().Contain("lu-admin");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
