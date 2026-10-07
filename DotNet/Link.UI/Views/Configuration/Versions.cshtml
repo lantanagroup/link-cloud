@@ -15,7 +15,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">@Model.VendorName</div>
     <div class="card-body">
-        <form method="post" asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId" class="row g-2 align-items-end">
+        <form method="post" data-au-save asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId" class="row g-2 align-items-end">
             <div class="col-12 col-md-6">
                 <label class="form-label" for="version">New version</label>
                 <input id="version" name="version" class="form-control" maxlength="255" required />
@@ -60,7 +60,7 @@
                                 </form>
                             </td>
                             <td>
-                                <form method="post" asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
+                                <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                             </td>

@@ -1,0 +1,91 @@
+using FluentAssertions;
+using Xunit;
+
+namespace Link.UI.Tests;
+
+public class SaveInPlaceTests
+{
+    [Theory]
+    [InlineData("DotNet/Link.UI/Views/Measures/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/QueryPlans/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/Normalizations/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/OrganizationResourceMaps/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/FacilityTemplates/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/PatientConfigurations/Index.cshtml")]
+    [InlineData("DotNet/Link.UI/Views/Automation/Scenarios.cshtml")]
+    public void Configuration_editors_refresh_the_open_page(string relativePath)
+    {
+        var text = File.ReadAllText(RepoFile(relativePath));
+        text.Should().NotContain("location.reload(");
+        text.Should().Contain("auRefreshPage(");
+    }
+
+    [Fact]
+    public void Patient_configuration_empty_name_reaches_the_server()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/PatientConfigurations/Index.cshtml"));
+        text.Should().NotContain("if (!model.name || !model.name.trim())");
+        text.Should().Contain("pcFormErrors");
+    }
+
+    [Theory]
+    [InlineData("DotNet/Link.UI/Views/Tenants/Facility.cshtml", 4)]
+    [InlineData("DotNet/Link.UI/Views/System/Integration.cshtml", 8)]
+    [InlineData("DotNet/Link.UI/Views/Shared/_CensusEditor.cshtml", 2)]
+    [InlineData("DotNet/Link.UI/Views/Shared/_FhirQueryEditor.cshtml", 13)]
+    [InlineData("DotNet/Link.UI/Views/Shared/_NormalizationOperationEditor.cshtml", 7)]
+    public void Editor_posts_save_in_place(string relativePath, int forms)
+    {
+        var text = File.ReadAllText(RepoFile(relativePath));
+        Count(text, "<form method=\"post\" data-au-save").Should().Be(forms);
+        text.Should().NotContain("<form method=\"post\" asp-");
+        text.Should().NotContain("<form method=\"post\"\r");
+        text.Should().NotContain("<form method=\"post\"\n");
+    }
+
+    [Fact]
+    public void Refresh_keeps_the_page_and_lifts_the_success_alert()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/live-region.js"));
+        js.Should().Contain("window.auRefreshPage = function");
+        js.Should().Contain("alert-success");
+        js.Should().Contain("data-au-rerun");
+        js.Should().Contain("Could not refresh this page.");
+
+        var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
+        css.Should().Contain(".lu-main:has(.lu-content h2.fw-bold) .lu-topbar");
+        css.Should().Contain("#reportResults th:nth-child(4)");
+        css.Should().Contain("#facilityReportResults th:nth-child(3)");
+    }
+
+    [Fact]
+    public void Report_counts_survive_a_page_refresh()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
+        text.Should().Contain("auReportCountsBound");
+        text.Should().Contain("lu-content");
+    }
+
+    private static int Count(string text, string value)
+    {
+        var count = 0;
+        var start = 0;
+        while (true)
+        {
+            var at = text.IndexOf(value, start, StringComparison.Ordinal);
+            if (at < 0) return count;
+            count++;
+            start = at + value.Length;
+        }
+    }
+
+    private static string RepoFile(string relative)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DotNet", "Link.UI", "Link.UI.csproj")))
+            dir = dir.Parent;
+
+        dir.Should().NotBeNull();
+        return Path.Combine(dir!.FullName, relative.Replace('/', Path.DirectorySeparatorChar));
+    }
+}

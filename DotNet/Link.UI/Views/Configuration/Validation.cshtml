@@ -9,11 +9,11 @@
 <p class="text-muted">Initialize the published implementation guides and categories, upload a package, check terminology dependencies, and import or export the category catalog. Importing replaces the catalog.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
-    <form method="post" asp-action="Initialize" onsubmit="return confirm('Initialize implementation guides from the published packages?');">
+    <form method="post" data-au-save asp-action="Initialize" onsubmit="return confirm('Initialize implementation guides from the published packages?');">
         <input type="hidden" name="categories" value="false" />
         <button type="submit" class="btn btn-outline-secondary">Initialize guides</button>
     </form>
-    <form method="post" asp-action="Initialize" onsubmit="return confirm('Initialize validation categories from the published packages?');">
+    <form method="post" data-au-save asp-action="Initialize" onsubmit="return confirm('Initialize validation categories from the published packages?');">
         <input type="hidden" name="categories" value="true" />
         <button type="submit" class="btn btn-outline-secondary">Initialize categories</button>
     </form>
@@ -24,7 +24,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Upload a package</div>
     <div class="card-body">
-        <form method="post" asp-action="UploadPackage" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Uploading replaces the package with this name. Continue?');">
+        <form method="post" data-au-save asp-action="UploadPackage" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Uploading replaces the package with this name. Continue?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="packageName">Package name</label>
                 <input id="packageName" name="name" class="form-control" maxlength="120" required />
@@ -44,7 +44,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Import categories</div>
     <div class="card-body">
-        <form method="post" asp-action="ImportCategories" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('This replaces the category catalog. Categories that are not in the file are deleted. Continue?');">
+        <form method="post" data-au-save asp-action="ImportCategories" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('This replaces the category catalog. Categories that are not in the file are deleted. Continue?');">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="categoryFile">Category export</label>
                 <input id="categoryFile" name="file" type="file" accept="application/json,.json" class="form-control" required />

@@ -21,7 +21,7 @@
                 {
                     <div class="alert alert-info">No census configuration for this facility.</div>
                 }
-                <form method="post" asp-controller="Tenants" asp-action="SaveCensus" asp-route-id="@Model.FacilityId">
+                <form method="post" data-au-save asp-controller="Tenants" asp-action="SaveCensus" asp-route-id="@Model.FacilityId">
                     <input type="hidden" name="censusExists" value="@(Model.CensusExists ? "true" : "false")" />
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="censusEnabled" name="enabled" value="true" @(Model.CensusEnabled ? "checked" : null) />
@@ -36,7 +36,7 @@
                 </form>
                 @if (Model.CensusExists)
                 {
-                    <form method="post" asp-controller="Tenants" asp-action="DeleteCensus" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the census configuration?');">
+                    <form method="post" data-au-save asp-controller="Tenants" asp-action="DeleteCensus" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the census configuration?');">
                         <button type="submit" class="btn btn-outline-danger btn-sm">Delete census</button>
                     </form>
                 }

@@ -12,7 +12,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Consumers</div>
     <div class="card-body">
-        <form method="post" asp-action="StartConsumers" class="row g-2 align-items-end" onsubmit="return confirm('Start consumers for this correlation id?');">
+        <form method="post" data-au-save asp-action="StartConsumers" class="row g-2 align-items-end" onsubmit="return confirm('Start consumers for this correlation id?');">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="startCorrelation">Correlation id</label>
                 <input id="startCorrelation" name="correlationId" class="form-control" maxlength="64" />
@@ -22,7 +22,7 @@
             </div>
         </form>
         <p class="text-muted small">Leave the id blank to generate one. The success message shows the id to use for read and stop.</p>
-        <form method="post" asp-action="ReadConsumers" class="row g-2 align-items-end">
+        <form method="post" data-au-save asp-action="ReadConsumers" class="row g-2 align-items-end">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="readCorrelation">Correlation id</label>
                 <input id="readCorrelation" name="correlationId" class="form-control" maxlength="64" />
@@ -31,7 +31,7 @@
                 <button type="submit" class="btn btn-outline-secondary">Read consumers</button>
             </div>
         </form>
-        <form method="post" asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
+        <form method="post" data-au-save asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="stopCorrelation">Correlation id</label>
                 <input id="stopCorrelation" name="correlationId" class="form-control" maxlength="64" />
@@ -107,7 +107,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Report scheduled</div>
     <div class="card-body">
-        <form method="post" asp-action="ScheduleReport" class="row g-2" onsubmit="return confirm('Post this report-scheduled event?');">
+        <form method="post" data-au-save asp-action="ScheduleReport" class="row g-2" onsubmit="return confirm('Post this report-scheduled event?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="facilityId">Facility</label>
                 <input id="facilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -149,7 +149,7 @@
 <div class="au-card card">
     <div class="card-header">Patient list acquired</div>
     <div class="card-body">
-        <form method="post" asp-action="AcquirePatientList" class="row g-2" onsubmit="return confirm('Post this patient-list-acquired event?');">
+        <form method="post" data-au-save asp-action="AcquirePatientList" class="row g-2" onsubmit="return confirm('Post this patient-list-acquired event?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="listFacilityId">Facility</label>
                 <input id="listFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -193,7 +193,7 @@
 <div class="au-card card mb-3 mt-3">
     <div class="card-header">Patient event</div>
     <div class="card-body">
-        <form method="post" asp-action="PostPatientEvent" class="row g-2" onsubmit="return confirm('Post this patient event?');">
+        <form method="post" data-au-save asp-action="PostPatientEvent" class="row g-2" onsubmit="return confirm('Post this patient event?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="eventFacilityId">Facility</label>
                 <input id="eventFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -222,7 +222,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Data acquisition requested</div>
     <div class="card-body">
-        <form method="post" asp-action="PostDataAcquisition" class="row g-2" onsubmit="return confirm('Post this data-acquisition-requested event?');">
+        <form method="post" data-au-save asp-action="PostDataAcquisition" class="row g-2" onsubmit="return confirm('Post this data-acquisition-requested event?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="acquisitionFacilityId">Facility</label>
                 <input id="acquisitionFacilityId" name="facilityId" class="form-control" maxlength="255" />
@@ -264,7 +264,7 @@
 <div class="au-card card">
     <div class="card-header">Patient acquired</div>
     <div class="card-body">
-        <form method="post" asp-action="PostPatientAcquired" class="row g-2" onsubmit="return confirm('Post this patient-acquired event?');">
+        <form method="post" data-au-save asp-action="PostPatientAcquired" class="row g-2" onsubmit="return confirm('Post this patient-acquired event?');">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="acquiredFacilityId">Facility</label>
                 <input id="acquiredFacilityId" name="facilityId" class="form-control" maxlength="255" />

@@ -498,16 +498,16 @@
                 isDefault:false
             };
             await post(saveUrl,model);
-            location.reload();
+            auRefreshPage();
         }catch(e){ errs.textContent=e.message||'Save failed'; errs.style.display=''; }
     });
     document.querySelectorAll('.btn-map-open').forEach(b=>b.addEventListener('click',async()=>{
         const r=await fetch(getUrl+'?id='+encodeURIComponent(b.dataset.id));
         if(r.ok) setModel(await r.json(), b.dataset.mode||'edit');
     }));
-    document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); location.reload(); }));
-    document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); location.reload(); }));
-    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); location.reload(); } }));
+    document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); auRefreshPage('Cloned.'); }));
+    document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); auRefreshPage('Saved.'); }));
+    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); auRefreshPage('Deleted.'); } }));
 
     const analyzeUrl='@Url.Action("Analyze","ConfigurationGeneration")';
     const applyOrmUrl='@Url.Action("ApplyOrm","ConfigurationGeneration")';
@@ -553,21 +553,21 @@
             {
                 selectOrmLabel: 'Save new ORM',
                 selectSuiteLabel: 'Save new suite',
-                onSelectOrm: () => location.reload(),
-                onSelectSuite: () => location.reload(),
+                onSelectOrm: () => auRefreshPage(),
+                onSelectSuite: () => auRefreshPage(),
                 onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
                 onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
                 onExtendOrm: async (id) => {
                     const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
                     const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
                     persist('lastOrmId', saved.id || saved.Id, refined);
-                    location.reload();
+                    auRefreshPage();
                 },
                 onExtendSuite: async (id) => {
                     const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
                     const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
                     persist('lastSuiteId', saved.id || saved.Id, refined);
-                    location.reload();
+                    auRefreshPage();
                 }
             });
         persist(null, null, proposal);

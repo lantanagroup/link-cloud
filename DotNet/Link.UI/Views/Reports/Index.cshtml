@@ -255,8 +255,12 @@
                 .catch(function () { });
         }
         fill();
-        document.addEventListener("au-refreshed", function (event) {
-            if (event.detail && event.detail.id === "reportResults") fill();
-        });
+        if (!window.auReportCountsBound) {
+            window.auReportCountsBound = true;
+            document.addEventListener("au-refreshed", function (event) {
+                if (!event.detail) return;
+                if (event.detail.id === "reportResults" || event.detail.id === "lu-content") fill();
+            });
+        }
     })();
 </script>

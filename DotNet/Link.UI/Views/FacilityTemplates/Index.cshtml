@@ -273,7 +273,7 @@
             body.id = crypto.randomUUID();
         try {
             await post(saveUrl, body);
-            window.location.reload();
+            auRefreshPage();
         } catch (err) {
             errors.textContent = err.message || 'Save failed';
             errors.style.display = '';
@@ -294,7 +294,7 @@
         button.addEventListener('click', async function () {
             try {
                 await post(cloneUrl, { id: button.dataset.id });
-                window.location.reload();
+                auRefreshPage('Cloned.');
             } catch (err) {
                 alert(err.message || 'Clone failed');
             }
@@ -305,7 +305,7 @@
             if (!window.confirm('Delete this facility template?')) return;
             try {
                 await post(deleteUrl, { id: button.dataset.id });
-                window.location.reload();
+                auRefreshPage('Deleted.');
             } catch (err) {
                 alert(err.message || 'Delete failed');
             }

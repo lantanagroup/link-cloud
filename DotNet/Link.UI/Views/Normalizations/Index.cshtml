@@ -908,7 +908,7 @@
         }
 
         const resp = await postJson('@Url.Action("SaveOperation", "Normalizations")', data);
-        if (resp.ok) { location.reload(); } else {
+        if (resp.ok) { auRefreshPage(); } else {
             const err = await resp.text();
             formErrors.textContent = err;
             formErrors.style.display = '';
@@ -925,12 +925,12 @@
     }));
     document.querySelectorAll('.btn-op-clone').forEach(btn => btn.addEventListener('click', async () => {
         await postJson('@Url.Action("CloneOperation", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage('Cloned.');
     }));
     document.querySelectorAll('.btn-op-delete').forEach(btn => btn.addEventListener('click', async () => {
         if (!confirm('Delete this operation?')) return;
         await postJson('@Url.Action("DeleteOperation", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage('Deleted.');
     }));
 
     // ============ SEQUENCE MODAL ============
@@ -1080,7 +1080,7 @@
         );
 
         if (resp.ok) {
-            location.reload();
+            auRefreshPage();
         } else {
             const err = await resp.text();
             formErrors.textContent = err;
@@ -1098,12 +1098,12 @@
     }));
     document.querySelectorAll('.btn-seq-clone').forEach(btn => btn.addEventListener('click', async () => {
         await postJson('@Url.Action("CloneSequence", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage('Cloned.');
     }));
     document.querySelectorAll('.btn-seq-delete').forEach(btn => btn.addEventListener('click', async () => {
         if (!confirm('Delete this sequence?')) return;
         await postJson('@Url.Action("DeleteSequence", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage('Deleted.');
     }));
 
     // ============ SUITE MODAL ============
@@ -1478,7 +1478,7 @@
         );
 
         if (resp.ok) {
-            location.reload();
+            auRefreshPage();
         } else {
             const err = await resp.text();
             formErrors.textContent = err;
@@ -1501,7 +1501,7 @@
         );
 
         if (resp.ok) {
-            location.reload();
+            auRefreshPage('Cloned.');
             return;
         }
 
@@ -1510,12 +1510,12 @@
     }));
     document.querySelectorAll('.btn-suite-default').forEach(btn => btn.addEventListener('click', async () => {
         await postJson('@Url.Action("SetDefaultSuite", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage();
     }));
     document.querySelectorAll('.btn-suite-delete').forEach(btn => btn.addEventListener('click', async () => {
         if (!confirm('Delete this suite?')) return;
         await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
-        location.reload();
+        auRefreshPage('Deleted.');
     }));
 
     const analyzeUrl = '@Url.Action("Analyze", "ConfigurationGeneration")';
@@ -1562,21 +1562,21 @@
             {
                 selectOrmLabel: 'Save new ORM',
                 selectSuiteLabel: 'Save new suite',
-                onSelectOrm: () => location.reload(),
-                onSelectSuite: () => location.reload(),
+                onSelectOrm: () => auRefreshPage(),
+                onSelectSuite: () => auRefreshPage(),
                 onSavedOrm: (id, p) => persist('lastOrmId', id, p || proposal),
                 onSavedSuite: (id, p) => persist('lastSuiteId', id, p || proposal),
                 onExtendOrm: async (id) => {
                     const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineOrmId: id }));
                     const saved = await window.BundleConfigGeneration.postJson(applyOrmUrl, { proposal: refined.orm || refined.Orm, updateExistingId: id });
                     persist('lastOrmId', saved.id || saved.Id, refined);
-                    location.reload();
+                    auRefreshPage();
                 },
                 onExtendSuite: async (id) => {
                     const refined = await window.BundleConfigGeneration.postJson(analyzeUrl, Object.assign({}, request, { refineSuiteId: id }));
                     const saved = await window.BundleConfigGeneration.postJson(applyNormUrl, { proposal: refined.normalization || refined.Normalization, updateExistingSuiteId: id });
                     persist('lastSuiteId', saved.id || saved.Id, refined);
-                    location.reload();
+                    auRefreshPage();
                 }
             });
         persist(null, null, proposal);
