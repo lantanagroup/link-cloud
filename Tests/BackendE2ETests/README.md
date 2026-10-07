@@ -1,11 +1,11 @@
 ﻿# BackendE2ETests
 
-Backend E2E tests are now **orchestration/contract tests** over `Automation.UI` APIs, not a second
+Backend E2E tests are **orchestration/contract tests** over Link.UI APIs, not a second
 copy of full pipeline orchestration logic.
 
 The suite verifies that:
 
-1. `Automation.UI` can start seeded system scenarios via API,
+1. Link.UI can start seeded system scenarios via API,
 2. scenario runs reach terminal `Succeeded` status,
 3. API Health (`Run All`) can be started and summarized via API,
 4. a PR-safe subset of backend scenarios is exercised in CI.
@@ -15,14 +15,15 @@ The suite verifies that:
 ## 1. What changed
 
 Historically, this project duplicated large amounts of report-pipeline setup and validation logic
-directly in each test class. That behavior has been consolidated into `Automation.UI` system
+directly in each test class. That behavior now lives in Link.UI system
 scenarios and API Health suites.
 
-`BackendE2ETests` now acts as a thin API-driven verifier:
+`BackendE2ETests` acts as a thin API-driven verifier against Link.UI:
 
-- scenario tests call `AutomationRunsApiController` (`/api/runs/*`),
-- API stability calls `ApiHealthRunsApiController` (`/api/api-health-runs/*`),
-- smoke test still validates the antiforgery-protected UI API launch path.
+- scenario tests call `/api/runs/*`,
+- API stability calls `/api/api-health-runs/*`,
+- the smoke test reads the antiforgery token from `GET /Runs` before it posts.
+- scenario run pages are `/Automation/Runs/{id}`. The tests poll `/api/runs/{id}/status` and do not open that page.
 
 ---
 
@@ -114,14 +115,14 @@ part of the PR path.
 
 ## 6. Prerequisites
 
-A full Link stack must be running, including `Automation.UI` and all dependent services.
+A full Link stack must be running, including Link.UI and all dependent services.
 
 At minimum, tests require:
 
-- `Automation.UI` reachable at `AUTOMATION_UI_BASE_URL` (default `http://localhost:5256`)
+- Link.UI reachable at the base URL below
 - services behind the scenario execution and API Health workflows (FHIR, Kafka, Mongo, SQL, etc.)
 
-The repository `docker-compose.yml` provides a suitable local environment.
+The repository `docker-compose.yml` provides a suitable local environment. The `link-ui` service is published on host port **5258**. `dotnet run` for Link.UI uses **5280** (`Properties/launchSettings.json`). The `automation-ui` service remains on **5256** and is not the default for this suite.
 
 ---
 
@@ -131,12 +132,15 @@ Key environment variables used by this project:
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `AUTOMATION_UI_BASE_URL` | Base URL for `Automation.UI` APIs used by scenario tests and smoke test | `http://localhost:5256` |
+| `LINK_UI_BASE_URL` | Base URL for Link.UI. Wins when it is set. | unset |
+| `AUTOMATION_UI_BASE_URL` | Fallback base URL when `LINK_UI_BASE_URL` is unset. | unset |
+| (neither set) | `link-ui` compose port | `http://localhost:5258` |
 | `AUTOMATION_UI_SMOKE_TIMEOUT_MINUTES` | Timeout for `AutomationUiApiSmokeTest` | `20` |
 | `API_STABILITY_TIMEOUT_MINUTES` | Timeout for `ApiStabilityTest` API Health run-all polling | `30` |
 
-Other service URL variables in `TestConfig` still exist for compatibility, but the primary
-execution path now routes through `Automation.UI` APIs.
+These tests do not read a bearer token. `POST /api/runs/start` and `POST /api/api-health-runs/start-all` send the antiforgery token scraped from `GET /Runs`. The Azure pipeline in `Tests/AutomationUI.Pipeline` is the caller that uses `LINK_UI_API_ACCESS_TOKEN` / `AUTOMATION_UI_API_ACCESS_TOKEN` and `LINK_UI_API_AUDIENCE` / `AUTOMATION_UI_API_AUDIENCE`.
+
+Other service URL variables in `TestConfig` still exist for compatibility. The scenario and API Health tests call Link.UI, which then calls those services.
 
 ---
 
@@ -158,6 +162,6 @@ full pipeline internals in test code.
 
 - Targets `.NET 8`.
 - Tests are `[Fact]` classes with `IClassFixture<BackendE2ETestFixture>`.
-- Scenario ids are deterministic and seeded by `Automation.UI` `ScenarioSeedService`.
-- If a scenario fails, inspect `Automation.UI` run details/logs first, since that host performs
+- Scenario ids are deterministic and seeded by Link.UI `ScenarioSeedService`.
+- If a scenario fails, inspect the Link.UI run at `/Automation/Runs/{id}` first, since that host performs
   the underlying generation/validation workflow.
