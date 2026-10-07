@@ -65,8 +65,8 @@
                             <span class="badge run-status-badge @Badge(run)" data-run-id="@run.RunId">@run.StatusLabel</span>
                         </td>
                         <td class="small text-muted">@(run.Duration ?? "–")</td>
-                        <td>@run.CreatedAt.LocalDateTime</td>
-                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
+                        <td>@LinkUiTime.IsoUtc(run.CreatedAt)</td>
+                        <td>@(run.FinishedAt is null ? "—" : LinkUiTime.IsoUtc(run.FinishedAt.Value))</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
                                 <a asp-action="Run" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action" title="View details"><i class="bi bi-box-arrow-up-right"></i></a>

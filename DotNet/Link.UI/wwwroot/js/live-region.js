@@ -182,9 +182,11 @@
             if (url) window.location.assign(url);
             return Promise.resolve();
         }
-        var y = window.scrollY;
+        var scroller = document.querySelector(".lu-main") || document.scrollingElement;
+        var y = scroller ? scroller.scrollTop : window.scrollY;
         current.innerHTML = next.innerHTML;
-        window.scrollTo(0, y);
+        if (scroller) scroller.scrollTop = y;
+        else window.scrollTo(0, y);
         if (push && url && url !== window.location.href) history.pushState(null, "", url);
         if (message) showToast(message);
         return activateScripts(current).then(function () {
@@ -294,6 +296,38 @@
     document.addEventListener("au-refreshed", scanRefresh);
 
     document.addEventListener("click", function (event) {
+        var copy = event.target && event.target.closest ? event.target.closest("[data-lu-copy]") : null;
+        if (copy) {
+            event.preventDefault();
+            var value = copy.getAttribute("data-lu-copy") || "";
+            var done = function () { copy.textContent = "Copied"; setTimeout(function () { copy.textContent = "Copy"; }, 1200); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(value).then(done);
+            return;
+        }
+        var resubmit = event.target && event.target.closest ? event.target.closest("[data-resubmit-open]") : null;
+        if (resubmit) {
+            var dialog = document.getElementById("resubmitDialog");
+            var form = document.getElementById("resubmitForm");
+            if (dialog && form && window.bootstrap && window.bootstrap.Modal) {
+                form.querySelectorAll("[data-resubmit-copy]").forEach(function (node) { node.remove(); });
+                var fields = resubmit.parentElement && resubmit.parentElement.querySelector("[data-resubmit-fields]");
+                if (fields) {
+                    fields.querySelectorAll("input").forEach(function (input) {
+                        var clone = input.cloneNode(true);
+                        clone.setAttribute("data-resubmit-copy", "1");
+                        form.appendChild(clone);
+                    });
+                }
+                var summary = document.getElementById("resubmitSummary");
+                if (summary) {
+                    summary.textContent = "Report " + (resubmit.getAttribute("data-report-id") || "")
+                        + " for facility " + (resubmit.getAttribute("data-facility-id") || "")
+                        + ". " + (resubmit.getAttribute("data-period") || "");
+                }
+                window.bootstrap.Modal.getOrCreateInstance(dialog).show();
+            }
+            return;
+        }
         var opener = event.target && event.target.closest ? event.target.closest("[data-lu-reveal]") : null;
         if (!opener) return;
         var panel = document.getElementById(opener.getAttribute("data-lu-reveal") || "");
@@ -328,4 +362,59 @@
         });
         if (panel.hasAttribute("data-lu-hide-on-cancel")) panel.classList.add("d-none");
     });
+
+    var instantPattern = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/g;
+    var localFormat = new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+    });
+
+    function utcTitle(date) {
+        function part(value) { return String(value).padStart(2, "0"); }
+        return date.getUTCFullYear() + "-" + part(date.getUTCMonth() + 1) + "-" + part(date.getUTCDate())
+            + " " + part(date.getUTCHours()) + ":" + part(date.getUTCMinutes()) + ":" + part(date.getUTCSeconds()) + " UTC";
+    }
+
+    function paintTimes(root) {
+        var scope = root && root.nodeType === 1 ? root : (document.querySelector(".lu-content") || document.body);
+        if (!scope) return;
+        var walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                var parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (parent.closest("script, style, textarea, pre, code, input, title, [data-lu-wall]")) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        var nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach(function (node) {
+            var text = node.nodeValue || "";
+            if (text.length > 180 || text.indexOf("{") >= 0 || text.indexOf("\"") >= 0) return;
+            instantPattern.lastIndex = 0;
+            if (!instantPattern.test(text)) return;
+            var titles = [];
+            instantPattern.lastIndex = 0;
+            var next = text.replace(instantPattern, function (iso) {
+                var date = new Date(iso);
+                if (isNaN(date.getTime())) return iso;
+                titles.push(utcTitle(date));
+                return localFormat.format(date);
+            });
+            if (next === text || !titles.length) return;
+            node.nodeValue = next;
+            var parent = node.parentElement;
+            if (parent && !parent.getAttribute("title")) parent.setAttribute("title", titles.join("; "));
+        });
+    }
+
+    window.luPaintTimes = paintTimes;
+    document.addEventListener("au-refreshed", function (event) {
+        var id = event.detail && event.detail.id;
+        paintTimes(id ? document.getElementById(id) : null);
+    });
+    paintTimes();
 })();

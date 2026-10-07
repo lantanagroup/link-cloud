@@ -109,7 +109,40 @@ public class SaveInPlaceTests
             var text = File.ReadAllText(RepoFile(relative));
             text.Should().Contain("btn btn-sm btn-warning\">Resubmit");
             text.Should().NotContain("btn-outline-primary\">Resubmit");
+            text.Should().Contain("id=\"resubmitDialog\"");
+            text.Should().Contain("id=\"resubmitForm\"");
+            text.Should().Contain("data-resubmit-open");
+            text.Should().Contain("name=\"bypassSubmission\" value=\"true\">Regenerate without submitting");
+            text.Should().NotContain("Bypass submission");
+            text.Should().NotContain("type=\"checkbox\" name=\"bypassSubmission\"");
         }
+
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/live-region.js"));
+        js.Should().Contain("new FormData(form, submitter)");
+        js.Should().Contain("data-resubmit-open");
+    }
+
+    [Fact]
+    public void Generate_report_posts_bypass_as_a_labeled_choice()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Generate.cshtml"));
+        text.Should().Contain("name=\"bypassSubmission\" value=\"false\"");
+        text.Should().Contain("name=\"bypassSubmission\" value=\"true\"");
+        text.Should().Contain("Generate and submit");
+        text.Should().Contain("Generate without submitting");
+        text.Should().NotContain("type=\"checkbox\" name=\"bypassSubmission\"");
+    }
+
+    [Fact]
+    public void Roles_add_starts_collapsed()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/System/Roles.cshtml"));
+        text.Should().Contain("data-lu-reveal=\"roleCreate\"");
+        text.Should().Contain("id=\"roleCreate\"");
+        text.Should().Contain("data-lu-cancel");
+        text.Should().Contain("btn btn-success\">Save");
+        text.Should().Contain("id=\"roleResults\" data-au-refresh=\"20000\"");
+        text.Should().NotContain("Create role");
     }
 
     [Fact]
@@ -130,10 +163,24 @@ public class SaveInPlaceTests
         deleteAt.Should().BeGreaterThan(-1);
 
         var plan = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_FhirQueryEditor.cshtml"));
-        plan.Should().Contain("id=\"queryPlanType\"");
+        plan.Should().Contain("id=\"queryPlanCount\"");
+        plan.Should().Contain("data-plan-type=");
+        plan.Should().NotContain("id=\"queryPlanType\"");
         plan.Should().NotContain("asp-route-planType=\"@planType\"");
 
+        var facility = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Tenants/Facility.cshtml"));
+        facility.Should().Contain("id=\"dispatchCount\"");
+        facility.Should().Contain("data-row-remove");
+        facility.Should().Contain("id=\"notificationCount\"");
+        facility.Should().Contain("id=\"notificationEmails\"");
+        facility.Should().NotContain("type=\"checkbox\" name=\"Schedules");
+
+        js.Should().Contain("reconcileEmptied");
+        js.Should().Contain("data-collection-clear");
+        js.Should().Contain("data-facility-edited");
+        js.Should().Contain("!pending && !wasDirty");
         var normalization = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_NormalizationOperationEditor.cshtml"));
+        normalization.Should().Contain("id=\"normalizationCount\"");
         normalization.Should().Contain("data-facility-swap=\"normalizationPanel\"");
 
         var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));

@@ -38,13 +38,10 @@
     };
     var collapsible = {
         SaveCensus: true,
-        SaveQueryDispatch: true,
         SaveFhirQuery: true,
         SaveFhirList: true,
-        SaveQueryPlan: true,
         SaveReportingOrg: true,
-        SaveSftp: true,
-        SaveNotification: true
+        SaveSftp: true
     };
     var labels = {
         SaveFacility: "Facility",
@@ -281,10 +278,10 @@
     function applySkip(deleteForm) {
         var saveName = saveNameFor(deleteForm.getAttribute("data-facility-action") || "");
         if (!saveName) return;
-        var delId = inputValue(deleteForm, "operationId");
+        var delId = inputValue(deleteForm, "operationId") || inputValue(deleteForm, "type");
         root().querySelectorAll("form[data-facility-action='" + saveName + "']").forEach(function (save) {
             if (delId) {
-                var editId = inputValue(save, "OperationId");
+                var editId = inputValue(save, "OperationId") || inputValue(save, "Type");
                 if (editId !== delId) return;
             }
             save.setAttribute("data-facility-skip", "true");
@@ -312,17 +309,22 @@
             if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
             form.setAttribute("data-facility-force", "true");
             applySkip(form);
+            var row = form.closest("[data-collection-row]");
+            if (row) row.classList.add("lu-row-staged");
             var note = document.createElement("div");
             note.className = "alert alert-warning mt-2 lu-remove-note";
             note.appendChild(document.createTextNode("Staged for removal. "));
             note.appendChild(undoButton(function () {
                 form.removeAttribute("data-facility-force");
                 syncSkip(action);
+                if (row) row.classList.remove("lu-row-staged");
                 note.remove();
                 refreshFlag();
+                updateCounts();
             }));
             form.appendChild(note);
             refreshFlag();
+            updateCounts();
         });
     }
 
@@ -369,7 +371,13 @@
 
     function wireRemove(form, submit) {
         var action = form.getAttribute("data-facility-action");
-        if (action === "DeleteOperation" || action === "DeleteOperationSequence") {
+        if (action === "DeleteQueryDispatch" || action === "DeleteNotification") {
+            submit.classList.add("d-none");
+            form.classList.add("d-none");
+            form.setAttribute("data-collection-clear", "true");
+            return;
+        }
+        if (action === "DeleteOperation" || action === "DeleteOperationSequence" || action === "DeleteQueryPlan") {
             wireRowRemove(form, submit);
             return;
         }
@@ -398,8 +406,9 @@
                 item.replaceWith(fresh);
                 history.replaceState(null, "", url);
                 fresh.querySelectorAll("form[data-au-save]").forEach(classify);
-                if (itemId === "normalizationPanel") decorateNormalization();
+                decorateAll();
                 wirePlanSelect(fresh);
+                refreshFlag();
                 return true;
             })
             .catch(function () {
@@ -410,24 +419,339 @@
             });
     }
 
-    function decorateNormalization() {
-        var item = document.getElementById("normalizationPanel");
-        if (!item) return;
-        if (item.querySelector("form[data-facility-action='DeleteOperation']")) return;
-        if (item.querySelector("#normalization-editor")) return;
-        if (!item.querySelector("a[data-facility-swap]")) return;
+    function updateCounts() {
+        var editor = root();
+        if (!editor) return;
+        var planBadge = editor.querySelector("#queryPlanCount");
+        if (planBadge) {
+            var plans = editor.querySelectorAll("[data-plan-type]:not(.lu-row-staged)").length;
+            var addingPlan = editor.querySelector("#queryPlanEditor[data-plan-edit='add']:not(.d-none)");
+            planBadge.textContent = String(plans + (addingPlan ? 1 : 0));
+        }
+        var normBadge = editor.querySelector("#normalizationCount");
+        if (normBadge) {
+            var ops = editor.querySelectorAll("[data-operation-row]:not(.lu-row-staged)").length;
+            var normEditor = editor.querySelector("#normalization-editor");
+            var opId = normEditor && normEditor.querySelector("input[name='OperationId']");
+            normBadge.textContent = String(ops + (normEditor && opId && !opId.value ? 1 : 0));
+        }
+        var dispatchBadge = editor.querySelector("#dispatchCount");
+        if (dispatchBadge) dispatchBadge.textContent = String(dispatchKept(editor));
+        var emailBadge = editor.querySelector("#notificationCount");
+        if (emailBadge) emailBadge.textContent = String(emailKept(editor));
+        var dispatchEmpty = editor.querySelector("#dispatchEmpty");
+        if (dispatchEmpty) dispatchEmpty.classList.toggle("d-none", dispatchKept(editor) > 0);
+        var emailEmpty = editor.querySelector("#notificationEmpty");
+        if (emailEmpty) emailEmpty.classList.toggle("d-none", emailKept(editor) > 0);
+    }
+
+    function dispatchKept(editor) {
+        var kept = 0;
+        editor.querySelectorAll("[data-dispatch-row]").forEach(function (row) {
+            if (row.classList.contains("d-none") || row.classList.contains("lu-row-staged")) return;
+            var eventField = row.querySelector("input[name$='.Event']");
+            var duration = row.querySelector("input[name$='.Duration']");
+            var has = (eventField && eventField.value.trim()) || (duration && duration.value.trim());
+            if (has || row.getAttribute("data-dispatch-new") === "true") kept++;
+        });
+        return kept;
+    }
+
+    function emailKept(editor) {
+        var kept = 0;
+        editor.querySelectorAll("[data-email-row]").forEach(function (row) {
+            if (!row.classList.contains("lu-row-staged") && !row.classList.contains("d-none")) kept++;
+        });
+        return kept;
+    }
+
+    function syncEmails(form) {
+        form = form || document.querySelector("#facilityEditor form[data-facility-action='SaveNotification']");
+        if (!form) return;
+        var box = form.querySelector("#notificationEmails");
+        if (!box) return;
+        var lines = [];
+        form.querySelectorAll("[data-email-row]").forEach(function (row) {
+            if (row.classList.contains("lu-row-staged")) return;
+            var input = row.querySelector("[data-email-input]");
+            if (input && input.value.trim()) lines.push(input.value.trim());
+        });
+        box.value = lines.join("\n");
+    }
+
+    function headerAdd(item, onClick) {
         var slot = ensureSlot(item);
-        if (!slot || slot.childElementCount > 0) return;
+        if (!slot || slot.querySelector("[data-collection-add]")) return null;
         var add = document.createElement("button");
         add.type = "button";
         add.className = "btn btn-sm btn-success";
         add.textContent = "+ Add";
+        add.setAttribute("data-collection-add", "1");
         add.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
-            setExpanded(item, true);
+            onClick();
         });
         slot.appendChild(add);
+        return add;
+    }
+
+    function decorateNormalization() {
+        var item = document.getElementById("normalizationPanel");
+        if (!item || item.getAttribute("data-vendor") === "true") return;
+        if (!item.querySelector("#normalizationTypes") && !item.querySelector("[data-operation-row]")) return;
+        if (!item.querySelector("#normalization-editor")) {
+            headerAdd(item, function () {
+                var types = item.querySelector("#normalizationTypes");
+                if (types) types.classList.remove("d-none");
+                setExpanded(item, true);
+                var link = types && types.querySelector("a, button");
+                if (link) link.focus();
+            });
+        }
+        updateCounts();
+    }
+
+    function decorateQueryPlans() {
+        var item = document.getElementById("queryPlanItem");
+        if (!item) return;
+        headerAdd(item, function () {
+            var types = ["Discharge", "Daily", "Weekly", "Monthly"];
+            var present = {};
+            item.querySelectorAll("[data-plan-type]").forEach(function (row) {
+                if (!row.classList.contains("lu-row-staged")) present[row.getAttribute("data-plan-type")] = true;
+            });
+            var missing = "";
+            types.forEach(function (type) { if (!missing && !present[type]) missing = type; });
+            if (!missing) {
+                showResults(["All four query plan types already exist."]);
+                return;
+            }
+            if (sectionDirty(item) && !window.confirm("This query plan has unsaved changes. Continue and discard them?")) return;
+            var url = new URL(window.location.href);
+            url.searchParams.set("planType", missing);
+            url.searchParams.set("planEdit", "add");
+            swapItem(url.toString(), "queryPlanItem");
+        });
+        var undo = item.querySelector("#queryPlanAddUndo");
+        if (undo && undo.getAttribute("data-wired") !== "1") {
+            undo.setAttribute("data-wired", "1");
+            undo.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                var url = new URL(window.location.href);
+                url.searchParams.delete("planEdit");
+                url.searchParams.delete("planType");
+                swapItem(url.toString(), "queryPlanItem");
+            });
+        }
+        var editor = item.querySelector("#queryPlanEditor[data-plan-edit='add']");
+        if (editor && !editor.classList.contains("d-none")) {
+            var form = editor.querySelector("form[data-facility-action='SaveQueryPlan']");
+            if (form && form.getAttribute("data-plan-armed") !== "1") {
+                form.setAttribute("data-plan-armed", "1");
+                form.setAttribute("data-facility-force", "true");
+                form.setAttribute("data-facility-dirty", "true");
+                refreshFlag();
+            }
+        }
+        updateCounts();
+    }
+
+    function cloneDispatchRow(form) {
+        var rows = form.querySelectorAll("[data-dispatch-row]");
+        var last = rows[rows.length - 1];
+        if (!last) return null;
+        var copy = last.cloneNode(true);
+        var next = rows.length;
+        copy.classList.remove("d-none", "lu-row-staged");
+        copy.setAttribute("data-dispatch-blank", "false");
+        copy.setAttribute("data-dispatch-new", "true");
+        copy.querySelectorAll("[name]").forEach(function (field) {
+            field.name = field.name.replace(/Schedules\[\d+\]/, "Schedules[" + next + "]");
+            if (field.type === "checkbox") field.checked = false;
+            else field.value = "";
+        });
+        copy.querySelectorAll("[id]").forEach(function (field) {
+            field.id = field.id.replace(/-\d+$/, "-" + next);
+        });
+        copy.querySelectorAll("label[for]").forEach(function (label) {
+            label.htmlFor = label.htmlFor.replace(/-\d+$/, "-" + next);
+        });
+        var note = copy.querySelector(".lu-remove-note");
+        if (note) note.remove();
+        var remove = copy.querySelector("[data-row-remove]");
+        if (remove) remove.removeAttribute("data-wired");
+        last.after(copy);
+        wireDispatchRemove(copy.querySelector("[data-row-remove]"));
+        return copy;
+    }
+
+    function wireDispatchRemove(button) {
+        if (!button || button.getAttribute("data-wired") === "1") return;
+        button.setAttribute("data-wired", "1");
+        button.addEventListener("click", function () {
+            var row = button.closest("[data-dispatch-row]");
+            var form = button.closest("form");
+            if (!row || !form) return;
+            if (!window.confirm("Delete this dispatch schedule? It is removed when you save the facility.")) return;
+            if (row.getAttribute("data-dispatch-new") === "true") {
+                row.remove();
+                if (!form.querySelector("[data-dispatch-new='true'], .lu-row-staged") && form.getAttribute("data-facility-edited") !== "1")
+                    form.removeAttribute("data-facility-dirty");
+                else
+                    markDirty(form);
+                refreshFlag();
+                updateCounts();
+                return;
+            }
+            var wasDirty = form.getAttribute("data-facility-dirty") === "true";
+            var box = row.querySelector("input[type='checkbox'][name$='.Remove']");
+            if (box) box.checked = true;
+            row.classList.add("lu-row-staged");
+            var note = document.createElement("div");
+            note.className = "alert alert-warning mt-2 lu-remove-note";
+            note.appendChild(document.createTextNode("Staged for removal. "));
+            note.appendChild(undoButton(function () {
+                if (box) box.checked = false;
+                row.classList.remove("lu-row-staged");
+                note.remove();
+                var pending = form.querySelector(".lu-row-staged, [data-dispatch-new='true']");
+                if (!pending && !wasDirty && form.getAttribute("data-facility-edited") !== "1")
+                    form.removeAttribute("data-facility-dirty");
+                refreshFlag();
+                updateCounts();
+            }));
+            row.appendChild(note);
+            markDirty(form);
+            updateCounts();
+        });
+    }
+
+    function decorateDispatch() {
+        var item = document.getElementById("dispatchItem");
+        if (!item || !item.querySelector("form[data-facility-action='SaveQueryDispatch']")) return;
+        headerAdd(item, function () {
+            var form = item.querySelector("form[data-facility-action='SaveQueryDispatch']");
+            setExpanded(item, true);
+            var blank = form.querySelector("[data-dispatch-blank='true'].d-none");
+            var row = blank || cloneDispatchRow(form);
+            if (blank) {
+                blank.classList.remove("d-none");
+                blank.setAttribute("data-dispatch-blank", "false");
+                blank.setAttribute("data-dispatch-new", "true");
+            }
+            updateCounts();
+            var focus = row && row.querySelector("input:not([type='hidden']):not([type='checkbox'])");
+            if (focus) focus.focus();
+        });
+        item.querySelectorAll("[data-row-remove]").forEach(wireDispatchRemove);
+        updateCounts();
+    }
+
+    function wireEmailRemove(button) {
+        if (!button || button.getAttribute("data-wired") === "1") return;
+        button.setAttribute("data-wired", "1");
+        button.addEventListener("click", function () {
+            var row = button.closest("[data-email-row]");
+            var form = button.closest("form");
+            if (!row || !form) return;
+            if (!window.confirm("Delete this address? It is removed when you save the facility.")) return;
+            if (row.getAttribute("data-email-new") === "true") {
+                row.remove();
+            } else {
+                var wasDirty = form.getAttribute("data-facility-dirty") === "true";
+                row.classList.add("lu-row-staged");
+                var note = document.createElement("div");
+                note.className = "small text-warning lu-remove-note";
+                note.textContent = "Staged for removal.";
+                var undo = undoButton(function () {
+                    row.classList.remove("lu-row-staged");
+                    note.remove();
+                    syncEmails(form);
+                    var pending = form.querySelector(".lu-row-staged, [data-email-new='true']");
+                    if (!pending && !wasDirty && form.getAttribute("data-facility-edited") !== "1")
+                        form.removeAttribute("data-facility-dirty");
+                    refreshFlag();
+                    updateCounts();
+                });
+                note.appendChild(document.createTextNode(" "));
+                note.appendChild(undo);
+                row.appendChild(note);
+            }
+            syncEmails(form);
+            if (!form.querySelector(".lu-row-staged, [data-email-new='true']") && form.getAttribute("data-facility-edited") !== "1")
+                form.removeAttribute("data-facility-dirty");
+            else
+                markDirty(form);
+            refreshFlag();
+            updateCounts();
+        });
+    }
+
+    function decorateNotification() {
+        var item = document.getElementById("notificationItem");
+        var form = item && item.querySelector("form[data-facility-action='SaveNotification']");
+        if (!item || !form) return;
+        headerAdd(item, function () {
+            var host = form.querySelector("#notificationRows");
+            setExpanded(item, true);
+            var row = document.createElement("div");
+            row.className = "row g-2 align-items-center mb-2";
+            row.setAttribute("data-email-row", "");
+            row.setAttribute("data-collection-row", "");
+            row.setAttribute("data-email-new", "true");
+            row.innerHTML = '<div class="col"><input class="form-control" data-email-input aria-label="Email address" maxlength="254" /></div>'
+                + '<div class="col-auto"><button type="button" class="btn btn-sm btn-danger" data-email-remove>Delete</button></div>';
+            var box = form.querySelector("#notificationEmails");
+            if (box) box.before(row);
+            else host.appendChild(row);
+            wireEmailRemove(row.querySelector("[data-email-remove]"));
+            markDirty(form);
+            updateCounts();
+            var focus = row.querySelector("input");
+            if (focus) focus.focus();
+        });
+        form.querySelectorAll("[data-email-remove]").forEach(wireEmailRemove);
+        if (form.getAttribute("data-email-wired") !== "1") {
+            form.setAttribute("data-email-wired", "1");
+            form.addEventListener("input", function () { syncEmails(form); });
+        }
+        updateCounts();
+    }
+
+    function reconcileEmptied() {
+        var editor = root();
+        if (!editor) return;
+        syncEmails();
+        var dispatchForm = editor.querySelector("form[data-facility-action='SaveQueryDispatch']");
+        var dispatchDelete = editor.querySelector("form[data-facility-action='DeleteQueryDispatch']");
+        if (dispatchForm && dispatchDelete) {
+            var exists = (dispatchForm.querySelector("input[name='queryDispatchExists']") || {}).value === "true";
+            var dirty = dispatchForm.getAttribute("data-facility-dirty") === "true";
+            if (exists && dirty && dispatchKept(editor) === 0) {
+                dispatchForm.setAttribute("data-facility-skip", "true");
+                dispatchDelete.setAttribute("data-facility-force", "true");
+            }
+        }
+        var emailForm = editor.querySelector("form[data-facility-action='SaveNotification']");
+        var emailDelete = editor.querySelector("form[data-facility-action='DeleteNotification']");
+        if (emailForm && emailDelete) {
+            var id = emailForm.querySelector("input[name='Id']");
+            var emailExists = !!(id && id.value.trim());
+            var emailDirty = emailForm.getAttribute("data-facility-dirty") === "true";
+            if (emailExists && emailDirty && emailKept(editor) === 0) {
+                emailForm.setAttribute("data-facility-skip", "true");
+                emailDelete.setAttribute("data-facility-force", "true");
+            }
+        }
+    }
+
+    function decorateAll() {
+        decorateNormalization();
+        decorateQueryPlans();
+        decorateDispatch();
+        decorateNotification();
     }
 
     function wirePlanSelect(scope) {
@@ -467,7 +791,10 @@
                 wrap.classList.add("d-none");
         }
         if (action.indexOf("Delete") === 0 && submit) wireRemove(form, submit);
-        form.addEventListener("input", function () { markDirty(form); });
+        form.addEventListener("input", function () {
+            form.setAttribute("data-facility-edited", "1");
+            markDirty(form);
+        });
         form.addEventListener("change", function () { markDirty(form); });
     }
 
@@ -477,7 +804,7 @@
         if (!document.getElementById("facilitySaveBar")) return;
         editor.setAttribute("data-facility-ready", "1");
         editor.querySelectorAll("form[data-au-save]").forEach(classify);
-        decorateNormalization();
+        decorateAll();
         wirePlanSelect(editor);
         var save = document.getElementById("facilitySaveButton");
         var cancel = document.getElementById("facilityCancelButton");
@@ -502,6 +829,7 @@
     }
 
     function postForm(form) {
+        if (form.getAttribute("data-facility-action") === "SaveNotification") syncEmails(form);
         return fetch(form.action, {
             method: "POST",
             body: new FormData(form),
@@ -571,6 +899,7 @@
         saving = true;
         refreshFlag();
         showResults([]);
+        reconcileEmptied();
         var forms = pending(saveOrder).concat(pending(removeOrder));
         var saved = [];
         var index = 0;
