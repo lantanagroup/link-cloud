@@ -1,7 +1,7 @@
 (function () {
     var statusChart;
     var dayChart;
-    var refreshing = false;
+    var refreshTicket = 0;
 
     function readStats() {
         var node = document.getElementById("automation-stats");
@@ -187,15 +187,16 @@
     }
 
     function refresh() {
-        if (refreshing) return;
-        refreshing = true;
+        var ticket = ++refreshTicket;
         var dataUrl = new URL("/Automation/data", window.location.origin);
         dataUrl.search = window.location.search;
         fetch(dataUrl, { headers: { "Accept": "application/json" } })
             .then(function (response) { return response.ok ? response.json() : null; })
-            .then(function (page) { if (page) apply(page); })
-            .catch(function () { setLive("Live updates unavailable", "bg-secondary"); })
-            .finally(function () { refreshing = false; });
+            .then(function (page) {
+                if (ticket !== refreshTicket) return;
+                if (page) apply(page);
+            })
+            .catch(function () { });
     }
 
     function setLive(text, badge) {
@@ -220,15 +221,21 @@
         .withAutomaticReconnect()
         .build();
 
+    function catchUp() {
+        return connection.invoke("SubscribeDashboard").then(function () {
+            setLive("Live", "bg-success");
+            refresh();
+        });
+    }
+
     connection.on("dashboardUpdate", refresh);
     connection.onreconnecting(function () { setLive("Reconnecting", "bg-warning text-dark"); });
     connection.onreconnected(function () {
-        setLive("Live", "bg-success");
-        connection.invoke("SubscribeDashboard").catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        catchUp().catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
     });
     connection.onclose(function () { setLive("Live updates unavailable", "bg-secondary"); });
+    refresh();
     connection.start()
-        .then(function () { return connection.invoke("SubscribeDashboard"); })
-        .then(function () { setLive("Live", "bg-success"); })
+        .then(catchUp)
         .catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
 })();

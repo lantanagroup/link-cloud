@@ -1,0 +1,24 @@
+@model Link.UI.Models.FacilityHubViewModel
+<label class="form-label" for="vendorVersionId">Vendor</label>
+@if (Model.VendorListLoaded)
+{
+    <select id="vendorVersionId" name="VendorVersionId" class="form-select">
+        <option value="">None</option>
+        @foreach (var vendor in Model.Vendors)
+        {
+            if (string.Equals(vendor.Id.ToString(), Model.VendorVersionId, StringComparison.OrdinalIgnoreCase))
+            {
+                <option value="@vendor.Id" selected>@vendor.Label</option>
+            }
+            else
+            {
+                <option value="@vendor.Id">@vendor.Label</option>
+            }
+        }
+    </select>
+}
+else
+{
+    <input type="hidden" name="VendorVersionId" value="@Model.VendorVersionId" />
+    <input id="vendorVersionId" class="form-control" value="@(Model.VendorVersionId ?? "Not loaded")" readonly />
+}

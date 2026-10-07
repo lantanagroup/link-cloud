@@ -11,8 +11,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace Link.UI.Controllers;
 
 /// <summary>
-/// JSON endpoints the scenario editor uses for the shared patient-configuration editor.
-/// The configurations page itself is a later slice.
+/// Patient-configuration list and the JSON endpoints the scenario editor uses.
 /// </summary>
 [Route("Automation/PatientConfigurations/[action]")]
 public class PatientConfigurationsController : Controller
@@ -49,6 +48,14 @@ public class PatientConfigurationsController : Controller
         catalogStore = catalog;
         terminology = lookup;
         base.OnActionExecuting(context);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Index(CancellationToken ct)
+    {
+        ViewData["Title"] = "Patient configurations";
+        ViewData["AutomationSection"] = "configurations";
+        return View(await store.GetAllAsync(ct));
     }
 
     [HttpGet]
