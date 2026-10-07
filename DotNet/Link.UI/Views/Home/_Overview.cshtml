@@ -37,13 +37,16 @@
                 </a>
             </div>
         }
-        <div class="col-6 col-md-3">
-            <a class="au-kpi-card au-kpi-link" asp-controller="Automation" asp-action="Index">
-                <div class="au-kpi-value">@runs.ActiveText</div>
-                <div class="au-kpi-label">Active runs</div>
-                <div class="au-kpi-note">Open the runs dashboard</div>
-            </a>
-        </div>
+        @if (LinkUiFeatures.Value.AutomationEnabled)
+        {
+            <div class="col-6 col-md-3">
+                <a class="au-kpi-card au-kpi-link" asp-controller="Automation" asp-action="Index">
+                    <div class="au-kpi-value">@runs.ActiveText</div>
+                    <div class="au-kpi-label">Active runs</div>
+                    <div class="au-kpi-note">Open the runs dashboard</div>
+                </a>
+            </div>
+        }
         <div class="col-6 col-md-3">
             <a class="au-kpi-card au-kpi-link @(health.Reachable && health.Unhealthy > 0 ? "au-kpi-bad" : "")" asp-controller="System" asp-action="Health">
                 <div class="au-kpi-value">@health.UnhealthyText</div>
