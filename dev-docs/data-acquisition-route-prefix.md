@@ -39,7 +39,7 @@ Each legacy request increments `link_data_acq_legacy_route_requests`. In Prometh
 | Tag | Value |
 | --- | --- |
 | `http_route` | The matched route template, e.g. `api/data-acquisition/{facilityId}/QueryPlan`, or `unmatched` when the path matches no endpoint |
-| `http_request_method` | `GET`, `POST`, ... |
+| `http_request_method` | `GET`, `POST`, ..., or `_OTHER` for any method outside the standard nine, so a client sending made-up methods can't grow the series |
 
 The tag is the template, never the raw path: raw paths carry facility and patient ids, which would be
 unbounded cardinality and identifiers in the metrics store. The middleware also writes a `Debug` log

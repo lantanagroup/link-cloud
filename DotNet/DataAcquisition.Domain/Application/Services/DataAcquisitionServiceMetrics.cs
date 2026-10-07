@@ -44,6 +44,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             ]);
         }
 
+        /// <summary>
+        /// Counts one request that arrived on the deprecated /api/data prefix, tagged by route template and method.
+        /// </summary>
         public void IncrementPathRewriteCounter(string route, string method)
         {
             _legacyRouteRequestsCounter.Add(1,

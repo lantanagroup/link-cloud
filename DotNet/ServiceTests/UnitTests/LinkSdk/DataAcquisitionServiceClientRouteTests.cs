@@ -1,10 +1,13 @@
 using System.Collections;
 using System.Reflection;
 using FluentAssertions;
+using Flurl.Http;
+using Flurl.Http.Testing;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Moq;
 using Task = System.Threading.Tasks.Task;
@@ -21,17 +24,18 @@ namespace UnitTests.LinkSdk;
 /// including ones added later.
 /// </remarks>
 [Trait("Category", "UnitTests")]
-public class DataAcquisitionServiceClientRouteTests : IClassFixture<DataAcquisitionRouteProbeServer>
+public class DataAcquisitionServiceClientRouteTests : IClassFixture<DataAcquisitionRouteProbe>
 {
     // Guid-shaped, so it also satisfies {id:guid} route constraints wherever a string id lands in a path.
     private const string SampleId = "7d9f7c1e-3b1a-4c55-9d7e-2f1e0f4a6b10";
+    private const string BaseUrl = "http://link.test";
     private const int MaxObjectDepth = 3;
 
-    private readonly DataAcquisitionRouteProbeServer _server;
+    private readonly DataAcquisitionRouteProbe _probe;
 
-    public DataAcquisitionServiceClientRouteTests(DataAcquisitionRouteProbeServer server)
+    public DataAcquisitionServiceClientRouteTests(DataAcquisitionRouteProbe probe)
     {
-        _server = server;
+        _probe = probe;
     }
 
     public static TheoryData<string> ClientMethods()
@@ -49,33 +53,45 @@ public class DataAcquisitionServiceClientRouteTests : IClassFixture<DataAcquisit
     [MemberData(nameof(ClientMethods))]
     public async Task ClientMethod_AgainstDataAcquisitionRoutes_ReachesAControllerAction(string methodName)
     {
-        using var client = CreateClient(_server.BaseUrl);
         var overloads = typeof(IDataAcquisitionServiceClient)
             .GetMethods()
             .Where(m => m.Name == methodName);
 
         foreach (var method in overloads)
         {
-            _server.TakeRequests();
-            var arguments = method
-                .GetParameters()
-                .Select(p => CreateValue(p.ParameterType, depth: 0))
-                .ToArray();
+            var calls = await CaptureCallsAsync(method);
 
-            await ((Task)method.Invoke(client, arguments)!).WaitAsync(TimeSpan.FromSeconds(10));
-
-            var requests = _server.TakeRequests();
-            requests.Should().NotBeEmpty("{0} should call Data Acquisition", method);
-            foreach (var request in requests)
+            calls.Should().NotBeEmpty("{0} should call Data Acquisition", method);
+            foreach (var call in calls)
             {
-                request.MatchedAction
-                    .Should()
-                    .NotBeNull("{0} sent {1} {2}, which no Data Acquisition action serves",
-                               method.Name,
-                               request.Method,
-                               request.Path);
+                var url = new Uri(call.Request.Url.ToString());
+                var matched = await _probe.MatchAsync(call.Request.Verb, url.PathAndQuery, call.RequestBody);
+
+                matched.Should().NotBeNull("{0} sent {1} {2}, which no Data Acquisition action serves",
+                                           method.Name,
+                                           call.Request.Verb.Method,
+                                           url.AbsolutePath);
             }
         }
+    }
+
+    /// <summary>
+    /// Invokes one client method with generated arguments and returns the HTTP calls it made, intercepted in
+    /// process by Flurl's HttpTest so nothing reaches the network.
+    /// </summary>
+    private static async Task<List<FlurlCall>> CaptureCallsAsync(MethodInfo method)
+    {
+        using var httpTest = new HttpTest();
+        httpTest.RespondWith(string.Empty, StatusCodes.Status204NoContent);
+        using var client = CreateClient(BaseUrl);
+        var arguments = method
+            .GetParameters()
+            .Select(p => CreateValue(p.ParameterType, depth: 0))
+            .ToArray();
+
+        await ((Task)method.Invoke(client, arguments)!).WaitAsync(TimeSpan.FromSeconds(10));
+
+        return httpTest.CallLog.ToList();
     }
 
     private static object? CreateValue(Type type, int depth)

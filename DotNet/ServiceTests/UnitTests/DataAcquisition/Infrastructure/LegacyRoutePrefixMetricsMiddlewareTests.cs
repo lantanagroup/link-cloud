@@ -55,6 +55,22 @@ public class LegacyRoutePrefixMetricsMiddlewareTests
         _metrics.Verify(m => m.IncrementPathRewriteCounter(RouteTemplate, method), Times.Once);
     }
 
+    [Theory]
+    [InlineData("FOO")]
+    [InlineData("PROPFIND")]
+    [InlineData("get")]
+    public async Task InvokeAsync_LegacyRequestWithNonStandardMethod_TagsOther(string method)
+    {
+        // Any method token reaches the middleware; tagging each one as sent would grow the series without bound.
+        var context = CreateContext(legacy: true, method, endpoint: null);
+
+        await CreateMiddleware().InvokeAsync(context, _metrics.Object);
+
+        _metrics.Verify(m => m.IncrementPathRewriteCounter("unmatched", LegacyRoutePrefixMetricsMiddleware.OtherMethod),
+                        Times.Once);
+        _metrics.Verify(m => m.IncrementPathRewriteCounter(It.IsAny<string>(), method), Times.Never);
+    }
+
     [Fact]
     public async Task InvokeAsync_LegacyRequest_CallsNext()
     {

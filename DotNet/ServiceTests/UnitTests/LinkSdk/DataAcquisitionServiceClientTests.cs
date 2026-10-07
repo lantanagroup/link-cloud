@@ -189,12 +189,11 @@ public class DataAcquisitionServiceClientTests
     [Fact]
     public async System.Threading.Tasks.Task SoftDeleteLogsByFacilityAsync_DeletesExpectedEndpoint()
     {
-        using var server = new OneShotServer("{}");
-        using var client = CreateClient(server.BaseUrl);
+        using var http = new FakeHttpBoundary("{}");
+        using var client = CreateClient(http.BaseUrl);
 
-        var callTask = client.SoftDeleteLogsByFacilityAsync("f1");
-        var request = await server.WaitForRequestAsync();
-        await callTask;
+        await client.SoftDeleteLogsByFacilityAsync("f1");
+        var request = http.SingleRequest();
 
         Assert.Equal("DELETE", request.Method);
         Assert.Equal("/api/data-acquisition/acquisition-logs/facility/f1", request.Path);
