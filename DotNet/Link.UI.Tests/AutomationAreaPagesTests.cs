@@ -41,6 +41,8 @@ public class AutomationAreaPagesTests
         engine.Should().Contain("IRunMetricsSnapshotService, RunMetricsSnapshotService");
         engine.Should().Contain("IApiHealthRunStore, MongoApiHealthRunStore");
         engine.Should().Contain("AddHostedService<ApiHealthStartupRecoveryService>");
+        engine.Should().Contain("AddHostedService<PatientBundleExternalizationMigrationService>()");
+        engine.Should().NotContain("DashboardSeedService");
     }
 
     [Fact]
