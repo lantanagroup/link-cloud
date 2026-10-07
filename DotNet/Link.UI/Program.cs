@@ -132,15 +132,6 @@ builder.Services.AddControllersWithViews()
     .AddJsonOptions(opts =>
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    })
-    .ConfigureApplicationPartManager(manager =>
-    {
-        // The engine assembly also contains the old web UI. Those controllers stay unmapped.
-        var imported = manager.ApplicationParts
-            .Where(part => string.Equals(part.Name, "Automation.UI", StringComparison.Ordinal))
-            .ToList();
-        foreach (var part in imported)
-            manager.ApplicationParts.Remove(part);
     });
 
 // RunHub and CleanupHub carry [Authorize]. The shell gate is the sign-in check.

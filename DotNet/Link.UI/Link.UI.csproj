@@ -10,25 +10,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="MongoDB.Driver" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Automation.UI\Automation.UI.csproj" />
+    <ProjectReference Include="..\Automation.Link\Automation.Link.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
+    <ProjectReference Include="..\Normalization.Engine\Normalization.Engine.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
-
-  <!-- Automation.UI is referenced for its run engine. Its wwwroot must not merge
-       into this host, which already serves css/site.css. -->
-  <Target Name="DropAutomationUiStaticWebAssets" BeforeTargets="GenerateStaticWebAssetsManifest">
-    <ItemGroup>
-      <StaticWebAsset Remove="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Automation.UI'" />
-      <StaticWebAssetEndpoint Remove="@(StaticWebAssetEndpoint)" Condition="'%(AssetFile)' != '' and $([System.String]::Copy('%(AssetFile)').Contains('Automation.UI'))" />
-      <StaticWebAssetDiscoveryPattern Remove="@(StaticWebAssetDiscoveryPattern)" Condition="$([System.String]::Copy('%(ContentRoot)').Contains('Automation.UI'))" />
-      <StaticWebAssetProjectConfiguration Remove="@(StaticWebAssetProjectConfiguration)" Condition="$([System.String]::Copy('%(Identity)').Contains('Automation.UI.csproj'))" />
-    </ItemGroup>
-  </Target>
 </Project>
