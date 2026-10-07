@@ -3,10 +3,7 @@
 @inject IAdminBffUserService UserService
 @{
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
-    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
     bool Ctrl(string name) => string.Equals(currentController, name, StringComparison.OrdinalIgnoreCase);
-    bool Placeholder(string action) =>
-        Ctrl("Placeholder") && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
 
     var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
         ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
@@ -49,9 +46,7 @@
                 <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
                     <i class="bi bi-gear me-2"></i>System
                 </a>
-
-                <div class="lu-nav-section-label mt-3">Later</div>
-                <a class="lu-nav-link lu-nav-link-muted @(Placeholder("Automation") ? "active" : "")" asp-controller="Placeholder" asp-action="Automation">
+                <a class="lu-nav-link @(Ctrl("Automation") ? "active" : "")" asp-controller="Automation" asp-action="Index">
                     <i class="bi bi-lightning-charge me-2"></i>Automation
                 </a>
             </nav>

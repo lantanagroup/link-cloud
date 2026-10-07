@@ -62,12 +62,13 @@ In:
 - LinkSDK registration, env + Azure App Config hooks, health
 - `--au-*` CSS tokens + Bootstrap + **left vertical nav**
 - Home, tenant list, facility hub (identity, census, query dispatch)
-- Placeholder nav for Reports / Configuration / Logs / System / Automation
+- Automation runs dashboard and run detail. Summaries are read from Automation.UI's `automation_runs` collection. Live status proxies that process's `/hubs/runs` hub.
 
 Out:
 
 - Data acquisition and normalization panels, facility view, reports, logs, configuration, system pages
-- Landing dashboard and Automation testing
+- Product landing dashboard
+- Automation new-run launch, scenarios, configuration editors, metrics, API health, and cleanup
 - No changes to Automation.UI or Web/Admin.UI behavior beyond solution registration
 
 ## Solution

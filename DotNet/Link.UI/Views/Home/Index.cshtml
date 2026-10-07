@@ -7,7 +7,7 @@
     <div class="card-header">Welcome</div>
     <div class="card-body">
         <p class="mb-2">
-            Link.UI is the Admin console on the Automation.UI MVC stack. Automation testing is a later phase.
+            Link.UI is the Admin console. Automation opens the test-run dashboard.
         </p>
         <ul class="mb-3">
             <li>Left-hand vertical navigation</li>
@@ -27,9 +27,12 @@
                 (proxied through this host). Local Development allows anonymous browsing by default.
             </div>
         }
-        <div class="mt-3">
+        <div class="mt-3 d-flex flex-wrap gap-2">
             <a class="btn btn-au-action" asp-controller="Tenants" asp-action="Index">
                 <i class="bi bi-building me-1"></i>Open Tenants
+            </a>
+            <a class="btn btn-outline-secondary" asp-controller="Automation" asp-action="Index">
+                <i class="bi bi-lightning-charge me-1"></i>Open Automation
             </a>
         </div>
     </div>

@@ -1,0 +1,159 @@
+@model AutomationDashboardPage
+@using System.Text.Json
+@using Link.UI.Services
+@{
+    var stats = Model.Stats;
+    var success = (stats.Succeeded + stats.Failed) == 0
+        ? "—"
+        : $"{stats.SuccessRate}%";
+    string SortDirFor(string column) =>
+        Model.SortBy == column && Model.SortDir == "asc" ? "desc" : "asc";
+    string SortMark(string column) =>
+        Model.SortBy != column ? "" : Model.SortDir == "asc" ? " ↑" : " ↓";
+}
+@await Html.PartialAsync("_Nav")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Automation runs</h1>
+        <p class="text-muted mb-0">Counts and history from the runs Automation.UI stores. A new run still stands up a throwaway facility, runs, and tears it down. Starting a run from here comes in a later slice.</p>
+    </div>
+    <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured ? "yes" : "no")">@(Model.LiveConfigured ? "Connecting" : "Live updates are not configured")</span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Message))
+{
+    <div class="alert alert-warning" id="storageMessage">@Model.Message</div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="au-kpi-card">
+            <div class="au-kpi-value" id="kpiActive">@(stats.Running + stats.Queued)</div>
+            <div class="au-kpi-label">Currently active</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="au-kpi-card">
+            <div class="au-kpi-value" id="kpiTotal">@stats.TotalRuns</div>
+            <div class="au-kpi-label">Runs in 14 days</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="au-kpi-card">
+            <div class="au-kpi-value" id="kpiSuccess">@success</div>
+            <div class="au-kpi-label">Success rate</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="au-kpi-card">
+            <div class="au-kpi-value" id="kpiDuration">@AutomationRules.FormatDuration(stats.AvgDurationSeconds)</div>
+            <div class="au-kpi-label">Average duration</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12 col-lg-4">
+        <div class="au-card card h-100">
+            <div class="card-header">Status</div>
+            <div class="card-body">
+                <canvas id="statusChart" height="180"></canvas>
+                <p id="statusEmpty" class="text-muted mb-0 @(stats.TotalRuns == 0 ? "" : "d-none")">No runs in the last 14 days.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-8">
+        <div class="au-card card h-100">
+            <div class="card-header">Runs per day</div>
+            <div class="card-body">
+                <canvas id="dayChart" height="180"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="au-card card mb-3" id="activeCard">
+    <div class="card-header">Active runs</div>
+    <div class="card-body">
+        <div class="row g-2" id="activeRuns">
+            @foreach (var run in Model.ActiveRuns)
+            {
+                <div class="col-12 col-md-4">
+                    <div class="border rounded p-2 h-100">
+                        <a class="fw-semibold" asp-action="Run" asp-route-id="@run.RunId">@run.RunName</a>
+                        <div class="small text-muted">@run.PatientCount patients · seed @run.Seed</div>
+                        <div class="d-flex justify-content-between gap-2 mt-1">
+                            <span class="badge bg-primary">@run.StatusLabel</span>
+                            <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")"></span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+        <p id="activeEmpty" class="text-muted mb-0 @(Model.ActiveRuns.Count == 0 ? "" : "d-none")">No run is in progress.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header d-flex justify-content-between">
+        <span>Run history</span>
+        <span class="text-muted" id="historyCount">@Model.TotalCount</span>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-2">
+                <thead>
+                    <tr>
+                        <th><a href="@Url.Action("Index", new { sortBy = "runName", sortDir = SortDirFor("runName"), pageSize = Model.PageSize })">Run@(SortMark("runName"))</a></th>
+                        <th><a href="@Url.Action("Index", new { sortBy = "status", sortDir = SortDirFor("status"), pageSize = Model.PageSize })">Status@(SortMark("status"))</a></th>
+                        <th><a href="@Url.Action("Index", new { sortBy = "patientCount", sortDir = SortDirFor("patientCount"), pageSize = Model.PageSize })">Patients@(SortMark("patientCount"))</a></th>
+                        <th><a href="@Url.Action("Index", new { sortBy = "createdAt", sortDir = SortDirFor("createdAt"), pageSize = Model.PageSize })">Created@(SortMark("createdAt"))</a></th>
+                        <th>Facility</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    @foreach (var run in Model.RecentRuns)
+                    {
+                        <tr>
+                            <td><a asp-action="Run" asp-route-id="@run.RunId">@run.RunName</a></td>
+                            <td>@run.StatusLabel</td>
+                            <td>@run.PatientCount</td>
+                            <td>@run.CreatedAt.ToString("u")</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(run.FacilityId))
+                                {
+                                    <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@run.FacilityId">@run.FacilityId</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p id="historyEmpty" class="text-muted mb-2 @(Model.RecentRuns.Count == 0 ? "" : "d-none")">No runs stored.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-center" id="historyPager">
+            @if (Model.PageNumber > 1)
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { pageNumber = Model.PageNumber - 1, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir })">Previous</a>
+            }
+            <span class="small text-muted">Page @Model.PageNumber of @Model.TotalPages</span>
+            @if (Model.PageNumber < Model.TotalPages)
+            {
+                <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { pageNumber = Model.PageNumber + 1, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir })">Next</a>
+            }
+        </div>
+    </div>
+</div>
+
+<script id="automation-stats" type="application/json">@Html.Raw(JsonSerializer.Serialize(stats, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }))</script>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script src="~/js/automation-dashboard.js" asp-append-version="true"></script>
+}

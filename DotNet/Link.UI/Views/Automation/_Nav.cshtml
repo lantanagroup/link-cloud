@@ -1,0 +1,12 @@
+@{
+    var active = ViewData["AutomationSection"] as string ?? "";
+    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+}
+<nav class="lu-section-nav mb-3" aria-label="Automation">
+    <a class="@Btn("runs")" asp-controller="Automation" asp-action="Index">Runs</a>
+    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Scenarios</span>
+    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Configurations</span>
+    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Metrics</span>
+    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">API health</span>
+    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Cleanup</span>
+</nav>
