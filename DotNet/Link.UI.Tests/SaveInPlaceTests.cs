@@ -121,6 +121,11 @@ public class SaveInPlaceTests
         js.Should().Contain("Staged for removal");
         js.Should().NotContain("lu-section-empty");
         js.Should().Contain("data-facility-swap");
+        var swapAt = js.IndexOf("closest(\"a[data-facility-swap]\")", StringComparison.Ordinal);
+        swapAt.Should().BeGreaterThan(-1);
+        var stopAt = js.IndexOf("stopImmediatePropagation()", swapAt, StringComparison.Ordinal);
+        stopAt.Should().BeGreaterThan(swapAt);
+        js.IndexOf("Leave without saving", stopAt, StringComparison.Ordinal).Should().BeGreaterThan(stopAt);
         var deleteAt = js.IndexOf("button.textContent = \"Delete\"", StringComparison.Ordinal);
         deleteAt.Should().BeGreaterThan(-1);
 

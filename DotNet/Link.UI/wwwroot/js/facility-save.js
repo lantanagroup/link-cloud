@@ -303,7 +303,7 @@
 
     function wireRowRemove(form, submit) {
         var action = form.getAttribute("data-facility-action");
-        var rest = (submit.textContent || "").replace(/^Delete\s+/i, "").trim();
+        var rest = (submit.textContent || "").replace(/^Delete\s*/i, "").trim();
         var label = rest || labels[action] || "this row";
         submit.type = "button";
         submit.className = "btn btn-sm btn-danger";
@@ -669,7 +669,7 @@
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         if (link.target && link.target !== "_self") return;
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         var swapId = link.getAttribute("data-facility-swap");
         var swapTarget = document.getElementById(swapId);
         if (sectionDirty(swapTarget) && !window.confirm("This section has unsaved changes. Continue and discard them?")) return;
