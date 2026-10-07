@@ -1,0 +1,68 @@
+@model SystemHomePage
+
+<h1 class="h3">System</h1>
+<p class="text-muted">Accounts, service health, the addresses this process calls, and integration events. Restore and identity-provider setup stay out of this area.</p>
+
+<div class="row g-3">
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Accounts</div>
+            <div class="card-body">
+                <p>Search users, create an account, and assign roles that already exist.</p>
+                @if (!Model.AccountConfigured)
+                {
+                    <p class="text-muted">Account service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Users">Open accounts</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Roles</div>
+            <div class="card-body">
+                <p>List roles and edit the name and description. Existing claims stay as they are.</p>
+                @if (!Model.AccountConfigured)
+                {
+                    <p class="text-muted">Account service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Roles">Open roles</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Service health</div>
+            <div class="card-body">
+                <p>Health reports and version information collected by Admin.BFF.</p>
+                @if (!Model.AdminConfigured)
+                {
+                    <p class="text-muted">Admin.BFF service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Health">Open health</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">App configuration</div>
+            <div class="card-body">
+                <p>The service addresses this process is using. The catalog is not edited here.</p>
+                <a class="btn btn-au-action" asp-action="AppConfiguration">Open app configuration</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Integration test</div>
+            <div class="card-body">
+                <p>Post a report-scheduled event or a patient-list-acquired event.</p>
+                @if (!Model.AdminConfigured)
+                {
+                    <p class="text-muted">Admin.BFF service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Integration">Open integration test</a>
+            </div>
+        </div>
+    </div>
+</div>

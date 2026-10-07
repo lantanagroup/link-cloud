@@ -42,6 +42,7 @@ builder.Services.AddScoped(ReportsService.Create);
 builder.Services.Configure<LogsLinkOptions>(builder.Configuration.GetSection(LogsLinkOptions.SectionName));
 builder.Services.AddScoped(LogsService.Create);
 builder.Services.AddScoped(ConfigurationService.Create);
+builder.Services.AddScoped(SystemService.Create);
 
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 

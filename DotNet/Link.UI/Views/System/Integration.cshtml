@@ -1,0 +1,101 @@
+@model IntegrationPage
+@using Link.UI.Services
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+</div>
+<h1 class="h3">Integration test</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">These posts go to Admin.BFF, which produces the event. A blank tracking id is filled in when the event is posted. Consumer start, read, and stop are not on this page.</p>
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warning">Admin.BFF service URL is not configured (ServiceRegistry:AdminBffServiceUrl).</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Report scheduled</div>
+    <div class="card-body">
+        <form method="post" asp-action="ScheduleReport" class="row g-2" onsubmit="return confirm('Post this report-scheduled event?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="frequency">Frequency</label>
+                <select id="frequency" name="frequency" class="form-select">
+                    <option value="">Choose</option>
+                    @foreach (var frequency in SystemRules.Frequencies)
+                    {
+                        <option value="@frequency">@frequency</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="startDate">Start date</label>
+                <input id="startDate" name="startDate" type="date" class="form-control" />
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="reportTypes">Report types</label>
+                <input id="reportTypes" name="reportTypes" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="delayMinutes">Delay minutes</label>
+                <input id="delayMinutes" name="delayMinutes" class="form-control" inputmode="numeric" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="reportTrackingId">Tracking id</label>
+                <input id="reportTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Post report scheduled</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The start date has to be in the past. Report types are separated by commas.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Patient list acquired</div>
+    <div class="card-body">
+        <form method="post" asp-action="AcquirePatientList" class="row g-2" onsubmit="return confirm('Post this patient-list-acquired event?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="listFacilityId">Facility</label>
+                <input id="listFacilityId" name="facilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-4">
+                <label class="form-label" for="listType">List type</label>
+                <select id="listType" name="listType" class="form-select">
+                    <option value="">Choose</option>
+                    @foreach (var listType in SystemRules.ListTypes)
+                    {
+                        <option value="@listType">@listType</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-4">
+                <label class="form-label" for="timeFrame">Time frame</label>
+                <select id="timeFrame" name="timeFrame" class="form-select">
+                    <option value="">Choose</option>
+                    @foreach (var timeFrame in SystemRules.TimeFrames)
+                    {
+                        <option value="@timeFrame">@timeFrame</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="patientIds">Patient ids</label>
+                <input id="patientIds" name="patientIds" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="listTrackingId">Tracking id</label>
+                <input id="listTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Post patient list</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces.</p>
+    </div>
+</div>

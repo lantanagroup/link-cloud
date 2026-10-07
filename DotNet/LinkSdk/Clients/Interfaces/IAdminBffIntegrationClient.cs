@@ -11,6 +11,9 @@ public interface IAdminBffIntegrationClient
 
     Task<LinkApiResponse<string>> GetServiceHealthAsync(string service, CancellationToken cancellationToken = default);
 
+    /// <summary>GET /api/info. Admin.BFF collects each service's version block.</summary>
+    Task<LinkApiResponse<string>> GetServiceInformationAsync(CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<FacilityModel>> CreateFacilityAsync(
         FacilityModel request,
         CancellationToken cancellationToken = default);

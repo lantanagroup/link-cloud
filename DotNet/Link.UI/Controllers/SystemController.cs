@@ -1,0 +1,135 @@
+using Link.UI.Models;
+using Link.UI.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Link.UI.Controllers;
+
+[Route("System")]
+public sealed class SystemController : Controller
+{
+    private readonly SystemService _system;
+
+    public SystemController(SystemService system)
+    {
+        _system = system;
+    }
+
+    [HttpGet("")]
+    public IActionResult Index()
+    {
+        ViewData["Title"] = "System";
+        return View(_system.LoadHome());
+    }
+
+    [HttpGet("Users")]
+    public async Task<IActionResult> Users(UserQuery query, CancellationToken cancellationToken)
+    {
+        Section("users", "Accounts");
+        return View(await _system.LoadUsersAsync(query, cancellationToken));
+    }
+
+    [HttpGet("Users/{id}")]
+    public async Task<IActionResult> Account(string id, CancellationToken cancellationToken)
+    {
+        Section("users", "Account");
+        return View(await _system.LoadUserAsync(id, cancellationToken));
+    }
+
+    [HttpPost("Users")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateUser(UserForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.SaveUserAsync(null, form, cancellationToken));
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpPost("Users/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateUser(string id, UserForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.SaveUserAsync(id, form, cancellationToken));
+        return RedirectToAction(nameof(Account), new { id });
+    }
+
+    [HttpPost("Users/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteUser(string id, CancellationToken cancellationToken)
+    {
+        Temp(await _system.DeleteUserAsync(id, cancellationToken));
+        return RedirectToAction(nameof(Users));
+    }
+
+    [HttpGet("Roles")]
+    public async Task<IActionResult> Roles(CancellationToken cancellationToken)
+    {
+        Section("roles", "Roles");
+        return View(await _system.LoadRolesAsync(cancellationToken));
+    }
+
+    [HttpPost("Roles")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveRole(RoleForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.SaveRoleAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Roles));
+    }
+
+    [HttpPost("Roles/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteRole(string id, CancellationToken cancellationToken)
+    {
+        Temp(await _system.DeleteRoleAsync(id, cancellationToken));
+        return RedirectToAction(nameof(Roles));
+    }
+
+    [HttpGet("Health")]
+    public async Task<IActionResult> Health(string? service, CancellationToken cancellationToken)
+    {
+        Section("health", "Service health");
+        return View(await _system.LoadHealthAsync(service, cancellationToken));
+    }
+
+    [HttpGet("AppConfiguration")]
+    public IActionResult AppConfiguration()
+    {
+        Section("configuration", "App configuration");
+        return View(_system.LoadAppConfiguration());
+    }
+
+    [HttpGet("Integration")]
+    public IActionResult Integration()
+    {
+        Section("integration", "Integration test");
+        return View(_system.LoadIntegration());
+    }
+
+    [HttpPost("Integration/report-scheduled")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ScheduleReport(ReportScheduledForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.ScheduleReportAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/patient-list")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AcquirePatientList(PatientListForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.AcquirePatientListAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    private void Section(string section, string title)
+    {
+        ViewData["Title"] = title;
+        ViewData["SystemSection"] = section;
+    }
+
+    private void Temp(SystemAction result)
+    {
+        if (result.Succeeded)
+            TempData["Message"] = result.Message;
+        else
+            TempData["Error"] = result.Message;
+    }
+}
