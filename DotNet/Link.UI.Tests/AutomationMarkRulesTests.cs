@@ -43,13 +43,20 @@ public class AutomationMarkRulesTests
     }
 
     [Fact]
-    public void An_unowned_guid_is_not_marked_and_the_filter_defaults_to_all()
+    public void An_unowned_guid_is_not_marked_and_the_filter_defaults_to_real()
     {
         var index = AutomationMarkRules.Build([], []);
         index.Contains(Guid.NewGuid().ToString()).Should().BeFalse();
-        AutomationMarkRules.NormalizeScope(null).Should().Be("all");
+        AutomationMarkRules.NormalizeScope(null).Should().Be("real");
         AutomationMarkRules.NormalizeScope(" AUTOMATION ").Should().Be("automation");
-        AutomationMarkRules.NormalizeScope("<script>").Should().Be("all");
+        AutomationMarkRules.NormalizeScope(" all ").Should().Be("all");
+        AutomationMarkRules.NormalizeScope("<script>").Should().Be("real");
+        AutomationMarkRules.ScopeForQuery(null).Should().BeNull();
+        AutomationMarkRules.ScopeForQuery("all").Should().Be("all");
+        AutomationMarkRules.Visible("real", owned: true).Should().BeFalse();
+        AutomationMarkRules.Visible("real", owned: false).Should().BeTrue();
+        AutomationMarkRules.Visible("automation", owned: true).Should().BeTrue();
+        AutomationMarkRules.Visible("all", owned: false).Should().BeTrue();
     }
 
     [Fact]
@@ -106,6 +113,23 @@ public class AutomationMarkRulesTests
         view.Should().Contain("name=\"_AutomationBadge\"");
         view.Should().Contain("data-au-refresh=");
         view.Should().Contain("data-au-filter=");
+    }
+
+    [Fact]
+    public void The_scope_control_offers_real_and_the_nav_follows_the_flag()
+    {
+        var scope = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_AutomationScope.cshtml"));
+        scope.Should().Contain("value=\"real\"");
+        scope.Should().Contain("AutomationEnabled");
+
+        var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
+        layout.Should().Contain("LinkUiFeatures.Value.AutomationEnabled");
+        layout.Should().Contain("bi-lightning-charge");
+
+        var shipped = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.json"));
+        shipped.Should().Contain("\"AutomationEnabled\": false");
+        var development = File.ReadAllText(RepoFile("DotNet/Link.UI/appsettings.Development.json"));
+        development.Should().Contain("\"AutomationEnabled\": true");
     }
 
     [Fact]

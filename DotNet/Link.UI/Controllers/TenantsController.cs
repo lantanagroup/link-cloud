@@ -3,6 +3,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Link.UI.Controllers;
 
@@ -16,6 +17,7 @@ public sealed class TenantsController : Controller
     private readonly FacilityViewService _view;
     private readonly ConfigurationService _configuration;
     private readonly AutomationOwnershipLookup _ownership;
+    private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly ILogger<TenantsController> _logger;
 
     public TenantsController(
@@ -24,6 +26,7 @@ public sealed class TenantsController : Controller
         FacilityViewService view,
         ConfigurationService configuration,
         AutomationOwnershipLookup ownership,
+        IOptions<LinkUiFeatureOptions> features,
         ILogger<TenantsController> logger)
     {
         _facilityServiceClient = facilityServiceClient;
@@ -31,6 +34,7 @@ public sealed class TenantsController : Controller
         _view = view;
         _configuration = configuration;
         _ownership = ownership;
+        _features = features;
         _logger = logger;
     }
 
@@ -43,8 +47,11 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken = default)
     {
         ViewData["Title"] = "Tenants";
-        var normalized = AutomationMarkRules.NormalizeScope(scope);
-        var ownership = await _ownership.GetAsync(cancellationToken);
+        var automationOn = _features.Value.AutomationEnabled;
+        var normalized = automationOn ? AutomationMarkRules.NormalizeScope(scope) : AutomationMarkRules.Real;
+        var ownership = automationOn
+            ? await _ownership.GetAsync(cancellationToken)
+            : AutomationOwnershipIndex.Empty;
 
         try
         {
@@ -89,10 +96,10 @@ public sealed class TenantsController : Controller
                     FacilityId = kvp.Key,
                     DisplayName = string.IsNullOrWhiteSpace(kvp.Value) ? kvp.Key : kvp.Value,
                     IsDeleted = !activeKeys.Contains(kvp.Key),
-                    AutomationRunId = ownership.RunIdFor(kvp.Key)
+                    AutomationRunId = automationOn ? ownership.RunIdFor(kvp.Key) : null
                 })
                 .Where(item => includeDeleted || !item.IsDeleted)
-                .Where(item => !AutomationMarkRules.IsAutomation(normalized) || item.AutomationRunId is not null)
+                .Where(item => !automationOn || AutomationMarkRules.Visible(normalized, item.AutomationRunId is not null))
                 .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(item => item.FacilityId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -153,7 +160,7 @@ public sealed class TenantsController : Controller
             includeDeleted,
             page,
             pageSize,
-            scope = AutomationMarkRules.IsAutomation(scope) ? AutomationMarkRules.Automation : null
+            scope = _features.Value.AutomationEnabled ? AutomationMarkRules.ScopeForQuery(scope) : null
         });
     }
 
@@ -169,7 +176,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> Create(FacilityEditInput input, CancellationToken cancellationToken)
     {
         var result = await _hub.CreateAsync(input, cancellationToken);
-        return FromResult(result, "New facility");
+        return await FromResult(result, "New facility");
     }
 
     [HttpGet]
@@ -195,6 +202,7 @@ public sealed class TenantsController : Controller
             operationPage ?? 1);
         if (!page.IsCreate && !page.NotFound && string.IsNullOrWhiteSpace(page.LoadError) && !string.IsNullOrWhiteSpace(page.FacilityId))
             page.Notification = await _configuration.LoadFacilityNotificationAsync(page.FacilityId, cancellationToken);
+        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
         var editor = planEdit.Sanitize();
         if (string.Equals(editor, "add", StringComparison.OrdinalIgnoreCase)
             || string.Equals(editor, "edit", StringComparison.OrdinalIgnoreCase))
@@ -208,7 +216,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveFacility([FromRoute] string? id, FacilityEditInput input, CancellationToken cancellationToken)
     {
         var result = await _hub.UpdateAsync(id, input, cancellationToken);
-        return FromResult(result, input.FacilityName ?? id ?? "Facility");
+        return await FromResult(result, input.FacilityName ?? id ?? "Facility");
     }
 
     [HttpPost]
@@ -221,7 +229,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.SaveCensusAsync(id, enabled, scheduledTrigger, censusExists, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -229,7 +237,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteCensus([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteCensusAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -241,7 +249,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.SaveQueryDispatchAsync(id, schedules, queryDispatchExists, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -249,7 +257,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteQueryDispatch([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteQueryDispatchAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -257,7 +265,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveFhirQuery([FromRoute] string? id, FhirQueryPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.SaveFhirQueryAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -265,7 +273,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteFhirQuery([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteFhirQueryAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -273,7 +281,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveFhirList([FromRoute] string? id, FhirListPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.SaveFhirListAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -281,7 +289,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteFhirList([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteFhirListAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -289,7 +297,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveQueryPlan([FromRoute] string? id, QueryPlanPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.SaveQueryPlanAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -297,7 +305,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteQueryPlan([FromRoute] string? id, string? type, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteQueryPlanAsync(id, type, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -305,7 +313,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveReportingOrg([FromRoute] string? id, ReportingOrgPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.SaveReportingOrgAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -313,7 +321,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteReportingOrg([FromRoute] string? id, int? configId, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteReportingOrgAsync(id, configId, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -321,7 +329,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> SaveSftp([FromRoute] string? id, SftpPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.SaveSftpAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -329,7 +337,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteSftp([FromRoute] string? id, string? configurationId, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteSftpAsync(id, configurationId, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -337,7 +345,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> DeleteSftpCredentials([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteSftpCredentialsAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -345,7 +353,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> TestSavedSftp([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.TestSavedSftpAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -353,7 +361,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> TestSftp([FromRoute] string? id, SftpPanel input, CancellationToken cancellationToken)
     {
         var result = await _hub.TestSftpAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -364,7 +372,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.SaveOperationAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -385,7 +393,7 @@ public sealed class TenantsController : Controller
         }
 
         var result = await _hub.ImportExtensionUrlsAsync(id, text, tooLarge, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -396,7 +404,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteOperationAsync(id, operationId.Sanitize(), cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -408,7 +416,7 @@ public sealed class TenantsController : Controller
     {
         input.ResourceType = input.ResourceType.Sanitize();
         var result = await _hub.SaveOperationSequenceAsync(id, input, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -419,7 +427,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.DeleteOperationSequenceAsync(id, resourceType.Sanitize(), cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -431,13 +439,14 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var result = await _hub.TestOperationAsync(id, operationId.Sanitize(), testResource, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     [HttpGet]
     public async Task<IActionResult> View([FromRoute] string? id, FacilityViewQuery query, CancellationToken cancellationToken)
     {
         var page = await _view.LoadAsync(id, query, cancellationToken);
+        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }
@@ -450,6 +459,7 @@ public sealed class TenantsController : Controller
         CancellationToken cancellationToken)
     {
         var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
+        await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
         ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
         return View(page);
     }
@@ -496,7 +506,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> Remove([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.SoftDeleteAsync(id, cancellationToken);
-        return FromResult(result, id ?? "Facility");
+        return await FromResult(result, id ?? "Facility");
     }
 
     private static bool TryMapFacilities(
@@ -537,7 +547,7 @@ public sealed class TenantsController : Controller
         };
     }
 
-    private IActionResult FromResult(FacilityWriteResult result, string title)
+    private async Task<IActionResult> FromResult(FacilityWriteResult result, string title)
     {
         if (result.RedirectToList)
         {
@@ -558,8 +568,18 @@ public sealed class TenantsController : Controller
             });
         }
 
+        await StampAsync(result.Page.FacilityId, runId => result.Page.AutomationRunId = runId, HttpContext.RequestAborted);
         ViewData["Title"] = title;
         return View("Facility", result.Page);
+    }
+
+    private async Task StampAsync(string? facilityId, Action<string?> assign, CancellationToken cancellationToken)
+    {
+        if (!_features.Value.AutomationEnabled || string.IsNullOrWhiteSpace(facilityId))
+            return;
+
+        var ownership = await _ownership.GetAsync(cancellationToken);
+        assign(ownership.RunIdFor(facilityId));
     }
 
     private async Task<IActionResult> ReportAction(

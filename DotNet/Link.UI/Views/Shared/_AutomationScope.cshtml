@@ -1,18 +1,26 @@
 @model string?
-@using Link.UI.Services
-@{
-    var automation = AutomationMarkRules.IsAutomation(Model);
+@if (LinkUiFeatures.Value.AutomationEnabled)
+{
+    var scope = AutomationMarkRules.NormalizeScope(Model);
+    <label class="form-label" for="automationScope">Show</label>
+    <select id="automationScope" name="scope" class="form-select">
+        @if (scope == AutomationMarkRules.Automation)
+        {
+            <option value="real">Real</option>
+            <option value="automation" selected>Automation</option>
+            <option value="all">All</option>
+        }
+        else if (scope == AutomationMarkRules.All)
+        {
+            <option value="real">Real</option>
+            <option value="automation">Automation</option>
+            <option value="all" selected>All</option>
+        }
+        else
+        {
+            <option value="real" selected>Real</option>
+            <option value="automation">Automation</option>
+            <option value="all">All</option>
+        }
+    </select>
 }
-<label class="form-label" for="automationScope">Show</label>
-<select id="automationScope" name="scope" class="form-select">
-    @if (automation)
-    {
-        <option value="all">All</option>
-        <option value="automation" selected>Automation</option>
-    }
-    else
-    {
-        <option value="all" selected>All</option>
-        <option value="automation">Automation</option>
-    }
-</select>

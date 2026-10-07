@@ -69,6 +69,7 @@ else
                         <a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a>
                     }
                     <code class="lu-facility-id">@report.FacilityId</code>
+                    <partial name="_AutomationBadge" model="Model.AutomationRunId" />
                 </dd>
                 <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
                 <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
