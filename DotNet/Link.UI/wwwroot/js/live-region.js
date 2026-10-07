@@ -25,9 +25,39 @@
         schedule(form);
     });
 
+    function selectionHeld(node) {
+        return !!node.querySelector("input[type=checkbox]:checked");
+    }
+
+    function focusedIn(node) {
+        var active = document.activeElement;
+        if (!active || active === document.body) return false;
+        if (node.contains(active)) return true;
+        var form = document.querySelector("form[data-au-target='" + node.id + "']");
+        return !!(form && form.contains(active));
+    }
+
+    function replaceRegion(node, url, push) {
+        if (!node || !node.id) return Promise.resolve();
+        return fetch(url, { headers: { "X-Requested-With": "fetch" } }).then(function (res) {
+            if (!res.ok) return;
+            return res.text().then(function (html) {
+                if (!node.isConnected) return;
+                if (!push && (selectionHeld(node) || focusedIn(node) || document.hidden)) return;
+                var doc = new DOMParser().parseFromString(html, "text/html");
+                var fresh = doc.getElementById(node.id);
+                if (!fresh) return;
+                if (fresh.innerHTML !== node.innerHTML) node.innerHTML = fresh.innerHTML;
+                if (push) history.replaceState(null, "", url);
+                document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: node.id } }));
+            });
+        }).catch(function () { /* leave the current page in place */ });
+    }
+
     document.addEventListener("submit", function (event) {
         var form = event.target;
         if (!form || !form.hasAttribute("data-au-filter")) return;
+        if (event.defaultPrevented) return;
         var targetId = form.getAttribute("data-au-target");
         var target = targetId && document.getElementById(targetId);
         if (!target || form.method.toLowerCase() !== "get") return;
@@ -39,28 +69,107 @@
         replaceRegion(target, next, true);
     });
 
-    function replaceRegion(node, url, push) {
-        return fetch(url, { headers: { "X-Requested-With": "fetch" } }).then(function (res) {
-            if (!res.ok) return;
-            return res.text().then(function (html) {
-                var doc = new DOMParser().parseFromString(html, "text/html");
-                var fresh = doc.getElementById(node.id);
-                if (!fresh) return;
-                if (fresh.innerHTML !== node.innerHTML) node.innerHTML = fresh.innerHTML;
-                if (push) history.replaceState(null, "", url);
-                document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: node.id } }));
-            });
-        }).catch(function () { /* leave the current page in place */ });
+    document.addEventListener("click", function (event) {
+        var link = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+        if (!link || event.defaultPrevented || event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (link.target && link.target !== "_self") return;
+        var region = link.closest("[data-au-refresh]");
+        if (!region) return;
+        var url;
+        try { url = new URL(link.href, window.location.href); }
+        catch (e) { return; }
+        if (url.origin !== window.location.origin) return;
+        if (url.pathname !== window.location.pathname) return;
+        event.preventDefault();
+        replaceRegion(region, url.pathname + url.search + url.hash, true);
+    });
+
+    function showToast(message) {
+        var host = document.getElementById("auToasts");
+        if (!host || !message) return;
+        var el = document.createElement("div");
+        el.className = "toast au-toast border-0";
+        el.setAttribute("role", "status");
+        el.innerHTML = '<div class="d-flex"><div class="toast-body"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>';
+        el.querySelector(".toast-body").textContent = message;
+        host.appendChild(el);
+        if (window.bootstrap && bootstrap.Toast) {
+            var toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 4000 });
+            el.addEventListener("hidden.bs.toast", function () { el.remove(); });
+            toast.show();
+        }
     }
 
-    document.querySelectorAll("[data-au-refresh]").forEach(function (node) {
-        var ms = Number(node.getAttribute("data-au-refresh")) || 12000;
-        setInterval(function () {
-            if (document.hidden) return;
-            if (node.contains(document.activeElement)) return;
-            var form = document.querySelector("form[data-au-target='" + node.id + "']");
-            if (form && form.contains(document.activeElement)) return;
-            replaceRegion(node, window.location.href, false);
-        }, ms);
+    function applyPage(html, url) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var next = doc.querySelector(".lu-content");
+        var current = document.querySelector(".lu-content");
+        if (!next || !current) {
+            window.location.assign(url);
+            return;
+        }
+        var success = next.querySelector(".alert-success");
+        var message = success ? success.textContent.trim() : "";
+        if (success) success.remove();
+        current.innerHTML = next.innerHTML;
+        if (url && url !== window.location.href) history.pushState(null, "", url);
+        if (message) showToast(message);
+        scanRefresh();
+        document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: "lu-content" } }));
+    }
+
+    document.addEventListener("submit", function (event) {
+        var form = event.target;
+        if (!form || !form.hasAttribute("data-au-save")) return;
+        if (event.defaultPrevented) return;
+        if ((form.method || "").toLowerCase() !== "post") return;
+        event.preventDefault();
+        var submitter = event.submitter;
+        var action = (submitter && submitter.formAction) || form.action;
+        var body = submitter ? new FormData(form, submitter) : new FormData(form);
+        if (submitter) submitter.disabled = true;
+        fetch(action, {
+            method: "POST",
+            body: body,
+            headers: { "X-Requested-With": "fetch" },
+            redirect: "follow"
+        }).then(function (res) {
+            var type = res.headers.get("content-type") || "";
+            if (!res.ok || type.indexOf("text/html") === -1) {
+                showToast("Could not save that change.");
+                return;
+            }
+            return res.text().then(function (html) { applyPage(html, res.url); });
+        }).catch(function () {
+            showToast("Could not save that change.");
+        }).finally(function () {
+            if (submitter) submitter.disabled = false;
+        });
     });
+
+    function refresh(node) {
+        if (!node.isConnected) {
+            clearInterval(node._auTimer);
+            node._auWatch = false;
+            return;
+        }
+        if (document.hidden || focusedIn(node) || selectionHeld(node) || node._auBusy) return;
+        node._auBusy = true;
+        replaceRegion(node, window.location.href, false).finally(function () { node._auBusy = false; });
+    }
+
+    function watch(node) {
+        if (node._auWatch) return;
+        node._auWatch = true;
+        var ms = Number(node.getAttribute("data-au-refresh")) || 12000;
+        node._auTimer = setInterval(function () { refresh(node); }, ms);
+    }
+
+    function scanRefresh() {
+        document.querySelectorAll("[data-au-refresh]").forEach(watch);
+    }
+
+    scanRefresh();
+    document.addEventListener("au-refreshed", scanRefresh);
 })();

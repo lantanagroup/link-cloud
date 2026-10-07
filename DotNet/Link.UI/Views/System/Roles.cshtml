@@ -16,7 +16,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">New role</div>
     <div class="card-body">
-        <form method="post" asp-action="SaveRole" class="row g-2 align-items-end">
+        <form method="post" data-au-save asp-action="SaveRole" class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="name">Name</label>
                 <input id="name" name="name" class="form-control" maxlength="255" />
@@ -63,13 +63,13 @@
                                 <input form="@formId" name="description" value="@role.Description" class="form-control form-control-sm" maxlength="1000" aria-label="Description for @role.Name" />
                             </td>
                             <td>
-                                <form id="@formId" method="post" asp-action="SaveRole">
+                                <form id="@formId" method="post" data-au-save asp-action="SaveRole">
                                     <input type="hidden" name="id" value="@role.Id" />
                                     <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
                                 </form>
                             </td>
                             <td>
-                                <form method="post" asp-action="DeleteRole" asp-route-id="@role.Id" onsubmit="return confirm('Delete this role?');">
+                                <form method="post" data-au-save asp-action="DeleteRole" asp-route-id="@role.Id" onsubmit="return confirm('Delete this role?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                             </td>
@@ -99,7 +99,7 @@
             {
                 var assigned = new HashSet<string>(role.Claims, StringComparer.Ordinal);
                 var claimIndex = 0;
-                <form method="post" asp-action="SaveRoleClaims" asp-route-id="@role.Id" class="mb-3">
+                <form method="post" data-au-save asp-action="SaveRoleClaims" asp-route-id="@role.Id" class="mb-3">
                     <fieldset>
                         <legend class="form-label">@role.Name</legend>
                         @foreach (var claim in Model.ClaimCatalog)

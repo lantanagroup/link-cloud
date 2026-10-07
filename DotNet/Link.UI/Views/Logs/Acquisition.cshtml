@@ -26,7 +26,7 @@
 <div class="au-card card">
     <div class="card-header">Search</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
+        <form method="get" class="row g-2 align-items-end" data-au-filter="400" data-au-target="acquisitionResults">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="facilityId">Facility</label>
                 <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
@@ -165,6 +165,8 @@
     </div>
 </div>
 
+<p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
+<div id="acquisitionResults" data-au-refresh="12000">
 @if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
 {
     <div class="au-card card mt-3">
@@ -172,11 +174,11 @@
         <div class="card-body">
             <p>These actions change every acquisition log for <code class="lu-facility-id">@search.FacilityId</code>, including logs outside this search.</p>
             <div class="d-flex flex-wrap gap-2">
-                <form method="post" asp-action="DisableFacility" onsubmit="return confirm('Disable every acquisition log for this facility?');">
+                <form method="post" data-au-save asp-action="DisableFacility" onsubmit="return confirm('Disable every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
                     <button type="submit" class="btn btn-sm btn-outline-danger">Disable logs</button>
                 </form>
-                <form method="post" asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
+                <form method="post" data-au-save asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
                     <button type="submit" class="btn btn-sm btn-outline-secondary">Restore logs</button>
                 </form>
@@ -222,11 +224,11 @@ else
             <span class="me-auto">Logs</span>
             @if (search.HasFilter)
             {
-                <form method="post" asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
+                <form method="post" data-au-save asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
                     <partial name="_AcquisitionFields" model="query" />
                     <button type="submit" class="btn btn-sm btn-au-action">Process matching</button>
                 </form>
-                <form method="post" asp-action="CancelMatching" class="d-inline" onsubmit="return confirm('Cancel every matching log that is old enough? This cannot be undone.');">
+                <form method="post" data-au-save asp-action="CancelMatching" class="d-inline" onsubmit="return confirm('Cancel every matching log that is old enough? This cannot be undone.');">
                     <partial name="_AcquisitionFields" model="query" />
                     <button type="submit" class="btn btn-sm btn-outline-danger">Cancel matching</button>
                 </form>
@@ -235,11 +237,11 @@ else
         <div class="card-body">
             @if (Model.Logs.Count == 0)
             {
-                <p class="mb-0">No acquisition logs found.</p>
+                <p class="au-empty mb-0">No acquisition logs found.</p>
             }
             else
             {
-                <form method="post" asp-action="Process" id="acquisition-logs">
+                <form method="post" data-au-save asp-action="Process" id="acquisition-logs">
                     <partial name="_AcquisitionFields" model="query" />
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-2">
@@ -292,7 +294,7 @@ else
                     </div>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" class="btn btn-sm btn-au-action" onclick="return confirm('Process the selected acquisition logs?');">Process selected</button>
-                        <button type="submit" class="btn btn-sm btn-outline-danger" formaction="@Url.Action("Cancel")" formmethod="post" onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
                     </div>
                     <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
                 </form>
@@ -319,3 +321,4 @@ else
         </div>
     </div>
 }
+</div>
