@@ -72,6 +72,31 @@ public sealed class AccountServiceClient : LinkApiClientBase, IAccountServiceCli
         SendAsync(() => Request($"/account/user/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> RecoverUserAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/account/user/{id}/recover")
+            .PostJsonAsync(new { }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<AccountClaimsApiModel>> GetClaimsAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync<AccountClaimsApiModel>(() => Request("/account/claims")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateUserClaimsAsync(
+        Guid id,
+        IReadOnlyList<string> claims,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/account/user/{id}/claims")
+            .PutJsonAsync(new AccountClaimsApiModel { Claims = claims.ToList() }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateRoleClaimsAsync(
+        Guid id,
+        IReadOnlyList<string> claims,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/account/role/{id}/claims")
+            .PutJsonAsync(new AccountClaimsApiModel { Claims = claims.ToList() }, cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<List<AccountRoleApiModel>>> GetRolesAsync(
         CancellationToken cancellationToken = default) =>
         SendAsync<List<AccountRoleApiModel>>(() => Request("/account/role")

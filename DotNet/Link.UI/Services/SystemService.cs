@@ -11,8 +11,8 @@ namespace Link.UI.Services;
 
 /// <summary>
 /// System pages: accounts, roles, service health, the configured service addresses,
-/// and the two integration events LinkSDK already posts. Restore, claim edits, and
-/// consumer control are not called.
+/// and the Admin.BFF integration events. Account restore and claim assignment call
+/// the Account service. Consumer start, read, and stop call Admin.BFF.
 /// </summary>
 public sealed class SystemService
 {
@@ -158,10 +158,13 @@ public sealed class SystemService
             Email = user.Body.Email,
             Roles = user.Body.Roles ?? []
         };
+        page.Claims = CleanClaims(user.Body.UserClaims);
         page.IsDeleted = user.Body.IsDeleted;
         page.IsActive = user.Body.IsActive;
         page.ReadOnly = user.Body.IsDeleted;
         page.Found = true;
+        if (!user.Body.IsDeleted)
+            await ApplyClaimCatalogAsync(page, cancellationToken);
         page.KnownRoles = page.KnownRoles
             .Concat((page.Form.Roles ?? []).Where(role => !string.IsNullOrWhiteSpace(role))!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -193,7 +196,7 @@ public sealed class SystemService
             if (!Ok(loaded) || loaded.Body is null)
                 return SystemAction.Fail(FailMessage("Account", loaded.StatusCode, loaded.RawBody));
             if (loaded.Body.IsDeleted)
-                return SystemAction.Fail("Deleted accounts are not edited here. Restore is not on this page.");
+                return SystemAction.Fail("Deleted accounts are not edited. Restore the account first.");
             existing = loaded.Body;
             known = known
                 .Concat(existing.Roles ?? [])
@@ -248,6 +251,53 @@ public sealed class SystemService
         return SystemAction.Ok("Account deleted.");
     }
 
+    public async Task<SystemAction> RecoverUserAsync(string? id, CancellationToken cancellationToken)
+    {
+        if (SystemRules.CheckUserId(id, out var userId) is { } error)
+            return SystemAction.Fail(error);
+        if (_account is null)
+            return SystemAction.Fail(AccountNotConfigured);
+        var response = await _account.RecoverUserAsync(userId, cancellationToken);
+        if (response.StatusCode == 404)
+            return SystemAction.Fail("That account was not found.");
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Account", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Account restored.");
+    }
+
+    public async Task<SystemAction> SaveUserClaimsAsync(string? id, ClaimForm form, CancellationToken cancellationToken)
+    {
+        if (SystemRules.CheckUserId(id, out var userId) is { } error)
+            return SystemAction.Fail(error);
+        if (_account is null)
+            return SystemAction.Fail(AccountNotConfigured);
+
+        var loaded = await _account.GetUserAsync(userId, cancellationToken);
+        if (loaded.StatusCode == 404)
+            return SystemAction.Fail("That account was not found.");
+        if (!Ok(loaded) || loaded.Body is null)
+            return SystemAction.Fail(FailMessage("Account", loaded.StatusCode, loaded.RawBody));
+        if (loaded.Body.IsDeleted)
+            return SystemAction.Fail("Deleted accounts are not edited. Restore the account first.");
+
+        var catalog = await _account.GetClaimsAsync(cancellationToken);
+        if (!Ok(catalog) || catalog.Body is null)
+            return SystemAction.Fail(catalog.StatusCode == 204
+                ? "No assignable claims were returned, so claims were not changed."
+                : FailMessage("Account", catalog.StatusCode, catalog.RawBody));
+
+        var allowed = catalog.Body.Claims.Concat(loaded.Body.UserClaims ?? []).ToArray();
+        if (SystemRules.CheckClaims(form.Claims, allowed, out var claims) is { } claimError)
+            return SystemAction.Fail(claimError);
+
+        var updated = await _account.UpdateUserClaimsAsync(userId, claims, cancellationToken);
+        if (updated.StatusCode == 404)
+            return SystemAction.Fail("That account was not found.");
+        if (!Ok(updated))
+            return SystemAction.Fail(FailMessage("Account", updated.StatusCode, updated.RawBody));
+        return SystemAction.Ok("Claims saved.");
+    }
+
     public async Task<RoleListPage> LoadRolesAsync(CancellationToken cancellationToken)
     {
         var page = new RoleListPage { Configured = _account is not null };
@@ -271,10 +321,18 @@ public sealed class SystemService
             {
                 Id = role.Id,
                 Name = role.Name ?? "",
-                Description = role.Description ?? ""
+                Description = role.Description ?? "",
+                Claims = CleanClaims(role.Claims)
             })
             .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var catalog = await _account.GetClaimsAsync(cancellationToken);
+        if (catalog.StatusCode == 204 || (Ok(catalog) && catalog.Body?.Claims is not { Count: > 0 }))
+            page.ClaimsError = "No assignable claims were returned.";
+        else if (!Ok(catalog) || catalog.Body is null)
+            page.ClaimsError = FailMessage("Account", catalog.StatusCode, catalog.RawBody);
+        else
+            page.ClaimCatalog = CleanClaims(catalog.Body.Claims.Concat(page.Roles.SelectMany(role => role.Claims)));
         return page;
     }
 
@@ -322,6 +380,37 @@ public sealed class SystemService
         if (!Ok(response))
             return SystemAction.Fail(FailMessage("Account", response.StatusCode, response.RawBody));
         return SystemAction.Ok("Role deleted.");
+    }
+
+    public async Task<SystemAction> SaveRoleClaimsAsync(string? id, ClaimForm form, CancellationToken cancellationToken)
+    {
+        if (SystemRules.CheckRoleId(id, out var roleId) is { } error)
+            return SystemAction.Fail(error);
+        if (_account is null)
+            return SystemAction.Fail(AccountNotConfigured);
+
+        var loaded = await _account.GetRoleAsync(roleId, cancellationToken);
+        if (loaded.StatusCode == 404)
+            return SystemAction.Fail("That role was not found.");
+        if (!Ok(loaded) || loaded.Body is null)
+            return SystemAction.Fail(FailMessage("Account", loaded.StatusCode, loaded.RawBody));
+
+        var catalog = await _account.GetClaimsAsync(cancellationToken);
+        if (!Ok(catalog) || catalog.Body is null)
+            return SystemAction.Fail(catalog.StatusCode == 204
+                ? "No assignable claims were returned, so claims were not changed."
+                : FailMessage("Account", catalog.StatusCode, catalog.RawBody));
+
+        var allowed = catalog.Body.Claims.Concat(loaded.Body.Claims ?? []).ToArray();
+        if (SystemRules.CheckClaims(form.Claims, allowed, out var claims) is { } claimError)
+            return SystemAction.Fail(claimError);
+
+        var updated = await _account.UpdateRoleClaimsAsync(roleId, claims, cancellationToken);
+        if (updated.StatusCode == 404)
+            return SystemAction.Fail("That role was not found.");
+        if (!Ok(updated))
+            return SystemAction.Fail(FailMessage("Account", updated.StatusCode, updated.RawBody));
+        return SystemAction.Ok("Claims saved.");
     }
 
     public async Task<HealthPage> LoadHealthAsync(string? service, CancellationToken cancellationToken)
@@ -437,6 +526,135 @@ public sealed class SystemService
             return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
         return SystemAction.Ok("Patient list acquired event posted. Tracking id " + tracking + ".");
     }
+
+    public async Task<SystemAction> PostPatientEventAsync(PatientEventForm form, CancellationToken cancellationToken)
+    {
+        var error = SystemRules.CheckPatientEvent(form, _numericOnly, out var request);
+        if (error is not null || request is null)
+            return SystemAction.Fail(error ?? "The patient event could not be checked.");
+        if (_admin is null)
+            return SystemAction.Fail(AdminNotConfigured);
+        var response = await _admin.CreatePatientEventAsync(request.FacilityId, request.PatientId, request.EventType, cancellationToken);
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Patient event posted.");
+    }
+
+    public async Task<SystemAction> PostDataAcquisitionAsync(DataAcquisitionForm form, CancellationToken cancellationToken)
+    {
+        var error = SystemRules.CheckDataAcquisition(form, _numericOnly, DateTime.UtcNow, out var request);
+        if (error is not null || request is null)
+            return SystemAction.Fail(error ?? "The data acquisition event could not be checked.");
+        if (_admin is null)
+            return SystemAction.Fail(AdminNotConfigured);
+        var response = await _admin.CreateDataAcquisitionRequestedAsync(
+            request.FacilityId,
+            request.PatientId,
+            request.QueryType,
+            request.ReportTypes,
+            request.StartDateUtc,
+            request.EndDateUtc,
+            cancellationToken);
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Data acquisition requested event posted.");
+    }
+
+    public async Task<SystemAction> PostPatientAcquiredAsync(PatientAcquiredForm form, CancellationToken cancellationToken)
+    {
+        var error = SystemRules.CheckPatientAcquired(form, _numericOnly, out var request);
+        if (error is not null || request is null)
+            return SystemAction.Fail(error ?? "The patient acquired event could not be checked.");
+        if (_admin is null)
+            return SystemAction.Fail(AdminNotConfigured);
+        var tracking = request.ReportTrackingId ?? Guid.NewGuid();
+        var response = await _admin.CreatePatientAcquiredAsync(
+            request.FacilityId,
+            request.PatientIds,
+            tracking.ToString(),
+            cancellationToken);
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Patient acquired event posted. Tracking id " + tracking + ".");
+    }
+
+    public async Task<SystemAction> StartConsumersAsync(string? correlationId, CancellationToken cancellationToken)
+    {
+        if (SystemRules.CheckCorrelation(correlationId, generate: true, out var correlation) is { } error)
+            return SystemAction.Fail(error);
+        if (_admin is null)
+            return SystemAction.Fail(AdminNotConfigured);
+        var response = await _admin.StartConsumersAsync(correlation.ToString(), cancellationToken);
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Consumers started. Correlation id " + correlation + ".");
+    }
+
+    public async Task<IntegrationPage> ReadConsumersAsync(string? correlationId, CancellationToken cancellationToken)
+    {
+        var page = LoadIntegration();
+        if (SystemRules.CheckCorrelation(correlationId, generate: false, out var correlation) is { } error)
+        {
+            page.ReadError = error;
+            return page;
+        }
+
+        if (_admin is null)
+        {
+            page.ReadError = AdminNotConfigured;
+            return page;
+        }
+
+        var response = await _admin.ReadConsumersAsync(correlation.ToString(), cancellationToken);
+        if (!Ok(response))
+        {
+            page.ReadError = FailMessage("Admin.BFF", response.StatusCode, response.RawBody);
+            return page;
+        }
+
+        if (SystemRules.ReadConsumers(response.Body, out var topics) is { } parseError)
+        {
+            page.ReadError = parseError;
+            return page;
+        }
+
+        page.Topics = topics;
+        page.ReadNote = topics.Count == 0
+            ? "No consumer events for " + correlation + "."
+            : "Consumer events for " + correlation + ".";
+        return page;
+    }
+
+    public async Task<SystemAction> StopConsumersAsync(string? correlationId, CancellationToken cancellationToken)
+    {
+        if (SystemRules.CheckCorrelation(correlationId, generate: false, out var correlation) is { } error)
+            return SystemAction.Fail(error);
+        if (_admin is null)
+            return SystemAction.Fail(AdminNotConfigured);
+        var response = await _admin.StopConsumersAsync(correlation.ToString(), cancellationToken);
+        if (!Ok(response))
+            return SystemAction.Fail(FailMessage("Admin.BFF", response.StatusCode, response.RawBody));
+        return SystemAction.Ok("Consumers stopped. Correlation id " + correlation + ".");
+    }
+
+    private async Task ApplyClaimCatalogAsync(UserEditPage page, CancellationToken cancellationToken)
+    {
+        var catalog = await _account!.GetClaimsAsync(cancellationToken);
+        if (catalog.StatusCode == 204 || (Ok(catalog) && catalog.Body?.Claims is not { Count: > 0 }))
+            page.ClaimsError = "No assignable claims were returned.";
+        else if (!Ok(catalog) || catalog.Body is null)
+            page.ClaimsError = FailMessage("Account", catalog.StatusCode, catalog.RawBody);
+        else
+            page.ClaimCatalog = CleanClaims(catalog.Body.Claims.Concat(page.Claims));
+    }
+
+    private static IReadOnlyList<string> CleanClaims(IEnumerable<string>? claims) =>
+        (claims ?? [])
+        .Where(claim => !string.IsNullOrWhiteSpace(claim))
+        .Select(claim => claim.Trim())
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(claim => claim, StringComparer.Ordinal)
+        .ToArray();
 
     private static IReadOnlyList<string> RoleNames(LinkApiResponse<List<AccountRoleApiModel>> response) =>
         (response.Body ?? [])

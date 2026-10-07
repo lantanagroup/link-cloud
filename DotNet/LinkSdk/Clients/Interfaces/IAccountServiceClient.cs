@@ -32,6 +32,23 @@ public interface IAccountServiceClient
         Guid id,
         CancellationToken cancellationToken = default);
 
+    Task<LinkApiResponse> RecoverUserAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<AccountClaimsApiModel>> GetClaimsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> UpdateUserClaimsAsync(
+        Guid id,
+        IReadOnlyList<string> claims,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> UpdateRoleClaimsAsync(
+        Guid id,
+        IReadOnlyList<string> claims,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<List<AccountRoleApiModel>>> GetRolesAsync(
         CancellationToken cancellationToken = default);
 

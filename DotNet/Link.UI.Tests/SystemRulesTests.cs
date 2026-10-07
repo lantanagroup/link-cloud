@@ -209,4 +209,78 @@ public class SystemRulesTests
         }, numericOnly: false, out var list).Should().BeNull();
         list!.PatientIds.Should().Equal("p1", "p2");
     }
+
+    [Fact]
+    public void Claims_stay_inside_the_catalog_and_an_empty_catalog_is_not_a_clear()
+    {
+        SystemRules.CheckClaims([], [], out _).Should().Contain("not changed");
+        SystemRules.CheckClaims(["Other"], ["CanViewLogs"], out _).Should().Contain("Account service");
+        SystemRules.CheckClaims(["CanViewLogs", "CanViewLogs"], ["CanViewLogs"], out var claims).Should().BeNull();
+        claims.Should().Equal("CanViewLogs");
+        SystemRules.CheckClaims([], ["CanViewLogs"], out var cleared).Should().BeNull();
+        cleared.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Patient_events_acquisition_requests_and_consumer_reads_are_checked()
+    {
+        SystemRules.CheckPatientEvent(new PatientEventForm
+        {
+            FacilityId = "link-ui",
+            PatientId = "p1",
+            EventType = "Transfer"
+        }, numericOnly: false, out _).Should().Contain("Admission");
+
+        SystemRules.CheckPatientEvent(new PatientEventForm
+        {
+            FacilityId = "link-ui",
+            PatientId = "p1",
+            EventType = "Discharge"
+        }, numericOnly: false, out var patient).Should().BeNull();
+        patient!.EventType.Should().Be("Discharge");
+
+        SystemRules.CheckDataAcquisition(new DataAcquisitionForm
+        {
+            FacilityId = "link-ui",
+            PatientId = "p1",
+            QueryType = "Initial",
+            ReportTypes = "NHSN",
+            StartDate = "2026-10-06",
+            EndDate = "2026-10-01"
+        }, numericOnly: false, Now, out _).Should().Contain("before the end");
+
+        SystemRules.CheckDataAcquisition(new DataAcquisitionForm
+        {
+            FacilityId = "link-ui",
+            PatientId = "p1",
+            QueryType = "Supplemental",
+            ReportTypes = "NHSN, NHSN",
+            StartDate = "2026-10-01",
+            EndDate = "2026-10-06"
+        }, numericOnly: false, Now, out var acquisition).Should().BeNull();
+        acquisition!.ReportTypes.Should().Equal("NHSN");
+        acquisition.QueryType.Should().Be("Supplemental");
+
+        SystemRules.CheckPatientAcquired(new PatientAcquiredForm
+        {
+            FacilityId = "link-ui",
+            PatientIds = "p1 p2"
+        }, numericOnly: false, out var acquired).Should().BeNull();
+        acquired!.PatientIds.Should().Equal("p1", "p2");
+
+        SystemRules.CheckCorrelation(" ", generate: false, out _).Should().Contain("required");
+        SystemRules.CheckCorrelation(" ", generate: true, out var generated).Should().BeNull();
+        generated.Should().NotBe(Guid.Empty);
+
+        var json = """{"ResourceNormalized":"[{\"patientId\":\"p1\",\"errorMessage\":\"missing\"}]"}""";
+        SystemRules.ReadConsumers(json, out var topics).Should().BeNull();
+        topics.Should().ContainSingle();
+        topics[0].Topic.Should().Be("ResourceNormalized");
+        topics[0].Events.Should().ContainSingle();
+        topics[0].Events[0].PatientId.Should().Be("p1");
+        topics[0].Events[0].Error.Should().Be("missing");
+
+        SystemRules.ReadConsumers("""{"Other":"not-an-array"}""", out var raw).Should().BeNull();
+        raw[0].Events[0].Error.Should().Be("not-an-array");
+    }
 }
