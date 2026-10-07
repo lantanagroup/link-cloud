@@ -2,6 +2,16 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "Azure.Storage.Blobs": {
+        "type": "Direct",
+        "requested": "[12.29.0, )",
+        "resolved": "12.29.0",
+        "contentHash": "e82Racxat6NsLHD+6Nwf2GxglYdN9T20QHgAsaHB1FYgbJUZilmUR0H+IPCu6AJy8nNyvSONc/erF8vtsyHrRw==",
+        "dependencies": {
+          "Azure.Core": "1.55.0",
+          "Azure.Storage.Common": "12.28.0"
+        }
+      },
       "MongoDB.Driver": {
         "type": "Direct",
         "requested": "[3.9.0, )",
@@ -1843,18 +1853,6 @@
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
-      "automation.ui": {
-        "type": "Project",
-        "dependencies": {
-          "Automation.Link": "[1.0.0, )",
-          "Azure.Storage.Blobs": "[12.29.0, )",
-          "LinkSdk": "[1.0.0, )",
-          "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
-          "Normalization.Engine": "[1.0.0, )",
-          "Swashbuckle.AspNetCore": "[6.9.0, )",
-          "com.lantanagroup.link.Shared": "[0.4.0, )"
-        }
-      },
       "com.lantanagroup.link.Shared": {
         "type": "Project",
         "dependencies": {
@@ -2022,16 +2020,6 @@
           "Azure.Core": "1.46.2"
         }
       },
-      "Azure.Storage.Blobs": {
-        "type": "CentralTransitive",
-        "requested": "[12.29.0, )",
-        "resolved": "12.29.0",
-        "contentHash": "e82Racxat6NsLHD+6Nwf2GxglYdN9T20QHgAsaHB1FYgbJUZilmUR0H+IPCu6AJy8nNyvSONc/erF8vtsyHrRw==",
-        "dependencies": {
-          "Azure.Core": "1.55.0",
-          "Azure.Storage.Common": "12.28.0"
-        }
-      },
       "Confluent.Kafka": {
         "type": "CentralTransitive",
         "requested": "[2.14.2, )",
@@ -2165,15 +2153,6 @@
         "requested": "[8.0.27, )",
         "resolved": "8.0.27",
         "contentHash": "OMYSRCQQyj2b2RxjIJqMg2kSRvN1X5VDk3tCHcR/gzQPMMiLQ04zUUH12ObFFdLj2zZAQq1E2A+owJCyKXXUrw==",
-        "dependencies": {
-          "Microsoft.IdentityModel.Protocols.OpenIdConnect": "7.1.2"
-        }
-      },
-      "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
-        "type": "CentralTransitive",
-        "requested": "[8.0.27, )",
-        "resolved": "8.0.27",
-        "contentHash": "154Dg1Mlt8tsdAJNYLgBzfPCNmkgr45wMRe4FyGQ/Jz6HAfNvzVUgP6SymrbfXajdaSnHpWd4Q8l4v3y7bYHhg==",
         "dependencies": {
           "Microsoft.IdentityModel.Protocols.OpenIdConnect": "7.1.2"
         }

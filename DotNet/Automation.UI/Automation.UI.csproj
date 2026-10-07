@@ -19,4 +19,10 @@
     <ProjectReference Include="..\Normalization.Engine\Normalization.Engine.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
+
+  <!-- The run engine lives in Link.UI. This host still compiles those files so the
+       old web project builds until it is removed. Link.UI does not reference this project. -->
+  <ItemGroup>
+    <Compile Include="..\Link.UI\Engine\**\*.cs" Link="Engine\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>
