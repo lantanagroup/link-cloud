@@ -173,6 +173,7 @@ public class RunCleanupGateTests
 
         var health = File.ReadAllText(RepoFile("DotNet/Link.UI/Engine/Services/ApiHealth/ApiHealthExecutionRunManager.cs"));
         health.Should().Contain("Seed facility kept because this API Health run did not succeed.");
+        health.Should().Contain("return SuiteChecksPassed(results, informationalKeys);");
 
         var editor = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_ScenarioEditorModal.cshtml"));
         editor.Should().Contain("only when the run succeeds");
