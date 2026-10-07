@@ -557,10 +557,17 @@ public sealed class ApiHealthExecutionRunManager(
             AddEvent(run, "result", json);
         }
 
-        return results
-            .Where(r => !informationalKeys.Contains(r.EndpointKey))
-            .All(r => r.Passed);
+        return SuiteChecksPassed(results, informationalKeys);
     }
+
+    /// <summary>
+    /// A skipped step is neither a pass nor a failure. Informational steps do not decide cleanup.
+    /// </summary>
+    internal static bool SuiteChecksPassed(
+        IEnumerable<ApiTestRunResult> results,
+        IReadOnlySet<string> informationalKeys) =>
+        results.All(result =>
+            informationalKeys.Contains(result.EndpointKey) || result.Skipped || result.Passed);
 
     private static string GetMetadataServiceName(string suiteServiceName)
     {
