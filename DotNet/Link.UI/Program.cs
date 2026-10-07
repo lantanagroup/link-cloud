@@ -39,6 +39,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
     options.DmrpEnabled = builder.Configuration.GetValue<bool>("DMRP:Enabled");
     options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
 });
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped(FacilityHubService.Create);
 builder.Services.AddScoped(FacilityViewService.Create);
 builder.Services.AddScoped(ReportsService.Create);

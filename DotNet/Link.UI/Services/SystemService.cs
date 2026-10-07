@@ -433,7 +433,10 @@ public sealed class SystemService
         return SystemAction.Ok("Claims saved.");
     }
 
-    public async Task<HealthPage> LoadHealthAsync(string? service, CancellationToken cancellationToken)
+    public async Task<HealthPage> LoadHealthAsync(string? service, CancellationToken cancellationToken) =>
+        await LoadHealthAsync(service, includeServiceInfo: true, cancellationToken);
+
+    public async Task<HealthPage> LoadHealthAsync(string? service, bool includeServiceInfo, CancellationToken cancellationToken)
     {
         var page = new HealthPage { Configured = _admin is not null, Service = service?.Trim() };
         if (SystemRules.CheckHealthService(service, out var key) is { } error)
@@ -470,6 +473,9 @@ public sealed class SystemService
             page.HealthError = healthParse;
         else
             page.Reports = rows;
+
+        if (!includeServiceInfo)
+            return page;
 
         var info = await _admin.GetServiceInformationAsync(cancellationToken);
         if (info.StatusCode == 204)

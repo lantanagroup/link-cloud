@@ -32,7 +32,7 @@
 <div class="au-card card">
     <div class="card-header">Report schedules</div>
     <div class="card-body">
-        <form method="get" class="row g-2 align-items-end mb-3">
+        <form method="get" class="row g-2 align-items-end mb-3" data-au-filter="300" data-au-target="reportResults">
             <div class="col-12 col-md-4 col-xl-3">
                 <label class="form-label" for="facilityId">Facility ID</label>
                 <input id="facilityId" name="facilityId" value="@Model.Query.FacilityId" class="form-control" />
@@ -109,6 +109,8 @@
             </div>
         </form>
 
+        <p class="lu-live-label mb-2" data-au-refresh-label>This list updates on its own.</p>
+        <div id="reportResults" data-au-refresh="12000">
         @if (Model.Reports.Count == 0)
         {
             <p class="mb-0">No reports found.</p>
@@ -116,7 +118,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table au-table table-sm align-middle mb-0">
                     <thead>
                         <tr>
                             <th><a asp-all-route-data="@SortRoute("Id")">Report ID</a></th>
@@ -134,7 +136,7 @@
                     <tbody>
                     @foreach (var report in Model.Reports)
                     {
-                        <tr class="@(report.Deleted ? "table-secondary" : null)">
+                        <tr class="@(report.Deleted ? "table-secondary" : null)" data-report-id="@report.Id">
                             <td>
                                 @if (report.Deleted)
                                 {
@@ -154,8 +156,8 @@
                             <td class="text-nowrap">@report.Created</td>
                             <td>@report.Measures</td>
                             <td><span class="badge text-bg-light border">@report.Frequency</span></td>
-                            <td class="text-end">@(report.CensusCount?.ToString() ?? "—")</td>
-                            <td class="text-end">@(report.InitialPopulationCount?.ToString() ?? "—")</td>
+                            <td class="text-end" data-census="@report.Id">—</td>
+                            <td class="text-end" data-population="@report.Id">—</td>
                             <td>
                                 <span class="badge @FacilityViewRules.StatusBadge(report.Status)">@report.StatusLabel</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Submitted))
@@ -230,5 +232,31 @@
                 }
             </nav>
         }
+        </div>
     </div>
 </div>
+<script>
+    (function () {
+        var url = '@Url.Action("Counts")';
+        function fill() {
+            var rows = document.querySelectorAll("#reportResults [data-report-id]");
+            if (!rows.length) return;
+            var ids = Array.prototype.map.call(rows, function (row) { return row.getAttribute("data-report-id"); });
+            fetch(url + "?ids=" + encodeURIComponent(ids.join(",")), { headers: { "X-Requested-With": "fetch" } })
+                .then(function (res) { return res.ok ? res.json() : []; })
+                .then(function (counts) {
+                    (counts || []).forEach(function (row) {
+                        var census = document.querySelector("[data-census='" + row.id + "']");
+                        var population = document.querySelector("[data-population='" + row.id + "']");
+                        if (census) census.textContent = row.census == null ? "—" : String(row.census);
+                        if (population) population.textContent = row.population == null ? "—" : String(row.population);
+                    });
+                })
+                .catch(function () { });
+        }
+        fill();
+        document.addEventListener("au-refreshed", function (event) {
+            if (event.detail && event.detail.id === "reportResults") fill();
+        });
+    })();
+</script>

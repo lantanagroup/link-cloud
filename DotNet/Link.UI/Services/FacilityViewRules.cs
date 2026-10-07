@@ -178,12 +178,12 @@ public static class FacilityViewRules
 
     public static string StatusBadge(ScheduleStatus status) => status switch
     {
-        ScheduleStatus.New => "text-bg-info",
-        ScheduleStatus.Scheduled => "text-bg-primary",
-        ScheduleStatus.EndOfPeriod => "text-bg-warning",
-        ScheduleStatus.Submitted => "text-bg-success",
-        ScheduleStatus.CompletedNotSubmitted => "text-bg-secondary",
-        _ => "text-bg-secondary"
+        ScheduleStatus.New => "au-badge-active",
+        ScheduleStatus.Scheduled => "au-badge-active",
+        ScheduleStatus.EndOfPeriod => "au-badge-warning",
+        ScheduleStatus.Submitted => "au-badge-success",
+        ScheduleStatus.CompletedNotSubmitted => "au-badge-muted",
+        _ => "au-badge-muted"
     };
 
     public static bool CanResubmit(ScheduleStatus status, bool deleted) =>
