@@ -176,6 +176,9 @@ public class RunCleanupGateTests
 
         var editor = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_ScenarioEditorModal.cshtml"));
         editor.Should().Contain("only when the run succeeds");
+
+        var reader = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/AutomationRunReader.cs"));
+        reader.Should().Contain("row.RetentionNotice");
     }
 
     private static string RepoFile(string relative)
