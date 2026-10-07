@@ -1768,3 +1768,64 @@ a.au-scenario-card:hover {
 
 .lu-wide-table { min-width: 48rem; }
 
+/* Admin pages use Automation's green save and a solid red destructive button.
+   Bootstrap 5.1 has no text-bg-* utilities, so those badges were white on white. */
+.lu-admin form[method="post"] .btn-au-action {
+  background: var(--au-success);
+  color: #fff;
+}
+.lu-admin form[method="post"] .btn-au-action:hover,
+.lu-admin form[method="post"] .btn-au-action:focus {
+  background: #218838;
+  color: #fff;
+}
+.lu-admin .btn-outline-danger {
+  color: #fff;
+  background: var(--au-danger);
+  border-color: var(--au-danger);
+}
+.lu-admin .btn-outline-danger:hover,
+.lu-admin .btn-outline-danger:focus {
+  color: #fff;
+  background: #b02a37;
+  border-color: #b02a37;
+}
+.badge.text-bg-light {
+  background-color: #f8f9fa !important;
+  color: #111 !important;
+  border: 1px solid #ced4da;
+}
+.badge.text-bg-secondary { background-color: #6c757d !important; color: #fff !important; }
+.badge.text-bg-success { background-color: #146c43 !important; color: #fff !important; }
+.badge.text-bg-danger { background-color: var(--au-danger) !important; color: #fff !important; }
+.badge.text-bg-warning { background-color: var(--au-warning) !important; color: #111 !important; }
+.badge.text-bg-primary { background-color: #0d6efd !important; color: #fff !important; }
+.badge.text-bg-info { background-color: #cff4fc !important; color: #111 !important; }
+.badge.text-bg-dark { background-color: #111 !important; color: #fff !important; }
+.badge.bg-light { color: #111 !important; }
+.lu-admin .badge.au-badge-active { color: #062033 !important; }
+.lu-admin .badge.au-badge-success,
+.lu-admin .badge.bg-success {
+  background-color: #146c43 !important;
+  color: #fff !important;
+}
+.lu-savebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1rem;
+  padding: .75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--au-border);
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+}
+.lu-savebar .lu-dirty { color: #8a6d00; font-weight: 600; }
+@media (max-width: 575.98px) {
+  .lu-savebar .btn { flex: 1 1 auto; }
+}
+
