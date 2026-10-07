@@ -26,7 +26,20 @@
             <dt class="col-sm-3">Bundle entries</dt>
             <dd class="col-sm-9">@(Model.EntryCount?.ToString() ?? "—")</dd>
         </dl>
-        <p class="text-muted small mb-0 mt-3">Related artifacts are listed below. Opening CQL and running an evaluation stay on MeasureEval.</p>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <a class="btn btn-outline-secondary" asp-action="MeasureCql" asp-route-id="@Model.Id">View CQL</a>
+            <a class="btn btn-outline-secondary" asp-action="MeasureEvaluate" asp-route-id="@Model.Id">Evaluate</a>
+        </div>
+        @if (Model.Libraries.Count > 0)
+        {
+            <p class="mb-1 mt-3">Libraries</p>
+            <ul class="mb-0">
+                @foreach (var library in Model.Libraries)
+                {
+                    <li><a asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-libraryId="@library">@library</a></li>
+                }
+            </ul>
+        }
     </div>
 </div>
 

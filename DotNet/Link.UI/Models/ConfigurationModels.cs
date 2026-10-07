@@ -53,6 +53,34 @@ public sealed class MeasureDetailPage
     public int? EntryCount { get; set; }
     public string? ArtifactError { get; set; }
     public IReadOnlyList<RelatedArtifactRow> Artifacts { get; set; } = Array.Empty<RelatedArtifactRow>();
+    public IReadOnlyList<string> Libraries { get; set; } = Array.Empty<string>();
+}
+
+public sealed class MeasureCqlPage
+{
+    public bool Configured { get; init; }
+    public string Id { get; init; } = "";
+    public string? LibraryId { get; set; }
+    public string? Range { get; set; }
+    public string? LoadError { get; set; }
+    public string? LibraryError { get; set; }
+    public string? CqlError { get; set; }
+    public string? Cql { get; set; }
+    public bool Truncated { get; set; }
+    public IReadOnlyList<string> Libraries { get; set; } = Array.Empty<string>();
+}
+
+public sealed class MeasureEvalPage
+{
+    public bool Configured { get; init; }
+    public string Id { get; init; } = "";
+    public string? Debug { get; set; }
+    public string? Parameters { get; set; }
+    public bool ParametersOmitted { get; set; }
+    public string? LoadError { get; set; }
+    public string? ResultError { get; set; }
+    public string? Result { get; set; }
+    public bool Truncated { get; set; }
 }
 
 public sealed class VendorRow
@@ -125,8 +153,58 @@ public sealed class CategoryPage
     public bool Configured { get; init; }
     public bool Reserved { get; set; }
     public bool Missing { get; set; }
+    public bool ShowForm { get; set; }
     public string? LoadError { get; set; }
+    public string? RuleError { get; set; }
     public CategoryForm Form { get; set; } = new();
+    public IReadOnlyList<CategoryRuleRow> Rules { get; set; } = Array.Empty<CategoryRuleRow>();
+}
+
+public sealed class CategoryRuleRow
+{
+    public long Id { get; init; }
+    public string Timestamp { get; init; } = "";
+    public string Summary { get; init; } = "";
+    public bool Inverted { get; init; }
+}
+
+public sealed class PackageResourceRow
+{
+    public string ResourceType { get; init; } = "";
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Url { get; init; } = "";
+    public string Version { get; init; } = "";
+}
+
+public sealed class DependencyRow
+{
+    public string Url { get; init; } = "";
+    public string Version { get; init; } = "";
+    public bool ResourceExists { get; init; }
+    public bool VersionExists { get; init; }
+    public int SourceCount { get; init; }
+}
+
+public sealed class PackagePage
+{
+    public bool Configured { get; init; }
+    public string Name { get; set; } = "";
+    public string? LoadError { get; set; }
+    public string? DependencyError { get; set; }
+    public string? ListNote { get; set; }
+    public string Version { get; set; } = "";
+    public string Title { get; set; } = "";
+    public IReadOnlyList<PackageResourceRow> Resources { get; set; } = Array.Empty<PackageResourceRow>();
+    public IReadOnlyList<DependencyRow> Dependencies { get; set; } = Array.Empty<DependencyRow>();
+}
+
+public sealed class DependencyPage
+{
+    public bool Configured { get; init; }
+    public string? LoadError { get; set; }
+    public string? ListNote { get; set; }
+    public IReadOnlyList<DependencyRow> Dependencies { get; set; } = Array.Empty<DependencyRow>();
 }
 
 public sealed class QueryPlanRow
@@ -272,6 +350,16 @@ public sealed class NotificationRow
     public string FacilityId { get; init; } = "";
     public string Subject { get; init; } = "";
     public string CreatedOn { get; init; } = "";
+}
+
+public sealed class NotificationSendForm
+{
+    public string? NotificationType { get; set; }
+    public string? FacilityId { get; set; }
+    public string? Subject { get; set; }
+    public string? Body { get; set; }
+    public string? Recipients { get; set; }
+    public string? Bcc { get; set; }
 }
 
 public sealed class NotificationListPage

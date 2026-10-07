@@ -24,6 +24,9 @@ public static class ConfigurationRules
     public const int MinCodeSearch = 3;
     public const int MaxUploadBytes = 8_000_000;
     public const int PreviewLength = 4000;
+    public const int MaxMatcherDepth = 8;
+    public const int MaxListRows = 200;
+    public const int MaxBody = 4000;
     public const string ReservedCategory = "uncategorized";
     public const string EmailChannel = "Email";
 
@@ -32,11 +35,17 @@ public static class ConfigurationRules
     public static readonly string[] Severities = ["ERROR", "WARNING", "INFORMATION"];
     public static readonly string[] Frequencies = ["Discharge", "Daily", "Weekly", "Monthly", "Adhoc"];
     public static readonly string[] OperationSorts = ["CreateDate", "Name", "OperationType", "FacilityId"];
+    public static readonly string[] ResultFields = ["SEVERITY", "CODE", "MESSAGE", "EXPRESSION"];
+    public static readonly string[] DebugSections = ["groups", "expressions", "librarydebug", "messages", "traces", "debuglog"];
+    public static readonly string[] NotificationTypes = ["System Notification", "Test Notification"];
 
     private static readonly Regex MeasureIdPattern = new("^[A-Za-z0-9][A-Za-z0-9\\-.]{0,63}$", RegexOptions.Compiled);
     private static readonly Regex SecretPattern = new("^[0-9a-zA-Z-]{1,127}$", RegexOptions.Compiled);
     private static readonly Regex EmailPattern = new("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CategoryIdPattern = new("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", RegexOptions.Compiled);
+    private static readonly Regex PackageNamePattern = new("^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$", RegexOptions.Compiled);
+    private static readonly Regex LibraryIdPattern = new("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", RegexOptions.Compiled);
+    private static readonly Regex CqlRangePattern = new("^\\d+:\\d+-\\d+:\\d+$", RegexOptions.Compiled);
 
     public static int ClampPage(int? page) => page is null or < 1 ? 1 : page.Value;
 
@@ -160,6 +169,7 @@ public static class ConfigurationRules
             page.Version = Text(root, "version");
             page.Created = When(root, "createdDate");
             page.Modified = When(root, "modifiedDate");
+            page.Libraries = LibraryIds(root);
             if (root.TryGetProperty("bundle", out var bundle)
                 && bundle.ValueKind == JsonValueKind.Object
                 && bundle.TryGetProperty("entry", out var entries)
@@ -535,6 +545,357 @@ public static class ConfigurationRules
     public static string SortOrder(string? dir) =>
         string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase) ? "Ascending" : "Descending";
 
+    public static string? CheckPackageName(string? name, out string value)
+    {
+        value = name?.Trim() ?? string.Empty;
+        if (!PackageNamePattern.IsMatch(value))
+            return "Package name must be 1 to 120 letters, numbers, dots, underscores, or hyphens.";
+        return null;
+    }
+
+    /// <summary>
+    /// A regex matcher is field, regex, and inverted. A composite matcher is children.
+    /// A non-blank <paramref name="matcherJson"/> is sent as written after it passes the same checks.
+    /// </summary>
+    public static string? CheckRule(string? field, string? regex, bool inverted, string? matcherJson, out string json)
+    {
+        json = string.Empty;
+        if (!string.IsNullOrWhiteSpace(matcherJson))
+        {
+            var trimmed = matcherJson.Trim();
+            if (trimmed.Length > 100_000)
+                return "The matcher JSON is too long.";
+            try
+            {
+                using var document = JsonDocument.Parse(trimmed);
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    return "The matcher must be a JSON object.";
+                var error = CheckMatcher(document.RootElement, 0);
+                if (error is not null)
+                    return error;
+                json = trimmed;
+                return null;
+            }
+            catch (JsonException)
+            {
+                return "The matcher is not valid JSON.";
+            }
+        }
+
+        var cleanField = ResultFields.FirstOrDefault(item => string.Equals(item, field?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (cleanField is null)
+            return "Field must be SEVERITY, CODE, MESSAGE, or EXPRESSION.";
+        var pattern = regex?.Trim() ?? string.Empty;
+        if (pattern.Length is < 1 or > 500)
+            return "Regex is required and must be 500 characters or fewer.";
+        if (!Compiles(pattern))
+            return "Regex is not a valid pattern.";
+
+        json = JsonSerializer.Serialize(new { field = cleanField, regex = pattern, inverted });
+        return null;
+    }
+
+    /// <summary>
+    /// Bulk import replaces the catalog. The file must already be a JSON array the validation service can store.
+    /// </summary>
+    public static string? CheckBulkImport(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return "A category export file is required.";
+        if (json.Length > MaxUploadBytes)
+            return "The file is larger than 8 MB.";
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return "The file must be a JSON array of categories.";
+            var count = document.RootElement.GetArrayLength();
+            if (count == 0)
+                return "No categories provided.";
+            if (count > 500)
+                return "The file has more than 500 categories.";
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var index = 0;
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    return "Category at index " + index + " must be an object.";
+                var id = Text(item, "id");
+                if (string.Equals(id, ReservedCategory, StringComparison.OrdinalIgnoreCase))
+                    return "uncategorized is reserved (index " + index + ").";
+                if (!CategoryIdPattern.IsMatch(id))
+                    return "Category id at index " + index + " is not valid.";
+                if (!ids.Add(id))
+                    return "Duplicate IDs provided: " + id + ".";
+                var title = Text(item, "title");
+                if (title.Length is < 1 or > MaxTitle)
+                    return "Title at index " + index + " is required.";
+                var severity = Text(item, "severity");
+                if (!Severities.Contains(severity, StringComparer.Ordinal))
+                    return "Severity at index " + index + " must be ERROR, WARNING, or INFORMATION.";
+                var guidance = Text(item, "guidance");
+                if (guidance.Length is < 1 or > MaxGuidance)
+                    return "Guidance at index " + index + " is required.";
+                if (!item.TryGetProperty("matcher", out var matcher) || matcher.ValueKind != JsonValueKind.Object)
+                    return "No matcher provided at index " + index + ".";
+                var matcherError = CheckMatcher(matcher, 0);
+                if (matcherError is not null)
+                    return matcherError + " at index " + index + ".";
+                index++;
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return "The file is not valid JSON.";
+        }
+    }
+
+    public static string? CheckCql(string? libraryId, string? range, out string library, out string? cleanRange)
+    {
+        library = libraryId?.Trim() ?? string.Empty;
+        cleanRange = string.IsNullOrWhiteSpace(range) ? null : range.Trim();
+        if (!LibraryIdPattern.IsMatch(library))
+            return "Library id must be 1 to 64 letters, numbers, dots, underscores, or hyphens.";
+        if (cleanRange is not null && !CqlRangePattern.IsMatch(cleanRange))
+            return "Range must look like 37:1-38:22, or be left blank.";
+        return null;
+    }
+
+    public static string? CheckEvaluate(string? parameters, string? debug, out string? cleanDebug)
+    {
+        cleanDebug = null;
+        if (string.IsNullOrWhiteSpace(parameters))
+            return "Parameters are required.";
+        if (parameters.Length > MaxUploadBytes)
+            return "The parameters are larger than 8 MB.";
+
+        try
+        {
+            using var document = JsonDocument.Parse(parameters);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return "Parameters must be a JSON object.";
+            if (!document.RootElement.TryGetProperty("resourceType", out var type)
+                || !string.Equals(type.GetString(), "Parameters", StringComparison.Ordinal))
+                return "Parameters resourceType must be Parameters.";
+        }
+        catch (JsonException)
+        {
+            return "Parameters are not valid JSON.";
+        }
+
+        if (string.IsNullOrWhiteSpace(debug) || string.Equals(debug.Trim(), "false", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var trimmed = debug.Trim();
+        if (string.Equals(trimmed, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(trimmed, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            cleanDebug = trimmed.ToLowerInvariant();
+            return null;
+        }
+
+        var tokens = trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length == 0)
+            return "Debug must be true, all, false, or a list of sections.";
+        var clean = new List<string>();
+        foreach (var token in tokens)
+        {
+            var match = DebugSections.FirstOrDefault(item => string.Equals(item, token, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+                return "Debug sections are groups, expressions, librarydebug, messages, traces, and debuglog.";
+            if (!clean.Contains(match, StringComparer.Ordinal))
+                clean.Add(match);
+        }
+
+        cleanDebug = string.Join(",", clean);
+        return null;
+    }
+
+    public static string? CheckSend(
+        NotificationSendForm? form,
+        bool numericOnly,
+        out NotificationSendForm value,
+        out List<string> recipients,
+        out List<string> bcc)
+    {
+        form ??= new NotificationSendForm();
+        recipients = new List<string>();
+        bcc = new List<string>();
+        var type = NotificationTypes.FirstOrDefault(item => string.Equals(item, form.NotificationType?.Trim(), StringComparison.Ordinal)) ?? string.Empty;
+        var subject = form.Subject?.Trim() ?? string.Empty;
+        var body = form.Body?.Trim() ?? string.Empty;
+        var facilityError = CheckFacility(form.FacilityId, numericOnly, required: false, out var facility);
+        value = new NotificationSendForm
+        {
+            NotificationType = type,
+            FacilityId = facility,
+            Subject = subject,
+            Body = body,
+            Recipients = form.Recipients,
+            Bcc = form.Bcc
+        };
+
+        if (type.Length == 0)
+            return "Type must be System Notification or Test Notification.";
+        if (facilityError is not null)
+            return facilityError;
+        if (subject.Length is < 1 or > MaxText)
+            return "Subject is required and must be 255 characters or fewer.";
+        if (body.Length is < 1 or > MaxBody)
+            return "Body is required and must be 4000 characters or fewer.";
+
+        var recipientError = CheckEmails(form.Recipients, channelEnabled: true, out recipients);
+        if (recipientError is not null)
+            return MapAddressError(recipientError, "recipient", "recipients");
+        var bccError = CheckEmails(form.Bcc, channelEnabled: false, out bcc);
+        if (bccError is not null)
+            return MapAddressError(bccError, "bcc address", "bcc addresses");
+        return null;
+    }
+
+    public static IReadOnlyList<string> LibraryIds(JsonElement root)
+    {
+        if (!root.TryGetProperty("bundle", out var bundle) || bundle.ValueKind != JsonValueKind.Object)
+            return Array.Empty<string>();
+        if (!bundle.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
+            return Array.Empty<string>();
+
+        var ids = new List<string>();
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (!entry.TryGetProperty("resource", out var resource) || resource.ValueKind != JsonValueKind.Object)
+                continue;
+            if (!string.Equals(Text(resource, "resourceType"), "Library", StringComparison.Ordinal))
+                continue;
+            var url = Text(resource, "url");
+            var slash = url.LastIndexOf('/');
+            if (slash < 0 || slash >= url.Length - 1)
+                continue;
+            var id = url[(slash + 1)..];
+            if (LibraryIdPattern.IsMatch(id) && !ids.Contains(id, StringComparer.Ordinal))
+                ids.Add(id);
+        }
+
+        return ids;
+    }
+
+    public static void ReadPackage(string? json, PackagePage page)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                page.LoadError ??= "Package details were not an object.";
+                return;
+            }
+
+            var root = document.RootElement;
+            page.Version = Text(root, "version");
+            page.Title = Text(root, "name");
+            if (!root.TryGetProperty("resources", out var resources) || resources.ValueKind != JsonValueKind.Array)
+            {
+                page.Resources = Array.Empty<PackageResourceRow>();
+                return;
+            }
+
+            page.Resources = resources.EnumerateArray().Select(item => new PackageResourceRow
+            {
+                ResourceType = Text(item, "resourceType"),
+                Id = Text(item, "id"),
+                Name = Text(item, "name"),
+                Url = Text(item, "url"),
+                Version = Text(item, "version")
+            }).Take(MaxListRows).ToList();
+        }
+        catch (JsonException)
+        {
+            page.LoadError ??= "Package details were not valid JSON.";
+        }
+    }
+
+    public static IReadOnlyList<DependencyRow>? ReadDependencies(string? json, out bool shortened)
+    {
+        shortened = false;
+        if (string.IsNullOrWhiteSpace(json))
+            return Array.Empty<DependencyRow>();
+        if (!TryArray(json, out var items))
+            return null;
+
+        var rows = new List<DependencyRow>();
+        foreach (var item in items)
+        {
+            var sources = 0;
+            if (item.TryGetProperty("sourceProfile", out var profiles) && profiles.ValueKind == JsonValueKind.Array)
+                sources = profiles.GetArrayLength();
+            rows.Add(new DependencyRow
+            {
+                Url = Text(item, "url"),
+                Version = Text(item, "version"),
+                ResourceExists = Flag(item, "resourceExists"),
+                VersionExists = Flag(item, "versionExists"),
+                SourceCount = sources
+            });
+        }
+
+        if (rows.Count > MaxListRows)
+        {
+            shortened = true;
+            return rows.Take(MaxListRows).ToList();
+        }
+
+        return rows;
+    }
+
+    public static IReadOnlyList<CategoryRuleRow>? ReadRules(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return Array.Empty<CategoryRuleRow>();
+        if (!TryArray(json, out var items))
+            return null;
+
+        var rows = new List<CategoryRuleRow>();
+        foreach (var item in items)
+        {
+            if (!long.TryParse(Text(item, "id"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) || id <= 0)
+                continue;
+            rows.Add(new CategoryRuleRow
+            {
+                Id = id,
+                Timestamp = When(item, "timestamp"),
+                Summary = RuleSummary(item),
+                Inverted = item.TryGetProperty("matcher", out var matcher) && Flag(matcher, "inverted")
+            });
+        }
+
+        return rows;
+    }
+
+    public static string? ReadCreatedId(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return null;
+            var id = Text(document.RootElement, "id");
+            if (id.Length is < 1 or > 64)
+                return null;
+            return Guid.TryParse(id, out _) || PackageNamePattern.IsMatch(id) ? id : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static string? Limit(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -626,5 +987,95 @@ public static class ConfigurationRules
         }
 
         return string.Empty;
+    }
+
+    private static string? CheckMatcher(JsonElement matcher, int depth)
+    {
+        if (matcher.ValueKind != JsonValueKind.Object)
+            return "A matcher must be an object.";
+        if (depth > MaxMatcherDepth)
+            return "A matcher is nested more than 8 levels.";
+
+        var hasChildren = matcher.TryGetProperty("children", out var children);
+        var hasField = matcher.TryGetProperty("field", out _);
+        var hasRegex = matcher.TryGetProperty("regex", out _);
+        if (hasChildren && (hasField || hasRegex))
+            return "A matcher is either a regex or a composite, not both.";
+        if (matcher.TryGetProperty("inverted", out var inverted)
+            && inverted.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+            return "inverted must be true or false.";
+
+        if (hasChildren)
+        {
+            if (children.ValueKind != JsonValueKind.Array || children.GetArrayLength() == 0)
+                return "A composite matcher needs at least one child.";
+            if (children.GetArrayLength() > 50)
+                return "A composite matcher has more than 50 children.";
+            if (matcher.TryGetProperty("requiresAllChildren", out var all)
+                && all.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                return "requiresAllChildren must be true or false.";
+            foreach (var child in children.EnumerateArray())
+            {
+                var error = CheckMatcher(child, depth + 1);
+                if (error is not null)
+                    return error;
+            }
+
+            return null;
+        }
+
+        if (!hasField || !hasRegex)
+            return "A regex matcher needs field and regex.";
+        var field = Text(matcher, "field");
+        if (!ResultFields.Contains(field, StringComparer.Ordinal))
+            return "Field must be SEVERITY, CODE, MESSAGE, or EXPRESSION.";
+        var pattern = Text(matcher, "regex");
+        if (pattern.Length is < 1 or > 500)
+            return "Regex is required and must be 500 characters or fewer.";
+        if (!Compiles(pattern))
+            return "Regex is not a valid pattern.";
+        return null;
+    }
+
+    private static bool Compiles(string pattern)
+    {
+        try
+        {
+            _ = new Regex(pattern, RegexOptions.None, TimeSpan.FromMilliseconds(250));
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string MapAddressError(string error, string singular, string plural)
+    {
+        if (error.Contains("at least one", StringComparison.Ordinal))
+            return "Add at least one " + singular + ".";
+        if (error.Contains("20", StringComparison.Ordinal))
+            return "A notification can list at most 20 " + plural + ".";
+        return "Each " + singular + " must be an email address.";
+    }
+
+    private static bool Flag(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object
+        && element.TryGetProperty(name, out var value)
+        && value.ValueKind == JsonValueKind.True;
+
+    private static string RuleSummary(JsonElement item)
+    {
+        if (!item.TryGetProperty("matcher", out var matcher) || matcher.ValueKind != JsonValueKind.Object)
+            return "No matcher";
+        if (matcher.TryGetProperty("children", out var children) && children.ValueKind == JsonValueKind.Array)
+            return "Composite (" + children.GetArrayLength() + ")";
+        var field = Text(matcher, "field");
+        var regex = Text(matcher, "regex");
+        if (regex.Length > 80)
+            regex = regex[..80] + "…";
+        if (field.Length == 0 && regex.Length == 0)
+            return "Matcher";
+        return (field + " " + regex).Trim();
     }
 }

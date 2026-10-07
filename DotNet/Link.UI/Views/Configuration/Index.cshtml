@@ -8,7 +8,7 @@
         <div class="au-card card h-100">
             <div class="card-header">Measure definitions</div>
             <div class="card-body">
-                <p>List measure definitions and save a FHIR Bundle.</p>
+                <p>List measure definitions, open a library's CQL, and evaluate a measure.</p>
                 @if (!Model.MeasuresConfigured)
                 {
                     <p class="text-muted">MeasureEval service URL is not configured.</p>
@@ -34,7 +34,7 @@
         <div class="au-card card h-100">
             <div class="card-header">Validation</div>
             <div class="card-body">
-                <p>Implementation guides, categories, and category guidance.</p>
+                <p>Implementation guides, terminology dependencies, categories, and category rules.</p>
                 @if (!Model.ValidationConfigured)
                 {
                     <p class="text-muted">Validation service URL is not configured.</p>
@@ -99,7 +99,7 @@
         <div class="au-card card h-100">
             <div class="card-header">Notifications</div>
             <div class="card-body">
-                <p>Search sent notifications and the email configuration for each facility.</p>
+                <p>Search notifications, send one, and edit facility email configuration.</p>
                 @if (!Model.NotificationConfigured)
                 {
                     <p class="text-muted">Notification service URL is not configured.</p>

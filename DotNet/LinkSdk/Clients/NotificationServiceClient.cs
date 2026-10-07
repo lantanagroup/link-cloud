@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -99,6 +100,25 @@ public class NotificationServiceClient : LinkApiClientBase, INotificationService
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"notification/configuration/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> CreateNotificationAsync(
+        NotificationMessageApiModel message,
+        CancellationToken cancellationToken = default)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            notificationType = message.NotificationType,
+            facilityId = string.IsNullOrWhiteSpace(message.FacilityId) ? null : message.FacilityId,
+            correlationId = string.IsNullOrWhiteSpace(message.CorrelationId) ? null : message.CorrelationId,
+            subject = message.Subject,
+            body = message.Body,
+            recipients = message.Recipients ?? new List<string>(),
+            bcc = message.Bcc ?? new List<string>()
+        }, new System.Text.Json.JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+        return SendStringAsync(() => Request("notification")
+            .WithHeader("Content-Type", "application/json")
+            .PostStringAsync(json, cancellationToken: cancellationToken));
+    }
 
     private static IFlurlRequest Set(IFlurlRequest request, string name, string? value) =>
         string.IsNullOrWhiteSpace(value) ? request : request.SetQueryParam(name, value);

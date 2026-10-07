@@ -6,7 +6,7 @@
 <h1 class="h3">Validation</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">Initialize the published implementation guides and categories, then edit a category's title, severity, and guidance. Package upload, dependency checks, bulk import, and rule matchers stay on the validation service.</p>
+<p class="text-muted">Initialize the published implementation guides and categories, upload a package, check terminology dependencies, and import or export the category catalog. Importing replaces the catalog.</p>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <form method="post" asp-action="Initialize" onsubmit="return confirm('Initialize implementation guides from the published packages?');">
@@ -17,6 +17,44 @@
         <input type="hidden" name="categories" value="true" />
         <button type="submit" class="btn btn-outline-secondary">Initialize categories</button>
     </form>
+    <a class="btn btn-outline-secondary" asp-action="Dependencies">All dependencies</a>
+    <a class="btn btn-outline-secondary" asp-action="ExportCategories">Export categories</a>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Upload a package</div>
+    <div class="card-body">
+        <form method="post" asp-action="UploadPackage" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Uploading replaces the package with this name. Continue?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="packageName">Package name</label>
+                <input id="packageName" name="name" class="form-control" maxlength="120" required />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="package">Package file</label>
+                <input id="package" name="package" type="file" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">Upload</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The name is the artifact name. The file is sent as the package bytes. The limit is 8 MB.</p>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Import categories</div>
+    <div class="card-body">
+        <form method="post" asp-action="ImportCategories" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('This replaces the category catalog. Categories that are not in the file are deleted. Continue?');">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="categoryFile">Category export</label>
+                <input id="categoryFile" name="file" type="file" accept="application/json,.json" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-danger">Import and replace</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Use an export from this page. uncategorized cannot be imported. The limit is 8 MB.</p>
+    </div>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
@@ -39,6 +77,7 @@
                         <tr>
                             <th scope="col">Name</th>
                             <th scope="col">Type</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -47,6 +86,12 @@
                         <tr>
                             <td>@row.Name</td>
                             <td>@row.Type</td>
+                            <td>
+                                @if (string.Equals(row.Type, "PACKAGE", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <a asp-action="Package" asp-route-name="@row.Name">Open</a>
+                                }
+                            </td>
                         </tr>
                     }
                     </tbody>
