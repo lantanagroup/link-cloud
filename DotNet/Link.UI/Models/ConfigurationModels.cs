@@ -302,6 +302,8 @@ public sealed class OperationQuery
     public string? ResourceType { get; set; }
     public string? OperationId { get; set; }
     public string? VendorVersionId { get; set; }
+    public string? EditType { get; set; }
+    public string? EditId { get; set; }
     public bool IncludeDisabled { get; set; }
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
@@ -317,6 +319,7 @@ public sealed class OperationRow
     public string FacilityId { get; init; } = "";
     public bool Disabled { get; init; }
     public string Resources { get; init; } = "";
+    public IReadOnlyList<Guid> VendorVersionIds { get; init; } = Array.Empty<Guid>();
 }
 
 public sealed class OperationSearchPage
@@ -328,6 +331,8 @@ public sealed class OperationSearchPage
     public PageBar Paging { get; set; } = new();
     public IReadOnlyList<string> ResourceTypes { get; set; } = Array.Empty<string>();
     public IReadOnlyList<OperationRow> Operations { get; set; } = Array.Empty<OperationRow>();
+    public FacilityHubViewModel? VendorEditor { get; set; }
+    public string? ActionMessage { get; set; }
 }
 
 public sealed class NotificationQuery

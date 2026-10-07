@@ -421,4 +421,97 @@ public class FacilityNormalizationRulesTests
         var other = new List<ExtensionUrlGroup> { new("Encounter", ["http://example.org/c"]) };
         FacilityNormalizationRules.HasExtensionConflict([existing], other, out error).Should().BeFalse();
     }
+
+    [Fact]
+    public void Pasted_code_map_rows_are_appended_when_the_operation_is_built()
+    {
+        var input = new NormalizationOperationInput
+        {
+            OperationType = "CodeMap",
+            Name = "Map",
+            FhirPath = "code",
+            ResourceTypes = ["Patient"],
+            Maps =
+            [
+                new CodeSystemMapInput
+                {
+                    SourceSystem = "http://src",
+                    TargetSystem = "http://tgt",
+                    Entries = [new CodeMapEntryInput { SourceCode = "A", Code = "1", Display = "One" }, new CodeMapEntryInput()],
+                    PasteRows = "B\t2\tTwo\nC\t3\n"
+                }
+            ]
+        };
+
+        FacilityNormalizationRules.TryBuild(input, "facility", ["Patient"], out var request, out _, out var error)
+            .Should().BeTrue(error);
+        var map = request!.Operation.CodeSystemMaps!.Single();
+        map.CodeMaps.Should().ContainKey("B");
+        map.CodeMaps["B"].Display.Should().Be("Two");
+        map.CodeMaps["C"].Display.Should().Be("3");
+        input.Maps![0].PasteRows.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_quoted_csv_paste_keeps_a_comma_in_the_display()
+    {
+        FacilityNormalizationRules.TryParseCodeMapPaste("A,1,\"One, two\"\n", out var rows, out var error).Should().BeTrue(error);
+        rows.Should().ContainSingle();
+        rows[0].SourceCode.Should().Be("A");
+        rows[0].Code.Should().Be("1");
+        rows[0].Display.Should().Be("One, two");
+    }
+
+    [Fact]
+    public void A_paste_with_no_codes_fails_and_a_blank_paste_does_not()
+    {
+        FacilityNormalizationRules.TryParseCodeMapPaste("only-one-column\n", out _, out var error).Should().BeFalse();
+        error.Should().Contain("source code");
+
+        FacilityNormalizationRules.TryParseCodeMapPaste("   \n", out var rows, out error).Should().BeTrue(error);
+        rows.Should().BeEmpty();
+
+        FacilityNormalizationRules.TryParseCodeMapPaste("A,1,\"no end\n", out _, out error).Should().BeFalse();
+        error.Should().Contain("quote");
+    }
+
+    [Fact]
+    public void A_failed_build_keeps_the_pasted_text()
+    {
+        var input = new NormalizationOperationInput
+        {
+            OperationType = "CodeMap",
+            Name = "",
+            FhirPath = "code",
+            ResourceTypes = ["Patient"],
+            Maps = [new CodeSystemMapInput { PasteRows = "A,1,One" }]
+        };
+
+        var displayed = FacilityNormalizationRules.WithBlanks(input);
+        FacilityNormalizationRules.TryBuild(displayed, "facility", ["Patient"], out _, out _, out var error).Should().BeFalse();
+        error.Should().Contain("Name");
+        displayed.Maps![0].PasteRows.Should().Be("A,1,One");
+    }
+
+    [Fact]
+    public void Vendor_owners_require_one_known_version()
+    {
+        var catalog = new[] { Guid.NewGuid() };
+        var existing = Guid.NewGuid();
+        FacilityNormalizationRules.TryVendorOwners(false, true, [catalog[0].ToString()], catalog, [], out _, out var error)
+            .Should().BeFalse();
+        error.Should().Contain("not saved");
+
+        FacilityNormalizationRules.TryVendorOwners(true, true, [], catalog, [], out _, out error)
+            .Should().BeFalse();
+        error.Should().Contain("at least one");
+
+        FacilityNormalizationRules.TryVendorOwners(true, true, [Guid.NewGuid().ToString()], catalog, [existing], out _, out error)
+            .Should().BeFalse();
+        error.Should().Contain("vendor version");
+
+        FacilityNormalizationRules.TryVendorOwners(true, true, [existing.ToString()], catalog, [existing], out var kept, out error)
+            .Should().BeTrue(error);
+        kept.Should().Equal(existing);
+    }
 }

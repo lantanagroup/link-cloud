@@ -446,6 +446,12 @@ public static class ConfigurationRules
         var sort = OperationSorts.FirstOrDefault(item => string.Equals(item, query.SortBy?.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? "CreateDate";
         var dir = string.Equals(query.SortDir, "asc", StringComparison.OrdinalIgnoreCase) ? "asc" : "desc";
+        var editType = string.IsNullOrWhiteSpace(query.EditType)
+            ? null
+            : FacilityNormalizationRules.CanonicalType(query.EditType);
+        string? editId = null;
+        if (!string.IsNullOrWhiteSpace(query.EditId) && Guid.TryParse(query.EditId.Trim(), out var parsedEdit) && parsedEdit != Guid.Empty)
+            editId = parsedEdit.ToString();
         value = new OperationQuery
         {
             FacilityId = facilityId,
@@ -453,6 +459,8 @@ public static class ConfigurationRules
             ResourceType = Limit(query.ResourceType),
             OperationId = operationId?.ToString(),
             VendorVersionId = vendorVersionId?.ToString(),
+            EditType = editType,
+            EditId = editId,
             IncludeDisabled = query.IncludeDisabled,
             SortBy = sort,
             SortDir = dir,

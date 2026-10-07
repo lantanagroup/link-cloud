@@ -15,6 +15,7 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationAsync(string facilityId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteVendorVersionOperationAsync(Guid vendorVersionId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationSequencesAsync(string facilityId, string resourceType, List<CreateNormalizationOperationSequenceApiModel> sequences, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteOperationSequencesAsync(string facilityId, string? resourceType = null, CancellationToken cancellationToken = default);
