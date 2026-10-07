@@ -1,0 +1,133 @@
+@model SftpDetailPage
+@{
+    ViewData["Title"] = "SFTP acquisition log";
+    ViewData["LogsSection"] = "sftp";
+}
+
+<div class="mb-3">
+    <a asp-action="Sftp"><i class="bi bi-arrow-left me-1"></i>SFTP logs</a>
+</div>
+<h1 class="h3">SFTP acquisition log</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+            <span class="me-auto">Log</span>
+            @if (Model.CanReset)
+            {
+                <form method="post" asp-action="ResetSftp" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
+                    <button type="submit" class="btn btn-sm btn-au-action">Reset</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Id</dt>
+                <dd class="col-sm-9"><code>@Model.Id</code></dd>
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dt class="col-sm-3">Type</dt>
+                <dd class="col-sm-9">@Model.AcquisitionType</dd>
+                <dt class="col-sm-3">Subtype</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.SubType) ? "—" : Model.SubType)</dd>
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9">@Model.Status</dd>
+                <dt class="col-sm-3">Scheduled</dt>
+                <dd class="col-sm-9">@Model.Scheduled</dd>
+                <dt class="col-sm-3">Processed</dt>
+                <dd class="col-sm-9">@Model.Processed</dd>
+                <dt class="col-sm-3">Retries</dt>
+                <dd class="col-sm-9">@Model.RetryAttempts</dd>
+                <dt class="col-sm-3">Trace</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.TraceId) ? "—" : Model.TraceId)</dd>
+            </dl>
+            @if (!Model.CanReset)
+            {
+                <p class="small text-muted mb-0 mt-3">Reset is available when the status is Configuration Required or Max Retries Reached.</p>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Files</div>
+        <div class="card-body">
+            @if (Model.Files.Count == 0)
+            {
+                <p class="mb-0">No files.</p>
+            }
+            else
+            {
+                <ul class="mb-0">
+                    @foreach (var file in Model.Files)
+                    {
+                        <li><code>@file</code></li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Notes</div>
+        <div class="card-body">
+            @if (Model.Notes.Count == 0)
+            {
+                <p class="mb-0">No notes.</p>
+            }
+            else
+            {
+                <ul class="mb-0">
+                    @foreach (var note in Model.Notes)
+                    {
+                        <li>@note</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Benchmarks</div>
+        <div class="card-body">
+            @if (Model.Benchmarks.Count == 0)
+            {
+                <p class="mb-0">No benchmarks.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Attempt</th>
+                                <th scope="col">Started</th>
+                                <th scope="col">Duration</th>
+                                <th scope="col">Items</th>
+                                <th scope="col">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Benchmarks)
+                        {
+                            <tr>
+                                <td>@row.Attempt</td>
+                                <td class="text-nowrap">@row.Started</td>
+                                <td>@row.Duration</td>
+                                <td>@row.Items</td>
+                                <td>@(row.Succeeded ? "Succeeded" : "Failed")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

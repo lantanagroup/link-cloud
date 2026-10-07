@@ -1,0 +1,29 @@
+@model AcquisitionQuery
+<input type="hidden" name="facilityId" value="@Model.FacilityId" />
+<input type="hidden" name="patientId" value="@Model.PatientId" />
+<input type="hidden" name="reportId" value="@Model.ReportId" />
+<input type="hidden" name="resourceId" value="@Model.ResourceId" />
+<input type="hidden" name="resourceType" value="@Model.ResourceType" />
+<input type="hidden" name="queryPhase" value="@Model.QueryPhase" />
+<input type="hidden" name="queryType" value="@Model.QueryType" />
+<input type="hidden" name="priority" value="@Model.Priority" />
+<input type="hidden" name="minAgeHours" value="@Model.MinAgeHours" />
+<input type="hidden" name="sortBy" value="@Model.SortBy" />
+<input type="hidden" name="sortDir" value="@Model.SortDir" />
+<input type="hidden" name="page" value="@Model.Page" />
+<input type="hidden" name="pageSize" value="@Model.PageSize" />
+@if (Model.IncludeDeleted)
+{
+    <input type="hidden" name="includeDeleted" value="true" />
+}
+@if (Model.CancellableOnly)
+{
+    <input type="hidden" name="cancellableOnly" value="true" />
+}
+@if (Model.Status is not null)
+{
+    foreach (var status in Model.Status)
+    {
+        <input type="hidden" name="status" value="@status" />
+    }
+}

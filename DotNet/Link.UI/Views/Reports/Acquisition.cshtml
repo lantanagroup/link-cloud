@@ -26,6 +26,7 @@
 </div>
 
 <h1 class="h3">Acquisition log</h1>
+<p class="mb-2"><a asp-controller="Logs" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open in Logs</a></p>
 <partial name="_ReportNav" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))

@@ -73,9 +73,21 @@ public interface IDataAcquisitionServiceClient
         string? searchTerm = null,
         CancellationToken cancellationToken = default,
         string? patientId = null);
+
+    /// <summary>
+    /// Searches acquisition logs with the filters the log API accepts.
+    /// Blank filters are omitted. Status values are repeated <c>statuses</c> query parameters.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<DataAcquisitionLogSummaryApiModel>>> SearchAcquisitionLogsAsync(
+        AcquisitionLogQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<string>>> GetAcquisitionLogNotesAsync(long id, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(
+        string reportId,
+        CancellationToken cancellationToken = default,
+        string? patientId = null);
     Task<LinkApiResponse> GetReportStatisticsAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<DataAcquisitionReportSummaryApiModel>> GetReportSummaryAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<string>>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId, CancellationToken cancellationToken = default);
@@ -192,6 +204,27 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> DeleteSftpCredentialsAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> TestSavedSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads one sFTP acquisition log: <c>GET /api/data/sftp-logs/{logId}</c>.</summary>
+    Task<LinkApiResponse<SftpLogApiModel>> GetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resets an sFTP log so it can be retried: <c>POST /api/data/sftp-logs/{logId}/reset</c>.
+    /// Only ConfigurationRequired and MaxRetriesReached logs reset.
+    /// </summary>
+    Task<LinkApiResponse> ResetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
+
+    /// <summary>Typed sFTP log search: <c>GET /api/data/sftp-logs</c>.</summary>
+    Task<LinkApiResponse<PagedConfigModel<SftpLogApiModel>>> SearchSftpAcquisitionLogsAsync(
+        string? facilityId = null,
+        string? status = null,
+        string? acquisitionType = null,
+        string? subType = null,
+        int pageNumber = 1,
+        int pageSize = 10,
+        string? sortBy = null,
+        string? sortOrder = null,
+        CancellationToken cancellationToken = default);
 
     Task<LinkApiResponse> SearchSftpLogsAsync(
         string? facilityId = null,

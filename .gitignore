@@ -36,7 +36,9 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
-[Ll]ogs/
+[Ll]ogs/**
+!/DotNet/Link.UI/Views/Logs/
+!/DotNet/Link.UI/Views/Logs/**
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

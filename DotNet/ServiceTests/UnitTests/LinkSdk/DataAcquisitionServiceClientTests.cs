@@ -478,6 +478,90 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("/api/data/location-mappings/7", request.Path);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task SearchAcquisitionLogsAsync_RepeatsStatusFilters()
+    {
+        using var http = new FakeHttpBoundary("""{"records":[],"metadata":{"pageSize":10,"pageNumber":1,"totalCount":0,"totalPages":0}}""");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.SearchAcquisitionLogsAsync(new AcquisitionLogQuery
+        {
+            FacilityId = "f1",
+            Statuses = ["Pending", "Failed"],
+            CreatedBefore = new DateTime(2026, 10, 6, 0, 0, 0, DateTimeKind.Unspecified),
+            SortBy = "ExecutionDate",
+            SortOrder = "Descending"
+        });
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/acquisition-logs", request.Path);
+        Assert.Contains("statuses=Pending", request.Query);
+        Assert.Contains("statuses=Failed", request.Query);
+        Assert.Contains("facilityId=f1", request.Query);
+        Assert.Contains("2026-10-06", request.Query);
+        Assert.DoesNotContain("includeDeleted", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetReportStatusCountsAsync_AddsPatientIdWhenSet()
+    {
+        using var http = new FakeHttpBoundary("""{"reportId":"r1","statuses":[]}""");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.GetReportStatusCountsAsync("r1", patientId: "p1");
+        var request = http.SingleRequest();
+
+        Assert.Equal("/api/data/acquisition-logs/report/r1/status-counts", request.Path);
+        Assert.Contains("patientId=p1", request.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetSftpLogAsync_GetsOneLog()
+    {
+        var id = "11111111-1111-1111-1111-111111111111";
+        using var http = new FakeHttpBoundary($$"""{"externalId":"{{id}}","status":"Failed"}""");
+        using var client = CreateClient(http.BaseUrl);
+
+        var result = await client.GetSftpLogAsync(id);
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal($"/api/data/sftp-logs/{id}", request.Path);
+        Assert.Equal(Guid.Parse(id), result.Body!.ExternalId);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ResetSftpLogAsync_PostsReset()
+    {
+        var id = "22222222-2222-2222-2222-222222222222";
+        using var http = new FakeHttpBoundary("{}", 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.ResetSftpLogAsync(id);
+        var request = http.SingleRequest();
+
+        Assert.Equal("POST", request.Method);
+        Assert.Equal($"/api/data/sftp-logs/{id}/reset", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SearchSftpAcquisitionLogsAsync_OmitsIncludeDeleted()
+    {
+        using var http = new FakeHttpBoundary("""{"records":[],"metadata":null}""");
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.SearchSftpAcquisitionLogsAsync(facilityId: "f1", status: "Failed", acquisitionType: "Census");
+        var request = http.SingleRequest();
+
+        Assert.Equal("GET", request.Method);
+        Assert.Equal("/api/data/sftp-logs", request.Path);
+        Assert.Contains("facilityId=f1", request.Query);
+        Assert.Contains("status=Failed", request.Query);
+        Assert.Contains("acquisitionType=Census", request.Query);
+        Assert.DoesNotContain("includeDeleted", request.Query);
+    }
+
     private static DataAcquisitionServiceClient CreateClient(string baseUrl)
     {
         var serviceRegistry = Options.Create(new ServiceRegistry

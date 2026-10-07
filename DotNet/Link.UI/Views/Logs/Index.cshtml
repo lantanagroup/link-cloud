@@ -1,0 +1,68 @@
+@model LogsHomePage
+@{
+    ViewData["Title"] = "Logs";
+}
+
+<h1 class="h3">Logs</h1>
+<p class="text-muted">Acquisition logs, SFTP logs, and audit events. Kafka and Grafana open the tools published for this environment.</p>
+
+<div class="row g-3">
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Acquisition log</div>
+            <div class="card-body">
+                <p>Search data acquisition logs across facilities, then open a log or the report it belongs to.</p>
+                @if (!Model.AcquisitionConfigured)
+                {
+                    <p class="text-muted">Data acquisition service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Acquisition">Open acquisition logs</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">SFTP acquisition log</div>
+            <div class="card-body">
+                <p>Search SFTP acquisition logs and reset a log that is waiting on configuration or retries.</p>
+                @if (!Model.AcquisitionConfigured)
+                {
+                    <p class="text-muted">Data acquisition service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Sftp">Open SFTP logs</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Audit event log</div>
+            <div class="card-body">
+                <p>Search audit events by facility, service, action, user, and correlation id.</p>
+                @if (!Model.AuditConfigured)
+                {
+                    <p class="text-muted">Audit service URL is not configured.</p>
+                }
+                <a class="btn btn-au-action" asp-action="Audit">Open audit events</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="au-card card h-100">
+            <div class="card-header">Kafka and Grafana</div>
+            <div class="card-body">
+                <p>Kafka UI is a link. Grafana is a link when this environment publishes one.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-secondary" asp-action="Kafka">Kafka</a>
+                    @if (!string.IsNullOrWhiteSpace(Model.GrafanaUrl))
+                    {
+                        <a class="btn btn-outline-secondary" href="@Model.GrafanaUrl" target="_blank" rel="noopener noreferrer">Grafana</a>
+                    }
+                    else
+                    {
+                        <span class="text-muted align-self-center">Grafana is not configured (LinkUi:GrafanaUrl).</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

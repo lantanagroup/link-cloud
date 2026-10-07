@@ -1,0 +1,221 @@
+@model AcquisitionDetailPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Acquisition log";
+    ViewData["LogsSection"] = "acquisition";
+    var bar = Model.ReferencesPaging;
+}
+
+<div class="mb-3">
+    <a asp-action="Acquisition"><i class="bi bi-arrow-left me-1"></i>Acquisition logs</a>
+</div>
+<h1 class="h3">Acquisition log @Model.Id</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+            <span class="me-auto">Log</span>
+            @if (Model.CanProcess)
+            {
+                <form method="post" asp-action="ProcessOne" asp-route-id="@Model.Id" class="d-inline" onsubmit="return confirm('Process this acquisition log?');">
+                    <button type="submit" class="btn btn-sm btn-au-action">Process</button>
+                </form>
+            }
+            @if (Model.CanCancel)
+            {
+                <form method="post" asp-action="CancelOne" asp-route-id="@Model.Id" class="d-inline d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('Cancel this log if it is old enough? This cannot be undone.');">
+                    <label class="small text-muted mb-0" for="minAgeHours">Min age (hours)</label>
+                    <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@Model.MinAgeHours" class="form-control form-control-sm" style="width: 6rem" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dt class="col-sm-3">Patient</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.PatientId) ? "—" : Model.PatientId)</code></dd>
+                <dt class="col-sm-3">Report</dt>
+                <dd class="col-sm-9">
+                    @if (Model.ReportLink)
+                    {
+                        <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">@Model.ReportId</a>
+                    }
+                    else
+                    {
+                        @(string.IsNullOrWhiteSpace(Model.ReportId) ? "—" : Model.ReportId)
+                    }
+                </dd>
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9">@Model.Status</dd>
+                <dt class="col-sm-3">Phase</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Phase) ? "—" : Model.Phase)</dd>
+                <dt class="col-sm-3">Priority</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Priority) ? "—" : Model.Priority)</dd>
+                <dt class="col-sm-3">Resources</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Resources) ? "—" : Model.Resources)</dd>
+                <dt class="col-sm-3">Correlation</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.CorrelationId) ? "—" : Model.CorrelationId)</dd>
+                <dt class="col-sm-3">Trace</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.TraceId) ? "—" : Model.TraceId)</dd>
+                <dt class="col-sm-3">FHIR version</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.FhirVersion) ? "—" : Model.FhirVersion)</dd>
+                <dt class="col-sm-3">Retries</dt>
+                <dd class="col-sm-9">@Model.RetryAttempts</dd>
+                <dt class="col-sm-3">Execution</dt>
+                <dd class="col-sm-9">@Model.Execution</dd>
+                <dt class="col-sm-3">Created</dt>
+                <dd class="col-sm-9">@Model.Created</dd>
+                <dt class="col-sm-3">Completed</dt>
+                <dd class="col-sm-9">@Model.Completed @(Model.CompletionMilliseconds is long ms ? $"({ms} ms)" : "")</dd>
+                <dt class="col-sm-3">Reference log</dt>
+                <dd class="col-sm-9">@(Model.ReferenceLog ? "Yes" : "No") (@Model.ReferenceCount)</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Notes</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.NotesError))
+            {
+                <p>@Model.NotesError</p>
+            }
+            @if (Model.Notes.Count == 0)
+            {
+                <p class="mb-0">No notes.</p>
+            }
+            else
+            {
+                <ul class="mb-0">
+                    @foreach (var note in Model.Notes)
+                    {
+                        <li>@note</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Queries</div>
+        <div class="card-body">
+            @if (Model.Queries.Count == 0)
+            {
+                <p class="mb-0">No queries.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Type</th>
+                                <th scope="col">Resources</th>
+                                <th scope="col">Parameters</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var query in Model.Queries)
+                        {
+                            <tr>
+                                <td>@query.Type</td>
+                                <td>@(string.IsNullOrWhiteSpace(query.Resources) ? "—" : query.Resources)</td>
+                                <td>@(string.IsNullOrWhiteSpace(query.Parameters) ? "—" : query.Parameters)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Acquired resource ids</div>
+        <div class="card-body">
+            @if (Model.AcquiredIds.Count == 0)
+            {
+                <p class="mb-0">None recorded.</p>
+            }
+            else
+            {
+                <ul class="mb-0">
+                    @foreach (var resourceId in Model.AcquiredIds)
+                    {
+                        <li><code>@resourceId</code></li>
+                    }
+                </ul>
+                @if (Model.AcquiredHidden > 0)
+                {
+                    <p class="small text-muted mt-2 mb-0">@Model.AcquiredHidden more ids are not listed.</p>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Reference resources</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.ReferencesError))
+            {
+                <p class="mb-0">@Model.ReferencesError</p>
+            }
+            else if (Model.References.Count == 0)
+            {
+                <p class="mb-0">No reference resources.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-2">
+                        <thead>
+                            <tr>
+                                <th scope="col">Type</th>
+                                <th scope="col">Id</th>
+                                <th scope="col">Phase</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.References)
+                        {
+                            <tr>
+                                <td>@row.ResourceType</td>
+                                <td><code>@row.ResourceId</code></td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Phase) ? "—" : row.Phase)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Reference pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

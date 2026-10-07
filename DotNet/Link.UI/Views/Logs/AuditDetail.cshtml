@@ -1,0 +1,79 @@
+@model AuditDetailPage
+@{
+    ViewData["Title"] = "Audit event";
+    ViewData["LogsSection"] = "audit";
+}
+
+<div class="mb-3">
+    <a asp-action="Audit"><i class="bi bi-arrow-left me-1"></i>Audit events</a>
+</div>
+<h1 class="h3">Audit event</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Event</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Id</dt>
+                <dd class="col-sm-9"><code>@Model.Id</code></dd>
+                <dt class="col-sm-3">When</dt>
+                <dd class="col-sm-9">@Model.When</dd>
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</code></dd>
+                <dt class="col-sm-3">Service</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Service) ? "—" : Model.Service)</dd>
+                <dt class="col-sm-3">Action</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Action) ? "—" : Model.Action)</dd>
+                <dt class="col-sm-3">User</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.User) ? "—" : Model.User)</dd>
+                <dt class="col-sm-3">Resource</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Resource) ? "—" : Model.Resource)</dd>
+                <dt class="col-sm-3">Correlation</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.CorrelationId) ? "—" : Model.CorrelationId)</dd>
+                <dt class="col-sm-3">Notes</dt>
+                <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Notes) ? "—" : Model.Notes)</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="au-card card mt-3">
+        <div class="card-header">Property changes</div>
+        <div class="card-body">
+            @if (Model.Changes.Count == 0)
+            {
+                <p class="mb-0">No property changes.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Property</th>
+                                <th scope="col">Before</th>
+                                <th scope="col">After</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var change in Model.Changes)
+                        {
+                            <tr>
+                                <td>@change.Name</td>
+                                <td>@(string.IsNullOrWhiteSpace(change.Before) ? "—" : change.Before)</td>
+                                <td>@(string.IsNullOrWhiteSpace(change.After) ? "—" : change.After)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

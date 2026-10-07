@@ -43,7 +43,7 @@
                 <a class="lu-nav-link @(Placeholder("Configuration") ? "active" : "")" asp-controller="Placeholder" asp-action="Configuration">
                     <i class="bi bi-sliders me-2"></i>Configuration
                 </a>
-                <a class="lu-nav-link @(Placeholder("Logs") ? "active" : "")" asp-controller="Placeholder" asp-action="Logs">
+                <a class="lu-nav-link @(Ctrl("Logs") ? "active" : "")" asp-controller="Logs" asp-action="Index">
                     <i class="bi bi-journal-text me-2"></i>Logs
                 </a>
                 <a class="lu-nav-link @(Placeholder("System") ? "active" : "")" asp-controller="Placeholder" asp-action="System">

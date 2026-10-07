@@ -1,0 +1,301 @@
+@model AcquisitionLogListPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Acquisition log";
+    ViewData["LogsSection"] = "acquisition";
+    var query = Model.Query;
+    var search = Model.Search;
+    var bar = Model.Paging;
+    var statuses = query.Status ?? [];
+    Dictionary<string, string> SortRoute(string column, bool dateColumn) => query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: LogsRules.NextSort(search.SortBy, search.SortDir, column, dateColumn));
+    string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
+        ? (search.SortDir == "asc" ? " ↑" : " ↓")
+        : "";
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+</div>
+<h1 class="h3">Acquisition log</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="patientId">Patient</label>
+                <input id="patientId" name="patientId" value="@query.PatientId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="reportId">Report</label>
+                <input id="reportId" name="reportId" value="@query.ReportId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="resourceType">Resource type</label>
+                <select id="resourceType" name="resourceType" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var type in LogsRules.ResourceTypes)
+                    {
+                        if (string.Equals(type, query.ResourceType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@type" selected>@type</option>
+                        }
+                        else
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="resourceId">Resource id</label>
+                <input id="resourceId" name="resourceId" value="@query.ResourceId" class="form-control" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="queryPhase">Phase</label>
+                <select id="queryPhase" name="queryPhase" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var phase in LogsRules.Phases)
+                    {
+                        if (string.Equals(phase, query.QueryPhase, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@phase" selected>@phase</option>
+                        }
+                        else
+                        {
+                            <option value="@phase">@phase</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="queryType">Query type</label>
+                <select id="queryType" name="queryType" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var type in LogsRules.QueryTypes)
+                    {
+                        if (string.Equals(type, query.QueryType, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@type" selected>@type</option>
+                        }
+                        else
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="status">Status</label>
+                <select id="status" name="status" class="form-select" multiple size="4">
+                    @foreach (var status in LogsRules.Statuses)
+                    {
+                        if (statuses.Any(value => value.Split(',').Any(part => part.Trim().Equals(status, StringComparison.OrdinalIgnoreCase))))
+                        {
+                            <option value="@status" selected>@status</option>
+                        }
+                        else
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="priority">Priority</label>
+                <select id="priority" name="priority" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var priority in LogsRules.Priorities)
+                    {
+                        if (string.Equals(priority, query.Priority, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@priority" selected>@priority</option>
+                        }
+                        else
+                        {
+                            <option value="@priority">@priority</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="minAgeHours">Min age (hours)</label>
+                <input id="minAgeHours" name="minAgeHours" type="number" min="0" max="@LogsRules.MaxMinAgeHours" value="@query.MinAgeHours" class="form-control" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="pageSize">Page</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var size in LogsRules.PageSizes)
+                    {
+                        if (search.PageSize == size)
+                        {
+                            <option value="@size" selected>@size</option>
+                        }
+                        else
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(query.IncludeDeleted ? "checked" : null) />
+                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="cancellableOnly" name="cancellableOnly" value="true" @(query.CancellableOnly ? "checked" : null) />
+                    <label class="form-check-label" for="cancellableOnly">Cancellable only</label>
+                </div>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Acquisition">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    @if (search.ReportId is not null)
+    {
+        <div class="au-card card mt-3">
+            <div class="card-header">Status counts for this report</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.CountsNote))
+                {
+                    <p class="mb-0">@Model.CountsNote</p>
+                }
+                else if (Model.Counts.Count == 0)
+                {
+                    <p class="mb-0">No status counts.</p>
+                }
+                else
+                {
+                    <ul class="mb-0">
+                        @foreach (var count in Model.Counts)
+                        {
+                            <li>@count.Name: @count.Count</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="au-card card mt-3">
+        <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+            <span class="me-auto">Logs</span>
+            @if (search.HasFilter)
+            {
+                <form method="post" asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button type="submit" class="btn btn-sm btn-au-action">Process matching</button>
+                </form>
+                <form method="post" asp-action="CancelMatching" class="d-inline" onsubmit="return confirm('Cancel every matching log that is old enough? This cannot be undone.');">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancel matching</button>
+                </form>
+            }
+        </div>
+        <div class="card-body">
+            @if (Model.Logs.Count == 0)
+            {
+                <p class="mb-0">No acquisition logs found.</p>
+            }
+            else
+            {
+                <form method="post" asp-action="Process" id="acquisition-logs">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><span class="visually-hidden">Select</span></th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("Id", false)">Id@(Mark("Id"))</a></th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("FacilityId", false)">Facility@(Mark("FacilityId"))</a></th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("PatientId", false)">Patient@(Mark("PatientId"))</a></th>
+                                    <th scope="col">Report</th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("Status", false)">Status@(Mark("Status"))</a></th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("QueryPhase", false)">Phase@(Mark("QueryPhase"))</a></th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("QueryType", false)">Type@(Mark("QueryType"))</a></th>
+                                    <th scope="col">Resources</th>
+                                    <th scope="col"><a asp-all-route-data="@SortRoute("CreateDate", true)">Created@(Mark("CreateDate"))</a></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var row in Model.Logs)
+                            {
+                                <tr>
+                                    <td>
+                                        @if (row.CanProcess)
+                                        {
+                                            <input class="form-check-input" type="checkbox" name="ids" value="@row.Id" aria-label="Select log @row.Id" />
+                                        }
+                                    </td>
+                                    <td><a asp-action="AcquisitionDetail" asp-route-id="@row.Id">@row.Id</a>@(row.Deleted ? " (deleted)" : "")</td>
+                                    <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                    <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.PatientId) ? "—" : row.PatientId)</code></td>
+                                    <td>
+                                        @if (row.ReportLink)
+                                        {
+                                            <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@row.FacilityId" asp-route-reportId="@row.ReportId">@row.ReportId</a>
+                                        }
+                                        else
+                                        {
+                                            @(string.IsNullOrWhiteSpace(row.ReportId) ? "—" : row.ReportId)
+                                        }
+                                    </td>
+                                    <td>@row.Status</td>
+                                    <td>@row.Phase</td>
+                                    <td>@row.QueryType</td>
+                                    <td>@row.Resources</td>
+                                    <td class="text-nowrap">@row.Created</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-sm btn-au-action" onclick="return confirm('Process the selected acquisition logs?');">Process selected</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger" formaction="@Url.Action("Cancel")" formmethod="post" onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
+                </form>
+                <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Log pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}
