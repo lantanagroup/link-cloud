@@ -116,8 +116,24 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   border-radius: var(--au-radius);
   box-shadow: var(--au-card-shadow);
   margin-bottom: 1.25rem;
-  overflow: hidden;          /* so header corners clip */
+  overflow: visible;
   background: #fff;
+}
+.au-card > .card-header:first-child {
+  border-top-left-radius: var(--au-radius);
+  border-top-right-radius: var(--au-radius);
+}
+.au-card > .card-body:last-child,
+.au-card > .list-group:last-child {
+  border-bottom-left-radius: var(--au-radius);
+  border-bottom-right-radius: var(--au-radius);
+}
+/* An open menu paints over the next card. The card itself does not clip it. */
+.au-card:has(.dropdown-menu.show),
+.accordion-item:has(.dropdown-menu.show),
+.modal-content:has(.dropdown-menu.show) {
+  position: relative;
+  z-index: 30;
 }
 .au-card .card-header {
   background: var(--au-dark);
@@ -1030,8 +1046,27 @@ a.au-scenario-card:hover {
 }
 .au-trend {
   width: 100%;
-  height: 160px;
+  height: 180px;
+  max-height: 220px;
   display: block;
+}
+.lu-chart,
+.lu-chart-donut {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  max-height: 220px;
+}
+.lu-chart-donut {
+  height: 210px;
+  max-width: 260px;
+  margin-inline: auto;
+}
+.lu-chart > canvas,
+.lu-chart-donut > canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 .au-trend-axis {
   font-size: 10px;
@@ -1536,8 +1571,16 @@ a.au-scenario-card:hover {
 .au-health-accordion {
   border: none;
   border-radius: var(--au-radius);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--au-card-shadow);
+}
+.au-health-accordion > .accordion-item:first-child {
+  border-top-left-radius: var(--au-radius);
+  border-top-right-radius: var(--au-radius);
+}
+.au-health-accordion > .accordion-item:last-child {
+  border-bottom-left-radius: var(--au-radius);
+  border-bottom-right-radius: var(--au-radius);
 }
 .au-health-header { background: #fff; padding: 0; }
 .au-health-toggle {
@@ -1790,33 +1833,44 @@ html:has(body.lu-body) {
 
 .lu-section-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  border-bottom: 1px solid var(--au-border);
+  flex-wrap: nowrap;
+  gap: .15rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--au-dark);
+  border-radius: var(--au-radius);
+  padding: .35rem .5rem .2rem;
+  margin-bottom: 1rem;
 }
 .lu-section-nav a {
-  border-radius: .25rem .25rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: .35rem;
   text-decoration: none;
   font-weight: 600;
-  font-size: 1rem;
-  line-height: 1.5;
-  padding: .5rem 1rem !important;
-  margin-bottom: -1px;
+  font-size: .95rem;
+  line-height: 1.4;
+  padding: .45rem .85rem !important;
+  margin: 0;
   background: transparent !important;
-  color: var(--au-muted) !important;
-  border: 1px solid transparent !important;
-  box-shadow: none;
+  color: rgba(255,255,255,.82) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .lu-section-nav a:hover,
 .lu-section-nav a:focus {
-  color: var(--au-text) !important;
-  border-color: var(--au-border) var(--au-border) transparent !important;
+  color: #fff !important;
+  background: rgba(255,255,255,.14) !important;
 }
 .lu-section-nav a.lu-nav-current,
-.lu-section-nav a.lu-nav-current:hover {
-  color: var(--au-text) !important;
-  background: #fff !important;
-  border-color: var(--au-border) var(--au-border) #fff !important;
+.lu-section-nav a.lu-nav-current:hover,
+.lu-section-nav a.lu-nav-current:focus {
+  color: #fff !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: inset 0 -3px 0 var(--au-warning) !important;
 }
 .lu-live-label {
   font-size: .75rem;
@@ -2040,10 +2094,15 @@ html:has(body.lu-body) {
 #facilityPanels > .accordion-item {
   border: none;
   border-radius: var(--au-radius);
-  overflow: hidden;
+  overflow: visible;
   margin-bottom: 1.25rem;
   background: #fff;
   box-shadow: var(--au-card-shadow);
+}
+#facilityPanels > .accordion-item > .accordion-header:first-child {
+  border-top-left-radius: var(--au-radius);
+  border-top-right-radius: var(--au-radius);
+  overflow: hidden;
 }
 #facilityPanels > .accordion-item:first-of-type,
 #facilityPanels > .accordion-item:last-of-type {

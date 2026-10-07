@@ -497,9 +497,27 @@
             }
         }
 
+        function fitChart(canvas) {
+            if (canvas.parentElement && canvas.parentElement.dataset.luChart) return;
+            const style = canvas.getAttribute('style') || '';
+            const match = style.match(/(?:max-height|height)\s*:\s*(\d+)px/);
+            let px = match ? Number(match[1]) : 200;
+            if (px > 220) px = 200;
+            const box = document.createElement('div');
+            box.className = 'lu-chart';
+            box.style.height = px + 'px';
+            box.dataset.luChart = '1';
+            canvas.parentElement.insertBefore(box, canvas);
+            box.appendChild(canvas);
+        }
+
         function upsertChart(canvasId, config) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
+            fitChart(canvas);
+            config.options = config.options || {};
+            config.options.responsive = true;
+            config.options.maintainAspectRatio = false;
             if (charts[canvasId]) {
                 charts[canvasId].data = config.data;
                 charts[canvasId].options = config.options;
@@ -533,7 +551,7 @@
                 options: {
                     indexAxis: 'y',
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     aspectRatio: 2.2,
                     animation: false,
                     plugins: { legend: { display: false } },
@@ -566,7 +584,7 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     aspectRatio: 2.6,
                     animation: false,
                     plugins: { legend: { display: false } },
@@ -617,7 +635,7 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     aspectRatio: 1.2,
                     animation: false,
                     cutout: '65%',

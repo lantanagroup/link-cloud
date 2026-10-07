@@ -26,10 +26,10 @@
     <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
 </div>
 
+<partial name="_ReportNav" />
 <h1 class="h3">Acquisition log</h1>
 <partial name="_ReportIdentity" />
 <p class="mb-2"><a asp-controller="Logs" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open in Logs</a></p>
-<partial name="_ReportNav" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {

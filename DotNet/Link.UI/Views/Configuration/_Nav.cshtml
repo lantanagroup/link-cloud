@@ -5,17 +5,17 @@
     var dmrp = Features.Value.DmrpEnabled;
     string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
 }
-<nav class="lu-section-nav mb-3" aria-label="Configuration">
-    <a class="@Btn("measures")" asp-controller="Configuration" asp-action="Measures">Measures</a>
-    <a class="@Btn("vendors")" asp-controller="Configuration" asp-action="Vendors">Vendors</a>
-    <a class="@Btn("validation")" asp-controller="Configuration" asp-action="Validation">Validation</a>
-    <a class="@Btn("plans")" asp-controller="Configuration" asp-action="QueryPlans">Query plans</a>
-    <a class="@Btn("terminology")" asp-controller="Configuration" asp-action="Terminology">Terminology</a>
-    <a class="@Btn("hsloc")" asp-controller="Configuration" asp-action="Hsloc">HSLOC</a>
-    <a class="@Btn("operations")" asp-controller="Configuration" asp-action="Operations">Operations</a>
-    <a class="@Btn("notifications")" asp-controller="Configuration" asp-action="Notifications">Notifications</a>
+<nav class="lu-section-nav" aria-label="Configuration">
+    <a class="@Btn("measures")" asp-controller="Configuration" asp-action="Measures"><i class="bi bi-clipboard-data me-1"></i>Measures</a>
+    <a class="@Btn("vendors")" asp-controller="Configuration" asp-action="Vendors"><i class="bi bi-building me-1"></i>Vendors</a>
+    <a class="@Btn("validation")" asp-controller="Configuration" asp-action="Validation"><i class="bi bi-shield-check me-1"></i>Validation</a>
+    <a class="@Btn("plans")" asp-controller="Configuration" asp-action="QueryPlans"><i class="bi bi-diagram-3 me-1"></i>Query plans</a>
+    <a class="@Btn("terminology")" asp-controller="Configuration" asp-action="Terminology"><i class="bi bi-book me-1"></i>Terminology</a>
+    <a class="@Btn("hsloc")" asp-controller="Configuration" asp-action="Hsloc"><i class="bi bi-geo-alt me-1"></i>HSLOC</a>
+    <a class="@Btn("operations")" asp-controller="Configuration" asp-action="Operations"><i class="bi bi-gear me-1"></i>Operations</a>
+    <a class="@Btn("notifications")" asp-controller="Configuration" asp-action="Notifications"><i class="bi bi-bell me-1"></i>Notifications</a>
     @if (dmrp)
     {
-        <a class="@Btn("mappings")" asp-controller="Configuration" asp-action="MeasureMappings">Mappings</a>
+        <a class="@Btn("mappings")" asp-controller="Configuration" asp-action="MeasureMappings"><i class="bi bi-arrow-left-right me-1"></i>Mappings</a>
     }
 </nav>

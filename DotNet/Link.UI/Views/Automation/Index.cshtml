@@ -56,8 +56,10 @@
     <div class="col-12 col-lg-4">
         <div class="au-card card h-100">
             <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
-            <div class="card-body d-flex align-items-center justify-content-center position-relative" style="min-height:240px;">
-                <canvas id="statusChart" height="180"></canvas>
+            <div class="card-body d-flex align-items-center justify-content-center position-relative">
+                <div class="lu-chart-donut">
+                    <canvas id="statusChart"></canvas>
+                </div>
                 <p id="statusEmpty" class="text-muted small mb-0 @(stats.TotalRuns == 0 ? "" : "d-none")">No runs yet</p>
             </div>
         </div>
@@ -65,8 +67,10 @@
     <div class="col-12 col-lg-8">
         <div class="au-card card h-100">
             <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Runs Per Day (Last 14 Days)</div>
-            <div class="card-body" style="min-height:240px;">
-                <canvas id="dayChart" height="180"></canvas>
+            <div class="card-body">
+                <div class="lu-chart">
+                    <canvas id="dayChart"></canvas>
+                </div>
             </div>
         </div>
     </div>

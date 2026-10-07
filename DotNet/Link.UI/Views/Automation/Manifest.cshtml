@@ -81,7 +81,7 @@
                 <div class="au-card">
                     <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Resource Distribution</div>
                     <div class="card-body">
-                        <div style="max-height:320px;display:flex;align-items:center;justify-content:center;">
+                        <div class="lu-chart-donut">
                             <canvas id="resourceDistChart"></canvas>
                         </div>
                     </div>
@@ -110,7 +110,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <div style="max-height:320px;display:flex;align-items:center;justify-content:center;" class="mb-3">
+                <div class="lu-chart mb-3">
                     <canvas id="patientBarChart"></canvas>
                 </div>
                 <div id="patientBreakdownContainer" style="max-height:600px;overflow-y:auto;">
@@ -379,7 +379,7 @@
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
                         tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} (${((ctx.parsed / data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)` } }
@@ -530,7 +530,7 @@
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         display: false

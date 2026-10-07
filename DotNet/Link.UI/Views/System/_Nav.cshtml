@@ -2,10 +2,10 @@
     var active = ViewData["SystemSection"] as string ?? "";
     string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
 }
-<nav class="lu-section-nav mb-3" aria-label="System">
-    <a class="@Btn("users")" asp-controller="System" asp-action="Users">Accounts</a>
-    <a class="@Btn("roles")" asp-controller="System" asp-action="Roles">Roles</a>
-    <a class="@Btn("health")" asp-controller="System" asp-action="Health">Health</a>
-    <a class="@Btn("configuration")" asp-controller="System" asp-action="AppConfiguration">App configuration</a>
-    <a class="@Btn("integration")" asp-controller="System" asp-action="Integration">Integration test</a>
+<nav class="lu-section-nav" aria-label="System">
+    <a class="@Btn("users")" asp-controller="System" asp-action="Users"><i class="bi bi-people me-1"></i>Accounts</a>
+    <a class="@Btn("roles")" asp-controller="System" asp-action="Roles"><i class="bi bi-person-badge me-1"></i>Roles</a>
+    <a class="@Btn("health")" asp-controller="System" asp-action="Health"><i class="bi bi-heart-pulse me-1"></i>Health</a>
+    <a class="@Btn("configuration")" asp-controller="System" asp-action="AppConfiguration"><i class="bi bi-sliders me-1"></i>App configuration</a>
+    <a class="@Btn("integration")" asp-controller="System" asp-action="Integration"><i class="bi bi-plug me-1"></i>Integration test</a>
 </nav>

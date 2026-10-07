@@ -9,9 +9,9 @@
 <div class="mb-3">
     <a class="btn btn-sm btn-au-neutral" asp-action="Acquisition"><i class="bi bi-arrow-left me-1"></i>Acquisition logs</a>
 </div>
+<partial name="_Nav" />
 <h1 class="h3">Acquisition log</h1>
 <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = Model.Id.ToString(), CopyLabel = "Copy log id" })" />
-<partial name="_Nav" />
 <partial name="_Alerts" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
