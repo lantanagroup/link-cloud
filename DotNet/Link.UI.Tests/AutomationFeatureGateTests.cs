@@ -26,6 +26,8 @@ public class AutomationFeatureGateTests
         home.StatusCode.Should().Be(HttpStatusCode.OK);
         var html = await home.Content.ReadAsStringAsync();
         html.Should().NotContain("bi-lightning-charge");
+        html.Should().NotContain("Active runs");
+        html.Should().NotContain("Open the runs dashboard");
 
         foreach (var path in new[]
         {
