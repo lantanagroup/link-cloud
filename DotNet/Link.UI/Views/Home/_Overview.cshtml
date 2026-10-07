@@ -275,14 +275,14 @@
                     {
                         foreach (var report in reports.Rows)
                         {
-                            <a class="home-row" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">
+                            <div class="home-row">
                                 <span class="badge @report.Badge">@report.Status</span>
                                 <span class="home-row-main">
-                                    <code class="lu-facility-id">@report.FacilityId</code>
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }) })" />
                                     <partial name="_AutomationBadge" model="report.AutomationRunId" />
                                 </span>
-                                <span class="home-row-time text-muted small">@report.When</span>
-                            </a>
+                                <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">@report.When</a>
+                            </div>
                         }
                         <p class="small text-muted mt-2 mb-0">@reports.Total total</p>
                     }

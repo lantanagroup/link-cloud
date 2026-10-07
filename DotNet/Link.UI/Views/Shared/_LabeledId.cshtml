@@ -1,0 +1,51 @@
+@model LabeledId
+@{
+    var value = Model.Value?.Trim() ?? "";
+    var empty = string.IsNullOrWhiteSpace(value) || value == "—";
+    var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
+    var href = Model.LinkHref;
+    var safeLink = !string.IsNullOrWhiteSpace(href)
+        && href.StartsWith('/')
+        && !href.StartsWith("//", StringComparison.Ordinal)
+        && href.IndexOf("://", StringComparison.Ordinal) < 0
+        && href.IndexOf('\\') < 0;
+}
+<span class="lu-labeled-id@(Model.Compact ? " lu-labeled-id-compact" : "")">
+    @if (!string.IsNullOrWhiteSpace(Model.Label))
+    {
+        <span class="lu-id-label@(Model.Compact ? " visually-hidden" : "")">@Model.Label</span>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.Name))
+    {
+        <span class="lu-id-name">@Model.Name</span>
+    }
+    <span class="lu-id-value">
+        @if (empty)
+        {
+            <span class="text-muted">—</span>
+        }
+        else if (safeLink)
+        {
+            if (string.IsNullOrWhiteSpace(Model.ValueElementId))
+            {
+                <a class="lu-clip" href="@href" title="@value">@value</a>
+            }
+            else
+            {
+                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId">@value</a>
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(Model.ValueElementId))
+        {
+            <code class="lu-facility-id" title="@value">@value</code>
+        }
+        else
+        {
+            <code class="lu-facility-id" title="@value" id="@Model.ValueElementId">@value</code>
+        }
+        @if (!empty && Model.Copy)
+        {
+            <partial name="_CopyButton" model="@(new CopyTarget { Value = value, Label = copyLabel })" />
+        }
+    </span>
+</span>

@@ -124,15 +124,7 @@
                     {
                         <tr class="@(report.Deleted ? "table-secondary" : null)">
                             <td>
-                                @if (report.Deleted)
-                                {
-                                    <span class="lu-clip" title="@report.Id">@report.Id</span>
-                                }
-                                else
-                                {
-                                    <a class="lu-clip" title="@report.Id" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@report.Id">@report.Id</a>
-                                }
-                                <button type="button" class="lu-copy" data-lu-copy="@report.Id" aria-label="Copy report id">Copy</button>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = report.Id }) })" />
                                 @if (report.Deleted)
                                 {
                                     <div class="small text-muted">Deleted</div>
@@ -147,7 +139,7 @@
                                 <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Measures))
                                 {
-                                    <button type="button" class="lu-copy" data-lu-copy="@report.Measures" aria-label="Copy measures">Copy</button>
+                                    <partial name="_CopyButton" model="@(new CopyTarget { Value = report.Measures, Label = "Copy measures" })" />
                                 }
                             </td>
                             <td><span class="badge text-bg-light border">@report.Frequency</span></td>
@@ -160,15 +152,16 @@
                                     <div class="small text-muted">@report.Submitted</div>
                                 }
                             </td>
-                            <td class="lu-row-actions">
+                            <td>
+                                <div class="lu-row-actions">
                                 @if (report.CanResubmit)
                                 {
-                                    <div>
+                                    <div class="lu-row-action">
                                         <div class="d-none" data-resubmit-fields>
                                             <partial name="_ViewReturnFields" model="Model.Query" />
                                             <input type="hidden" name="targetId" value="@report.Id" />
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-warning" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd">Resubmit</button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@Model.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
                                     </div>
                                 }
                                 @if (report.CanAbort)
@@ -176,7 +169,7 @@
                                     <form method="post" data-au-save asp-action="AbortReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Abort</button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Abort" aria-label="Abort"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
                                     </form>
                                 }
                                 @if (report.CanCleanUp)
@@ -184,7 +177,7 @@
                                     <form method="post" data-au-save asp-action="CleanUpReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Clean up</button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Clean up" aria-label="Clean up"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 }
                                 @if (report.CanRestore)
@@ -192,9 +185,10 @@
                                     <form method="post" data-au-save asp-action="RestoreReport" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Restore this report and its acquisition logs?');">
                                         <partial name="_ViewReturnFields" model="Model.Query" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-au-neutral">Restore</button>
+                                        <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
                                     </form>
                                 }
+                                </div>
                             </td>
                         </tr>
                     }

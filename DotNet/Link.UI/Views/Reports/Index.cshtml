@@ -149,21 +149,14 @@
                     {
                         <tr class="@(report.Deleted ? "table-secondary" : null)" data-report-id="@report.Id">
                             <td>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }) })" />
                                 @if (report.Deleted)
                                 {
-                                    <span class="lu-clip" title="@report.Id">@report.Id</span>
-                                    <button type="button" class="lu-copy" data-lu-copy="@report.Id" aria-label="Copy report id">Copy</button>
                                     <div class="small text-muted">Deleted</div>
-                                }
-                                else
-                                {
-                                    <a class="lu-clip" title="@report.Id" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">@report.Id</a>
-                                    <button type="button" class="lu-copy" data-lu-copy="@report.Id" aria-label="Copy report id">Copy</button>
                                 }
                             </td>
                             <td>
-                                <a class="lu-clip" title="@report.FacilityId" asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId">@report.FacilityId</a>
-                                <button type="button" class="lu-copy" data-lu-copy="@report.FacilityId" aria-label="Copy facility id">Copy</button>
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("View", "Tenants", new { id = report.FacilityId }) })" />
                                 <partial name="_AutomationBadge" model="report.AutomationRunId" />
                             </td>
                             <td class="text-nowrap">
@@ -175,7 +168,7 @@
                                 <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Measures))
                                 {
-                                    <button type="button" class="lu-copy" data-lu-copy="@report.Measures" aria-label="Copy measures">Copy</button>
+                                    <partial name="_CopyButton" model="@(new CopyTarget { Value = report.Measures, Label = "Copy measures" })" />
                                 }
                             </td>
                             <td><span class="badge text-bg-light border">@report.Frequency</span></td>
@@ -188,16 +181,17 @@
                                     <div class="small text-muted">@report.Submitted</div>
                                 }
                             </td>
-                            <td class="lu-row-actions">
+                            <td>
+                                <div class="lu-row-actions">
                                 @if (report.CanResubmit)
                                 {
-                                    <div>
+                                    <div class="lu-row-action">
                                         <div class="d-none" data-resubmit-fields>
                                             <partial name="_ListReturn" model="Model.Query" />
                                             <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                             <input type="hidden" name="targetId" value="@report.Id" />
                                         </div>
-                                        <button type="button" class="btn btn-sm btn-warning" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@report.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd">Resubmit</button>
+                                        <button type="button" class="btn btn-sm btn-warning lu-icon-btn" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@report.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd" title="Resubmit" aria-label="Resubmit"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
                                     </div>
                                 }
                                 @if (report.CanAbort)
@@ -206,7 +200,7 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Abort</button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Abort" aria-label="Abort"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
                                     </form>
                                 }
                                 @if (report.CanCleanUp)
@@ -215,7 +209,7 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-danger">Clean up</button>
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Clean up" aria-label="Clean up"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 }
                                 @if (report.CanRestore)
@@ -224,9 +218,10 @@
                                         <partial name="_ListReturn" model="Model.Query" />
                                         <input type="hidden" name="rowFacility" value="@report.FacilityId" />
                                         <input type="hidden" name="targetId" value="@report.Id" />
-                                        <button type="submit" class="btn btn-sm btn-au-neutral">Restore</button>
+                                        <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
                                     </form>
                                 }
+                                </div>
                             </td>
                         </tr>
                     }

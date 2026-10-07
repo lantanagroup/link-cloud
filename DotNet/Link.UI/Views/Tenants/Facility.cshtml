@@ -34,7 +34,7 @@ else if (Model.NotFound)
     <div class="au-card card">
         <div class="card-header">Facility</div>
         <div class="card-body">
-            <p class="mb-0">No facility named <code class="lu-facility-id">@Model.FacilityId</code> was found.</p>
+            <p class="mb-0">No facility named <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, CopyLabel = "Copy facility id" })" /> was found.</p>
         </div>
     </div>
 }

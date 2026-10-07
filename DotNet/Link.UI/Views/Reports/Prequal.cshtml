@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Prequalification";
     ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "prequal";
 }
@@ -16,6 +17,7 @@
 }
 
 <h1 class="h3">Prequalification</h1>
+<partial name="_ReportIdentity" />
 <partial name="_ReportNav" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
@@ -28,7 +30,6 @@ else if (Model.NotFound || Model.Report is null)
 }
 else
 {
-    <p class="mb-3"><a asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a> <code class="lu-facility-id">@Model.ReportId</code></p>
     @if (Model.TooLarge)
     {
         <div class="alert alert-warning">Validation results for this report are too large to list here. Open Validation for the count.</div>
@@ -87,11 +88,11 @@ else
                                 @foreach (var issue in Model.Issues)
                                 {
                                     <tr>
-                                        <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(issue.PatientId) ? "—" : issue.PatientId)</code></td>
+                                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = issue.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                                         <td>@issue.Severity</td>
                                         <td>@issue.Code</td>
                                         <td>@issue.Message</td>
-                                        <td><code class="lu-facility-id">@issue.Location</code></td>
+                                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = issue.Location, Compact = true, CopyLabel = "Copy location" })" /></td>
                                     </tr>
                                 }
                                 </tbody>
