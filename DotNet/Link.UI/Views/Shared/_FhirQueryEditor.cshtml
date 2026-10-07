@@ -248,7 +248,7 @@ else
         </div>
     </div>
 
-    <div class="accordion-item">
+    <div class="accordion-item" id="queryPlanItem">
         <h2 class="accordion-header" id="queryPlanHeading">
             <button class="@Button(Model.QueryPlanError, plan.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#queryPlanPanel" aria-expanded="@Expanded(Model.QueryPlanError, plan.ReadFailed)" aria-controls="queryPlanPanel">
                 Query plan
@@ -257,6 +257,21 @@ else
                     <span class="badge text-bg-secondary ms-2">@Model.ExistingQueryPlanTypes.Count saved</span>
                 }
             </button>
+            <label class="visually-hidden" for="queryPlanType">Query plan type</label>
+            <select id="queryPlanType" class="form-select form-select-sm lu-header-select">
+                @foreach (var planType in FacilityAcquisitionRules.QueryPlanTypes)
+                {
+                    var selectedType = string.Equals(planType, plan.Type, StringComparison.OrdinalIgnoreCase);
+                    if (selectedType)
+                    {
+                        <option value="@planType" selected>@planType</option>
+                    }
+                    else
+                    {
+                        <option value="@planType">@planType</option>
+                    }
+                }
+            </select>
         </h2>
         <div id="queryPlanPanel" class="@Collapse(Model.QueryPlanError, plan.ReadFailed)" aria-labelledby="queryPlanHeading">
             <div class="accordion-body">
@@ -272,24 +287,6 @@ else
                 {
                     <div class="alert alert-info">No @plan.Type query plan for this facility.</div>
                 }
-                <div class="d-flex flex-wrap gap-2 mb-3">
-                    @foreach (var planType in FacilityAcquisitionRules.QueryPlanTypes)
-                    {
-                        var selectedType = string.Equals(planType, plan.Type, StringComparison.OrdinalIgnoreCase);
-                        var saved = Model.ExistingQueryPlanTypes.Contains(planType, StringComparer.OrdinalIgnoreCase);
-                        <a class="btn btn-sm @(selectedType ? "btn-au-action" : "btn-outline-secondary")"
-                           asp-action="Facility"
-                           asp-route-id="@Model.FacilityId"
-                           asp-route-planType="@planType"
-                           asp-route-orgConfig="@org.ConfigId">
-                            @planType
-                            @if (saved)
-                            {
-                                <span class="badge text-bg-light ms-1">Saved</span>
-                            }
-                        </a>
-                    }
-                </div>
                 @if (!plan.ReadFailed)
                 {
                     <form method="post" data-au-save asp-action="SaveQueryPlan" asp-route-id="@Model.FacilityId" id="queryPlanForm">
@@ -424,7 +421,7 @@ else
         </div>
     </div>
 
-    <div class="accordion-item">
+    <div class="accordion-item" id="reportingOrgItem">
         <h2 class="accordion-header" id="reportingOrgHeading">
             <button class="@Button(Model.ReportingOrgError, org.ReadFailed)" type="button" data-bs-toggle="collapse" data-bs-target="#reportingOrgPanel" aria-expanded="@Expanded(Model.ReportingOrgError, org.ReadFailed)" aria-controls="reportingOrgPanel">
                 Reporting organization
@@ -457,6 +454,7 @@ else
                             else
                             {
                                 <a class="btn btn-sm btn-outline-secondary"
+                                   data-facility-swap="reportingOrgItem"
                                    asp-action="Facility"
                                    asp-route-id="@Model.FacilityId"
                                    asp-route-orgConfig="@choice.Id"

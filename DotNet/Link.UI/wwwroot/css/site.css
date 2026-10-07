@@ -147,6 +147,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 .btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
 .btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
 .btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
+.btn-warning:hover, .btn-warning:focus { background: #e0a800; border-color: #d39e00; color: #111; }
 
 /* ===================================================================
    Status badges
@@ -1827,5 +1828,71 @@ a.au-scenario-card:hover {
 .lu-savebar .lu-dirty { color: #8a6d00; font-weight: 600; }
 @media (max-width: 575.98px) {
   .lu-savebar .btn { flex: 1 1 auto; }
+}
+
+/* Facility sections use the same black bar as a card header. The action sits beside the toggle. */
+#facilityPanels > .accordion-item {
+  border: none;
+  border-radius: var(--au-radius);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: #fff;
+  box-shadow: var(--au-card-shadow);
+}
+#facilityPanels > .accordion-item:first-of-type,
+#facilityPanels > .accordion-item:last-of-type {
+  border-radius: var(--au-radius);
+}
+#facilityPanels > .accordion-item > .accordion-header {
+  display: flex;
+  align-items: stretch;
+  background: var(--au-dark);
+  margin-bottom: 0;
+}
+#facilityPanels > .accordion-item > .accordion-header > .accordion-button {
+  width: auto;
+  flex: 1 1 auto;
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  font-size: .95rem;
+  padding: .65rem 1rem;
+  box-shadow: none;
+}
+#facilityPanels > .accordion-item > .accordion-header > .accordion-button:not(.collapsed) {
+  background: var(--au-dark);
+  color: #fff;
+  box-shadow: none;
+}
+#facilityPanels > .accordion-item > .accordion-header > .accordion-button::after {
+  filter: brightness(0) invert(1);
+}
+#facilityPanels > .accordion-item > .accordion-header > .accordion-button:focus {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+#facilityPanels .lu-header-select {
+  width: auto;
+  max-width: 12rem;
+  align-self: center;
+  margin-right: .35rem;
+  background-color: #fff;
+  color: #111;
+}
+#facilityPanels .lu-section-action {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .35rem .75rem .35rem 0;
+  background: var(--au-dark);
+  flex: 0 0 auto;
+}
+#facilityPanels .lu-staged-flag {
+  color: #111;
+  background: var(--au-warning);
+  border-radius: .25rem;
+  padding: .15rem .45rem;
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
