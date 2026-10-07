@@ -182,6 +182,49 @@ public sealed class AutomationRunReader
         }
     }
 
+    /// <summary>
+    /// Active runs plus the newest rows for the home page. Skips the 14-day chart scan and the scenario list.
+    /// </summary>
+    public async Task<HomeRunSlice> LoadHomeSliceAsync(int take, CancellationToken cancellationToken)
+    {
+        var limit = take < 1 ? 1 : Math.Min(take, 10);
+        if (_runs is null)
+            return HomeRunSlice.Unavailable(_unavailableMessage ?? NotConfiguredMessage);
+
+        try
+        {
+            var active = await LoadActiveAsync(cancellationToken);
+            var recent = await FindRowsAsync(
+                FilterDefinition<AutomationRunDocument>.Empty,
+                Builders<AutomationRunDocument>.Sort.Descending(row => row.CreatedAt),
+                skip: 0,
+                Math.Min(limit * 2, 10),
+                cancellationToken);
+            return new HomeRunSlice
+            {
+                Reachable = true,
+                ActiveCount = active.Count,
+                Active = active.Take(limit).ToList(),
+                Recent = recent
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return HomeRunSlice.Unavailable(UnreachableMessage);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Automation run storage could not be read ({ExceptionType}).",
+                ex.GetType().Name);
+            return HomeRunSlice.Unavailable(UnreachableMessage);
+        }
+    }
+
     public async Task<AutomationRunPage> LoadRunAsync(Guid runId, CancellationToken cancellationToken)
     {
         if (_runs is null)

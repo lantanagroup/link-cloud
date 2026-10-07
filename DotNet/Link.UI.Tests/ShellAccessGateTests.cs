@@ -27,6 +27,8 @@ public class ShellAccessGateTests
     [InlineData("/hubs/link")]
     [InlineData("/hubs/runs")]
     [InlineData("/hubs/cleanup")]
+    [InlineData("/Home/overview")]
+    [InlineData("/Home/overview/data")]
     public void Anonymous_off_blocks_the_shell(string path)
     {
         var decision = ShellAccessGate.Evaluate(false, false, path, user: null, out var message);
@@ -97,6 +99,36 @@ public class ShellAccessGateTests
                 new AdminBffUser { IsAuthenticated = true, Email = "ada@example.com" },
                 out _)
             .Should().Be(ShellAccessGate.Decision.Continue);
+    }
+
+    [Theory]
+    [InlineData("/Home/overview")]
+    [InlineData("/Home/overview/data")]
+    public void Overview_requires_the_same_sign_in_as_the_shell(string path)
+    {
+        ShellAccessGate.Evaluate(false, false, path, user: null, out var blocked)
+            .Should().Be(ShellAccessGate.Decision.Unavailable);
+        blocked.Should().Be(ShellAccessGate.AnonymousBlockedMessage);
+
+        ShellAccessGate.Evaluate(
+                false,
+                true,
+                path,
+                new AdminBffUser { IsAuthenticated = false },
+                out _)
+            .Should().Be(ShellAccessGate.Decision.RedirectToLogin);
+
+        ShellAccessGate.Evaluate(
+                false,
+                true,
+                path,
+                new AdminBffUser { IsAuthenticated = true, Email = "ada@example.com" },
+                out _)
+            .Should().Be(ShellAccessGate.Decision.Continue);
+
+        ShellAccessGate.Evaluate(true, false, path, user: null, out var open)
+            .Should().Be(ShellAccessGate.Decision.Continue);
+        open.Should().BeNull();
     }
 
     [Fact]

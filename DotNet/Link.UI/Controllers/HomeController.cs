@@ -1,4 +1,3 @@
-﻿using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,18 +5,17 @@ namespace Link.UI.Controllers;
 
 public sealed class HomeController : Controller
 {
-    private readonly IAdminBffUserService _userService;
+    private readonly IHomeOverview _overview;
 
-    public HomeController(IAdminBffUserService userService)
+    public HomeController(IHomeOverview overview)
     {
-        _userService = userService;
+        _overview = overview;
     }
 
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public IActionResult Index()
     {
         ViewData["Title"] = "Home";
-        var user = await _userService.GetCurrentUserAsync(cancellationToken);
-        return View(user);
+        return View();
     }
 
     /// <summary>
@@ -25,6 +23,22 @@ public sealed class HomeController : Controller
     /// </summary>
     [HttpGet("/dashboard")]
     public IActionResult Dashboard() => RedirectToAction(nameof(Index));
+
+    /// <summary>HTML fragment the home region swaps in. The shell paints before this runs.</summary>
+    [HttpGet("/Home/overview")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> Overview(CancellationToken cancellationToken)
+    {
+        return PartialView("_Overview", await _overview.LoadAsync(cancellationToken));
+    }
+
+    /// <summary>Same cards as <see cref="Overview"/>, as JSON. Same sign-in as the rest of the shell.</summary>
+    [HttpGet("/Home/overview/data")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> OverviewData(CancellationToken cancellationToken)
+    {
+        return Json(await _overview.LoadAsync(cancellationToken));
+    }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()

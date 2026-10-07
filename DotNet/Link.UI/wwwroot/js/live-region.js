@@ -37,9 +37,15 @@
         return !!(form && form.contains(active));
     }
 
+    function regionUrl(node) {
+        return node.getAttribute("data-au-refresh-url") || window.location.href;
+    }
+
     function replaceRegion(node, url, push) {
         if (!node || !node.id) return Promise.resolve();
-        return fetch(url, { headers: { "X-Requested-With": "fetch" } }).then(function (res) {
+        var init = { headers: { "X-Requested-With": "fetch" } };
+        if (node.hasAttribute("data-au-refresh-url")) init.cache = "no-store";
+        return fetch(url, init).then(function (res) {
             if (!res.ok) return;
             return res.text().then(function (html) {
                 if (!node.isConnected) return;
@@ -262,13 +268,16 @@
         }
         if (document.hidden || focusedIn(node) || selectionHeld(node) || node._auBusy) return;
         node._auBusy = true;
-        replaceRegion(node, window.location.href, false).finally(function () { node._auBusy = false; });
+        replaceRegion(node, regionUrl(node), false).finally(function () { node._auBusy = false; });
     }
 
     function watch(node) {
         if (node._auWatch) return;
         node._auWatch = true;
         var ms = Number(node.getAttribute("data-au-refresh")) || 12000;
+        if (node.hasAttribute("data-au-refresh-url")) {
+            setTimeout(function () { refresh(node); }, 0);
+        }
         node._auTimer = setInterval(function () { refresh(node); }, ms);
     }
 
