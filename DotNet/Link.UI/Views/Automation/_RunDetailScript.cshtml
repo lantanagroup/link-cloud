@@ -1102,6 +1102,11 @@
             document.getElementById('status').textContent = displayStatus(run.status);
             showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
+            const retention = document.getElementById('runRetention');
+            if (retention) {
+                retention.textContent = run.retentionNotice || '';
+                retention.classList.toggle('d-none', !run.retentionNotice);
+            }
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
             if (window.luPaintTimes) window.luPaintTimes(document.getElementById('started'));

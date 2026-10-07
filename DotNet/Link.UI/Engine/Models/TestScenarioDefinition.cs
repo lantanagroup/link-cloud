@@ -123,12 +123,15 @@ public class TestScenarioDefinition
     public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     /// <summary>
-    /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
+    /// After a successful run, remove the facility config, soft-delete reports, DA logs,
+    /// and query dispatch config for a facility this run created. A failed or cancelled
+    /// run keeps that data. A facility this run did not create is left alone.
     /// </summary>
     public bool CleanupServiceData { get; set; }
 
     /// <summary>
-    /// Expunge all data from the FHIR server after the run.
+    /// After a successful run, delete only the FHIR resources this run created.
+    /// A failed or cancelled run keeps them. Pre-existing resources are not deleted.
     /// </summary>
     public bool CleanupFhirData { get; set; } = true;
 

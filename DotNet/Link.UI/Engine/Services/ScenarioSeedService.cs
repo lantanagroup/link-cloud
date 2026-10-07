@@ -129,7 +129,7 @@ public sealed class ScenarioSeedService : IHostedService
         return SystemPatientConfigurationIds.PneumoniaInpatient;
     }
 
-    private static List<TestScenarioDefinition> BuildSystemScenarioList() =>
+    internal static List<TestScenarioDefinition> BuildSystemScenarioList() =>
     [
         // --- Adhoc Report Test (ad-hoc, ACH Monthly, 1 patient, 1000 resources) ---
         new TestScenarioDefinition
@@ -157,7 +157,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -191,7 +191,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -221,7 +221,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -251,7 +251,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -281,7 +281,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -320,7 +320,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -395,7 +395,7 @@ public sealed class ScenarioSeedService : IHostedService
                     Intent = new PatientGenerationIntent { EncounterClass = "AMB", IncludeHypoglycemicInsulin = false }
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -425,7 +425,7 @@ public sealed class ScenarioSeedService : IHostedService
                     ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -470,7 +470,7 @@ public sealed class ScenarioSeedService : IHostedService
                     Intent = new PatientGenerationIntent { EncounterClass = "IMP", IncludeHypoglycemicInsulin = false }
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
 
@@ -502,7 +502,7 @@ public sealed class ScenarioSeedService : IHostedService
                         ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
-            CleanupServiceData = false,
+            CleanupServiceData = true,
             CleanupFhirData = true,
         },
     ];

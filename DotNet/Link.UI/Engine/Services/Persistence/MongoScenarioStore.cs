@@ -430,6 +430,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             UpdatedAt = model.UpdatedAt
         };
 
+    internal static TestScenarioDefinition RoundTripCleanupFlags(TestScenarioDefinition model) =>
+        ToModel(ToDocument(model, model.ImportedPatientBundles ?? [], []));
+
     private static TestScenarioDefinition ToModel(TestScenarioDocument doc)
     {
         var model = new TestScenarioDefinition

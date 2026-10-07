@@ -1,3 +1,4 @@
+using System.Globalization;
 using Link.UI.Models;
 using Microsoft.AspNetCore.Http;
 
@@ -11,9 +12,29 @@ public static class HomeOverviewRules
 {
     public const int RowLimit = 5;
     public const int CacheSeconds = 15;
+    public const int TrendLength = 7;
+    public const int StuckHours = 24;
+    public const double SlowApiMs = 2000;
+    public const int IssueLimit = 8;
+    public const int ChipLimit = 8;
     public static readonly TimeSpan CardBudget = TimeSpan.FromSeconds(6);
 
     public static readonly string[] ErrorLogStatuses = ["Failed", "MaxRetriesReached"];
+    public static readonly string[] InFlightStatuses = ["New", "Scheduled", "EndOfPeriod"];
+    public const string SubmittedStatus = "Submitted";
+    public const string CompletedStatus = "CompletedNotSubmitted";
+
+    public const string InFlightHref = "/Reports?status=New,Scheduled,EndOfPeriod";
+    public const string SubmittedHref = "/Reports?status=Submitted";
+    public const string CompletedHref = "/Reports?status=CompletedNotSubmitted";
+    public const string FailedLogsHref = "/Logs/Acquisition?status=Failed,MaxRetriesReached";
+    public const string HealthHref = "/System/Health";
+    public const string MetricsHref = "/Metrics";
+    public const string TenantsHref = "/Tenants";
+    public const string ReportsHref = "/Reports";
+    public const string AuditHref = "/Logs/Audit";
+    public const string AutomationTenantsHref = "/Tenants?scope=automation";
+    public const string AutomationHref = "/Automation";
 
     public enum CardFailure
     {
@@ -267,6 +288,238 @@ public static class HomeOverviewRules
 
     public static string When(DateTimeOffset value) =>
         value == default ? "" : LinkUiTime.IsoUtc(value);
+
+    public static DateTimeOffset? ParseIso(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        return DateTimeOffset.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+            out var parsed)
+            ? parsed
+            : null;
+    }
+
+    public static IReadOnlyList<DateOnly> TrendDays(DateOnly todayUtc)
+    {
+        var days = new DateOnly[TrendLength];
+        for (var i = 0; i < TrendLength; i++)
+            days[i] = todayUtc.AddDays(i - (TrendLength - 1));
+        return days;
+    }
+
+    public static string CreatedHref(string day) => "/Reports?created=" + day;
+
+    public static string CpuText(double? percent) =>
+        percent is double value ? Math.Round(value).ToString(CultureInfo.InvariantCulture) + "%" : "—";
+
+    public static string LatencyText(double? milliseconds) =>
+        milliseconds is double value ? Math.Round(value).ToString(CultureInfo.InvariantCulture) + " ms" : "—";
+
+    public static int BarPercent(long count, long max)
+    {
+        if (max <= 0 || count <= 0)
+            return 0;
+        return (int)Math.Clamp(Math.Round(count * 100.0 / max), 4, 100);
+    }
+
+    /// <summary>
+    /// Real-facility count when automation is on and the split is known.
+    /// When automation is off the home page does not classify, so the tile is the total.
+    /// </summary>
+    public static string PrimaryFacilityText(FacilityCard card, bool automationVisible)
+    {
+        if (!card.Reachable)
+            return "—";
+        if (automationVisible && card.Regular is int real)
+            return real.ToString(CultureInfo.InvariantCulture);
+        return card.Total.ToString(CultureInfo.InvariantCulture);
+    }
+
+    public static ActivityCard Activity(
+        bool inFlightReachable,
+        long inFlight,
+        DateTimeOffset? oldestInFlightUtc,
+        bool submittedReachable,
+        long submitted,
+        bool completedReachable,
+        long completedNotSubmitted,
+        IReadOnlyList<TrendDay>? trend) => new()
+    {
+        InFlightReachable = inFlightReachable,
+        InFlight = inFlightReachable ? Math.Max(0, inFlight) : 0,
+        OldestInFlightUtc = inFlightReachable ? oldestInFlightUtc : null,
+        SubmittedReachable = submittedReachable,
+        Submitted = submittedReachable ? Math.Max(0, submitted) : 0,
+        CompletedReachable = completedReachable,
+        CompletedNotSubmitted = completedReachable ? Math.Max(0, completedNotSubmitted) : 0,
+        Trend = (trend ?? []).Take(TrendLength).ToList()
+    };
+
+    public static ServicePulseCard Pulse(bool reachable, string? message, IEnumerable<PulseSample>? samples)
+    {
+        if (!reachable)
+        {
+            return new ServicePulseCard
+            {
+                Message = string.IsNullOrWhiteSpace(message) ? "Service metrics could not be read." : message
+            };
+        }
+
+        var chips = (samples ?? [])
+            .Where(sample => string.Equals(sample.Group, "pipeline", StringComparison.OrdinalIgnoreCase))
+            .Where(sample => !string.IsNullOrWhiteSpace(sample.Name))
+            .Take(ChipLimit)
+            .Select(sample => new ServiceChip
+            {
+                Name = sample.Name.Trim(),
+                CpuPercent = sample.CpuPercent,
+                ApiP95Ms = sample.ApiP95Ms
+            })
+            .ToList();
+        return new ServicePulseCard { Reachable = true, Chips = chips };
+    }
+
+    public static IReadOnlyList<HomeIssue> Issues(
+        bool facilitiesReachable,
+        bool ownershipKnown,
+        bool automationVisible,
+        ActivityCard activity,
+        HealthCard health,
+        LogCard logs,
+        ServicePulseCard pulse,
+        DateTimeOffset utcNow)
+    {
+        var issues = new List<HomeIssue>();
+        if (!facilitiesReachable)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Facilities could not be read",
+                Detail = "The tenant list did not answer.",
+                Href = TenantsHref
+            });
+        }
+        else if (automationVisible && !ownershipKnown)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Automation ownership could not be read",
+                Detail = "Owned facilities could not be separated.",
+                Href = AutomationTenantsHref
+            });
+        }
+
+        if (!activity.InFlightReachable || !activity.SubmittedReachable || !activity.CompletedReachable)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Report counts could not be read",
+                Detail = "Status totals did not answer.",
+                Href = ReportsHref
+            });
+        }
+
+        if (activity.InFlightReachable
+            && activity.OldestInFlightUtc is DateTimeOffset oldest
+            && utcNow - oldest >= TimeSpan.FromHours(StuckHours))
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "A report has been in flight for more than a day",
+                Detail = LinkUiTime.IsoUtc(oldest),
+                Href = InFlightHref
+            });
+        }
+
+        if (activity.Trend.Count > 0 && activity.Trend.All(day => !day.Reachable))
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Report trend could not be read",
+                Detail = "Daily counts did not answer.",
+                Href = ReportsHref
+            });
+        }
+
+        if (!health.Reachable)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Service health could not be read",
+                Detail = string.IsNullOrWhiteSpace(health.Message) ? "Admin.BFF did not answer." : health.Message,
+                Href = HealthHref
+            });
+        }
+        else if (health.Unhealthy > 0)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = health.Unhealthy.ToString(CultureInfo.InvariantCulture) + " unhealthy services",
+                Detail = string.Join(", ", health.UnhealthyNames),
+                Href = HealthHref
+            });
+        }
+
+        if (!logs.Reachable)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Acquisition logs could not be read",
+                Detail = string.IsNullOrWhiteSpace(logs.Message) ? "Data acquisition did not answer." : logs.Message,
+                Href = FailedLogsHref
+            });
+        }
+        else if (logs.Total > 0)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = logs.Total.ToString(CultureInfo.InvariantCulture) + " failed acquisition logs",
+                Detail = "Failed or out of retries.",
+                Href = FailedLogsHref
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(logs.AuditMessage))
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Audit could not be read",
+                Detail = logs.AuditMessage,
+                Href = AuditHref
+            });
+        }
+
+        if (automationVisible && !pulse.Reachable)
+        {
+            issues.Add(new HomeIssue
+            {
+                Title = "Service metrics could not be read",
+                Detail = string.IsNullOrWhiteSpace(pulse.Message) ? "Service metrics could not be read." : pulse.Message,
+                Href = MetricsHref
+            });
+        }
+        else if (automationVisible)
+        {
+            var slow = pulse.Chips
+                .Where(chip => chip.ApiP95Ms is > SlowApiMs)
+                .OrderByDescending(chip => chip.ApiP95Ms)
+                .FirstOrDefault();
+            if (slow is not null)
+            {
+                issues.Add(new HomeIssue
+                {
+                    Title = slow.Name + " API is slower than 2 seconds",
+                    Detail = LatencyText(slow.ApiP95Ms),
+                    Href = MetricsHref
+                });
+            }
+        }
+
+        return issues.Take(IssueLimit).ToList();
+    }
 
     private static IReadOnlyList<HomeRunLine> Lines(IEnumerable<AutomationRunRow>? rows, HashSet<string>? skip = null) =>
         (rows ?? [])

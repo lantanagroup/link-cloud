@@ -111,7 +111,8 @@ public static class AutomationRules
         string? facilityId,
         bool automationCreatedFacility,
         string? reportId,
-        int? templateVersion)
+        int? templateVersion,
+        string? retentionNotice = null)
     {
         var facility = string.IsNullOrWhiteSpace(facilityId) ? null : facilityId.Trim();
         var report = string.IsNullOrWhiteSpace(reportId) ? null : reportId.Trim();
@@ -131,6 +132,7 @@ public static class AutomationRules
             StartedAt = startedAt,
             FinishedAt = finishedAt,
             Error = string.IsNullOrWhiteSpace(error) ? null : error.Trim(),
+            RetentionNotice = string.IsNullOrWhiteSpace(retentionNotice) ? null : retentionNotice.Trim(),
             Duration = string.IsNullOrWhiteSpace(duration) ? null : duration.Trim(),
             FacilityId = facility,
             AutomationCreatedFacility = automationCreatedFacility,
