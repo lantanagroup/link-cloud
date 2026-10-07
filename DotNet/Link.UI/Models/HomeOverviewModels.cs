@@ -44,6 +44,7 @@ public sealed class HomeReportLine
     public string Status { get; init; } = "";
     public string Badge { get; init; } = "";
     public string When { get; init; } = "";
+    public string? AutomationRunId { get; init; }
 }
 
 public sealed class HealthCard
@@ -98,6 +99,7 @@ public sealed class HomeLogLine
     public string Status { get; init; } = "";
     public string Badge { get; init; } = "";
     public string When { get; init; } = "";
+    public string? AutomationRunId { get; init; }
 }
 
 /// <summary>Active and newest run rows for the home page. Not the 14-day chart query.</summary>

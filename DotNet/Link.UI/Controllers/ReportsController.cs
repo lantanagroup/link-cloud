@@ -2,6 +2,7 @@ using System.Text;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Link.UI.Controllers;
 
@@ -10,51 +11,79 @@ public sealed class ReportsController : Controller
     private readonly ReportsService _reports;
     private readonly FacilityViewService _view;
     private readonly AutomationOwnershipLookup _ownership;
+    private readonly IOptions<LinkUiFeatureOptions> _features;
 
-    public ReportsController(ReportsService reports, FacilityViewService view, AutomationOwnershipLookup ownership)
+    public ReportsController(
+        ReportsService reports,
+        FacilityViewService view,
+        AutomationOwnershipLookup ownership,
+        IOptions<LinkUiFeatureOptions> features)
     {
         _reports = reports;
         _view = view;
         _ownership = ownership;
+        _features = features;
     }
 
     [HttpGet]
     public async Task<IActionResult> Index(ReportsListQuery query, CancellationToken cancellationToken)
     {
         query ??= new ReportsListQuery();
-        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
-        var ownership = await _ownership.GetAsync(cancellationToken);
-        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
         ReportsListModel page;
-        if (!AutomationMarkRules.IsAutomation(query.Scope))
+        if (!_features.Value.AutomationEnabled)
         {
+            query.Scope = null;
             page = await _reports.LoadListAsync(query, cancellationToken);
-        }
-        else if (facility is not null && !ownership.Contains(facility))
-        {
-            page = new ReportsListModel
-            {
-                Query = query,
-                ScopeNote = AutomationMarkRules.NotOwnedNote,
-                Paging = new PageBar { Page = 1, PageSize = FacilityViewRules.ClampPageSize(query.PageSize) }
-            };
-        }
-        else if (facility is null)
-        {
-            var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
-            page = await _reports.LoadForFacilitiesAsync(query, ids, truncated, cancellationToken);
         }
         else
         {
-            page = await _reports.LoadListAsync(query, cancellationToken);
-        }
+            query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+            var ownership = await _ownership.GetAsync(cancellationToken);
+            var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
+            if (AutomationMarkRules.IsAutomation(query.Scope))
+            {
+                if (facility is not null && !ownership.Contains(facility))
+                {
+                    page = EmptyReports(query, AutomationMarkRules.NotOwnedNote);
+                }
+                else if (facility is null)
+                {
+                    var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
+                    page = await _reports.LoadForFacilitiesAsync(query, ids, truncated, cancellationToken);
+                }
+                else
+                {
+                    page = await _reports.LoadListAsync(query, cancellationToken);
+                }
+            }
+            else if (facility is not null && ownership.Contains(facility) && AutomationMarkRules.IsReal(query.Scope))
+            {
+                page = EmptyReports(query, AutomationMarkRules.OwnedFacilityNote);
+            }
+            else
+            {
+                page = await _reports.LoadListAsync(query, cancellationToken);
+                if (AutomationMarkRules.IsReal(query.Scope))
+                {
+                    page.Reports = AutomationMarkRules.DropOwned(page.Reports, report => report.FacilityId, ownership, out var hidAny);
+                    page.ScopeNote = AutomationMarkRules.WithHiddenNote(page.ScopeNote, hidAny);
+                }
+            }
 
-        foreach (var report in page.Reports)
-            report.AutomationRunId = ownership.RunIdFor(report.FacilityId);
+            foreach (var report in page.Reports)
+                report.AutomationRunId = ownership.RunIdFor(report.FacilityId);
+        }
 
         ViewData["Title"] = "Reports";
         return View(page);
     }
+
+    private static ReportsListModel EmptyReports(ReportsListQuery query, string note) => new()
+    {
+        Query = query,
+        ScopeNote = note,
+        Paging = new PageBar { Page = 1, PageSize = FacilityViewRules.ClampPageSize(query.PageSize) }
+    };
 
     [HttpGet]
     public async Task<IActionResult> Counts(string? ids, CancellationToken cancellationToken)

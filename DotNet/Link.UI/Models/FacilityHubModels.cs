@@ -33,6 +33,7 @@ public sealed class FacilityHubViewModel
 
     public string? FacilityId { get; set; }
     public string? FacilityName { get; set; }
+    public string? AutomationRunId { get; set; }
     public string? TimeZone { get; set; }
     public string? VendorVersionId { get; set; }
     public bool VendorListLoaded { get; set; }

@@ -26,8 +26,10 @@ public sealed class AutomationOwnershipLookup
     }
 
     /// <summary>
-    /// The same cached read as <see cref="GetAsync"/>, plus whether storage answered.
-    /// An empty index with <c>Reachable</c> false is a miss, not "no automation facilities".
+    /// The classification read for home and for a later dashboard.
+    /// One cached index, not a call per facility. The same read as <see cref="GetAsync"/>,
+    /// plus whether storage answered. An empty index with <c>Reachable</c> false is a miss,
+    /// not "no automation facilities".
     /// </summary>
     public async Task<(AutomationOwnershipIndex Index, bool Reachable)> GetSnapshotAsync(CancellationToken cancellationToken)
     {

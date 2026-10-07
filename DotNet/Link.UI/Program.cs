@@ -11,6 +11,7 @@ using Link.UI.Hubs;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
 
@@ -37,6 +38,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
 {
     options.DmrpEnabled = builder.Configuration.GetValue<bool>("DMRP:Enabled");
     options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
+    options.AutomationEnabled = builder.Configuration.GetValue("LinkUi:AutomationEnabled", false);
 });
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped(FacilityHubService.Create);
@@ -142,7 +144,10 @@ builder.Services.AddControllersWithViews()
 // ApiBearer is a named scheme only. It is not the default authenticate or challenge scheme.
 var apiBearerEnabled = Link.UI.Auth.ApiBearerAuthentication.Add(builder.Services, builder.Configuration);
 
-var automationEngine = LinkAutomationEngine.Add(builder.Services, builder.Configuration);
+var automationEnabled = builder.Configuration.GetValue("LinkUi:AutomationEnabled", false);
+LinkAutomationEngineStatus? automationEngine = null;
+if (automationEnabled)
+    automationEngine = LinkAutomationEngine.Add(builder.Services, builder.Configuration);
 
 builder.Services.AddProblemDetails(options =>
 {
@@ -199,6 +204,15 @@ else
 
 app.Use(async (context, next) =>
 {
+    // Pages read this options object. The gate uses the same value so a late
+    // configuration source cannot leave a route up after the nav has hidden it.
+    var automationOn = context.RequestServices.GetRequiredService<IOptions<LinkUiFeatureOptions>>().Value.AutomationEnabled;
+    if (!automationOn && AutomationSurface.IsAutomationPath(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
     if (ShellAccessGate.IsClosedNativeApi(allowAnonymousAccess, apiBearerEnabled, context.Request.Path))
     {
         context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
@@ -264,12 +278,15 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapHub<LinkStubHub>("/hubs/link");
-app.MapHub<RunHub>("/hubs/runs");
-app.MapHub<CleanupHub>("/hubs/cleanup");
+if (automationEnabled)
+{
+    app.MapHub<RunHub>("/hubs/runs");
+    app.MapHub<CleanupHub>("/hubs/cleanup");
+}
 app.MapHealthChecks("/health");
 app.MapReverseProxy();
 
-if (automationEngine.Ready)
+if (automationEngine is { Ready: true })
 {
     try
     {
@@ -282,9 +299,9 @@ if (automationEngine.Ready)
             ex.GetType().Name);
     }
 }
-else
+else if (automationEnabled)
 {
-    app.Logger.LogWarning("Automation run engine is off. {Message}", automationEngine.Message);
+    app.Logger.LogWarning("Automation run engine is off. {Message}", automationEngine?.Message);
 }
 
 app.Run();

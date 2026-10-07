@@ -2,6 +2,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
 using Link.UI.Models;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Link.UI.Services;
 
@@ -26,6 +27,7 @@ public sealed class HomeOverviewService : IHomeOverview
     private readonly LogsService _logs;
     private readonly IApiHealthRunStore? _apiHealth;
     private readonly IMemoryCache _cache;
+    private readonly IOptions<LinkUiFeatureOptions> _features;
     private readonly ILogger<HomeOverviewService> _logger;
 
     public HomeOverviewService(
@@ -37,6 +39,7 @@ public sealed class HomeOverviewService : IHomeOverview
         LogsService logs,
         IApiHealthRunStore? apiHealth,
         IMemoryCache cache,
+        IOptions<LinkUiFeatureOptions> features,
         ILogger<HomeOverviewService> logger)
     {
         _facilities = facilities;
@@ -47,6 +50,7 @@ public sealed class HomeOverviewService : IHomeOverview
         _logs = logs;
         _apiHealth = apiHealth;
         _cache = cache;
+        _features = features;
         _logger = logger;
     }
 
@@ -59,18 +63,23 @@ public sealed class HomeOverviewService : IHomeOverview
         services.GetRequiredService<LogsService>(),
         services.GetService<IApiHealthRunStore>(),
         services.GetRequiredService<IMemoryCache>(),
+        services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
         services.GetRequiredService<ILogger<HomeOverviewService>>());
 
     public async Task<HomeOverviewModel> LoadAsync(CancellationToken cancellationToken)
     {
-        if (_cache.TryGetValue(CacheKey, out HomeOverviewModel? cached) && cached is not null)
+        var automationOn = _features.Value.AutomationEnabled;
+        var cacheKey = automationOn ? CacheKey : CacheKey + ":off";
+        if (_cache.TryGetValue(cacheKey, out HomeOverviewModel? cached) && cached is not null)
             return cached;
 
-        var facilities = LoadFacilitiesAsync(cancellationToken);
-        var reports = LoadReportsAsync(cancellationToken);
-        var health = LoadHealthAsync(cancellationToken);
-        var runs = LoadRunsAsync(cancellationToken);
-        var logs = LoadLogsAsync(cancellationToken);
+        var facilities = LoadFacilitiesAsync(cancellationToken, automationOn);
+        var reports = LoadReportsAsync(cancellationToken, automationOn);
+        var health = LoadHealthAsync(cancellationToken, automationOn);
+        var runs = automationOn
+            ? LoadRunsAsync(cancellationToken)
+            : Task.FromResult(new RunCard { Reachable = true });
+        var logs = LoadLogsAsync(cancellationToken, automationOn);
         await Task.WhenAll(facilities, reports, health, runs, logs);
 
         var model = new HomeOverviewModel
@@ -83,27 +92,35 @@ public sealed class HomeOverviewService : IHomeOverview
             LoadedAt = DateTimeOffset.UtcNow
         };
         cancellationToken.ThrowIfCancellationRequested();
-        _cache.Set(CacheKey, model, TimeSpan.FromSeconds(HomeOverviewRules.CacheSeconds));
+        _cache.Set(cacheKey, model, TimeSpan.FromSeconds(HomeOverviewRules.CacheSeconds));
         return model;
     }
 
-    private Task<FacilityCard> LoadFacilitiesAsync(CancellationToken cancellationToken) =>
+    private Task<FacilityCard> LoadFacilitiesAsync(CancellationToken cancellationToken, bool classify) =>
         Guard("facilities", async token =>
         {
             var listTask = _facilities.GetFacilityListAsync(cancellationToken: token);
-            var ownershipTask = _ownership.GetSnapshotAsync(token);
-            await Task.WhenAll(listTask, ownershipTask);
+            Task<(AutomationOwnershipIndex Index, bool Reachable)>? ownershipTask = classify
+                ? _ownership.GetSnapshotAsync(token)
+                : null;
+            if (ownershipTask is null)
+                await listTask;
+            else
+                await Task.WhenAll(listTask, ownershipTask);
             var list = await listTask;
-            var (index, ownershipReachable) = await ownershipTask;
+            var ownershipReachable = false;
+            AutomationOwnershipIndex? index = null;
+            if (ownershipTask is not null)
+                (index, ownershipReachable) = await ownershipTask;
             if (!HomeOverviewRules.TryReadFacilities(list.StatusCode, list.IsSuccessStatusCode, list.Body, out var ids))
             {
                 var message = list.StatusCode == 0
                     ? "Tenant service could not be reached."
                     : $"Tenant service returned HTTP {list.StatusCode}.";
-                return HomeOverviewRules.Facilities(false, message, ownershipReachable, null, null);
+                return HomeOverviewRules.Facilities(false, message, ownershipReachable, null, null, classify);
             }
 
-            return HomeOverviewRules.Facilities(true, null, ownershipReachable, ids, index);
+            return HomeOverviewRules.Facilities(true, null, ownershipReachable, ids, index, classify);
         }, failure => HomeOverviewRules.Facilities(
             false,
             failure == HomeOverviewRules.CardFailure.Timeout
@@ -113,7 +130,7 @@ public sealed class HomeOverviewService : IHomeOverview
             null,
             null), cancellationToken);
 
-    private Task<ReportCard> LoadReportsAsync(CancellationToken cancellationToken) =>
+    private Task<ReportCard> LoadReportsAsync(CancellationToken cancellationToken, bool stamp) =>
         Guard("reports", async token =>
         {
             var page = await _reports.LoadListAsync(new ReportsListQuery
@@ -125,7 +142,10 @@ public sealed class HomeOverviewService : IHomeOverview
             }, token);
             if (page.LoadError is not null)
                 return HomeOverviewRules.Reports(false, page.LoadError, 0, null);
-            return HomeOverviewRules.Reports(true, null, page.Paging.TotalCount, page.Reports);
+            AutomationOwnershipIndex? ownership = null;
+            if (stamp)
+                ownership = (await _ownership.GetSnapshotAsync(token)).Index;
+            return HomeOverviewRules.Reports(true, null, page.Paging.TotalCount, page.Reports, ownership);
         }, failure => HomeOverviewRules.Reports(
             false,
             failure == HomeOverviewRules.CardFailure.Timeout
@@ -134,7 +154,7 @@ public sealed class HomeOverviewService : IHomeOverview
             0,
             null), cancellationToken);
 
-    private async Task<HealthCard> LoadHealthAsync(CancellationToken cancellationToken)
+    private async Task<HealthCard> LoadHealthAsync(CancellationToken cancellationToken, bool includeApiHealth)
     {
         var healthTask = Guard("health", async token =>
         {
@@ -150,6 +170,12 @@ public sealed class HomeOverviewService : IHomeOverview
                 : "Admin.BFF call failed.",
             (IReadOnlyList<(string, string)>)[]), cancellationToken);
 
+        if (!includeApiHealth)
+        {
+            var skipped = await healthTask;
+            return HomeOverviewRules.Health(skipped.Item1, skipped.Item2, skipped.Item3, true, null, null, null, null, null);
+        }
+
         var apiTask = Guard("api-health", LoadApiHealthAsync, failure => (
             false,
             failure == HomeOverviewRules.CardFailure.Timeout
@@ -161,9 +187,9 @@ public sealed class HomeOverviewService : IHomeOverview
             (string?)null), cancellationToken);
 
         await Task.WhenAll(healthTask, apiTask);
-        var (reachable, message, rows) = await healthTask;
-        var (apiReachable, apiMessage, runId, mode, service, when) = await apiTask;
-        return HomeOverviewRules.Health(reachable, message, rows, apiReachable, apiMessage, runId, mode, service, when);
+        var health = await healthTask;
+        var api = await apiTask;
+        return HomeOverviewRules.Health(health.Item1, health.Item2, health.Item3, api.Item1, api.Item2, api.Item3, api.Item4, api.Item5, api.Item6);
     }
 
     private async Task<(bool Reachable, string? Message, Guid? RunId, string? Mode, string? Service, string? When)> LoadApiHealthAsync(
@@ -193,7 +219,7 @@ public sealed class HomeOverviewService : IHomeOverview
             null,
             null), cancellationToken);
 
-    private async Task<LogCard> LoadLogsAsync(CancellationToken cancellationToken)
+    private async Task<LogCard> LoadLogsAsync(CancellationToken cancellationToken, bool stamp)
     {
         var acquisitionTask = Guard("acquisition-logs", token => _logs.LoadAcquisitionAsync(new AcquisitionQuery
         {
@@ -213,6 +239,9 @@ public sealed class HomeOverviewService : IHomeOverview
         await Task.WhenAll(acquisitionTask, auditTask);
         var acquisition = await acquisitionTask;
         var audit = await auditTask;
+        AutomationOwnershipIndex? ownership = null;
+        if (stamp && acquisition is { LoadError: null })
+            ownership = (await _ownership.GetSnapshotAsync(cancellationToken)).Index;
         var rows = acquisition is { LoadError: null }
             ? acquisition.Logs.Take(HomeOverviewRules.RowLimit).Select(row => new HomeLogLine
             {
@@ -220,7 +249,8 @@ public sealed class HomeOverviewService : IHomeOverview
                 FacilityId = row.FacilityId,
                 Status = row.Status,
                 Badge = HomeOverviewRules.LogBadge(row.Status),
-                When = row.Created
+                When = row.Created,
+                AutomationRunId = ownership?.RunIdFor(row.FacilityId)
             })
             : null;
         return HomeOverviewRules.Logs(
