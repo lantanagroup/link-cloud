@@ -1,0 +1,79 @@
+<h1 class="h3">Themes</h1>
+<p class="text-muted">The controls used across Link.UI.</p>
+
+<div class="d-flex flex-column gap-3">
+    <section class="au-card card">
+        <div class="card-header">Buttons</div>
+        <div class="card-body d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-au-action">Action</button>
+            <button type="button" class="btn btn-outline-primary">Outline</button>
+            <button type="button" class="btn btn-outline-secondary">Secondary</button>
+            <button type="button" class="btn btn-outline-danger">Danger</button>
+            <button type="button" class="btn btn-au-action" disabled>Disabled</button>
+        </div>
+    </section>
+
+    <section class="au-card card">
+        <div class="card-header">Input</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="themeName">Name</label>
+                    <input id="themeName" class="form-control" value="Sample" />
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="themeChoice">Choice</label>
+                    <select id="themeChoice" class="form-select">
+                        <option>First</option>
+                        <option>Second</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="themeNotes">Notes</label>
+                    <textarea id="themeNotes" class="form-control" rows="2">A short note.</textarea>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="au-card card">
+        <div class="card-header">Checkbox</div>
+        <div class="card-body">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="themeCheck" checked />
+                <label class="form-check-label" for="themeCheck">Checked</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="themeCheckOff" />
+                <label class="form-check-label" for="themeCheckOff">Not checked</label>
+            </div>
+        </div>
+    </section>
+
+    <section class="au-card card">
+        <div class="card-header">Expansion panel</div>
+        <div class="card-body">
+            <div class="accordion" id="themeAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="themeExpandHeading">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#themeExpandBody" aria-expanded="true" aria-controls="themeExpandBody">
+                            Open section
+                        </button>
+                    </h2>
+                    <div id="themeExpandBody" class="accordion-collapse collapse show" aria-labelledby="themeExpandHeading">
+                        <div class="accordion-body">This section is expanded.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="au-card card" id="theme-sample-card">
+        <div class="card-header">A card</div>
+        <div class="card-body">
+            <h2 class="h6">Card title</h2>
+            <p class="mb-2">Cards group a heading and the content that belongs with it.</p>
+            <div class="alert alert-info mb-0">Informational alert</div>
+        </div>
+    </section>
+</div>

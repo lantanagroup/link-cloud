@@ -21,6 +21,14 @@ public sealed class SystemController : Controller
         return View(_system.LoadHome());
     }
 
+    [HttpGet("Themes")]
+    [HttpGet("/themes")]
+    public IActionResult Themes()
+    {
+        ViewData["Title"] = "Themes";
+        return View();
+    }
+
     [HttpGet("Users")]
     public async Task<IActionResult> Users(UserQuery query, CancellationToken cancellationToken)
     {
