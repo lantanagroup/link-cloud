@@ -53,7 +53,7 @@ dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --filter Category=ApiSt
 dotnet test Tests/BackendE2ETests/BackendE2ETests.csproj --logger "console;verbosity=detailed"
 ```
 
-Endpoints are read from env vars (see `Tests/BackendE2ETests/README.md` and `TestConfig.cs`); defaults match the local docker-compose ports. Each test seeds deterministic FHIR data and validates with **strict prediction-vs-actual reconciliation** — generated input drives an exact expected count for every downstream layer (manifest, ABS NDJSON, Report/DA/Normalization/Validation DBs), and a deviation in either direction fails the run.
+Endpoints are read from env vars (see `Tests/BackendE2ETests/README.md` and `TestConfig.cs`); defaults match the local docker-compose ports. The UI caller uses `LINK_UI_BASE_URL` when it is set, then `AUTOMATION_UI_BASE_URL`, then `http://localhost:5258` (the `link-ui` compose port). `http://localhost:5280` is the `dotnet run` port. `http://localhost:5256` is the `automation-ui` compose port. Each test seeds deterministic FHIR data and validates with **strict prediction-vs-actual reconciliation** — generated input drives an exact expected count for every downstream layer (manifest, ABS NDJSON, Report/DA/Normalization/Validation DBs), and a deviation in either direction fails the run.
 
 ### Java
 
