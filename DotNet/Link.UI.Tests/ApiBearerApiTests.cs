@@ -174,36 +174,42 @@ public sealed class ApiBearerEnabledTests : IClassFixture<BearerOnHost>
     }
 
     [Fact]
-    public async Task Ui_start_all_uses_antiforgery_and_not_the_bearer_scheme()
+    public async Task Ui_start_all_is_closed_when_anonymous_access_is_off()
     {
         using var missing = await _host.Client.PostAsync("/api/api-health-runs/start-all", null);
-        missing.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        missing.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await missing.Content.ReadAsStringAsync()).Should().Be(ShellAccessGate.AnonymousBlockedMessage);
 
         using var client = _host.CreatePlainClient();
         _host.AddAntiforgery(client);
+        _host.Authorize(client, "api://link-ui-test");
         using var started = await client.PostAsync("/api/api-health-runs/start-all", null);
+        started.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
 
-        started.StatusCode.Should().Be(HttpStatusCode.Created);
+        using var status = await client.GetAsync($"/api/api-health-runs/{ApiRunsFakes.HealthRunId}/status");
+        status.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+
+        using var results = await client.GetAsync($"/api/api-health-runs/{ApiRunsFakes.HealthRunId}/results");
+        results.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 }
 
 [Collection("api-hosts")]
-public sealed class ApiBearerDisabledTests : IClassFixture<BearerOffHost>
+public sealed class ApiBearerDisabledTests : IClassFixture<BearerOffAnonymousHost>
 {
+    private readonly BearerOffAnonymousHost _host;
 
-    private readonly BearerOffHost _host;
+    public ApiBearerDisabledTests(BearerOffAnonymousHost host) => _host = host;
 
-    public ApiBearerDisabledTests(BearerOffHost host) => _host = host;
-
-    [Theory]
-    [InlineData("/")]
-    [InlineData("/Tenants")]
-    [InlineData("/Home/overview/data")]
-    [InlineData("/hubs/runs")]
-    public async Task Shell_stays_closed_when_anonymous_mode_is_off(string path)
+    [Fact]
+    public async Task Development_anonymous_access_leaves_the_shell_open()
     {
-        using var response = await _host.Client.GetAsync(path);
-        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var home = await _host.Client.GetAsync("/");
+        home.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var hub = await _host.Client.GetAsync("/hubs/runs");
+        hub.StatusCode.Should().NotBe(HttpStatusCode.ServiceUnavailable);
+        hub.Headers.Location.Should().BeNull();
     }
 
     [Fact]
@@ -386,6 +392,35 @@ public sealed class ApiBearerDisabledTests : IClassFixture<BearerOffHost>
         using var unknown = await _host.Client.GetAsync($"/api/api-health-runs/{Guid.NewGuid()}/status");
         unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Runs_page_supplies_the_token_the_callers_scrape()
+    {
+        using var client = _host.CreatePlainClient();
+        using var page = await client.GetAsync("Runs");
+        var html = await page.Content.ReadAsStringAsync();
+        page.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var token = CallerToken.Extract(html);
+        token.Should().NotBeNullOrWhiteSpace();
+        page.Headers.Contains("Set-Cookie").Should().BeTrue();
+
+        using var caller = _host.CreatePlainClient();
+        var cookie = string.Join("; ", page.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0]));
+        caller.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", cookie);
+        caller.DefaultRequestHeaders.TryAddWithoutValidation("RequestVerificationToken", token);
+
+        using var health = await caller.PostAsJsonAsync(
+            "api/api-health-runs/start-all",
+            new { source = "BackendE2ETests.ApiStabilityTest" });
+        health.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        using var started = await caller.PostAsJsonAsync(
+            "api/runs/start",
+            new { scenarioId = ApiRunsFakes.ScenarioId, source = "AutomationUiApiSmokeTest" });
+        started.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await ApiJson.Read(started)).GetProperty("runId").GetGuid().Should().Be(ApiRunsFakes.RunId);
+    }
 }
 
 [CollectionDefinition("api-hosts", DisableParallelization = true)]
@@ -395,7 +430,21 @@ public sealed class ApiHostCollection
 
 public sealed class BearerOnHost() : ApiRunsHost(bearerEnabled: true, allowAnonymous: false, requireSession: true);
 
+public sealed class BearerOnAnonymousHost() : ApiRunsHost(bearerEnabled: true, allowAnonymous: true, requireSession: false);
+
 public sealed class BearerOffHost() : ApiRunsHost(bearerEnabled: false, allowAnonymous: false, requireSession: false);
+
+public sealed class BearerOffAnonymousHost() : ApiRunsHost(bearerEnabled: false, allowAnonymous: true, requireSession: false);
+
+public sealed class BearerOffSignedInHost() : ApiRunsHost(bearerEnabled: false, allowAnonymous: false, requireSession: false)
+{
+    protected override bool SignedIn => true;
+}
+
+public sealed class BearerOnSignedInHost() : ApiRunsHost(bearerEnabled: true, allowAnonymous: false, requireSession: true)
+{
+    protected override bool SignedIn => true;
+}
 
 public class ApiRunsHost : WebApplicationFactory<Program>
 {
@@ -421,6 +470,7 @@ public class ApiRunsHost : WebApplicationFactory<Program>
     public bool BearerEnabled { get; }
     public bool AllowAnonymous { get; }
     public bool RequireSession { get; }
+    protected virtual bool SignedIn => false;
     private ApiRunsFakes.RunManager Runs { get; }
     private ApiRunsFakes.ScenarioStore Scenarios { get; }
     private ApiRunsFakes.MetricsStore Metrics { get; }
@@ -514,7 +564,10 @@ public class ApiRunsHost : WebApplicationFactory<Program>
             services.RemoveAll<IApiHealthExecutionRunManager>();
             services.AddSingleton<IApiHealthExecutionRunManager>(Health);
             services.RemoveAll<IAdminBffUserService>();
-            services.AddSingleton<IAdminBffUserService, SignedOutUser>();
+            if (SignedIn)
+                services.AddSingleton<IAdminBffUserService, SignedInUser>();
+            else
+                services.AddSingleton<IAdminBffUserService, SignedOutUser>();
 
             if (BearerEnabled)
             {
@@ -589,6 +642,12 @@ public class ApiRunsHost : WebApplicationFactory<Program>
     {
         public Task<AdminBffUser?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<AdminBffUser?>(new AdminBffUser { IsAuthenticated = false });
+    }
+
+    private sealed class SignedInUser : IAdminBffUserService
+    {
+        public Task<AdminBffUser?> GetCurrentUserAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<AdminBffUser?>(new AdminBffUser { IsAuthenticated = true, Email = "ada@example.com" });
     }
 }
 

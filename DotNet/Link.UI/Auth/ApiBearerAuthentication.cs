@@ -9,6 +9,7 @@ namespace Link.UI.Auth;
 /// Inbound bearer auth for the automation HTTP API.
 /// The scheme is named and is not the app default, so cookie sign-in for the shell is unchanged.
 /// When Authentication:ApiBearer:Enabled is false, ApiBearerPolicy allows the caller through.
+/// ShellAccessGate still returns 503 for these routes when anonymous access is also off.
 /// </summary>
 public static class ApiBearerAuthentication
 {
