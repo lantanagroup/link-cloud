@@ -1,0 +1,11 @@
+@{
+    var active = ViewData["SystemSection"] as string ?? "";
+    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+}
+<nav class="lu-section-nav mb-3" aria-label="System">
+    <a class="@Btn("users")" asp-controller="System" asp-action="Users">Accounts</a>
+    <a class="@Btn("roles")" asp-controller="System" asp-action="Roles">Roles</a>
+    <a class="@Btn("health")" asp-controller="System" asp-action="Health">Health</a>
+    <a class="@Btn("configuration")" asp-controller="System" asp-action="AppConfiguration">App configuration</a>
+    <a class="@Btn("integration")" asp-controller="System" asp-action="Integration">Integration test</a>
+</nav>

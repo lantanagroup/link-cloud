@@ -17,7 +17,7 @@ public sealed class PlaceholderController : Controller
     public IActionResult Logs() => RedirectToAction("Index", "Logs");
 
     [HttpGet]
-    public IActionResult System() => ComingSoon("System");
+    public IActionResult System() => RedirectToAction("Index", "System");
 
     [HttpGet]
     public IActionResult Automation() => ComingSoon("Automation");
