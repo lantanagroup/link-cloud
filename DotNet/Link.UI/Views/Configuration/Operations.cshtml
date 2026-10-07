@@ -31,7 +31,7 @@
 <h1 class="h3">Normalization operations</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">This search covers every facility. Open a facility to edit its operations. An operation with no facility belongs to a vendor version and is not edited here.</p>
+<p class="text-muted">This search covers every facility. Open a facility to edit its operations. An operation with no facility belongs to vendor versions and is edited below.</p>
 
 <div class="au-card card">
     <div class="card-header">Search</div>
@@ -137,6 +137,13 @@
     </div>
 </div>
 
+@if (Model.VendorEditor is not null)
+{
+    <div class="accordion mt-3" id="vendorOperationAccordion">
+        <partial name="~/Views/Tenants/_NormalizationPanel.cshtml" model="Model.VendorEditor" />
+    </div>
+}
+
 @if (!string.IsNullOrWhiteSpace(Model.ResourceWarning))
 {
     <div class="alert alert-warning mt-3">@Model.ResourceWarning</div>
@@ -165,6 +172,7 @@ else
                                 <th scope="col"><a asp-all-route-data="@Route(1, "FacilityId", sortBy == "FacilityId" && sortDir == "asc" ? "desc" : "asc")">Facility</a></th>
                                 <th scope="col">Resources</th>
                                 <th scope="col">Disabled</th>
+                                <th scope="col">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -185,6 +193,22 @@ else
                                 </td>
                                 <td class="text-break">@(string.IsNullOrWhiteSpace(row.Resources) ? "—" : row.Resources)</td>
                                 <td>@(row.Disabled ? "Yes" : "No")</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(row.FacilityId))
+                                    {
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <a class="btn btn-outline-primary btn-sm" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor">Edit</a>
+                                            <form method="post" asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
+                                                <input type="hidden" name="operationId" value="@row.Id" />
+                                                @if (row.VendorVersionIds.Count > 0)
+                                                {
+                                                    <input type="hidden" name="vendorVersionId" value="@row.VendorVersionIds[0]" />
+                                                }
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                            </form>
+                                        </div>
+                                    }
+                                </td>
                             </tr>
                         }
                         </tbody>

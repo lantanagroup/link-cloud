@@ -243,4 +243,25 @@ public class ConfigurationRulesTests
         clean.SortBy.Should().Be("CreateDate");
         clean.SortDir.Should().Be("asc");
     }
+
+    [Fact]
+    public void Operation_search_keeps_a_vendor_editor_route_and_ignores_a_bad_one()
+    {
+        var id = Guid.NewGuid();
+        ConfigurationRules.CheckOperation(
+                new OperationQuery { EditType = "copyproperty", EditId = id.ToString() },
+                false,
+                out var clean)
+            .Should().BeNull();
+        clean.EditType.Should().Be("CopyProperty");
+        clean.EditId.Should().Be(id.ToString());
+
+        ConfigurationRules.CheckOperation(
+                new OperationQuery { EditType = "not-a-type", EditId = "nope" },
+                false,
+                out var ignored)
+            .Should().BeNull();
+        ignored.EditType.Should().BeNull();
+        ignored.EditId.Should().BeNull();
+    }
 }

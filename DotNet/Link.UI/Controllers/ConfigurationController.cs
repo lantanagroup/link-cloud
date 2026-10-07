@@ -278,6 +278,60 @@ public sealed class ConfigurationController : Controller
         return View(await _configuration.LoadOperationsAsync(query, cancellationToken));
     }
 
+    [HttpPost("Operations/vendor")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveVendorOperation(NormalizationOperationInput input, CancellationToken cancellationToken)
+    {
+        Section("operations", "Normalization operations");
+        var page = await _configuration.SaveVendorOperationAsync(input, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(page.ActionMessage))
+        {
+            TempData["Message"] = page.ActionMessage;
+            return RedirectToAction(nameof(Operations));
+        }
+
+        return View("Operations", page);
+    }
+
+    [HttpPost("Operations/vendor/extensions")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(256 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 256 * 1024)]
+    public async Task<IActionResult> ImportVendorExtensions(
+        List<string>? vendorVersionIds,
+        IFormFile? csv,
+        CancellationToken cancellationToken)
+    {
+        Section("operations", "Normalization operations");
+        string? text = null;
+        var tooLarge = csv is { Length: > FacilityNormalizationRules.MaxImportCharacters };
+        if (csv is { Length: > 0 } && !tooLarge)
+        {
+            using var reader = new StreamReader(csv.OpenReadStream());
+            text = await reader.ReadToEndAsync(cancellationToken);
+        }
+
+        var page = await _configuration.ImportVendorExtensionsAsync(vendorVersionIds, text, tooLarge, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(page.ActionMessage))
+        {
+            TempData["Message"] = page.ActionMessage;
+            return RedirectToAction(nameof(Operations));
+        }
+
+        return View("Operations", page);
+    }
+
+    [HttpPost("Operations/vendor/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteVendorOperation(
+        string? operationId,
+        string? vendorVersionId,
+        CancellationToken cancellationToken)
+    {
+        Temp(await _configuration.DeleteVendorOperationAsync(operationId, vendorVersionId, cancellationToken));
+        return RedirectToAction(nameof(Operations));
+    }
+
     [HttpGet("Notifications")]
     public async Task<IActionResult> Notifications(NotificationQuery query, CancellationToken cancellationToken)
     {

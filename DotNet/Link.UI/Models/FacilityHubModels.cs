@@ -332,6 +332,8 @@ public sealed class NormalizationPanel
     public bool SequenceIncomplete { get; set; }
     public string? TestResult { get; set; }
     public bool TestFailed { get; set; }
+    public bool VendorOwned { get; set; }
+    public IReadOnlyList<string> ImportVendorIds { get; set; } = Array.Empty<string>();
 }
 
 public sealed class NormalizationOperationRow
@@ -382,6 +384,9 @@ public sealed class CodeSystemMapInput
     public string? TargetSystem { get; set; }
     public bool Remove { get; set; }
     public List<CodeMapEntryInput>? Entries { get; set; }
+
+    /// <summary>CSV or TSV rows appended to <see cref="Entries"/> when the operation is saved.</summary>
+    public string? PasteRows { get; set; }
 }
 
 public sealed class CodeMapEntryInput

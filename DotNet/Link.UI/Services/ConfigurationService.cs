@@ -16,9 +16,10 @@ namespace Link.UI.Services;
 /// Configuration pages: measure definitions, vendors, validation, query plans, terminology,
 /// HSLOC, the global normalization search, notifications, and DMRP measure mappings.
 /// Package upload, category rules, CQL, evaluation, and sending a notification use the same clients.
-/// Reads and writes go through LinkSDK. Query-plan and normalization editors stay on the facility page.
+/// Reads and writes go through LinkSDK. Query-plan editors and facility normalization stay on the facility page.
+/// Vendor-owned operations are edited from the operation search.
 /// </summary>
-public sealed class ConfigurationService
+public sealed partial class ConfigurationService
 {
     public const string MeasuresNotConfigured = "MeasureEval service URL is not configured (ServiceRegistry:MeasureServiceUrl).";
     public const string TenantNotConfigured = "Tenant service URL is not configured (ServiceRegistry:TenantService:TenantServiceUrl).";
@@ -1215,19 +1216,13 @@ public sealed class ConfigurationService
         if (error is null)
             page.Query = clean;
         if (error is not null)
-        {
             page.LoadError = error;
-            return page;
-        }
-
-        if (_normalization is null)
-        {
+        else if (_normalization is null)
             page.LoadError = NormalizationNotConfigured;
-            return page;
-        }
-
-        try
+        else
         {
+            try
+            {
             var resources = await _normalization.GetResourcesAsync(cancellationToken);
             if (Ok(resources))
             {
@@ -1260,32 +1255,42 @@ public sealed class ConfigurationService
             if (!Ok(response) || response.Body is null)
             {
                 page.LoadError = Fail("Normalization", response.StatusCode, response.RawBody);
-                return page;
             }
-
-            page.Operations = response.Body.Records.Select(item => new OperationRow
+            else
             {
-                Id = item.Id,
-                Name = item.Name,
-                OperationType = item.OperationType,
-                FacilityId = item.FacilityId,
-                Disabled = item.IsDisabled,
-                Resources = string.Join(", ", item.OperationResourceTypes
-                    .Select(type => type.Resource?.ResourceName)
-                    .Where(name => !string.IsNullOrWhiteSpace(name)))
-            }).ToList();
-            var metadata = response.Body.Metadata;
-            page.Paging = ConfigurationRules.Bar(
-                metadata?.PageNumber > 0 ? metadata.PageNumber : clean.Page ?? 1,
-                metadata?.PageSize > 0 ? metadata.PageSize : clean.PageSize ?? ConfigurationRules.DefaultPageSize,
-                metadata?.TotalCount ?? page.Operations.Count,
-                metadata?.TotalPages > 0 ? (int)metadata.TotalPages : null);
+                page.Operations = response.Body.Records.Select(item => new OperationRow
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    OperationType = item.OperationType,
+                    FacilityId = item.FacilityId,
+                    Disabled = item.IsDisabled,
+                    Resources = string.Join(", ", item.OperationResourceTypes
+                        .Select(type => type.Resource?.ResourceName)
+                        .Where(name => !string.IsNullOrWhiteSpace(name))),
+                    VendorVersionIds = (item.VendorPresets ?? [])
+                        .Select(preset => preset.VendorVersionId)
+                        .Where(id => id != Guid.Empty)
+                        .Distinct()
+                        .ToList()
+                }).ToList();
+                var metadata = response.Body.Metadata;
+                page.Paging = ConfigurationRules.Bar(
+                    metadata?.PageNumber > 0 ? metadata.PageNumber : clean.Page ?? 1,
+                    metadata?.PageSize > 0 ? metadata.PageSize : clean.PageSize ?? ConfigurationRules.DefaultPageSize,
+                    metadata?.TotalCount ?? page.Operations.Count,
+                    metadata?.TotalPages > 0 ? (int)metadata.TotalPages : null);
+            }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Normalization operation search failed");
+                page.LoadError = "Normalization service call failed: " + ex.Message;
+            }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Normalization operation search failed");
-            page.LoadError = "Normalization service call failed: " + ex.Message;
-        }
+
+        if (_normalization is not null)
+            await AttachVendorEditorAsync(page, cancellationToken);
 
         return page;
     }
