@@ -15,7 +15,7 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthRunStore store,
     IHttpClientFactory httpClientFactory,
     IConfiguration configuration,
-    ILogger<ApiHealthExecutionRunManager> logger)
+    ILogger<ApiHealthExecutionRunManager> logger) : IApiHealthExecutionRunManager
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
     private static readonly TimeSpan CompletedRunRetention = TimeSpan.FromHours(6);
