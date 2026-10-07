@@ -54,6 +54,7 @@ public sealed class AutomationRunReader
             .Include(row => row.StartedAt)
             .Include(row => row.FinishedAt)
             .Include(row => row.Error)
+            .Include(row => row.RetentionNotice)
             .Include(row => row.Duration)
             .Include(row => row.GeneratedTemplateCacheVersionNumber);
 
