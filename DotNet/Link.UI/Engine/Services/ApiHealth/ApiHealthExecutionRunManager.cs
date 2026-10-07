@@ -222,6 +222,7 @@ public sealed class ApiHealthExecutionRunManager(
 
             await AddPhaseAsync(run, "Testing", "Executing tests");
             var abortedBySeedCancellation = false;
+            var suitesPassed = true;
             try
             {
                 var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
@@ -235,7 +236,16 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite, serviceInformationByService);
+                    try
+                    {
+                        if (!await RunSuiteAsync(run, suite, serviceInformationByService))
+                            suitesPassed = false;
+                    }
+                    catch
+                    {
+                        suitesPassed = false;
+                        throw;
+                    }
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -246,8 +256,15 @@ public sealed class ApiHealthExecutionRunManager(
             }
             finally
             {
-                await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
-                await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+                if (suitesPassed && !abortedBySeedCancellation)
+                {
+                    await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
+                    await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+                }
+                else
+                {
+                    await AddPhaseAsync(run, "Cleanup", "Seed facility kept because this API Health run did not succeed.");
+                }
             }
 
             if (abortedBySeedCancellation)
@@ -297,6 +314,7 @@ public sealed class ApiHealthExecutionRunManager(
 
             await AddPhaseAsync(run, "Testing", "Executing tests");
             var abortedBySeedCancellation = false;
+            var suitesPassed = true;
             try
             {
                 var serviceInformationByService = new Dictionary<string, ServiceInformation>(StringComparer.OrdinalIgnoreCase);
@@ -310,7 +328,16 @@ public sealed class ApiHealthExecutionRunManager(
                     }
 
                     seedContext.Current = seedSession;
-                    await RunSuiteAsync(run, suite, serviceInformationByService);
+                    try
+                    {
+                        if (!await RunSuiteAsync(run, suite, serviceInformationByService))
+                            suitesPassed = false;
+                    }
+                    catch
+                    {
+                        suitesPassed = false;
+                        throw;
+                    }
 
                     if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
                     {
@@ -321,8 +348,15 @@ public sealed class ApiHealthExecutionRunManager(
             }
             finally
             {
-                await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
-                await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+                if (suitesPassed && !abortedBySeedCancellation)
+                {
+                    await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
+                    await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+                }
+                else
+                {
+                    await AddPhaseAsync(run, "Cleanup", "Seed facility kept because this API Health run did not succeed.");
+                }
             }
 
             if (abortedBySeedCancellation)
@@ -454,7 +488,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private async Task RunSuiteAsync(RunState run, IServiceTestSuite suite, IDictionary<string, ServiceInformation> serviceInformationByService)
+    private async Task<bool> RunSuiteAsync(RunState run, IServiceTestSuite suite, IDictionary<string, ServiceInformation> serviceInformationByService)
     {
         await EnsureHostServiceInformationAsync(suite.ServiceName, serviceInformationByService);
 
@@ -522,6 +556,10 @@ public sealed class ApiHealthExecutionRunManager(
             var json = JsonSerializer.Serialize(result, _jsonOptions);
             AddEvent(run, "result", json);
         }
+
+        return results
+            .Where(r => !informationalKeys.Contains(r.EndpointKey))
+            .All(r => r.Passed);
     }
 
     private static string GetMetadataServiceName(string suiteServiceName)

@@ -91,6 +91,12 @@
             error.classList.toggle("d-none", !run.error);
         }
 
+        var retention = document.getElementById("runRetention");
+        if (retention) {
+            retention.textContent = run.retentionNotice || "";
+            retention.classList.toggle("d-none", !run.retentionNotice);
+        }
+
         var actions = document.getElementById("runActions");
         if (actions) {
             actions.replaceChildren();

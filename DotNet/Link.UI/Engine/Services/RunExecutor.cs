@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using Link.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
@@ -162,6 +163,10 @@ internal sealed class RunExecutor
         ServiceProvider? runServices = null;
         MockDmrpApiHelper? mockDmrpApiHelperForCleanup = null;
         var cleanupMockDmrpEntries = false;
+        var cleanupAttempted = false;
+        var removedFhir = false;
+        var removedService = false;
+        var serviceKeptUnowned = false;
 
         state.Status = AutomationRunStatus.Running;
         state.StartedAt = DateTimeOffset.UtcNow;
@@ -1255,23 +1260,10 @@ internal sealed class RunExecutor
 
             validatorResults = validatorRunner.Results;
 
-            // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
-            // place for inspection.
+            // A failed validator leaves this run's data in place.
             validatorRunner.ThrowIfAnyFailed();
 
             await QuiescePipelineAsync(state, output, cancellationToken);
-
-            await RunCleanupHelper.CleanupAfterRunAsync(
-                scenarioConfig,
-                services.GetRequiredService<IFacilityServiceClient>(),
-                services.GetRequiredService<INormalizationServiceClient>(),
-                services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                services.GetRequiredService<IQueryDispatchServiceClient>(),
-                services.GetRequiredService<IReportServiceClient>(),
-                fhirDataLoader,
-                output,
-                facilityId,
-                reportId);
 
             lock (state.Sync)
             {
@@ -1314,6 +1306,8 @@ internal sealed class RunExecutor
                         throw new OperationCanceledException("Run was cancelled.");
                     state.Status = AutomationRunStatus.Failed;
                     state.Error = "Missed the time budget or saved limits: " + string.Join("; ", metricsSnapshot.Benchmark.Violations);
+                    if (!cleanupAttempted)
+                        state.RetentionNotice = RunCleanupGate.DataKeptNotice(state.Options.CleanupFhirData, state.Options.CleanupServiceData);
                 }
                 metricsSnapshot.Outcome = state.Status.ToString();
                 var store = _hostServices.GetService<IRunMetricsStore>();
@@ -1321,6 +1315,8 @@ internal sealed class RunExecutor
                     await store.UpsertAsync(metricsSnapshot, cancellationToken);
                 await callbacks.BroadcastStatus();
                 output.WriteLine($"Run failed: {state.Error}");
+                if (!string.IsNullOrWhiteSpace(state.RetentionNotice))
+                    output.WriteLine(state.RetentionNotice);
                 return;
             }
 
@@ -1328,15 +1324,68 @@ internal sealed class RunExecutor
             {
                 if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
                     throw new OperationCanceledException("Run was cancelled.");
+            }
+
+            var ownsFacility = FacilityClassification.RunOwns(
+                state.RunId, facilityId, state.AutomationCreatedFacility, facilityId);
+            removedFhir = RunCleanupGate.ShouldCleanup(scenarioConfig.CleanupFhirData, succeeded: true);
+            removedService = RunCleanupGate.ShouldDeleteServiceData(
+                scenarioConfig.CleanupServiceData, succeeded: true, ownsFacility);
+            serviceKeptUnowned = scenarioConfig.CleanupServiceData && !ownsFacility;
+            cleanupAttempted = true;
+            if (removedFhir || removedService)
+            {
+                await RunCleanupHelper.CleanupAfterRunAsync(
+                    new TestScenarioConfig
+                    {
+                        CleanupServiceData = removedService,
+                        CleanupFhirData = removedFhir
+                    },
+                    services.GetRequiredService<IFacilityServiceClient>(),
+                    services.GetRequiredService<INormalizationServiceClient>(),
+                    services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                    services.GetRequiredService<IQueryDispatchServiceClient>(),
+                    services.GetRequiredService<IReportServiceClient>(),
+                    fhirDataLoader,
+                    output,
+                    facilityId,
+                    reportId,
+                    runSucceeded: true);
+            }
+
+            var retentionNotice = RunCleanupGate.SuccessNotice(removedFhir, removedService, serviceKeptUnowned);
+            lock (state.Sync)
+            {
+                if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
+                    throw new OperationCanceledException("Run was cancelled.");
                 state.Status = AutomationRunStatus.Succeeded;
                 state.FinishedAt = DateTimeOffset.UtcNow;
+                state.RetentionNotice = retentionNotice;
             }
             await callbacks.BroadcastStatus();
             output.WriteLine("Run completed successfully.");
+            if (!string.IsNullOrWhiteSpace(retentionNotice))
+                output.WriteLine(retentionNotice);
         }
         catch (OperationCanceledException) when (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
         {
             _logger.LogInformation("Run {RunId} cancellation acknowledged.", state.RunId);
+            lock (state.Sync)
+            {
+                if (!cleanupAttempted)
+                {
+                    state.RetentionNotice ??= RunCleanupGate.DataKeptNotice(
+                        state.Options.CleanupFhirData, state.Options.CleanupServiceData);
+                }
+                else
+                {
+                    state.RetentionNotice ??= RunCleanupGate.SuccessNotice(removedFhir, removedService, serviceKeptUnowned);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(state.RetentionNotice))
+                output.WriteLine(state.RetentionNotice);
+            await callbacks.BroadcastStatus();
         }
         catch (Exception ex)
         {
@@ -1350,11 +1399,20 @@ internal sealed class RunExecutor
                     state.Error = ex.Message;
                     state.FinishedAt = DateTimeOffset.UtcNow;
                 }
+
+                if (!cleanupAttempted)
+                {
+                    state.RetentionNotice ??= RunCleanupGate.DataKeptNotice(
+                        state.Options.CleanupFhirData, state.Options.CleanupServiceData);
+                }
             }
 
             if (cancelledAfterFault)
             {
                 _logger.LogInformation(ex, "Run {RunId} faulted after cancel request: {ExceptionType}", state.RunId, ex.GetType().Name);
+                if (!string.IsNullOrWhiteSpace(state.RetentionNotice))
+                    output.WriteLine(state.RetentionNotice);
+                await callbacks.BroadcastStatus();
                 return;
             }
 
@@ -1362,6 +1420,8 @@ internal sealed class RunExecutor
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
+            if (!string.IsNullOrWhiteSpace(state.RetentionNotice))
+                output.WriteLine(state.RetentionNotice);
             await QuiescePipelineAsync(state, output, CancellationToken.None);
         }
         finally
