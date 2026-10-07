@@ -1,45 +1,58 @@
 namespace Link.UI.Services;
 
 /// <summary>
-/// One read the home page uses to separate real facilities from automation facilities.
+/// Whether a facility is automation-owned (a throwaway) or real.
+/// The decision uses durable run and tombstone rows only.
+/// Automation stores the facility name as the facility id. There is no name prefix,
+/// so the name is not consulted. A facility that no run and no tombstone claims is real.
 /// </summary>
-public interface IFacilityClassification
+public static class FacilityClassification
 {
-    Task<FacilityClassification> ReadAsync(CancellationToken cancellationToken);
-}
-
-public sealed class FacilityClassification
-{
-    public bool AutomationVisible { get; init; }
-    public bool OwnershipReachable { get; init; }
-    public AutomationOwnershipIndex Ownership { get; init; } = AutomationOwnershipIndex.Empty;
-
-    /// <summary>Tenant list scope for real facilities. Null until the shared classification supplies one.</summary>
-    public string? RealScope { get; init; }
-}
-
-/// <summary>
-/// Delegates to <see cref="AutomationOwnershipLookup"/> and keeps automation visible.
-/// Replace this type with the shared classification and LinkUi:AutomationEnabled when that flag is in this build.
-/// </summary>
-public sealed class OwnershipFacilityClassification : IFacilityClassification
-{
-    private readonly AutomationOwnershipLookup _ownership;
-
-    public OwnershipFacilityClassification(AutomationOwnershipLookup ownership)
+    /// <summary>
+    /// True when <paramref name="candidate"/> is the run id, or this run created that facility.
+    /// A reused tenant (a different id, created flag false) is not owned.
+    /// </summary>
+    public static bool RunOwns(Guid runId, string? storedFacilityId, bool created, string? candidate)
     {
-        _ownership = ownership;
+        if (string.IsNullOrWhiteSpace(candidate))
+            return false;
+
+        var id = candidate.Trim();
+        if (Guid.TryParse(id, out var parsed) && parsed == runId)
+            return true;
+
+        return created
+            && !string.IsNullOrWhiteSpace(storedFacilityId)
+            && string.Equals(id, storedFacilityId.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<FacilityClassification> ReadAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Server-side guard for teardown, purge, and quiesce.
+    /// True only when a run owns the id or a tombstone still names it.
+    /// </summary>
+    public static bool AllowsDestructive(
+        string? facilityId,
+        IEnumerable<AutomationRunMark> runs,
+        IEnumerable<string?>? tombstoneFacilityIds)
     {
-        var (index, reachable) = await _ownership.GetSnapshotAsync(cancellationToken);
-        return new FacilityClassification
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return false;
+
+        foreach (var run in runs)
         {
-            AutomationVisible = true,
-            OwnershipReachable = reachable,
-            Ownership = index,
-            RealScope = null
-        };
+            if (RunOwns(run.RunId, run.FacilityId, run.AutomationCreatedFacility, facilityId))
+                return true;
+        }
+
+        if (tombstoneFacilityIds is null)
+            return false;
+
+        foreach (var id in tombstoneFacilityIds)
+        {
+            if (string.Equals(id?.Trim(), facilityId.Trim(), StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 }

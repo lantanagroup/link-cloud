@@ -10,4 +10,10 @@ public sealed class LinkUiFeatureOptions
 {
     public bool DmrpEnabled { get; set; }
     public bool NumericOnlyFacilityId { get; set; }
+
+    /// <summary>
+    /// Automation runs, cleanup, and the automation nav.
+    /// Off in production. On for local Development. Test and QA set this true in their own settings.
+    /// </summary>
+    public bool AutomationEnabled { get; set; }
 }

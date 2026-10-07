@@ -86,8 +86,7 @@ public sealed class AcquisitionQuery
             route["includeDeleted"] = "true";
         if (CancellableOnly)
             route["cancellableOnly"] = "true";
-        if (AutomationMarkRules.IsAutomation(Scope))
-            route["scope"] = AutomationMarkRules.Automation;
+        AutomationMarkRules.AddScope(route, Scope);
         if (MinAgeHours != LogsRules.DefaultMinAgeHours)
             route["minAgeHours"] = MinAgeHours.ToString();
         Add(route, "sortBy", sortBy ?? SortBy);
@@ -260,8 +259,7 @@ public sealed class SftpQuery
         Add(route, "status", Status);
         Add(route, "acquisitionType", AcquisitionType);
         Add(route, "subType", SubType);
-        if (AutomationMarkRules.IsAutomation(Scope))
-            route["scope"] = AutomationMarkRules.Automation;
+        AutomationMarkRules.AddScope(route, Scope);
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
         var size = LogsRules.ClampPageSize(PageSize);
@@ -399,8 +397,7 @@ public sealed class AuditQuery
         Add(route, "service", Service);
         Add(route, "eventAction", Action);
         Add(route, "user", User);
-        if (AutomationMarkRules.IsAutomation(Scope))
-            route["scope"] = AutomationMarkRules.Automation;
+        AutomationMarkRules.AddScope(route, Scope);
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
         var size = LogsRules.ClampAuditPageSize(PageSize);

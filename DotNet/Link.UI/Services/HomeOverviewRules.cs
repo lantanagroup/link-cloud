@@ -97,7 +97,8 @@ public static class HomeOverviewRules
         string? listMessage,
         bool ownershipReachable,
         IEnumerable<string>? facilityIds,
-        AutomationOwnershipIndex? ownership)
+        AutomationOwnershipIndex? ownership,
+        bool classify = true)
     {
         if (!listReachable)
         {
@@ -118,7 +119,7 @@ public static class HomeOverviewRules
 
         int? automation = null;
         int? regular = null;
-        if (ownershipReachable && ownership is not null)
+        if (classify && ownershipReachable && ownership is not null)
         {
             var owned = distinct.Count(ownership.Contains);
             automation = owned;
@@ -131,11 +132,16 @@ public static class HomeOverviewRules
             Total = distinct.Count,
             Automation = automation,
             Regular = regular,
-            Message = ownershipReachable ? null : "Automation ownership could not be read."
+            Message = classify && !ownershipReachable ? "Automation ownership could not be read." : null
         };
     }
 
-    public static ReportCard Reports(bool reachable, string? message, long total, IEnumerable<FacilityReportRow>? rows)
+    public static ReportCard Reports(
+        bool reachable,
+        string? message,
+        long total,
+        IEnumerable<FacilityReportRow>? rows,
+        AutomationOwnershipIndex? ownership = null)
     {
         if (!reachable)
         {
@@ -155,7 +161,8 @@ public static class HomeOverviewRules
                 FacilityId = row.FacilityId,
                 Status = row.StatusLabel,
                 Badge = FacilityViewRules.StatusBadge(row.Status),
-                When = row.Created
+                When = row.Created,
+                AutomationRunId = ownership?.RunIdFor(row.FacilityId)
             }).ToList()
         };
     }
@@ -319,48 +326,16 @@ public static class HomeOverviewRules
     }
 
     /// <summary>
-    /// Real-facility count when the split is known. When automation is hidden and the split
-    /// is not known, the total would mix the two, so the tile stays blank.
+    /// Real-facility count when automation is on and the split is known.
+    /// When automation is off the home page does not classify, so the tile is the total.
     /// </summary>
     public static string PrimaryFacilityText(FacilityCard card, bool automationVisible)
     {
         if (!card.Reachable)
             return "—";
-        if (card.Regular is int real)
+        if (automationVisible && card.Regular is int real)
             return real.ToString(CultureInfo.InvariantCulture);
-        if (!automationVisible)
-            return "—";
         return card.Total.ToString(CultureInfo.InvariantCulture);
-    }
-
-    public static string? PrimaryFacilityNote(FacilityCard card, bool automationVisible)
-    {
-        if (!card.Reachable || card.Regular is int || automationVisible)
-            return null;
-        return "Facility classification could not be read.";
-    }
-
-    /// <summary>Drops automation counts when that section is hidden.</summary>
-    public static FacilityCard ForAudience(FacilityCard card, bool automationVisible)
-    {
-        if (automationVisible || !card.Reachable)
-            return card;
-        if (card.Regular is int real)
-        {
-            return new FacilityCard
-            {
-                Reachable = true,
-                Total = card.Total,
-                Regular = real
-            };
-        }
-
-        return new FacilityCard
-        {
-            Reachable = true,
-            Total = card.Total,
-            Message = "Facility classification could not be read."
-        };
     }
 
     public static ActivityCard Activity(
@@ -427,13 +402,13 @@ public static class HomeOverviewRules
                 Href = TenantsHref
             });
         }
-        else if (!ownershipKnown && !automationVisible)
+        else if (automationVisible && !ownershipKnown)
         {
             issues.Add(new HomeIssue
             {
-                Title = "Facility classification could not be read",
-                Detail = "Real facilities could not be separated.",
-                Href = TenantsHref
+                Title = "Automation ownership could not be read",
+                Detail = "Owned facilities could not be separated.",
+                Href = AutomationTenantsHref
             });
         }
 
@@ -517,7 +492,7 @@ public static class HomeOverviewRules
             });
         }
 
-        if (!pulse.Reachable)
+        if (automationVisible && !pulse.Reachable)
         {
             issues.Add(new HomeIssue
             {
@@ -526,7 +501,7 @@ public static class HomeOverviewRules
                 Href = MetricsHref
             });
         }
-        else
+        else if (automationVisible)
         {
             var slow = pulse.Chips
                 .Where(chip => chip.ApiP95Ms is > SlowApiMs)
