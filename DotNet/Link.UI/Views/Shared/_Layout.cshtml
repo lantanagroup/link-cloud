@@ -46,7 +46,7 @@
                 <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
                     <i class="bi bi-gear me-2"></i>System
                 </a>
-                <a class="lu-nav-link @(Ctrl("Automation") ? "active" : "")" asp-controller="Automation" asp-action="Index">
+                <a class="lu-nav-link @(Ctrl("Automation") || Ctrl("Metrics") || Ctrl("ApiHealth") || Ctrl("Cleanup") ? "active" : "")" asp-controller="Automation" asp-action="Index">
                     <i class="bi bi-lightning-charge me-2"></i>Automation
                 </a>
             </nav>
