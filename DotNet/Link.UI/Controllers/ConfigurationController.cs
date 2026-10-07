@@ -358,14 +358,18 @@ public sealed class ConfigurationController : Controller
     public async Task<IActionResult> SaveConfiguration(NotificationConfigForm form, CancellationToken cancellationToken)
     {
         Temp(await _configuration.SaveConfigurationAsync(form, cancellationToken));
+        if (_configuration.AcceptFacilityReturn(form.ReturnFacility))
+            return RedirectToAction("Facility", "Tenants", new { id = form.ReturnFacility!.Trim() });
         return RedirectToAction(nameof(Configurations), new { edit = form.Id });
     }
 
     [HttpPost("Notifications/configurations/delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfiguration(string? id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteConfiguration(string? id, string? returnFacility, CancellationToken cancellationToken)
     {
         Temp(await _configuration.DeleteConfigurationAsync(id, cancellationToken));
+        if (_configuration.AcceptFacilityReturn(returnFacility))
+            return RedirectToAction("Facility", "Tenants", new { id = returnFacility!.Trim() });
         return RedirectToAction(nameof(Configurations));
     }
 

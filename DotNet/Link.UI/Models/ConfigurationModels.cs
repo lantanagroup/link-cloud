@@ -407,6 +407,7 @@ public sealed class NotificationConfigForm
     public string? FacilityId { get; set; }
     public string? Emails { get; set; }
     public bool EmailEnabled { get; set; } = true;
+    public string? ReturnFacility { get; set; }
 }
 
 public sealed class NotificationConfigRow

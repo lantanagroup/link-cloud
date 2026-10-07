@@ -6,14 +6,15 @@
 <h1 class="h3">Vendor versions</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
+<p class="mb-3">Vendor: <strong>@Model.VendorName</strong></p>
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning">@Model.LoadError</div>
 }
 
-<div class="au-card card mb-3">
-    <div class="card-header">@Model.VendorName</div>
+<div class="au-card card mb-3 d-none" id="versionCreate" data-lu-panel data-lu-hide-on-cancel>
+    <div class="card-header">New version for @Model.VendorName</div>
     <div class="card-body">
         <form method="post" data-au-save asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId" class="row g-2 align-items-end">
             <div class="col-12 col-md-6">
@@ -21,18 +22,22 @@
                 <input id="version" name="version" class="form-control" maxlength="255" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-au-action">Add version</button>
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
 </div>
 
 <div class="au-card card">
-    <div class="card-header">Versions</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Versions</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="versionCreate">+ Add</button>
+    </div>
     <div class="card-body">
         @if (Model.Versions.Count == 0)
         {
-            <p class="mb-0">No versions found.</p>
+            <p class="mb-0">No versions yet. Add the first version for this vendor.</p>
         }
         else
         {
@@ -54,9 +59,10 @@
                                 <input form="@formId" name="version" value="@row.Version" class="form-control form-control-sm" maxlength="255" required aria-label="Version @row.Version" />
                             </td>
                             <td>
-                                <form id="@formId" method="post" asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
+                                <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
                                     <input type="hidden" name="versionId" value="@row.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                    <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-lu-cancel>Cancel</button>
                                 </form>
                             </td>
                             <td>

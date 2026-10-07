@@ -21,41 +21,21 @@
 <h1 class="h3">Notification configuration</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">Each facility has one email list. Saving an existing configuration keeps its other channels.</p>
+<p class="text-muted">Each facility has one email list. Add or change it on the facility, then save the facility. This page lists every facility.</p>
 
 <div class="au-card card mb-3">
-    <div class="card-header">@(string.IsNullOrWhiteSpace(form.Id) ? "New configuration" : "Edit configuration")</div>
+    <div class="card-header">Open a facility</div>
     <div class="card-body">
-        @if (!string.IsNullOrWhiteSpace(Model.FormError))
-        {
-            <div class="alert alert-warning">@Model.FormError</div>
-        }
-        <form method="post" data-au-save asp-action="SaveConfiguration" class="row g-2">
-            <input type="hidden" name="Id" value="@form.Id" />
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="configFacility">Facility</label>
-                <input id="configFacility" name="FacilityId" value="@form.FacilityId" class="form-control" required />
+        <form method="get" asp-controller="Tenants" asp-action="Facility" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="configFacility">Facility id</label>
+                <input id="configFacility" name="id" value="@form.FacilityId" class="form-control" required />
             </div>
-            <div class="col-12 col-md-8">
-                <label class="form-label" for="emails">Email addresses</label>
-                <textarea id="emails" name="Emails" class="form-control" rows="4">@form.Emails</textarea>
-                <div class="form-text">One address per line, or separate them with commas. At most 20.</div>
-            </div>
-            <div class="col-12">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="emailEnabled" name="EmailEnabled" value="true" @(form.EmailEnabled ? "checked" : null) />
-                    <input type="hidden" name="EmailEnabled" value="false" />
-                    <label class="form-check-label" for="emailEnabled">Email channel enabled</label>
-                </div>
-            </div>
-            <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-au-action">Save configuration</button>
-                @if (!string.IsNullOrWhiteSpace(form.Id))
-                {
-                    <a class="btn btn-outline-secondary" asp-action="Configurations">Clear</a>
-                }
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-outline-secondary">Open</button>
             </div>
         </form>
+        <p class="text-muted small mb-0 mt-2">The facility page shows + Add when that facility has no email list.</p>
     </div>
 </div>
 
@@ -128,7 +108,7 @@ else
                                 <td class="text-break">@row.Emails</td>
                                 <td>@(row.EmailEnabled ? "Yes" : "No")</td>
                                 <td class="text-nowrap">
-                                    <a asp-all-route-data="@Route(bar.Page, row.Id)">Edit</a>
+                                    <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@row.FacilityId">Edit</a>
                                     <form method="post" data-au-save asp-action="DeleteConfiguration" class="d-inline" onsubmit="return confirm('Delete this notification configuration?');">
                                         <input type="hidden" name="id" value="@row.Id" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>

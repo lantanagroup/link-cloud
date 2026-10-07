@@ -21,7 +21,7 @@
     <a class="btn btn-outline-secondary" asp-action="ExportCategories">Export categories</a>
 </div>
 
-<div class="au-card card mb-3">
+<div class="au-card card mb-3 d-none" id="packageUpload" data-lu-panel data-lu-hide-on-cancel>
     <div class="card-header">Upload a package</div>
     <div class="card-body">
         <form method="post" data-au-save asp-action="UploadPackage" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Uploading replaces the package with this name. Continue?');">
@@ -34,7 +34,8 @@
                 <input id="package" name="package" type="file" class="form-control" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-au-action">Upload</button>
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The name is the artifact name. The file is sent as the package bytes. The limit is 8 MB.</p>
@@ -63,11 +64,14 @@
 }
 
 <div class="au-card card mb-3">
-    <div class="card-header">Implementation guides</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Implementation guides</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="packageUpload">+ Add</button>
+    </div>
     <div class="card-body">
         @if (Model.Artifacts.Count == 0)
         {
-            <p class="mb-0">No implementation guides found.</p>
+            <p class="mb-0">No implementation guides yet. Add a package when you have one to upload.</p>
         }
         else
         {
@@ -127,7 +131,7 @@
     <div class="card-body">
         @if (Model.Categories.Count == 0)
         {
-            <p class="mb-0">No categories found.</p>
+            <p class="mb-0">No categories yet. Initialize the published categories, or open a category id to create one.</p>
         }
         else
         {
