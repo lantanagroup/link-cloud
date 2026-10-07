@@ -54,6 +54,7 @@ public sealed class AutomationRunReader
             .Include(row => row.StartedAt)
             .Include(row => row.FinishedAt)
             .Include(row => row.Error)
+            .Include(row => row.RetentionNotice)
             .Include(row => row.Duration)
             .Include(row => row.GeneratedTemplateCacheVersionNumber);
 
@@ -515,7 +516,8 @@ public sealed class AutomationRunReader
             document.FacilityId,
             document.AutomationCreatedFacility,
             document.ReportId,
-            document.GeneratedTemplateCacheVersionNumber);
+            document.GeneratedTemplateCacheVersionNumber,
+            document.RetentionNotice);
 
     [BsonIgnoreExtraElements]
     private sealed class AutomationRunDocument
@@ -554,6 +556,8 @@ public sealed class AutomationRunReader
         public DateTimeOffset? FinishedAt { get; set; }
 
         public string? Error { get; set; }
+
+        public string? RetentionNotice { get; set; }
 
         public string? Duration { get; set; }
 

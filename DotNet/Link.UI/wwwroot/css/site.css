@@ -145,8 +145,19 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 .btn-au-run:hover { background: #333; color: #fff; }
 .btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
 
-/* overrides for bootstrap btn-success / danger / warning */
-.btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
+/* overrides for bootstrap btn-success / danger / warning.
+   :disabled and :hover beat a plain .btn-success rule, so every state uses the token. */
+.btn-success,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active,
+.btn-success:disabled,
+.btn-success.disabled {
+  background-color: var(--au-success);
+  border-color: var(--au-success);
+  color: #fff;
+}
+.btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); color: #fff; }
 .btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
 .btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
 .btn-warning:hover, .btn-warning:focus { background: #e0a800; border-color: #d39e00; color: #111; }
@@ -772,6 +783,57 @@ a.au-kpi-link:hover {
 }
 .home-row:hover { color: inherit; background: #f7f8fa; }
 .home-name { overflow-wrap: anywhere; }
+
+.home-trend {
+  display: flex;
+  gap: .25rem;
+  align-items: stretch;
+}
+.home-trend-link {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  font-size: .75rem;
+  border-radius: .25rem;
+}
+.home-trend-link:hover,
+.home-trend-link:focus {
+  color: inherit;
+  background: #f7f8fa;
+}
+.home-trend-plot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 4.5rem;
+  width: 100%;
+}
+.home-trend-bar {
+  width: 70%;
+  background: var(--au-accent-fill);
+  border-radius: .2rem .2rem 0 0;
+}
+.home-trend-count { font-weight: 700; }
+.home-trend-day { color: var(--au-muted); font-size: .65rem; }
+.home-issue {
+  display: block;
+  padding: .45rem 0;
+  border-top: 1px solid var(--au-border);
+  color: inherit;
+  text-decoration: none;
+}
+.home-issue:hover,
+.home-issue:focus { background: #f7f8fa; color: inherit; }
+.home-issue-title { display: block; font-weight: 600; }
+.home-issue-detail { display: block; color: var(--au-muted); font-size: .8rem; }
+a.au-service-chip { display: block; color: inherit; text-decoration: none; }
+a.au-service-chip:hover,
+a.au-service-chip:focus { color: inherit; }
+.home-chip-slow { box-shadow: inset 0 0 0 2px var(--au-danger); }
 
 .au-service-chip {
   background: #f7f8fa;
@@ -1775,6 +1837,16 @@ html:has(body.lu-body) {
   color: #fff;
   border-radius: var(--au-radius);
   box-shadow: var(--au-card-shadow);
+}
+
+/* Sit above the page and under a Bootstrap dialog (1055). The inset leaves the facility note readable. */
+#auToasts {
+  z-index: 1040;
+  padding-bottom: 6.5rem;
+}
+
+.lu-facility-note {
+  margin-bottom: 1.5rem;
 }
 
 .lu-hsloc {
