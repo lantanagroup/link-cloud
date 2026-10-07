@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
@@ -13,6 +14,30 @@ namespace Link.UI.Services;
 /// Acquisition logs, sFTP logs, audit events, and the Kafka/Grafana links. Reads and the
 /// log actions go through LinkSDK, including facility-wide disable and restore.
 /// </summary>
+public sealed class AcquisitionCountLoad
+{
+    public bool Ok { get; init; }
+    public string? Error { get; init; }
+    public long FailedTotal { get; init; }
+    public IReadOnlyList<TrendDay> Days { get; init; } = [];
+
+    public static AcquisitionCountLoad Failed(string error) => new() { Error = error };
+
+    public static AcquisitionCountLoad Ready(long failedTotal, IReadOnlyList<TrendDay> days) =>
+        new() { Ok = true, FailedTotal = failedTotal, Days = days };
+}
+
+public sealed class AuditErrorLoad
+{
+    public bool Ok { get; init; }
+    public string? Error { get; init; }
+    public long Errors { get; init; }
+
+    public static AuditErrorLoad Failed(string error) => new() { Error = error };
+
+    public static AuditErrorLoad Ready(long errors) => new() { Ok = true, Errors = errors };
+}
+
 public sealed class LogsService
 {
     public const string AcquisitionNotConfigured =
@@ -72,6 +97,62 @@ public sealed class LogsService
     {
         LogsRules.TryExternalUrl(_links.KafkaUiUrl, out var kafka);
         return new KafkaPage { Url = string.IsNullOrEmpty(kafka) ? null : kafka };
+    }
+
+    public async Task<AcquisitionCountLoad> LoadAcquisitionCountsAsync(int days, CancellationToken cancellationToken)
+    {
+        if (_acquisition is null)
+            return AcquisitionCountLoad.Failed(AcquisitionNotConfigured);
+
+        try
+        {
+            var response = await _acquisition.GetActivityCountsAsync(
+                new AcquisitionActivityCountRequest { Days = days },
+                cancellationToken);
+            if (!response.IsSuccessStatusCode || response.Body is null)
+                return AcquisitionCountLoad.Failed(FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody));
+
+            var daysInWindow = response.Body.Days.Select(day => new TrendDay
+            {
+                Day = day.Day,
+                Reachable = true,
+                Count = day.Total,
+                Failed = day.Failed
+            }).ToList();
+            return AcquisitionCountLoad.Ready(response.Body.FailedTotal, daysInWindow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Acquisition activity counts failed");
+            return AcquisitionCountLoad.Failed("Data acquisition service call failed.");
+        }
+    }
+
+    public async Task<AuditErrorLoad> LoadAuditErrorsAsync(int hours, CancellationToken cancellationToken)
+    {
+        if (_audit is null)
+            return AuditErrorLoad.Failed(AuditNotConfigured);
+
+        try
+        {
+            var response = await _audit.GetErrorCountAsync(hours, cancellationToken);
+            if (!response.IsSuccessStatusCode || response.Body is null)
+                return AuditErrorLoad.Failed(FacilityFormRules.ServiceMessage("Audit", response.StatusCode, response.RawBody));
+            return AuditErrorLoad.Ready(response.Body.Errors);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Audit error count failed");
+            return AuditErrorLoad.Failed("Audit service call failed.");
+        }
     }
 
     public async Task<AcquisitionLogListPage> LoadAcquisitionAsync(AcquisitionQuery? query, CancellationToken cancellationToken)

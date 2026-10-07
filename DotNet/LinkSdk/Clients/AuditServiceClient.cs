@@ -2,6 +2,7 @@ using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Audit;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 
@@ -52,6 +53,13 @@ public class AuditServiceClient : LinkApiClientBase, IAuditServiceClient
         Guid id,
         CancellationToken cancellationToken = default) =>
         SendAsync<AuditEventApiModel>(() => Request($"audit/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<AuditErrorCount>> GetErrorCountAsync(
+        int hours,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<AuditErrorCount>(() => Request("audit/errors")
+            .SetQueryParam("hours", hours)
             .GetAsync(cancellationToken: cancellationToken));
 
     private static IFlurlRequest Set(IFlurlRequest request, string name, string? value) =>

@@ -21,6 +21,11 @@ public interface IReportServiceClient
     Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchFacilitySchedulesAsync(
         ReportScheduleSearch query,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Status totals and created-per-day counts: <c>POST /api/schedules/counts</c>.</summary>
+    Task<LinkApiResponse<ReportActivityCounts>> GetActivityCountsAsync(
+        ReportActivityCountRequest request,
+        CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(string? facilityId = null, ReportStatus? status = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<ReportSummaryApiModel>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool allowInProgress = false);

@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using FacilityCounts = LantanaGroup.Link.Shared.Application.Models.Tenant.FacilityCounts;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Business.Models;
 using LantanaGroup.Link.Tenant.Entities;
@@ -24,6 +25,8 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
         Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model,
             string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10,
             int pageNumber = 1, bool includeDeleted = false, CancellationToken cancellationToken = default);
+
+        Task<FacilityCounts> CountAsync(IReadOnlyCollection<string>? facilityIds, CancellationToken cancellationToken = default);
     }
 
     public class FacilityQueries : IFacilityQueries
@@ -147,6 +150,10 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
             };
         }
 
+        public Task<FacilityCounts> CountAsync(
+            IReadOnlyCollection<string>? facilityIds,
+            CancellationToken cancellationToken = default) =>
+            FacilityCountQuery.ExecuteAsync(_context.Facilities.AsNoTracking(), facilityIds, cancellationToken);
 
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {

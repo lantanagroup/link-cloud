@@ -102,9 +102,14 @@ public sealed class LogCard
     public string? Message { get; init; }
     public long Total { get; init; }
     public IReadOnlyList<HomeLogLine> Rows { get; init; } = [];
+    public bool TrendReachable { get; init; } = true;
+    public IReadOnlyList<TrendDay> Trend { get; init; } = [];
     public string? AuditMessage { get; init; }
+    public bool AuditCounted { get; init; } = true;
+    public long AuditErrors { get; init; }
 
     public string TotalText => Reachable ? Total.ToString() : "—";
+    public string AuditErrorsText => AuditCounted ? AuditErrors.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—";
 }
 
 public sealed class HomeLogLine
@@ -139,6 +144,9 @@ public sealed class TrendDay
     public string Day { get; init; } = "";
     public bool Reachable { get; init; }
     public long Count { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public long Failed { get; init; }
 
     public string CountText => Reachable ? Count.ToString() : "—";
 }

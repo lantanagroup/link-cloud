@@ -375,6 +375,33 @@ public class HomeOverviewTests
         reports.Rows.Should().HaveCount(HomeOverviewRules.RowLimit);
         reports.Total.Should().Be(9000);
         reports.Rows.Should().OnlyContain(row => row.FacilityId.StartsWith("facility-", StringComparison.Ordinal));
+
+        var counted = HomeOverviewRules.FacilitiesFromCounts(true, null, 4000, 250, true, true);
+        counted.Total.Should().Be(4000);
+        counted.Automation.Should().Be(250);
+        counted.Regular.Should().Be(3750);
+        counted.GetType().GetProperties().Should().NotContain(property =>
+            property.PropertyType != typeof(string)
+            && typeof(System.Collections.IEnumerable).IsAssignableFrom(property.PropertyType));
+
+        var batches = HomeOverviewRules.FacilityIdBatches(ids);
+        batches.Should().HaveCount(1);
+        batches[0].Should().HaveCount(4000);
+        var overflow = HomeOverviewRules.FacilityIdBatches(Enumerable.Range(0, 5001).Select(i => "id-" + i).ToArray());
+        overflow.Should().HaveCount(2);
+        overflow.Sum(batch => batch.Count).Should().Be(5001);
+
+        var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/HomeOverviewService.cs"));
+        var overview = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Home/_Overview.cshtml"));
+        service.Should().NotContain("GetFacilityListAsync");
+        service.Should().NotContain("CountReportsAsync");
+        service.Should().Contain("GetFacilityCountsAsync");
+        service.Should().Contain("LoadActivityCountsAsync");
+        service.Should().Contain("LoadAcquisitionCountsAsync");
+        service.Should().Contain("LoadAuditErrorsAsync");
+        overview.Should().Contain("Acquisition throughput");
+        overview.Should().Contain("Audit errors");
+        overview.Should().Contain("UTC days");
     }
 
     [Fact]
@@ -511,6 +538,26 @@ public class HomeOverviewTests
             HomeOverviewRules.Logs(true, null, 0, null, true, null),
             HomeOverviewRules.Pulse(false, "Service metrics could not be read.", null),
             now).Should().ContainSingle(issue => issue.Href == HomeOverviewRules.MetricsHref && issue.Title == "Service metrics could not be read");
+
+        var auditErrors = HomeOverviewRules.Logs(
+            true, null, 0, null, true, null, true,
+            [new TrendDay { Day = "2026-10-07", Reachable = true, Count = 4, Failed = 1 }],
+            true, 3);
+        HomeOverviewRules.Issues(
+            true, true, false,
+            HomeOverviewRules.Activity(true, 0, null, true, 0, true, 0, []),
+            HomeOverviewRules.Health(true, null, [("account", "Healthy")], true, null, null, null, null, null),
+            auditErrors,
+            HomeOverviewRules.Pulse(true, null, []),
+            now).Should().ContainSingle(issue => issue.Title == "3 audit errors in the last 24 hours" && issue.Href == HomeOverviewRules.AuditHref);
+
+        var unread = HomeOverviewRules.Logs(false, "Data acquisition returned HTTP 404.", 0, null, false, "Audit returned HTTP 404.");
+        unread.Reachable.Should().BeFalse();
+        unread.TotalText.Should().Be("—");
+        unread.TrendReachable.Should().BeFalse();
+        unread.AuditCounted.Should().BeFalse();
+        unread.AuditErrorsText.Should().Be("—");
+        unread.Total.Should().Be(0);
 
         HomeOverviewRules.CreatedHref("2026-10-07").Should().Be("/Reports?created=2026-10-07");
         HomeOverviewRules.BarPercent(9000, 9000).Should().Be(100);
