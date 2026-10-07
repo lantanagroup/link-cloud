@@ -2,6 +2,8 @@
 
 Every configuration key the code reads, derived from source by
 `Scripts/AzureAppConfig/extract_config_keys.py`. **Generated - do not edit by hand.**
+The LinkUI section at the end is the exception: it lists settings Link.UI reads that this
+extractor still attributes to Automation.UI, and it is maintained with app-config.yaml.
 
 Regenerate with:
 
@@ -2000,3 +2002,33 @@ value set in a store can never take effect.
 | `spring.kafka.retry.max-attempts` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/KafkaRetryConfig.java:7` |
 | `spring.kafka.retry.retry-backoff-ms` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/KafkaRetryConfig.java:7` |
 | `telemetry.exporter-endpoint` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/TelemetryConfig.java:7` |
+
+### LinkUI
+
+Settings Link.UI reads. Store columns are copied from the AutomationUI rows above.
+A dash means this inventory has no store list for that key. Regenerating this file
+with the extractor does not replace this section.
+
+| Key | Runtime | Catalog | Stores | Source |
+|---|---|---|---|---|
+| `ApiHealth:EnableAdminBffAuthSuite` | dotnet | - | test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `Authentication:ApiBearer:Audience` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Auth/ApiBearerAuthentication.cs` |
+| `Authentication:ApiBearer:Authority` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Auth/ApiBearerAuthentication.cs` |
+| `Authentication:ApiBearer:Enabled` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Auth/ApiBearerAuthentication.cs` |
+| `Authentication:EnableAnonymousAccess` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Program.cs` |
+| `Authentication:UseBearerForServiceCalls` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Program.cs` |
+| `Automation:FacilityFhirServerBase` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `Automation:FhirServerBase` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `InternalBlobStorage:BlobContainerName` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `InternalBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Link.UI/Engine/Services/Persistence/ImportedBundleBlobStorageSettings.cs` |
+| `InternalBlobStorage:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `InternalBlobStorage:GeneratedTemplateBlobRoot` | dotnet | - | - | `DotNet/Link.UI/Engine/Services/Persistence/ImportedBundleBlobStorageSettings.cs` |
+| `LeftoverRunCleanup:DailyTeardownEnabled` | dotnet | - | - | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `LeftoverRunCleanup:Enabled` | dotnet | - | - | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `LeftoverRunCleanup:QuiesceEnabled` | dotnet | - | - | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `LeftoverRunCleanup:WeeklyHistoryPurgeEnabled` | dotnet | - | - | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `Loki:App` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `Loki:Url` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `MongoDB:ConnectionString` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `MongoDB:DatabaseName` | dotnet | - | dev, qa, qa2, test | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |
+| `Telemetry:PrometheusQueryEndpoint` | dotnet | - | - | `DotNet/Link.UI/Services/LinkAutomationEngine.cs` |

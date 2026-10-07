@@ -163,6 +163,7 @@ public static class LinkAutomationEngine
         services.AddHostedService<FacilityTemplateSeedService>();
         services.AddHostedService<GenerationCatalogSeedService>();
         services.AddHostedService<ScenarioRunStartupRecoveryService>();
+        services.AddHostedService<PatientBundleExternalizationMigrationService>();
 
         services.AddSingleton<RunSnapshotOrchestrator>();
         services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());

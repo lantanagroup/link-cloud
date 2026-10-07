@@ -181,11 +181,15 @@ if (requireBffSession)
     app.Logger.LogInformation(
         "Authentication:RequireBffSession is true. Pages without an Admin.BFF session redirect to /api/login.");
 }
+else if (!allowAnonymousAccess && apiBearerEnabled)
+{
+    app.Logger.LogWarning(
+        "Authentication:EnableAnonymousAccess is false. Pages, hubs, and native automation routes that are not bearer-protected return 503. Bearer routes stay on ApiBearer. /health and the Admin.BFF proxy stay open. Set Authentication:RequireBffSession to true to require an Admin.BFF session for pages.");
+}
 else if (!allowAnonymousAccess)
 {
     app.Logger.LogWarning(
-        "Authentication:EnableAnonymousAccess is false. Non-health, non-api requests will be rejected with 503. " +
-        "Set Authentication:RequireBffSession to true to require an Admin.BFF session instead.");
+        "Authentication:EnableAnonymousAccess is false. Non-health requests outside the Admin.BFF proxy will be rejected with 503. The automation HTTP API is included while Authentication:ApiBearer:Enabled is false. Set Authentication:RequireBffSession to true to require an Admin.BFF session for pages.");
 }
 else
 {
@@ -195,6 +199,14 @@ else
 
 app.Use(async (context, next) =>
 {
+    if (ShellAccessGate.IsClosedNativeApi(allowAnonymousAccess, apiBearerEnabled, context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        await context.Response.WriteAsync(ShellAccessGate.AnonymousBlockedMessage, context.RequestAborted);
+        return;
+    }
+
     AdminBffUser? user = null;
     if (requireBffSession && !ShellAccessGate.IsSessionPublic(context.Request.Path))
     {
