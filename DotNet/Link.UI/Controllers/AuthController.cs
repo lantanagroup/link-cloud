@@ -25,4 +25,13 @@ public sealed class AuthController : Controller
         ViewData["Title"] = "Unauthorized";
         return View("Unauthorized");
     }
+
+    /// <summary>
+    /// Admin.BFF logout redirects the browser to /logout on this host.
+    /// </summary>
+    [HttpGet("/logout")]
+    public IActionResult SignedOut()
+    {
+        return RedirectToAction("Index", "Home");
+    }
 }

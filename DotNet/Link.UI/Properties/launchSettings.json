@@ -31,8 +31,7 @@
         "LinkTokenService__Authority": "LinkServiceAdmin",
         "LinkTokenService__SigningKey": "local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes",
         "ServiceRegistry__TenantService__TenantServiceUrl": "http://localhost:8074",
-        "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063",
-        "ReverseProxy__Clusters__admin-bff__Destinations__primary__Address": "http://localhost:8063/"
+        "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063"
       }
     }
   }

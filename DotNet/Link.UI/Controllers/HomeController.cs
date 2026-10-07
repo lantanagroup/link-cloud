@@ -20,6 +20,12 @@ public sealed class HomeController : Controller
         return View(user);
     }
 
+    /// <summary>
+    /// Admin.BFF login sets RedirectUri to {origin}/dashboard. Land on Home.
+    /// </summary>
+    [HttpGet("/dashboard")]
+    public IActionResult Dashboard() => RedirectToAction(nameof(Index));
+
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {
