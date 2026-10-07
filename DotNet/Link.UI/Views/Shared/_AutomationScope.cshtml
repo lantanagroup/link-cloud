@@ -6,21 +6,21 @@
     <select id="automationScope" name="scope" class="form-select">
         @if (scope == AutomationMarkRules.Automation)
         {
+            <option value="all">All</option>
             <option value="real">Real</option>
             <option value="automation" selected>Automation</option>
-            <option value="all">All</option>
         }
         else if (scope == AutomationMarkRules.All)
         {
+            <option value="all" selected>All</option>
             <option value="real">Real</option>
             <option value="automation">Automation</option>
-            <option value="all" selected>All</option>
         }
         else
         {
+            <option value="all">All</option>
             <option value="real" selected>Real</option>
             <option value="automation">Automation</option>
-            <option value="all">All</option>
         }
     </select>
 }

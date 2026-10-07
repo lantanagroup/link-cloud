@@ -110,9 +110,18 @@ public class AutomationMarkRulesTests
         var view = File.ReadAllText(RepoFile(relativePath));
 
         view.Should().Contain("name=\"_AutomationScope\"");
-        view.Should().Contain("name=\"_AutomationBadge\"");
         view.Should().Contain("data-au-refresh=");
         view.Should().Contain("data-au-filter=");
+        if (relativePath.EndsWith("Acquisition.cshtml", StringComparison.Ordinal))
+        {
+            view.Should().Contain("name=\"_AcquisitionLogList\"");
+            var list = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml"));
+            list.Should().Contain("name=\"_AutomationBadge\"");
+        }
+        else
+        {
+            view.Should().Contain("name=\"_AutomationBadge\"");
+        }
     }
 
     [Fact]
@@ -120,6 +129,14 @@ public class AutomationMarkRulesTests
     {
         var scope = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_AutomationScope.cshtml"));
         scope.Should().Contain("value=\"real\"");
+        scope.Should().Contain(">Real<");
+        var all = scope.IndexOf(">All<", StringComparison.Ordinal);
+        var real = scope.IndexOf(">Real<", StringComparison.Ordinal);
+        var automation = scope.IndexOf(">Automation<", StringComparison.Ordinal);
+        all.Should().BeGreaterThan(-1);
+        real.Should().BeGreaterThan(all);
+        automation.Should().BeGreaterThan(real);
+        scope.Should().NotContain("Non-automation");
         scope.Should().Contain("AutomationEnabled");
 
         var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));

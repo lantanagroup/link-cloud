@@ -17,9 +17,9 @@
             <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index">
                 <div class="au-kpi-value">@facilities.TotalText</div>
                 <div class="au-kpi-label">Facilities</div>
-                @if (LinkUiFeatures.Value.AutomationEnabled && facilities.Reachable && facilities.Automation is int automation && facilities.Regular is int regular)
+                @if (LinkUiFeatures.Value.AutomationEnabled && facilities.Reachable && facilities.Automation is int automation)
                 {
-                    <div class="au-kpi-note">@automation automation · @regular regular</div>
+                    <div class="au-kpi-note">@automation automation</div>
                 }
                 else if (facilities.Reachable && facilities.Message is not null)
                 {

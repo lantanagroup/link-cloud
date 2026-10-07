@@ -882,7 +882,8 @@ public sealed class LogsService
         PageNumber = search.Page,
         PageSize = search.PageSize,
         SortBy = search.SortBy,
-        SortOrder = LogsRules.SortOrder(search.SortDir)
+        SortOrder = LogsRules.SortOrder(search.SortDir),
+        SearchTerm = search.SearchTerm
     };
 
     private static AcquisitionListRow MapRow(DataAcquisitionLogSummaryApiModel row)

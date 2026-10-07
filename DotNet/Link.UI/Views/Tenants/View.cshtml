@@ -9,6 +9,7 @@
     @if (!Model.NotFound && Model.LoadError is null)
     {
         <a asp-action="Facility" asp-route-id="@Model.FacilityId"><i class="bi bi-gear me-1"></i>Configuration</a>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
 
@@ -107,4 +108,9 @@ else
     {
         <partial name="_ViewPlans" model="Model" />
     }
+}
+
+@if (!Model.NotFound && Model.LoadError is null && !string.IsNullOrWhiteSpace(Model.FacilityId))
+{
+    <partial name="_DataAcquisitionLogsModal" model="@(new DataAcquisitionLogsModal { FacilityId = Model.FacilityId })" />
 }
