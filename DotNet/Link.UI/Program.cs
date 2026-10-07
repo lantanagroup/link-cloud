@@ -10,7 +10,6 @@ using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using Link.UI.Hubs;
 using Link.UI.Models;
 using Link.UI.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
@@ -85,6 +84,7 @@ var proxyRoutes = new List<RouteConfig>
     {
         RouteId = "admin-bff-api",
         ClusterId = "admin-bff",
+        Order = int.MaxValue,
         Match = new RouteMatch { Path = "/api/{**catch-all}" }
     }
 };
@@ -139,13 +139,8 @@ builder.Services.AddControllersWithViews()
     });
 
 // RunHub and CleanupHub carry [Authorize]. The shell gate is the sign-in check.
-// This policy lets the attribute succeed after the gate has already allowed the request.
-builder.Services.AddAuthorization(options =>
-{
-    options.DefaultPolicy = new AuthorizationPolicyBuilder()
-        .RequireAssertion(_ => true)
-        .Build();
-});
+// ApiBearer is a named scheme only. It is not the default authenticate or challenge scheme.
+var apiBearerEnabled = Link.UI.Auth.ApiBearerAuthentication.Add(builder.Services, builder.Configuration);
 
 var automationEngine = LinkAutomationEngine.Add(builder.Services, builder.Configuration);
 
@@ -242,6 +237,8 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseWebSockets();
 app.UseRouting();
+if (apiBearerEnabled)
+    app.UseAuthentication();
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
@@ -287,6 +284,10 @@ static string ResolveAdminBffAddress(IConfiguration configuration)
         address = "http://localhost:8063";
 
     return address.TrimEnd('/') + "/";
+}
+
+public partial class Program
+{
 }
 
 

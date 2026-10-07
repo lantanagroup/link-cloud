@@ -1,0 +1,358 @@
+using Automation.UI.Models;
+using Automation.UI.Models.Metrics;
+using Automation.UI.Services;
+using Automation.UI.Services.Persistence;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Link.UI.Controllers.Api;
+
+/// <summary>
+/// Service-to-service API for triggering automation runs from outside the UI
+/// (for example from the deployment pipeline as a post-deploy smoke test).
+///
+/// Notifications are left to the caller. The caller polls <see cref="GetStatus"/>.
+/// </summary>
+[ApiController]
+[Route("api/runs")]
+[Authorize(Policy = "ApiBearerPolicy")]
+public sealed class AutomationRunsApiController(
+    IAutomationRunManager runManager,
+    IScenarioStore scenarioStore,
+    MetricsRunPresenter metricsPresenter,
+    ILogger<AutomationRunsApiController> logger) : ControllerBase
+{
+    /// <summary>
+    /// Starts a saved scenario by id and returns immediately with the new run id.
+    /// The run continues asynchronously in the background; callers should poll
+    /// <see cref="GetStatus"/> until the run reaches a terminal state.
+    /// </summary>
+    [HttpPost("start")]
+    public async Task<IActionResult> Start([FromBody] StartScenarioApiRequest request, CancellationToken cancellationToken)
+    {
+        if (request == null || request.ScenarioId == Guid.Empty)
+            return BadRequest(new { error = "scenarioId is required." });
+
+        var scenario = await scenarioStore.GetByIdAsync(request.ScenarioId, cancellationToken);
+        if (scenario == null)
+            return NotFound(new { error = $"Scenario {request.ScenarioId} not found." });
+
+        var startRequest = StartScenarioRequest.FromScenario(scenario);
+
+        Guid runId;
+        try
+        {
+            runId = await runManager.StartAsync(startRequest, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to start scenario {ScenarioId} via API.", request.ScenarioId);
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        return Accepted(new
+        {
+            runId,
+            scenarioId = scenario.Id,
+            scenarioName = scenario.Name,
+            source = request.Source,
+        });
+    }
+
+    /// <summary>
+    /// Lists Metrics-run snapshots from Mongo. Does not query Prometheus.
+    /// </summary>
+    [HttpGet("metrics")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListMetrics(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var (records, metadata) = await metricsPresenter.ListAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    /// <summary>
+    /// Lists stored Metrics benchmarks.
+    /// </summary>
+    [HttpGet("metrics/benchmarks")]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListBenchmarks(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    {
+        var (records, metadata) = await metricsPresenter.ListBenchmarksAsync(pageNumber, pageSize, cancellationToken);
+        return Ok(new { records, metadata });
+    }
+
+    [HttpGet("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBenchmark(string key, CancellationToken cancellationToken)
+    {
+        var document = await metricsPresenter.GetBenchmarkAsync(key, cancellationToken);
+        if (document == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Benchmark not found",
+                detail: $"Benchmark '{key}' was not found.");
+        }
+
+        return Ok(document);
+    }
+
+    [HttpPut("metrics/benchmarks/{key}")]
+    [ProducesResponseType(typeof(AutomationMetricsBenchmarkDocument), StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> PutBenchmark(
+        string key,
+        [FromBody] AutomationMetricsBenchmarkDocument body,
+        CancellationToken cancellationToken)
+    {
+        if (body == null || string.IsNullOrWhiteSpace(key)
+            || !string.Equals(body.Key, key, StringComparison.Ordinal))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Benchmark key mismatch",
+                detail: "The route key must match the body key.");
+        }
+
+        if (body.RegressionPercent <= 0)
+            body.RegressionPercent = 10;
+
+        await metricsPresenter.UpsertBenchmarkAsync(body, cancellationToken);
+        return Accepted(body);
+    }
+
+    /// <summary>
+    /// Returns the persisted Metrics snapshot for a run. 404 only when both the
+    /// operational run and the metrics snapshot are missing. A deleted run still
+    /// returns 200 when automation_run_metrics has a row. When the snapshot
+    /// row is missing but the run exists, returns wall-clock fields with stages
+    /// marked unavailable. Does not query Prometheus.
+    /// </summary>
+    [HttpGet("{runId:guid}/metrics")]
+    [ProducesResponseType(typeof(MetricsRunDetailViewModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMetrics(Guid runId, CancellationToken cancellationToken)
+    {
+        var detail = await metricsPresenter.GetDetailAsync(runId, cancellationToken);
+        if (detail == null)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status404NotFound,
+                title: "Run not found",
+                detail: $"Run {runId} not found.");
+        }
+
+        return Ok(detail);
+    }
+
+    /// <summary>
+    /// Returns lightweight status for a run. Designed for polling by external
+    /// callers (deployment pipelines) that need to know when a run has reached a
+    /// terminal state without pulling the full run summary.
+    /// </summary>
+    [HttpGet("{runId:guid}/status")]
+    public async Task<IActionResult> GetStatus(Guid runId, CancellationToken cancellationToken)
+    {
+        var summary = await runManager.GetRunAsync(runId, cancellationToken);
+        if (summary == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        var isTerminal = summary.Status.IsTerminal();
+
+        return Ok(new RunStatusResponse
+        {
+            RunId = summary.RunId,
+            RunName = summary.RunName,
+            Status = summary.Status.ToString(),
+            IsTerminal = isTerminal,
+            CreatedAt = summary.CreatedAt,
+            StartedAt = summary.StartedAt,
+            FinishedAt = summary.FinishedAt,
+            Duration = summary.Duration,
+            Error = summary.Error,
+        });
+    }
+
+    public sealed class LivePatientEventRequest
+    {
+        public string? PatientId { get; set; }
+        public string? Notes { get; set; }
+        public string? Source { get; set; }
+    }
+
+    [HttpPost("{runId:guid}/events/admit")]
+    [ValidateAntiForgeryToken] // CodeQL cs/web/missing-token-validation; live mutations are browser-reachable
+    public async Task<IActionResult> Admit(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        return await ExecuteLiveInjectAsync(
+            runId,
+            () => runManager.InjectAdmitAsync(
+                runId,
+                request.PatientId,
+                string.IsNullOrWhiteSpace(request.Source) ? "API" : request.Source.Trim(),
+                request.Notes,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/events/discharge")]
+    [ValidateAntiForgeryToken] // CodeQL cs/web/missing-token-validation; live mutations are browser-reachable
+    public async Task<IActionResult> Discharge(Guid runId, [FromBody] LivePatientEventRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        return await ExecuteLiveInjectAsync(
+            runId,
+            () => runManager.InjectDischargeAsync(
+                runId,
+                request.PatientId,
+                string.IsNullOrWhiteSpace(request.Source) ? "API" : request.Source.Trim(),
+                request.Notes,
+                cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpGet("{runId:guid}/events")]
+    public async Task<IActionResult> GetEvents(Guid runId, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        var events = await runManager.GetLiveEventsAsync(runId, cancellationToken);
+        return Ok(events);
+    }
+
+    [HttpGet("{runId:guid}/patient-state")]
+    public async Task<IActionResult> GetPatientState(Guid runId, CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        var state = await runManager.GetLivePatientStateAsync(runId, cancellationToken);
+        return Ok(new
+        {
+            admitted = state.Admitted,
+            dischargedDuringWindow = state.DischargedDuringWindow,
+            expectedPopulation = state.ExpectedPopulation,
+            pool = state.Pool,
+            poolTotals = state.PoolTotals,
+            acceptingInjections = state.AcceptingInjections,
+            windowStartUtc = state.WindowStartUtc,
+            windowEndUtc = state.WindowEndUtc,
+            reportGenerationTimeUtc = state.ReportGenerationTimeUtc
+        });
+    }
+
+    public sealed class LivePoolReferenceRequest
+    {
+        public string? PatientId { get; set; }
+    }
+
+    [HttpPost("{runId:guid}/pool/generate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeneratePoolPatient(Guid runId, CancellationToken cancellationToken)
+    {
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.GenerateLivePoolPatientAsync(runId, "API", cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/pool/upload")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadPoolPatient(Guid runId, CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var content = await reader.ReadToEndAsync(cancellationToken);
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.UploadLivePoolPatientAsync(runId, content, Request.ContentType, "API", cancellationToken),
+            cancellationToken);
+    }
+
+    [HttpPost("{runId:guid}/pool/reference")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReferencePoolPatient(Guid runId, [FromBody] LivePoolReferenceRequest? request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.PatientId))
+            return BadRequest(new { error = "patientId is required." });
+
+        return await ExecuteLivePoolAsync(
+            runId,
+            () => runManager.ReferenceLivePoolPatientAsync(runId, request.PatientId, "API", cancellationToken),
+            cancellationToken);
+    }
+
+    private async Task<IActionResult> ExecuteLiveInjectAsync(
+        Guid runId,
+        Func<Task<PatientStateEvent>> action,
+        CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        try
+        {
+            var evt = await action();
+            return Ok(evt);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    private async Task<IActionResult> ExecuteLivePoolAsync(
+        Guid runId,
+        Func<Task<LivePatientPoolEntry>> action,
+        CancellationToken cancellationToken)
+    {
+        if (await runManager.GetRunAsync(runId, cancellationToken) == null)
+            return NotFound(new { error = $"Run {runId} not found." });
+
+        try
+        {
+            var entry = await action();
+            return Ok(entry);
+        }
+        catch (LiveInjectionException ex)
+        {
+            return StatusCode(ex.StatusCode, new { error = ex.Message });
+        }
+    }
+
+    public sealed class StartScenarioApiRequest
+    {
+        /// <summary>Saved scenario id to launch.</summary>
+        public Guid ScenarioId { get; set; }
+
+        /// <summary>
+        /// Free-form label echoed back in the response so the caller can confirm
+        /// which trigger started the run (for example "Test deploy pipeline").
+        /// Optional.
+        /// </summary>
+        public string? Source { get; set; }
+    }
+
+    public sealed class RunStatusResponse
+    {
+        public Guid RunId { get; set; }
+        public string RunName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public bool IsTerminal { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? FinishedAt { get; set; }
+        public string? Duration { get; set; }
+        public string? Error { get; set; }
+    }
+}
