@@ -7,7 +7,97 @@
 <h1 class="h3">Integration test</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">These posts go to Admin.BFF, which produces the event. A blank tracking id is filled in when the event is posted. Consumer start, read, and stop are not on this page.</p>
+<p class="text-muted">These posts go to Admin.BFF, which produces the event. A blank tracking id or correlation id is filled in when the event is posted.</p>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Consumers</div>
+    <div class="card-body">
+        <form method="post" asp-action="StartConsumers" class="row g-2 align-items-end" onsubmit="return confirm('Start consumers for this correlation id?');">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="startCorrelation">Correlation id</label>
+                <input id="startCorrelation" name="correlationId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-au-action">Start consumers</button>
+            </div>
+        </form>
+        <p class="text-muted small">Leave the id blank to generate one. The success message shows the id to use for read and stop.</p>
+        <form method="post" asp-action="ReadConsumers" class="row g-2 align-items-end">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="readCorrelation">Correlation id</label>
+                <input id="readCorrelation" name="correlationId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-secondary">Read consumers</button>
+            </div>
+        </form>
+        <form method="post" asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
+            <div class="col-12 col-md-8">
+                <label class="form-label" for="stopCorrelation">Correlation id</label>
+                <input id="stopCorrelation" name="correlationId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12 col-md-4">
+                <button type="submit" class="btn btn-outline-danger">Stop consumers</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ReadNote) || Model.Topics.Count > 0)
+{
+    <div class="au-card card mb-3">
+        <div class="card-header">Consumer read</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.ReadNote))
+            {
+                <p>@Model.ReadNote</p>
+            }
+            @if (Model.Topics.Count == 0)
+            {
+                <p class="mb-0">No events.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Topic</th>
+                                <th scope="col">Correlation</th>
+                                <th scope="col">Patient</th>
+                                <th scope="col">Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var topic in Model.Topics)
+                        {
+                            if (topic.Events.Count == 0)
+                            {
+                                <tr>
+                                    <td>@topic.Topic</td>
+                                    <td colspan="3">No events</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var item in topic.Events)
+                                {
+                                    <tr>
+                                        <td>@topic.Topic</td>
+                                        <td class="text-break">@(string.IsNullOrWhiteSpace(item.CorrelationId) ? "—" : item.CorrelationId)</td>
+                                        <td class="text-break">@(string.IsNullOrWhiteSpace(item.PatientId) ? "—" : item.PatientId)</td>
+                                        <td class="text-break">@(string.IsNullOrWhiteSpace(item.Error) ? "—" : item.Error)</td>
+                                    </tr>
+                                }
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
 
 @if (!Model.Configured)
 {
@@ -97,5 +187,100 @@
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces.</p>
+    </div>
+</div>
+
+<div class="au-card card mb-3 mt-3">
+    <div class="card-header">Patient event</div>
+    <div class="card-body">
+        <form method="post" asp-action="PostPatientEvent" class="row g-2" onsubmit="return confirm('Post this patient event?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="eventFacilityId">Facility</label>
+                <input id="eventFacilityId" name="facilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="eventPatientId">Patient id</label>
+                <input id="eventPatientId" name="patientId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="eventType">Event type</label>
+                <select id="eventType" name="eventType" class="form-select">
+                    <option value="">Choose</option>
+                    @foreach (var eventType in SystemRules.PatientEventTypes)
+                    {
+                        <option value="@eventType">@eventType</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Post patient event</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Data acquisition requested</div>
+    <div class="card-body">
+        <form method="post" asp-action="PostDataAcquisition" class="row g-2" onsubmit="return confirm('Post this data-acquisition-requested event?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="acquisitionFacilityId">Facility</label>
+                <input id="acquisitionFacilityId" name="facilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="acquisitionPatientId">Patient id</label>
+                <input id="acquisitionPatientId" name="patientId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="queryType">Query type</label>
+                <select id="queryType" name="queryType" class="form-select">
+                    <option value="">Choose</option>
+                    @foreach (var queryType in SystemRules.QueryTypes)
+                    {
+                        <option value="@queryType">@queryType</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="acquisitionReportTypes">Report types</label>
+                <input id="acquisitionReportTypes" name="reportTypes" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="acquisitionStart">Start date</label>
+                <input id="acquisitionStart" name="startDate" type="date" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="acquisitionEnd">End date</label>
+                <input id="acquisitionEnd" name="endDate" type="date" class="form-control" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Post data acquisition</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">The start date has to be in the past and before the end date. Report types are separated by commas.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Patient acquired</div>
+    <div class="card-body">
+        <form method="post" asp-action="PostPatientAcquired" class="row g-2" onsubmit="return confirm('Post this patient-acquired event?');">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="acquiredFacilityId">Facility</label>
+                <input id="acquiredFacilityId" name="facilityId" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="acquiredPatientIds">Patient ids</label>
+                <input id="acquiredPatientIds" name="patientIds" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="acquiredTrackingId">Tracking id</label>
+                <input id="acquiredTrackingId" name="reportTrackingId" class="form-control" maxlength="64" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-au-action">Post patient acquired</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Patient ids are separated by commas or spaces. A blank tracking id is filled in.</p>
     </div>
 </div>

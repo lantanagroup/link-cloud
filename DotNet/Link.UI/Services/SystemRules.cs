@@ -7,8 +7,8 @@ using Link.UI.Models;
 namespace Link.UI.Services;
 
 /// <summary>
-/// Checks for the system pages. Account writes keep claims that were already stored.
-/// Restore and claim assignment are not part of these checks.
+/// Checks for the system pages. A profile save keeps claims that were already stored.
+/// Claim assignment is a separate check against the claims the Account service listed.
 /// </summary>
 public static class SystemRules
 {
@@ -31,6 +31,8 @@ public static class SystemRules
     public static readonly string[] Frequencies = ["Discharge", "Daily", "Weekly", "Monthly", "Adhoc"];
     public static readonly string[] ListTypes = ["Admit", "Discharge"];
     public static readonly string[] TimeFrames = ["LessThan24Hours", "Between24To48Hours", "MoreThan48Hours"];
+    public static readonly string[] PatientEventTypes = ["Admission", "Discharge"];
+    public static readonly string[] QueryTypes = ["Initial", "Supplemental"];
 
     private static readonly string[] AddressLabels =
     [
@@ -368,6 +370,176 @@ public static class SystemRules
         return null;
     }
 
+    public static string? CheckClaims(
+        IEnumerable<string>? posted,
+        IReadOnlyCollection<string> allowed,
+        out IReadOnlyList<string> claims)
+    {
+        claims = Array.Empty<string>();
+        if (allowed.Count == 0)
+            return "No assignable claims were returned, so claims were not changed.";
+
+        var known = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in allowed)
+        {
+            var trimmed = name?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+                continue;
+            known.TryAdd(trimmed, trimmed);
+        }
+
+        var selected = new List<string>();
+        foreach (var claim in posted ?? Array.Empty<string>())
+        {
+            var trimmed = claim?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+                continue;
+            if (!known.TryGetValue(trimmed, out var canonical))
+                return "Each claim must be one the Account service lists.";
+            if (selected.Contains(canonical, StringComparer.Ordinal))
+                continue;
+            if (selected.Count >= 40)
+                return "At most 40 claims can be assigned.";
+            selected.Add(canonical);
+        }
+
+        claims = selected;
+        return null;
+    }
+
+    public static string? CheckCorrelation(string? value, bool generate, out Guid correlation)
+    {
+        correlation = Guid.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (!generate)
+                return "Correlation id is required.";
+            correlation = Guid.NewGuid();
+            return null;
+        }
+
+        if (!Guid.TryParse(value.Trim(), out correlation) || correlation == Guid.Empty)
+            return "Correlation id must be a GUID.";
+        return null;
+    }
+
+    public static string? CheckPatientEvent(PatientEventForm? form, bool numericOnly, out PatientEventRequest? request)
+    {
+        form ??= new PatientEventForm();
+        request = null;
+        var facilityError = ConfigurationRules.CheckFacility(form.FacilityId, numericOnly, required: true, out var facility);
+        if (facilityError is not null)
+            return facilityError;
+        var patientError = RequiredToken(form.PatientId, "Patient id", out var patient);
+        if (patientError is not null)
+            return patientError;
+        var eventType = form.EventType?.Trim() ?? "";
+        if (!PatientEventTypes.Contains(eventType, StringComparer.Ordinal))
+            return "Event type must be Admission or Discharge.";
+        request = new PatientEventRequest { FacilityId = facility ?? "", PatientId = patient, EventType = eventType };
+        return null;
+    }
+
+    public static string? CheckDataAcquisition(
+        DataAcquisitionForm? form,
+        bool numericOnly,
+        DateTime utcNow,
+        out DataAcquisitionRequest? request)
+    {
+        form ??= new DataAcquisitionForm();
+        request = null;
+        var facilityError = ConfigurationRules.CheckFacility(form.FacilityId, numericOnly, required: true, out var facility);
+        if (facilityError is not null)
+            return facilityError;
+        var patientError = RequiredToken(form.PatientId, "Patient id", out var patient);
+        if (patientError is not null)
+            return patientError;
+        var queryType = form.QueryType?.Trim() ?? "";
+        if (!QueryTypes.Contains(queryType, StringComparer.Ordinal))
+            return "Query type must be Initial or Supplemental.";
+        var typesError = SplitTokens(form.ReportTypes, "report type", MaxReportTypes, out var types);
+        if (typesError is not null)
+            return typesError;
+        if (types.Count == 0)
+            return "Enter at least one report type.";
+        if (!TryDay(form.StartDate, out var start))
+            return "Start date must be a calendar date.";
+        if (!TryDay(form.EndDate, out var end))
+            return "End date must be a calendar date.";
+        if (start >= utcNow)
+            return "Start date must be in the past.";
+        if (start >= end)
+            return "Start date must be before the end date.";
+        request = new DataAcquisitionRequest
+        {
+            FacilityId = facility ?? "",
+            PatientId = patient,
+            QueryType = queryType,
+            ReportTypes = types,
+            StartDateUtc = start,
+            EndDateUtc = end
+        };
+        return null;
+    }
+
+    public static string? CheckPatientAcquired(PatientAcquiredForm? form, bool numericOnly, out PatientAcquiredRequest? request)
+    {
+        form ??= new PatientAcquiredForm();
+        request = null;
+        var facilityError = ConfigurationRules.CheckFacility(form.FacilityId, numericOnly, required: true, out var facility);
+        if (facilityError is not null)
+            return facilityError;
+        var patientsError = SplitTokens(form.PatientIds, "patient id", MaxPatients, out var patients);
+        if (patientsError is not null)
+            return patientsError;
+        if (patients.Count == 0)
+            return "Enter at least one patient id.";
+        var trackingError = CheckTrackingId(form.ReportTrackingId, out var tracking);
+        if (trackingError is not null)
+            return trackingError;
+        request = new PatientAcquiredRequest
+        {
+            FacilityId = facility ?? "",
+            PatientIds = patients,
+            ReportTrackingId = tracking
+        };
+        return null;
+    }
+
+    public static string? ReadConsumers(string? json, out IReadOnlyList<ConsumerTopicRow> topics)
+    {
+        topics = Array.Empty<ConsumerTopicRow>();
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return "Consumer read was not a list of topics.";
+            var parsed = new List<ConsumerTopicRow>();
+            var shown = 0;
+            foreach (var topic in document.RootElement.EnumerateObject())
+            {
+                if (parsed.Count >= MaxRows)
+                    break;
+                var events = new List<ConsumerEventRow>();
+                var raw = topic.Value.ValueKind == JsonValueKind.String
+                    ? topic.Value.GetString()
+                    : topic.Value.GetRawText();
+                if (!string.IsNullOrWhiteSpace(raw))
+                    ReadConsumerEvents(raw, events, ref shown);
+                parsed.Add(new ConsumerTopicRow { Topic = Trim(topic.Name, ConfigurationRules.MaxText), Events = events });
+            }
+
+            topics = parsed;
+            return null;
+        }
+        catch (JsonException)
+        {
+            return "Consumer read was not valid JSON.";
+        }
+    }
+
     public static string FormatDuration(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -428,6 +600,51 @@ public static class SystemRules
 
         roles = selected;
         return null;
+    }
+
+    private static bool TryDay(string? value, out DateTime day)
+    {
+        day = default;
+        if (!DateTime.TryParseExact(value?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+            return false;
+        day = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+        return true;
+    }
+
+    private static void ReadConsumerEvents(string raw, List<ConsumerEventRow> events, ref int shown)
+    {
+        if (shown >= MaxRows)
+            return;
+        try
+        {
+            using var document = JsonDocument.Parse(raw);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                events.Add(new ConsumerEventRow { Error = Trim(raw, 180) });
+                shown++;
+                return;
+            }
+
+            foreach (var item in document.RootElement.EnumerateArray())
+            {
+                if (shown >= MaxRows)
+                    return;
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                events.Add(new ConsumerEventRow
+                {
+                    CorrelationId = Trim(ReadEither(item, "correlationId", "CorrelationId"), 64),
+                    PatientId = Trim(ReadEither(item, "patientId", "PatientId"), ConfigurationRules.MaxText),
+                    Error = Trim(ReadEither(item, "errorMessage", "ErrorMessage"), 180)
+                });
+                shown++;
+            }
+        }
+        catch (JsonException)
+        {
+            events.Add(new ConsumerEventRow { Error = Trim(raw, 180) });
+            shown++;
+        }
     }
 
     private static string? CheckTrackingId(string? value, out Guid? tracking)
@@ -493,6 +710,12 @@ public static class SystemRules
         }
 
         return rows;
+    }
+
+    private static string ReadEither(JsonElement item, string camel, string pascal)
+    {
+        var value = ReadString(item, camel);
+        return value.Length > 0 ? value : ReadString(item, pascal);
     }
 
     private static string ReadString(JsonElement item, string name)

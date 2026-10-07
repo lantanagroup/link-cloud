@@ -99,4 +99,72 @@ public sealed class AdminBffIntegrationClient : LinkApiClientBase, IAdminBffInte
         return SendAsync(() => Request("/integration/patient-list-acquired")
             .PostJsonAsync(body, cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse> CreatePatientEventAsync(
+        string facilityId,
+        string patientId,
+        string eventType,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new { key = facilityId, patientId, eventType };
+        return SendAsync(() => Request("/integration/patient-event")
+            .PostJsonAsync(body, cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse> CreateDataAcquisitionRequestedAsync(
+        string facilityId,
+        string patientId,
+        string queryType,
+        IReadOnlyList<string> reportTypes,
+        DateTime startDateUtc,
+        DateTime endDateUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            key = facilityId,
+            patientId,
+            queryType,
+            scheduledReports = new[]
+            {
+                new
+                {
+                    reportTypes,
+                    startDate = DateTime.SpecifyKind(startDateUtc, DateTimeKind.Utc),
+                    endDate = DateTime.SpecifyKind(endDateUtc, DateTimeKind.Utc)
+                }
+            }
+        };
+        return SendAsync(() => Request("/integration/data-acquisition-requested")
+            .PostJsonAsync(body, cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse> CreatePatientAcquiredAsync(
+        string facilityId,
+        IReadOnlyList<string> patientIds,
+        string reportTrackingId,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new { facilityId, patientIds, reportTrackingId };
+        return SendAsync(() => Request("/integration/patient-acquired")
+            .PostJsonAsync(body, cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse> StartConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("/integration/start-consumers")
+            .PostJsonAsync(new { correlationId }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> ReadConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("/integration/read-consumers")
+            .PostJsonAsync(new { correlationId }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> StopConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("/integration/stop-consumers")
+            .PostJsonAsync(new { correlationId }, cancellationToken: cancellationToken));
 }
