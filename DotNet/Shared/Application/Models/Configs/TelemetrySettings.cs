@@ -64,5 +64,11 @@
         /// Prometheus query base URL for run-end snapshots. Empty = skip Prom enrichment.
         /// </summary>
         public string? PrometheusQueryEndpoint { get; set; }
+
+        /// <summary>
+        /// The environment this process runs in, sent as the <c>deployment.environment.name</c> resource
+        /// attribute. Empty leaves the attribute off.
+        /// </summary>
+        public string? DeploymentEnvironment { get; set; }
     }
 }

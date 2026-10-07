@@ -1,0 +1,11 @@
+apiVersion: 1
+providers:
+  # Loads every dashboard committed under /dashboards. Edits made in the UI are kept until Grafana
+  # restarts; export the JSON back into /dashboards to keep them.
+  - name: link
+    folder: Link
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
