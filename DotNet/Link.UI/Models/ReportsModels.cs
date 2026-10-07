@@ -14,8 +14,39 @@ public sealed class ReportsListQuery
     public bool ShowDeleted { get; set; }
     public string? SortBy { get; set; }
     public string? SortDir { get; set; }
+    public string? Scope { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = FacilityViewRules.DefaultPageSize;
+
+    public ReportsListQuery WithFacility(string facilityId, int page, int pageSize) => new()
+    {
+        FacilityId = facilityId,
+        ReportId = ReportId,
+        Status = Status,
+        Frequency = Frequency,
+        Created = Created,
+        PeriodFrom = PeriodFrom,
+        PeriodTo = PeriodTo,
+        ShowDeleted = ShowDeleted,
+        SortBy = SortBy,
+        SortDir = SortDir,
+        Scope = Scope,
+        Page = page,
+        PageSize = pageSize
+    };
+
+    public string AutomationFingerprint() => string.Join('\u001f', new[]
+    {
+        ReportId,
+        Frequency,
+        Created,
+        PeriodFrom,
+        PeriodTo,
+        ShowDeleted ? "1" : "0",
+        Status is null ? "" : string.Join(',', Status),
+        SortBy,
+        SortDir
+    });
 
     public Dictionary<string, string> ToRoute(int? page = null, string? sortBy = null, string? sortDir = null)
     {
@@ -30,6 +61,8 @@ public sealed class ReportsListQuery
         Add(route, "periodTo", PeriodTo);
         if (ShowDeleted)
             route["showDeleted"] = "true";
+        if (AutomationMarkRules.IsAutomation(Scope))
+            route["scope"] = AutomationMarkRules.Automation;
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
 
@@ -59,6 +92,7 @@ public sealed class ReportsListModel
     public IReadOnlyList<FacilityReportRow> Reports { get; set; } = [];
     public string SortBy { get; set; } = "CreateDate";
     public string SortDir { get; set; } = "desc";
+    public string? ScopeNote { get; set; }
 }
 
 public sealed class GenerateReportInput

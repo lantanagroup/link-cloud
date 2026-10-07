@@ -92,6 +92,9 @@
                     }
                 </select>
             </div>
+            <div class="col-6 col-md-3">
+                <partial name="_AutomationScope" model="query.Scope" />
+            </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-action">Search</button>
                 <a class="btn btn-outline-secondary" asp-action="Audit">Clear</a>
@@ -102,6 +105,10 @@
 
 <p class="lu-live-label mt-3 mb-2">This list updates on its own.</p>
 <div id="auditResults" data-au-refresh="15000">
+@if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
+{
+    <p class="small text-muted mt-3">@Model.ScopeNote</p>
+}
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning mt-3">@Model.LoadError</div>
@@ -113,7 +120,7 @@ else
         <div class="card-body">
             @if (Model.Events.Count == 0)
             {
-                <p class="au-empty mb-0">No audit events found.</p>
+                <p class="au-empty mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation audit events." : "No audit events found.")</p>
             }
             else
             {
@@ -143,7 +150,10 @@ else
                                         @row.When
                                     }
                                 </td>
-                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                <td>
+                                    <code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code>
+                                    <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                </td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Service) ? "—" : row.Service)</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Action) ? "—" : row.Action)</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.User) ? "—" : row.User)</td>

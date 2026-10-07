@@ -9,17 +9,49 @@ public sealed class ReportsController : Controller
 {
     private readonly ReportsService _reports;
     private readonly FacilityViewService _view;
+    private readonly AutomationOwnershipLookup _ownership;
 
-    public ReportsController(ReportsService reports, FacilityViewService view)
+    public ReportsController(ReportsService reports, FacilityViewService view, AutomationOwnershipLookup ownership)
     {
         _reports = reports;
         _view = view;
+        _ownership = ownership;
     }
 
     [HttpGet]
     public async Task<IActionResult> Index(ReportsListQuery query, CancellationToken cancellationToken)
     {
-        var page = await _reports.LoadListAsync(query, cancellationToken);
+        query ??= new ReportsListQuery();
+        query.Scope = AutomationMarkRules.NormalizeScope(query.Scope);
+        var ownership = await _ownership.GetAsync(cancellationToken);
+        var facility = string.IsNullOrWhiteSpace(query.FacilityId) ? null : query.FacilityId.Trim();
+        ReportsListModel page;
+        if (!AutomationMarkRules.IsAutomation(query.Scope))
+        {
+            page = await _reports.LoadListAsync(query, cancellationToken);
+        }
+        else if (facility is not null && !ownership.Contains(facility))
+        {
+            page = new ReportsListModel
+            {
+                Query = query,
+                ScopeNote = AutomationMarkRules.NotOwnedNote,
+                Paging = new PageBar { Page = 1, PageSize = FacilityViewRules.ClampPageSize(query.PageSize) }
+            };
+        }
+        else if (facility is null)
+        {
+            var ids = ownership.NewestFacilityIds(AutomationMarkRules.MaxFacilitySearches, out var truncated);
+            page = await _reports.LoadForFacilitiesAsync(query, ids, truncated, cancellationToken);
+        }
+        else
+        {
+            page = await _reports.LoadListAsync(query, cancellationToken);
+        }
+
+        foreach (var report in page.Reports)
+            report.AutomationRunId = ownership.RunIdFor(report.FacilityId);
+
         ViewData["Title"] = "Reports";
         return View(page);
     }

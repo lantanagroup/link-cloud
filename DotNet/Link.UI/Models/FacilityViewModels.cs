@@ -218,6 +218,7 @@ public sealed class FacilityReportRow
     public bool CanCleanUp { get; init; }
     public bool CanRestore { get; init; }
     public bool CanDownload { get; init; }
+    public string? AutomationRunId { get; set; }
 }
 
 public sealed class LocationRow

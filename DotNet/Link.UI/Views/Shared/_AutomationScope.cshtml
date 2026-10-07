@@ -1,0 +1,18 @@
+@model string?
+@using Link.UI.Services
+@{
+    var automation = AutomationMarkRules.IsAutomation(Model);
+}
+<label class="form-label" for="automationScope">Show</label>
+<select id="automationScope" name="scope" class="form-select">
+    @if (automation)
+    {
+        <option value="all">All</option>
+        <option value="automation" selected>Automation</option>
+    }
+    else
+    {
+        <option value="all" selected>All</option>
+        <option value="automation">Automation</option>
+    }
+</select>

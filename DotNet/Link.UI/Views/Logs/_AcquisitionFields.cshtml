@@ -20,6 +20,10 @@
 {
     <input type="hidden" name="cancellableOnly" value="true" />
 }
+@if (Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope))
+{
+    <input type="hidden" name="scope" value="automation" />
+}
 @if (Model.Status is not null)
 {
     foreach (var status in Model.Status)

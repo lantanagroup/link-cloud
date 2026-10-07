@@ -50,6 +50,7 @@ builder.Services.AddScoped(SystemService.Create);
 builder.Services.AddSingleton(sp => AutomationRunReader.Create(
     sp.GetRequiredService<IConfiguration>(),
     sp.GetRequiredService<ILogger<AutomationRunReader>>()));
+builder.Services.AddSingleton<AutomationOwnershipLookup>();
 
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 

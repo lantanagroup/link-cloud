@@ -24,6 +24,19 @@ public sealed class AutomationRunReader
 
     private const string CollectionName = "automation_runs";
 
+    private static readonly ProjectionDefinition<OwnershipRunDocument> OwnershipProjection =
+        Builders<OwnershipRunDocument>.Projection
+            .Include(row => row.RunId)
+            .Include(row => row.FacilityId)
+            .Include(row => row.AutomationCreatedFacility)
+            .Include(row => row.CreatedAt);
+
+    private static readonly ProjectionDefinition<OwnershipTombstoneDocument> TombstoneProjection =
+        Builders<OwnershipTombstoneDocument>.Projection
+            .Include(row => row.FacilityId)
+            .Include(row => row.RunId)
+            .Include(row => row.CreatedAt);
+
     private static readonly ProjectionDefinition<AutomationRunDocument> SummaryProjection =
         Builders<AutomationRunDocument>.Projection
             .Include(row => row.RunId)
@@ -333,6 +346,56 @@ public sealed class AutomationRunReader
             SortDir = AutomationRules.SortDir(descending)
         };
 
+    public async Task<AutomationOwnershipLoad> LoadOwnershipAsync(CancellationToken cancellationToken)
+    {
+        if (_runs is null)
+            return new AutomationOwnershipLoad();
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            var token = timeout.Token;
+            var runs = await _runs.Database
+                .GetCollection<OwnershipRunDocument>(CollectionName)
+                .Find(FilterDefinition<OwnershipRunDocument>.Empty, new FindOptions { MaxTime = TimeSpan.FromSeconds(8) })
+                .Project<OwnershipRunDocument>(OwnershipProjection)
+                .ToListAsync(token);
+            var tombstones = await _runs.Database
+                .GetCollection<OwnershipTombstoneDocument>("automation_owned_facility_tombstones")
+                .Find(FilterDefinition<OwnershipTombstoneDocument>.Empty, new FindOptions { MaxTime = TimeSpan.FromSeconds(8) })
+                .Project<OwnershipTombstoneDocument>(TombstoneProjection)
+                .ToListAsync(token);
+
+            return new AutomationOwnershipLoad
+            {
+                Reachable = true,
+                Runs = runs
+                    .Select(row => new AutomationRunMark(row.RunId, row.FacilityId, row.AutomationCreatedFacility, row.CreatedAt))
+                    .ToList(),
+                Tombstones = tombstones
+                    .Select(row => new AutomationTombstoneMark(row.FacilityId, row.RunId, row.CreatedAt))
+                    .ToList()
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Automation ownership could not be read (timeout).");
+            return new AutomationOwnershipLoad();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Automation ownership could not be read ({ExceptionType}).",
+                ex.GetType().Name);
+            return new AutomationOwnershipLoad();
+        }
+    }
+
     private async Task<IReadOnlyList<AutomationRunRow>> LoadActiveAsync(CancellationToken cancellationToken)
     {
         var byFlag = await FindRowsAsync(
@@ -452,6 +515,33 @@ public sealed class AutomationRunReader
         public string? Duration { get; set; }
 
         public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    }
+
+    [BsonIgnoreExtraElements]
+    private sealed class OwnershipRunDocument
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.String)]
+        public Guid RunId { get; set; }
+
+        public string FacilityId { get; set; } = string.Empty;
+
+        public bool AutomationCreatedFacility { get; set; }
+
+        [BsonRepresentation(BsonType.DateTime)]
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    [BsonIgnoreExtraElements]
+    private sealed class OwnershipTombstoneDocument
+    {
+        [BsonId]
+        public string FacilityId { get; set; } = string.Empty;
+
+        public string RunId { get; set; } = string.Empty;
+
+        [BsonRepresentation(BsonType.DateTime)]
+        public DateTimeOffset CreatedAt { get; set; }
     }
 
     [BsonIgnoreExtraElements]
