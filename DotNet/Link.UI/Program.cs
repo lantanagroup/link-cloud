@@ -37,6 +37,7 @@ builder.Services.Configure<LinkUiFeatureOptions>(options =>
     options.NumericOnlyFacilityId = builder.Configuration.GetValue<bool>("FacilityIdSettings:NumericOnlyFacilityId");
 });
 builder.Services.AddScoped(FacilityHubService.Create);
+builder.Services.AddScoped(FacilityViewService.Create);
 
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 

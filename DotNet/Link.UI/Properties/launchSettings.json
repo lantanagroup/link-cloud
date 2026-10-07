@@ -36,6 +36,7 @@
         "ServiceRegistry__QueryDispatchServiceUrl": "http://localhost:8071",
         "ServiceRegistry__DataAcquisitionServiceUrl": "http://localhost:8065",
         "ServiceRegistry__NormalizationServiceUrl": "http://localhost:8068",
+        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
         "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063"
       }
     }

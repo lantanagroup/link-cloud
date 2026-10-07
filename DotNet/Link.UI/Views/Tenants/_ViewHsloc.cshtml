@@ -1,0 +1,61 @@
+@model FacilityViewModel
+@{
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["Hsloc"] = Model.Query.Hsloc;
+}
+
+<div class="au-card card">
+    <div class="card-header">HSLOC locations</div>
+    <div class="card-body">
+        @if (Model.LocationTree.Count == 0)
+        {
+            <p class="mb-0">No locations found.</p>
+        }
+        else
+        {
+            <div class="lu-hsloc">
+                <div>
+                    <partial name="_ViewHslocNodes" model="Model.LocationTree" />
+                </div>
+                <aside class="lu-hsloc-detail" aria-live="polite">
+                    @if (Model.SelectedLocation is { } location)
+                    {
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <h2 class="h6 mb-1">@(string.IsNullOrWhiteSpace(location.Name) ? location.LocationId : location.Name)</h2>
+                            <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="hsloc">Close</a>
+                        </div>
+                        <p class="small text-muted mb-2">Local code mappings (@location.Mappings.Count)</p>
+                        @if (location.Mappings.Count == 0)
+                        {
+                            <p class="mb-0">No local code mappings.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead>
+                                        <tr><th>Code system</th><th>Local code</th><th>HSLOC</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach (var mapping in location.Mappings)
+                                    {
+                                        <tr>
+                                            <td>@mapping.CodeSystem</td>
+                                            <td>@mapping.LocalCode</td>
+                                            <td>@mapping.Hsloc</td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">Choose a location to see its local code mappings.</p>
+                    }
+                </aside>
+            </div>
+        }
+    </div>
+</div>

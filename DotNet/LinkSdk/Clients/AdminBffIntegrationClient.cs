@@ -51,6 +51,9 @@ public sealed class AdminBffIntegrationClient : LinkApiClientBase, IAdminBffInte
     public Task<LinkApiResponse> DeleteAggregateReportAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/aggregate/reports/{reportScheduleId}").DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> AbortAggregateReportAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/aggregate/reports/{reportScheduleId}/abort").PostAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> RestoreAggregateReportAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"/aggregate/reports/{reportScheduleId}/restore").PatchAsync(cancellationToken: cancellationToken));
 

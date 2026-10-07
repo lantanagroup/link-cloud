@@ -1,0 +1,118 @@
+@model FacilityViewModel
+@using Link.UI.Services
+@{
+    Dictionary<string, string> PlanSort(string column)
+    {
+        var route = Model.Query.ToRoute(
+            page: 1,
+            sortDir: FacilityViewRules.NextSortDirection(Model.Query.PlanSort, Model.Query.PlanDir, column));
+        route["planSort"] = column;
+        route["planDir"] = FacilityViewRules.NextSortDirection(Model.Query.PlanSort, Model.Query.PlanDir, column);
+        route.Remove("sortBy");
+        route.Remove("sortDir");
+        return route;
+    }
+}
+
+<div class="au-card card">
+    <div class="card-header">Reporting plans</div>
+    <div class="card-body">
+        <p class="small text-muted">Every period DMRP recorded for this facility, including enrollments the facility later withdrew.</p>
+        @if (Model.Periods.Count > 0)
+        {
+            <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="section" value="plans" />
+                <div class="col-12 col-md-6 col-xl-3">
+                    <label class="form-label" for="measure">Measure</label>
+                    <input id="measure" name="measure" value="@Model.Query.Measure" class="form-control" />
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="dqm">dQM</label>
+                    <input id="dqm" name="dqm" value="@Model.Query.Dqm" class="form-control" />
+                </div>
+                <div class="col-12 col-md-4 col-xl-3">
+                    <label class="form-label" for="period">Reporting period</label>
+                    <select id="period" name="period" class="form-select">
+                        <option value="">All periods</option>
+                        @foreach (var period in Model.Periods)
+                        {
+                            if (string.Equals(Model.Query.Period, period.Key, StringComparison.Ordinal))
+                            {
+                                <option value="@period.Key" selected>@period.Label</option>
+                            }
+                            else
+                            {
+                                <option value="@period.Key">@period.Label</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="cadence">Cadence</label>
+                    <select id="cadence" name="cadence" class="form-select">
+                        <option value="">All</option>
+                        @foreach (var cadence in Model.Cadences)
+                        {
+                            if (string.Equals(Model.Query.Cadence, cadence, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@cadence" selected>@cadence</option>
+                            }
+                            else
+                            {
+                                <option value="@cadence">@cadence</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="reporting">Reporting</label>
+                    <select id="reporting" name="reporting" class="form-select">
+                        <option value="">All</option>
+                        <option value="true" selected="@(Model.Query.Reporting == "true" ? "selected" : null)">Reporting</option>
+                        <option value="false" selected="@(Model.Query.Reporting == "false" ? "selected" : null)">Not reporting</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-action">Search</button>
+                    <a class="btn btn-outline-secondary" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="plans">Clear</a>
+                </div>
+            </form>
+        }
+
+        @if (Model.Plans.Count == 0)
+        {
+            <p class="mb-0">No reporting plans found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@PlanSort("measure")">Measure</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@PlanSort("dqm")">dQM</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@PlanSort("frequency")">Cadence</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@PlanSort("period")">Period</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@PlanSort("isReporting")">Reporting</a></th>
+                            <th>Updated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var plan in Model.Plans)
+                    {
+                        <tr>
+                            <td>@plan.Measure</td>
+                            <td>@plan.Dqm</td>
+                            <td>@plan.Frequency</td>
+                            <td>@plan.Period</td>
+                            <td>@(plan.IsReporting ? "Reporting" : "Not reporting")</td>
+                            <td class="text-nowrap">@plan.Updated</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_ViewPager" model="Model" />
+        }
+    </div>
+</div>

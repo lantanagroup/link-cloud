@@ -1,0 +1,93 @@
+@model FacilityViewModel
+@using Link.UI.Services
+@{
+    Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
+}
+
+<div class="au-card card">
+    <div class="card-header">Organization locations</div>
+    <div class="card-body">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+            <input type="hidden" name="section" value="locations" />
+            <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label" for="locationId">Location ID</label>
+                <input id="locationId" name="locationId" value="@Model.Query.LocationId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label" for="locationName">Name</label>
+                <input id="locationName" name="locationName" value="@Model.Query.LocationName" class="form-control" />
+            </div>
+            <div class="col-12 col-md-6 col-xl-2">
+                <label class="form-label" for="locationAlias">Alias</label>
+                <input id="locationAlias" name="locationAlias" value="@Model.Query.LocationAlias" class="form-control" />
+            </div>
+            <div class="col-12 col-md-6 col-xl-2">
+                <label class="form-label" for="partOf">Part of</label>
+                <input id="partOf" name="partOf" value="@Model.Query.PartOf" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4 col-xl-2">
+                <label class="form-label" for="orgLocation">Org location</label>
+                <select id="orgLocation" name="orgLocation" class="form-select">
+                    <option value="">Any</option>
+                    <option value="true" selected="@(Model.Query.OrgLocation == "true" ? "selected" : null)">Yes</option>
+                    <option value="false" selected="@(Model.Query.OrgLocation == "false" ? "selected" : null)">No</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-check-label">
+                    <input class="form-check-input me-1" type="checkbox" name="showInactive" value="true" @(Model.Query.ShowInactive ? "checked" : null) />
+                    Show inactive
+                </label>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="locations">Clear</a>
+            </div>
+        </form>
+
+        @if (Model.Locations.Count == 0)
+        {
+            <p class="mb-0">No locations found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("LocationMappingId")">Mapping ID</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("LocationId")">Location ID</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("LocationName")">Name</a></th>
+                            <th>Alias</th>
+                            <th>Part of</th>
+                            <th>Org</th>
+                            <th>Active</th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("CreateDate")">Created</a></th>
+                            <th>Modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Locations)
+                    {
+                        <tr class="@(!row.IsActive ? "table-secondary" : null)">
+                            <td>@row.Id</td>
+                            <td><code class="lu-facility-id">@row.LocationId</code></td>
+                            <td>@row.Name</td>
+                            <td>@row.Alias</td>
+                            <td>@(string.IsNullOrWhiteSpace(row.PartOf) ? "—" : row.PartOf)</td>
+                            <td>@(row.IsOrg ? "Yes" : "No")</td>
+                            <td>@(row.IsActive ? "Yes" : "No")</td>
+                            <td class="text-nowrap">@row.Created</td>
+                            <td class="text-nowrap">@row.Modified</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_ViewPager" model="Model" />
+        }
+    </div>
+</div>
