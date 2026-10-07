@@ -94,6 +94,45 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Resubmit_is_a_solid_warning_button()
+    {
+        foreach (var relative in new[]
+        {
+            "DotNet/Link.UI/Views/Reports/Index.cshtml",
+            "DotNet/Link.UI/Views/Tenants/_ViewReports.cshtml"
+        })
+        {
+            var text = File.ReadAllText(RepoFile(relative));
+            text.Should().Contain("btn btn-sm btn-warning\">Resubmit");
+            text.Should().NotContain("btn-outline-primary\">Resubmit");
+        }
+    }
+
+    [Fact]
+    public void Facility_section_actions_live_on_the_header()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        js.Should().Contain("lu-section-action");
+        js.Should().Contain("\"+ Add\"");
+        js.Should().Contain("Staged for removal");
+        js.Should().NotContain("lu-section-empty");
+        js.Should().Contain("data-facility-swap");
+        var deleteAt = js.IndexOf("button.textContent = \"Delete\"", StringComparison.Ordinal);
+        deleteAt.Should().BeGreaterThan(-1);
+
+        var plan = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_FhirQueryEditor.cshtml"));
+        plan.Should().Contain("id=\"queryPlanType\"");
+        plan.Should().NotContain("asp-route-planType=\"@planType\"");
+
+        var normalization = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_NormalizationOperationEditor.cshtml"));
+        normalization.Should().Contain("data-facility-swap=\"normalizationPanel\"");
+
+        var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
+        css.Should().Contain("#facilityPanels > .accordion-item > .accordion-header");
+        css.Should().Contain(".btn-warning:hover");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
