@@ -25,7 +25,7 @@
     <div class="au-card card">
         <div class="card-header"><code>@form.Id</code></div>
         <div class="card-body">
-            <form method="post" asp-action="SaveCategory" class="row g-3">
+            <form method="post" data-au-save asp-action="SaveCategory" class="row g-3">
                 <input type="hidden" name="Id" value="@form.Id" />
                 <div class="col-12">
                     <label class="form-label" for="title">Title</label>
@@ -113,7 +113,7 @@
                                     <td>@rule.Summary</td>
                                     <td>@(rule.Inverted ? "Yes" : "No")</td>
                                     <td>
-                                        <form method="post" asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
+                                        <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
                                             <input type="hidden" name="id" value="@form.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                         </form>
@@ -125,7 +125,7 @@
                     </div>
                 }
 
-                <form method="post" asp-action="SaveRule" asp-route-id="@form.Id" class="row g-3">
+                <form method="post" data-au-save asp-action="SaveRule" asp-route-id="@form.Id" class="row g-3">
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="field">Field</label>
                         <select id="field" name="field" class="form-select">

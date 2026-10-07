@@ -30,7 +30,7 @@
         {
             <div class="alert alert-warning">@Model.FormError</div>
         }
-        <form method="post" asp-action="SaveConfiguration" class="row g-2">
+        <form method="post" data-au-save asp-action="SaveConfiguration" class="row g-2">
             <input type="hidden" name="Id" value="@form.Id" />
             <div class="col-12 col-md-4">
                 <label class="form-label" for="configFacility">Facility</label>
@@ -129,7 +129,7 @@ else
                                 <td>@(row.EmailEnabled ? "Yes" : "No")</td>
                                 <td class="text-nowrap">
                                     <a asp-all-route-data="@Route(bar.Page, row.Id)">Edit</a>
-                                    <form method="post" asp-action="DeleteConfiguration" class="d-inline" onsubmit="return confirm('Delete this notification configuration?');">
+                                    <form method="post" data-au-save asp-action="DeleteConfiguration" class="d-inline" onsubmit="return confirm('Delete this notification configuration?');">
                                         <input type="hidden" name="id" value="@row.Id" />
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                     </form>

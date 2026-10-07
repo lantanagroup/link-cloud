@@ -137,12 +137,19 @@
 <script>
     (function () {
 
-        // The shared editor fires this event after a successful save/clone/delete.
-        // On the Scenarios list page we reload so the table reflects the change.
-
-        document.addEventListener('scenario-editor:changed', function () {
-            location.reload();
-        });
+        // The shared editor fires this event after a successful save, clone, or delete.
+        // Refresh the list in place. The listener is installed once so a refresh can run this script again.
+        window.auOnScenarioChanged = function (ev) {
+            var action = ev.detail && ev.detail.action;
+            var message = action === 'cloned' ? 'Scenario cloned.' : action === 'deleted' ? 'Scenario deleted.' : 'Scenario saved.';
+            if (window.auRefreshPage) window.auRefreshPage(message);
+        };
+        if (!window.auScenarioListBound) {
+            window.auScenarioListBound = true;
+            document.addEventListener('scenario-editor:changed', function (ev) {
+                if (window.auOnScenarioChanged) window.auOnScenarioChanged(ev);
+            });
+        }
 
         // Open a scenario passed from Quick Launch directly in the editor.
         var editScenarioId = new URLSearchParams(window.location.search).get('editScenarioId');

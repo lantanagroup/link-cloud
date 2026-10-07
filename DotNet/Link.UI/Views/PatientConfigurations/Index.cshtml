@@ -202,14 +202,13 @@
     document.getElementById('btnPcClose').addEventListener('click', closeModal);
     document.getElementById('btnPcSave').addEventListener('click', function () {
         var model = editor.collect();
-        if (!model.name || !model.name.trim()) { showErr('Name is required.'); return; }
         fetch(saveUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
             body: JSON.stringify(model)
         }).then(function (r) {
             if (!r.ok) return r.text().then(function (t) { throw new Error(t || r.statusText); });
-            window.location.reload();
+            auRefreshPage();
         }).catch(function (e) { showErr(e.message); });
     });
     document.querySelectorAll('.btn-pc-open').forEach(function (btn) {
@@ -231,7 +230,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
                 body: JSON.stringify({ id: btn.dataset.id })
-            }).then(function () { window.location.reload(); });
+            }).then(function () { auRefreshPage('Cloned.'); });
         });
     });
     document.querySelectorAll('.btn-pc-delete').forEach(function (btn) {
@@ -241,7 +240,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token() },
                 body: JSON.stringify({ id: btn.dataset.id })
-            }).then(function () { window.location.reload(); });
+            }).then(function () { auRefreshPage('Deleted.'); });
         });
     });
 })();
