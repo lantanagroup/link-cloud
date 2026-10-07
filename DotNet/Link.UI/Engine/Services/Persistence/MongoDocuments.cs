@@ -32,6 +32,8 @@ public sealed class AutomationRunDocument
     public string? RunConfigurationJson { get; set; }
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }
+    /// <summary>Short note of what this run kept or removed.</summary>
+    public string? RetentionNotice { get; set; }
 
     // Store DateTimeOffset values as native BSON ISODate (UTC) so server-side range
     // queries and indexes work. The driver's default representation is a two-element

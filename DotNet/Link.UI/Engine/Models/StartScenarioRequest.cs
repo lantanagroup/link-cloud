@@ -34,12 +34,14 @@ public class StartScenarioRequest : IValidatableObject
     public string? RunConfigurationJson { get; set; }
 
     /// <summary>
-    /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
+    /// After a successful run, remove service data for a facility this run created.
+    /// Null keeps the scenario's stored setting. A failed or cancelled run keeps the data.
     /// </summary>
     public bool? CleanupServiceData { get; set; }
 
     /// <summary>
-    /// Expunge all data from the FHIR server after the run.
+    /// After a successful run, delete only the FHIR resources this run created.
+    /// Null keeps the scenario's stored setting. A failed or cancelled run keeps them.
     /// </summary>
     public bool? CleanupFhirData { get; set; }
 

@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
+using Link.UI.Services;
 
 namespace Automation.UI.Services.ApiHealth.Seeding;
 
@@ -91,14 +92,31 @@ public sealed class ApiHealthSeedOrchestrator(
         {
             if (session.Report is { FacilityId: { Length: > 0 } facilityId })
             {
-                try
+                var owned = false;
+                if (session.SeedRunId is Guid seedRunId)
                 {
-                    await facilityClient.DeleteAsync(facilityId, ct);
-                    logger.LogInformation("API Health seed cleanup removed facility {FacilityId}", facilityId);
+                    var run = await runManager.GetRunAsync(seedRunId, ct);
+                    owned = run != null && FacilityClassification.RunOwns(
+                        run.RunId, run.FacilityId, run.AutomationCreatedFacility, facilityId);
                 }
-                catch (Exception ex)
+
+                if (!owned)
                 {
-                    logger.LogWarning(ex, "API Health seed cleanup failed for facility {FacilityId}", facilityId);
+                    logger.LogInformation(
+                        "API Health seed cleanup left facility {FacilityId} alone. The seed run does not own it.",
+                        facilityId);
+                }
+                else
+                {
+                    try
+                    {
+                        await facilityClient.DeleteAsync(facilityId, ct);
+                        logger.LogInformation("API Health seed cleanup removed facility {FacilityId}", facilityId);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "API Health seed cleanup failed for facility {FacilityId}", facilityId);
+                    }
                 }
             }
         }
@@ -138,6 +156,10 @@ public sealed class ApiHealthSeedOrchestrator(
             }
 
             var startRequest = StartScenarioRequest.FromScenario(scenario);
+            // Suites still read this facility. The stored scenario keeps service cleanup on
+            // for a direct run. This start turns it off, and EndAsync removes the facility
+            // after the suites when this run created it.
+            startRequest.CleanupServiceData = false;
             var runId = await runManager.StartAsync(startRequest, ct);
 
             if (apiHealthRunId.HasValue)
