@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using Automation.UI.Services;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -1172,6 +1173,84 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
 
         return builder.ToString();
+    }
+
+    public async Task<RunLogPage> GetLogPageAsync(Guid runId, int pageNumber, int pageSize, CancellationToken ct = default)
+    {
+        var size = RunLogPaging.NormalizePageSize(pageSize);
+        var legacy = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
+        var metas = await _logs.Find(CreateLogChunkFilter(runId))
+            .Project<LogChunkMeta>(Builders<RunLogDocument>.Projection
+                .Include(l => l.Id)
+                .Include(l => l.ChunkNumber)
+                .Include(l => l.LineCount)
+                .Include(l => l.LineSequences))
+            .SortBy(l => l.Id)
+            .ToListAsync(ct);
+
+        var indexed = new List<RunLogPaging.SourceLine>();
+        var ordinal = 0;
+        var fallback = 0L;
+        if (legacy != null)
+        {
+            for (var i = 0; i < legacy.Lines.Count; i++)
+                indexed.Add(new RunLogPaging.SourceLine(fallback++, ordinal++, legacy.Id, i));
+        }
+
+        foreach (var chunk in metas)
+        {
+            var sequences = chunk.LineSequences ?? [];
+            var lineCount = Math.Max(chunk.LineCount, sequences.Count);
+            for (var i = 0; i < lineCount; i++)
+            {
+                if (i < sequences.Count)
+                {
+                    var sequence = sequences[i];
+                    indexed.Add(new RunLogPaging.SourceLine(sequence, ordinal++, chunk.Id, i));
+                    if (fallback <= sequence)
+                        fallback = sequence + 1;
+                }
+                else
+                {
+                    indexed.Add(new RunLogPaging.SourceLine(fallback++, ordinal++, chunk.Id, i));
+                }
+            }
+        }
+
+        var selected = RunLogPaging.Select(indexed, pageNumber, size);
+        var lines = new string[selected.Items.Count];
+        foreach (var group in selected.Items.Select((item, index) => (item, index)).GroupBy(pair => pair.item.SourceId))
+        {
+            RunLogDocument? doc = legacy != null && group.Key == legacy.Id
+                ? legacy
+                : await _logs.Find(l => l.Id == group.Key).FirstOrDefaultAsync(ct);
+            if (doc == null)
+                continue;
+
+            foreach (var (item, index) in group)
+            {
+                if (item.LineIndex >= 0 && item.LineIndex < doc.Lines.Count)
+                    lines[index] = doc.Lines[item.LineIndex];
+            }
+        }
+
+        return new RunLogPage(
+            lines.Select(line => line ?? string.Empty).ToList(),
+            selected.PageNumber,
+            size,
+            indexed.Count,
+            selected.TotalPages);
+    }
+
+    private sealed class LogChunkMeta
+    {
+        public string Id { get; set; } = string.Empty;
+
+        public int ChunkNumber { get; set; }
+
+        public int LineCount { get; set; }
+
+        public List<long>? LineSequences { get; set; }
     }
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
