@@ -101,23 +101,120 @@
         }
     }
 
-    function applyPage(html, url) {
-        var doc = new DOMParser().parseFromString(html, "text/html");
+    function skipScript(src) {
+        return src.indexOf("jquery") >= 0
+            || src.indexOf("bootstrap") >= 0
+            || src.indexOf("live-region") >= 0
+            || src.indexOf("au-data-table") >= 0;
+    }
+
+    function activateScripts(root) {
+        var scripts = Array.prototype.slice.call(root.querySelectorAll("script"));
+        var chain = Promise.resolve();
+        scripts.forEach(function (old) {
+            var src = old.getAttribute("src") || "";
+            if (skipScript(src)) {
+                old.remove();
+                return;
+            }
+            chain = chain.then(function () {
+                return new Promise(function (resolve) {
+                    var fresh = document.createElement("script");
+                    if (src) {
+                        fresh.src = src;
+                        fresh.onload = resolve;
+                        fresh.onerror = resolve;
+                        old.replaceWith(fresh);
+                    } else {
+                        fresh.textContent = old.textContent;
+                        old.replaceWith(fresh);
+                        resolve();
+                    }
+                });
+            });
+        });
+        return chain;
+    }
+
+    function rerunEditorScripts(doc) {
+        document.querySelectorAll("script[data-au-rerun]").forEach(function (node) { node.remove(); });
+        var scripts = Array.prototype.slice.call(doc.body.querySelectorAll("script"));
+        var chain = Promise.resolve();
+        scripts.forEach(function (old) {
+            if (old.closest(".lu-content")) return;
+            var src = old.getAttribute("src") || "";
+            var text = old.textContent || "";
+            if (skipScript(src)) return;
+            if (src.indexOf("configuration-deep-link") < 0
+                && text.indexOf("auRefreshPage") < 0
+                && text.indexOf("SaveInline") < 0)
+                return;
+            chain = chain.then(function () {
+                return new Promise(function (resolve) {
+                    var fresh = document.createElement("script");
+                    fresh.setAttribute("data-au-rerun", "1");
+                    if (src) {
+                        fresh.src = src;
+                        fresh.onload = resolve;
+                        fresh.onerror = resolve;
+                        document.body.appendChild(fresh);
+                    } else {
+                        fresh.textContent = text;
+                        document.body.appendChild(fresh);
+                        resolve();
+                    }
+                });
+            });
+        });
+        return chain;
+    }
+
+    function swapContent(doc, url, message, push) {
         var next = doc.querySelector(".lu-content");
         var current = document.querySelector(".lu-content");
         if (!next || !current) {
-            window.location.assign(url);
-            return;
+            if (url) window.location.assign(url);
+            return Promise.resolve();
         }
-        var success = next.querySelector(".alert-success");
-        var message = success ? success.textContent.trim() : "";
-        if (success) success.remove();
+        var y = window.scrollY;
         current.innerHTML = next.innerHTML;
-        if (url && url !== window.location.href) history.pushState(null, "", url);
+        window.scrollTo(0, y);
+        if (push && url && url !== window.location.href) history.pushState(null, "", url);
         if (message) showToast(message);
-        scanRefresh();
-        document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: "lu-content" } }));
+        return activateScripts(current).then(function () {
+            scanRefresh();
+            document.dispatchEvent(new CustomEvent("au-refreshed", { detail: { id: "lu-content" } }));
+        });
     }
+
+    function applyPage(html, url) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var next = doc.querySelector(".lu-content");
+        var message = "";
+        if (next) {
+            var success = next.querySelector(".alert-success");
+            message = success ? success.textContent.trim() : "";
+            if (success) success.remove();
+        }
+        return swapContent(doc, url, message, true);
+    }
+
+    window.auRefreshPage = function (message) {
+        return fetch(window.location.href, { headers: { "X-Requested-With": "fetch" } }).then(function (res) {
+            if (!res.ok) {
+                showToast("Could not refresh this page.");
+                return;
+            }
+            return res.text().then(function (html) {
+                var doc = new DOMParser().parseFromString(html, "text/html");
+                return swapContent(doc, null, message || "Saved.", false).then(function () {
+                    return rerunEditorScripts(doc);
+                });
+            });
+        }).catch(function () {
+            showToast("Could not refresh this page.");
+        });
+    };
 
     document.addEventListener("submit", function (event) {
         var form = event.target;

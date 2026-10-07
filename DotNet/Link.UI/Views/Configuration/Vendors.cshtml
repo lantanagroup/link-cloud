@@ -15,7 +15,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">New vendor</div>
     <div class="card-body">
-        <form method="post" asp-action="SaveVendor" class="row g-2 align-items-end">
+        <form method="post" data-au-save asp-action="SaveVendor" class="row g-2 align-items-end">
             <div class="col-12 col-md-4">
                 <label class="form-label" for="name">Name</label>
                 <input id="name" name="name" class="form-control" maxlength="255" required />
@@ -71,7 +71,7 @@
                             </td>
                             <td><a asp-action="Versions" asp-route-vendorId="@row.Id">Versions</a></td>
                             <td>
-                                <form method="post" asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
+                                <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                             </td>

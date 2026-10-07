@@ -61,7 +61,7 @@ else
                 }
                 @if (!query.ReadFailed)
                 {
-                    <form method="post" asp-action="SaveFhirQuery" asp-route-id="@Model.FacilityId" id="fhirQueryForm">
+                    <form method="post" data-au-save asp-action="SaveFhirQuery" asp-route-id="@Model.FacilityId" id="fhirQueryForm">
                         <input type="hidden" name="Exists" value="@(query.Exists ? "true" : "false")" />
                         <input type="hidden" name="Id" value="@query.Id" />
                         <div class="mb-3">
@@ -181,7 +181,7 @@ else
                     </form>
                     @if (query.Exists)
                     {
-                        <form method="post" asp-action="DeleteFhirQuery" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR query configuration?');">
+                        <form method="post" data-au-save asp-action="DeleteFhirQuery" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR query configuration?');">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete FHIR query</button>
                         </form>
                     }
@@ -212,7 +212,7 @@ else
                 }
                 @if (!list.ReadFailed)
                 {
-                    <form method="post" asp-action="SaveFhirList" asp-route-id="@Model.FacilityId">
+                    <form method="post" data-au-save asp-action="SaveFhirList" asp-route-id="@Model.FacilityId">
                         <input type="hidden" name="Exists" value="@(list.Exists ? "true" : "false")" />
                         <div class="mb-3">
                             <label class="form-label" for="fhirListBaseUrl">FHIR server base URL</label>
@@ -239,7 +239,7 @@ else
                     </form>
                     @if (list.Exists)
                     {
-                        <form method="post" asp-action="DeleteFhirList" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR list configuration?');">
+                        <form method="post" data-au-save asp-action="DeleteFhirList" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the FHIR list configuration?');">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete FHIR list</button>
                         </form>
                     }
@@ -292,7 +292,7 @@ else
                 </div>
                 @if (!plan.ReadFailed)
                 {
-                    <form method="post" asp-action="SaveQueryPlan" asp-route-id="@Model.FacilityId" id="queryPlanForm">
+                    <form method="post" data-au-save asp-action="SaveQueryPlan" asp-route-id="@Model.FacilityId" id="queryPlanForm">
                         <input type="hidden" name="Exists" value="@(plan.Exists ? "true" : "false")" />
                         <input type="hidden" name="Type" value="@plan.Type" />
                         <div class="row g-3">
@@ -414,7 +414,7 @@ else
                     </form>
                     @if (plan.Exists)
                     {
-                        <form method="post" asp-action="DeleteQueryPlan" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this query plan?');">
+                        <form method="post" data-au-save asp-action="DeleteQueryPlan" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this query plan?');">
                             <input type="hidden" name="type" value="@plan.Type" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete @plan.Type query plan</button>
                         </form>
@@ -467,7 +467,7 @@ else
                 }
                 @if (!org.ReadFailed)
                 {
-                    <form method="post" asp-action="SaveReportingOrg" asp-route-id="@Model.FacilityId" id="reportingOrgForm">
+                    <form method="post" data-au-save asp-action="SaveReportingOrg" asp-route-id="@Model.FacilityId" id="reportingOrgForm">
                         <input type="hidden" name="Exists" value="@(org.Exists ? "true" : "false")" />
                         <input type="hidden" name="ConfigId" value="@org.ConfigId" />
                         <div class="mb-3">
@@ -557,7 +557,7 @@ else
                     </form>
                     @if (org.Exists && org.ConfigId is int configId)
                     {
-                        <form method="post" asp-action="DeleteReportingOrg" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this reporting organization configuration?');">
+                        <form method="post" data-au-save asp-action="DeleteReportingOrg" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete this reporting organization configuration?');">
                             <input type="hidden" name="configId" value="@configId" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete reporting organization</button>
                         </form>
@@ -597,7 +597,7 @@ else
                     {
                         <p class="text-muted">Credentials are not saved.</p>
                     }
-                    <form method="post" asp-action="SaveSftp" asp-route-id="@Model.FacilityId" autocomplete="off">
+                    <form method="post" data-au-save asp-action="SaveSftp" asp-route-id="@Model.FacilityId" autocomplete="off">
                         <input type="hidden" name="Exists" value="@(sftp.Exists ? "true" : "false")" />
                         <input type="hidden" name="ConfigurationId" value="@sftp.ConfigurationId" />
                         <div class="row g-3">
@@ -687,22 +687,22 @@ else
                     @if (sftp.Exists)
                     {
                         <div class="d-flex flex-wrap gap-2 mt-2">
-                            <form method="post" asp-action="TestSavedSftp" asp-route-id="@Model.FacilityId">
+                            <form method="post" data-au-save asp-action="TestSavedSftp" asp-route-id="@Model.FacilityId">
                                 <button type="submit" class="btn btn-outline-secondary btn-sm">Test saved connection</button>
                             </form>
                             @if (sftp.CredentialsSaved == true)
                             {
-                                <form method="post" asp-action="DeleteSftpCredentials" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the saved SFTP credentials?');">
+                                <form method="post" data-au-save asp-action="DeleteSftpCredentials" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the saved SFTP credentials?');">
                                     <button type="submit" class="btn btn-outline-danger btn-sm">Delete credentials</button>
                                 </form>
                             }
-                            <form method="post" asp-action="DeleteSftp" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the SFTP configuration?');">
+                            <form method="post" data-au-save asp-action="DeleteSftp" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete the SFTP configuration?');">
                                 <input type="hidden" name="configurationId" value="@sftp.ConfigurationId" />
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete SFTP</button>
                             </form>
                         </div>
                     }
-                    <form method="post" asp-action="TestSftp" asp-route-id="@Model.FacilityId" class="mt-3" autocomplete="off">
+                    <form method="post" data-au-save asp-action="TestSftp" asp-route-id="@Model.FacilityId" class="mt-3" autocomplete="off">
                         <h3 class="h6">Test these details</h3>
                         <p class="form-text">This test uses the password you type and does not store it.</p>
                         <div class="row g-3">

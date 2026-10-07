@@ -308,7 +308,7 @@
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
                 body: JSON.stringify({ id: btn.getAttribute('data-id') })
             }).then(function (r) {
-                if (r.ok) location.reload();
+                if (r.ok) auRefreshPage('Cloned.');
                 else r.text().then(function (t) { alert(t || 'Clone failed'); });
             });
         });
@@ -322,7 +322,7 @@
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
                 body: JSON.stringify({ id: btn.getAttribute('data-id') })
             }).then(function (r) {
-                if (r.ok) location.reload();
+                if (r.ok) auRefreshPage('Deleted.');
                 else r.text().then(function (t) { alert(t || 'Delete failed'); });
             });
         });
@@ -346,7 +346,7 @@
             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
             body: JSON.stringify(body)
         }).then(function (r) {
-            if (r.ok) { location.reload(); return; }
+            if (r.ok) { auRefreshPage(); return; }
             return r.text().then(function (t) { showErrors(t || 'Save failed'); });
         });
     });

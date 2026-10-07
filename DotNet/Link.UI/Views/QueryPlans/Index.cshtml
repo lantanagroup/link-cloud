@@ -734,7 +734,7 @@
         if (!valid) return;
         try {
             await qpPostJson(saveUrl, model);
-            location.reload();
+            auRefreshPage();
         } catch (err) {
             showQpError('Save failed: ' + (err.message || 'Unknown error'));
         }
@@ -751,7 +751,7 @@
 
     document.querySelectorAll('.btn-qp-clone').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-            try { await qpPostJson(cloneUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            try { await qpPostJson(cloneUrl, { id: btn.getAttribute('data-id') }); auRefreshPage('Cloned.'); }
             catch (err) { showQpError('Clone failed: ' + (err.message || 'Unknown error')); openModal(); }
         });
     });
@@ -759,14 +759,14 @@
     document.querySelectorAll('.btn-qp-delete').forEach(function (btn) {
         btn.addEventListener('click', async function () {
             if (!confirm('Delete this query plan?')) return;
-            try { await qpPostJson(deleteUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            try { await qpPostJson(deleteUrl, { id: btn.getAttribute('data-id') }); auRefreshPage('Deleted.'); }
             catch (err) { showQpError('Delete failed: ' + (err.message || 'Unknown error')); openModal(); }
         });
     });
 
     document.querySelectorAll('.btn-qp-default').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-            try { await qpPostJson(setDefaultUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            try { await qpPostJson(setDefaultUrl, { id: btn.getAttribute('data-id') }); auRefreshPage(); }
             catch (err) { showQpError('Set default failed: ' + (err.message || 'Unknown error')); openModal(); }
         });
     });

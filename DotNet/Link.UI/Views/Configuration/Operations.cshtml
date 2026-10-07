@@ -198,7 +198,7 @@ else
                                     {
                                         <div class="d-flex flex-wrap gap-2">
                                             <a class="btn btn-outline-primary btn-sm" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor">Edit</a>
-                                            <form method="post" asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
+                                            <form method="post" data-au-save asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
                                                 @if (row.VendorVersionIds.Count > 0)
                                                 {

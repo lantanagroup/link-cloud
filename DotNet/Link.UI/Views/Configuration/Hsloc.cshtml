@@ -42,7 +42,7 @@
 <div class="au-card card mb-3">
     <div class="card-header">Replace a version</div>
     <div class="card-body">
-        <form method="post" asp-action="ReplaceHsloc" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Replace this HSLOC version with the uploaded CSV?');">
+        <form method="post" data-au-save asp-action="ReplaceHsloc" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Replace this HSLOC version with the uploaded CSV?');">
             <input type="hidden" name="text" value="@query.Text" />
             <input type="hidden" name="version" value="@query.Version" />
             <input type="hidden" name="page" value="@query.Page" />
@@ -104,7 +104,7 @@ else
                                 <td>@row.Version</td>
                                 <td>@(row.Active ? "Yes" : "No")</td>
                                 <td>
-                                    <form method="post" asp-action="DeleteHsloc" asp-route-id="@row.Id" onsubmit="return confirm('Delete this HSLOC code?');">
+                                    <form method="post" data-au-save asp-action="DeleteHsloc" asp-route-id="@row.Id" onsubmit="return confirm('Delete this HSLOC code?');">
                                         <input type="hidden" name="text" value="@query.Text" />
                                         <input type="hidden" name="version" value="@query.Version" />
                                         <input type="hidden" name="page" value="@bar.Page" />

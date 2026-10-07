@@ -52,7 +52,7 @@
     <div class="card-header">Save a bundle</div>
     <div class="card-body">
         <p class="text-muted">Upload a FHIR Bundle JSON file. Bundle.id is the measure id. The file must be 8 MB or smaller.</p>
-        <form method="post" asp-action="SaveMeasure" enctype="multipart/form-data" class="row g-2 align-items-end">
+        <form method="post" data-au-save asp-action="SaveMeasure" enctype="multipart/form-data" class="row g-2 align-items-end">
             <div class="col-12 col-md-8">
                 <label class="form-label" for="bundle">Bundle file</label>
                 <input id="bundle" name="bundle" type="file" accept=".json,application/json" class="form-control" required />

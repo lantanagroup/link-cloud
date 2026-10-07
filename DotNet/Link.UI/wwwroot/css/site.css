@@ -1539,8 +1539,10 @@ a.au-scenario-card:hover {
   margin: 0;
 }
 
-/* The shell title repeats a page that already has its own heading. */
-.lu-main:has(.lu-content h1) .lu-topbar {
+/* The shell title repeats a page that already has its own heading.
+   Configuration editors use h2.fw-bold, the same heading Automation uses. */
+.lu-main:has(.lu-content h1) .lu-topbar,
+.lu-main:has(.lu-content h2.fw-bold) .lu-topbar {
   display: none;
 }
 
@@ -1672,6 +1674,24 @@ a.au-scenario-card:hover {
   white-space: nowrap;
   overflow-wrap: normal;
 }
+/* Reports and the facility report tab. At 1280 the sidebar leaves about 970px.
+   Created is a low-value timestamp and was the nowrap column that forced
+   about 90px of horizontal scroll. Below the sidebar breakpoint the table
+   scrolls inside the card, same as the other dense tables. */
+@media (min-width: 768px) and (max-width: 1399.98px) {
+  #reportResults th:nth-child(4),
+  #reportResults td:nth-child(4),
+  #facilityReportResults th:nth-child(3),
+  #facilityReportResults td:nth-child(3) {
+    display: none;
+  }
+  #reportResults td:nth-child(5),
+  #facilityReportResults td:nth-child(4) {
+    overflow-wrap: anywhere;
+    max-width: 18rem;
+  }
+}
+
 #scenarioTable .badge {
   white-space: normal;
   text-align: left;
