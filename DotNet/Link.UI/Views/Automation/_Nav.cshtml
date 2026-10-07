@@ -6,7 +6,7 @@
     <a class="@Btn("runs")" asp-controller="Automation" asp-action="Index"><i class="bi bi-play-circle me-1"></i>Runs</a>
     <a class="@Btn("scenarios")" asp-controller="Scenarios" asp-action="Index"><i class="bi bi-collection me-1"></i>Scenarios</a>
     <a class="@Btn("configurations")" asp-controller="AutomationConfigurations" asp-action="Index"><i class="bi bi-sliders me-1"></i>Configurations</a>
-    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Metrics</span>
-    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">API health</span>
-    <span class="btn btn-sm btn-outline-secondary disabled" title="Later slice">Cleanup</span>
+    <a class="@Btn("metrics")" asp-controller="Metrics" asp-action="Index"><i class="bi bi-speedometer2 me-1"></i>Metrics</a>
+    <a class="@Btn("api-health")" asp-controller="ApiHealth" asp-action="Index"><i class="bi bi-heart-pulse me-1"></i>API health</a>
+    <a class="@Btn("cleanup")" asp-controller="Cleanup" asp-action="Index"><i class="bi bi-recycle me-1"></i>Cleanup</a>
 </nav>
