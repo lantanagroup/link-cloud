@@ -9,10 +9,28 @@
     }
 }
 
+@{
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "report";
+}
 <div class="mb-3 d-flex flex-wrap gap-3">
     <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
 </div>
 
+@if (TempData["Message"] is string saved)
+{
+    <div class="alert alert-success">@saved</div>
+}
+@if (TempData["Error"] is string actionError)
+{
+    <div class="alert alert-warning">@actionError</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ReportId))
+{
+    <partial name="_ReportNav" />
+}
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning">@Model.LoadError</div>
@@ -27,6 +45,12 @@ else if (Model.NotFound || Model.Report is null)
 else
 {
     var report = Model.Report;
+    @if (report.CanDownload)
+    {
+        <div class="mb-3">
+            <a class="btn btn-au-action" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
+        </div>
+    }
     <div class="au-card card mb-3">
         <div class="card-header d-flex justify-content-between flex-wrap gap-2">
             <span>Report</span>
@@ -127,6 +151,7 @@ else
                                 <th>Location org</th>
                                 <th>Encounter mapping</th>
                                 <th>HSLOC</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -139,6 +164,10 @@ else
                                 <td>@row.LocationOrg</td>
                                 <td>@row.EncounterMapping</td>
                                 <td>@row.Hsloc</td>
+                                <td>
+                                    <a asp-controller="Reports" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId">Measure</a>
+                                    <a asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@row.PatientId">Log</a>
+                                </td>
                             </tr>
                         }
                         </tbody>

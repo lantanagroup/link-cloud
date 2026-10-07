@@ -1,0 +1,114 @@
+@model MeasureReportPage
+@{
+    ViewData["Title"] = "Measure report";
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "report";
+}
+
+<div class="mb-3">
+    <a asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
+</div>
+
+@if (TempData["Error"] is string actionError)
+{
+    <div class="alert alert-warning">@actionError</div>
+}
+
+<h1 class="h3">Measure report</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound)
+{
+    <div class="au-card card"><div class="card-body"><p class="mb-0">That report was not found.</p></div></div>
+}
+else
+{
+    <div class="au-card card mb-3">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Report</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@Model.ReportId</code></dd>
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@Model.FacilityId</code></dd>
+                <dt class="col-sm-3">Patient</dt>
+                <dd class="col-sm-9"><code class="lu-facility-id">@Model.PatientId</code></dd>
+                <dt class="col-sm-3">Validation status</dt>
+                <dd class="col-sm-9">@Model.ReportingStatus</dd>
+                <dt class="col-sm-3">Submission status</dt>
+                <dd class="col-sm-9">@Model.SubmissionStatus</dd>
+            </dl>
+            @if (Model.CanDownloadJson)
+            {
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <a class="btn btn-outline-secondary" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId" asp-route-json="true">View JSON</a>
+                    <a class="btn btn-au-action" asp-action="MeasureFile" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId">Download measure eval input</a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="au-card card mb-3">
+        <div class="card-header">Measures</div>
+        <div class="card-body">
+            @if (Model.Measures.Count == 0)
+            {
+                <p class="mb-0">No measure reports for this patient.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Measure report</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Resources</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var measure in Model.Measures)
+                        {
+                            <tr>
+                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(measure.Id) ? "—" : measure.Id)</code></td>
+                                <td>@measure.Type</td>
+                                <td>@measure.Status</td>
+                                <td>@measure.Resources</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (Model.ShowJson)
+    {
+        <div class="au-card card">
+            <div class="card-header">Measure eval input</div>
+            <div class="card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.JsonError))
+                {
+                    <div class="alert alert-warning mb-0">@Model.JsonError</div>
+                }
+                else if (Model.JsonTooLarge)
+                {
+                    <p class="mb-0">The bundle is too large to show on this page. Download it instead.</p>
+                }
+                else if (string.IsNullOrWhiteSpace(Model.Json))
+                {
+                    <p class="mb-0">No bundle was returned.</p>
+                }
+                else
+                {
+                    <pre class="lu-json mb-0">@Model.Json</pre>
+                }
+            </div>
+        </div>
+    }
+}

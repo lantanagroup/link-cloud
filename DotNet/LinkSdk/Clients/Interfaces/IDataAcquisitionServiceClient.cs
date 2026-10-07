@@ -71,7 +71,8 @@ public interface IDataAcquisitionServiceClient
         string sortBy = "Id",
         string sortOrder = "Ascending",
         string? searchTerm = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? patientId = null);
     Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<string>>> GetAcquisitionLogNotesAsync(long id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(string reportId, CancellationToken cancellationToken = default);

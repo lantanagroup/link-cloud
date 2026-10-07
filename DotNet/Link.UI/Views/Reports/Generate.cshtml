@@ -1,0 +1,104 @@
+@model GenerateReportPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Generate report";
+    var input = Model.Input;
+    var cadence = string.IsNullOrWhiteSpace(input.Cadence) ? "Custom" : input.Cadence;
+    var patientsMode = string.Equals(input.PatientsMode, "census", StringComparison.OrdinalIgnoreCase) ? "census" : "manual";
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to reports</a>
+</div>
+
+<h1 class="h3">Generate report</h1>
+
+@if (!string.IsNullOrWhiteSpace(Model.MeasuresNote))
+{
+    <div class="alert alert-info">@Model.MeasuresNote</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-warning">@Model.Error</div>
+}
+
+<form method="post" class="au-card card">
+    <div class="card-body row g-3">
+        @Html.AntiForgeryToken()
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="facilityId">Facility ID</label>
+            <input id="facilityId" name="facilityId" value="@input.FacilityId" class="form-control" required />
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="cadence">Period</label>
+            <select id="cadence" name="cadence" class="form-select">
+                @foreach (var option in ReportsRules.Cadences)
+                {
+                    if (string.Equals(cadence, option, StringComparison.OrdinalIgnoreCase))
+                    {
+                        <option value="@option" selected>@option</option>
+                    }
+                    else
+                    {
+                        <option value="@option">@option</option>
+                    }
+                }
+            </select>
+            <div class="form-text">Daily uses the start date. Monthly uses the start date's calendar month. Dates are read in the facility time zone.</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="startDate">Start</label>
+            <input id="startDate" name="startDate" type="date" value="@input.StartDate" class="form-control" required />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="endDate">End</label>
+            <input id="endDate" name="endDate" type="date" value="@input.EndDate" class="form-control" />
+        </div>
+        <div class="col-12">
+            <span class="form-label d-block">Measures</span>
+            @if (Model.Measures.Count == 0)
+            {
+                <p class="small text-muted mb-2">No measure list is loaded.</p>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-3 mb-2">
+                    @foreach (var measure in Model.Measures)
+                    {
+                        var selected = input.ReportTypes?.Contains(measure, StringComparer.Ordinal) == true;
+                        <label class="form-check-label">
+                            <input class="form-check-input me-1" type="checkbox" name="reportTypes" value="@measure" @(selected ? "checked" : null) />
+                            @measure
+                        </label>
+                    }
+                </div>
+            }
+            <label class="form-label" for="reportTypesText">Other measure ids</label>
+            <input id="reportTypesText" name="reportTypesText" value="@input.ReportTypesText" class="form-control" placeholder="Comma-separated" />
+        </div>
+        <div class="col-12">
+            <span class="form-label d-block">Patients</span>
+            <div class="d-flex flex-wrap gap-3 mb-2">
+                <label class="form-check-label">
+                    <input class="form-check-input me-1" type="radio" name="patientsMode" value="manual" @(patientsMode == "manual" ? "checked" : null) />
+                    Listed patients
+                </label>
+                <label class="form-check-label">
+                    <input class="form-check-input me-1" type="radio" name="patientsMode" value="census" @(patientsMode == "census" ? "checked" : null) />
+                    Facility census
+                </label>
+            </div>
+            <label class="form-label" for="patients">Patient ids</label>
+            <textarea id="patients" name="patients" class="form-control" rows="4" placeholder="One id per line">@input.Patients</textarea>
+        </div>
+        <div class="col-12">
+            <label class="form-check-label">
+                <input class="form-check-input me-1" type="checkbox" name="bypassSubmission" value="true" @(input.BypassSubmission ? "checked" : null) />
+                Bypass submission
+            </label>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-au-action">Generate</button>
+        </div>
+    </div>
+</form>

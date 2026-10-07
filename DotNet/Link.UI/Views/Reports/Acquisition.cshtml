@@ -1,0 +1,138 @@
+@model AcquisitionLogPage
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Acquisition log";
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "acquisition";
+    var bar = Model.Paging;
+    Dictionary<string, string> PageRoute(int page)
+    {
+        var route = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["facilityId"] = Model.FacilityId ?? "",
+            ["reportId"] = Model.ReportId,
+            ["pageSize"] = Model.PageSize.ToString(),
+            ["page"] = page.ToString()
+        };
+        if (!string.IsNullOrWhiteSpace(Model.PatientId))
+            route["patientId"] = Model.PatientId;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
+</div>
+
+<h1 class="h3">Acquisition log</h1>
+<partial name="_ReportNav" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound || Model.Report is null)
+{
+    <div class="au-card card"><div class="card-body"><p class="mb-0">That report was not found.</p></div></div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Logs for this report</div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="facilityId" value="@Model.FacilityId" />
+                <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="patientId">Patient ID</label>
+                    <input id="patientId" name="patientId" value="@Model.PatientId" class="form-control" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="pageSize">Page</label>
+                    <select id="pageSize" name="pageSize" class="form-select">
+                        @foreach (var size in ReportsRules.LogPageSizes)
+                        {
+                            if (Model.PageSize == size)
+                            {
+                                <option value="@size" selected>@size</option>
+                            }
+                            else
+                            {
+                                <option value="@size">@size</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-au-action">Search</button>
+                    <a class="btn btn-outline-secondary" asp-action="Acquisition" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
+                </div>
+            </form>
+
+            @if (!string.IsNullOrWhiteSpace(Model.SectionError))
+            {
+                <div class="alert alert-warning">@Model.SectionError</div>
+            }
+            else if (Model.Logs.Count == 0)
+            {
+                <p class="mb-0">No acquisition logs found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>Patient</th>
+                                <th>Status</th>
+                                <th>Phase</th>
+                                <th>Priority</th>
+                                <th>Created</th>
+                                <th>Completed</th>
+                                <th>Resources</th>
+                                <th class="text-end">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Logs)
+                        {
+                            <tr>
+                                <td>@row.Id</td>
+                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.PatientId) ? "—" : row.PatientId)</code></td>
+                                <td>@row.Status</td>
+                                <td>@row.Phase</td>
+                                <td>@row.Priority</td>
+                                <td class="text-nowrap">@row.Created</td>
+                                <td class="text-nowrap">@row.Completed</td>
+                                <td>@row.Resources</td>
+                                <td class="text-end">@row.Notes</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Log pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}
