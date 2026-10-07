@@ -68,6 +68,10 @@ public sealed class FacilityHubViewModel
     public string? ReportingOrgError { get; set; }
     public SftpPanel Sftp { get; set; } = new();
     public string? SftpError { get; set; }
+
+    public bool NormalizationConfigured { get; set; }
+    public NormalizationPanel Normalization { get; set; } = new();
+    public string? NormalizationError { get; set; }
 }
 
 public sealed class FacilityWriteResult
@@ -81,17 +85,27 @@ public sealed class FacilityWriteResult
 
     public string? RedirectPlanType { get; init; }
     public int? RedirectReportingOrgId { get; init; }
+    public string? RedirectSequenceType { get; init; }
+    public int? RedirectOperationPage { get; init; }
 
     public static FacilityWriteResult ToFacility(string facilityId, string message) =>
         new() { RedirectFacilityId = facilityId, RedirectMessage = message };
 
-    public static FacilityWriteResult ToFacility(string facilityId, string message, string? planType, int? reportingOrgId) =>
+    public static FacilityWriteResult ToFacility(
+        string facilityId,
+        string message,
+        string? planType,
+        int? reportingOrgId,
+        string? sequenceType = null,
+        int? operationPage = null) =>
         new()
         {
             RedirectFacilityId = facilityId,
             RedirectMessage = message,
             RedirectPlanType = planType,
-            RedirectReportingOrgId = reportingOrgId
+            RedirectReportingOrgId = reportingOrgId,
+            RedirectSequenceType = sequenceType,
+            RedirectOperationPage = operationPage
         };
 
     public static FacilityWriteResult ToList(string message) =>
@@ -298,4 +312,101 @@ public sealed class SftpPanel
         Password = null;
         Acquisitions = posted.Acquisitions ?? new List<SftpAcquisitionInput>();
     }
+}
+
+public sealed class NormalizationPanel
+{
+    public bool ReadFailed { get; set; }
+    public string? ResourceWarning { get; set; }
+    public IReadOnlyList<string> ResourceTypes { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<NormalizationOperationRow> Operations { get; set; } = Array.Empty<NormalizationOperationRow>();
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public long TotalCount { get; set; }
+    public long TotalPages { get; set; }
+    public bool EditorOpen { get; set; }
+    public NormalizationOperationInput Editor { get; set; } = new();
+    public string? SequenceType { get; set; }
+    public IReadOnlyList<string> SequenceResourceTypes { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<NormalizationSequenceEntryInput> Sequence { get; set; } = Array.Empty<NormalizationSequenceEntryInput>();
+    public bool SequenceIncomplete { get; set; }
+    public string? TestResult { get; set; }
+    public bool TestFailed { get; set; }
+}
+
+public sealed class NormalizationOperationRow
+{
+    public Guid Id { get; set; }
+    public string OperationType { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsDisabled { get; set; }
+    public string ResourceTypes { get; set; } = string.Empty;
+    public string OperationJson { get; set; } = string.Empty;
+}
+
+public sealed class NormalizationOperationInput
+{
+    public string? OperationId { get; set; }
+    public string? OperationType { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public bool IsDisabled { get; set; }
+    public bool ParseFailed { get; set; }
+    public List<string>? ResourceTypes { get; set; }
+    public string? SourceFhirPath { get; set; }
+    public string? TargetFhirPath { get; set; }
+    public string? FhirPath { get; set; }
+    public string? TargetValue { get; set; }
+    public int? MaxIterations { get; set; }
+    public bool SplitOnComma { get; set; }
+    public List<ConditionInput>? Conditions { get; set; }
+    public List<CodeSystemMapInput>? Maps { get; set; }
+    public List<ExtensionUrlInput>? ExtensionUrls { get; set; }
+    public string? TestResource { get; set; }
+}
+
+public sealed class ConditionInput
+{
+    public string? FhirPathSource { get; set; }
+    public int Operator { get; set; }
+    public string? Value { get; set; }
+    public bool Remove { get; set; }
+}
+
+public sealed class CodeSystemMapInput
+{
+    public string? SourceSystem { get; set; }
+    public string? TargetSystem { get; set; }
+    public bool Remove { get; set; }
+    public List<CodeMapEntryInput>? Entries { get; set; }
+}
+
+public sealed class CodeMapEntryInput
+{
+    public string? SourceCode { get; set; }
+    public string? Code { get; set; }
+    public string? Display { get; set; }
+    public bool Remove { get; set; }
+}
+
+public sealed class ExtensionUrlInput
+{
+    public string? Url { get; set; }
+    public bool Remove { get; set; }
+}
+
+public sealed class NormalizationSequenceEntryInput
+{
+    public Guid OperationId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string OperationType { get; set; } = string.Empty;
+    public bool IsDisabled { get; set; }
+    public int? Sequence { get; set; }
+}
+
+public sealed class NormalizationSequenceInput
+{
+    public string? ResourceType { get; set; }
+    public List<NormalizationSequenceEntryInput>? Rows { get; set; }
 }

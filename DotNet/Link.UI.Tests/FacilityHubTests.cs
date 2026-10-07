@@ -289,6 +289,21 @@ public class FacilityHubServiceTests
         result.Page!.FhirQueryError.Should().Contain("DataAcquisitionServiceUrl");
     }
 
+    [Fact]
+    public async Task A_missing_normalization_url_does_not_save()
+    {
+        var hub = Hub(Facility("hub-1"), census: null, queryDispatch: null, dmrp: true);
+
+        var result = await hub.SaveOperationAsync("hub-1", new NormalizationOperationInput
+        {
+            OperationType = "CopyProperty",
+            Name = "Proof"
+        }, CancellationToken.None);
+
+        result.RedirectFacilityId.Should().BeNull();
+        result.Page!.NormalizationError.Should().Contain("NormalizationServiceUrl");
+    }
+
     private static FacilityHubService Hub(
         FakeFacilities facilities,
         FakeCensus? census,

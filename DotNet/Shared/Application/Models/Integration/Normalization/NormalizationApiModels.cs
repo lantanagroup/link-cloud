@@ -21,6 +21,21 @@ public class CreateNormalizationOperationRequestApiModel
     public List<Guid> VendorVersionIds { get; set; } = [];
 }
 
+public class UpdateNormalizationOperationRequestApiModel
+{
+    public Guid? Id { get; set; }
+    public List<string> ResourceTypes { get; set; } = [];
+    public string? FacilityId { get; set; }
+    public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
+    public bool IsDisabled { get; set; }
+
+    /// <summary>
+    /// Null leaves vendor presets alone. An empty list removes them.
+    /// Facility operations are not vendor operations, so the editor sends null.
+    /// </summary>
+    public List<Guid>? VendorVersionIds { get; set; }
+}
+
 public class CreateNormalizationOperationDetailsApiModel
 {
     public string OperationType { get; set; } = string.Empty;

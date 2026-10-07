@@ -16,6 +16,7 @@ public sealed class FacilityHubService
     private readonly ICensusServiceClient? _census;
     private readonly IQueryDispatchServiceClient? _queryDispatch;
     private readonly FacilityAcquisitionService? _acquisition;
+    private readonly FacilityNormalizationService? _normalization;
     private readonly LinkUiFeatureOptions _options;
     private readonly ILogger<FacilityHubService> _logger;
 
@@ -25,12 +26,14 @@ public sealed class FacilityHubService
         IQueryDispatchServiceClient? queryDispatch,
         IOptions<LinkUiFeatureOptions> options,
         ILogger<FacilityHubService> logger,
-        IDataAcquisitionServiceClient? dataAcquisition = null)
+        IDataAcquisitionServiceClient? dataAcquisition = null,
+        INormalizationServiceClient? normalization = null)
     {
         _facilities = facilities;
         _census = census;
         _queryDispatch = queryDispatch;
         _acquisition = dataAcquisition is null ? null : new FacilityAcquisitionService(dataAcquisition, logger);
+        _normalization = normalization is null ? null : new FacilityNormalizationService(normalization, logger);
         _options = options.Value;
         _logger = logger;
     }
@@ -50,13 +53,18 @@ public sealed class FacilityHubService
         if (!string.IsNullOrWhiteSpace(registry.DataAcquisitionServiceUrl))
             dataAcquisition = services.GetRequiredService<IDataAcquisitionServiceClient>();
 
+        INormalizationServiceClient? normalization = null;
+        if (!string.IsNullOrWhiteSpace(registry.NormalizationServiceUrl))
+            normalization = services.GetRequiredService<INormalizationServiceClient>();
+
         return new FacilityHubService(
             services.GetRequiredService<IFacilityServiceClient>(),
             census,
             queryDispatch,
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<ILogger<FacilityHubService>>(),
-            dataAcquisition);
+            dataAcquisition,
+            normalization);
     }
 
     public async Task<FacilityHubViewModel> LoadCreateAsync(CancellationToken cancellationToken)
@@ -72,7 +80,11 @@ public sealed class FacilityHubService
         string? facilityId,
         string? planType,
         int? reportingOrgId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? operationId = null,
+        string? operationType = null,
+        string? sequenceType = null,
+        int operationPage = 1)
     {
         var id = facilityId?.Trim() ?? string.Empty;
         if (!FacilityFormRules.IsValidFacilityId(id, _options.NumericOnlyFacilityId))
@@ -112,7 +124,7 @@ public sealed class FacilityHubService
         }
 
         var page = FromFacility(facility.Body, vendors);
-        await LoadPanelsAsync(page, id, planType, reportingOrgId, cancellationToken);
+        await LoadPanelsAsync(page, id, planType, reportingOrgId, operationId, operationType, sequenceType, operationPage, cancellationToken);
         return page;
     }
 
@@ -385,6 +397,66 @@ public sealed class FacilityHubService
             (page, token) => _acquisition!.TestSftpAsync(page, input, token),
             "SFTP connection succeeded.");
 
+    public Task<FacilityWriteResult> SaveOperationAsync(
+        string? facilityId,
+        NormalizationOperationInput input,
+        CancellationToken cancellationToken) =>
+        WriteNormalizationAsync(facilityId, null, null, 1, cancellationToken,
+            (page, error) => page.NormalizationError = error,
+            (page, token) => _normalization!.SaveAsync(page, input, token),
+            "Operation saved.");
+
+    public Task<FacilityWriteResult> DeleteOperationAsync(
+        string? facilityId,
+        string? operationId,
+        CancellationToken cancellationToken) =>
+        WriteNormalizationAsync(facilityId, null, null, 1, cancellationToken,
+            (page, error) => page.NormalizationError = error,
+            (page, token) => _normalization!.DeleteAsync(page.FacilityId!, operationId, token),
+            "Operation deleted.");
+
+    public Task<FacilityWriteResult> SaveOperationSequenceAsync(
+        string? facilityId,
+        NormalizationSequenceInput input,
+        CancellationToken cancellationToken) =>
+        WriteNormalizationAsync(facilityId, null, input.ResourceType, 1, cancellationToken,
+            (page, error) => page.NormalizationError = error,
+            (page, token) => _normalization!.SaveSequenceAsync(page, input, token),
+            "Sequence saved.");
+
+    public Task<FacilityWriteResult> DeleteOperationSequenceAsync(
+        string? facilityId,
+        string? resourceType,
+        CancellationToken cancellationToken) =>
+        WriteNormalizationAsync(facilityId, null, resourceType, 1, cancellationToken,
+            (page, error) => page.NormalizationError = error,
+            (page, token) => _normalization!.DeleteSequenceAsync(page, resourceType, token),
+            "Sequence deleted.");
+
+    public async Task<FacilityWriteResult> TestOperationAsync(
+        string? facilityId,
+        string? operationId,
+        string? resourceJson,
+        CancellationToken cancellationToken)
+    {
+        var page = await LoadEditAsync(
+            facilityId, null, null, cancellationToken, operationId, null, null, 1);
+        if (page.LoadError is not null || page.NotFound)
+            return FacilityWriteResult.Stay(page);
+
+        if (_normalization is null)
+        {
+            page.NormalizationError = FacilityNormalizationService.NotConfigured;
+            return FacilityWriteResult.Stay(page);
+        }
+
+        var error = await _normalization.TestAsync(page, operationId, resourceJson, cancellationToken);
+        if (error is not null)
+            page.NormalizationError = error;
+
+        return FacilityWriteResult.Stay(page);
+    }
+
     public async Task<FacilityWriteResult> SoftDeleteAsync(string? facilityId, CancellationToken cancellationToken)
     {
         var id = facilityId?.Trim() ?? string.Empty;
@@ -463,6 +535,7 @@ public sealed class FacilityHubService
             CensusConfigured = _census is not null,
             QueryDispatchConfigured = _queryDispatch is not null,
             DataAcquisitionConfigured = _acquisition is not null,
+            NormalizationConfigured = _normalization is not null,
             CensusEnabled = true,
             Schedules = FacilityFormRules.WithBlankRow(null)
         };
@@ -473,12 +546,17 @@ public sealed class FacilityHubService
         string facilityId,
         string? planType,
         int? reportingOrgId,
+        string? operationId,
+        string? operationType,
+        string? sequenceType,
+        int operationPage,
         CancellationToken cancellationToken)
     {
         Task<LinkApiResponse<CensusConfigApiModel>>? censusTask = _census?.GetCensusConfigAsync(facilityId, cancellationToken);
         Task<LinkApiResponse<QueryDispatchConfigurationApiModel>>? dispatchTask =
             _queryDispatch?.GetConfigurationAsync(facilityId, cancellationToken);
         var acquisitionTask = _acquisition?.LoadAsync(page, planType, reportingOrgId, cancellationToken);
+        var normalizationTask = _normalization?.LoadAsync(page, operationId, operationType, sequenceType, operationPage, cancellationToken);
 
         if (censusTask is not null)
             await ApplyCensusAsync(page, facilityId, censusTask);
@@ -488,6 +566,46 @@ public sealed class FacilityHubService
 
         if (acquisitionTask is not null)
             await acquisitionTask;
+
+        if (normalizationTask is not null)
+            await normalizationTask;
+    }
+
+    private async Task<FacilityWriteResult> WriteNormalizationAsync(
+        string? facilityId,
+        string? operationId,
+        string? sequenceType,
+        int operationPage,
+        CancellationToken cancellationToken,
+        Action<FacilityHubViewModel, string?> writeError,
+        Func<FacilityHubViewModel, CancellationToken, Task<string?>> action,
+        string success)
+    {
+        var page = await LoadEditAsync(
+            facilityId, null, null, cancellationToken, operationId, null, sequenceType, operationPage);
+        if (page.LoadError is not null || page.NotFound)
+            return FacilityWriteResult.Stay(page);
+
+        if (_normalization is null)
+        {
+            writeError(page, FacilityNormalizationService.NotConfigured);
+            return FacilityWriteResult.Stay(page);
+        }
+
+        var error = await action(page, cancellationToken);
+        if (error is not null)
+        {
+            writeError(page, error);
+            return FacilityWriteResult.Stay(page);
+        }
+
+        return FacilityWriteResult.ToFacility(
+            page.FacilityId!,
+            success,
+            null,
+            null,
+            string.IsNullOrWhiteSpace(sequenceType) ? null : sequenceType.Trim(),
+            operationPage > 1 ? operationPage : null);
     }
 
     private async Task<FacilityWriteResult> WriteAcquisitionAsync(
