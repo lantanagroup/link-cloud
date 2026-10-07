@@ -42,7 +42,7 @@
                 {
                     <p class="text-muted">This account is deactivated.</p>
                 }
-                <form method="post" data-au-save asp-action="UpdateUser" asp-route-id="@Model.Id" class="row g-2">
+                <form method="post" data-au-save data-lu-panel asp-action="UpdateUser" asp-route-id="@Model.Id" class="row g-2">
                     <div class="col-12 col-md-4">
                         <label class="form-label" for="username">Username</label>
                         <input id="username" name="username" value="@Model.Form.Username" class="form-control" maxlength="255" autocomplete="off" />
@@ -91,7 +91,8 @@
                         </fieldset>
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-au-action">Save account</button>
+                        <button type="submit" class="btn btn-success">Save</button>
+                        <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
                     </div>
                 </form>
                 @if (!string.IsNullOrWhiteSpace(Model.ClaimsError))
@@ -121,7 +122,7 @@
                                 </div>
                             }
                         </fieldset>
-                        <button type="submit" class="btn btn-outline-secondary mt-2">Save claims</button>
+                        <button type="submit" class="btn btn-success mt-2">Save</button>
                         <p class="text-muted small mt-2 mb-0">Saving the account above keeps these claims. Clear every box to remove them.</p>
                     </form>
                 }

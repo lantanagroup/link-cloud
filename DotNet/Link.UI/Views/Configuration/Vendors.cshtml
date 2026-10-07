@@ -12,7 +12,7 @@
     <div class="alert alert-warning">@Model.LoadError</div>
 }
 
-<div class="au-card card mb-3">
+<div class="au-card card mb-3 d-none" id="vendorCreate" data-lu-panel data-lu-hide-on-cancel>
     <div class="card-header">New vendor</div>
     <div class="card-body">
         <form method="post" data-au-save asp-action="SaveVendor" class="row g-2 align-items-end">
@@ -25,7 +25,8 @@
                 <input id="secret" name="secret" class="form-control" maxlength="127" autocomplete="off" />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-au-action">Create vendor</button>
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The secret name is a Key Vault secret name. Leave it blank when the vendor has no signing key.</p>
@@ -33,11 +34,14 @@
 </div>
 
 <div class="au-card card">
-    <div class="card-header">Vendors</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Vendors</span>
+        <button type="button" class="btn btn-sm btn-success" data-lu-reveal="vendorCreate">+ Add</button>
+    </div>
     <div class="card-body">
         @if (Model.Vendors.Count == 0)
         {
-            <p class="mb-0">No vendors found.</p>
+            <p class="mb-0">No vendors yet. Add one to name an EHR vendor.</p>
         }
         else
         {
@@ -64,9 +68,10 @@
                                 <input form="@formId" name="secret" value="@row.SecretId" class="form-control form-control-sm" maxlength="127" autocomplete="off" aria-label="Signing key secret name for @row.Name" />
                             </td>
                             <td>
-                                <form id="@formId" method="post" asp-action="SaveVendor">
+                                <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVendor">
                                     <input type="hidden" name="id" value="@row.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                    <button type="submit" class="btn btn-sm btn-success">Save</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-lu-cancel>Cancel</button>
                                 </form>
                             </td>
                             <td><a asp-action="Versions" asp-route-vendorId="@row.Id">Versions</a></td>

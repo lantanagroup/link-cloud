@@ -74,7 +74,7 @@
     </div>
 </div>
 
-<div class="au-card card mb-3">
+<div class="au-card card mb-3 d-none" id="accountCreate" data-lu-panel data-lu-hide-on-cancel>
     <div class="card-header">New account</div>
     <div class="card-body">
         <form method="post" data-au-save asp-action="CreateUser" class="row g-2">
@@ -99,7 +99,8 @@
                 <input id="middleName" name="middleName" class="form-control" maxlength="255" />
             </div>
             <div class="col-12 col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-au-action">Create account</button>
+                <button type="submit" class="btn btn-success">Save</button>
+                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">Roles are assigned from the account page after the account exists.</p>
@@ -109,13 +110,16 @@
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>Accounts</span>
-        <span class="lu-live-label">This list updates on its own.</span>
+        <span class="d-flex align-items-center gap-2">
+            <span class="lu-live-label">This list updates on its own.</span>
+            <button type="button" class="btn btn-sm btn-success" data-lu-reveal="accountCreate">+ Add</button>
+        </span>
     </div>
     <div class="card-body">
         <div id="userResults" data-au-refresh="20000">
         @if (Model.Users.Count == 0)
         {
-            <p class="mb-0">No accounts found.</p>
+            <p class="mb-0">No accounts match this search. Add one, or clear the search.</p>
         }
         else
         {

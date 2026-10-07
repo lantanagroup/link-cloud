@@ -72,6 +72,18 @@ public sealed class FacilityHubViewModel
     public bool NormalizationConfigured { get; set; }
     public NormalizationPanel Normalization { get; set; } = new();
     public string? NormalizationError { get; set; }
+
+    public FacilityNotificationSection Notification { get; set; } = new();
+}
+
+public sealed class FacilityNotificationSection
+{
+    public bool Configured { get; set; }
+    public bool Exists { get; set; }
+    public string? Id { get; set; }
+    public string Emails { get; set; } = "";
+    public bool EmailEnabled { get; set; } = true;
+    public string? Error { get; set; }
 }
 
 public sealed class FacilityWriteResult

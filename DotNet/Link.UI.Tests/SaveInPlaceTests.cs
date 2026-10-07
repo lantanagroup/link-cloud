@@ -29,7 +29,7 @@ public class SaveInPlaceTests
     }
 
     [Theory]
-    [InlineData("DotNet/Link.UI/Views/Tenants/Facility.cshtml", 4)]
+    [InlineData("DotNet/Link.UI/Views/Tenants/Facility.cshtml", 6)]
     [InlineData("DotNet/Link.UI/Views/System/Integration.cshtml", 8)]
     [InlineData("DotNet/Link.UI/Views/Shared/_CensusEditor.cshtml", 2)]
     [InlineData("DotNet/Link.UI/Views/Shared/_FhirQueryEditor.cshtml", 13)]
@@ -78,9 +78,13 @@ public class SaveInPlaceTests
         var saveFacility = js.IndexOf("\"SaveFacility\"", StringComparison.Ordinal);
         var saveCensus = js.IndexOf("\"SaveCensus\"", StringComparison.Ordinal);
         var deleteCensus = js.IndexOf("\"DeleteCensus\"", StringComparison.Ordinal);
+        var saveNotification = js.IndexOf("\"SaveNotification\"", StringComparison.Ordinal);
+        var deleteNotification = js.IndexOf("\"DeleteNotification\"", StringComparison.Ordinal);
         saveFacility.Should().BeGreaterThan(-1);
         saveCensus.Should().BeGreaterThan(saveFacility);
-        deleteCensus.Should().BeGreaterThan(saveCensus);
+        saveNotification.Should().BeGreaterThan(saveCensus);
+        deleteCensus.Should().BeGreaterThan(saveNotification);
+        deleteNotification.Should().BeGreaterThan(deleteCensus);
         js.Should().Contain("beforeunload");
         js.Should().Contain("show.bs.tab");
         js.Should().Contain("form.action");
