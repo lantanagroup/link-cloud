@@ -315,15 +315,15 @@
                                 <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                                 <td>@FormatWhen(run.FinishedAt)</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral">View</a>
                                     @if (run.ScenarioId is Guid scenarioId)
                                     {
-                                        <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-outline-secondary">History</a>
+                                        <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-au-neutral">History</a>
                                     }
                                     <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
                                           onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
                                     </form>
                                 </td>
                             </tr>
@@ -336,12 +336,12 @@
         @if (Model.Metadata.TotalPages > 1)
         {
             <div class="card-body border-top d-flex justify-content-between align-items-center">
-                <a class="btn btn-sm btn-outline-secondary @(Model.Metadata.PageNumber <= 1 ? "disabled" : "")"
+                <a class="btn btn-sm btn-au-neutral @(Model.Metadata.PageNumber <= 1 ? "disabled" : "")"
                    asp-action="Index"
                    asp-route-pageNumber="@(Model.Metadata.PageNumber - 1)"
                    asp-route-pageSize="@Model.Metadata.PageSize">Previous</a>
                 <span class="small text-muted">Page @Model.Metadata.PageNumber of @Model.Metadata.TotalPages</span>
-                <a class="btn btn-sm btn-outline-secondary @(Model.Metadata.PageNumber >= Model.Metadata.TotalPages ? "disabled" : "")"
+                <a class="btn btn-sm btn-au-neutral @(Model.Metadata.PageNumber >= Model.Metadata.TotalPages ? "disabled" : "")"
                    asp-action="Index"
                    asp-route-pageNumber="@(Model.Metadata.PageNumber + 1)"
                    asp-route-pageSize="@Model.Metadata.PageSize">Next</a>

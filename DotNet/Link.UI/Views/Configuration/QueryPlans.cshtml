@@ -1,7 +1,7 @@
 @model QueryPlanPage
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
 </div>
 <h1 class="h3">Query plans</h1>
 <partial name="_Nav" />
@@ -17,7 +17,7 @@
                 <input id="facilityId" name="facilityId" value="@Model.FacilityId" class="form-control" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-outline-secondary">Look up</button>
+                <button type="submit" class="btn btn-au-neutral">Look up</button>
             </div>
         </form>
     </div>

@@ -52,10 +52,10 @@
             <div class="card-body">
                 <p>Kafka UI is a link. Grafana is a link when this environment publishes one.</p>
                 <div class="d-flex flex-wrap gap-2">
-                    <a class="btn btn-outline-secondary" asp-action="Kafka">Kafka</a>
+                    <a class="btn btn-au-neutral" asp-action="Kafka">Kafka</a>
                     @if (!string.IsNullOrWhiteSpace(Model.GrafanaUrl))
                     {
-                        <a class="btn btn-outline-secondary" href="@Model.GrafanaUrl" target="_blank" rel="noopener noreferrer">Grafana</a>
+                        <a class="btn btn-au-neutral" href="@Model.GrafanaUrl" target="_blank" rel="noopener noreferrer">Grafana</a>
                     }
                     else
                     {

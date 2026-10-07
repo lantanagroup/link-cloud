@@ -12,7 +12,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
 </div>
 <h1 class="h3">Service health</h1>
 <partial name="_Nav" />
@@ -37,10 +37,10 @@
                 <input id="service" name="service" value="@Model.Service" class="form-control" maxlength="64" placeholder="account" />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-outline-secondary">Check</button>
+                <button type="submit" class="btn btn-au-neutral">Check</button>
             </div>
             <div class="col-12 col-md-3">
-                <a class="btn btn-outline-secondary" asp-action="Health">All services</a>
+                <a class="btn btn-au-neutral" asp-action="Health">All services</a>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">@string.Join(", ", SystemRules.HealthServices)</p>

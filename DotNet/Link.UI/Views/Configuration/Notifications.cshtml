@@ -19,14 +19,14 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
 </div>
 <h1 class="h3">Notifications</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
 <p class="text-muted">Search notifications already sent, or send one. A facility id is optional. Recipients are always required. When a facility is set, its saved addresses are added as well.</p>
 <div class="mb-3">
-    <a class="btn btn-outline-secondary" asp-action="Configurations">Email configuration</a>
+    <a class="btn btn-au-neutral" asp-action="Configurations">Email configuration</a>
 </div>
 
 <div class="au-card card mb-3">
@@ -120,8 +120,8 @@
                 <input id="sentOnEnd" name="sentOnEnd" value="@query.SentOnEnd" type="date" class="form-control" />
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
-                <a class="btn btn-outline-secondary" asp-action="Notifications">Clear</a>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
+                <a class="btn btn-au-neutral" asp-action="Notifications">Clear</a>
             </div>
         </form>
     </div>
@@ -170,20 +170,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Notification pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

@@ -33,11 +33,11 @@
             @if (Model.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
             {
                 <button type="button" class="btn btn-danger btn-sm" id="btnDeleteRun"><i class="bi bi-trash me-1"></i>Delete</button>
-                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm btn-outline-secondary">
+                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-neutral">
                     <i class="bi bi-download me-1"></i>Export Diagnostics
                 </a>
             }
-            <a asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <a asp-action="Index" class="btn btn-sm btn-au-neutral"><i class="bi bi-arrow-left me-1"></i>Back</a>
         </div>
     </div>
 
@@ -174,9 +174,9 @@
             <div class="mb-3" id="liveInjectControls">
                 <h6 class="text-uppercase text-muted small mb-2">Add to pool</h6>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveGenerate">Generate</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveUpload">Upload</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnLiveReference">FHIR ID</button>
+                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveGenerate">Generate</button>
+                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveUpload">Upload</button>
+                    <button type="button" class="btn btn-au-neutral btn-sm" id="btnLiveReference">FHIR ID</button>
                 </div>
                 <input type="file" id="liveUploadFile" accept=".json,application/json" class="d-none" />
             </div>
@@ -217,7 +217,7 @@
     <div class="au-card" id="testConfigCard" style="display:none;">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
-            <a href="#" class="btn btn-sm btn-outline-secondary" id="btnViewManifest" style="display:none;">
+            <a href="#" class="btn btn-sm btn-au-neutral" id="btnViewManifest" style="display:none;">
                 <i class="bi bi-card-checklist me-1"></i>Generation Manifest
             </a>
         </div>
@@ -356,7 +356,7 @@
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="dataAcqRate">0.00</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active duration</div><div class="fs-4 fw-semibold" id="dataAcqActiveDuration">—</div></div></div>
                         <div class="col-md-3 d-flex align-items-end justify-content-end">
-                            <button type="button" id="dataAcqErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                            <button type="button" id="dataAcqErrorsBtn" class="btn btn-sm btn-danger" style="display:none;">Errors Encountered</button>
                         </div>
                     </div>
 
@@ -387,7 +387,7 @@
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="normalizationRate">0.00</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active duration</div><div class="fs-4 fw-semibold" id="normalizationActiveDuration">—</div></div></div>
                         <div class="col-md-3 d-flex align-items-end justify-content-end">
-                            <button type="button" id="normalizationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                            <button type="button" id="normalizationErrorsBtn" class="btn btn-sm btn-danger" style="display:none;">Errors Encountered</button>
                         </div>
                     </div>
 
@@ -413,7 +413,7 @@
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="measureRate">0.00</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active duration</div><div class="fs-4 fw-semibold" id="measureActiveDuration">—</div></div></div>
                         <div class="col-md-3 d-flex align-items-end justify-content-end">
-                            <button type="button" id="measureErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                            <button type="button" id="measureErrorsBtn" class="btn btn-sm btn-danger" style="display:none;">Errors Encountered</button>
                         </div>
                     </div>
 
@@ -444,7 +444,7 @@
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Failed</div><div class="fs-4 fw-semibold text-danger" id="validationFailedCount">0</div></div></div>
                         <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Active duration</div><div class="fs-4 fw-semibold" id="validationActiveDuration">—</div></div></div>
                         <div class="col-md-3 d-flex align-items-end justify-content-end">
-                            <button type="button" id="validationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                            <button type="button" id="validationErrorsBtn" class="btn btn-sm btn-danger" style="display:none;">Errors Encountered</button>
                         </div>
                     </div>
 
@@ -470,8 +470,8 @@
                     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
                         <span class="small text-muted" id="logPageInfo">Loading stored log…</span>
                         <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary" id="logOlder">Older</button>
-                            <button type="button" class="btn btn-outline-secondary" id="logNewer" disabled>Newer</button>
+                            <button type="button" class="btn btn-au-neutral" id="logOlder">Older</button>
+                            <button type="button" class="btn btn-au-neutral" id="logNewer" disabled>Newer</button>
                         </div>
                     </div>
                     <pre id="logBox" class="au-log-console mb-0"></pre>
@@ -484,7 +484,7 @@
 <div id="errorFlyout" style="position:fixed; top:0; right:-480px; width:460px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1055; transition:right .2s ease;">
     <div class="d-flex justify-content-between align-items-center border-bottom p-3">
         <h6 class="mb-0" id="errorFlyoutTitle">Errors</h6>
-        <button class="btn btn-sm btn-outline-secondary" id="closeFlyout">Close</button>
+        <button class="btn btn-sm btn-au-neutral" id="closeFlyout">Close</button>
     </div>
     <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
 </div>

@@ -20,7 +20,7 @@
                 @Html.AntiForgeryToken()
                 <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
                 <button type="button" class="btn btn-sm btn-success" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNormGenerateReset">Start over</button>
+                <button type="button" class="btn btn-sm btn-au-neutral" id="btnNormGenerateReset">Start over</button>
                 <span id="normGenSessionHint" class="small text-muted"></span>
             </div>
         </div>
@@ -89,13 +89,13 @@
                                     <td class="small text-muted">@LinkUiTime.Display(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
                                                 @(op.IsSystem ? "View" : "Edit")
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-op-clone" data-id="@op.Id">Clone</button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-op-clone" data-id="@op.Id">Clone</button>
                                             @if (!op.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-op-delete" data-id="@op.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger btn-op-delete" data-id="@op.Id">Delete</button>
                                             }
                                         </div>
                                     </td>
@@ -152,13 +152,13 @@
                                     <td class="small text-muted">@LinkUiTime.Display(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
                                                 @(seq.IsSystem ? "View" : "Edit")
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-seq-clone" data-id="@seq.Id">Clone</button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-seq-clone" data-id="@seq.Id">Clone</button>
                                             @if (!seq.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-seq-delete" data-id="@seq.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger btn-seq-delete" data-id="@seq.Id">Delete</button>
                                             }
                                         </div>
                                     </td>
@@ -221,19 +221,19 @@
                                     <td class="small text-muted">@LinkUiTime.Display(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
                                                 @(suite.IsSystem ? "View" : "Edit")
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-suite-clone" data-id="@suite.Id">Clone</button>
+                                            <button type="button" class="btn btn-sm btn-au-neutral btn-suite-clone" data-id="@suite.Id">Clone</button>
                                             @if (!suite.IsDefault)
                                             {
-                                                <button type="button" class="btn btn-sm btn-outline-success btn-suite-default" data-id="@suite.Id" title="Set as default">
+                                                <button type="button" class="btn btn-sm btn-success btn-suite-default" data-id="@suite.Id" title="Set as default">
                                                     <i class="bi bi-star"></i>
                                                 </button>
                                             }
                                             @if (!suite.IsSystem)
                                             {
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-suite-delete" data-id="@suite.Id">Delete</button>
+                                                <button type="button" class="btn btn-sm btn-danger btn-suite-delete" data-id="@suite.Id">Delete</button>
                                             }
                                         </div>
                                     </td>
@@ -259,7 +259,7 @@
                 <h5 class="mb-0" id="opModalTitle"><i class="bi bi-gear me-2"></i>Operation</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnOpSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnOpClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnOpClose">Close</button>
                 </div>
             </div>
             <div id="opFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -316,7 +316,7 @@
                         <div class="col-12 op-field op-field-ConditionalTransform">
                             <label class="form-label">Conditions</label>
                             <div id="opConditionsContainer"></div>
-                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddCondition"><i class="bi bi-plus-lg me-1"></i>Add Condition</button>
+                            <button type="button" class="btn btn-sm btn-success mt-1" id="btnAddCondition"><i class="bi bi-plus-lg me-1"></i>Add Condition</button>
                         </div>
 
                         <div class="col-12 op-field op-field-HSLOCMap">
@@ -333,9 +333,9 @@
                             <label class="form-label">Code System Maps</label>
                             <div id="opCodeSystemMapRows"></div>
                             <div class="d-flex gap-2 mt-2 align-items-center">
-                                <button type="button" class="btn btn-sm btn-outline-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
+                                <button type="button" class="btn btn-sm btn-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
+                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
                                 <span class="text-muted" title="Use the textarea and controls independently: Load from JSON copies textarea JSON into controls, and Sync JSON from Controls copies controls into the textarea.">
                                     <i class="bi bi-info-circle"></i>
                                 </span>
@@ -380,7 +380,7 @@
                 <h5 class="mb-0" id="seqModalTitle"><i class="bi bi-list-ol me-2"></i>Sequence</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnSeqSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnSeqClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnSeqClose">Close</button>
                 </div>
             </div>
             <div id="seqFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -401,7 +401,7 @@
                         <div class="col-12">
                             <label class="form-label">Operations (in order)</label>
                             <div id="seqEntriesContainer"></div>
-                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btnAddSeqEntry"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
+                            <button type="button" class="btn btn-sm btn-success mt-2" id="btnAddSeqEntry"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
                         </div>
                     </div>
                     <div id="seqSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
@@ -420,7 +420,7 @@
                 <h5 class="mb-0" id="suiteModalTitle"><i class="bi bi-box me-2"></i>Suite</h5>
                 <div class="d-flex gap-2 align-items-center">
                     <button type="button" class="btn btn-sm btn-success" id="btnSuiteSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnSuiteClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnSuiteClose">Close</button>
                 </div>
             </div>
             <div id="suiteFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -441,12 +441,12 @@
                         <div class="col-12">
                             <label class="form-label">Sequences</label>
                             <div id="suiteSequencesContainer"></div>
-                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddSuiteSeq"><i class="bi bi-plus-lg me-1"></i>Add Sequence</button>
+                            <button type="button" class="btn btn-sm btn-success mt-1" id="btnAddSuiteSeq"><i class="bi bi-plus-lg me-1"></i>Add Sequence</button>
                         </div>
                         <div class="col-12">
                             <label class="form-label">Standalone Operations</label>
                             <div id="suiteOpsContainer"></div>
-                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddSuiteOp"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
+                            <button type="button" class="btn btn-sm btn-success mt-1" id="btnAddSuiteOp"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
                         </div>
                     </div>
                     <div id="suiteSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
@@ -619,7 +619,7 @@
             '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
             + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
             + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
-            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button></div>';
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button></div>';
 
         row.querySelector('.code-map-source-key').value = key || '';
         row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
@@ -635,7 +635,7 @@
         card.innerHTML =
             '<div class="d-flex justify-content-between align-items-center mb-2">'
             + '<span class="fw-semibold">Code System Map</span>'
-            + '<button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>'
+            + '<button type="button" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i></button>'
             + '</div>'
             + '<div class="row g-2 mb-2">'
             + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
@@ -643,9 +643,9 @@
             + '</div>'
             + '<div class="small text-muted mb-1">Code Maps</div>'
             + '<div class="csm-code-maps"></div>'
-            + '<button type="button" class="btn btn-sm btn-outline-success mt-2 csm-add-code-map"><i class="bi bi-plus-lg me-1"></i>Add Code Map</button>';
+            + '<button type="button" class="btn btn-sm btn-success mt-2 csm-add-code-map"><i class="bi bi-plus-lg me-1"></i>Add Code Map</button>';
 
-        card.querySelector('button.btn-outline-danger').addEventListener('click', () => card.remove());
+        card.querySelector('button.btn-danger').addEventListener('click', () => card.remove());
         const entriesHost = card.querySelector('.csm-code-maps');
         card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
 
@@ -789,7 +789,7 @@
         col4.className = 'col-2';
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.className = 'btn btn-sm btn-danger';
         removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
         removeButton.addEventListener('click', () => row.remove());
         col4.appendChild(removeButton);
@@ -989,7 +989,7 @@
         row.innerHTML = `
             <span class="badge bg-dark" style="width:28px;">${seq}</span>
             <select class="form-select form-select-sm seq-op-select"></select>
-            <button type="button" class="btn btn-sm btn-outline-danger">
+            <button type="button" class="btn btn-sm btn-danger">
                 <i class="bi bi-x-lg"></i>
             </button>`;
 
@@ -1005,7 +1005,7 @@
 
         select.addEventListener('change', updateSeqOperationOptions);
 
-        row.querySelector('.btn-outline-danger').addEventListener('click', () => {
+        row.querySelector('.btn-danger').addEventListener('click', () => {
             row.remove();
             renumberSeqEntries();
             updateSeqOperationOptions();
@@ -1374,7 +1374,7 @@
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.className = 'btn btn-sm btn-danger';
         removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
 
         removeButton.addEventListener('click', () => {
@@ -1421,7 +1421,7 @@
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.className = 'btn btn-sm btn-danger';
         removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
 
         removeButton.addEventListener('click', () => {

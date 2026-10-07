@@ -30,7 +30,7 @@
                 }
             </p>
         </div>
-        <a asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>All use cases</a>
+        <a asp-action="Index" class="btn btn-sm btn-au-neutral"><i class="bi bi-arrow-left me-1"></i>All use cases</a>
     </div>
 
     <div class="au-card mb-4">
@@ -124,11 +124,11 @@
                                 <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                                 <td>@FormatWhen(run.FinishedAt)</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-secondary">View</a>
+                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral">View</a>
                                     <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
                                           onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
                                     </form>
                                 </td>
                             </tr>
@@ -140,7 +140,7 @@
         </div>
         <div class="card-body border-top d-flex justify-content-between align-items-center">
             <span class="small text-muted">Select two runs and compare them side by side.</span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCompare" disabled>Compare selected</button>
+            <button type="button" class="btn btn-sm btn-au-neutral" id="btnCompare" disabled>Compare selected</button>
         </div>
     </div>
 </div>

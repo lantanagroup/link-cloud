@@ -104,7 +104,7 @@ public class DataAcquisitionLogsTests
         list.Should().Contain("btn btn-sm btn-danger\">Disable logs");
         list.Should().Contain("btn btn-sm btn-danger\">Cancel matching");
         list.Should().Contain("btn btn-sm btn-danger\" formaction");
-        list.Should().Contain("btn-outline-secondary\">Restore logs");
+        list.Should().Contain("btn-au-neutral\">Restore logs");
 
         var detail = Read("DotNet/Link.UI/Views/Logs/AcquisitionDetail.cshtml");
         detail.Should().Contain("btn btn-sm btn-success\">Process");
@@ -113,7 +113,7 @@ public class DataAcquisitionLogsTests
         foreach (var searchPage in new[] { "Acquisition", "Audit", "Sftp" })
         {
             Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
-                .Should().Contain("btn btn-outline-secondary\">Search");
+                .Should().Contain("btn btn-au-neutral\">Search");
         }
 
         Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain(".btn-danger:hover");

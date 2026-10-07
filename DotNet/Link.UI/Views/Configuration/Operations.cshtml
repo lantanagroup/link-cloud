@@ -26,7 +26,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
 </div>
 <h1 class="h3">Normalization operations</h1>
 <partial name="_Nav" />
@@ -130,8 +130,8 @@
                 </div>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
-                <a class="btn btn-outline-secondary" asp-action="Operations">Clear</a>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
+                <a class="btn btn-au-neutral" asp-action="Operations">Clear</a>
             </div>
         </form>
     </div>
@@ -197,14 +197,14 @@ else
                                     @if (string.IsNullOrWhiteSpace(row.FacilityId))
                                     {
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a class="btn btn-outline-secondary btn-sm" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor">Edit</a>
+                                            <a class="btn btn-au-neutral btn-sm" asp-action="Operations" asp-route-editId="@row.Id" asp-fragment="normalization-editor">Edit</a>
                                             <form method="post" data-au-save asp-action="DeleteVendorOperation" onsubmit="return confirm('Delete this operation?');">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
                                                 @if (row.VendorVersionIds.Count > 0)
                                                 {
                                                     <input type="hidden" name="vendorVersionId" value="@row.VendorVersionIds[0]" />
                                                 }
-                                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                                             </form>
                                         </div>
                                     }
@@ -217,20 +217,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Operation pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

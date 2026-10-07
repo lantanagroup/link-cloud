@@ -33,7 +33,7 @@
         <div class="d-flex gap-2">
             @if (Model.RunAvailable)
             {
-                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-sm btn-outline-secondary">
+                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-neutral">
                     <i class="bi bi-clipboard-data me-1"></i>Open full run
                 </a>
             }
@@ -43,24 +43,24 @@
             }
             @if (Model.PreviousRunId is Guid previous && Model.ScenarioId is Guid)
             {
-                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" class="btn btn-sm btn-outline-secondary">
+                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" class="btn btn-sm btn-au-neutral">
                     Compare with previous
                 </a>
             }
             @if (Model.ScenarioId is Guid scenarioId)
             {
-                <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-outline-secondary">
+                <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-au-neutral">
                     History of this use case
                 </a>
             }
             <form asp-action="Delete" asp-route-id="@Model.RunId" method="post" class="d-inline"
                   onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-sm btn-outline-danger">
+                <button type="submit" class="btn btn-sm btn-danger">
                     <i class="bi bi-trash me-1"></i>Remove from history
                 </button>
             </form>
-            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+            <a asp-action="Index" class="btn btn-sm btn-au-neutral">
                 <i class="bi bi-arrow-left me-1"></i>All use cases
             </a>
         </div>

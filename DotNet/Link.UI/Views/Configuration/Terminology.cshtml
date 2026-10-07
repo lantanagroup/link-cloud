@@ -1,14 +1,14 @@
 @model TerminologyPage
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
 </div>
 <h1 class="h3">Terminology</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
 
 <div class="mb-3">
-    <a class="btn btn-outline-secondary" asp-action="Codes">Search codes</a>
+    <a class="btn btn-au-neutral" asp-action="Codes">Search codes</a>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ValueSetError))

@@ -69,15 +69,15 @@
                         <td>@(run.FinishedAt is null ? "—" : LinkUiTime.Display(run.FinishedAt.Value))</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
-                                <a asp-action="Run" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-secondary" title="View details"><i class="bi bi-box-arrow-up-right"></i></a>
+                                <a asp-action="Run" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral" title="View details"><i class="bi bi-box-arrow-up-right"></i></a>
                                 @if (AutomationRules.IsCancellable(run.Status))
                                 {
-                                    <button type="button" class="btn btn-sm btn-outline-warning btn-cancel-run" data-run-id="@run.RunId" title="Cancel"><i class="bi bi-x-circle"></i></button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-cancel-run" data-run-id="@run.RunId" title="Cancel"><i class="bi bi-x-circle"></i></button>
                                 }
                                 @if (AutomationRules.IsTerminal(run.Status))
                                 {
-                                    <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-secondary" title="Export diagnostics ZIP"><i class="bi bi-download"></i></a>
-                                    <button type="button" class="btn btn-sm btn-outline-danger btn-delete-run" data-run-id="@run.RunId" title="Delete"><i class="bi bi-trash"></i></button>
+                                    <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-au-neutral" title="Export diagnostics ZIP"><i class="bi bi-download"></i></a>
+                                    <button type="button" class="btn btn-sm btn-danger btn-delete-run" data-run-id="@run.RunId" title="Delete"><i class="bi bi-trash"></i></button>
                                 }
                             </div>
                         </td>

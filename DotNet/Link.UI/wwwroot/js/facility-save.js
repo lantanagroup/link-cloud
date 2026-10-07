@@ -185,7 +185,7 @@
     function undoButton(onClick) {
         var undo = document.createElement("button");
         undo.type = "button";
-        undo.className = "btn btn-sm btn-outline-light";
+        undo.className = "btn btn-sm btn-au-close";
         undo.textContent = "Undo";
         undo.addEventListener("click", function (event) {
             event.preventDefault();

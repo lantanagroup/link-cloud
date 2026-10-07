@@ -46,7 +46,7 @@
                 </form>
                 <form method="post" data-au-save asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Restore logs</button>
+                    <button type="submit" class="btn btn-sm btn-au-neutral">Restore logs</button>
                 </form>
             </div>
         </div>
@@ -174,20 +174,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Log pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" href="@Href(Route(bar.Page - 1))" @(Model.Embedded ? "data-da-panel" : null)>Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" href="@Href(Route(bar.Page - 1))" @(Model.Embedded ? "data-da-panel" : null)>Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" href="@Href(Route(bar.Page + 1))" @(Model.Embedded ? "data-da-panel" : null)>Next</a>
+                        <a class="btn btn-sm btn-au-neutral" href="@Href(Route(bar.Page + 1))" @(Model.Embedded ? "data-da-panel" : null)>Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

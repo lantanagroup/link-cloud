@@ -15,7 +15,7 @@
         <p class="text-muted mb-0">Dashboard overview and run history. A new run stands up a throwaway facility, runs, and tears it down.</p>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-center">
-        <a class="btn btn-sm btn-outline-secondary" asp-action="New">Ad hoc</a>
+        <a class="btn btn-sm btn-au-neutral" asp-action="New">Ad hoc</a>
         <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured ? "yes" : "no")">@(Model.LiveConfigured ? "Connecting" : "Live updates are off")</span>
     </div>
 </div>
@@ -86,7 +86,7 @@
                             <span class="badge au-badge-active">@run.StatusLabel</span>
                             <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")"></span>
                         </div>
-                        <a class="btn btn-sm btn-outline-secondary mt-2 w-100" asp-action="Run" asp-route-id="@run.RunId">
+                        <a class="btn btn-sm btn-au-neutral mt-2 w-100" asp-action="Run" asp-route-id="@run.RunId">
                             <i class="bi bi-box-arrow-up-right me-1"></i>View Details
                         </a>
                     </div>
@@ -171,7 +171,7 @@
                     </button>
                 </div>
                 <div class="col-6 col-md-2">
-                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100" id="btnManageScenario">
+                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-au-neutral w-100" id="btnManageScenario">
                         <i class="bi bi-journal-text me-1"></i> Manage
                     </a>
                 </div>

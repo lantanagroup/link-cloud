@@ -123,13 +123,13 @@
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pc-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-pc-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
                                         @(t.IsSystem ? "View" : "Edit")
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-pc-clone" data-id="@t.Id">Clone</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-pc-clone" data-id="@t.Id">Clone</button>
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-danger btn-pc-delete" data-id="@t.Id">Delete</button>
+                                        <button type="button" class="btn btn-sm btn-danger btn-pc-delete" data-id="@t.Id">Delete</button>
                                     }
                                 </div>
                             </td>
@@ -152,7 +152,7 @@
                 <h5 class="mb-0" id="pcModalTitle"><i class="bi bi-person-gear me-2"></i>Patient Configuration</h5>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-success" id="btnPcSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnPcClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnPcClose">Close</button>
                 </div>
             </div>
             <div id="pcFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>

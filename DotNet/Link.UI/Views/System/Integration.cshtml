@@ -2,7 +2,7 @@
 @using Link.UI.Services
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>System</a>
 </div>
 <h1 class="h3">Integration test</h1>
 <partial name="_Nav" />
@@ -28,7 +28,7 @@
                 <input id="readCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-outline-secondary">Read consumers</button>
+                <button type="submit" class="btn btn-au-neutral">Read consumers</button>
             </div>
         </form>
         <form method="post" data-au-save asp-action="StopConsumers" class="row g-2 align-items-end mt-2" onsubmit="return confirm('Stop consumers for this correlation id?');">
@@ -37,7 +37,7 @@
                 <input id="stopCorrelation" name="correlationId" class="form-control" maxlength="64" />
             </div>
             <div class="col-12 col-md-4">
-                <button type="submit" class="btn btn-outline-danger">Stop consumers</button>
+                <button type="submit" class="btn btn-danger">Stop consumers</button>
             </div>
         </form>
     </div>

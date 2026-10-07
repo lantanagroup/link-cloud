@@ -76,19 +76,19 @@
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
                                         @(t.IsSystem ? "View" : "Edit")
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-qp-clone" data-id="@t.Id">Clone</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-qp-clone" data-id="@t.Id">Clone</button>
                                     @if (!t.IsDefault)
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-success btn-qp-default" data-id="@t.Id" title="Set as default">
+                                        <button type="button" class="btn btn-sm btn-success btn-qp-default" data-id="@t.Id" title="Set as default">
                                             <i class="bi bi-star"></i>
                                         </button>
                                     }
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-danger btn-qp-delete" data-id="@t.Id">Delete</button>
+                                        <button type="button" class="btn btn-sm btn-danger btn-qp-delete" data-id="@t.Id">Delete</button>
                                     }
                                 </div>
                             </td>
@@ -115,7 +115,7 @@
                     <button type="button" class="btn btn-sm btn-success" id="btnModalSave" style="display:none;">
                         <i class="bi bi-floppy me-1"></i>Save
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnModalClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnModalClose">Close</button>
                 </div>
             </div>
             <div id="qpFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -218,11 +218,11 @@
                                 The JSON should match the DataAcquisition query plan format (with <code>InitialQueries</code> and <code>SupplementalQueries</code> as numbered objects or arrays).
                             </p>
                             <div class="d-flex gap-2 mb-2">
-                                <label class="btn btn-sm btn-outline-secondary mb-0" for="jsonFileInput">
+                                <label class="btn btn-sm btn-au-neutral mb-0" for="jsonFileInput">
                                     <i class="bi bi-upload me-1"></i>Upload File
                                 </label>
                                 <input type="file" id="jsonFileInput" accept=".json,application/json" class="d-none" />
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnJsonClear">
+                                <button type="button" class="btn btn-sm btn-au-neutral" id="btnJsonClear">
                                     <i class="bi bi-x-lg me-1"></i>Clear
                                 </button>
                             </div>
@@ -344,7 +344,7 @@
             '<input class="form-control qp-p-literal" placeholder="literal value" value="' + esc(p.literal) + '" style="flex:1;min-width:100px;" title="Literal value (e.g. order, imaging,laboratory)" />' +
             '<input class="form-control qp-p-resource" placeholder="resource" value="' + esc(p.resource) + '" style="width:95px;" title="Resource type for ResourceIds (e.g. Encounter)" />' +
             '<input class="form-control qp-p-paged" placeholder="paged" value="' + esc(p.pagedValue) + '" style="width:60px;" title="Page size for ResourceIds" />' +
-            '<button type="button" class="btn btn-sm btn-outline-danger qp-remove-param-btn" title="Remove parameter">&times;</button>';
+            '<button type="button" class="btn btn-sm btn-danger qp-remove-param-btn" title="Remove parameter">&times;</button>';
 
         container.appendChild(row);
 
@@ -390,7 +390,7 @@
                 '<option value="Reference"' + (isRef ? ' selected' : '') + '>Reference</option>' +
             '</select>' +
             '<div style="flex:1;"></div>' +
-            '<button type="button" class="btn btn-sm btn-outline-danger qp-remove-query-btn" title="Remove query"><i class="bi bi-trash"></i></button>';
+            '<button type="button" class="btn btn-sm btn-danger qp-remove-query-btn" title="Remove query"><i class="bi bi-trash"></i></button>';
         card.appendChild(header);
 
         // Body
@@ -415,7 +415,7 @@
 
         var paramFooter = document.createElement('div');
         paramFooter.className = 'mt-1';
-        paramFooter.innerHTML = '<button type="button" class="btn btn-sm btn-outline-success qp-add-param-btn"><i class="bi bi-plus me-1"></i>Add Parameter</button>';
+        paramFooter.innerHTML = '<button type="button" class="btn btn-sm btn-success qp-add-param-btn"><i class="bi bi-plus me-1"></i>Add Parameter</button>';
         body.appendChild(paramFooter);
 
         // Populate parameters

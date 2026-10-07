@@ -101,13 +101,13 @@
                                 <td class="small text-muted">@LinkUiTime.Display(s.UpdatedAt)</td>
                                 <td class="text-nowrap">
                                     <div class="d-inline-flex gap-1">
-                                        <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
+                                        <button type="button" class="btn btn-sm btn-au-neutral btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
                                             @(s.IsSystemScenario ? "View" : "Edit")
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>
+                                        <button type="button" class="btn btn-sm btn-au-neutral btn-scenario-clone" data-id="@s.Id">Clone</button>
                                         @if (!s.IsSystemScenario)
                                         {
-                                            <button type="button" class="btn btn-sm btn-outline-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
+                                            <button type="button" class="btn btn-sm btn-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
                                         }
                                     </div>
                                 </td>
