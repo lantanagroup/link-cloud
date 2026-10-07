@@ -28,64 +28,63 @@ public sealed class TenantsController : Controller
         _logger = logger;
     }
 
-    public async Task<IActionResult> Index(string? search, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(string? search, bool includeDeleted, CancellationToken cancellationToken)
     {
         ViewData["Title"] = "Tenants";
 
         try
         {
-            var response = await _facilityServiceClient.GetFacilityListAsync(
+            var activeResponse = await _facilityServiceClient.GetFacilityListAsync(
                 search: search,
                 includeDeleted: false,
                 cancellationToken: cancellationToken);
-
-            // Tenant returns 204 when the facility list is empty.
-            if (response.StatusCode == StatusCodes.Status204NoContent
-                || (response.IsSuccessStatusCode && response.Body is { Count: 0 }))
-            {
-                return View(new TenantListViewModel
-                {
-                    Search = search,
-                    LoadedSuccessfully = true
-                });
-            }
-
-            if (!response.IsSuccessStatusCode || response.Body is null)
+            if (!TryMapFacilities(activeResponse, out var active))
             {
                 _logger.LogWarning(
                     "Facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
-                    response.StatusCode,
-                    response.RequestUrl,
-                    response.TraceId);
-
-                var detail = response.StatusCode == 0
-                    ? "Tenant service could not be reached."
-                    : $"Tenant service returned HTTP {response.StatusCode}.";
-
-                return View(new TenantListViewModel
-                {
-                    Search = search,
-                    LoadedSuccessfully = false,
-                    ErrorMessage = $"Unable to load tenants. {detail} " +
-                                   "Confirm ServiceRegistry:TenantService:TenantServiceUrl and Link token settings."
-                });
+                    activeResponse.StatusCode,
+                    activeResponse.RequestUrl,
+                    activeResponse.TraceId);
+                return View(FacilityListError(search, includeDeleted, activeResponse.StatusCode));
             }
 
-            var tenants = response.Body
-                .OrderBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+            var allResponse = await _facilityServiceClient.GetFacilityListAsync(
+                search: search,
+                includeDeleted: true,
+                cancellationToken: cancellationToken);
+            string? deletedNote = null;
+            Dictionary<string, string> all;
+            if (!TryMapFacilities(allResponse, out all))
+            {
+                all = active;
+                deletedNote = "Deleted facilities could not be loaded.";
+                _logger.LogWarning(
+                    "Deleted facility list failed with status {StatusCode}. RequestUrl={RequestUrl} TraceId={TraceId}",
+                    allResponse.StatusCode,
+                    allResponse.RequestUrl,
+                    allResponse.TraceId);
+            }
+
+            var activeKeys = new HashSet<string>(active.Keys, StringComparer.OrdinalIgnoreCase);
+            var tenants = all
                 .Select(kvp => new TenantListItem
                 {
                     FacilityId = kvp.Key,
-                    DisplayName = string.IsNullOrWhiteSpace(kvp.Value) ? kvp.Key : kvp.Value
+                    DisplayName = string.IsNullOrWhiteSpace(kvp.Value) ? kvp.Key : kvp.Value,
+                    IsDeleted = !activeKeys.Contains(kvp.Key)
                 })
+                .Where(item => includeDeleted || !item.IsDeleted)
+                .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(item => item.FacilityId, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             return View(new TenantListViewModel
             {
                 Search = search,
+                IncludeDeleted = includeDeleted,
                 Tenants = tenants,
-                LoadedSuccessfully = true
+                LoadedSuccessfully = true,
+                DeletedNote = deletedNote
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -98,10 +97,24 @@ public sealed class TenantsController : Controller
             return View(new TenantListViewModel
             {
                 Search = search,
+                IncludeDeleted = includeDeleted,
                 LoadedSuccessfully = false,
                 ErrorMessage = "Tenant service call failed: " + ex.Message
             });
         }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(string? id, string? search, bool includeDeleted, CancellationToken cancellationToken)
+    {
+        var result = await _view.RestoreFacilityAsync(id, cancellationToken);
+        if (result.Succeeded)
+            TempData["Message"] = result.Message;
+        else
+            TempData["Error"] = result.Message;
+
+        return RedirectToAction(nameof(Index), new { search, includeDeleted });
     }
 
     [HttpGet]
@@ -309,6 +322,27 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequestSizeLimit(256 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 256 * 1024)]
+    public async Task<IActionResult> ImportExtensionUrls(
+        [FromRoute] string? id,
+        IFormFile? csv,
+        CancellationToken cancellationToken)
+    {
+        string? text = null;
+        var tooLarge = csv is { Length: > FacilityNormalizationRules.MaxImportCharacters };
+        if (csv is { Length: > 0 } && !tooLarge)
+        {
+            using var reader = new StreamReader(csv.OpenReadStream());
+            text = await reader.ReadToEndAsync(cancellationToken);
+        }
+
+        var result = await _hub.ImportExtensionUrlsAsync(id, text, tooLarge, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOperation(
         [FromRoute] string? id,
         string? operationId,
@@ -416,6 +450,43 @@ public sealed class TenantsController : Controller
     {
         var result = await _hub.SoftDeleteAsync(id, cancellationToken);
         return FromResult(result, id ?? "Facility");
+    }
+
+    private static bool TryMapFacilities(
+        LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse<Dictionary<string, string>> response,
+        out Dictionary<string, string> facilities)
+    {
+        // Tenant returns 204 when the facility list is empty.
+        if (response.StatusCode == StatusCodes.Status204NoContent
+            || (response.IsSuccessStatusCode && response.Body is { Count: 0 }))
+        {
+            facilities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return true;
+        }
+
+        if (!response.IsSuccessStatusCode || response.Body is null)
+        {
+            facilities = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return false;
+        }
+
+        facilities = response.Body;
+        return true;
+    }
+
+    private TenantListViewModel FacilityListError(string? search, bool includeDeleted, int statusCode)
+    {
+        var detail = statusCode == 0
+            ? "Tenant service could not be reached."
+            : $"Tenant service returned HTTP {statusCode}.";
+        return new TenantListViewModel
+        {
+            Search = search,
+            IncludeDeleted = includeDeleted,
+            LoadedSuccessfully = false,
+            ErrorMessage = "Unable to load tenants. " + detail +
+                           " Confirm ServiceRegistry:TenantService:TenantServiceUrl and Link token settings."
+        };
     }
 
     private IActionResult FromResult(FacilityWriteResult result, string title)

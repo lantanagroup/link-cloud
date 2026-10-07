@@ -10,7 +10,7 @@ namespace Link.UI.Services;
 
 /// <summary>
 /// Acquisition logs, sFTP logs, audit events, and the Kafka/Grafana links. Reads and the
-/// log actions go through LinkSDK. Facility-wide log restore is not part of this area.
+/// log actions go through LinkSDK, including facility-wide disable and restore.
 /// </summary>
 public sealed class LogsService
 {
@@ -340,6 +340,38 @@ public sealed class LogsService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Acquisition log cancel-by-filter failed");
+            return Fail("Data acquisition service call failed: " + ex.Message);
+        }
+    }
+
+    public async Task<LogsAction> ChangeFacilityLogsAsync(string? facilityId, bool restore, CancellationToken cancellationToken)
+    {
+        if (_acquisition is null)
+            return Fail(AcquisitionNotConfigured);
+
+        var id = facilityId?.Trim() ?? string.Empty;
+        if (!FacilityFormRules.IsValidFacilityId(id, _options.NumericOnlyFacilityId))
+            return Fail(FacilityFormRules.FacilityIdRule(_options.NumericOnlyFacilityId));
+
+        try
+        {
+            var response = restore
+                ? await _acquisition.RestoreLogsByFacilityAsync(id, cancellationToken)
+                : await _acquisition.SoftDeleteLogsByFacilityAsync(id, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return Fail(FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody));
+
+            return Ok(restore
+                ? "Acquisition logs for this facility were restored."
+                : "Acquisition logs for this facility were disabled.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Facility acquisition log change failed. FacilityId={FacilityId}", id.Sanitize());
             return Fail("Data acquisition service call failed: " + ex.Message);
         }
     }

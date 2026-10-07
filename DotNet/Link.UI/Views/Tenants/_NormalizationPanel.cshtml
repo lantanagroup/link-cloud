@@ -342,6 +342,59 @@
                                             </div>
                                         }
                                     </div>
+                                    @{
+                                        var selectedVendors = new HashSet<string>(editor.VendorVersionIds ?? [], StringComparer.OrdinalIgnoreCase);
+                                        var vendorOptions = Model.Vendors.ToList();
+                                        foreach (var rawVendor in editor.VendorVersionIds ?? [])
+                                        {
+                                            if (Guid.TryParse(rawVendor, out var parsedVendor) && vendorOptions.All(option => option.Id != parsedVendor))
+                                            {
+                                                vendorOptions.Add(new VendorOption { Id = parsedVendor, Label = parsedVendor.ToString() });
+                                            }
+                                        }
+                                    }
+                                    @if (Model.VendorListLoaded)
+                                    {
+                                        <div class="mt-3">
+                                            <input type="hidden" name="VendorPresetsPosted" value="true" />
+                                            <fieldset>
+                                                <legend class="form-label">Vendor presets</legend>
+                                                @if (vendorOptions.Count == 0)
+                                                {
+                                                    <p class="text-muted mb-0">No vendor versions are available. Saving clears presets on this operation.</p>
+                                                }
+                                                else
+                                                {
+                                                    var vendorIndex = 0;
+                                                    foreach (var vendor in vendorOptions)
+                                                    {
+                                                        var vendorInputId = "vendor-preset-" + vendorIndex++;
+                                                        var vendorValue = vendor.Id.ToString();
+                                                        <div class="form-check">
+                                                            @if (selectedVendors.Contains(vendorValue))
+                                                            {
+                                                                <input class="form-check-input" type="checkbox" id="@vendorInputId" name="VendorVersionIds" value="@vendorValue" checked />
+                                                            }
+                                                            else
+                                                            {
+                                                                <input class="form-check-input" type="checkbox" id="@vendorInputId" name="VendorVersionIds" value="@vendorValue" />
+                                                            }
+                                                            <label class="form-check-label" for="@vendorInputId">@vendor.Label</label>
+                                                        </div>
+                                                    }
+                                                }
+                                            </fieldset>
+                                            <p class="form-text">Checked versions keep this operation as a preset. Clearing every box removes the presets.</p>
+                                        </div>
+                                    }
+                                    else if (editing)
+                                    {
+                                        <p class="form-text">Vendor versions could not be loaded, so saving leaves the presets on this operation as they are.</p>
+                                    }
+                                    else
+                                    {
+                                        <p class="form-text">Vendor versions could not be loaded, so this operation is saved without presets.</p>
+                                    }
                                     <button type="submit" class="btn btn-au-action mt-3">@(editing ? "Save operation" : "Add operation")</button>
                                 </form>
 
@@ -361,6 +414,19 @@
                                     }
                                 }
                             }
+                        </div>
+                    }
+
+                    @if (panel.ResourceTypes.Count > 0)
+                    {
+                        <div class="border rounded p-3 mb-3" id="extension-url-import">
+                            <h3 class="h6">Import extension URLs</h3>
+                            <p class="text-muted">CSV with two columns: resource type and extension URL. One remove-extensions operation is created for each resource type on this facility. Vendor-wide import is not on this page.</p>
+                            <form method="post" asp-action="ImportExtensionUrls" asp-route-id="@Model.FacilityId" enctype="multipart/form-data">
+                                <label class="form-label" for="extensionCsv">CSV file</label>
+                                <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
+                                <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
+                            </form>
                         </div>
                     }
 
