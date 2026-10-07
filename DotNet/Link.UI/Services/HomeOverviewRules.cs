@@ -287,7 +287,7 @@ public static class HomeOverviewRules
         status is "Failed" or "MaxRetriesReached" ? "au-badge-danger" : "au-badge-muted";
 
     public static string When(DateTimeOffset value) =>
-        value == default ? "" : LinkUiTime.IsoUtc(value);
+        value == default ? "" : LinkUiTime.Display(value);
 
     public static DateTimeOffset? ParseIso(string? value)
     {
@@ -429,7 +429,7 @@ public static class HomeOverviewRules
             issues.Add(new HomeIssue
             {
                 Title = "A report has been in flight for more than a day",
-                Detail = LinkUiTime.IsoUtc(oldest),
+                Detail = LinkUiTime.Display(oldest),
                 Href = InFlightHref
             });
         }

@@ -118,7 +118,7 @@
             var actionsDiv = document.getElementById('runHeaderActions');
             if (!actionsDiv) return;
 
-            var backLink = actionsDiv.querySelector('a.btn-au-action');
+            var backLink = actionsDiv.querySelector('a.btn-outline-secondary');
 
             if (!document.getElementById('btnDeleteRun')) {
                 var deleteBtn = document.createElement('button');
@@ -133,10 +133,7 @@
             if (!document.getElementById('btnExportRun')) {
                 var exportLink = document.createElement('a');
                 exportLink.id = 'btnExportRun';
-                exportLink.className = 'btn btn-sm';
-                exportLink.style.background = 'var(--au-accent)';
-                exportLink.style.color = '#fff';
-                exportLink.style.fontWeight = '600';
+                exportLink.className = 'btn btn-sm btn-outline-secondary';
                 exportLink.href = '@Url.Action("Export", "Automation", new { id = Model.RunId })';
                 exportLink.innerHTML = '<i class="bi bi-download me-1"></i>Export Diagnostics';
                 if (backLink) actionsDiv.insertBefore(exportLink, backLink);
@@ -807,7 +804,7 @@
             try {
                 const d = new Date(value);
                 if (Number.isNaN(d.getTime())) return String(value);
-                return d.toISOString().slice(11, 19) + 'Z';
+                return d.toISOString().replace(/\.000Z$/, 'Z');
             } catch {
                 return String(value);
             }
@@ -884,7 +881,7 @@
                 if (accepting && census === 'NotAdmitted')
                     action = `<button type="button" class="btn btn-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Admit</button>`;
                 else if (accepting && census === 'Admitted')
-                    action = `<button type="button" class="btn btn-warning btn-sm live-pool-discharge" data-patient-id="${escapeHtml(id)}">Discharge</button>`;
+                    action = `<button type="button" class="btn btn-danger btn-sm live-pool-discharge" data-patient-id="${escapeHtml(id)}">Discharge</button>`;
                 else if (accepting && census === 'DischargedDuringWindow')
                     action = `<button type="button" class="btn btn-outline-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Re-admit</button>`;
                 return `<tr>
@@ -967,6 +964,7 @@
                     ${notes ? `<span class="text-muted">— ${escapeHtml(notes)}</span>` : ''}
                 </div>`;
             }).join('');
+            if (window.luPaintTimes) window.luPaintTimes(box);
             box.scrollTop = 0;
         }
 

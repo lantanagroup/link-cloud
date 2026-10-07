@@ -397,7 +397,8 @@
         if (panel.hasAttribute("data-lu-hide-on-cancel")) panel.classList.add("d-none");
     });
 
-    var instantPattern = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/g;
+    var instantPattern = /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}| UTC)/g;
+    var utcTitlePattern = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC(?:; \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC)*$/;
     var localFormat = new Intl.DateTimeFormat(undefined, {
         year: "numeric",
         month: "short",
@@ -410,6 +411,15 @@
         function part(value) { return String(value).padStart(2, "0"); }
         return date.getUTCFullYear() + "-" + part(date.getUTCMonth() + 1) + "-" + part(date.getUTCDate())
             + " " + part(date.getUTCHours()) + ":" + part(date.getUTCMinutes()) + ":" + part(date.getUTCSeconds()) + " UTC";
+    }
+
+    function parseInstant(token) {
+        var body = token.slice(-4) === " UTC" ? token.slice(0, -4) : token;
+        if (!/Z$|[+-]\d{2}:\d{2}$/.test(body)) body += "Z";
+        body = body.replace(" ", "T");
+        if (/T\d{2}:\d{2}Z$/.test(body)) body = body.replace("Z", ":00Z");
+        else if (/T\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(body)) body = body.replace(/([+-]\d{2}:\d{2})$/, ":00$1");
+        return new Date(body);
     }
 
     function paintTimes(root) {
@@ -432,16 +442,18 @@
             if (!instantPattern.test(text)) return;
             var titles = [];
             instantPattern.lastIndex = 0;
-            var next = text.replace(instantPattern, function (iso) {
-                var date = new Date(iso);
-                if (isNaN(date.getTime())) return iso;
+            var next = text.replace(instantPattern, function (token) {
+                var date = parseInstant(token);
+                if (isNaN(date.getTime())) return token;
                 titles.push(utcTitle(date));
                 return localFormat.format(date);
             });
             if (next === text || !titles.length) return;
             node.nodeValue = next;
             var parent = node.parentElement;
-            if (parent && !parent.getAttribute("title")) parent.setAttribute("title", titles.join("; "));
+            if (!parent) return;
+            var title = parent.getAttribute("title") || "";
+            if (!title || utcTitlePattern.test(title)) parent.setAttribute("title", titles.join("; "));
         });
     }
 

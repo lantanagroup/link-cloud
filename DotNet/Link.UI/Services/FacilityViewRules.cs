@@ -209,10 +209,10 @@ public static class FacilityViewRules
     }
 
     public static string When(DateTime value) =>
-        value == default ? "" : value.ToString("M/d/yy HH:mm");
+        value == default ? "" : LinkUiTime.Display(value);
 
     public static string When(DateTime? value) =>
-        value is null || value.Value == default ? "" : LinkUiTime.IsoUtc(value.Value);
+        value is null || value.Value == default ? "" : LinkUiTime.Display(value.Value);
 
     public static IReadOnlyList<FacilityLocationNode> BuildLocationTree(IEnumerable<FacilityLocationTreeApiModel>? locations)
     {

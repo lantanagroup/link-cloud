@@ -61,6 +61,66 @@ public class DataAcquisitionLogsTests
     }
 
     [Fact]
+    public void The_shared_list_renders_times_through_the_shared_painter()
+    {
+        Read("DotNet/Link.UI/Services/LogsService.cs").Should().Contain("FacilityViewRules.When(row.CreateDate)");
+        Read("DotNet/Link.UI/Services/FacilityViewRules.cs").Should().Contain("LinkUiTime.Display");
+        Read("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml").Should().Contain("@row.Created");
+
+        var painter = Read("DotNet/Link.UI/wwwroot/js/live-region.js");
+        painter.Should().Contain(" UTC");
+        painter.Should().Contain("window.luPaintTimes = paintTimes");
+
+        var module = Read("DotNet/Link.UI/wwwroot/js/data-acquisition-logs.js");
+        module.Should().Contain("window.luPaintTimes");
+        Read("DotNet/Link.UI/wwwroot/js/automation-run.js").Should().Contain("window.luPaintTimes");
+    }
+
+    [Fact]
+    public void Log_actions_use_green_and_solid_red()
+    {
+        var pages = new[]
+        {
+            "DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml",
+            "DotNet/Link.UI/Views/Logs/AcquisitionDetail.cshtml",
+            "DotNet/Link.UI/Views/Logs/Acquisition.cshtml",
+            "DotNet/Link.UI/Views/Logs/Audit.cshtml",
+            "DotNet/Link.UI/Views/Logs/Sftp.cshtml",
+            "DotNet/Link.UI/Views/Logs/SftpDetail.cshtml",
+            "DotNet/Link.UI/Views/Logs/Index.cshtml",
+            "DotNet/Link.UI/Views/Logs/Kafka.cshtml"
+        };
+        foreach (var page in pages)
+        {
+            var text = Read(page);
+            text.Should().NotContain("btn-au-action", because: page);
+            text.Should().NotContain("btn-primary", because: page);
+            text.Should().NotContain("btn-outline-danger", because: page);
+        }
+
+        var list = Read("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml");
+        list.Should().Contain("btn btn-sm btn-success\">Process matching");
+        list.Should().Contain("btn btn-sm btn-success\" onclick=\"return confirm('Process the selected acquisition logs?');\"");
+        list.Should().Contain("btn btn-sm btn-danger\">Disable logs");
+        list.Should().Contain("btn btn-sm btn-danger\">Cancel matching");
+        list.Should().Contain("btn btn-sm btn-danger\" formaction");
+        list.Should().Contain("btn-outline-secondary\">Restore logs");
+
+        var detail = Read("DotNet/Link.UI/Views/Logs/AcquisitionDetail.cshtml");
+        detail.Should().Contain("btn btn-sm btn-success\">Process");
+        detail.Should().Contain("btn btn-sm btn-danger\">Cancel");
+
+        foreach (var searchPage in new[] { "Acquisition", "Audit", "Sftp" })
+        {
+            Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
+                .Should().Contain("btn btn-outline-secondary\">Search");
+        }
+
+        Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain(".btn-danger:hover");
+        Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain("--lu-dialog-top");
+    }
+
+    [Fact]
     public void Home_and_the_editor_do_not_substitute_another_name_for_a_facility()
     {
         Read("DotNet/Link.UI/Views/Home/_Overview.cshtml").Should().NotContain("regular");

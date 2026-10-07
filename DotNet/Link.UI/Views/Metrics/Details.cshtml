@@ -4,7 +4,7 @@
     string FormatWhen(DateTimeOffset? value)
     {
         if (value is null) return "—";
-        return LinkUiTime.IsoUtc(value.Value);
+        return LinkUiTime.Display(value.Value);
     }
 }
 
@@ -33,7 +33,7 @@
         <div class="d-flex gap-2">
             @if (Model.RunAvailable)
             {
-                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-action">
+                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-clipboard-data me-1"></i>Open full run
                 </a>
             }

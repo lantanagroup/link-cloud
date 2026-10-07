@@ -32,7 +32,7 @@
                         <input id="scheduledTrigger" name="scheduledTrigger" value="@Model.CensusTrigger" class="form-control" placeholder="0 0 6 * * ?" />
                         <div class="form-text">Quartz cron expression.</div>
                     </div>
-                    <button type="submit" class="btn btn-au-action">@(Model.CensusExists ? "Save census" : "Add census")</button>
+                    <button type="submit" class="btn btn-success">@(Model.CensusExists ? "Save census" : "Add census")</button>
                 </form>
                 @if (Model.CensusExists)
                 {

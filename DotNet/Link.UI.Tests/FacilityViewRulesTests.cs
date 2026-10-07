@@ -40,6 +40,17 @@ public class FacilityViewRulesTests
     }
 
     [Fact]
+    public void When_shows_labeled_utc_for_both_clocks()
+    {
+        var instant = new DateTime(2026, 10, 7, 12, 49, 40, DateTimeKind.Utc);
+
+        FacilityViewRules.When(instant).Should().Be("2026-10-07 12:49:40 UTC");
+        FacilityViewRules.When((DateTime?)instant).Should().Be(LinkUiTime.Display(instant));
+        FacilityViewRules.When(default(DateTime)).Should().BeEmpty();
+        FacilityViewRules.When((DateTime?)null).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Blank_report_id_is_no_filter_and_a_non_guid_is_an_error()
     {
         FacilityViewRules.ParseReportId("  ", out var blank).Should().BeNull();

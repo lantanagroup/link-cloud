@@ -211,7 +211,7 @@
                                                     <dd class="col-sm-10 text-danger">@ep.LastResult.ErrorMessage</dd>
                                                 }
                                                 <dt class="col-sm-2 text-muted">Time</dt>
-                                                <dd class="col-sm-10">@LinkUiTime.IsoUtc(ep.LastResult.ExecutedAt) | @(ep.LastResult.DurationMs)ms</dd>
+                                                <dd class="col-sm-10">@LinkUiTime.Display(ep.LastResult.ExecutedAt) | @(ep.LastResult.DurationMs)ms</dd>
                                             </dl>
                                         </td>
                                     </tr>
@@ -497,6 +497,7 @@
 
         // Insert after error row if it exists, otherwise after main row
         row.after(detailRow);
+        if (window.luPaintTimes) window.luPaintTimes(detailRow);
 
         updateSummary();
     }
@@ -946,7 +947,7 @@
                 const build = r.build ? `<code class="text-break">${escapeHtml(r.build)}</code>` : '<span class="text-muted">N/A</span>';
                 const version = r.version ? `<code class="text-break">${escapeHtml(r.version)}</code>` : '<span class="text-muted">N/A</span>';
                 const productVersion = r.productVersion ? `<code class="text-break">${escapeHtml(r.productVersion)}</code>` : '<span class="text-muted">N/A</span>';
-                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td><td>${commit}</td><td>${build}</td><td>${version}</td><td>${productVersion}</td></tr>`;
+                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toISOString()}</small></td><td>${error}</td><td>${commit}</td><td>${build}</td><td>${version}</td><td>${productVersion}</td></tr>`;
                 // Expandable detail row
                 const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
                 const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
@@ -959,6 +960,7 @@
             });
             html += '</tbody></table></div>';
             content.innerHTML = html;
+            if (window.luPaintTimes) window.luPaintTimes(content);
 
             // Toggle detail on row click in history
             content.querySelectorAll('tr[data-toggle-detail]').forEach(tr => {

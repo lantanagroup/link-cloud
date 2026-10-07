@@ -13,7 +13,7 @@
 
 <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
     <h1 class="h3 mb-0 me-auto">Reports</h1>
-    <a class="btn btn-au-action" asp-action="Generate">Generate report</a>
+    <a class="btn btn-success" asp-action="Generate">Generate report</a>
 </div>
 
 @if (TempData["Message"] is string message)
@@ -107,7 +107,7 @@
                 <partial name="_AutomationScope" model="Model.Query.Scope" />
             </div>
             <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-au-action">Search</button>
+                <button type="submit" class="btn btn-outline-secondary">Search</button>
                 <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
             </div>
         </form>

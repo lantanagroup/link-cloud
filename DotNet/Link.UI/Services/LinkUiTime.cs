@@ -3,7 +3,9 @@ using System.Globalization;
 namespace Link.UI.Services;
 
 /// <summary>
-/// Display instants as a UTC ISO-8601 value. The browser rewrites that text into local time.
+/// Instants are stored and compared in UTC. Page text uses <see cref="Display"/>,
+/// which is the UTC clock labeled UTC. The browser rewrites that text into the
+/// viewer's local time and keeps the UTC value as the element's title.
 /// Unspecified values are service timestamps stored as UTC and are not shifted again.
 /// A local value is converted once, to the same instant.
 /// </summary>
@@ -41,4 +43,14 @@ public static class LinkUiTime
 
         return string.Concat(iso.AsSpan(0, 10), " ", iso.AsSpan(11, 8), " UTC");
     }
+
+    public static string Display(DateTime value) => Title(IsoUtc(value));
+
+    public static string Display(DateTime? value) =>
+        value is null ? "" : Display(value.Value);
+
+    public static string Display(DateTimeOffset value) => Title(IsoUtc(value));
+
+    public static string Display(DateTimeOffset? value) =>
+        value is null ? "" : Display(value.Value);
 }

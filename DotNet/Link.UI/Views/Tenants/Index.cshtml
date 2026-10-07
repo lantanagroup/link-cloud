@@ -1,4 +1,4 @@
-﻿@model Link.UI.Models.TenantListViewModel
+@model Link.UI.Models.TenantListViewModel
 @using Link.UI.Services
 @{
     ViewData["Title"] = "Tenants";
@@ -59,7 +59,7 @@
                 <partial name="_AutomationScope" model="Model.Scope" />
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-au-action">Search</button>
+                <button type="submit" class="btn btn-outline-secondary">Search</button>
             </div>
         </form>
         <div id="tenantResults" data-au-refresh="20000">

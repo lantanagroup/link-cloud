@@ -37,7 +37,7 @@
     string FormatWhen(DateTimeOffset? value)
     {
         if (value is null) return "—";
-        return LinkUiTime.IsoUtc(value.Value);
+        return LinkUiTime.Display(value.Value);
     }
     string FormatPercent(double? percent)
     {

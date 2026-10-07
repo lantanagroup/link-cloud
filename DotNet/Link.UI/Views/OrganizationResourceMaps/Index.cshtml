@@ -16,7 +16,7 @@
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 @Html.AntiForgeryToken()
                 <input type="file" id="ormGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
-                <button type="button" class="btn btn-sm btn-au-action" id="btnOrmGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-success" id="btnOrmGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOrmGenerateReset">Start over</button>
                 <span id="ormGenSessionHint" class="small text-muted"></span>
             </div>
@@ -68,9 +68,9 @@
                                 <span class="badge bg-light text-dark border">Custom</span>
                             }
                         </td>
-                        <td class="small text-muted">@LinkUiTime.IsoUtc(t.UpdatedAt)</td>
+                        <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                         <td class="text-nowrap">
-                            <button class="btn btn-sm btn-outline-primary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
+                            <button class="btn btn-sm btn-outline-secondary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
                             <button class="btn btn-sm btn-outline-secondary btn-map-clone" data-id="@t.Id">Clone</button>
                             @if (!t.IsDefault)
                             {

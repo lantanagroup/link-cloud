@@ -121,7 +121,7 @@ else
                 </div>
 
                 <div class="mt-3 d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-au-action">@(Model.IsCreate ? "Create facility" : "Save facility")</button>
+                    <button type="submit" class="btn btn-success">@(Model.IsCreate ? "Create facility" : "Save facility")</button>
                 </div>
             </form>
 
@@ -188,7 +188,7 @@ else
                                         </div>
                                     </div>
                                 }
-                                <button type="submit" class="btn btn-au-action">@(Model.QueryDispatchExists ? "Save query dispatch" : "Add query dispatch")</button>
+                                <button type="submit" class="btn btn-success">@(Model.QueryDispatchExists ? "Save query dispatch" : "Add query dispatch")</button>
                             </form>
                             @if (Model.QueryDispatchExists)
                             {
@@ -264,7 +264,7 @@ else
                                     <input type="hidden" name="EmailEnabled" value="false" />
                                     <label class="form-check-label" for="notificationEmailEnabled">Email channel enabled</label>
                                 </div>
-                                <button type="submit" class="btn btn-au-action">@(Model.Notification.Exists ? "Save notification" : "Add notification")</button>
+                                <button type="submit" class="btn btn-success">@(Model.Notification.Exists ? "Save notification" : "Add notification")</button>
                             </form>
                             @if (Model.Notification.Exists)
                             {
