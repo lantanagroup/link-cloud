@@ -20,7 +20,7 @@ public sealed class PlaceholderController : Controller
     public IActionResult System() => RedirectToAction("Index", "System");
 
     [HttpGet]
-    public IActionResult Automation() => ComingSoon("Automation");
+    public IActionResult Automation() => RedirectToAction("Index", "Automation");
 
     private IActionResult ComingSoon(string section)
     {

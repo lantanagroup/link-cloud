@@ -2,6 +2,21 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "MongoDB.Driver": {
+        "type": "Direct",
+        "requested": "[3.9.0, )",
+        "resolved": "3.9.0",
+        "contentHash": "XKUa+y5RtNH1iInfxj3Y7c1FN1BQ16/7hFxoqU6fzc3+BKM1D3mGa+pB/yBbAk8jNxf7+JWEnCfuQOyCo7dQLg==",
+        "dependencies": {
+          "DnsClient": "1.6.1",
+          "Microsoft.Extensions.Logging.Abstractions": "2.0.0",
+          "MongoDB.Bson": "3.9.0",
+          "SharpCompress": "0.48.1",
+          "Snappier": "1.3.1",
+          "System.Buffers": "4.6.1",
+          "ZstdSharp.Port": "0.7.3"
+        }
+      },
       "Swashbuckle.AspNetCore": {
         "type": "Direct",
         "requested": "[6.9.0, )",
@@ -2253,21 +2268,6 @@
         "contentHash": "cloLGeZolXbCJhJBc5OC05uhrdhdPL6MWHuVUnkkUvPDeK7HkwThBaLZ1XjBQVk9YhxXE2OvHXnKi0PLleXxDg==",
         "dependencies": {
           "Microsoft.IdentityModel.Tokens": "7.1.2"
-        }
-      },
-      "MongoDB.Driver": {
-        "type": "CentralTransitive",
-        "requested": "[3.9.0, )",
-        "resolved": "3.9.0",
-        "contentHash": "XKUa+y5RtNH1iInfxj3Y7c1FN1BQ16/7hFxoqU6fzc3+BKM1D3mGa+pB/yBbAk8jNxf7+JWEnCfuQOyCo7dQLg==",
-        "dependencies": {
-          "DnsClient": "1.6.1",
-          "Microsoft.Extensions.Logging.Abstractions": "2.0.0",
-          "MongoDB.Bson": "3.9.0",
-          "SharpCompress": "0.48.1",
-          "Snappier": "1.3.1",
-          "System.Buffers": "4.6.1",
-          "ZstdSharp.Port": "0.7.3"
         }
       },
       "OpenTelemetry": {

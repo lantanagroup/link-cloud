@@ -1,0 +1,112 @@
+@model AutomationRunPage
+@{
+    var run = Model.Run;
+}
+@await Html.PartialAsync("_Nav")
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1" id="runTitle">@(run?.RunName ?? "Run")</h1>
+        <p class="text-muted mb-0">Stored summary for this run. Lines that arrive while this page is open are shown below. Older log chunks stay in Automation storage.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured && Model.Found ? "yes" : "no")" data-run-id="@Model.RequestedId">@(Model.LiveConfigured && Model.Found ? "Connecting" : "Live updates are off")</span>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Back to runs</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Message))
+{
+    <div class="alert alert-warning" id="runMessage">@Model.Message</div>
+}
+
+<div id="runSummary" class="@(run is null ? "d-none" : "")">
+    <div class="au-card card mb-3">
+        <div class="card-header">Summary</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Status</div>
+                    <div id="runStatus">@run?.StatusLabel</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Scenario</div>
+                    <div id="runScenario">@(string.IsNullOrWhiteSpace(run?.Scenario) ? "—" : run!.Scenario)</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Patients</div>
+                    <div id="runPatients">@run?.PatientCount</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Seed</div>
+                    <div id="runSeed">@run?.Seed</div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="small text-muted">Facility</div>
+                    <div id="runFacility">
+                        @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
+                        {
+                            <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@run.FacilityId">@run.FacilityId</a>
+                            @if (run.ThrowawayFacility)
+                            {
+                                <span class="badge bg-secondary ms-1">Automation facility</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="small text-muted">Report</div>
+                    <div id="runReport">
+                        @if (run is not null && !string.IsNullOrWhiteSpace(run.ReportId))
+                        {
+                            <a asp-controller="Reports" asp-action="Index" asp-route-facilityId="@run.FacilityId">@run.ReportId</a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Started</div>
+                    <div id="runStarted">@(run?.StartedAt?.ToString("u") ?? "—")</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Finished</div>
+                    <div id="runFinished">@(run?.FinishedAt?.ToString("u") ?? "—")</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Duration</div>
+                    <div id="runDuration">@(run?.Duration ?? "—")</div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="small text-muted">Templates</div>
+                    <div id="runTemplates">@(run?.TemplateVersion is int version ? $"v{version}" : "—")</div>
+                </div>
+            </div>
+            <div id="runError" class="alert alert-danger mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.Error) ? "d-none" : "")">@run?.Error</div>
+            <div class="mt-3 d-flex flex-wrap gap-2">
+                @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Logs" asp-action="Acquisition" asp-route-facilityId="@run.FacilityId">Acquisition log</a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="au-card card">
+        <div class="card-header">Live log</div>
+        <div class="card-body">
+            <pre id="liveLog" class="lu-live-log text-muted">No new lines yet.</pre>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script src="~/js/automation-run.js" asp-append-version="true"></script>
+}
