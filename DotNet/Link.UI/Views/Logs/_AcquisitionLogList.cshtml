@@ -117,7 +117,7 @@ else
                         <table class="table table-sm align-middle mb-2">
                             <thead>
                                 <tr>
-                                    <th scope="col"><span class="visually-hidden">Select</span></th>
+                                    <th scope="col"><input class="form-check-input" type="checkbox" data-au-select-page aria-label="Select all logs on this page" /></th>
                                     <th scope="col"><a href="@Href(SortRoute("Id", false))" @(Model.Embedded ? "data-da-panel" : null)>Id@(Mark("Id"))</a></th>
                                     <th scope="col"><a href="@Href(SortRoute("FacilityId", false))" @(Model.Embedded ? "data-da-panel" : null)>Facility@(Mark("FacilityId"))</a></th>
                                     <th scope="col"><a href="@Href(SortRoute("PatientId", false))" @(Model.Embedded ? "data-da-panel" : null)>Patient@(Mark("PatientId"))</a></th>
@@ -134,9 +134,22 @@ else
                             {
                                 <tr>
                                     <td>
-                                        @if (row.CanProcess)
+                                        @{
+                                            var canCancel = !row.Deleted && LogsRules.CanCancel(row.Status, row.CreatedUtc, search.MinAgeHours, DateTime.UtcNow);
+                                            var canProcess = !row.Deleted && row.CanProcess;
+                                            var reason = row.Deleted
+                                                ? "Deleted logs cannot be selected."
+                                                : !canProcess && !canCancel
+                                                    ? row.Status + " logs cannot be selected."
+                                                    : null;
+                                        }
+                                        @if (reason is null)
                                         {
-                                            <input class="form-check-input" type="checkbox" name="ids" value="@row.Id" aria-label="Select log @row.Id" />
+                                            <input class="form-check-input" type="checkbox" name="ids" value="@row.Id" data-can-process="@(canProcess ? "yes" : "no")" data-can-cancel="@(canCancel ? "yes" : "no")" aria-label="Select log @row.Id" />
+                                        }
+                                        else
+                                        {
+                                            <input class="form-check-input" type="checkbox" disabled title="@reason" aria-label="Log @row.Id cannot be selected" />
                                         }
                                     </td>
                                     <td>
@@ -162,8 +175,8 @@ else
                         </table>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Process the selected acquisition logs?');">Process selected</button>
-                        <button type="submit" class="btn btn-sm btn-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
+                        <button type="submit" class="btn btn-sm btn-success" data-au-bulk="process" disabled>Process selected</button>
+                        <button type="submit" class="btn btn-sm btn-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save data-au-bulk="cancel" disabled>Cancel selected</button>
                     </div>
                     <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
                 </form>

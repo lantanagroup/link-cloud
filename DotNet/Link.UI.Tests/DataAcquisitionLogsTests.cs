@@ -24,8 +24,11 @@ public class DataAcquisitionLogsTests
     public void The_shared_list_is_the_only_acquisition_log_presentation()
     {
         var list = Read("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml");
-        list.Should().Contain("Process the selected acquisition logs?");
-        list.Should().Contain("Cancel the selected logs that are old enough? This cannot be undone.");
+        list.Should().Contain("data-au-bulk=\"process\"");
+        list.Should().Contain("data-au-select-page");
+        var live = Read("DotNet/Link.UI/wwwroot/js/live-region.js");
+        live.Should().Contain("Process \" + count + \" selected acquisition logs?");
+        live.Should().Contain("Cancel \" + count + \" selected logs that are old enough? This cannot be undone.");
         list.Should().Contain("Process every acquisition log that matches these filters?");
         list.Should().Contain("Cancel every matching log that is old enough? This cannot be undone.");
         list.Should().Contain("Disable every acquisition log for this facility?");
@@ -34,7 +37,7 @@ public class DataAcquisitionLogsTests
 
         var page = Read("DotNet/Link.UI/Views/Logs/Acquisition.cshtml");
         page.Should().Contain("name=\"_AcquisitionLogList\"");
-        page.Should().NotContain("Process the selected acquisition logs?");
+        page.Should().NotContain("data-au-bulk=\"process\"");
 
         var detail = Read("DotNet/Link.UI/Views/Automation/_RunDetail.cshtml");
         detail.Should().Contain("data-bs-target=\"#dataAcqLogModal\"");
@@ -100,7 +103,9 @@ public class DataAcquisitionLogsTests
 
         var list = Read("DotNet/Link.UI/Views/Logs/_AcquisitionLogList.cshtml");
         list.Should().Contain("btn btn-sm btn-success\">Process matching");
-        list.Should().Contain("btn btn-sm btn-success\" onclick=\"return confirm('Process the selected acquisition logs?');\"");
+        list.Should().Contain("data-au-bulk=\"process\"");
+        list.Should().Contain("data-au-select-page");
+        list.Should().Contain("cannot be selected.");
         list.Should().Contain("btn btn-sm btn-danger\">Disable logs");
         list.Should().Contain("btn btn-sm btn-danger\">Cancel matching");
         list.Should().Contain("btn btn-sm btn-danger\" formaction");
@@ -115,6 +120,11 @@ public class DataAcquisitionLogsTests
             Read($"DotNet/Link.UI/Views/Logs/{searchPage}.cshtml")
                 .Should().Contain("btn btn-au-neutral\"><i class=\"bi bi-search me-1\"></i>Search");
         }
+
+        var live = Read("DotNet/Link.UI/wwwroot/js/live-region.js");
+        live.Should().Contain("restoreChecked");
+        live.Should().Contain("Process \" + process + \" selected");
+        live.Should().Contain("Cancel \" + cancel + \" selected");
 
         Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain(".btn-danger:hover");
         Read("DotNet/Link.UI/wwwroot/css/site.css").Should().Contain("--lu-dialog-top");
