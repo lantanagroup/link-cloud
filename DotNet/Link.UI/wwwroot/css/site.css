@@ -161,10 +161,12 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 /* ===================================================================
    Tables
    =================================================================== */
-.au-table {
+.au-table,
+.au-card .table {
   font-size: .875rem;
 }
-.au-table thead th {
+.au-table thead th,
+.au-card .table thead th {
   background: var(--au-dark);
   color: #fff;
   font-weight: 600;
@@ -175,11 +177,19 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   top: 0;
   z-index: 2;
 }
-.au-table tbody td {
+.au-table tbody td,
+.au-card .table tbody td {
   vertical-align: middle;
   padding: .5rem .75rem;
 }
-.au-table tbody tr:hover { background: rgba(77,163,255,.06); }
+.au-table tbody tr:hover,
+.au-card .table tbody tr:hover { background: rgba(77,163,255,.06); }
+.au-card .table thead th a,
+.au-card .table thead th a:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 /* Sort header anchors inside .au-table thead th. The default user-agent +
    Bootstrap link color (blue/purple) clashes with the white header text;
@@ -1520,8 +1530,9 @@ a.au-scenario-card:hover {
 }
 
 .lu-page-title {
-  font-size: 1.35rem;
-  font-weight: 650;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -.015em;
   margin: 0;
 }
 
@@ -1553,7 +1564,26 @@ a.au-scenario-card:hover {
 .lu-section-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem;
+  gap: .35rem;
+}
+.lu-section-nav a {
+  border-radius: 999px;
+  text-decoration: none;
+}
+.lu-live-label {
+  font-size: .75rem;
+  color: var(--au-muted);
+  font-weight: 500;
+}
+.lu-live-label::before {
+  content: '';
+  display: inline-block;
+  width: .45rem;
+  height: .45rem;
+  margin-right: .35rem;
+  border-radius: 50%;
+  background: var(--au-success);
+  vertical-align: middle;
 }
 
 .lu-live-log {

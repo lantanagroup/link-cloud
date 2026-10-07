@@ -30,7 +30,7 @@
             labels: ["Succeeded", "Failed", "Cancelled", "Running", "Queued"],
             datasets: [{
                 data: [stats.succeeded || 0, stats.failed || 0, stats.cancelled || 0, stats.running || 0, stats.queued || 0],
-                backgroundColor: ["#198754", "#dc3545", "#6c757d", "#0d6efd", "#ffc107"]
+                backgroundColor: ["#28a745", "#dc3545", "#ffc107", "#4da3ff", "#6c757d"]
             }]
         };
         if (statusChart) {
@@ -42,12 +42,16 @@
 
         var days = stats.runsPerDay || [];
         var dayData = {
-            labels: days.map(function (day) { return day.date; }),
+            labels: days.map(function (day) {
+                var text = String(day.date || "");
+                var match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                return match ? match[2] + "/" + match[3] : text;
+            }),
             datasets: [
-                { label: "Succeeded", data: days.map(function (day) { return day.succeeded || 0; }), backgroundColor: "#198754" },
+                { label: "Succeeded", data: days.map(function (day) { return day.succeeded || 0; }), backgroundColor: "#28a745" },
                 { label: "Failed", data: days.map(function (day) { return day.failed || 0; }), backgroundColor: "#dc3545" },
-                { label: "Cancelled", data: days.map(function (day) { return day.cancelled || 0; }), backgroundColor: "#6c757d" },
-                { label: "Other", data: days.map(function (day) { return day.other || 0; }), backgroundColor: "#0d6efd" }
+                { label: "Cancelled", data: days.map(function (day) { return day.cancelled || 0; }), backgroundColor: "#ffc107" },
+                { label: "Other", data: days.map(function (day) { return day.other || 0; }), backgroundColor: "#6c757d" }
             ]
         };
         if (dayChart) {
@@ -103,7 +107,7 @@
             var row = document.createElement("div");
             row.className = "d-flex justify-content-between gap-2 mt-1";
             var badge = document.createElement("span");
-            badge.className = "badge bg-primary";
+            badge.className = "badge au-badge-active";
             badge.textContent = run.statusLabel || run.status || "";
             var time = document.createElement("span");
             time.className = "small text-muted js-elapsed";
@@ -114,6 +118,8 @@
             host.append(col);
         });
         if (empty) empty.classList.toggle("d-none", (runs || []).length > 0);
+        var card = document.getElementById("activeCard");
+        if (card) card.style.display = (runs || []).length > 0 ? "" : "none";
     }
 
     function fillHistory(page) {
