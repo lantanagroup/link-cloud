@@ -176,6 +176,7 @@ public sealed class TenantsController : Controller
     public async Task<IActionResult> Facility(
         [FromRoute] string? id,
         string? planType,
+        string? planEdit,
         int? orgConfig,
         string? operationId,
         string? operationType,
@@ -194,6 +195,10 @@ public sealed class TenantsController : Controller
             operationPage ?? 1);
         if (!page.IsCreate && !page.NotFound && string.IsNullOrWhiteSpace(page.LoadError) && !string.IsNullOrWhiteSpace(page.FacilityId))
             page.Notification = await _configuration.LoadFacilityNotificationAsync(page.FacilityId, cancellationToken);
+        var editor = planEdit.Sanitize();
+        if (string.Equals(editor, "add", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(editor, "edit", StringComparison.OrdinalIgnoreCase))
+            page.QueryPlanEditor = editor.ToLowerInvariant();
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }

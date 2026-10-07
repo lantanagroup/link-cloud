@@ -63,7 +63,9 @@ public sealed class FacilityHubViewModel
     public string? FhirListError { get; set; }
     public QueryPlanPanel QueryPlan { get; set; } = new();
     public string? QueryPlanError { get; set; }
+    public string? QueryPlanEditor { get; set; }
     public IReadOnlyList<string> ExistingQueryPlanTypes { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<QueryPlanSummary> QueryPlanSummaries { get; set; } = Array.Empty<QueryPlanSummary>();
     public ReportingOrgPanel ReportingOrg { get; set; } = new();
     public string? ReportingOrgError { get; set; }
     public SftpPanel Sftp { get; set; } = new();
@@ -218,6 +220,13 @@ public sealed class QueryRowInput
     public int? Paged { get; set; } = 100;
     public bool Remove { get; set; }
     public List<QueryParameterInput> Parameters { get; set; } = new();
+}
+
+public sealed class QueryPlanSummary
+{
+    public string Type { get; init; } = "";
+    public string? PlanName { get; init; }
+    public string? LookBack { get; init; }
 }
 
 public sealed class QueryPlanPanel

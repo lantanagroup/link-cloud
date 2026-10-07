@@ -12,7 +12,7 @@
     string FormatWhen(DateTimeOffset? value)
     {
         if (value is null) return "—";
-        return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+        return LinkUiTime.IsoUtc(value.Value);
     }
 }
 
@@ -62,7 +62,7 @@
                         var p = pts[i];
                         <a asp-action="Details" asp-route-id="@p.RunId">
                             <circle cx="@X(i)" cy="@Y(p.E2eDurationSeconds)" r="5" fill="#4da3ff" stroke="#fff" stroke-width="1.5">
-                                <title>@FormatDuration(p.E2eDurationSeconds) · @FormatWhen(p.FinishedAt)</title>
+                                <title>@FormatDuration(p.E2eDurationSeconds) · @LinkUiTime.Title(LinkUiTime.IsoUtc(p.FinishedAt))</title>
                             </circle>
                         </a>
                     }

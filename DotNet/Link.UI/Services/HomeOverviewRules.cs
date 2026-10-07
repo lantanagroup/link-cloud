@@ -259,7 +259,7 @@ public static class HomeOverviewRules
         status is "Failed" or "MaxRetriesReached" ? "au-badge-danger" : "au-badge-muted";
 
     public static string When(DateTimeOffset value) =>
-        value == default ? "" : FacilityViewRules.When(value.LocalDateTime);
+        value == default ? "" : LinkUiTime.IsoUtc(value);
 
     private static IReadOnlyList<HomeRunLine> Lines(IEnumerable<AutomationRunRow>? rows, HashSet<string>? skip = null) =>
         (rows ?? [])

@@ -19,6 +19,10 @@
     <h2 class="accordion-header" id="normalizationHeading">
         <button class="@button" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationBody" aria-expanded="@expanded" aria-controls="normalizationBody">
             @(panel.VendorOwned ? "Vendor operation" : "Normalization operations")
+            @if (!panel.VendorOwned)
+            {
+                <span class="badge text-bg-light ms-2" id="normalizationCount">@panel.Operations.Count</span>
+            }
         </button>
     </h2>
     <div id="normalizationBody" class="@collapse" aria-labelledby="normalizationHeading">
@@ -62,7 +66,7 @@
                         <div class="d-flex flex-column gap-2 mb-3">
                             @foreach (var row in panel.Operations)
                             {
-                                <div class="border rounded p-2">
+                                <div class="border rounded p-2" data-collection-row data-operation-row>
                                     <div class="d-flex flex-wrap justify-content-between gap-2">
                                         <div>
                                             <div class="fw-semibold">@FacilityNormalizationRules.Label(row.OperationType)</div>
@@ -112,7 +116,7 @@
 
                     @if (!panel.EditorOpen)
                     {
-                        <div class="d-flex flex-wrap gap-2 mb-3">
+                        <div id="normalizationTypes" class="d-flex flex-wrap gap-2 mb-3@(panel.VendorOwned ? "" : " d-none")">
                             @foreach (var operationType in FacilityNormalizationRules.OperationTypes)
                             {
                                 var skipVendorType = panel.VendorOwned && operationType == "HSLOCMap";

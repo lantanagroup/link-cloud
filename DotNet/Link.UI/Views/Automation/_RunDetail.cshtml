@@ -81,8 +81,8 @@
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status.ToDisplayName()</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">-</code></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt is null ? "-" : LinkUiTime.IsoUtc(Model.StartedAt.Value))</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt is null ? "-" : LinkUiTime.IsoUtc(Model.FinishedAt.Value))</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{

@@ -40,7 +40,7 @@
         return $"{ms.Value:0} ms";
     }
     string FormatWhen(DateTimeOffset? value) =>
-        value is null ? "—" : value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+        value is null ? "—" : LinkUiTime.IsoUtc(value.Value);
     string DeltaClass(double? left, double? right)
     {
         if (left is null || right is null || left == 0) return "";

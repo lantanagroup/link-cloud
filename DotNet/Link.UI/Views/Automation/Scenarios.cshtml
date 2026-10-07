@@ -98,7 +98,7 @@
                                         <span class="badge bg-light text-dark border">Custom</span>
                                     }
                                 </td>
-                                <td class="small text-muted">@s.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                <td class="small text-muted">@LinkUiTime.IsoUtc(s.UpdatedAt)</td>
                                 <td class="text-nowrap">
                                     <div class="d-inline-flex gap-1">
                                         <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
