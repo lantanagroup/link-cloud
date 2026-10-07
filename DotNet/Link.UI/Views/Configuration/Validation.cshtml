@@ -1,0 +1,125 @@
+@model ValidationListPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Validation</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Initialize the published implementation guides and categories, then edit a category's title, severity, and guidance. Package upload, dependency checks, bulk import, and rule matchers stay on the validation service.</p>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <form method="post" asp-action="Initialize" onsubmit="return confirm('Initialize implementation guides from the published packages?');">
+        <input type="hidden" name="categories" value="false" />
+        <button type="submit" class="btn btn-outline-secondary">Initialize guides</button>
+    </form>
+    <form method="post" asp-action="Initialize" onsubmit="return confirm('Initialize validation categories from the published packages?');">
+        <input type="hidden" name="categories" value="true" />
+        <button type="submit" class="btn btn-outline-secondary">Initialize categories</button>
+    </form>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Implementation guides</div>
+    <div class="card-body">
+        @if (Model.Artifacts.Count == 0)
+        {
+            <p class="mb-0">No implementation guides found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Artifacts)
+                    {
+                        <tr>
+                            <td>@row.Name</td>
+                            <td>@row.Type</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.CategoryError))
+{
+    <div class="alert alert-warning">@Model.CategoryError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Open or create a category</div>
+    <div class="card-body">
+        <form method="get" asp-action="Category" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="id">Category id</label>
+                <input id="id" name="id" class="form-control" maxlength="64" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <button type="submit" class="btn btn-au-action">Open</button>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">A category that is not saved yet can be created from the next page. uncategorized is reserved.</p>
+    </div>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Categories</div>
+    <div class="card-body">
+        @if (Model.Categories.Count == 0)
+        {
+            <p class="mb-0">No categories found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Id</th>
+                            <th scope="col">Title</th>
+                            <th scope="col">Severity</th>
+                            <th scope="col">Acceptable</th>
+                            <th scope="col"><span class="visually-hidden">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Categories)
+                    {
+                        <tr>
+                            <td><code>@row.Id</code></td>
+                            <td>@row.Title</td>
+                            <td>@row.Severity</td>
+                            <td>@(row.Acceptable ? "Yes" : "No")</td>
+                            <td>
+                                @if (row.Reserved)
+                                {
+                                    <span class="text-muted">Reserved</span>
+                                }
+                                else
+                                {
+                                    <a asp-action="Category" asp-route-id="@row.Id">Edit</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

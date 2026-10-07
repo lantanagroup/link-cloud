@@ -9,6 +9,12 @@ public interface IMeasureEvalServiceClient
     Task<LinkApiResponse<string>> GetAllMeasureDefinitionsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Related artifacts named by one measure definition:
+    /// <c>GET /api/measureeval/measure-definition/{id}/relatedArtifact</c>.
+    /// </summary>
+    Task<LinkApiResponse<string>> GetRelatedArtifactsAsync(string measureId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The patient bundle MeasureEval used as input for one report:
     /// <c>GET /api/measureeval/patient/{facilityId}/{reportId}/{patientId}</c>.
     /// </summary>

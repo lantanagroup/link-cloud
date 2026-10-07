@@ -1,0 +1,138 @@
+@model CodeSearchPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page)
+    {
+        var route = new Dictionary<string, string> { ["submitted"] = "true", ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.Search)) route["search"] = query.Search;
+        if (!string.IsNullOrWhiteSpace(query.CodeSystem)) route["codeSystem"] = query.CodeSystem;
+        if (!string.IsNullOrWhiteSpace(query.ValueSet)) route["valueSet"] = query.ValueSet;
+        if (!string.IsNullOrWhiteSpace(query.Version)) route["version"] = query.Version;
+        if (query.ExcludeInactive) route["excludeInactive"] = "true";
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-action="Terminology"><i class="bi bi-arrow-left me-1"></i>Terminology</a>
+</div>
+<h1 class="h3">Terminology codes</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="submitted" value="true" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="search">Search</label>
+                <input id="search" name="search" value="@query.Search" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="codeSystem">Code system</label>
+                <input id="codeSystem" name="codeSystem" value="@query.CodeSystem" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="valueSet">Value set</label>
+                <input id="valueSet" name="valueSet" value="@query.ValueSet" class="form-control" maxlength="2000" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="version">Version</label>
+                <input id="version" name="version" value="@query.Version" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="pageSize">Page size</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var option in new[] { 10, 20, 50, 100 })
+                    {
+                        if (size == option)
+                        {
+                            <option value="@option" selected>@option</option>
+                        }
+                        else
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="excludeInactive" name="excludeInactive" value="true" @(query.ExcludeInactive ? "checked" : null) />
+                    <label class="form-check-label" for="excludeInactive">Exclude inactive</label>
+                </div>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Codes">Clear</a>
+            </div>
+        </form>
+        <p class="text-muted small mb-0 mt-2">Enter a search of at least 3 characters, or one code system, or one value set. A version belongs with a system or a set.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else if (Model.Searched)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Codes</div>
+        <div class="card-body">
+            @if (Model.Codes.Count == 0)
+            {
+                <p class="mb-0">No codes found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">System</th>
+                                <th scope="col">Code</th>
+                                <th scope="col">Display</th>
+                                <th scope="col">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Codes)
+                        {
+                            <tr>
+                                <td class="text-break">@row.System</td>
+                                <td><code>@row.Code</code></td>
+                                <td>@row.Display</td>
+                                <td>@row.Status</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Code pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

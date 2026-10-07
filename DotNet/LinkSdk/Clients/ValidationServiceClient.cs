@@ -35,6 +35,29 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
         SendAsync<List<ValidationCategoryApiModel>>(() => Request("validation/category")
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<ValidationCategoryApiModel>> GetCategoryAsync(string id, CancellationToken cancellationToken = default) =>
+        SendAsync<ValidationCategoryApiModel>(() => Request($"validation/category/{Uri.EscapeDataString(id)}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateCategoryAsync(ValidationCategoryApiModel category, CancellationToken cancellationToken = default)
+    {
+        // The validation service is Java. Its Jackson binding is case-sensitive, so the body uses
+        // the camelCase names the Category entity declares.
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            id = category.Id,
+            title = category.Title,
+            severity = category.Severity,
+            acceptable = category.Acceptable,
+            submit = category.Submit,
+            review = category.Review,
+            guidance = category.Guidance
+        });
+        return SendAsync(() => Request($"validation/category/{Uri.EscapeDataString(category.Id)}")
+            .WithHeader("Content-Type", "application/json")
+            .PutStringAsync(json, cancellationToken: cancellationToken));
+    }
+
     public Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"validation/artifact/RESOURCE/{artifactId}")
             .WithHeader("Content-Type", "application/json")

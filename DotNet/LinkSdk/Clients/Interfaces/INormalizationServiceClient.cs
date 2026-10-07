@@ -30,8 +30,26 @@ public interface INormalizationServiceClient
     Task<LinkApiResponse<FacilityLocationLocalCodeMappingApiModel>> UpdateFacilityLocationLocalCodeMappingAsync(string mappingId, UpdateFacilityLocationLocalCodeMappingRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingAsync(string mappingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityLocationLocalCodeMappingsForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Searches operations across facilities and vendor versions:
+    /// <c>GET /api/normalization/Operations</c>. Facility id is optional.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchOperationsAsync(
+        string? facilityId = null,
+        string? operationType = null,
+        string? resourceType = null,
+        Guid? operationId = null,
+        bool includeDisabled = false,
+        Guid? vendorVersionId = null,
+        string? sortBy = null,
+        string? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse<List<HslocCodeApiModel>>> GetHslocCodesAsync(bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> UpdateHslocCodesAsync(string oldVersion, string newVersion, Stream csvFile, string fileName = "hsloc.csv", CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteHslocCodeAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Deletes every HSLOC code, across all versions: <c>DELETE /api/normalization/HSLOC</c>.</summary>
     Task<LinkApiResponse> DeleteAllHslocCodesAsync(CancellationToken cancellationToken = default);

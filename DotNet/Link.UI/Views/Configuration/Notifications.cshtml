@@ -1,0 +1,150 @@
+@model NotificationListPage
+@using Link.UI.Services
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var size = query.PageSize ?? ConfigurationRules.DefaultPageSize;
+    Dictionary<string, string> Route(int page)
+    {
+        var route = new Dictionary<string, string> { ["page"] = page.ToString(), ["pageSize"] = size.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.SearchText)) route["searchText"] = query.SearchText;
+        if (!string.IsNullOrWhiteSpace(query.FacilityId)) route["facilityId"] = query.FacilityId;
+        if (!string.IsNullOrWhiteSpace(query.NotificationType)) route["notificationType"] = query.NotificationType;
+        if (!string.IsNullOrWhiteSpace(query.CreatedOnStart)) route["createdOnStart"] = query.CreatedOnStart;
+        if (!string.IsNullOrWhiteSpace(query.CreatedOnEnd)) route["createdOnEnd"] = query.CreatedOnEnd;
+        if (!string.IsNullOrWhiteSpace(query.SentOnStart)) route["sentOnStart"] = query.SentOnStart;
+        if (!string.IsNullOrWhiteSpace(query.SentOnEnd)) route["sentOnEnd"] = query.SentOnEnd;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Notifications</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">Notifications are sent by the pipeline. This page searches them. It does not send one.</p>
+<div class="mb-3">
+    <a class="btn btn-outline-secondary" asp-action="Configurations">Email configuration</a>
+</div>
+
+<div class="au-card card">
+    <div class="card-header">Search</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="searchText">Text</label>
+                <input id="searchText" name="searchText" value="@query.SearchText" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="facilityId">Facility</label>
+                <input id="facilityId" name="facilityId" value="@query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="notificationType">Type</label>
+                <input id="notificationType" name="notificationType" value="@query.NotificationType" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="pageSize">Page size</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var option in ConfigurationRules.NotificationPageSizes)
+                    {
+                        if (size == option)
+                        {
+                            <option value="@option" selected>@option</option>
+                        }
+                        else
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="createdOnStart">Created from</label>
+                <input id="createdOnStart" name="createdOnStart" value="@query.CreatedOnStart" type="date" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="createdOnEnd">Created to</label>
+                <input id="createdOnEnd" name="createdOnEnd" value="@query.CreatedOnEnd" type="date" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="sentOnStart">Sent from</label>
+                <input id="sentOnStart" name="sentOnStart" value="@query.SentOnStart" type="date" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="sentOnEnd">Sent to</label>
+                <input id="sentOnEnd" name="sentOnEnd" value="@query.SentOnEnd" type="date" class="form-control" />
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Notifications">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning mt-3">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Notifications</div>
+        <div class="card-body">
+            @if (Model.Notifications.Count == 0)
+            {
+                <p class="mb-0">No notifications found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Created</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Facility</th>
+                                <th scope="col">Subject</th>
+                                <th scope="col"><span class="visually-hidden">Open</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Notifications)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@row.CreatedOn</td>
+                                <td>@row.Type</td>
+                                <td><code class="lu-facility-id">@(string.IsNullOrWhiteSpace(row.FacilityId) ? "—" : row.FacilityId)</code></td>
+                                <td>@row.Subject</td>
+                                <td><a asp-action="Notification" asp-route-id="@row.Id">Open</a></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Notification pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

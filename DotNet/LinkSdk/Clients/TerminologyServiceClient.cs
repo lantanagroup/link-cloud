@@ -72,6 +72,16 @@ public class TerminologyServiceClient : LinkApiClientBase, ITerminologyServiceCl
         return SendStringAsync(() => request.GetAsync(cancellationToken: cancellationToken));
     }
 
+    public Task<LinkApiResponse<string>> GetValueSetSummariesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("terminology/fhir/ValueSet")
+            .SetQueryParam("_summary", "true")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetCodeSystemSummariesAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("terminology/fhir/CodeSystem")
+            .SetQueryParam("_summary", "true")
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse<string>> LookupCodeInCodeSystemAsync(
         string? system = null,
         string? code = null,

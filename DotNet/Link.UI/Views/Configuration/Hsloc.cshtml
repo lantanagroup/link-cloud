@@ -1,0 +1,141 @@
+@model HslocPage
+@{
+    var query = Model.Query;
+    var bar = Model.Paging;
+    Dictionary<string, string> Route(int page)
+    {
+        var route = new Dictionary<string, string> { ["page"] = page.ToString() };
+        if (!string.IsNullOrWhiteSpace(query.Text)) route["text"] = query.Text;
+        if (!string.IsNullOrWhiteSpace(query.Version)) route["version"] = query.Version;
+        return route;
+    }
+}
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">HSLOC</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+<p class="text-muted">The catalog is filtered on this page. Replacing a version uploads a CSV. Facility location mappings stay on the facility.</p>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Filter</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label class="form-label" for="text">Code or description</label>
+                <input id="text" name="text" value="@query.Text" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="filterVersion">Version</label>
+                <input id="filterVersion" name="version" value="@query.Version" class="form-control" maxlength="255" />
+            </div>
+            <div class="col-12 col-md-4 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Filter</button>
+                <a class="btn btn-outline-secondary" asp-action="Hsloc">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="au-card card mb-3">
+    <div class="card-header">Replace a version</div>
+    <div class="card-body">
+        <form method="post" asp-action="ReplaceHsloc" enctype="multipart/form-data" class="row g-2 align-items-end" onsubmit="return confirm('Replace this HSLOC version with the uploaded CSV?');">
+            <input type="hidden" name="text" value="@query.Text" />
+            <input type="hidden" name="version" value="@query.Version" />
+            <input type="hidden" name="page" value="@query.Page" />
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="oldVersion">Old version</label>
+                <input id="oldVersion" name="oldVersion" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="newVersion">New version</label>
+                <input id="newVersion" name="newVersion" class="form-control" maxlength="255" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="csv">CSV file</label>
+                <input id="csv" name="csv" type="file" accept=".csv,text/csv" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-outline-secondary">Replace</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Codes</div>
+        <div class="card-body">
+            @if (Model.Rows.Count == 0)
+            {
+                <p class="mb-0">No HSLOC codes found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2 lu-wide-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Code</th>
+                                <th scope="col">CDC</th>
+                                <th scope="col">Short</th>
+                                <th scope="col">Long</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">Active</th>
+                                <th scope="col"><span class="visually-hidden">Delete</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                <td class="text-nowrap"><code>@row.Code</code></td>
+                                <td>@row.CdcCode</td>
+                                <td>@row.ShortDescription</td>
+                                <td>@row.LongDescription</td>
+                                <td>@row.Version</td>
+                                <td>@(row.Active ? "Yes" : "No")</td>
+                                <td>
+                                    <form method="post" asp-action="DeleteHsloc" asp-route-id="@row.Id" onsubmit="return confirm('Delete this HSLOC code?');">
+                                        <input type="hidden" name="text" value="@query.Text" />
+                                        <input type="hidden" name="version" value="@query.Version" />
+                                        <input type="hidden" name="page" value="@bar.Page" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="HSLOC pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

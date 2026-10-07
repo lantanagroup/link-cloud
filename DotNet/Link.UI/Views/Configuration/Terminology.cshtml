@@ -1,0 +1,90 @@
+@model TerminologyPage
+
+<div class="mb-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+</div>
+<h1 class="h3">Terminology</h1>
+<partial name="_Nav" />
+<partial name="_Alerts" />
+
+<div class="mb-3">
+    <a class="btn btn-au-action" asp-action="Codes">Search codes</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ValueSetError))
+{
+    <div class="alert alert-warning">@Model.ValueSetError</div>
+}
+
+<div class="au-card card mb-3">
+    <div class="card-header">Value sets</div>
+    <div class="card-body">
+        @if (Model.ValueSets.Count == 0)
+        {
+            <p class="mb-0">No value sets found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">URL</th>
+                            <th scope="col">Version</th>
+                            <th scope="col">Id</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.ValueSets)
+                    {
+                        <tr>
+                            <td class="text-break">@row.Url</td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                            <td><code>@row.Id</code></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.CodeSystemError))
+{
+    <div class="alert alert-warning">@Model.CodeSystemError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Code systems</div>
+    <div class="card-body">
+        @if (Model.CodeSystems.Count == 0)
+        {
+            <p class="mb-0">No code systems found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 lu-wide-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">URL</th>
+                            <th scope="col">Version</th>
+                            <th scope="col">Id</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.CodeSystems)
+                    {
+                        <tr>
+                            <td class="text-break">@row.Url</td>
+                            <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
+                            <td><code>@row.Id</code></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
