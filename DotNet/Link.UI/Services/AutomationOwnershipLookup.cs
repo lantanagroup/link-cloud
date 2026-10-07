@@ -21,17 +21,30 @@ public sealed class AutomationOwnershipLookup
 
     public async Task<AutomationOwnershipIndex> GetAsync(CancellationToken cancellationToken)
     {
-        if (_cache.TryGetValue(CacheKey, out AutomationOwnershipIndex? cached) && cached is not null)
-            return cached;
+        var snapshot = await GetSnapshotAsync(cancellationToken);
+        return snapshot.Index;
+    }
+
+    /// <summary>
+    /// The same cached read as <see cref="GetAsync"/>, plus whether storage answered.
+    /// An empty index with <c>Reachable</c> false is a miss, not "no automation facilities".
+    /// </summary>
+    public async Task<(AutomationOwnershipIndex Index, bool Reachable)> GetSnapshotAsync(CancellationToken cancellationToken)
+    {
+        if (_cache.TryGetValue(CacheKey, out OwnershipCache? cached) && cached is not null)
+            return (cached.Index, cached.Reachable);
 
         var load = await _reader.LoadOwnershipAsync(cancellationToken);
         var index = load.Reachable
             ? AutomationMarkRules.Build(load.Runs, load.Tombstones)
             : AutomationOwnershipIndex.Empty;
+        var snapshot = new OwnershipCache(index, load.Reachable);
         _cache.Set(
             CacheKey,
-            index,
+            snapshot,
             load.Reachable ? TimeSpan.FromSeconds(20) : TimeSpan.FromSeconds(15));
-        return index;
+        return (index, load.Reachable);
     }
+
+    private sealed record OwnershipCache(AutomationOwnershipIndex Index, bool Reachable);
 }
