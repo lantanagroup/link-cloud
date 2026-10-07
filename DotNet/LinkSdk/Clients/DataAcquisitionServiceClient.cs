@@ -34,6 +34,12 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync(() => Request("data/fhirQueryConfiguration")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("data/fhirQueryConfiguration")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
@@ -372,6 +378,19 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/location-config/facility/{facilityId}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateOrganizationLocationConfigurationByIdAsync(
+        int id,
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/{id}")
+            .PutJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteOrganizationLocationConfigurationByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-config/{id}")
+            .DeleteAsync(cancellationToken: cancellationToken));
 
     // ----- Organization location mappings -----
 

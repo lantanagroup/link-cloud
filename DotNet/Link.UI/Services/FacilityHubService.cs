@@ -15,6 +15,7 @@ public sealed class FacilityHubService
     private readonly IFacilityServiceClient _facilities;
     private readonly ICensusServiceClient? _census;
     private readonly IQueryDispatchServiceClient? _queryDispatch;
+    private readonly FacilityAcquisitionService? _acquisition;
     private readonly LinkUiFeatureOptions _options;
     private readonly ILogger<FacilityHubService> _logger;
 
@@ -23,11 +24,13 @@ public sealed class FacilityHubService
         ICensusServiceClient? census,
         IQueryDispatchServiceClient? queryDispatch,
         IOptions<LinkUiFeatureOptions> options,
-        ILogger<FacilityHubService> logger)
+        ILogger<FacilityHubService> logger,
+        IDataAcquisitionServiceClient? dataAcquisition = null)
     {
         _facilities = facilities;
         _census = census;
         _queryDispatch = queryDispatch;
+        _acquisition = dataAcquisition is null ? null : new FacilityAcquisitionService(dataAcquisition, logger);
         _options = options.Value;
         _logger = logger;
     }
@@ -43,12 +46,17 @@ public sealed class FacilityHubService
         if (!string.IsNullOrWhiteSpace(registry.QueryDispatchServiceUrl))
             queryDispatch = services.GetRequiredService<IQueryDispatchServiceClient>();
 
+        IDataAcquisitionServiceClient? dataAcquisition = null;
+        if (!string.IsNullOrWhiteSpace(registry.DataAcquisitionServiceUrl))
+            dataAcquisition = services.GetRequiredService<IDataAcquisitionServiceClient>();
+
         return new FacilityHubService(
             services.GetRequiredService<IFacilityServiceClient>(),
             census,
             queryDispatch,
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
-            services.GetRequiredService<ILogger<FacilityHubService>>());
+            services.GetRequiredService<ILogger<FacilityHubService>>(),
+            dataAcquisition);
     }
 
     public async Task<FacilityHubViewModel> LoadCreateAsync(CancellationToken cancellationToken)
@@ -57,7 +65,14 @@ public sealed class FacilityHubService
         return CreateShell(vendors);
     }
 
-    public async Task<FacilityHubViewModel> LoadEditAsync(string? facilityId, CancellationToken cancellationToken)
+    public Task<FacilityHubViewModel> LoadEditAsync(string? facilityId, CancellationToken cancellationToken) =>
+        LoadEditAsync(facilityId, planType: null, reportingOrgId: null, cancellationToken);
+
+    public async Task<FacilityHubViewModel> LoadEditAsync(
+        string? facilityId,
+        string? planType,
+        int? reportingOrgId,
+        CancellationToken cancellationToken)
     {
         var id = facilityId?.Trim() ?? string.Empty;
         if (!FacilityFormRules.IsValidFacilityId(id, _options.NumericOnlyFacilityId))
@@ -97,7 +112,7 @@ public sealed class FacilityHubService
         }
 
         var page = FromFacility(facility.Body, vendors);
-        await LoadPanelsAsync(page, id, cancellationToken);
+        await LoadPanelsAsync(page, id, planType, reportingOrgId, cancellationToken);
         return page;
     }
 
@@ -302,6 +317,74 @@ public sealed class FacilityHubService
         return FacilityWriteResult.ToFacility(page.FacilityId!, "Query dispatch configuration deleted.");
     }
 
+    public Task<FacilityWriteResult> SaveFhirQueryAsync(string? facilityId, FhirQueryPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.FhirQueryError = error,
+            (page, token) => _acquisition!.SaveFhirQueryAsync(page, input, token),
+            input.Exists ? "FHIR query configuration saved." : "FHIR query configuration created.");
+
+    public Task<FacilityWriteResult> DeleteFhirQueryAsync(string? facilityId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.FhirQueryError = error,
+            (page, token) => _acquisition!.DeleteFhirQueryAsync(page, token),
+            "FHIR query configuration deleted.");
+
+    public Task<FacilityWriteResult> SaveFhirListAsync(string? facilityId, FhirListPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.FhirListError = error,
+            (page, token) => _acquisition!.SaveFhirListAsync(page, input, token),
+            input.Exists ? "FHIR list configuration saved." : "FHIR list configuration created.");
+
+    public Task<FacilityWriteResult> DeleteFhirListAsync(string? facilityId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.FhirListError = error,
+            (page, token) => _acquisition!.DeleteFhirListAsync(page, token),
+            "FHIR list configuration deleted.");
+
+    public Task<FacilityWriteResult> SaveQueryPlanAsync(string? facilityId, QueryPlanPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, input.Type, null, cancellationToken, (page, error) => page.QueryPlanError = error,
+            (page, token) => _acquisition!.SaveQueryPlanAsync(page, input, token),
+            input.Exists ? "Query plan saved." : "Query plan created.",
+            FacilityAcquisitionRules.NormalizePlanType(input.Type));
+
+    public Task<FacilityWriteResult> DeleteQueryPlanAsync(string? facilityId, string? type, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, type, null, cancellationToken, (page, error) => page.QueryPlanError = error,
+            (page, token) => _acquisition!.DeleteQueryPlanAsync(page, type, token),
+            "Query plan deleted.",
+            FacilityAcquisitionRules.NormalizePlanType(type));
+
+    public Task<FacilityWriteResult> SaveReportingOrgAsync(string? facilityId, ReportingOrgPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, input.ConfigId, cancellationToken, (page, error) => page.ReportingOrgError = error,
+            (page, token) => _acquisition!.SaveReportingOrgAsync(page, input, token),
+            input.Exists ? "Reporting organization saved." : "Reporting organization created.",
+            reportingOrgRedirect: input.ConfigId);
+
+    public Task<FacilityWriteResult> DeleteReportingOrgAsync(string? facilityId, int? configId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, configId, cancellationToken, (page, error) => page.ReportingOrgError = error,
+            (page, token) => _acquisition!.DeleteReportingOrgAsync(page, configId, token),
+            "Reporting organization deleted.");
+
+    public Task<FacilityWriteResult> SaveSftpAsync(string? facilityId, SftpPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.SftpError = error,
+            (page, token) => _acquisition!.SaveSftpAsync(page, input, token),
+            input.Exists ? "SFTP configuration saved." : "SFTP configuration created.");
+
+    public Task<FacilityWriteResult> DeleteSftpAsync(string? facilityId, string? configurationId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.SftpError = error,
+            (page, token) => _acquisition!.DeleteSftpAsync(page, configurationId, token),
+            "SFTP configuration deleted.");
+
+    public Task<FacilityWriteResult> DeleteSftpCredentialsAsync(string? facilityId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.SftpError = error,
+            (page, token) => _acquisition!.DeleteSftpCredentialsAsync(page, token),
+            "SFTP credentials deleted.");
+
+    public Task<FacilityWriteResult> TestSavedSftpAsync(string? facilityId, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.SftpError = error,
+            (page, token) => _acquisition!.TestSavedSftpAsync(page, token),
+            "SFTP connection succeeded.");
+
+    public Task<FacilityWriteResult> TestSftpAsync(string? facilityId, SftpPanel input, CancellationToken cancellationToken) =>
+        WriteAcquisitionAsync(facilityId, null, null, cancellationToken, (page, error) => page.SftpError = error,
+            (page, token) => _acquisition!.TestSftpAsync(page, input, token),
+            "SFTP connection succeeded.");
+
     public async Task<FacilityWriteResult> SoftDeleteAsync(string? facilityId, CancellationToken cancellationToken)
     {
         var id = facilityId?.Trim() ?? string.Empty;
@@ -379,22 +462,63 @@ public sealed class FacilityHubService
             MonthlyReports = FacilityFormRules.JoinReports(reports.Monthly),
             CensusConfigured = _census is not null,
             QueryDispatchConfigured = _queryDispatch is not null,
+            DataAcquisitionConfigured = _acquisition is not null,
             CensusEnabled = true,
             Schedules = FacilityFormRules.WithBlankRow(null)
         };
     }
 
-    private async Task LoadPanelsAsync(FacilityHubViewModel page, string facilityId, CancellationToken cancellationToken)
+    private async Task LoadPanelsAsync(
+        FacilityHubViewModel page,
+        string facilityId,
+        string? planType,
+        int? reportingOrgId,
+        CancellationToken cancellationToken)
     {
         Task<LinkApiResponse<CensusConfigApiModel>>? censusTask = _census?.GetCensusConfigAsync(facilityId, cancellationToken);
         Task<LinkApiResponse<QueryDispatchConfigurationApiModel>>? dispatchTask =
             _queryDispatch?.GetConfigurationAsync(facilityId, cancellationToken);
+        var acquisitionTask = _acquisition?.LoadAsync(page, planType, reportingOrgId, cancellationToken);
 
         if (censusTask is not null)
             await ApplyCensusAsync(page, facilityId, censusTask);
 
         if (dispatchTask is not null)
             await ApplyQueryDispatchAsync(page, facilityId, dispatchTask);
+
+        if (acquisitionTask is not null)
+            await acquisitionTask;
+    }
+
+    private async Task<FacilityWriteResult> WriteAcquisitionAsync(
+        string? facilityId,
+        string? planType,
+        int? reportingOrgId,
+        CancellationToken cancellationToken,
+        Action<FacilityHubViewModel, string?> writeError,
+        Func<FacilityHubViewModel, CancellationToken, Task<string?>> action,
+        string success,
+        string? redirectPlanType = null,
+        int? reportingOrgRedirect = null)
+    {
+        var page = await LoadEditAsync(facilityId, planType, reportingOrgId, cancellationToken);
+        if (page.LoadError is not null || page.NotFound)
+            return FacilityWriteResult.Stay(page);
+
+        if (_acquisition is null)
+        {
+            writeError(page, "Data acquisition service URL is not configured (ServiceRegistry:DataAcquisitionServiceUrl).");
+            return FacilityWriteResult.Stay(page);
+        }
+
+        var error = await action(page, cancellationToken);
+        if (error is not null)
+        {
+            writeError(page, error);
+            return FacilityWriteResult.Stay(page);
+        }
+
+        return FacilityWriteResult.ToFacility(page.FacilityId!, success, redirectPlanType, reportingOrgRedirect);
     }
 
     private async Task ApplyCensusAsync(
