@@ -1,5 +1,6 @@
 ﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -348,6 +349,54 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<OrganizationLocationMappingApiModel>>> SearchOrganizationLocationMappingsAsync(
+        string facilityId,
+        string? locationId = null,
+        string? locationName = null,
+        string? locationAlias = null,
+        string? partOfValue = null,
+        bool? isOrgLocation = null,
+        bool? isActive = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<OrganizationLocationMappingApiModel>>(() =>
+            Request($"data/location-mappings/facility/{facilityId}/search")
+                .SetQueryParam("pageSize", pageSize)
+                .SetQueryParam("pageNumber", pageNumber)
+                .SetQueryParam("LocationId", locationId)
+                .SetQueryParam("LocationName", locationName)
+                .SetQueryParam("LocationAlias", locationAlias)
+                .SetQueryParam("PartOfValue", partOfValue)
+                .SetQueryParam("IsOrgLocation", isOrgLocation)
+                .SetQueryParam("IsActive", isActive)
+                .SetQueryParam("sortBy", sortBy)
+                .SetQueryParam("sortOrder", sortOrder?.ToString())
+                .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<EncounterMappingApiModel>>> SearchEncounterMappingsAsync(
+        string facilityId,
+        string? encounterId = null,
+        string? patientId = null,
+        bool? mappedToOrg = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<EncounterMappingApiModel>>(() =>
+            Request($"data/encounter-mappings/facilities/{facilityId}/search")
+                .SetQueryParam("pageSize", pageSize)
+                .SetQueryParam("pageNumber", pageNumber)
+                .SetQueryParam("EncounterId", encounterId)
+                .SetQueryParam("PatientId", patientId)
+                .SetQueryParam("MappedToOrg", mappedToOrg)
+                .SetQueryParam("sortBy", sortBy)
+                .SetQueryParam("sortOrder", sortOrder?.ToString())
+                .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FhirServerConnectionResult>> ValidateFhirServerConnectionAsync(
         string fhirServerUrl,

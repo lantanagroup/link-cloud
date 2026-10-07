@@ -25,8 +25,10 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
-        SendAsync<ReportScheduleApiModel>(() => Request($"/schedules/{reportId}").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool includeDeleted = false) =>
+        SendAsync<ReportScheduleApiModel>(() => Request($"/schedules/{reportId}")
+            .SetQueryParam("includeDeleted", includeDeleted ? "true" : null)
+            .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<ReportScheduleApiModel>>> GetSchedulesByFacilityAsync(string facilityId, bool? active = null, bool blocking = false, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
@@ -39,6 +41,35 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
 
     public Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
         SendAsync<PagedConfigModel<ReportScheduleApiModel>>(() => Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchFacilitySchedulesAsync(
+        ReportScheduleSearch query,
+        CancellationToken cancellationToken = default)
+    {
+        var pageSize = query.PageSize is < 1 or > 100 ? 10 : query.PageSize;
+        var pageNumber = query.PageNumber < 1 ? 1 : query.PageNumber;
+        var request = Request("/schedules/search")
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .SetQueryParam("facilityId", query.FacilityId)
+            .SetQueryParam("frequency", query.Frequency?.ToString())
+            .SetQueryParam("reportType", query.ReportType)
+            .SetQueryParam("reportStartDate", query.ReportStartDate?.ToString("yyyy-MM-dd"))
+            .SetQueryParam("reportEndDate", query.ReportEndDate?.ToString("yyyy-MM-ddTHH:mm:ss"))
+            .SetQueryParam("includeDeleted", query.IncludeDeleted ? "true" : null)
+            .SetQueryParam("sortBy", query.SortBy)
+            .SetQueryParam("sortOrder", query.SortOrder?.ToString())
+            .SetQueryParam("createDate", query.CreateDate?.ToString("yyyy-MM-dd"))
+            .SetQueryParam("id", query.Id?.ToString());
+
+        if (query.Statuses is { Count: > 0 })
+        {
+            foreach (var status in query.Statuses)
+                request.Url.QueryParams.Add("status", status.ToString());
+        }
+
+        return SendAsync<PagedConfigModel<ReportScheduleApiModel>>(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
 
     public Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(
         string? facilityId = null,

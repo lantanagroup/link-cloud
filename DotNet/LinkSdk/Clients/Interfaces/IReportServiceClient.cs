@@ -10,9 +10,17 @@ namespace LantanaGroup.Link.Sdk.Clients;
 public interface IReportServiceClient
 {
     // --- Schedules ---
-    Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool includeDeleted = false);
     Task<LinkApiResponse<List<ReportScheduleApiModel>>> GetSchedulesByFacilityAsync(string facilityId, bool? active = null, bool blocking = false, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Paged schedule search used by a facility's report list:
+    /// <c>GET /api/schedules/search</c>.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchFacilitySchedulesAsync(
+        ReportScheduleSearch query,
+        CancellationToken cancellationToken = default);
     Task<LinkApiResponse<PagedConfigModel<ReportSummaryApiModel>>> GetReportSummariesAsync(string? facilityId = null, ReportStatus? status = null, string? sortBy = null, SortOrder? sortOrder = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<ReportSummaryApiModel>> GetReportSummaryAsync(string reportScheduleId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default, bool allowInProgress = false);

@@ -1,0 +1,169 @@
+@model ReportDetailModel
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.ReportId) ? "Report" : Model.ReportId;
+    var bar = Model.Paging;
+    Dictionary<string, string> PageRoute(int page)
+    {
+        var route = Model.Query.ToRoute(Model.ReportId, page);
+        return route;
+    }
+}
+
+<div class="mb-3 d-flex flex-wrap gap-3">
+    <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound || Model.Report is null)
+{
+    <div class="au-card card">
+        <div class="card-header">Report</div>
+        <div class="card-body"><p class="mb-0">That report was not found.</p></div>
+    </div>
+}
+else
+{
+    var report = Model.Report;
+    <div class="au-card card mb-3">
+        <div class="card-header d-flex justify-content-between flex-wrap gap-2">
+            <span>Report</span>
+            <code class="lu-facility-id">@report.Id</code>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Facility</dt>
+                <dd class="col-sm-9"><a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a> <code class="lu-facility-id">@report.FacilityId</code></dd>
+                <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
+                <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
+                <dt class="col-sm-3">Reporting period</dt><dd class="col-sm-9">@report.PeriodStart to @report.PeriodEnd</dd>
+                <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><span class="badge @Link.UI.Services.FacilityViewRules.StatusBadge(report.Status)">@report.StatusLabel</span></dd>
+                <dt class="col-sm-3">Patients in census</dt><dd class="col-sm-9">@(report.CensusCount?.ToString() ?? "—")</dd>
+                <dt class="col-sm-3">Patients in IP</dt><dd class="col-sm-9">@(report.InitialPopulationCount?.ToString() ?? "—")</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="au-card card">
+        <div class="card-header">Patients</div>
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(Model.SectionError))
+            {
+                <div class="alert alert-warning">@Model.SectionError</div>
+            }
+            <form method="get" asp-action="Report" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <div class="col-12 col-md-6">
+                    <label class="form-label" for="patientId">Patient ID</label>
+                    <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-au-action">Search</button>
+                    <a class="btn btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
+                </div>
+            </form>
+
+            @if (Model.Patient is { } patient)
+            {
+                <div class="alert alert-light border">
+                    <div class="d-flex justify-content-between gap-2">
+                        <strong>Patient @patient.PatientId</strong>
+                        <a asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.Query.PatientId">Close</a>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(patient.Error))
+                    {
+                        <p class="mb-0 mt-2">@patient.Error</p>
+                    }
+                    else
+                    {
+                        @if (patient.AcquisitionMissing)
+                        {
+                            <p class="mb-1 mt-2">Data acquisition has not reported for this patient.</p>
+                        }
+                        else
+                        {
+                            <p class="mb-1 mt-2">Encounters @patient.EncounterCount, in the organization @patient.OrgEncounterCount, assumed @patient.AssumedOrgEncounterCount.</p>
+                            @if (patient.Locations.Count > 0)
+                            {
+                                <p class="mb-1">Locations: @string.Join(", ", patient.Locations)</p>
+                            }
+                        }
+                        @if (patient.NormalizationMissing)
+                        {
+                            <p class="mb-0">Normalization has not reported code maps for this patient.</p>
+                        }
+                        else if (patient.CodeMaps.Count == 0)
+                        {
+                            <p class="mb-0">No code map totals.</p>
+                        }
+                        else
+                        {
+                            <ul class="mb-0">
+                                @foreach (var map in patient.CodeMaps)
+                                {
+                                    <li>@map</li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
+            }
+
+            @if (Model.Patients.Count == 0)
+            {
+                <p class="mb-0">No patients found.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Reporting</th>
+                                <th>Submission</th>
+                                <th>Location org</th>
+                                <th>Encounter mapping</th>
+                                <th>HSLOC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in Model.Patients)
+                        {
+                            <tr>
+                                <td><a asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.ToRoute(Model.ReportId, patient: row.PatientId)"><code class="lu-facility-id">@row.PatientId</code></a></td>
+                                <td>@row.ReportingStatus</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.SubmissionStatus) ? "—" : row.SubmissionStatus)</td>
+                                <td>@row.LocationOrg</td>
+                                <td>@row.EncounterMapping</td>
+                                <td>@row.Hsloc</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Patient pages">
+                    @if (bar.HasPrevious)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                    }
+                    <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                    @if (bar.HasNext)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                    }
+                </nav>
+            }
+        </div>
+    </div>
+}

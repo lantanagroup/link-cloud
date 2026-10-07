@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 
@@ -108,6 +109,39 @@ public interface IDataAcquisitionServiceClient
 
     Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
         string facilityId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Paged location mappings for one facility:
+    /// <c>GET /api/data/location-mappings/facility/{facilityId}/search</c>.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<OrganizationLocationMappingApiModel>>> SearchOrganizationLocationMappingsAsync(
+        string facilityId,
+        string? locationId = null,
+        string? locationName = null,
+        string? locationAlias = null,
+        string? partOfValue = null,
+        bool? isOrgLocation = null,
+        bool? isActive = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Paged encounter mappings for one facility:
+    /// <c>GET /api/data/encounter-mappings/facilities/{facilityId}/search</c>.
+    /// </summary>
+    Task<LinkApiResponse<PagedConfigModel<EncounterMappingApiModel>>> SearchEncounterMappingsAsync(
+        string facilityId,
+        string? encounterId = null,
+        string? patientId = null,
+        bool? mappedToOrg = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
         CancellationToken cancellationToken = default);
 
     /// <summary>

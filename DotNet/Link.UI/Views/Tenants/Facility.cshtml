@@ -33,7 +33,10 @@ else
             <span>@heading</span>
             @if (!Model.IsCreate)
             {
-                <span class="badge text-bg-secondary">LinkSDK</span>
+                <span class="d-flex align-items-center gap-2">
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="View" asp-route-id="@Model.FacilityId">View</a>
+                    <span class="badge text-bg-secondary">LinkSDK</span>
+                </span>
             }
         </div>
         <div class="card-body">
@@ -272,7 +275,7 @@ else
             <partial name="_NormalizationPanel" model="Model" />
         </div>
         <p class="text-muted small mt-3 mb-0">
-            Facility view stays on the next slice. This page saves facility identity, census, query dispatch, data acquisition, and normalization operations.
+            This page saves facility identity, census, query dispatch, data acquisition, and normalization operations. View opens locations, reports, and reporting plans.
         </p>
     }
 }

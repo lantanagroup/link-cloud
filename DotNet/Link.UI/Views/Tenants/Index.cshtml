@@ -45,13 +45,16 @@
                     {
                         <tr>
                             <td><a asp-action="Facility" asp-route-id="@tenant.FacilityId"><code class="lu-facility-id">@tenant.FacilityId</code></a></td>
-                            <td><a asp-action="Facility" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a></td>
+                            <td>
+                                <a asp-action="View" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a>
+                                <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId">Configuration</a></div>
+                            </td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
-            <p class="text-muted small mt-2 mb-0">@Model.Tenants.Count tenant(s). Open a row to edit the facility.</p>
+            <p class="text-muted small mt-2 mb-0">@Model.Tenants.Count tenant(s). The name opens the facility. Configuration opens the editor.</p>
         }
     </div>
 </div>

@@ -1,0 +1,133 @@
+@model FacilityViewModel
+@using Link.UI.Services
+@{
+    Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
+    Dictionary<string, string> LocationRoute(int mappingId)
+    {
+        var route = Model.Query.ToRoute();
+        route["location"] = mappingId.ToString();
+        route["section"] = "encounters";
+        return route;
+    }
+    var closeLocation = Model.Query.ToRoute();
+    closeLocation.Remove("location");
+}
+
+<div class="au-card card">
+    <div class="card-header">Encounters</div>
+    <div class="card-body">
+        <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+            <input type="hidden" name="section" value="encounters" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="encounterId">Encounter ID</label>
+                <input id="encounterId" name="encounterId" value="@Model.Query.EncounterId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="patientId">Patient ID</label>
+                <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="mapped">Mapped to org</label>
+                <select id="mapped" name="mapped" class="form-select">
+                    <option value="">Any</option>
+                    <option value="true" selected="@(Model.Query.Mapped == "true" ? "selected" : null)">Yes</option>
+                    <option value="false" selected="@(Model.Query.Mapped == "false" ? "selected" : null)">No</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="encounters">Clear</a>
+            </div>
+        </form>
+
+        @if (Model.LocationDetail is not null || !string.IsNullOrWhiteSpace(Model.LocationDetailError))
+        {
+            <div class="alert alert-light border">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <strong>Location details</strong>
+                    <a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@closeLocation">Close</a>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.LocationDetailError))
+                {
+                    <p class="mb-0 mt-2">@Model.LocationDetailError</p>
+                }
+                else if (Model.LocationDetail is { } detail)
+                {
+                    @if (!detail.IsActive)
+                    {
+                        <p class="mb-2 mt-2">This location mapping is inactive. Encounters referencing it will not map to the organization.</p>
+                    }
+                    <dl class="row mb-0 mt-2">
+                        <dt class="col-sm-3">Mapping ID</dt><dd class="col-sm-9">@detail.Id</dd>
+                        <dt class="col-sm-3">Location ID</dt><dd class="col-sm-9"><code class="lu-facility-id">@detail.LocationId</code></dd>
+                        <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(detail.Name) ? "—" : detail.Name)</dd>
+                        <dt class="col-sm-3">Alias</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(detail.Alias) ? "—" : detail.Alias)</dd>
+                        <dt class="col-sm-3">Part of</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(detail.PartOf) ? "—" : detail.PartOf)</dd>
+                        <dt class="col-sm-3">Org location</dt><dd class="col-sm-9">@(detail.IsOrg ? "Yes" : "No")</dd>
+                        <dt class="col-sm-3">Active</dt><dd class="col-sm-9">@(detail.IsActive ? "Yes" : "No")</dd>
+                        <dt class="col-sm-3">Created</dt><dd class="col-sm-9">@detail.Created</dd>
+                        <dt class="col-sm-3">Modified</dt><dd class="col-sm-9">@detail.Modified</dd>
+                    </dl>
+                }
+            </div>
+        }
+
+        @if (Model.Encounters.Count == 0)
+        {
+            <p class="mb-0">No encounters found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("EncounterMappingId")">Mapping ID</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("EncounterId")">Encounter ID</a></th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("PatientId")">Patient ID</a></th>
+                            <th>Location ID</th>
+                            <th>Mapped to org</th>
+                            <th><a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@SortRoute("CreateDate")">Created</a></th>
+                            <th>Modified</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.Encounters)
+                    {
+                        <tr>
+                            <td>@row.Id</td>
+                            <td><code class="lu-facility-id">@row.EncounterId</code></td>
+                            <td><code class="lu-facility-id">@row.PatientId</code></td>
+                            <td>
+                                @if (row.Locations.Count == 0)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    @for (var i = 0; i < row.Locations.Count; i++)
+                                    {
+                                        var location = row.Locations[i];
+                                        <a asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@LocationRoute(location.MappingId)">@location.LocationId</a>
+                                        if (i < row.Locations.Count - 1)
+                                        {
+                                            <span>, </span>
+                                        }
+                                    }
+                                }
+                            </td>
+                            <td>@(row.MappedToOrg ? "Yes" : "No")</td>
+                            <td class="text-nowrap">@row.Created</td>
+                            <td class="text-nowrap">@row.Modified</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <partial name="_ViewPager" model="Model" />
+        }
+    </div>
+</div>

@@ -1550,3 +1550,49 @@ a.au-scenario-card:hover {
   .lu-nav-section-label { width: 100%; }
 }
 
+.lu-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.lu-row-actions form { margin-bottom: .35rem; }
+.lu-row-actions form:last-child { margin-bottom: 0; }
+
+.lu-hsloc {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 1fr);
+  gap: 1rem;
+}
+
+.lu-location-tree,
+.lu-location-tree ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.lu-location-tree details > ul { padding-left: 1rem; }
+
+.lu-location-row {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: center;
+  padding: .4rem 0;
+  border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.lu-location-row.is-selected { background: #f3f8fd; }
+
+.lu-hsloc-detail {
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: .375rem;
+  padding: .75rem;
+}
+
+@media (max-width: 767.98px) {
+  .lu-hsloc { grid-template-columns: 1fr; }
+  .lu-location-row { align-items: flex-start; }
+}
+

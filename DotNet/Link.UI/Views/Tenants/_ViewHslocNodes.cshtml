@@ -1,0 +1,33 @@
+@model IReadOnlyList<FacilityLocationNode>
+<ul class="lu-location-tree">
+@foreach (var node in Model)
+{
+    var label = string.IsNullOrWhiteSpace(node.Name) ? node.LocationId : node.Name;
+    var selected = string.Equals(node.LocationId, ViewData["Hsloc"] as string, StringComparison.Ordinal);
+    <li>
+        <div class="lu-location-row @(node.Mapped ? "is-mapped" : "is-unmapped") @(selected ? "is-selected" : null)">
+            <div>
+                <strong>@label</strong>
+                <div class="small text-muted">
+                    <code class="lu-facility-id">@node.LocationId</code>
+                    @if (!string.IsNullOrWhiteSpace(node.Alias))
+                    {
+                        <span> · @node.Alias</span>
+                    }
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge @(node.Mapped ? "text-bg-success" : "text-bg-secondary")">@(node.Mapped ? "Mapped" : "Unmapped")</span>
+                <a asp-action="View" asp-route-id="@ViewData["FacilityId"]" asp-route-section="hsloc" asp-route-hsloc="@node.LocationId">Mappings</a>
+            </div>
+        </div>
+        @if (node.Children.Count > 0)
+        {
+            <details open>
+                <summary class="small">@node.Children.Count child location@(node.Children.Count == 1 ? "" : "s")</summary>
+                <partial name="_ViewHslocNodes" model="node.Children" />
+            </details>
+        }
+    </li>
+}
+</ul>

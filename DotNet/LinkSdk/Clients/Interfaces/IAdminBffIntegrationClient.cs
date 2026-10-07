@@ -37,6 +37,15 @@ public interface IAdminBffIntegrationClient
         string reportScheduleId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Stops an in-progress report and soft-deletes it:
+    /// <c>POST /api/aggregate/reports/{reportScheduleId}/abort</c>.
+    /// Admin.BFF owns this because it also drops that report's acquisition work.
+    /// </summary>
+    Task<LinkApiResponse> AbortAggregateReportAsync(
+        string reportScheduleId,
+        CancellationToken cancellationToken = default);
+
     Task<LinkApiResponse> RestoreAggregateReportAsync(
         string reportScheduleId,
         CancellationToken cancellationToken = default);

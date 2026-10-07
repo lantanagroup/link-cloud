@@ -13,15 +13,18 @@ public sealed class TenantsController : Controller
 {
     private readonly IFacilityServiceClient _facilityServiceClient;
     private readonly FacilityHubService _hub;
+    private readonly FacilityViewService _view;
     private readonly ILogger<TenantsController> _logger;
 
     public TenantsController(
         IFacilityServiceClient facilityServiceClient,
         FacilityHubService hub,
+        FacilityViewService view,
         ILogger<TenantsController> logger)
     {
         _facilityServiceClient = facilityServiceClient;
         _hub = hub;
+        _view = view;
         _logger = logger;
     }
 
@@ -350,6 +353,63 @@ public sealed class TenantsController : Controller
         return FromResult(result, id ?? "Facility");
     }
 
+    [HttpGet]
+    public async Task<IActionResult> View([FromRoute] string? id, FacilityViewQuery query, CancellationToken cancellationToken)
+    {
+        var page = await _view.LoadAsync(id, query, cancellationToken);
+        ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
+        return View(page);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Report(
+        [FromRoute] string? id,
+        string? reportId,
+        ReportPageQuery query,
+        CancellationToken cancellationToken)
+    {
+        var page = await _view.LoadReportAsync(id, reportId, query, cancellationToken);
+        ViewData["Title"] = page.ReportId.Length == 0 ? "Report" : page.ReportId;
+        return View(page);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> ResubmitReport(
+        [FromRoute] string? id,
+        string? targetId,
+        bool bypassSubmission,
+        FacilityViewQuery query,
+        CancellationToken cancellationToken) =>
+        ReportAction(id, query, cancellationToken, () => _view.ResubmitAsync(id, targetId, bypassSubmission, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> AbortReport(
+        [FromRoute] string? id,
+        string? targetId,
+        FacilityViewQuery query,
+        CancellationToken cancellationToken) =>
+        ReportAction(id, query, cancellationToken, () => _view.AbortAsync(id, targetId, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> CleanUpReport(
+        [FromRoute] string? id,
+        string? targetId,
+        FacilityViewQuery query,
+        CancellationToken cancellationToken) =>
+        ReportAction(id, query, cancellationToken, () => _view.CleanUpAsync(id, targetId, cancellationToken));
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public Task<IActionResult> RestoreReport(
+        [FromRoute] string? id,
+        string? targetId,
+        FacilityViewQuery query,
+        CancellationToken cancellationToken) =>
+        ReportAction(id, query, cancellationToken, () => _view.RestoreReportAsync(id, targetId, cancellationToken));
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Remove([FromRoute] string? id, CancellationToken cancellationToken)
@@ -381,5 +441,23 @@ public sealed class TenantsController : Controller
 
         ViewData["Title"] = title;
         return View("Facility", result.Page);
+    }
+
+    private async Task<IActionResult> ReportAction(
+        string? id,
+        FacilityViewQuery query,
+        CancellationToken cancellationToken,
+        Func<Task<FacilityViewAction>> action)
+    {
+        var result = await action();
+        if (result.Succeeded)
+            TempData["Message"] = result.Message;
+        else
+            TempData["Error"] = result.Message;
+
+        var route = new RouteValueDictionary { ["id"] = id };
+        foreach (var (key, value) in query.ToRoute())
+            route[key] = value;
+        return RedirectToAction(nameof(View), route);
     }
 }

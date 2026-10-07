@@ -1,0 +1,110 @@
+@model FacilityViewModel
+@{
+    var heading = Model.FacilityName ?? Model.FacilityId ?? "Facility";
+    ViewData["Title"] = heading;
+}
+
+<div class="mb-3 d-flex flex-wrap gap-3">
+    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
+    @if (!Model.NotFound && Model.LoadError is null)
+    {
+        <a asp-action="Facility" asp-route-id="@Model.FacilityId"><i class="bi bi-gear me-1"></i>Configuration</a>
+    }
+</div>
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+@if (TempData["Error"] is string actionError)
+{
+    <div class="alert alert-warning">@actionError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound)
+{
+    <div class="au-card card">
+        <div class="card-header">Facility</div>
+        <div class="card-body">
+            <p class="mb-0">No facility named <code class="lu-facility-id">@Model.FacilityId</code> was found.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="au-card card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>@heading</span>
+            <code class="lu-facility-id">@Model.FacilityId</code>
+        </div>
+        <div class="card-body">
+            <h2 class="h6">Enrolled reporting</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th>Cadence</th><th>Measures</th></tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var report in Model.Enrolled)
+                    {
+                        <tr>
+                            <td><span class="badge text-bg-light border">@report.Cadence</span></td>
+                            <td>
+                                @if (report.Measures.Count == 0)
+                                {
+                                    <span class="text-muted">No enrolled measures</span>
+                                }
+                                else
+                                {
+                                    @string.Join(", ", report.Measures)
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <nav class="lu-section-nav mb-3" aria-label="Facility sections">
+        @foreach (var section in new[] { ("reports", "Reports"), ("hsloc", "HSLOC locations"), ("locations", "Org locations"), ("encounters", "Encounters") })
+        {
+            <a class="btn btn-sm @(Model.Section == section.Item1 ? "btn-au-action" : "btn-outline-secondary")"
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1)">@(section.Item2)</a>
+        }
+        @if (Model.DmrpEnabled)
+        {
+            <a class="btn btn-sm @(Model.Section == "plans" ? "btn-au-action" : "btn-outline-secondary")"
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans")">Reporting plans</a>
+        }
+    </nav>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SectionError))
+    {
+        <div class="alert alert-warning">@Model.SectionError</div>
+    }
+    else if (Model.Section == "reports")
+    {
+        <partial name="_ViewReports" model="Model" />
+    }
+    else if (Model.Section == "hsloc")
+    {
+        <partial name="_ViewHsloc" model="Model" />
+    }
+    else if (Model.Section == "locations")
+    {
+        <partial name="_ViewLocations" model="Model" />
+    }
+    else if (Model.Section == "encounters")
+    {
+        <partial name="_ViewEncounters" model="Model" />
+    }
+    else if (Model.Section == "plans")
+    {
+        <partial name="_ViewPlans" model="Model" />
+    }
+}
