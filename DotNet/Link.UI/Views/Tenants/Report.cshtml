@@ -59,7 +59,17 @@ else
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Facility</dt>
-                <dd class="col-sm-9"><a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a> <code class="lu-facility-id">@report.FacilityId</code></dd>
+                <dd class="col-sm-9">
+                    @if (Model.FacilityMissing)
+                    {
+                        <span>The facility record is not available.</span>
+                    }
+                    else
+                    {
+                        <a asp-action="View" asp-route-id="@Model.FacilityId">@Model.FacilityName</a>
+                    }
+                    <code class="lu-facility-id">@report.FacilityId</code>
+                </dd>
                 <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
                 <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
                 <dt class="col-sm-3">Reporting period</dt><dd class="col-sm-9">@report.PeriodStart to @report.PeriodEnd</dd>
