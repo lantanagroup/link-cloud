@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.UI.Models;
 using Link.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Link.UI.Controllers;
 
 /// <summary>
-/// Tenant list and the facility hub (identity, census, query dispatch, data acquisition) via LinkSDK.
+/// Tenant list and the facility hub (identity, census, query dispatch, data acquisition, normalization) via LinkSDK.
 /// </summary>
 public sealed class TenantsController : Controller
 {
@@ -116,9 +117,25 @@ public sealed class TenantsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Facility([FromRoute] string? id, string? planType, int? orgConfig, CancellationToken cancellationToken)
+    public async Task<IActionResult> Facility(
+        [FromRoute] string? id,
+        string? planType,
+        int? orgConfig,
+        string? operationId,
+        string? operationType,
+        string? sequenceType,
+        int? operationPage,
+        CancellationToken cancellationToken)
     {
-        var page = await _hub.LoadEditAsync(id, planType, orgConfig, cancellationToken);
+        var page = await _hub.LoadEditAsync(
+            id,
+            planType.Sanitize(),
+            orgConfig,
+            cancellationToken,
+            operationId.Sanitize(),
+            operationType.Sanitize(),
+            sequenceType.Sanitize(),
+            operationPage ?? 1);
         ViewData["Title"] = page.FacilityName ?? page.FacilityId ?? "Facility";
         return View(page);
     }
@@ -278,6 +295,63 @@ public sealed class TenantsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveOperation(
+        [FromRoute] string? id,
+        NormalizationOperationInput input,
+        CancellationToken cancellationToken)
+    {
+        var result = await _hub.SaveOperationAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteOperation(
+        [FromRoute] string? id,
+        string? operationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteOperationAsync(id, operationId.Sanitize(), cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveOperationSequence(
+        [FromRoute] string? id,
+        NormalizationSequenceInput input,
+        CancellationToken cancellationToken)
+    {
+        input.ResourceType = input.ResourceType.Sanitize();
+        var result = await _hub.SaveOperationSequenceAsync(id, input, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteOperationSequence(
+        [FromRoute] string? id,
+        string? resourceType,
+        CancellationToken cancellationToken)
+    {
+        var result = await _hub.DeleteOperationSequenceAsync(id, resourceType.Sanitize(), cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestOperation(
+        [FromRoute] string? id,
+        string? operationId,
+        string? testResource,
+        CancellationToken cancellationToken)
+    {
+        var result = await _hub.TestOperationAsync(id, operationId.Sanitize(), testResource, cancellationToken);
+        return FromResult(result, id ?? "Facility");
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Remove([FromRoute] string? id, CancellationToken cancellationToken)
     {
         var result = await _hub.SoftDeleteAsync(id, cancellationToken);
@@ -299,7 +373,9 @@ public sealed class TenantsController : Controller
             {
                 id = result.RedirectFacilityId,
                 planType = result.RedirectPlanType,
-                orgConfig = result.RedirectReportingOrgId
+                orgConfig = result.RedirectReportingOrgId,
+                sequenceType = result.RedirectSequenceType,
+                operationPage = result.RedirectOperationPage
             });
         }
 

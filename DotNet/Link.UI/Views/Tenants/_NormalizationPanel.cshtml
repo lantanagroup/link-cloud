@@ -1,0 +1,456 @@
+@using Link.UI.Services
+@model FacilityHubViewModel
+@{
+    var panel = Model.Normalization;
+    var open = !string.IsNullOrWhiteSpace(Model.NormalizationError)
+        || panel.ReadFailed
+        || panel.EditorOpen
+        || !string.IsNullOrWhiteSpace(panel.TestResult);
+    var collapse = open ? "accordion-collapse collapse show" : "accordion-collapse collapse";
+    var button = open ? "accordion-button" : "accordion-button collapsed";
+    var expanded = open ? "true" : "false";
+    var editor = panel.Editor;
+    var editing = editor.OperationId is not null;
+    var type = editor.OperationType ?? string.Empty;
+}
+
+<div class="accordion-item" id="normalizationPanel">
+    <h2 class="accordion-header" id="normalizationHeading">
+        <button class="@button" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationBody" aria-expanded="@expanded" aria-controls="normalizationBody">
+            Normalization operations
+        </button>
+    </h2>
+    <div id="normalizationBody" class="@collapse" aria-labelledby="normalizationHeading">
+        <div class="accordion-body">
+            @if (!Model.NormalizationConfigured)
+            {
+                <p class="text-muted mb-0">Normalization service URL is not configured (ServiceRegistry:NormalizationServiceUrl).</p>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(Model.NormalizationError))
+                {
+                    <div class="alert alert-warning">@Model.NormalizationError</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(panel.ResourceWarning))
+                {
+                    <div class="alert alert-info">@panel.ResourceWarning</div>
+                }
+                @if (panel.ReadFailed)
+                {
+                    <div class="alert alert-warning">Normalization operations could not be read. Saving is hidden so this page cannot replace them.</div>
+                }
+                else
+                {
+                    @if (panel.Operations.Count == 0)
+                    {
+                        <div class="alert alert-info">No normalization operations for this facility.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            @foreach (var row in panel.Operations)
+                            {
+                                <div class="border rounded p-2">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2">
+                                        <div>
+                                            <div class="fw-semibold">@FacilityNormalizationRules.Label(row.OperationType)</div>
+                                            <div>@row.Name</div>
+                                            @if (!string.IsNullOrWhiteSpace(row.Description))
+                                            {
+                                                <div class="text-muted small">@row.Description</div>
+                                            }
+                                            <div class="small">@row.ResourceTypes</div>
+                                            <div class="small">@(row.IsDisabled ? "Disabled" : "Enabled")</div>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-2 align-items-start">
+                                            <a class="btn btn-outline-primary btn-sm" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber > 1 ? panel.PageNumber : null)">Edit</a>
+                                            <form method="post" asp-action="DeleteOperation" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete this operation?');">
+                                                <input type="hidden" name="operationId" value="@row.Id" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(row.OperationJson))
+                                    {
+                                        <details class="mt-2">
+                                            <summary>JSON</summary>
+                                            <pre class="small mb-0 text-break" style="max-height:12rem;overflow:auto;white-space:pre-wrap">@row.OperationJson</pre>
+                                        </details>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (panel.TotalPages > 1)
+                    {
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                            <span class="small text-muted">Page @panel.PageNumber of @panel.TotalPages</span>
+                            @if (panel.PageNumber > 1)
+                            {
+                                <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber - 1)" asp-route-sequenceType="@panel.SequenceType">Previous</a>
+                            }
+                            @if (panel.PageNumber < panel.TotalPages)
+                            {
+                                <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationPage="@(panel.PageNumber + 1)" asp-route-sequenceType="@panel.SequenceType">Next</a>
+                            }
+                        </div>
+                    }
+
+                    @if (!panel.EditorOpen)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            @foreach (var operationType in FacilityNormalizationRules.OperationTypes)
+                            {
+                                <a class="btn btn-outline-primary btn-sm" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="border rounded p-3 mb-3" id="normalization-editor">
+                            <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                                <h3 class="h6 mb-0">@(editing ? "Edit" : "Add") @FacilityNormalizationRules.Label(type)</h3>
+                                <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-sequenceType="@panel.SequenceType">Close</a>
+                            </div>
+                            @if (editor.ParseFailed)
+                            {
+                                <div class="alert alert-warning mb-0">This operation could not be read into the form, so it cannot be saved here.</div>
+                            }
+                            else
+                            {
+                                <form method="post" asp-action="SaveOperation" asp-route-id="@Model.FacilityId" id="normalizationOperationForm">
+                                    <input type="hidden" name="OperationId" value="@editor.OperationId" />
+                                    <input type="hidden" name="OperationType" value="@type" />
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label" for="operationName">Name</label>
+                                            <input id="operationName" name="Name" value="@editor.Name" class="form-control" maxlength="200" required />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label" for="operationDescription">Description</label>
+                                            <input id="operationDescription" name="Description" value="@editor.Description" class="form-control" maxlength="2000" />
+                                        </div>
+                                        @if (editing)
+                                        {
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="operationDisabled" name="IsDisabled" value="true" checked="@editor.IsDisabled" />
+                                                    <label class="form-check-label" for="operationDisabled">Disabled</label>
+                                                </div>
+                                            </div>
+                                        }
+                                        @if (type != "HSLOCMap")
+                                        {
+                                            var choices = panel.ResourceTypes
+                                                .Concat(editor.ResourceTypes ?? new List<string>())
+                                                .Where(name => !string.IsNullOrWhiteSpace(name))
+                                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                                                .ToList();
+                                            <div class="col-12">
+                                                <label class="form-label" for="operationResourceTypes">Resource types</label>
+                                                <select id="operationResourceTypes" name="ResourceTypes" class="form-select" multiple size="6">
+                                                    @foreach (var resourceType in choices)
+                                                    {
+                                                        var selected = (editor.ResourceTypes ?? new List<string>()).Any(item => string.Equals(item, resourceType, StringComparison.OrdinalIgnoreCase));
+                                                        if (selected)
+                                                        {
+                                                            <option value="@resourceType" selected>@resourceType</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="@resourceType">@resourceType</option>
+                                                        }
+                                                    }
+                                                </select>
+                                                @if (type is "CopyLocation" or "CopyLocationAliasToTypeIteratively")
+                                                {
+                                                    <div class="form-text">Location is included even when it is not selected.</div>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="col-12">
+                                                <p class="mb-0">This operation runs on Location. Target codes must be active HSLOC codes. The target system is the NHSN HSLOC code system.</p>
+                                            </div>
+                                        }
+
+                                        @if (type == "CopyProperty")
+                                        {
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label" for="sourceFhirPath">Source FHIR path</label>
+                                                <input id="sourceFhirPath" name="SourceFhirPath" value="@editor.SourceFhirPath" class="form-control" required />
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label" for="targetFhirPath">Target FHIR path</label>
+                                                <input id="targetFhirPath" name="TargetFhirPath" value="@editor.TargetFhirPath" class="form-control" required />
+                                            </div>
+                                        }
+                                        else if (type == "ConditionalTransform")
+                                        {
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label" for="transformTarget">Target FHIR path</label>
+                                                <input id="transformTarget" name="TargetFhirPath" value="@editor.TargetFhirPath" class="form-control" required />
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label" for="transformValue">Target value</label>
+                                                <input id="transformValue" name="TargetValue" value="@editor.TargetValue" class="form-control" required />
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="fw-semibold mb-2">Conditions</div>
+                                                @for (var i = 0; i < (editor.Conditions?.Count ?? 0); i++)
+                                                {
+                                                    var condition = editor.Conditions![i];
+                                                    <div class="row g-2 align-items-end mb-2">
+                                                        <div class="col-12 col-md-4">
+                                                            <label class="form-label" for="condition-path-@i">FHIR path</label>
+                                                            <input id="condition-path-@i" name="Conditions[@i].FhirPathSource" value="@condition.FhirPathSource" class="form-control" />
+                                                        </div>
+                                                        <div class="col-12 col-md-3">
+                                                            <label class="form-label" for="condition-operator-@i">Operator</label>
+                                                            <select id="condition-operator-@i" name="Conditions[@i].Operator" class="form-select">
+                                                                @foreach (var op in FacilityNormalizationRules.Operators)
+                                                                {
+                                                                    if (op.Value == condition.Operator)
+                                                                    {
+                                                                        <option value="@op.Value" selected>@op.Label</option>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <option value="@op.Value">@op.Label</option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-12 col-md-3">
+                                                            <label class="form-label" for="condition-value-@i">Value</label>
+                                                            <input id="condition-value-@i" name="Conditions[@i].Value" value="@condition.Value" class="form-control" />
+                                                        </div>
+                                                        <div class="col-12 col-md-2">
+                                                            <div class="form-check mb-2">
+                                                                <input class="form-check-input" type="checkbox" id="condition-remove-@i" name="Conditions[@i].Remove" value="true" />
+                                                                <label class="form-check-label" for="condition-remove-@i">Remove</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                <p class="form-text">Leave the last row blank to ignore it. Exists and Does not exist do not need a value.</p>
+                                            </div>
+                                        }
+                                        else if (type is "CodeMap" or "HSLOCMap")
+                                        {
+                                            if (type == "CodeMap")
+                                            {
+                                                <div class="col-12">
+                                                    <label class="form-label" for="codeMapPath">FHIR path</label>
+                                                    <input id="codeMapPath" name="FhirPath" value="@editor.FhirPath" class="form-control" required />
+                                                </div>
+                                            }
+                                            <div class="col-12">
+                                                @for (var i = 0; i < (editor.Maps?.Count ?? 0); i++)
+                                                {
+                                                    var map = editor.Maps![i];
+                                                    <div class="border rounded p-2 mb-2">
+                                                        <div class="row g-2">
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label" for="map-source-@i">Source system</label>
+                                                                <input id="map-source-@i" name="Maps[@i].SourceSystem" value="@map.SourceSystem" class="form-control" />
+                                                            </div>
+                                                            <div class="col-12 col-md-6">
+                                                                <label class="form-label" for="map-target-@i">Target system</label>
+                                                                @if (type == "HSLOCMap")
+                                                                {
+                                                                    <input id="map-target-@i" class="form-control" value="@FacilityNormalizationRules.HslocSystem" readonly />
+                                                                    <input type="hidden" name="Maps[@i].TargetSystem" value="@FacilityNormalizationRules.HslocSystem" />
+                                                                }
+                                                                else
+                                                                {
+                                                                    <input id="map-target-@i" name="Maps[@i].TargetSystem" value="@map.TargetSystem" class="form-control" />
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                        @for (var j = 0; j < (map.Entries?.Count ?? 0); j++)
+                                                        {
+                                                            var entry = map.Entries![j];
+                                                            <div class="row g-2 align-items-end mt-1">
+                                                                <div class="col-12 col-md-3">
+                                                                    <label class="form-label" for="entry-source-@i-@j">Source code</label>
+                                                                    <input id="entry-source-@i-@j" name="Maps[@i].Entries[@j].SourceCode" value="@entry.SourceCode" class="form-control" />
+                                                                </div>
+                                                                <div class="col-12 col-md-3">
+                                                                    <label class="form-label" for="entry-code-@i-@j">Target code</label>
+                                                                    <input id="entry-code-@i-@j" name="Maps[@i].Entries[@j].Code" value="@entry.Code" class="form-control" />
+                                                                </div>
+                                                                <div class="col-12 col-md-4">
+                                                                    <label class="form-label" for="entry-display-@i-@j">Display</label>
+                                                                    <input id="entry-display-@i-@j" name="Maps[@i].Entries[@j].Display" value="@entry.Display" class="form-control" />
+                                                                </div>
+                                                                <div class="col-12 col-md-2">
+                                                                    <div class="form-check mb-2">
+                                                                        <input class="form-check-input" type="checkbox" id="entry-remove-@i-@j" name="Maps[@i].Entries[@j].Remove" value="true" />
+                                                                        <label class="form-check-label" for="entry-remove-@i-@j">Remove</label>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                        <div class="form-check mt-2">
+                                                            <input class="form-check-input" type="checkbox" id="map-remove-@i" name="Maps[@i].Remove" value="true" />
+                                                            <label class="form-check-label" for="map-remove-@i">Remove this map</label>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                <p class="form-text">Leave the last map and the last code row blank to ignore them. Save once to add another row.</p>
+                                            </div>
+                                        }
+                                        else if (type == "CopyLocationAliasToTypeIteratively")
+                                        {
+                                            <div class="col-12 col-md-4">
+                                                <label class="form-label" for="maxIterations">Max iterations</label>
+                                                <input id="maxIterations" name="MaxIterations" value="@editor.MaxIterations" type="number" min="1" max="1000" class="form-control" required />
+                                            </div>
+                                            <div class="col-12 col-md-8 d-flex align-items-end">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="splitOnComma" name="SplitOnComma" value="true" checked="@editor.SplitOnComma" />
+                                                    <label class="form-check-label" for="splitOnComma">Split alias on comma</label>
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (type == "RemoveExtensions")
+                                        {
+                                            <div class="col-12">
+                                                <div class="fw-semibold mb-2">Extension URLs</div>
+                                                @for (var i = 0; i < (editor.ExtensionUrls?.Count ?? 0); i++)
+                                                {
+                                                    var url = editor.ExtensionUrls![i];
+                                                    <div class="row g-2 align-items-end mb-2">
+                                                        <div class="col-12 col-md-10">
+                                                            <label class="form-label" for="extension-url-@i">URL</label>
+                                                            <input id="extension-url-@i" name="ExtensionUrls[@i].Url" value="@url.Url" class="form-control" />
+                                                        </div>
+                                                        <div class="col-12 col-md-2">
+                                                            <div class="form-check mb-2">
+                                                                <input class="form-check-input" type="checkbox" id="extension-remove-@i" name="ExtensionUrls[@i].Remove" value="true" />
+                                                                <label class="form-check-label" for="extension-remove-@i">Remove</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                <p class="form-text">Leave the last row blank to ignore it. Save once to add another URL.</p>
+                                            </div>
+                                        }
+                                    </div>
+                                    <button type="submit" class="btn btn-au-action mt-3">@(editing ? "Save operation" : "Add operation")</button>
+                                </form>
+
+                                @if (editing)
+                                {
+                                    <form method="post" asp-action="TestOperation" asp-route-id="@Model.FacilityId" class="mt-3">
+                                        <input type="hidden" name="operationId" value="@editor.OperationId" />
+                                        <label class="form-label" for="testResource">Test with a FHIR resource</label>
+                                        <textarea id="testResource" name="testResource" class="form-control" rows="6">@editor.TestResource</textarea>
+                                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Test saved operation</button>
+                                    </form>
+                                    @if (!string.IsNullOrWhiteSpace(panel.TestResult))
+                                    {
+                                        <div class="alert @(panel.TestFailed ? "alert-warning" : "alert-success") mt-3 mb-0">
+                                            <pre class="small mb-0 text-break" style="max-height:16rem;overflow:auto;white-space:pre-wrap">@panel.TestResult</pre>
+                                        </div>
+                                    }
+                                }
+                            }
+                        </div>
+                    }
+
+                    <div class="border rounded p-3" id="normalization-sequence">
+                        <h3 class="h6">Operation sequence</h3>
+                        @if (panel.SequenceResourceTypes.Count == 0)
+                        {
+                            <p class="text-muted mb-0">Add an operation before setting its sequence. A new operation is appended to the sequence for each of its resource types.</p>
+                        }
+                        else
+                        {
+                            <form method="get" asp-action="Facility" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
+                                @if (panel.EditorOpen && editing)
+                                {
+                                    <input type="hidden" name="operationId" value="@editor.OperationId" />
+                                }
+                                else if (panel.EditorOpen)
+                                {
+                                    <input type="hidden" name="operationType" value="@type" />
+                                }
+                                @if (panel.PageNumber > 1)
+                                {
+                                    <input type="hidden" name="operationPage" value="@panel.PageNumber" />
+                                }
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="sequenceType">Resource type</label>
+                                    <select id="sequenceType" name="sequenceType" class="form-select">
+                                        @foreach (var resourceType in panel.SequenceResourceTypes)
+                                        {
+                                            if (string.Equals(resourceType, panel.SequenceType, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@resourceType" selected>@resourceType</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@resourceType">@resourceType</option>
+                                            }
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm">Show sequence</button>
+                                </div>
+                            </form>
+
+                            @if (panel.Sequence.Count == 0)
+                            {
+                                <p class="text-muted">No operations use @panel.SequenceType.</p>
+                            }
+                            else
+                            {
+                                @if (panel.SequenceIncomplete)
+                                {
+                                    <div class="alert alert-warning">Not every operation for this resource type could be listed, so the sequence cannot be replaced from here.</div>
+                                }
+                                <form method="post" asp-action="SaveOperationSequence" asp-route-id="@Model.FacilityId">
+                                    <input type="hidden" name="ResourceType" value="@panel.SequenceType" />
+                                    @for (var i = 0; i < panel.Sequence.Count; i++)
+                                    {
+                                        var row = panel.Sequence[i];
+                                        <div class="row g-2 align-items-end mb-2">
+                                            <input type="hidden" name="Rows[@i].OperationId" value="@row.OperationId" />
+                                            <input type="hidden" name="Rows[@i].Name" value="@row.Name" />
+                                            <input type="hidden" name="Rows[@i].OperationType" value="@row.OperationType" />
+                                            <input type="hidden" name="Rows[@i].IsDisabled" value="@(row.IsDisabled ? "true" : "false")" />
+                                            <div class="col-12 col-md-8">
+                                                <div class="fw-semibold">@row.Name</div>
+                                                <div class="small text-muted">@FacilityNormalizationRules.Label(row.OperationType)@(row.IsDisabled ? " · Disabled" : "")</div>
+                                            </div>
+                                            <div class="col-12 col-md-4">
+                                                <label class="form-label" for="sequence-@i">Sequence</label>
+                                                <input id="sequence-@i" name="Rows[@i].Sequence" value="@row.Sequence" type="number" min="1" class="form-control" />
+                                            </div>
+                                        </div>
+                                    }
+                                    <p class="form-text">Numbers start at 1 and must be unique. Leave a row blank to leave that operation out. Saving replaces the sequence for @panel.SequenceType.</p>
+                                    @if (!panel.SequenceIncomplete)
+                                    {
+                                        <button type="submit" class="btn btn-au-action">Save sequence</button>
+                                    }
+                                </form>
+                                <form method="post" asp-action="DeleteOperationSequence" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the sequence for this resource type?');">
+                                    <input type="hidden" name="resourceType" value="@panel.SequenceType" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete sequence</button>
+                                </form>
+                            }
+                        }
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>

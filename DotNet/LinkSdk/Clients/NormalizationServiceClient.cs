@@ -3,6 +3,7 @@ using Flurl.Http.Configuration;
 using Flurl.Http.Content;
 using LantanaGroup.Link.Sdk.ApiClient;
 using System.Net.Http;
+using System.Text;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -30,12 +31,27 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         bool includeDisabled = true,
         int pageSize = 100,
         int pageNumber = 1,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() => Request($"normalization/Operations/facility/{facilityId}")
+        CancellationToken cancellationToken = default,
+        string? resourceType = null,
+        Guid? operationId = null,
+        string? sortBy = null,
+        string? sortOrder = null)
+    {
+        var request = Request($"normalization/Operations/facility/{facilityId}")
             .SetQueryParam("includeDisabled", includeDisabled)
             .SetQueryParam("pageSize", pageSize)
-            .SetQueryParam("pageNumber", pageNumber)
-            .GetAsync(cancellationToken: cancellationToken));
+            .SetQueryParam("pageNumber", pageNumber);
+        if (!string.IsNullOrWhiteSpace(resourceType))
+            request = request.SetQueryParam("resourceType", resourceType);
+        if (operationId.HasValue)
+            request = request.SetQueryParam("operationId", operationId.Value);
+        if (!string.IsNullOrWhiteSpace(sortBy))
+            request = request.SetQueryParam("sortBy", sortBy);
+        if (!string.IsNullOrWhiteSpace(sortOrder))
+            request = request.SetQueryParam("sortOrder", sortOrder);
+
+        return SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() => request.GetAsync(cancellationToken: cancellationToken));
+    }
 
     public Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(
         Guid vendorVersionId,
@@ -54,6 +70,26 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request("normalization/Operations")
             .PostJsonAsync(requestBody, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpdateOperationAsync(
+        UpdateNormalizationOperationRequestApiModel requestBody,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("normalization/Operations")
+            .PutJsonAsync(requestBody, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<NormalizationResourceApiModel>>> GetResourcesAsync(
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<NormalizationResourceApiModel>>(() => Request("normalization/resource/resources")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> TestOperationAsync(
+        Guid operationId,
+        string facilityId,
+        string resourceJson,
+        CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"normalization/operations/{operationId}/test")
+            .SetQueryParam("facilityId", facilityId)
+            .PostAsync(new StringContent(resourceJson, Encoding.UTF8, "application/json"), cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteFacilityOperationsAsync(
         string facilityId,

@@ -6,9 +6,12 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public interface INormalizationServiceClient
 {
-    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(string facilityId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchFacilityOperationsAsync(string facilityId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default, string? resourceType = null, Guid? operationId = null, string? sortBy = null, string? sortOrder = null);
     Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(Guid vendorVersionId, bool includeDisabled = true, int pageSize = 100, int pageNumber = 1, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateOperationAsync(CreateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpdateOperationAsync(UpdateNormalizationOperationRequestApiModel requestBody, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<NormalizationResourceApiModel>>> GetResourcesAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<string>> TestOperationAsync(Guid operationId, string facilityId, string resourceJson, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationsAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFacilityOperationAsync(string facilityId, Guid operationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
