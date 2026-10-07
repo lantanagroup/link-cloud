@@ -5,7 +5,7 @@
 }
 
 <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
     @if (!Model.IsCreate && !string.IsNullOrWhiteSpace(Model.FacilityId))
     {
         <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
@@ -58,7 +58,7 @@ else
             @if (!Model.IsCreate)
             {
                 <span class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm btn-light" asp-action="View" asp-route-id="@Model.FacilityId">View</a>
+                    <a class="btn btn-sm btn-light" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">View</a>
                 </span>
             }
         </div>

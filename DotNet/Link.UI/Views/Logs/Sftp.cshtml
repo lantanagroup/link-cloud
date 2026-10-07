@@ -164,7 +164,7 @@ else
                                 <td>@row.RetryAttempts</td>
                                 <td>@row.FileCount</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="SftpDetail" asp-route-id="@row.Id">Open</a>
+                                    <a asp-action="SftpDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
                                     @if (row.CanReset)
                                     {
                                         <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">

@@ -10,7 +10,7 @@
         route["planDir"] = FacilityViewRules.NextSortDirection(Model.Query.PlanSort, Model.Query.PlanDir, column);
         route.Remove("sortBy");
         route.Remove("sortDir");
-        return route;
+        return route.WithOrigin(ReturnUrlRules.FromQuery(Context.Request));
     }
 }
 
@@ -22,6 +22,7 @@
         {
             <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
                 <input type="hidden" name="section" value="plans" />
+                <partial name="_ReturnField" />
                 <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="measure">Measure</label>
                     <input id="measure" name="measure" value="@Model.Query.Measure" class="form-control" />
@@ -74,7 +75,7 @@
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                    <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="plans">Clear</a>
+                    <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="plans" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Clear</a>
                 </div>
             </form>
         }

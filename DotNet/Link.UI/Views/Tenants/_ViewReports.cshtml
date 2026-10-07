@@ -7,11 +7,13 @@
         page: 1,
         sortBy: column,
         sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
-    var sortId = SortRoute("Id");
-    var sortPeriod = SortRoute("ReportStartDate");
-    var sortCreated = SortRoute("CreateDate");
-    var sortFrequency = SortRoute("Frequency");
-    var sortStatus = SortRoute("Status");
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+    Dictionary<string, string> Kept(string column) => SortRoute(column).WithOrigin(origin);
+    var sortId = Kept("Id");
+    var sortPeriod = Kept("ReportStartDate");
+    var sortCreated = Kept("CreateDate");
+    var sortFrequency = Kept("Frequency");
+    var sortStatus = Kept("Status");
 }
 
 <div class="au-card card">
@@ -19,6 +21,7 @@
     <div class="card-body">
         <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3" data-au-filter="400" data-au-target="facilityReportResults">
             <input type="hidden" name="section" value="reports" />
+            <partial name="_ReturnField" />
             <div class="col-12 col-md-4 col-xl-3">
                 <label class="form-label" for="reportId">Report ID</label>
                 <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
@@ -87,7 +90,7 @@
             </div>
             <div class="col-12 d-flex gap-2">
                 <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports">Clear</a>
+                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports" asp-route-returnUrl="@origin">Clear</a>
             </div>
         </form>
 
@@ -124,7 +127,7 @@
                     {
                         <tr class="@(report.Deleted ? "table-secondary" : null)">
                             <td>
-                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = report.Id }) })" />
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = report.Id }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                                 @if (report.Deleted)
                                 {
                                     <div class="small text-muted">Deleted</div>

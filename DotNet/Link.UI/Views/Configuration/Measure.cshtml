@@ -2,7 +2,7 @@
 @using Link.UI.Services
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Measures"><i class="bi bi-arrow-left me-1"></i>Measure definitions</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Measures")!, "Measure definitions"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Measure definition</h1>
@@ -27,8 +27,8 @@
             <dd class="col-sm-9">@(Model.EntryCount?.ToString() ?? "—")</dd>
         </dl>
         <div class="d-flex flex-wrap gap-2 mt-3">
-            <a class="btn btn-au-neutral" asp-action="MeasureCql" asp-route-id="@Model.Id">View CQL</a>
-            <a class="btn btn-au-neutral" asp-action="MeasureEvaluate" asp-route-id="@Model.Id">Evaluate</a>
+            <a class="btn btn-au-neutral" asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">View CQL</a>
+            <a class="btn btn-au-neutral" asp-action="MeasureEvaluate" asp-route-id="@Model.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Evaluate</a>
         </div>
         @if (Model.Libraries.Count > 0)
         {
@@ -36,7 +36,7 @@
             <ul class="mb-0">
                 @foreach (var library in Model.Libraries)
                 {
-                    <li><a asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-libraryId="@library">@library</a></li>
+                    <li><a asp-action="MeasureCql" asp-route-id="@Model.Id" asp-route-libraryId="@library" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@library</a></li>
                 }
             </ul>
         }

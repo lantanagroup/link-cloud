@@ -8,7 +8,7 @@
 <partial name="_Alerts" />
 
 <div class="mb-3">
-    <a class="btn btn-au-neutral" asp-action="Codes">Search codes</a>
+    <a class="btn btn-au-neutral" asp-action="Codes" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Search codes</a>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ValueSetError))

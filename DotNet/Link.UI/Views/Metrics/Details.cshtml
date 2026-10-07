@@ -33,7 +33,7 @@
         <div class="d-flex gap-2">
             @if (Model.RunAvailable)
             {
-                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" class="btn btn-sm btn-au-neutral">
+                <a asp-controller="Automation" asp-action="Run" asp-route-id="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">
                     <i class="bi bi-clipboard-data me-1"></i>Open full run
                 </a>
             }
@@ -43,7 +43,7 @@
             }
             @if (Model.PreviousRunId is Guid previous && Model.ScenarioId is Guid)
             {
-                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" class="btn btn-sm btn-au-neutral">
+                <a asp-action="Compare" asp-route-a="@previous" asp-route-b="@Model.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">
                     Compare with previous
                 </a>
             }
@@ -60,9 +60,7 @@
                     <i class="bi bi-trash me-1"></i>Remove from history
                 </button>
             </form>
-            <a asp-action="Index" class="btn btn-sm btn-au-neutral">
-                <i class="bi bi-arrow-left me-1"></i>All use cases
-            </a>
+            <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "All use cases"))" />
         </div>
     </div>
 

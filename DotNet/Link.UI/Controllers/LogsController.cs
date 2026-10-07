@@ -141,20 +141,20 @@ public sealed class LogsController : Controller
 
     [HttpPost("Acquisition/{id:long}/process")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ProcessOne(long id, CancellationToken cancellationToken)
+    public async Task<IActionResult> ProcessOne(long id, string? returnUrl, CancellationToken cancellationToken)
     {
         var result = await _logs.ProcessSelectedAsync([id], cancellationToken);
         Temp(result);
-        return RedirectToAction(nameof(AcquisitionDetail), new { id });
+        return Redirect(ReturnUrlRules.WithReturn(Url.Action(nameof(AcquisitionDetail), new { id }), returnUrl));
     }
 
     [HttpPost("Acquisition/{id:long}/cancel")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CancelOne(long id, int minAgeHours, CancellationToken cancellationToken)
+    public async Task<IActionResult> CancelOne(long id, int minAgeHours, string? returnUrl, CancellationToken cancellationToken)
     {
         var result = await _logs.CancelSelectedAsync([id], minAgeHours, cancellationToken);
         Temp(result);
-        return RedirectToAction(nameof(AcquisitionDetail), new { id });
+        return Redirect(ReturnUrlRules.WithReturn(Url.Action(nameof(AcquisitionDetail), new { id }), returnUrl));
     }
 
     [HttpGet("Sftp")]
@@ -175,11 +175,11 @@ public sealed class LogsController : Controller
 
     [HttpPost("Sftp/{id:guid}/reset")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetSftp(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> ResetSftp(string id, string? returnUrl, CancellationToken cancellationToken)
     {
         var result = await _logs.ResetSftpAsync(id, cancellationToken);
         Temp(result);
-        return RedirectToAction(nameof(SftpDetail), new { id });
+        return Redirect(ReturnUrlRules.WithReturn(Url.Action(nameof(SftpDetail), new { id }), returnUrl));
     }
 
     [HttpGet("Audit")]

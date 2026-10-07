@@ -158,7 +158,7 @@
                                 }
                             </td>
                             <td class="text-nowrap">
-                                <a asp-action="Account" asp-route-id="@user.Id">Open</a>
+                                <a asp-action="Account" asp-route-id="@user.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
                                 @if (user.IsDeleted)
                                 {
                                     <form method="post" data-au-save asp-action="RestoreUser" asp-route-id="@user.Id" class="d-inline" onsubmit="return confirm('Restore this account?');">

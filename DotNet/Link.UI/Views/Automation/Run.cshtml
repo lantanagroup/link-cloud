@@ -17,7 +17,7 @@
         <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured && Model.Found ? "yes" : "no")" data-run-id="@Model.RequestedId">@(Model.LiveConfigured && Model.Found ? "Connecting" : "Live updates are off")</span>
         @if (detail is null)
         {
-            <a class="btn btn-sm btn-au-neutral" asp-action="Index">Back to runs</a>
+            <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to runs"))" />
         }
     </div>
 </div>

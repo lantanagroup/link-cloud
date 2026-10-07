@@ -149,14 +149,14 @@
                     {
                         <tr class="@(report.Deleted ? "table-secondary" : null)" data-report-id="@report.Id">
                             <td>
-                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }) })" />
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = report.Id.ToString(), Compact = true, CopyLabel = "Copy report id", LinkHref = report.Deleted ? null : Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                                 @if (report.Deleted)
                                 {
                                     <div class="small text-muted">Deleted</div>
                                 }
                             </td>
                             <td>
-                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("View", "Tenants", new { id = report.FacilityId }) })" />
+                                <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("View", "Tenants", new { id = report.FacilityId }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
                                 <partial name="_AutomationBadge" model="report.AutomationRunId" />
                             </td>
                             <td class="text-nowrap">

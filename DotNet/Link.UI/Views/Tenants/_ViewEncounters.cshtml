@@ -1,18 +1,19 @@
 @model FacilityViewModel
 @using Link.UI.Services
 @{
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
     Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
         page: 1,
         sortBy: column,
-        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
+        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column)).WithOrigin(origin);
     Dictionary<string, string> LocationRoute(int mappingId)
     {
-        var route = Model.Query.ToRoute();
+        var route = Model.Query.ToRoute().WithOrigin(origin);
         route["location"] = mappingId.ToString();
         route["section"] = "encounters";
         return route;
     }
-    var closeLocation = Model.Query.ToRoute();
+    var closeLocation = Model.Query.ToRoute().WithOrigin(origin);
     closeLocation.Remove("location");
 }
 
@@ -21,6 +22,7 @@
     <div class="card-body">
         <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
             <input type="hidden" name="section" value="encounters" />
+            <partial name="_ReturnField" />
             <div class="col-12 col-md-4">
                 <label class="form-label" for="encounterId">Encounter ID</label>
                 <input id="encounterId" name="encounterId" value="@Model.Query.EncounterId" class="form-control" />
@@ -39,7 +41,7 @@
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="encounters">Clear</a>
+                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="encounters" asp-route-returnUrl="@origin">Clear</a>
             </div>
         </form>
 

@@ -147,7 +147,7 @@ else
                                 <td class="text-nowrap">
                                     @if (row.Link)
                                     {
-                                        <a asp-action="AuditDetail" asp-route-id="@row.Id">@row.When</a>
+                                        <a asp-action="AuditDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@row.When</a>
                                     }
                                     else
                                     {

@@ -11,6 +11,7 @@ public sealed class LabeledId
     public string? Value { get; init; }
     public string? CopyLabel { get; init; }
     public string? LinkHref { get; init; }
+    public string? ReturnUrl { get; init; }
     public string? ValueElementId { get; init; }
     public bool Compact { get; init; }
     public bool Copy { get; init; } = true;

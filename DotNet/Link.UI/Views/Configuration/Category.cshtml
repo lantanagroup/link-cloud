@@ -5,7 +5,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Validation")!, "Validation"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Validation category</h1>

@@ -8,7 +8,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to reports</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to reports"))" />
 </div>
 
 <h1 class="h3">Generate report</h1>
