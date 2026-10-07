@@ -27,3 +27,8 @@ public sealed class AccountRoleApiModel
     public string? Description { get; set; }
     public List<string>? Claims { get; set; }
 }
+
+public sealed class AccountClaimsApiModel
+{
+    public List<string> Claims { get; set; } = [];
+}

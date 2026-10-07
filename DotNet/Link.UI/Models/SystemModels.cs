@@ -74,11 +74,19 @@ public sealed class UserEditPage
     public bool ReadOnly { get; set; }
     public bool Found { get; set; }
     public string? LoadError { get; set; }
+    public string? ClaimsError { get; set; }
     public Guid? Id { get; set; }
     public UserForm Form { get; set; } = new();
     public IReadOnlyList<string> KnownRoles { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> ClaimCatalog { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Claims { get; set; } = Array.Empty<string>();
     public bool IsDeleted { get; set; }
     public bool IsActive { get; set; }
+}
+
+public sealed class ClaimForm
+{
+    public List<string>? Claims { get; set; }
 }
 
 public sealed class RoleForm
@@ -93,12 +101,15 @@ public sealed class RoleRow
     public Guid Id { get; init; }
     public string Name { get; init; } = "";
     public string Description { get; init; } = "";
+    public IReadOnlyList<string> Claims { get; init; } = Array.Empty<string>();
 }
 
 public sealed class RoleListPage
 {
     public bool Configured { get; set; }
     public string? LoadError { get; set; }
+    public string? ClaimsError { get; set; }
+    public IReadOnlyList<string> ClaimCatalog { get; set; } = Array.Empty<string>();
     public IReadOnlyList<RoleRow> Roles { get; set; } = Array.Empty<RoleRow>();
 }
 
@@ -190,6 +201,70 @@ public sealed class PatientListRequest
 
 public sealed class IntegrationPage
 {
-    public bool Configured { get; init; }
-    public bool NumericOnlyFacilityId { get; init; }
+    public bool Configured { get; set; }
+    public bool NumericOnlyFacilityId { get; set; }
+    public string? ReadError { get; set; }
+    public string? ReadNote { get; set; }
+    public IReadOnlyList<ConsumerTopicRow> Topics { get; set; } = Array.Empty<ConsumerTopicRow>();
+}
+
+public sealed class ConsumerTopicRow
+{
+    public string Topic { get; init; } = "";
+    public IReadOnlyList<ConsumerEventRow> Events { get; init; } = Array.Empty<ConsumerEventRow>();
+}
+
+public sealed class ConsumerEventRow
+{
+    public string CorrelationId { get; init; } = "";
+    public string PatientId { get; init; } = "";
+    public string Error { get; init; } = "";
+}
+
+public sealed class PatientEventForm
+{
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
+    public string? EventType { get; set; }
+}
+
+public sealed class PatientEventRequest
+{
+    public string FacilityId { get; init; } = "";
+    public string PatientId { get; init; } = "";
+    public string EventType { get; init; } = "";
+}
+
+public sealed class DataAcquisitionForm
+{
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
+    public string? QueryType { get; set; }
+    public string? ReportTypes { get; set; }
+    public string? StartDate { get; set; }
+    public string? EndDate { get; set; }
+}
+
+public sealed class DataAcquisitionRequest
+{
+    public string FacilityId { get; init; } = "";
+    public string PatientId { get; init; } = "";
+    public string QueryType { get; init; } = "";
+    public IReadOnlyList<string> ReportTypes { get; init; } = Array.Empty<string>();
+    public DateTime StartDateUtc { get; init; }
+    public DateTime EndDateUtc { get; init; }
+}
+
+public sealed class PatientAcquiredForm
+{
+    public string? FacilityId { get; set; }
+    public string? PatientIds { get; set; }
+    public string? ReportTrackingId { get; set; }
+}
+
+public sealed class PatientAcquiredRequest
+{
+    public string FacilityId { get; init; } = "";
+    public IReadOnlyList<string> PatientIds { get; init; } = Array.Empty<string>();
+    public Guid? ReportTrackingId { get; init; }
 }

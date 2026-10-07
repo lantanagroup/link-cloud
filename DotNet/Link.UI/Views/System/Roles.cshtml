@@ -6,7 +6,7 @@
 <h1 class="h3">Roles</h1>
 <partial name="_Nav" />
 <partial name="_Alerts" />
-<p class="text-muted">Saving a role keeps its existing claims. Claim assignment is not on this page.</p>
+<p class="text-muted">Saving a role name keeps its existing claims. Assign claims in the section below.</p>
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
@@ -78,6 +78,50 @@
                     </tbody>
                 </table>
             </div>
+        }
+    </div>
+</div>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Claims</div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.ClaimsError))
+        {
+            <div class="alert alert-warning mb-0">@Model.ClaimsError</div>
+        }
+        else if (Model.Roles.Count == 0)
+        {
+            <p class="mb-0">Create a role before assigning claims.</p>
+        }
+        else
+        {
+            foreach (var role in Model.Roles)
+            {
+                var assigned = new HashSet<string>(role.Claims, StringComparer.Ordinal);
+                var claimIndex = 0;
+                <form method="post" asp-action="SaveRoleClaims" asp-route-id="@role.Id" class="mb-3">
+                    <fieldset>
+                        <legend class="form-label">@role.Name</legend>
+                        @foreach (var claim in Model.ClaimCatalog)
+                        {
+                            var inputId = "role-claim-" + role.Id + "-" + claimIndex++;
+                            <div class="form-check">
+                                @if (assigned.Contains(claim))
+                                {
+                                    <input class="form-check-input" type="checkbox" id="@inputId" name="Claims" value="@claim" checked />
+                                }
+                                else
+                                {
+                                    <input class="form-check-input" type="checkbox" id="@inputId" name="Claims" value="@claim" />
+                                }
+                                <label class="form-check-label" for="@inputId">@claim</label>
+                            </div>
+                        }
+                    </fieldset>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-2">Save claims</button>
+                </form>
+            }
+            <p class="text-muted small mb-0">Clear every box and save to remove that role's claims.</p>
         }
     </div>
 </div>

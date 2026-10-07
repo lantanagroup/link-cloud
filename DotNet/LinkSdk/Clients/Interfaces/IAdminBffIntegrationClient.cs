@@ -67,4 +67,37 @@ public interface IAdminBffIntegrationClient
         IReadOnlyList<PatientListItem> patientLists,
         Guid reportTrackingId,
         CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreatePatientEventAsync(
+        string facilityId,
+        string patientId,
+        string eventType,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreateDataAcquisitionRequestedAsync(
+        string facilityId,
+        string patientId,
+        string queryType,
+        IReadOnlyList<string> reportTypes,
+        DateTime startDateUtc,
+        DateTime endDateUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> CreatePatientAcquiredAsync(
+        string facilityId,
+        IReadOnlyList<string> patientIds,
+        string reportTrackingId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> StartConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<string>> ReadConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse> StopConsumersAsync(
+        string correlationId,
+        CancellationToken cancellationToken = default);
 }

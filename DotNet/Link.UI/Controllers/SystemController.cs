@@ -59,6 +59,22 @@ public sealed class SystemController : Controller
         return RedirectToAction(nameof(Users));
     }
 
+    [HttpPost("Users/{id}/restore")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreUser(string id, CancellationToken cancellationToken)
+    {
+        Temp(await _system.RecoverUserAsync(id, cancellationToken));
+        return RedirectToAction(nameof(Account), new { id });
+    }
+
+    [HttpPost("Users/{id}/claims")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveUserClaims(string id, ClaimForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.SaveUserClaimsAsync(id, form, cancellationToken));
+        return RedirectToAction(nameof(Account), new { id });
+    }
+
     [HttpGet("Roles")]
     public async Task<IActionResult> Roles(CancellationToken cancellationToken)
     {
@@ -79,6 +95,14 @@ public sealed class SystemController : Controller
     public async Task<IActionResult> DeleteRole(string id, CancellationToken cancellationToken)
     {
         Temp(await _system.DeleteRoleAsync(id, cancellationToken));
+        return RedirectToAction(nameof(Roles));
+    }
+
+    [HttpPost("Roles/{id}/claims")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveRoleClaims(string id, ClaimForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.SaveRoleClaimsAsync(id, form, cancellationToken));
         return RedirectToAction(nameof(Roles));
     }
 
@@ -116,6 +140,61 @@ public sealed class SystemController : Controller
     public async Task<IActionResult> AcquirePatientList(PatientListForm form, CancellationToken cancellationToken)
     {
         Temp(await _system.AcquirePatientListAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/patient-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PostPatientEvent(PatientEventForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.PostPatientEventAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/data-acquisition")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PostDataAcquisition(DataAcquisitionForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.PostDataAcquisitionAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/patient-acquired")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PostPatientAcquired(PatientAcquiredForm form, CancellationToken cancellationToken)
+    {
+        Temp(await _system.PostPatientAcquiredAsync(form, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/start-consumers")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> StartConsumers(string? correlationId, CancellationToken cancellationToken)
+    {
+        Temp(await _system.StartConsumersAsync(correlationId, cancellationToken));
+        return RedirectToAction(nameof(Integration));
+    }
+
+    [HttpPost("Integration/read-consumers")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReadConsumers(string? correlationId, CancellationToken cancellationToken)
+    {
+        var page = await _system.ReadConsumersAsync(correlationId, cancellationToken);
+        if (page.ReadError is not null)
+        {
+            TempData["Error"] = page.ReadError;
+            return RedirectToAction(nameof(Integration));
+        }
+
+        Section("integration", "Integration test");
+        return View("Integration", page);
+    }
+
+    [HttpPost("Integration/stop-consumers")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> StopConsumers(string? correlationId, CancellationToken cancellationToken)
+    {
+        Temp(await _system.StopConsumersAsync(correlationId, cancellationToken));
         return RedirectToAction(nameof(Integration));
     }
 
