@@ -19,7 +19,7 @@
             <code class="ms-1">@runId</code>
         </div>
     </div>
-    <a asp-action="Run" asp-route-id="@runId" class="btn btn-sm btn-outline-secondary">
+    <a asp-action="Run" asp-route-id="@runId" class="btn btn-sm btn-au-neutral">
         <i class="bi bi-arrow-left me-1"></i>Back to Run
     </a>
 </div>
@@ -190,7 +190,7 @@
             ? `Download generated FHIR bundle. This run used generation template v${cacheVersion}; latest is v${latestCacheVersion} (the generator has changed since this run). Replay uses the template stored for this run.`
             : 'Download generated FHIR bundle (replayed from this run\'s generation template)';
         const href = `${downloadBundleUrl}?id=${encodeURIComponent(runId)}&patientId=${encodeURIComponent(patientId)}`;
-        const staleClass = stale ? ' btn-outline-warning' : ' btn-outline-secondary';
+        const staleClass = stale ? ' btn-au-neutral' : ' btn-au-neutral';
         return `<a href="${href}" class="btn btn-sm${staleClass} py-0 px-1" title="${escapeHtml(title)}" download>
             <i class="bi bi-download"></i><span class="visually-hidden">Download bundle</span>
         </a>`;
@@ -938,7 +938,7 @@
                     <td class="text-end fw-semibold">${d !== 0 ? dSign + d.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
                     <td>${verdict}</td>
                     <td class="text-end">${generatedBundleDownloadLink(pid)}</td>
-                    <td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="this.closest('tr').nextElementSibling.classList.toggle('d-none');this.querySelector('i').classList.toggle('bi-chevron-down');this.querySelector('i').classList.toggle('bi-chevron-up');"><i class="bi bi-chevron-down"></i></button></td>
+                    <td><button class="btn btn-sm btn-au-neutral py-0 px-1" onclick="this.closest('tr').nextElementSibling.classList.toggle('d-none');this.querySelector('i').classList.toggle('bi-chevron-down');this.querySelector('i').classList.toggle('bi-chevron-up');"><i class="bi bi-chevron-down"></i></button></td>
                 </tr>
                 <tr class="d-none"><td colspan="8" class="p-0">${detailHtml}</td></tr>`;
             });

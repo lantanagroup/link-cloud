@@ -7,7 +7,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Acquisition"><i class="bi bi-arrow-left me-1"></i>Acquisition logs</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Acquisition"><i class="bi bi-arrow-left me-1"></i>Acquisition logs</a>
 </div>
 <h1 class="h3">Acquisition log @Model.Id</h1>
 <partial name="_Nav" />
@@ -199,20 +199,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Reference pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-action="AcquisitionDetail" asp-route-id="@Model.Id" asp-route-refPage="@(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

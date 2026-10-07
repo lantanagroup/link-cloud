@@ -7,7 +7,7 @@
 }
 
 <div class="mb-3">
-    <a asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+    <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
 </div>
 
 <h1 class="h3">Validation</h1>
@@ -40,7 +40,7 @@ else
                     <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Severity) ? "—" : Model.Severity)</dd>
                 </dl>
             }
-            <a class="btn btn-outline-secondary mt-3" asp-action="Prequal" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open prequalification</a>
+            <a class="btn btn-au-neutral mt-3" asp-action="Prequal" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open prequalification</a>
         </div>
     </div>
 }

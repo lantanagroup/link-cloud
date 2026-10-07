@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Link.UI.Services;
 using Xunit;
 
 namespace Link.UI.Tests;
@@ -36,8 +37,52 @@ public class ButtonVocabularyTests
     {
         var css = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "css", "site.css"));
         css.Should().Contain(".lu-section-nav a.lu-nav-current");
-        css.Should().Contain(".btn-outline-danger:hover");
+        css.Should().Contain(".btn-au-neutral");
         css.Should().NotContain(".lu-section-nav a.btn-au-action");
+    }
+
+    [Fact]
+    public void Buttons_are_solid_and_the_green_matches_the_shared_token()
+    {
+        var css = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "css", "site.css"));
+        css.Should().Contain("--au-success:     #28a745;");
+        css.Should().Contain(".btn-au-neutral");
+        css.Should().Contain(".btn-danger:hover");
+
+        var outline = SourceFiles()
+            .SelectMany(file => File.ReadAllLines(file)
+                .Select((line, index) => (file, line, index))
+                .Where(row => row.line.Contains("btn-outline-", StringComparison.Ordinal))
+                .Select(row => Path.GetRelativePath(ProjectRoot(), row.file) + ":" + (row.index + 1)))
+            .ToList();
+        outline.Should().BeEmpty();
+
+        var linkButtons = SourceFiles()
+            .SelectMany(file => File.ReadAllLines(file)
+                .Select((line, index) => (file, line, index))
+                .Where(row => row.line.Contains("btn-link", StringComparison.Ordinal)
+                    && !row.line.Contains("patient-sort-button", StringComparison.Ordinal))
+                .Select(row => Path.GetRelativePath(ProjectRoot(), row.file) + ":" + (row.index + 1)))
+            .ToList();
+        linkButtons.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Status_pills_are_not_blue()
+    {
+        StatusPills.ForSchedule(LantanaGroup.Link.Shared.Application.Enums.ScheduleStatus.New)
+            .Should().Be("au-badge-muted");
+        StatusPills.ForSchedule(LantanaGroup.Link.Shared.Application.Enums.ScheduleStatus.Submitted)
+            .Should().Be("au-badge-success");
+        StatusPills.ForRun("Running").Should().Be("au-badge-active");
+
+        var css = File.ReadAllText(Path.Combine(ProjectRoot(), "wwwroot", "css", "site.css"));
+        var active = css.IndexOf(".au-badge-active", StringComparison.Ordinal);
+        active.Should().BeGreaterThan(-1);
+        var rule = css.Substring(active, Math.Min(180, css.Length - active));
+        rule.Should().NotContain("--au-accent");
+        rule.Should().NotContain("#4da3ff");
+        rule.Should().NotContain("#0d6efd");
     }
 
     private static IEnumerable<string> SourceFiles()

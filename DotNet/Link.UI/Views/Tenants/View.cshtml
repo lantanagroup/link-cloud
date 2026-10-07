@@ -5,11 +5,11 @@
 }
 
 <div class="mb-3 d-flex flex-wrap gap-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
     @if (!Model.NotFound && Model.LoadError is null)
     {
         <a asp-action="Facility" asp-route-id="@Model.FacilityId"><i class="bi bi-gear me-1"></i>Configuration</a>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+        <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
 
@@ -74,12 +74,12 @@ else
     <nav class="lu-section-nav mb-3" aria-label="Facility sections">
         @foreach (var section in new[] { ("reports", "Reports"), ("hsloc", "HSLOC locations"), ("locations", "Org locations"), ("encounters", "Encounters") })
         {
-            <a class="btn btn-sm @(Model.Section == section.Item1 ? "lu-nav-current" : "btn-outline-secondary")"
+            <a class="btn btn-sm @(Model.Section == section.Item1 ? "lu-nav-current" : "btn-au-neutral")"
                asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1)">@(section.Item2)</a>
         }
         @if (Model.DmrpEnabled)
         {
-            <a class="btn btn-sm @(Model.Section == "plans" ? "lu-nav-current" : "btn-outline-secondary")"
+            <a class="btn btn-sm @(Model.Section == "plans" ? "lu-nav-current" : "btn-au-neutral")"
                asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans")">Reporting plans</a>
         }
     </nav>

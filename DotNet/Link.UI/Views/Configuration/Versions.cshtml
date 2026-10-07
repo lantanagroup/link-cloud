@@ -1,7 +1,7 @@
 @model VendorVersionPage
 
 <div class="mb-3">
-    <a asp-action="Vendors"><i class="bi bi-arrow-left me-1"></i>Vendors</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Vendors"><i class="bi bi-arrow-left me-1"></i>Vendors</a>
 </div>
 <h1 class="h3">Vendor versions</h1>
 <partial name="_Nav" />
@@ -23,7 +23,7 @@
             </div>
             <div class="col-12 col-md-3">
                 <button type="submit" class="btn btn-success">Save</button>
-                <button type="button" class="btn btn-outline-secondary" data-lu-cancel>Cancel</button>
+                <button type="button" class="btn btn-au-neutral" data-lu-cancel>Cancel</button>
             </div>
         </form>
     </div>
@@ -62,12 +62,12 @@
                                 <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
                                     <input type="hidden" name="versionId" value="@row.Id" />
                                     <button type="submit" class="btn btn-sm btn-success">Save</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-lu-cancel>Cancel</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral" data-lu-cancel>Cancel</button>
                                 </form>
                             </td>
                             <td>
                                 <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                 </form>
                             </td>
                         </tr>

@@ -17,7 +17,7 @@
                 @Html.AntiForgeryToken()
                 <input type="file" id="ormGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
                 <button type="button" class="btn btn-sm btn-success" id="btnOrmGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnOrmGenerateReset">Start over</button>
+                <button type="button" class="btn btn-sm btn-au-neutral" id="btnOrmGenerateReset">Start over</button>
                 <span id="ormGenSessionHint" class="small text-muted"></span>
             </div>
         </div>
@@ -70,15 +70,15 @@
                         </td>
                         <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                         <td class="text-nowrap">
-                            <button class="btn btn-sm btn-outline-secondary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
-                            <button class="btn btn-sm btn-outline-secondary btn-map-clone" data-id="@t.Id">Clone</button>
+                            <button class="btn btn-sm btn-au-neutral btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
+                            <button class="btn btn-sm btn-au-neutral btn-map-clone" data-id="@t.Id">Clone</button>
                             @if (!t.IsDefault)
                             {
-                                <button class="btn btn-sm btn-outline-success btn-map-default" data-id="@t.Id">Default</button>
+                                <button class="btn btn-sm btn-success btn-map-default" data-id="@t.Id">Default</button>
                             }
                             @if (!t.IsSystem)
                             {
-                                <button class="btn btn-sm btn-outline-danger btn-map-delete" data-id="@t.Id">Delete</button>
+                                <button class="btn btn-sm btn-danger btn-map-delete" data-id="@t.Id">Delete</button>
                             }
                         </td>
                     </tr>
@@ -96,7 +96,7 @@
                 <h5 class="mb-0" id="mapModalTitle">Organization Resource Map</h5>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-sm btn-success" id="btnMapSave">Save</button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnMapClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnMapClose">Close</button>
                 </div>
             </div>
             <div id="mapFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
@@ -187,7 +187,7 @@
     function makeRemoveButton(onClick){
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'btn btn-sm btn-outline-danger';
+        btn.className = 'btn btn-sm btn-danger';
         btn.innerHTML = '<i class="bi bi-x-lg"></i>';
         btn.addEventListener('click', onClick);
         return btn;

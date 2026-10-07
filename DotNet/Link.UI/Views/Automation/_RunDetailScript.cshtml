@@ -118,7 +118,7 @@
             var actionsDiv = document.getElementById('runHeaderActions');
             if (!actionsDiv) return;
 
-            var backLink = actionsDiv.querySelector('a.btn-outline-secondary');
+            var backLink = actionsDiv.querySelector('a.btn-au-neutral');
 
             if (!document.getElementById('btnDeleteRun')) {
                 var deleteBtn = document.createElement('button');
@@ -133,7 +133,7 @@
             if (!document.getElementById('btnExportRun')) {
                 var exportLink = document.createElement('a');
                 exportLink.id = 'btnExportRun';
-                exportLink.className = 'btn btn-sm btn-outline-secondary';
+                exportLink.className = 'btn btn-sm btn-au-neutral';
                 exportLink.href = '@Url.Action("Export", "Automation", new { id = Model.RunId })';
                 exportLink.innerHTML = '<i class="bi bi-download me-1"></i>Export Diagnostics';
                 if (backLink) actionsDiv.insertBefore(exportLink, backLink);
@@ -883,7 +883,7 @@
                 else if (accepting && census === 'Admitted')
                     action = `<button type="button" class="btn btn-danger btn-sm live-pool-discharge" data-patient-id="${escapeHtml(id)}">Discharge</button>`;
                 else if (accepting && census === 'DischargedDuringWindow')
-                    action = `<button type="button" class="btn btn-outline-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Re-admit</button>`;
+                    action = `<button type="button" class="btn btn-success btn-sm live-pool-admit" data-patient-id="${escapeHtml(id)}" data-expected="${expected}">Re-admit</button>`;
                 return `<tr>
                     <td>
                         <code>${escapeHtml(id)}</code>
@@ -1419,10 +1419,10 @@
             if (!_exModalGroups.length) { host.innerHTML = ''; return; }
 
             const allActive = _exModalActiveGroup === null;
-            let html = `<button class="btn btn-sm ${allActive ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="">All</button>`;
+            let html = `<button class="btn btn-sm ${allActive ? 'btn-dark' : 'btn-au-neutral'} ex-group-chip" data-group="">All</button>`;
             for (const g of _exModalGroups) {
                 const active = _exModalActiveGroup === g.label;
-                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="badge bg-light text-dark ms-1">${g.count}</span></button>`;
+                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-au-neutral'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="badge bg-light text-dark ms-1">${g.count}</span></button>`;
             }
             host.innerHTML = html;
 

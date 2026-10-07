@@ -5,7 +5,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Validation"><i class="bi bi-arrow-left me-1"></i>Validation</a>
 </div>
 <h1 class="h3">Validation category</h1>
 <partial name="_Nav" />
@@ -115,7 +115,7 @@
                                     <td>
                                         <form method="post" data-au-save asp-action="DeleteRule" asp-route-ruleId="@rule.Id" onsubmit="return confirm('Delete this rule? This cannot be undone.');">
                                             <input type="hidden" name="id" value="@form.Id" />
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                         </form>
                                     </td>
                                 </tr>

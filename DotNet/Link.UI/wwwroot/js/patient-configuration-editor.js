@@ -172,7 +172,7 @@
             list += '<div class="text-muted small px-1 pt-1">Showing ' + cap + ' of ' + matches.length + '. Type more to narrow.</div>';
         var exact = q && items.some(function (i) { return String(i.code).toLowerCase() === qLower; });
         var add = enablePickerAdd && q && !exact
-            ? '<button type="button" class="btn btn-sm btn-outline-success w-100 mt-2 pc-picker-add">Add “' + esc(q) + '”</button>'
+            ? '<button type="button" class="btn btn-sm btn-success w-100 mt-2 pc-picker-add">Add “' + esc(q) + '”</button>'
             : '';
         return { list: list, add: add };
     }
@@ -215,10 +215,10 @@
         var html = pickerResultsHtml(host, keepQuery);
         host.innerHTML =
             '<div class="dropdown">' +
-                '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static"></button>' +
+                '<button type="button" class="btn btn-sm btn-au-neutral dropdown-toggle w-100 pc-picker-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-bs-display="static"></button>' +
                 '<div class="dropdown-menu p-2 pc-picker-menu">' +
                     '<input type="text" class="form-control form-control-sm mb-2 pc-picker-search" autocomplete="off" placeholder="' + esc(placeholder) + '" value="' + esc(keepQuery) + '" />' +
-                    '<div class="mb-1"><button type="button" class="btn btn-link btn-sm p-0 pc-picker-clear">Clear</button></div>' +
+                    '<div class="mb-1"><button type="button" class="btn btn-sm btn-au-neutral pc-picker-clear">Clear</button></div>' +
                     '<div class="pc-picker-list">' + html.list + '</div>' +
                     '<div class="pc-picker-add-slot">' + html.add + '</div>' +
                 '</div>' +

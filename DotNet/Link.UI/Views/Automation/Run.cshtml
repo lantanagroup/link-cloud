@@ -17,7 +17,7 @@
         <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured && Model.Found ? "yes" : "no")" data-run-id="@Model.RequestedId">@(Model.LiveConfigured && Model.Found ? "Connecting" : "Live updates are off")</span>
         @if (detail is null)
         {
-            <a class="btn btn-sm btn-outline-secondary" asp-action="Index">Back to runs</a>
+            <a class="btn btn-sm btn-au-neutral" asp-action="Index">Back to runs</a>
         }
     </div>
 </div>
@@ -106,7 +106,7 @@ else
                 <div class="mt-3 d-flex flex-wrap gap-2" id="runActions">
                     @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
                     }
                 </div>
             </div>

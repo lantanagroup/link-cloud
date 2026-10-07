@@ -72,16 +72,16 @@
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-measure-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-measure-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
                                         @(t.IsSystem ? "View" : "Edit")
                                     </button>
-                                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Download", "Measures", new { id = t.Id })" title="Download FHIR bundle">
+                                    <a class="btn btn-sm btn-au-neutral" href="@Url.Action("Download", "Measures", new { id = t.Id })" title="Download FHIR bundle">
                                         <i class="bi bi-download"></i>
                                     </a>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-measure-clone" data-id="@t.Id">Clone</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral btn-measure-clone" data-id="@t.Id">Clone</button>
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-outline-danger btn-measure-delete" data-id="@t.Id">Delete</button>
+                                        <button type="button" class="btn btn-sm btn-danger btn-measure-delete" data-id="@t.Id">Delete</button>
                                     }
                                 </div>
                             </td>
@@ -103,13 +103,13 @@
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0" id="measureModalTitle"><i class="bi bi-clipboard2-pulse me-2"></i>Measure</h5>
                 <div class="d-flex gap-2 align-items-center">
-                    <a class="btn btn-sm btn-outline-light" id="btnMeasureDownload" href="#" style="display:none;">
+                    <a class="btn btn-sm btn-au-close" id="btnMeasureDownload" href="#" style="display:none;">
                         <i class="bi bi-download me-1"></i>Download
                     </a>
                     <button type="button" class="btn btn-sm btn-success" id="btnMeasureSave" style="display:none;">
                         <i class="bi bi-floppy me-1"></i>Save
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-light" id="btnMeasureClose">Close</button>
+                    <button type="button" class="btn btn-sm btn-au-close" id="btnMeasureClose">Close</button>
                 </div>
             </div>
             <div id="measureFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>

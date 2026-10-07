@@ -16,7 +16,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Notifications"><i class="bi bi-arrow-left me-1"></i>Notifications</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Notifications"><i class="bi bi-arrow-left me-1"></i>Notifications</a>
 </div>
 <h1 class="h3">Notification configuration</h1>
 <partial name="_Nav" />
@@ -32,7 +32,7 @@
                 <input id="configFacility" name="id" value="@form.FacilityId" class="form-control" required />
             </div>
             <div class="col-12 col-md-3">
-                <button type="submit" class="btn btn-outline-secondary">Open</button>
+                <button type="submit" class="btn btn-au-neutral">Open</button>
             </div>
         </form>
         <p class="text-muted small mb-0 mt-2">The facility page shows + Add when that facility has no email list.</p>
@@ -68,8 +68,8 @@
                 </select>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
-                <a class="btn btn-outline-secondary" asp-action="Configurations">Clear</a>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
+                <a class="btn btn-au-neutral" asp-action="Configurations">Clear</a>
             </div>
         </form>
     </div>
@@ -111,7 +111,7 @@ else
                                     <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@row.FacilityId">Edit</a>
                                     <form method="post" data-au-save asp-action="DeleteConfiguration" class="d-inline" onsubmit="return confirm('Delete this notification configuration?');">
                                         <input type="hidden" name="id" value="@row.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                                     </form>
                                 </td>
                             </tr>
@@ -122,20 +122,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Configuration pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page - 1, query.Edit)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page - 1, query.Edit)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @bar.TotalPages (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Route(bar.Page + 1, query.Edit)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@Route(bar.Page + 1, query.Edit)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

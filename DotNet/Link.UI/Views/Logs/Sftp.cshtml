@@ -16,7 +16,7 @@
 }
 
 <div class="mb-3">
-    <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
 </div>
 <h1 class="h3">SFTP acquisition log</h1>
 <partial name="_Nav" />
@@ -101,8 +101,8 @@
                 <partial name="_AutomationScope" model="query.Scope" />
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
-                <button type="submit" class="btn btn-outline-secondary">Search</button>
-                <a class="btn btn-outline-secondary" asp-action="Sftp">Clear</a>
+                <button type="submit" class="btn btn-au-neutral">Search</button>
+                <a class="btn btn-au-neutral" asp-action="Sftp">Clear</a>
             </div>
         </form>
     </div>
@@ -168,7 +168,7 @@ else
                                     @if (row.CanReset)
                                     {
                                         <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Reset</button>
+                                            <button type="submit" class="btn btn-sm btn-au-neutral">Reset</button>
                                         </form>
                                     }
                                 </td>
@@ -180,20 +180,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="SFTP pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@query.ToRoute(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-all-route-data="@query.ToRoute(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }

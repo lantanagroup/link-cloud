@@ -173,7 +173,7 @@
                             </button>
                         </div>
 
-                        <button type="submit" class="btn btn-outline-secondary" name="runKind" value="">Save settings</button>
+                        <button type="submit" class="btn btn-au-neutral" name="runKind" value="">Save settings</button>
                     </div>
                 </div>
             </form>
@@ -279,7 +279,7 @@
                                     purged @report.PurgedRunIds.Count/@report.HistoryPurgeCandidateCount
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary cleanup-open-report" data-report-id="@report.Id" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")">View</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral cleanup-open-report" data-report-id="@report.Id" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")">View</button>
                                 </td>
                             </tr>
                         }

@@ -15,7 +15,7 @@
     ViewData["ReportSection"] = "report";
 }
 <div class="mb-3 d-flex flex-wrap gap-3">
-    <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+    <a class="btn btn-sm btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
 </div>
 
 @if (TempData["Message"] is string saved)
@@ -48,7 +48,7 @@ else
     @if (report.CanDownload)
     {
         <div class="mb-3">
-            <a class="btn btn-outline-secondary" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
+            <a class="btn btn-au-neutral" asp-controller="Reports" asp-action="Download" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Download</a>
         </div>
     }
     <div class="au-card card mb-3">
@@ -95,8 +95,8 @@ else
                     <input id="patientId" name="patientId" value="@Model.Query.PatientId" class="form-control" />
                 </div>
                 <div class="col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-outline-secondary">Search</button>
-                    <a class="btn btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
+                    <button type="submit" class="btn btn-au-neutral">Search</button>
+                    <a class="btn btn-au-neutral" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Clear</a>
                 </div>
             </form>
 
@@ -187,20 +187,20 @@ else
                 <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Patient pages">
                     @if (bar.HasPrevious)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page - 1)">Previous</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
                     }
                     <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
                     @if (bar.HasNext)
                     {
-                        <a class="btn btn-sm btn-outline-secondary" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
+                        <a class="btn btn-sm btn-au-neutral" asp-action="Report" asp-route-id="@Model.FacilityId" asp-all-route-data="@PageRoute(bar.Page + 1)">Next</a>
                     }
                     else
                     {
-                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                        <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
                     }
                 </nav>
             }
