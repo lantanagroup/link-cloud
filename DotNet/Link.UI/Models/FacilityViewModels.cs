@@ -165,6 +165,7 @@ public sealed class ReportDetailModel
 {
     public string? FacilityId { get; set; }
     public string? FacilityName { get; set; }
+    public bool FacilityMissing { get; set; }
     public bool NotFound { get; set; }
     public string? LoadError { get; set; }
     public string ReportId { get; set; } = string.Empty;
