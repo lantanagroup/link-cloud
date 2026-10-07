@@ -1,3 +1,5 @@
+using Automation.UI.Models;
+using LantanaGroup.Automation.Generation;
 using Link.UI.Models;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -131,6 +133,7 @@ public sealed class AutomationRunReader
                 token);
 
             var active = await LoadActiveAsync(token);
+            var scenarios = await ListScenariosAsync(token);
 
             return new AutomationDashboardPage
             {
@@ -140,6 +143,7 @@ public sealed class AutomationRunReader
                 Stats = AutomationRules.BuildStats(windowRows, now),
                 ActiveRuns = active,
                 RecentRuns = recent,
+                Scenarios = scenarios.Scenarios,
                 PageNumber = pageNumber,
                 PageSize = pageSize,
                 TotalCount = total,
@@ -241,6 +245,10 @@ public sealed class AutomationRunReader
             var projection = Builders<ScenarioChoiceDocument>.Projection
                 .Include(row => row.Id)
                 .Include(row => row.Name)
+                .Include(row => row.Description)
+                .Include(row => row.ReportMethod)
+                .Include(row => row.SelectedMeasures)
+                .Include(row => row.UpdatedAt)
                 .Include(row => row.IsSystemScenario);
             var documents = await collection
                 .Find(FilterDefinition<ScenarioChoiceDocument>.Empty, new FindOptions { MaxTime = TimeSpan.FromSeconds(8) })
@@ -258,6 +266,10 @@ public sealed class AutomationRunReader
                     {
                         Id = document.Id,
                         Name = document.Name ?? string.Empty,
+                        Description = document.Description ?? string.Empty,
+                        ReportMethod = document.ReportMethod.ToString(),
+                        Measures = string.Join(" ", (document.SelectedMeasures ?? []).Select(ProfiledMeasureCatalog.GetDisplayName)),
+                        UpdatedAtUnixMs = document.UpdatedAt.ToUnixTimeMilliseconds(),
                         IsSystemScenario = document.IsSystemScenario
                     })
                     .ToList()
@@ -451,6 +463,15 @@ public sealed class AutomationRunReader
 
         public string Name { get; set; } = string.Empty;
 
+        public string? Description { get; set; }
+
         public bool IsSystemScenario { get; set; }
+
+        public ReportMethod ReportMethod { get; set; }
+
+        public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
+
+        [BsonRepresentation(BsonType.DateTime)]
+        public DateTimeOffset UpdatedAt { get; set; }
     }
 }

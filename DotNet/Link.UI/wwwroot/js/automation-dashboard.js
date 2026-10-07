@@ -72,7 +72,7 @@
         var total = Math.max(0, Math.round((Date.now() - created.getTime()) / 1000));
         var minutes = Math.floor(total / 60);
         var seconds = total % 60;
-        return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+        return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0") + " elapsed";
     }
 
     function tick() {
@@ -96,16 +96,15 @@
             var col = document.createElement("div");
             col.className = "col-12 col-md-4";
             var card = document.createElement("div");
-            card.className = "border rounded p-2 h-100";
-            var link = document.createElement("a");
-            link.className = "fw-semibold";
-            link.href = "/Automation/Runs/" + run.runId;
-            link.textContent = run.runName || "Run";
+            card.className = "border rounded p-3 h-100";
+            var title = document.createElement("div");
+            title.className = "fw-semibold";
+            title.textContent = run.runName || "Run";
             var meta = document.createElement("div");
             meta.className = "small text-muted";
             meta.textContent = (run.patientCount || 0) + " patients · seed " + (run.seed || 0);
             var row = document.createElement("div");
-            row.className = "d-flex justify-content-between gap-2 mt-1";
+            row.className = "d-flex justify-content-between align-items-center mt-2";
             var badge = document.createElement("span");
             badge.className = "badge au-badge-active";
             badge.textContent = run.statusLabel || run.status || "";
@@ -113,46 +112,17 @@
             time.className = "small text-muted js-elapsed";
             time.setAttribute("data-created-at", run.createdAt || "");
             row.append(badge, time);
-            card.append(link, meta, row);
+            var details = document.createElement("a");
+            details.className = "btn btn-sm btn-au-action mt-2 w-100";
+            details.href = "/Automation/Runs/" + run.runId;
+            details.textContent = "View Details";
+            card.append(title, meta, row, details);
             col.append(card);
             host.append(col);
         });
         if (empty) empty.classList.toggle("d-none", (runs || []).length > 0);
-        var card = document.getElementById("activeCard");
-        if (card) card.style.display = (runs || []).length > 0 ? "" : "none";
-    }
-
-    function fillHistory(page) {
-        var body = document.getElementById("historyBody");
-        var empty = document.getElementById("historyEmpty");
-        var count = document.getElementById("historyCount");
-        if (!body) return;
-        body.replaceChildren();
-        (page.recentRuns || []).forEach(function (run) {
-            var row = document.createElement("tr");
-            var name = document.createElement("td");
-            var link = document.createElement("a");
-            link.href = "/Automation/Runs/" + run.runId;
-            link.textContent = run.runName || "Run";
-            name.append(link);
-            row.append(name);
-            row.append(cell(run.statusLabel || ""));
-            row.append(cell(String(run.patientCount || 0)));
-            row.append(cell(run.createdAt ? new Date(run.createdAt).toISOString().replace("T", " ").replace(".000Z", "Z") : ""));
-            var facility = document.createElement("td");
-            if (run.facilityId) {
-                var facilityLink = document.createElement("a");
-                facilityLink.href = "/Tenants/Facility/" + encodeURIComponent(run.facilityId);
-                facilityLink.textContent = run.facilityId;
-                facility.append(facilityLink);
-            } else {
-                facility.textContent = "—";
-            }
-            row.append(facility);
-            body.append(row);
-        });
-        if (empty) empty.classList.toggle("d-none", (page.recentRuns || []).length > 0);
-        if (count) count.textContent = String(page.totalCount || 0);
+        var cardHost = document.getElementById("activeCard");
+        if (cardHost) cardHost.style.display = (runs || []).length > 0 ? "" : "none";
     }
 
     function apply(page) {
@@ -182,14 +152,43 @@
         if (node) node.textContent = JSON.stringify(stats);
         draw(stats);
         fillActive(page.activeRuns);
-        fillHistory(page);
         tick();
+    }
+
+    var recentTicket = 0;
+
+    function recentCard() {
+        return document.getElementById("recentRunsCard");
+    }
+
+    function recentQuery() {
+        var card = recentCard();
+        var params = new URLSearchParams();
+        params.set("pageNumber", card ? (card.getAttribute("data-page-number") || "1") : "1");
+        params.set("pageSize", card ? (card.getAttribute("data-page-size") || "20") : "20");
+        params.set("sortBy", card ? (card.getAttribute("data-sort-by") || "createdAt") : "createdAt");
+        params.set("sortDir", card ? (card.getAttribute("data-sort-dir") || "desc") : "desc");
+        return params;
+    }
+
+    function refreshRecent() {
+        var host = document.getElementById("recentRunsHost");
+        if (!host) return;
+        var ticket = ++recentTicket;
+        fetch("/Automation/recent?" + recentQuery().toString(), { headers: { "Accept": "text/html" } })
+            .then(function (response) { return response.ok ? response.text() : null; })
+            .then(function (html) {
+                if (ticket !== recentTicket || html == null) return;
+                host.innerHTML = html;
+                tick();
+            })
+            .catch(function () { });
     }
 
     function refresh() {
         var ticket = ++refreshTicket;
         var dataUrl = new URL("/Automation/data", window.location.origin);
-        dataUrl.search = window.location.search;
+        dataUrl.search = recentQuery().toString();
         fetch(dataUrl, { headers: { "Accept": "application/json" } })
             .then(function (response) { return response.ok ? response.json() : null; })
             .then(function (page) {
@@ -197,6 +196,239 @@
                 if (page) apply(page);
             })
             .catch(function () { });
+        refreshRecent();
+    }
+
+    function antiforgeryToken() {
+        var token = document.querySelector("#quickLaunchForm input[name='__RequestVerificationToken']");
+        if (!token) token = document.querySelector("input[name='__RequestVerificationToken']");
+        return token ? token.value : "";
+    }
+
+    function postRunAction(url, runId) {
+        return fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "RequestVerificationToken": antiforgeryToken()
+            },
+            body: JSON.stringify({ id: runId })
+        }).then(function (response) {
+            return response.json().then(function (body) { return { ok: response.ok, body: body }; });
+        });
+    }
+
+    function bindDashboardActions() {
+        document.addEventListener("click", function (event) {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+
+            var sort = event.target.closest(".au-sort-header");
+            if (sort && sort.closest("#recentRunsHost")) {
+                event.preventDefault();
+                var sortUrl = new URL(sort.href, window.location.origin);
+                var card = recentCard();
+                if (card) {
+                    card.setAttribute("data-page-number", sortUrl.searchParams.get("pageNumber") || "1");
+                    card.setAttribute("data-page-size", sortUrl.searchParams.get("pageSize") || card.getAttribute("data-page-size") || "20");
+                    card.setAttribute("data-sort-by", sortUrl.searchParams.get("sortBy") || "createdAt");
+                    card.setAttribute("data-sort-dir", sortUrl.searchParams.get("sortDir") || "desc");
+                }
+                refresh();
+                return;
+            }
+
+            var pageLink = event.target.closest("#recentRunsHost .page-link");
+            if (pageLink && pageLink.hasAttribute("data-page")) {
+                event.preventDefault();
+                var cardForPage = recentCard();
+                if (cardForPage) cardForPage.setAttribute("data-page-number", pageLink.getAttribute("data-page") || "1");
+                refresh();
+                return;
+            }
+
+            var cancel = event.target.closest(".btn-cancel-run");
+            if (cancel) {
+                event.preventDefault();
+                if (!confirm("Cancel this running test? This aborts pipeline work for the facility and removes generated FHIR data.")) return;
+                var cancelId = cancel.getAttribute("data-run-id");
+                cancel.disabled = true;
+                postRunAction("/Automation/cancel", cancelId)
+                    .then(function (result) {
+                        if (result.ok && result.body && result.body.success) {
+                            refresh();
+                            return;
+                        }
+                        cancel.disabled = false;
+                        var reason = result.body && (result.body.error || result.body.detail)
+                            ? (result.body.error || result.body.detail)
+                            : "This run is not running.";
+                        alert(reason);
+                    })
+                    .catch(function () {
+                        cancel.disabled = false;
+                        alert("Cancel could not be completed. Refresh the page and check the run status.");
+                    });
+                return;
+            }
+
+            var remove = event.target.closest(".btn-delete-run");
+            if (remove) {
+                event.preventDefault();
+                if (!confirm("Delete this run?")) return;
+                var deleteId = remove.getAttribute("data-run-id");
+                remove.disabled = true;
+                postRunAction("/Automation/delete", deleteId)
+                    .then(function (result) {
+                        if (result.ok && result.body && result.body.success) {
+                            refresh();
+                            return;
+                        }
+                        remove.disabled = false;
+                        alert("Unable to delete the run. It may still be active.");
+                    })
+                    .catch(function () {
+                        remove.disabled = false;
+                        alert("Unable to delete the run. Please try again.");
+                    });
+            }
+        });
+
+        document.addEventListener("change", function (event) {
+            if (!event.target || event.target.id !== "pageSizeSelect") return;
+            var card = recentCard();
+            if (card) {
+                card.setAttribute("data-page-size", event.target.value || "20");
+                card.setAttribute("data-page-number", "1");
+            }
+            refresh();
+        });
+
+        var form = document.getElementById("quickLaunchForm");
+        var choice = document.getElementById("qlChoice");
+        var runButton = document.getElementById("qlRunButton");
+        var dropdownButton = document.getElementById("quickLaunchDropdownButton");
+        var search = document.getElementById("quickLaunchSearch");
+        var typeFilter = document.getElementById("quickLaunchTypeFilter");
+        var sortSelect = document.getElementById("quickLaunchSort");
+
+        function optionMatches(option) {
+            var query = search ? search.value.trim().toLowerCase() : "";
+            var type = typeFilter ? typeFilter.value : "";
+            var hay = ((option.dataset.name || "") + " " + (option.dataset.description || "") + " " + (option.dataset.measures || "") + " " + (option.dataset.method || "")).toLowerCase();
+            if (type && (option.dataset.type || "") !== type) return false;
+            return !query || hay.indexOf(query) >= 0;
+        }
+
+        function applyQuickLaunchSearch() {
+            var visible = 0;
+            document.querySelectorAll(".quick-launch-option").forEach(function (option) {
+                var show = optionMatches(option);
+                option.hidden = !show;
+                if (show) visible += 1;
+            });
+            document.querySelectorAll(".quick-launch-group").forEach(function (group) {
+                var any = group.querySelector(".quick-launch-option:not([hidden])");
+                group.hidden = !any;
+            });
+            var empty = document.getElementById("quickLaunchNoResults");
+            if (empty) empty.hidden = visible > 0;
+        }
+
+        function sortQuickLaunch() {
+            var mode = sortSelect ? sortSelect.value : "name";
+            document.querySelectorAll(".quick-launch-group").forEach(function (group) {
+                var options = Array.prototype.slice.call(group.querySelectorAll(".quick-launch-option"));
+                options.sort(function (a, b) {
+                    if (mode === "updated") return Number(b.dataset.updated || 0) - Number(a.dataset.updated || 0);
+                    return String(a.dataset.name || "").localeCompare(String(b.dataset.name || ""), undefined, { sensitivity: "base" });
+                });
+                options.forEach(function (option) { group.appendChild(option); });
+            });
+        }
+
+        function selectScenario(id, label) {
+            if (choice) choice.value = id ? "scenario:" + id : "";
+            if (runButton) runButton.disabled = !id;
+            if (dropdownButton) dropdownButton.textContent = label || "-- Select a scenario --";
+            var hidden = document.getElementById("quickLaunchSelect");
+            if (hidden) hidden.value = id || "";
+        }
+
+        if (search) search.addEventListener("input", applyQuickLaunchSearch);
+        if (typeFilter) typeFilter.addEventListener("change", applyQuickLaunchSearch);
+        if (sortSelect) sortSelect.addEventListener("change", function () {
+            sortQuickLaunch();
+            applyQuickLaunchSearch();
+        });
+        var menu = document.querySelector("#quickLaunchDropdown .dropdown-menu");
+        if (menu) {
+            menu.addEventListener("click", function (event) {
+                var option = event.target.closest(".quick-launch-option");
+                if (!option) return;
+                selectScenario(option.dataset.id || "", option.dataset.name || "Scenario");
+                if (search) {
+                    search.value = "";
+                    applyQuickLaunchSearch();
+                }
+                if (dropdownButton && window.bootstrap && bootstrap.Dropdown) {
+                    bootstrap.Dropdown.getOrCreateInstance(dropdownButton).hide();
+                }
+            });
+        }
+        if (form) {
+            form.addEventListener("submit", function (event) {
+                if (!choice || !choice.value) event.preventDefault();
+            });
+        }
+
+        var newScenario = document.getElementById("btnNewScenarioFromRuns");
+        if (newScenario) {
+            newScenario.addEventListener("click", function () {
+                if (typeof window.openScenarioEditor === "function") window.openScenarioEditor(null, "edit");
+            });
+        }
+
+        document.addEventListener("scenario-editor:changed", function (event) {
+            var detail = event.detail || {};
+            if (detail.action !== "saved" || !detail.id) return;
+            var id = String(detail.id);
+            fetch("/Automation/Scenarios/GetQuickLaunchMetadata?id=" + encodeURIComponent(id), { headers: { "Accept": "application/json" } })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (scenario) {
+                    if (!scenario) return;
+                    var label = scenario.name || "Scenario";
+                    var type = scenario.type || "Custom";
+                    var group = document.querySelector(".quick-launch-group[data-group='" + type + "']");
+                    var option = document.querySelector(".quick-launch-option[data-id='" + id + "']");
+                    if (!option) {
+                        option = document.createElement("button");
+                        option.type = "button";
+                        option.className = "dropdown-item quick-launch-option";
+                        option.dataset.id = id;
+                        if (group) group.appendChild(option);
+                    }
+                    option.dataset.name = label;
+                    option.dataset.description = scenario.description || "";
+                    option.dataset.method = scenario.method || "";
+                    option.dataset.type = type;
+                    option.dataset.measures = Array.isArray(scenario.measures) ? scenario.measures.join(" ") : "";
+                    option.dataset.updated = String(scenario.updatedAt || Date.now());
+                    option.textContent = label + (type === "System" ? " [System]" : "");
+                    var hidden = document.getElementById("quickLaunchSelect");
+                    if (hidden && !hidden.querySelector("option[value='" + id + "']")) {
+                        var hiddenOption = document.createElement("option");
+                        hiddenOption.value = id;
+                        hidden.appendChild(hiddenOption);
+                    }
+                    sortQuickLaunch();
+                    applyQuickLaunchSearch();
+                    selectScenario(id, label);
+                })
+                .catch(function () { });
+        });
+
+        sortQuickLaunch();
+        applyQuickLaunchSearch();
     }
 
     function setLive(text, badge) {
@@ -209,6 +441,7 @@
     draw(readStats());
     tick();
     setInterval(tick, 1000);
+    bindDashboardActions();
 
     var live = document.getElementById("liveStatus");
     if (!live || live.getAttribute("data-live") !== "yes" || typeof signalR === "undefined") {
