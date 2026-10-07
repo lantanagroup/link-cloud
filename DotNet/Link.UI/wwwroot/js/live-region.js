@@ -237,6 +237,15 @@
                 showToast("Could not save that change.");
                 return;
             }
+            if (form.getAttribute("data-au-save") === "navigate") {
+                try {
+                    var nextUrl = new URL(res.url, window.location.href);
+                    if (nextUrl.origin === window.location.origin && nextUrl.pathname !== window.location.pathname) {
+                        window.location.assign(nextUrl.pathname + nextUrl.search + nextUrl.hash);
+                        return;
+                    }
+                } catch (e) { /* keep the validation page inline */ }
+            }
             return res.text().then(function (html) { applyPage(html, res.url); });
         }).catch(function () {
             showToast("Could not save that change.");
