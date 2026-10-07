@@ -11,7 +11,7 @@ using static LantanaGroup.Link.DataAcquisition.Domain.Settings.DataAcquisitionCo
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data/connectionValidation")]
+[Route("api/data-acquisition/connectionValidation")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class ConnectionValidationController : Controller

@@ -11,6 +11,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
         private readonly Histogram<double> _dataRequestDuration;
         private readonly Histogram<double> _semaphoreWaitDuration;
         private readonly Counter<long> _resourceAcquiredCounter;
+        private readonly Counter<long> _legacyRouteRequestsCounter;
         private readonly TimeProvider _timeProvider;
 
         public DataAcquisitionServiceMetrics(IMeterFactory meterFactory, TimeProvider timeProvider, ServiceInformation serviceInformation)
@@ -22,6 +23,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             _resourceAcquiredCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionResourceAcquiredCount);
             _dataRequestDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionQueryDuration, "ms");
             _semaphoreWaitDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionSemaphoreWaitDuration, "ms");
+            _legacyRouteRequestsCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionLegacyRouteRequests);
         }
 
         public void IncrementResourceAcquiredCounter(List<KeyValuePair<string, object?>> tags)
@@ -39,6 +41,15 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
             _semaphoreWaitDuration.Record(durationMilliseconds,
             [
                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId)
+            ]);
+        }
+
+        public void IncrementPathRewriteCounter(string route, string method)
+        {
+            _legacyRouteRequestsCounter.Add(1,
+            [
+                new KeyValuePair<string, object?>(DiagnosticNames.Route, route),
+                new KeyValuePair<string, object?>(DiagnosticNames.Method, method)
             ]);
         }
     }

@@ -13,7 +13,7 @@ using System.Net;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
-[Route("api/data/location-mappings")]
+[Route("api/data-acquisition/location-mappings")]
 [Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class OrganizationLocationMappingController : Controller

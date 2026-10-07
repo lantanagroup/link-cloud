@@ -29,6 +29,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 
 using Microsoft.AspNetCore.Antiforgery;
+using LantanaGroup.Link.DataAcquisition.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -186,7 +187,7 @@ static void SetupMiddleware(WebApplication app)
         app.UseExceptionHandler();
     }
 
-    app.UseRouting();
+    app.UseRoutingWithLegacyRoutePrefix();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
 
     //check for anonymous access
@@ -202,7 +203,7 @@ static void SetupMiddleware(WebApplication app)
 
     // Antiforgery token endpoint for browser-based callers (Admin.UI via YARP proxy).
     // Returns the request token in the response body and sets the cookie token automatically.
-    app.MapGet("/api/data/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
+    app.MapGet("/api/data-acquisition/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
     {
         var tokens = antiforgery.GetAndStoreTokens(context);
         return Results.Ok(new { token = tokens.RequestToken, headerName = "X-Link-AntiForgery" });
@@ -213,7 +214,7 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
     });
-    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data");
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data-acquisition");
 }
 
 #endregion
