@@ -44,26 +44,30 @@ Both the proxy and the server-side user chip use **`ServiceRegistry:AdminBffServ
 
 This prefers **same-site reverse proxy** over embedding BFF auth into the MVC host, so Admin.BFF stays independently deployable.
 
-## Tenant list (proof page)
+## Tenants
 
-**Choice: LinkSDK `IFacilityServiceClient.GetFacilityListAsync`** (Tenant service `/Facility/list`), not BFF `/api/facility`.
+**Choice: LinkSDK**, not Admin.BFF, for facility, census, and query dispatch. Those clients already speak the service APIs. Admin.BFF stays the browser session.
 
-- Read-only table under **Tenants**.
-- Uses system/bearer LinkSDK patterns already used by Automation.UI (`AddLinkSdk` + `ServiceRegistry` + `LinkTokenService`).
-- Later Admin pages that need the authenticated *user* identity for audit/permissions should prefer Admin.BFF (cookie → downstream) instead of (or in addition to) system-token LinkSDK calls.
+- **Tenants** lists facilities (`IFacilityServiceClient.GetFacilityListAsync`). A row opens the facility hub.
+- The hub creates and updates facility identity (name, IANA timezone, vendor version). While `DMRP:Enabled` is true, scheduled reports are read-only because Tenant rejects a caller-supplied schedule. While it is false, daily/weekly/monthly measure ids are editable and must be unique across periods.
+- Census (`ICensusServiceClient`) and query dispatch (`IQueryDispatchServiceClient`) panels create, update, and delete that facility's configuration. A missing `ServiceRegistry` URL leaves the panel as a configuration message and does not take down the identity form.
+- `FacilityIdSettings:NumericOnlyFacilityId` defaults to false, matching Tenant. Set it true only when that Tenant rejects alphanumeric ids.
+- Calls use the same LinkSDK bearer path as Automation.UI (`AddLinkSdk` + `ServiceRegistry` + `LinkTokenService`).
 
-## Phase-1 scope
+## Phase scope
 
 In:
 
 - MVC + Razor, static files, SignalR stub hub (`/hubs/link`)
 - LinkSDK registration, env + Azure App Config hooks, health
 - `--au-*` CSS tokens + Bootstrap + **left vertical nav**
-- Home, Tenants proof list, placeholder nav for Reports / Configuration / Logs / System / Automation
+- Home, tenant list, facility hub (identity, census, query dispatch)
+- Placeholder nav for Reports / Configuration / Logs / System / Automation
 
 Out:
 
-- Facility edit hub, Runs, ApiHealth, Angular Admin.UI, landing dashboard polish
+- Data acquisition and normalization panels, facility view, reports, logs, configuration, system pages
+- Landing dashboard and Automation testing
 - No changes to Automation.UI or Web/Admin.UI behavior beyond solution registration
 
 ## Solution

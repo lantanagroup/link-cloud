@@ -1535,6 +1535,10 @@ a.au-scenario-card:hover {
   font-size: .85rem;
 }
 
+.lu-facility-id {
+  word-break: break-all;
+}
+
 @media (max-width: 767.98px) {
   .lu-shell { flex-direction: column; }
   .lu-sidebar {

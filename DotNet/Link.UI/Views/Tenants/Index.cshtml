@@ -6,9 +6,13 @@
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>Tenants</span>
-        <span class="badge text-bg-secondary">read-only</span>
+        <a class="btn btn-sm btn-au-action" asp-action="Create">New facility</a>
     </div>
     <div class="card-body">
+        @if (TempData["Message"] is string message)
+        {
+            <div class="alert alert-success">@message</div>
+        }
         <form method="get" class="row g-2 mb-3">
             <div class="col-md-6">
                 <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
@@ -40,14 +44,14 @@
                     @foreach (var tenant in Model.Tenants)
                     {
                         <tr>
-                            <td><code>@tenant.FacilityId</code></td>
-                            <td>@tenant.DisplayName</td>
+                            <td><a asp-action="Facility" asp-route-id="@tenant.FacilityId"><code class="lu-facility-id">@tenant.FacilityId</code></a></td>
+                            <td><a asp-action="Facility" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a></td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
-            <p class="text-muted small mt-2 mb-0">@Model.Tenants.Count tenant(s) loaded via LinkSDK.</p>
+            <p class="text-muted small mt-2 mb-0">@Model.Tenants.Count tenant(s). Open a row to edit the facility.</p>
         }
     </div>
 </div>
