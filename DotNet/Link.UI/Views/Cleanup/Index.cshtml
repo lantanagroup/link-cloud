@@ -94,7 +94,7 @@
                                     <input class="form-control" type="number" min="1" max="500" id="MaxFacilitiesPerPass" name="MaxFacilitiesPerPass" value="@s.MaxFacilitiesPerPass" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-au-action btn-sm cleanup-run-btn" name="runKind" value="quiesce">
+                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="quiesce">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run quiesce
                             </button>
                         </div>
@@ -124,7 +124,7 @@
                                     <input class="form-control" type="number" min="1" max="365" id="AbortTtlDays" name="AbortTtlDays" value="@((int)s.AbortTtl.TotalDays)" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-au-action btn-sm cleanup-run-btn" name="runKind" value="teardown"
+                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="teardown"
                                     data-confirm="Teardown leftover Automation.UI facilities older than retention, including stale in-progress scenario jobs? Named production facilities are not touched.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run teardown
                             </button>
@@ -167,7 +167,7 @@
                                     <input class="form-control" type="number" min="1" max="12" id="CatchUpWindowHours" name="CatchUpWindowHours" value="@((int)s.CatchUpWindow.TotalHours)" />
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-outline-danger btn-sm cleanup-run-btn" name="runKind" value="history-purge"
+                            <button type="submit" class="btn btn-danger btn-sm cleanup-run-btn" name="runKind" value="history-purge"
                                     data-confirm="Delete Automation.UI run history older than retention and tear down each purged run's Automation.UI facility? Named production facilities are not touched. This cannot be undone.">
                                 <i class="bi bi-play-fill me-1"></i>Save &amp; run weekly purge
                             </button>
@@ -184,18 +184,18 @@
                     <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status</div>
                     <div class="card-body">
                         <dl class="row mb-0 small">
-                            <dt class="col-6">Now (UTC)</dt>
-                            <dd class="col-6" id="cleanup-now">@LinkUiTime.IsoUtc(Model.NowUtc)</dd>
+                            <dt class="col-6">Now</dt>
+                            <dd class="col-6" id="cleanup-now">@LinkUiTime.Display(Model.NowUtc)</dd>
                             <dt class="col-6">Next daily teardown</dt>
-                            <dd class="col-6">@LinkUiTime.IsoUtc(Model.NextDailyTeardownUtc)</dd>
+                            <dd class="col-6">@LinkUiTime.Display(Model.NextDailyTeardownUtc)</dd>
                             <dt class="col-6">Next weekly purge</dt>
-                            <dd class="col-6">@LinkUiTime.IsoUtc(Model.NextWeeklyPurgeUtc)</dd>
+                            <dd class="col-6">@LinkUiTime.Display(Model.NextWeeklyPurgeUtc)</dd>
                             <dt class="col-6">Last daily</dt>
-                            <dd class="col-6">@(s.LastDailyTeardownAt is null ? "never" : LinkUiTime.IsoUtc(s.LastDailyTeardownAt.Value))</dd>
+                            <dd class="col-6">@(s.LastDailyTeardownAt is null ? "never" : LinkUiTime.Display(s.LastDailyTeardownAt.Value))</dd>
                             <dt class="col-6">Last weekly</dt>
-                            <dd class="col-6">@(s.LastWeeklyPurgeAt is null ? "never" : LinkUiTime.IsoUtc(s.LastWeeklyPurgeAt.Value))</dd>
+                            <dd class="col-6">@(s.LastWeeklyPurgeAt is null ? "never" : LinkUiTime.Display(s.LastWeeklyPurgeAt.Value))</dd>
                             <dt class="col-6">Last quiesce</dt>
-                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt is null ? "not yet this process" : LinkUiTime.IsoUtc(Model.LastQuiesceAt.Value))</dd>
+                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt is null ? "not yet this process" : LinkUiTime.Display(Model.LastQuiesceAt.Value))</dd>
                         </dl>
                         @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
                         {
@@ -235,7 +235,7 @@
                                 <input class="form-check-input" type="checkbox" id="PurgeHistory" name="PurgeHistory" value="true" />
                                 <label class="form-check-label" for="PurgeHistory">Purge matching run history</label>
                             </div>
-                            <button type="submit" class="btn btn-au-action w-100 cleanup-run-btn">Run custom range</button>
+                            <button type="submit" class="btn btn-danger w-100 cleanup-run-btn">Run custom range</button>
                         </form>
                     </div>
                 </div>
@@ -255,7 +255,7 @@
                     <table class="table table-sm table-hover mb-0 au-cleanup-reports">
                         <thead>
                             <tr>
-                                <th>Finished (UTC)</th>
+                                <th>Finished</th>
                                 <th>Pass</th>
                                 <th>Trigger</th>
                                 <th>Status</th>
@@ -267,7 +267,7 @@
                         @foreach (var report in Model.RecentReports)
                         {
                             <tr>
-                                <td class="text-nowrap">@LinkUiTime.IsoUtc(report.FinishedAt)</td>
+                                <td class="text-nowrap">@LinkUiTime.Display(report.FinishedAt)</td>
                                 <td>@report.Label</td>
                                 <td>@report.Trigger</td>
                                 <td>

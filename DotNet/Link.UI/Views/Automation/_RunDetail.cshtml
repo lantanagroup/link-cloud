@@ -28,16 +28,16 @@
         <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
             @if (Model.Status.IsCancellable())
             {
-                <button type="button" class="btn btn-warning btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
             }
             @if (Model.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
             {
                 <button type="button" class="btn btn-danger btn-sm" id="btnDeleteRun"><i class="bi bi-trash me-1"></i>Delete</button>
-                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm" style="background:var(--au-accent);color:#fff;font-weight:600;">
+                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-download me-1"></i>Export Diagnostics
                 </a>
             }
-            <a asp-action="Index" class="btn btn-sm btn-au-action"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
         </div>
     </div>
 
@@ -81,8 +81,8 @@
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status.ToDisplayName()</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">-</code></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt is null ? "-" : LinkUiTime.IsoUtc(Model.StartedAt.Value))</span></div></div>
-                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt is null ? "-" : LinkUiTime.IsoUtc(Model.FinishedAt.Value))</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt is null ? "-" : LinkUiTime.Display(Model.StartedAt.Value))</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt is null ? "-" : LinkUiTime.Display(Model.FinishedAt.Value))</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">FHIR generator</span><span class="au-value" id="fhirGenerator">Thetis Engine</span></div></div>
                 @{
@@ -217,7 +217,7 @@
     <div class="au-card" id="testConfigCard" style="display:none;">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
-            <a href="#" class="btn btn-sm" id="btnViewManifest" style="display:none; background:var(--au-accent); color:#fff; font-weight:600;">
+            <a href="#" class="btn btn-sm btn-outline-secondary" id="btnViewManifest" style="display:none;">
                 <i class="bi bi-card-checklist me-1"></i>Generation Manifest
             </a>
         </div>
@@ -470,8 +470,8 @@
                     <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
                         <span class="small text-muted" id="logPageInfo">Loading stored log…</span>
                         <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-au-action" id="logOlder">Older</button>
-                            <button type="button" class="btn btn-au-action" id="logNewer" disabled>Newer</button>
+                            <button type="button" class="btn btn-outline-secondary" id="logOlder">Older</button>
+                            <button type="button" class="btn btn-outline-secondary" id="logNewer" disabled>Newer</button>
                         </div>
                     </div>
                     <pre id="logBox" class="au-log-console mb-0"></pre>

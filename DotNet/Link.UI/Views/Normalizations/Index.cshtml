@@ -19,7 +19,7 @@
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 @Html.AntiForgeryToken()
                 <input type="file" id="normGenFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width:320px;" multiple />
-                <button type="button" class="btn btn-sm btn-au-action" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
+                <button type="button" class="btn btn-sm btn-success" id="btnNormGenerate"><i class="bi bi-magic me-1"></i>Analyze bundle</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="btnNormGenerateReset">Start over</button>
                 <span id="normGenSessionHint" class="small text-muted"></span>
             </div>
@@ -86,10 +86,10 @@
                                         @if (op.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@LinkUiTime.IsoUtc(op.UpdatedAt)</td>
+                                    <td class="small text-muted">@LinkUiTime.Display(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
                                                 @(op.IsSystem ? "View" : "Edit")
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary btn-op-clone" data-id="@op.Id">Clone</button>
@@ -149,10 +149,10 @@
                                         @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@LinkUiTime.IsoUtc(seq.UpdatedAt)</td>
+                                    <td class="small text-muted">@LinkUiTime.Display(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
                                                 @(seq.IsSystem ? "View" : "Edit")
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary btn-seq-clone" data-id="@seq.Id">Clone</button>
@@ -218,10 +218,10 @@
                                         @if (suite.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@LinkUiTime.IsoUtc(suite.UpdatedAt)</td>
+                                    <td class="small text-muted">@LinkUiTime.Display(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
-                                            <button type="button" class="btn btn-sm btn-outline-primary btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
                                                 @(suite.IsSystem ? "View" : "Edit")
                                             </button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary btn-suite-clone" data-id="@suite.Id">Clone</button>

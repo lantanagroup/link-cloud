@@ -214,9 +214,11 @@
                         {
                             <a class="home-row" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">
                                 <span class="badge @report.Badge">@report.Status</span>
-                                <code class="lu-facility-id">@report.FacilityId</code>
-                                <partial name="_AutomationBadge" model="report.AutomationRunId" />
-                                <span class="text-muted small">@report.When</span>
+                                <span class="home-row-main">
+                                    <code class="lu-facility-id">@report.FacilityId</code>
+                                    <partial name="_AutomationBadge" model="report.AutomationRunId" />
+                                </span>
+                                <span class="home-row-time text-muted small">@report.When</span>
                             </a>
                         }
                         <p class="small text-muted mt-2 mb-0">@reports.Total total</p>
@@ -267,8 +269,8 @@
                             {
                                 <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id">
                                     <span class="badge @run.Badge">@run.Status</span>
-                                    <span class="home-name">@run.Name</span>
-                                    <span class="text-muted small">@run.When</span>
+                                    <span class="home-row-main"><span class="home-name">@run.Name</span></span>
+                                    <span class="home-row-time text-muted small">@run.When</span>
                                 </a>
                             }
                         }
@@ -277,5 +279,5 @@
             </div>
         }
     </div>
-    <p class="small text-muted mt-3 mb-0">Checked @LinkUiTime.IsoUtc(Model.LoadedAt)</p>
+    <p class="small text-muted mt-3 mb-0">Checked @LinkUiTime.Display(Model.LoadedAt)</p>
 </div>

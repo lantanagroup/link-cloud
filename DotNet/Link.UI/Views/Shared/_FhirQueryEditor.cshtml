@@ -177,7 +177,7 @@ else
                                 <p class="form-text">Leave the last header row blank to ignore it. Values are Key Vault secret names.</p>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-au-action">@(query.Exists ? "Save FHIR query" : "Add FHIR query")</button>
+                        <button type="submit" class="btn btn-success">@(query.Exists ? "Save FHIR query" : "Add FHIR query")</button>
                     </form>
                     @if (query.Exists)
                     {
@@ -235,7 +235,7 @@ else
                             </div>
                         }
                         <p class="form-text">Six lists, one for each admit and discharge window. Each FHIR id must be unique. Authentication on an existing list is kept.</p>
-                        <button type="submit" class="btn btn-au-action">@(list.Exists ? "Save FHIR list" : "Add FHIR list")</button>
+                        <button type="submit" class="btn btn-success">@(list.Exists ? "Save FHIR list" : "Add FHIR list")</button>
                     </form>
                     @if (list.Exists)
                     {
@@ -423,7 +423,7 @@ else
                             }
                             <p class="form-text">Leave the last @group.Label.ToLowerInvariant() resource row blank to ignore it. Initial queries cannot repeat a resource type. Reference queries use page size. Parameter queries use the parameter rows.</p>
                         }
-                        <button type="submit" class="btn btn-au-action">@(plan.Exists ? "Save query plan" : "Add query plan")</button>
+                        <button type="submit" class="btn btn-success">@(plan.Exists ? "Save query plan" : "Add query plan")</button>
                     </form>
                 }
                 </div>
@@ -459,7 +459,7 @@ else
                             var choiceLabel = string.IsNullOrWhiteSpace(choice.Description) ? $"Configuration {choice.Id}" : choice.Description;
                             if (choice.Id == org.ConfigId)
                             {
-                                <span class="btn btn-sm btn-au-action disabled">@choiceLabel</span>
+                                <span class="btn btn-sm btn-success disabled">@choiceLabel</span>
                             }
                             else
                             {
@@ -561,7 +561,7 @@ else
                             }
                             <p class="form-text">Alias is optional. Leave the last row blank.</p>
                         </div>
-                        <button type="submit" class="btn btn-au-action mt-2">@(org.Exists ? "Save reporting organization" : "Add reporting organization")</button>
+                        <button type="submit" class="btn btn-success mt-2">@(org.Exists ? "Save reporting organization" : "Add reporting organization")</button>
                     </form>
                     @if (org.Exists && org.ConfigId is int configId)
                     {
@@ -690,7 +690,7 @@ else
                             </div>
                         </div>
                         <p class="form-text">The password is not shown again. Leave the username and password blank to keep the saved credentials. Enter both to replace them.</p>
-                        <button type="submit" class="btn btn-au-action">@(sftp.Exists ? "Save SFTP" : "Add SFTP")</button>
+                        <button type="submit" class="btn btn-success">@(sftp.Exists ? "Save SFTP" : "Add SFTP")</button>
                     </form>
                     @if (sftp.Exists)
                     {

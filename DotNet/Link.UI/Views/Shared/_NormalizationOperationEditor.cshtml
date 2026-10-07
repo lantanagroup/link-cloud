@@ -79,7 +79,7 @@
                                             <div class="small">@(row.IsDisabled ? "Disabled" : "Enabled")</div>
                                         </div>
                                         <div class="d-flex flex-wrap gap-2 align-items-start">
-                                            <a class="btn btn-outline-primary btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber > 1 ? panel.PageNumber : null)">Edit</a>
+                                            <a class="btn btn-outline-secondary btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber > 1 ? panel.PageNumber : null)">Edit</a>
                                             <form method="post" data-au-save asp-action="DeleteOperation" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete this operation?');">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
                                                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
@@ -122,11 +122,11 @@
                                 var skipVendorType = panel.VendorOwned && operationType == "HSLOCMap";
                                 if (!skipVendorType && panel.VendorOwned)
                                 {
-                                    <a class="btn btn-outline-primary btn-sm" asp-controller="Configuration" asp-action="Operations" asp-route-editType="@operationType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                    <a class="btn btn-outline-success btn-sm" asp-controller="Configuration" asp-action="Operations" asp-route-editType="@operationType">Add @FacilityNormalizationRules.Label(operationType)</a>
                                 }
                                 else if (!skipVendorType)
                                 {
-                                    <a class="btn btn-outline-primary btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
+                                    <a class="btn btn-outline-success btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationType="@operationType" asp-route-sequenceType="@panel.SequenceType">Add @FacilityNormalizationRules.Label(operationType)</a>
                                 }
                             }
                         </div>
@@ -476,7 +476,7 @@
                                     {
                                         <p class="form-text">Vendor versions could not be loaded, so this operation is saved without presets.</p>
                                     }
-                                    <button type="submit" class="btn btn-au-action mt-3">@(editing ? "Save operation" : "Add operation")</button>
+                                    <button type="submit" class="btn btn-success mt-3">@(editing ? "Save operation" : "Add operation")</button>
                                 </form>
 
                                 @if (editing && !panel.VendorOwned)
@@ -485,7 +485,7 @@
                                         <input type="hidden" name="operationId" value="@editor.OperationId" />
                                         <label class="form-label" for="testResource">Test with a FHIR resource</label>
                                         <textarea id="testResource" name="testResource" class="form-control" rows="6">@editor.TestResource</textarea>
-                                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Test saved operation</button>
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm mt-2">Test saved operation</button>
                                     </form>
                                     @if (!string.IsNullOrWhiteSpace(panel.TestResult))
                                     {
@@ -540,7 +540,7 @@
                                     }
                                     <label class="form-label" for="extensionCsv">CSV file</label>
                                     <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
-                                    <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm mt-2">Import</button>
                                 </form>
                             }
                             else
@@ -549,7 +549,7 @@
                                 <form method="post" data-au-save asp-action="ImportExtensionUrls" asp-route-id="@Model.FacilityId" enctype="multipart/form-data">
                                     <label class="form-label" for="extensionCsv">CSV file</label>
                                     <input id="extensionCsv" name="csv" type="file" accept=".csv,text/csv" class="form-control" />
-                                    <button type="submit" class="btn btn-outline-primary btn-sm mt-2">Import</button>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm mt-2">Import</button>
                                 </form>
                             }
                         </div>
@@ -595,7 +595,7 @@
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <button type="submit" class="btn btn-outline-primary btn-sm">Show sequence</button>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm">Show sequence</button>
                                 </div>
                             </form>
 
@@ -632,7 +632,7 @@
                                     <p class="form-text">Numbers start at 1 and must be unique. Leave a row blank to leave that operation out. Saving replaces the sequence for @panel.SequenceType.</p>
                                     @if (!panel.SequenceIncomplete)
                                     {
-                                        <button type="submit" class="btn btn-au-action">Save sequence</button>
+                                        <button type="submit" class="btn btn-success">Save sequence</button>
                                     }
                                 </form>
                                 <form method="post" data-au-save asp-action="DeleteOperationSequence" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the sequence for this resource type?');">

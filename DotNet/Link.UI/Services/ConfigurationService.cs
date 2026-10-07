@@ -1860,7 +1860,7 @@ public sealed partial class ConfigurationService
     {
         if (value is null)
             return string.Empty;
-        return LinkUiTime.IsoUtc(value);
+        return LinkUiTime.Display(value);
     }
 
     private static T? Client<T>(IServiceProvider services, string? url) where T : class =>

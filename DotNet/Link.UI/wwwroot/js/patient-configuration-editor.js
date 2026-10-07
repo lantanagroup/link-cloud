@@ -172,7 +172,7 @@
             list += '<div class="text-muted small px-1 pt-1">Showing ' + cap + ' of ' + matches.length + '. Type more to narrow.</div>';
         var exact = q && items.some(function (i) { return String(i.code).toLowerCase() === qLower; });
         var add = enablePickerAdd && q && !exact
-            ? '<button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2 pc-picker-add">Add “' + esc(q) + '”</button>'
+            ? '<button type="button" class="btn btn-sm btn-outline-success w-100 mt-2 pc-picker-add">Add “' + esc(q) + '”</button>'
             : '';
         return { list: list, add: add };
     }
@@ -568,6 +568,7 @@
         var window = computeStayWindow(pattern, reportPeriod.start, reportPeriod.end, 0);
         if (window) {
             datesEl.textContent = 'Admit ' + formatStayStamp(window.start) + '  →  Discharge ' + formatStayStamp(window.end);
+            if (window.luPaintTimes) window.luPaintTimes(datesEl);
             var minutes = Math.max(1, Math.round((window.end - window.start) / 60000));
             setVal('PcDuration', minutes);
             if (hintEl) hintEl.textContent = hint + (patternExpectedInReport(pattern) ? '' : ' This stay is outside the report window.');

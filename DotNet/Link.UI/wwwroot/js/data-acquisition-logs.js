@@ -52,6 +52,7 @@
                 return res.text().then(function (html) {
                     if (currentUrl !== url || !node.isConnected) return;
                     node.innerHTML = html;
+                    if (window.luPaintTimes) window.luPaintTimes(node);
                 });
             })
             .catch(function () {

@@ -42,7 +42,7 @@
             <div class="d-flex flex-wrap gap-2">
                 <form method="post" data-au-save asp-action="DisableFacility" onsubmit="return confirm('Disable every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Disable logs</button>
+                    <button type="submit" class="btn btn-sm btn-danger">Disable logs</button>
                 </form>
                 <form method="post" data-au-save asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
                     <partial name="_AcquisitionFields" model="query" />
@@ -92,11 +92,11 @@ else
             {
                 <form method="post" data-au-save asp-action="ProcessMatching" class="d-inline" onsubmit="return confirm('Process every acquisition log that matches these filters?');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-au-action">Process matching</button>
+                    <button type="submit" class="btn btn-sm btn-success">Process matching</button>
                 </form>
                 <form method="post" data-au-save asp-action="CancelMatching" class="d-inline" onsubmit="return confirm('Cancel every matching log that is old enough? This cannot be undone.');">
                     <partial name="_AcquisitionFields" model="query" />
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancel matching</button>
+                    <button type="submit" class="btn btn-sm btn-danger">Cancel matching</button>
                 </form>
             }
         </div>
@@ -166,8 +166,8 @@ else
                         </table>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="submit" class="btn btn-sm btn-au-action" onclick="return confirm('Process the selected acquisition logs?');">Process selected</button>
-                        <button type="submit" class="btn btn-sm btn-outline-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
+                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Process the selected acquisition logs?');">Process selected</button>
+                        <button type="submit" class="btn btn-sm btn-danger" formaction="@Url.Action("Cancel")" formmethod="post" data-au-save onclick="return confirm('Cancel the selected logs that are old enough? This cannot be undone.');">Cancel selected</button>
                     </div>
                     <p class="small text-muted mt-2 mb-0">Cancel leaves logs that are newer than @search.MinAgeHours hours, and logs in a terminal status.</p>
                 </form>
