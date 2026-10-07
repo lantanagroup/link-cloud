@@ -1,9 +1,9 @@
 @model string?
-@if (!string.IsNullOrWhiteSpace(Model) && Guid.TryParse(Model, out var runId))
+@if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model) && Guid.TryParse(Model, out var runId))
 {
     <a class="badge au-badge-warning text-decoration-none ms-1" asp-controller="Automation" asp-action="Run" asp-route-id="@runId">Automation</a>
 }
-else if (!string.IsNullOrWhiteSpace(Model))
+else if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model))
 {
     <span class="badge au-badge-warning ms-1">Automation</span>
 }

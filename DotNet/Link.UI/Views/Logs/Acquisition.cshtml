@@ -244,7 +244,11 @@ else
         <div class="card-body">
             @if (Model.Logs.Count == 0)
             {
-                <p class="au-empty mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation acquisition logs." : "No acquisition logs found.")</p>
+                <p class="au-empty mb-0">@(
+                    !LinkUiFeatures.Value.AutomationEnabled ? "No acquisition logs found."
+                    : Link.UI.Services.AutomationMarkRules.IsAutomation(query.Scope) ? "No automation acquisition logs."
+                    : Link.UI.Services.AutomationMarkRules.IsReal(query.Scope) ? "No real acquisition logs."
+                    : "No acquisition logs found.")</p>
             }
             else
             {

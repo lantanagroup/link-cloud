@@ -120,7 +120,11 @@
         }
         @if (Model.Reports.Count == 0)
         {
-            <p class="mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Query.Scope) ? "No automation reports." : "No reports found.")</p>
+            <p class="mb-0">@(
+                !LinkUiFeatures.Value.AutomationEnabled ? "No reports found."
+                : Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Query.Scope) ? "No automation reports."
+                : Link.UI.Services.AutomationMarkRules.IsReal(Model.Query.Scope) ? "No real reports."
+                : "No reports found.")</p>
         }
         else
         {

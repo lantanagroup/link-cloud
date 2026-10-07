@@ -61,8 +61,7 @@ public sealed class ReportsListQuery
         Add(route, "periodTo", PeriodTo);
         if (ShowDeleted)
             route["showDeleted"] = "true";
-        if (AutomationMarkRules.IsAutomation(Scope))
-            route["scope"] = AutomationMarkRules.Automation;
+        AutomationMarkRules.AddScope(route, Scope);
         Add(route, "sortBy", sortBy ?? SortBy);
         Add(route, "sortDir", sortDir ?? SortDir);
 

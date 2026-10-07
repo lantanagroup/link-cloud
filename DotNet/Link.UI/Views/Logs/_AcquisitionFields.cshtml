@@ -20,9 +20,12 @@
 {
     <input type="hidden" name="cancellableOnly" value="true" />
 }
-@if (Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope))
+@{
+    var scopeQuery = Link.UI.Services.AutomationMarkRules.ScopeForQuery(Model.Scope);
+}
+@if (scopeQuery is not null)
 {
-    <input type="hidden" name="scope" value="automation" />
+    <input type="hidden" name="scope" value="@scopeQuery" />
 }
 @if (Model.Status is not null)
 {
