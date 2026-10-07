@@ -3,7 +3,7 @@
     var value = Model.Value?.Trim() ?? "";
     var empty = string.IsNullOrWhiteSpace(value) || value == "—";
     var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
-    var href = Model.LinkHref;
+    var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
     var safeLink = !string.IsNullOrWhiteSpace(href)
         && href.StartsWith('/')
         && !href.StartsWith("//", StringComparison.Ordinal)

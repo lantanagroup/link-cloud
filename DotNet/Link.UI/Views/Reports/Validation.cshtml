@@ -8,7 +8,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("View", "Tenants", new { id = Model.FacilityId, section = "reports" })!, "Back to facility"))" />
 </div>
 
 <partial name="_ReportNav" />

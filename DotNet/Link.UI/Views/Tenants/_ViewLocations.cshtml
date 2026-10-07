@@ -1,10 +1,11 @@
 @model FacilityViewModel
 @using Link.UI.Services
 @{
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
     Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
         page: 1,
         sortBy: column,
-        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column));
+        sortDir: FacilityViewRules.NextSortDirection(Model.Query.SortBy, Model.Query.SortDir, column)).WithOrigin(origin);
 }
 
 <div class="au-card card">
@@ -12,6 +13,7 @@
     <div class="card-body">
         <form method="get" asp-action="View" asp-route-id="@Model.FacilityId" class="row g-2 align-items-end mb-3">
             <input type="hidden" name="section" value="locations" />
+            <partial name="_ReturnField" />
             <div class="col-12 col-md-6 col-xl-3">
                 <label class="form-label" for="locationId">Location ID</label>
                 <input id="locationId" name="locationId" value="@Model.Query.LocationId" class="form-control" />
@@ -44,7 +46,7 @@
             </div>
             <div class="col-12 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
-                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="locations">Clear</a>
+                <a class="btn btn-au-neutral" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="locations" asp-route-returnUrl="@origin">Clear</a>
             </div>
         </form>
 

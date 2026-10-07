@@ -22,7 +22,7 @@
                     {
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <h2 class="h6 mb-1">@(string.IsNullOrWhiteSpace(location.Name) ? location.LocationId : location.Name)</h2>
-                            <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="hsloc">Close</a>
+                            <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="hsloc" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Close</a>
                         </div>
                         <p class="small text-muted mb-2">Local code mappings (@location.Mappings.Count)</p>
                         @if (location.Mappings.Count == 0)

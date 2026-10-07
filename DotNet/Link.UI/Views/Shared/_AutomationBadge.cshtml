@@ -1,7 +1,7 @@
 @model string?
 @if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model) && Guid.TryParse(Model, out var runId))
 {
-    <a class="badge au-badge-warning text-decoration-none ms-1" asp-controller="Automation" asp-action="Run" asp-route-id="@runId">Automation</a>
+    <a class="badge au-badge-warning text-decoration-none ms-1" asp-controller="Automation" asp-action="Run" asp-route-id="@runId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Automation</a>
 }
 else if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model))
 {

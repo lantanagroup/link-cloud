@@ -161,7 +161,7 @@ else
                                 <td>@row.Type</td>
                                 <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></td>
                                 <td>@row.Subject</td>
-                                <td><a asp-action="Notification" asp-route-id="@row.Id">Open</a></td>
+                                <td><a asp-action="Notification" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a></td>
                             </tr>
                         }
                         </tbody>

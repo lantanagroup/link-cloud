@@ -38,7 +38,7 @@
                     <i class="bi bi-download me-1"></i>Export Diagnostics
                 </a>
             }
-            <a asp-action="Index" class="btn btn-sm btn-au-neutral"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to runs"))" />
         </div>
     </div>
 

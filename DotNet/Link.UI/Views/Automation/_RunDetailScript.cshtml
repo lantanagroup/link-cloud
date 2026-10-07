@@ -1752,7 +1752,7 @@
             var btn = document.getElementById('btnViewManifest');
             if (btn) {
                 btn.style.display = '';
-                btn.href = `${manifestPageUrl}?id=${runId}`;
+                btn.href = manifestPageUrl + "?id=" + encodeURIComponent(runId) + "&returnUrl=" + encodeURIComponent(window.location.pathname + window.location.search);
             }
             // Ensure the parent card is visible even if no config properties were rendered.
             var card = document.getElementById('testConfigCard');

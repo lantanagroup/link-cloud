@@ -8,7 +8,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="Report" asp-route-id="@Model.FacilityId" asp-route-reportId="@Model.ReportId"><i class="bi bi-arrow-left me-1"></i>Back to report</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Report", "Tenants", new { id = Model.FacilityId, reportId = Model.ReportId })!, "Back to report"))" />
 </div>
 
 @if (TempData["Error"] is string actionError)
@@ -42,7 +42,7 @@ else
             @if (Model.CanDownloadJson)
             {
                 <div class="d-flex flex-wrap gap-2 mt-3">
-                    <a class="btn btn-au-neutral" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId" asp-route-json="true">View JSON</a>
+                    <a class="btn btn-au-neutral" asp-action="Measure" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId" asp-route-json="true" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">View JSON</a>
                     <a class="btn btn-au-neutral" asp-action="MeasureFile" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId" asp-route-patientId="@Model.PatientId">Download measure eval input</a>
                 </div>
             }
