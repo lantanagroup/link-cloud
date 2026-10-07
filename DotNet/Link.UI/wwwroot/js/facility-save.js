@@ -140,6 +140,64 @@
         });
     }
 
+    function sectionItem(form) {
+        return form.closest(".accordion-item");
+    }
+
+    function ensureSlot(item) {
+        if (!item) return null;
+        var header = item.querySelector(":scope > .accordion-header");
+        if (!header) return null;
+        var slot = header.querySelector(":scope > .lu-section-action");
+        if (!slot) {
+            slot = document.createElement("div");
+            slot.className = "lu-section-action";
+            header.appendChild(slot);
+        }
+        return slot;
+    }
+
+    function setExpanded(item, open) {
+        if (!item) return;
+        var panel = item.querySelector(":scope > .accordion-collapse");
+        var toggle = item.querySelector(":scope > .accordion-header > .accordion-button");
+        if (panel && window.bootstrap && window.bootstrap.Collapse) {
+            var instance = window.bootstrap.Collapse.getOrCreateInstance(panel, { toggle: false });
+            if (open) instance.show();
+            else instance.hide();
+        } else if (panel) {
+            panel.classList.toggle("show", open);
+        }
+        if (toggle) {
+            toggle.classList.toggle("collapsed", !open);
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+    }
+
+    function sectionDirty(item) {
+        return !!(item && item.querySelector("[data-facility-dirty='true'], [data-facility-force='true']"));
+    }
+
+    function undoButton(onClick) {
+        var undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "btn btn-sm btn-outline-light";
+        undo.textContent = "Undo";
+        undo.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            onClick();
+        });
+        return undo;
+    }
+
+    function stagedFlag(text) {
+        var flag = document.createElement("span");
+        flag.className = "lu-staged-flag";
+        flag.textContent = text;
+        return flag;
+    }
+
     function collapseEmpty(form) {
         form.classList.add("d-none");
         var body = form.closest(".accordion-body") || form.parentElement;
@@ -157,31 +215,50 @@
             }
             node = node.nextElementSibling;
         }
-        var row = document.createElement("div");
-        row.className = "d-flex justify-content-between align-items-center gap-2 lu-section-empty";
-        var note = document.createElement("span");
-        note.className = "text-muted";
-        note.textContent = "Not configured";
-        var add = document.createElement("button");
-        add.type = "button";
-        add.className = "btn btn-sm btn-success";
-        add.textContent = "+ Add";
-        add.addEventListener("click", function () {
-            form.classList.remove("d-none");
-            extras.forEach(function (extra) { extra.classList.remove("d-none"); });
-            var submit = form.querySelector("button[type='submit'], input[type='submit']");
-            if (submit) submit.classList.add("d-none");
-            form.setAttribute("data-facility-dirty", "true");
-            form.setAttribute("data-facility-force", "true");
-            row.remove();
-            refreshFlag();
-            var focus = form.querySelector("input:not([type='hidden']), select, textarea");
-            if (focus) focus.focus();
-        });
-        row.appendChild(note);
-        row.appendChild(add);
-        if (body) body.insertBefore(row, form);
-        else form.parentNode.insertBefore(row, form);
+        var item = sectionItem(form);
+        setExpanded(item, false);
+        var slot = ensureSlot(item);
+        if (!slot) return;
+
+        function showAdd() {
+            slot.textContent = "";
+            var add = document.createElement("button");
+            add.type = "button";
+            add.className = "btn btn-sm btn-success";
+            add.textContent = "+ Add";
+            add.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                form.classList.remove("d-none");
+                extras.forEach(function (extra) { extra.classList.remove("d-none"); });
+                var submit = form.querySelector("button[type='submit'], input[type='submit']");
+                if (submit) submit.classList.add("d-none");
+                form.setAttribute("data-facility-dirty", "true");
+                form.setAttribute("data-facility-force", "true");
+                setExpanded(item, true);
+                showUndo();
+                refreshFlag();
+                var focus = form.querySelector("input:not([type='hidden']), select, textarea");
+                if (focus) focus.focus();
+            });
+            slot.appendChild(add);
+        }
+
+        function showUndo() {
+            slot.textContent = "";
+            slot.appendChild(stagedFlag("New"));
+            slot.appendChild(undoButton(function () {
+                form.classList.add("d-none");
+                extras.forEach(function (extra) { extra.classList.add("d-none"); });
+                form.removeAttribute("data-facility-dirty");
+                form.removeAttribute("data-facility-force");
+                setExpanded(item, false);
+                showAdd();
+                refreshFlag();
+            }));
+        }
+
+        showAdd();
     }
 
     function saveNameFor(action) {
@@ -211,33 +288,152 @@
         editor.querySelectorAll("form[data-facility-action='" + action + "'][data-facility-force='true']").forEach(applySkip);
     }
 
-    function wireRemove(form, submit) {
+    function wireRowRemove(form, submit) {
         var action = form.getAttribute("data-facility-action");
         var rest = (submit.textContent || "").replace(/^Delete\s+/i, "").trim();
-        var label = rest || labels[action] || "this section";
+        var label = rest || labels[action] || "this row";
         submit.type = "button";
         submit.className = "btn btn-sm btn-danger";
-        submit.textContent = "Remove";
+        submit.textContent = "Delete";
         submit.addEventListener("click", function () {
-            if (!window.confirm("Remove " + label + "? It is deleted when you save the facility.")) return;
+            if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
             form.setAttribute("data-facility-force", "true");
             applySkip(form);
             var note = document.createElement("div");
             note.className = "alert alert-warning mt-2 lu-remove-note";
-            note.appendChild(document.createTextNode("This will be removed when you save the facility. "));
-            var undo = document.createElement("button");
-            undo.type = "button";
-            undo.className = "btn btn-sm btn-outline-secondary";
-            undo.textContent = "Undo";
-            undo.addEventListener("click", function () {
+            note.appendChild(document.createTextNode("Staged for removal. "));
+            note.appendChild(undoButton(function () {
                 form.removeAttribute("data-facility-force");
                 syncSkip(action);
                 note.remove();
                 refreshFlag();
-            });
-            note.appendChild(undo);
+            }));
             form.appendChild(note);
             refreshFlag();
+        });
+    }
+
+    function wireHeaderDelete(form, submit) {
+        var action = form.getAttribute("data-facility-action");
+        var label = labels[action] || "this section";
+        submit.classList.add("d-none");
+        form.classList.add("d-none");
+        var item = sectionItem(form);
+        var slot = ensureSlot(item);
+        if (!slot) return;
+
+        function showDelete() {
+            slot.textContent = "";
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-sm btn-danger";
+            button.textContent = "Delete";
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
+                form.setAttribute("data-facility-force", "true");
+                applySkip(form);
+                showStaged();
+                refreshFlag();
+            });
+            slot.appendChild(button);
+        }
+
+        function showStaged() {
+            slot.textContent = "";
+            slot.appendChild(stagedFlag("Staged for removal"));
+            slot.appendChild(undoButton(function () {
+                form.removeAttribute("data-facility-force");
+                syncSkip(action);
+                showDelete();
+                refreshFlag();
+            }));
+        }
+
+        showDelete();
+    }
+
+    function wireRemove(form, submit) {
+        var action = form.getAttribute("data-facility-action");
+        if (action === "DeleteOperation" || action === "DeleteOperationSequence") {
+            wireRowRemove(form, submit);
+            return;
+        }
+        wireHeaderDelete(form, submit);
+    }
+
+    function withPlanType(url) {
+        var select = document.getElementById("queryPlanType");
+        if (select && select.value) url.searchParams.set("planType", select.value);
+        return url;
+    }
+
+    function swapItem(url, itemId) {
+        var item = document.getElementById(itemId);
+        if (!item) return Promise.resolve(false);
+        item.setAttribute("aria-busy", "true");
+        return fetch(url, { headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
+            .then(function (res) {
+                if (!res.ok) throw new Error(String(res.status));
+                return res.text();
+            })
+            .then(function (html) {
+                var doc = new DOMParser().parseFromString(html, "text/html");
+                var fresh = doc.getElementById(itemId);
+                if (!fresh) throw new Error("missing");
+                item.replaceWith(fresh);
+                history.replaceState(null, "", url);
+                fresh.querySelectorAll("form[data-au-save]").forEach(classify);
+                if (itemId === "normalizationPanel") decorateNormalization();
+                wirePlanSelect(fresh);
+                return true;
+            })
+            .catch(function () {
+                var current = document.getElementById(itemId);
+                if (current) current.removeAttribute("aria-busy");
+                showResults(["That section could not be opened. The rest of your edits are still here."]);
+                return false;
+            });
+    }
+
+    function decorateNormalization() {
+        var item = document.getElementById("normalizationPanel");
+        if (!item) return;
+        if (item.querySelector("form[data-facility-action='DeleteOperation']")) return;
+        if (item.querySelector("#normalization-editor")) return;
+        if (!item.querySelector("a[data-facility-swap]")) return;
+        var slot = ensureSlot(item);
+        if (!slot || slot.childElementCount > 0) return;
+        var add = document.createElement("button");
+        add.type = "button";
+        add.className = "btn btn-sm btn-success";
+        add.textContent = "+ Add";
+        add.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setExpanded(item, true);
+        });
+        slot.appendChild(add);
+    }
+
+    function wirePlanSelect(scope) {
+        var select = (scope || document).querySelector("#queryPlanType");
+        if (!select || select.getAttribute("data-wired") === "1") return;
+        select.setAttribute("data-wired", "1");
+        select.setAttribute("data-current", select.value);
+        select.addEventListener("change", function () {
+            var item = select.closest(".accordion-item");
+            if (!item || !item.id) return;
+            if (sectionDirty(item) && !window.confirm("This query plan has unsaved changes. Switch type without saving?")) {
+                select.value = select.getAttribute("data-current");
+                return;
+            }
+            var url = new URL(window.location.href);
+            url.searchParams.set("planType", select.value);
+            swapItem(url.toString(), item.id).then(function (ok) {
+                if (!ok && select.isConnected) select.value = select.getAttribute("data-current");
+            });
         });
     }
 
@@ -268,6 +464,8 @@
         if (!document.getElementById("facilitySaveBar")) return;
         editor.setAttribute("data-facility-ready", "1");
         editor.querySelectorAll("form[data-au-save]").forEach(classify);
+        decorateNormalization();
+        wirePlanSelect(editor);
         var save = document.getElementById("facilitySaveButton");
         var cancel = document.getElementById("facilityCancelButton");
         if (save) save.addEventListener("click", saveAll);
@@ -421,6 +619,19 @@
         var form = event.target;
         if (!form || !form.getAttribute) return;
         if ((form.method || "").toLowerCase() === "get") {
+            var swapId = form.getAttribute("data-facility-swap");
+            if (swapId) {
+                event.preventDefault();
+                event.stopPropagation();
+                var swapTarget = document.getElementById(swapId);
+                if (sectionDirty(swapTarget) && !window.confirm("This section has unsaved changes. Continue and discard them?")) return;
+                var url = new URL(form.action, window.location.href);
+                new FormData(form).forEach(function (value, key) {
+                    if (value) url.searchParams.set(key, value);
+                });
+                swapItem(withPlanType(url).toString(), swapId);
+                return;
+            }
             if (!isDirty()) return;
             if (!window.confirm("This facility has unsaved changes. Leave without saving?")) {
                 event.preventDefault();
@@ -436,6 +647,23 @@
         event.preventDefault();
         event.stopPropagation();
         if (action.indexOf("Delete") !== 0) markDirty(form);
+    }, true);
+
+    document.addEventListener("click", function (event) {
+        var link = event.target && event.target.closest ? event.target.closest("a[data-facility-swap]") : null;
+        var editor = root();
+        if (!link || !editor || editor.getAttribute("data-facility-ready") !== "1" || !editor.contains(link)) return;
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (link.target && link.target !== "_self") return;
+        event.preventDefault();
+        event.stopPropagation();
+        var swapId = link.getAttribute("data-facility-swap");
+        var swapTarget = document.getElementById(swapId);
+        if (sectionDirty(swapTarget) && !window.confirm("This section has unsaved changes. Continue and discard them?")) return;
+        var url;
+        try { url = new URL(link.href, window.location.href); }
+        catch (e) { return; }
+        swapItem(withPlanType(url).toString(), swapId);
     }, true);
 
     document.addEventListener("click", function (event) {
