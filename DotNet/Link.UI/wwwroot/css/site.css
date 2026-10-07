@@ -145,8 +145,19 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 .btn-au-run:hover { background: #333; color: #fff; }
 .btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
 
-/* overrides for bootstrap btn-success / danger / warning */
-.btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
+/* overrides for bootstrap btn-success / danger / warning.
+   :disabled and :hover beat a plain .btn-success rule, so every state uses the token. */
+.btn-success,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active,
+.btn-success:disabled,
+.btn-success.disabled {
+  background-color: var(--au-success);
+  border-color: var(--au-success);
+  color: #fff;
+}
+.btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); color: #fff; }
 .btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
 .btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
 .btn-warning:hover, .btn-warning:focus { background: #e0a800; border-color: #d39e00; color: #111; }
@@ -1775,6 +1786,16 @@ html:has(body.lu-body) {
   color: #fff;
   border-radius: var(--au-radius);
   box-shadow: var(--au-card-shadow);
+}
+
+/* Sit above the page and under a Bootstrap dialog (1055). The inset leaves the facility note readable. */
+#auToasts {
+  z-index: 1040;
+  padding-bottom: 6.5rem;
+}
+
+.lu-facility-note {
+  margin-bottom: 1.5rem;
 }
 
 .lu-hsloc {
