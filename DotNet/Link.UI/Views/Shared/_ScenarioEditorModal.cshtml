@@ -136,9 +136,9 @@
                             <label class="form-label d-block">Facility configuration</label>
                             <div class="btn-group" role="group" aria-label="Facility configuration mode">
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeFacility" value="Facility" autocomplete="off" checked />
-                                <label class="btn btn-outline-primary" for="FacilityModeFacility">Facility template</label>
+                                <label class="btn btn-outline-secondary" for="FacilityModeFacility">Facility template</label>
                                 <input type="radio" class="btn-check" name="FacilityConfigurationMode" id="FacilityModeAlaCarte" value="AlaCarte" autocomplete="off" />
-                                <label class="btn btn-outline-primary" for="FacilityModeAlaCarte">Ala carte</label>
+                                <label class="btn btn-outline-secondary" for="FacilityModeAlaCarte">Ala carte</label>
                             </div>
                             <div class="form-text">Facility mode uses one template. Ala carte chooses each piece and does not select a facility.</div>
                         </div>
@@ -383,13 +383,13 @@
                                         <div class="input-group input-group-sm" style="width:auto;">
                                             <span class="input-group-text">Patient ID</span>
                                             <input type="text" class="form-control" id="newImportedPatientId" placeholder="e.g. patient-123" maxlength="128" style="width:200px;" />
-                                            <button type="button" class="btn btn-outline-primary" id="btnAddImportedById">+ Add by ID</button>
+                                            <button type="button" class="btn btn-outline-success" id="btnAddImportedById">+ Add by ID</button>
                                         </div>
-                                        <label class="btn btn-outline-primary btn-sm mb-0">
+                                        <label class="btn btn-outline-secondary btn-sm mb-0">
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
-                                        <button type="button" class="btn btn-sm btn-au-action" id="btnSuggestFromImported">
+                                        <button type="button" class="btn btn-sm btn-success" id="btnSuggestFromImported">
                                             <i class="bi bi-magic me-1"></i>Suggest from patient data
                                         </button>
                                         <span id="importedUploadStatus" class="small text-muted" style="display:none;" role="status" aria-live="polite"></span>
@@ -433,7 +433,7 @@
                 </div>
                 <div class="d-flex justify-content-end gap-2 mt-3">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReplaceFhirCancel">Cancel</button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
                     <button type="button" class="btn btn-danger btn-sm" id="btnReplaceFhirConfirm">
                         <i class="bi bi-arrow-repeat me-1"></i>Purge + Replace
                     </button>
@@ -1265,7 +1265,6 @@
             var btn = row.querySelector('.btn-cohort-customize');
             if (!btn) return;
             btn.textContent = 'Configure';
-            btn.classList.remove('btn-primary');
             btn.classList.add('btn-outline-secondary');
         }
         function addCohortRow(count, patientConfigurationId, intent, rMin, rMax) {

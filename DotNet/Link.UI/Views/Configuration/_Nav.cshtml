@@ -3,7 +3,7 @@
 @{
     var active = ViewData["ConfigurationSection"] as string ?? "";
     var dmrp = Features.Value.DmrpEnabled;
-    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-outline-secondary";
 }
 <nav class="lu-section-nav mb-3" aria-label="Configuration">
     <a class="@Btn("measures")" asp-controller="Configuration" asp-action="Measures">Measures</a>

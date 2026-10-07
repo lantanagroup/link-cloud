@@ -324,6 +324,11 @@ public class HomeOverviewTests
         overview.Should().Contain("au-service-chip");
         overview.Should().Contain("id=\"homeOverview\"");
         overview.Should().Contain("Nothing needs attention right now.");
+        overview.Should().Contain("home-row-main");
+        overview.Should().Contain("home-row-time text-muted small");
+        var css = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/css/site.css"));
+        css.Should().Contain("grid-template-columns: auto minmax(0, 1fr) auto;");
+        css.Should().Contain(".home-row-time { grid-column: 1 / -1; justify-self: start; }");
 
         var gate = overview.IndexOf("@if (Model.AutomationVisible)", StringComparison.Ordinal);
         var scope = overview.IndexOf("asp-route-scope=\"automation\"", StringComparison.Ordinal);
@@ -478,7 +483,7 @@ public class HomeOverviewTests
             "Submission API is slower than 2 seconds");
         issues.Should().OnlyContain(issue => !issue.Title.Contains("facility-", StringComparison.Ordinal));
         issues[2].Href.Should().Be(HomeOverviewRules.InFlightHref);
-        issues[2].Detail.Should().Be("2026-10-06T09:00:00Z");
+        issues[2].Detail.Should().Be("2026-10-06 09:00:00 UTC");
         issues[4].Href.Should().Be(HomeOverviewRules.HealthHref);
         issues[4].Detail.Should().NotContain("service-4");
         issues[5].Href.Should().Be(HomeOverviewRules.FailedLogsHref);

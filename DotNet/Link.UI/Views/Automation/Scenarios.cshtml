@@ -98,10 +98,10 @@
                                         <span class="badge bg-light text-dark border">Custom</span>
                                     }
                                 </td>
-                                <td class="small text-muted">@LinkUiTime.IsoUtc(s.UpdatedAt)</td>
+                                <td class="small text-muted">@LinkUiTime.Display(s.UpdatedAt)</td>
                                 <td class="text-nowrap">
                                     <div class="d-inline-flex gap-1">
-                                        <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
                                             @(s.IsSystemScenario ? "View" : "Edit")
                                         </button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>

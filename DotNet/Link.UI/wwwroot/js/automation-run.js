@@ -49,6 +49,10 @@
         text("runSeed", String(run.seed || 0));
         text("runStarted", run.startedAt ? new Date(run.startedAt).toISOString().replace(".000Z", "Z") : "");
         text("runFinished", run.finishedAt ? new Date(run.finishedAt).toISOString().replace(".000Z", "Z") : "");
+        ["started", "finished", "runStarted", "runFinished"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el && window.luPaintTimes) window.luPaintTimes(el);
+        });
         text("runDuration", run.duration);
         text("runTemplates", run.templateVersion ? "v" + run.templateVersion : "");
 

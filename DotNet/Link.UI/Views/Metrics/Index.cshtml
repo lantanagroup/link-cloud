@@ -12,7 +12,7 @@
     string FormatWhen(DateTimeOffset? value)
     {
         if (value is null) return "—";
-        return LinkUiTime.IsoUtc(value.Value);
+        return LinkUiTime.Display(value.Value);
     }
     string FormatMs(double? ms)
     {
@@ -315,7 +315,7 @@
                                 <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                                 <td>@FormatWhen(run.FinishedAt)</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action">View</a>
+                                    <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-outline-secondary">View</a>
                                     @if (run.ScenarioId is Guid scenarioId)
                                     {
                                         <a asp-action="Scenario" asp-route-id="@scenarioId" class="btn btn-sm btn-outline-secondary">History</a>

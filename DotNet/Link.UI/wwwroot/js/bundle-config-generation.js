@@ -159,7 +159,7 @@
                         <span class="badge ${isReuse ? 'au-badge-success' : 'au-badge-warning'}">${esc(isReuse ? 'Ready to use' : 'Needs a few additions')}</span>
                     </div>
                     <div class="au-cfggen-choice-actions d-flex align-items-center gap-2 flex-wrap">
-                        <button type="button" class="btn btn-sm ${recommended && isReuse ? 'btn-au-action' : 'btn-outline-secondary'} cfggen-reuse"
+                        <button type="button" class="btn btn-sm ${recommended && isReuse ? 'btn-success' : 'btn-outline-secondary'} cfggen-reuse"
                             data-kind="${esc(kindHint)}"
                             data-id="${esc(pick(item, 'id', 'Id', ''))}"
                             data-name="${esc(pick(item, 'name', 'Name', ''))}"
@@ -314,7 +314,7 @@
                         <pre class="au-cfggen-pre">${esc(ormConds.map(c => pick(c, 'fhirPath', 'FhirPath', '')).join('\n')) || '(none)'}</pre>
                     </details>
                     <div class="au-cfggen-choice-actions d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-sm btn-au-action" id="cfgGenSaveOrm" ${ormConds.length ? '' : 'disabled'}>
+                        <button type="button" class="btn btn-sm btn-success" id="cfgGenSaveOrm" ${ormConds.length ? '' : 'disabled'}>
                             ${refinedOrmId ? 'Update this map' : 'Save and use this map'}
                         </button>
                         ${refinedOrmId ? '<button type="button" class="btn btn-sm btn-outline-secondary" id="cfgGenSaveOrmNew">Save as a new map</button>' : ''}
@@ -352,7 +352,7 @@
                     <div class="small text-muted mb-1">${ops.length ? 'Include these operations' : 'Nothing new to add — an existing suite already covers this upload.'}</div>
                     ${opRows || ''}
                     <div class="au-cfggen-choice-actions d-flex flex-wrap gap-2 mt-2">
-                        <button type="button" class="btn btn-sm btn-au-action" id="cfgGenSaveNorm" ${ops.length || refinedSuiteId ? '' : 'disabled'}>
+                        <button type="button" class="btn btn-sm btn-success" id="cfgGenSaveNorm" ${ops.length || refinedSuiteId ? '' : 'disabled'}>
                             ${refinedSuiteId ? 'Update this suite' : 'Save and use this suite'}
                         </button>
                         ${refinedSuiteId ? '<button type="button" class="btn btn-sm btn-outline-secondary" id="cfgGenSaveNormNew">Save as a new suite</button>' : ''}
@@ -362,7 +362,7 @@
 
         function footerHtml() {
             if (step === 1)
-                return `<span></span><button type="button" class="btn btn-au-action" data-cfggen-next>Continue</button>`;
+                return `<span></span><button type="button" class="btn btn-success" data-cfggen-next>Continue</button>`;
             if (step === 2)
                 return `<button type="button" class="btn btn-outline-secondary" data-cfggen-back>Back</button>
                     <button type="button" class="btn btn-outline-secondary" data-cfggen-skip>Skip for now</button>`;

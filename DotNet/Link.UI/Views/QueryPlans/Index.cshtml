@@ -73,10 +73,10 @@
                                     <span class="badge bg-light text-dark border">Custom</span>
                                 }
                             </td>
-                            <td class="small text-muted">@LinkUiTime.IsoUtc(t.UpdatedAt)</td>
+                            <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
                                 <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
                                         @(t.IsSystem ? "View" : "Edit")
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-qp-clone" data-id="@t.Id">Clone</button>
@@ -218,7 +218,7 @@
                                 The JSON should match the DataAcquisition query plan format (with <code>InitialQueries</code> and <code>SupplementalQueries</code> as numbered objects or arrays).
                             </p>
                             <div class="d-flex gap-2 mb-2">
-                                <label class="btn btn-sm btn-outline-primary mb-0" for="jsonFileInput">
+                                <label class="btn btn-sm btn-outline-secondary mb-0" for="jsonFileInput">
                                     <i class="bi bi-upload me-1"></i>Upload File
                                 </label>
                                 <input type="file" id="jsonFileInput" accept=".json,application/json" class="d-none" />
@@ -230,7 +230,7 @@
                         </div>
                         <div id="jsonImportError" class="alert alert-danger py-2 small" style="display:none;"></div>
                         <div id="jsonImportSuccess" class="alert alert-success py-2 small" style="display:none;"></div>
-                        <button type="button" class="btn btn-au-action" id="btnJsonApply">
+                        <button type="button" class="btn btn-success" id="btnJsonApply">
                             <i class="bi bi-check-lg me-1"></i>Apply to Editor
                         </button>
                     </div>
@@ -415,7 +415,7 @@
 
         var paramFooter = document.createElement('div');
         paramFooter.className = 'mt-1';
-        paramFooter.innerHTML = '<button type="button" class="btn btn-sm btn-outline-primary qp-add-param-btn"><i class="bi bi-plus me-1"></i>Add Parameter</button>';
+        paramFooter.innerHTML = '<button type="button" class="btn btn-sm btn-outline-success qp-add-param-btn"><i class="bi bi-plus me-1"></i>Add Parameter</button>';
         body.appendChild(paramFooter);
 
         // Populate parameters

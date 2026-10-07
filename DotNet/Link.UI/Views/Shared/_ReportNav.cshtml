@@ -2,7 +2,7 @@
     var facilityId = ViewData["FacilityId"] as string ?? "";
     var reportId = ViewData["ReportId"] as string ?? "";
     var active = ViewData["ReportSection"] as string ?? "report";
-    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+    string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-outline-secondary";
 }
 <nav class="lu-section-nav mb-3" aria-label="Report">
     <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId">Report details</a>

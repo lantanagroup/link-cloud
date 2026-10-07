@@ -158,7 +158,20 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   color: #fff;
 }
 .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); color: #fff; }
-.btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
+.btn-danger,
+.btn-danger:hover,
+.btn-danger:focus,
+.btn-danger:active,
+.btn-danger:disabled,
+.btn-danger.disabled,
+.btn-outline-danger,
+.btn-outline-danger:hover,
+.btn-outline-danger:focus,
+.btn-outline-danger:active {
+  background-color: var(--au-danger);
+  border-color: var(--au-danger);
+  color: #fff;
+}
 .btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
 .btn-warning:hover, .btn-warning:focus { background: #e0a800; border-color: #d39e00; color: #111; }
 
@@ -772,9 +785,10 @@ a.au-kpi-link:hover {
 .home-card-link { color: #fff; text-decoration: none; }
 .home-card-link:hover { color: var(--au-accent); }
 .home-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .35rem .75rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: .75rem;
+  row-gap: .15rem;
   align-items: baseline;
   padding: .45rem 0;
   border-top: 1px solid var(--au-border);
@@ -782,7 +796,13 @@ a.au-kpi-link:hover {
   text-decoration: none;
 }
 .home-row:hover { color: inherit; background: #f7f8fa; }
+.home-row-main { min-width: 0; overflow-wrap: anywhere; }
+.home-row-time { white-space: nowrap; justify-self: end; }
 .home-name { overflow-wrap: anywhere; }
+@media (max-width: 767.98px) {
+  .home-row { grid-template-columns: auto minmax(0, 1fr); }
+  .home-row-time { grid-column: 1 / -1; justify-self: start; }
+}
 
 .home-trend {
   display: flex;
@@ -1736,8 +1756,8 @@ html:has(body.lu-body) {
   color: var(--au-text) !important;
   border-color: var(--au-border) var(--au-border) transparent !important;
 }
-.lu-section-nav a.btn-au-action,
-.lu-section-nav a.btn-au-action:hover {
+.lu-section-nav a.lu-nav-current,
+.lu-section-nav a.lu-nav-current:hover {
   color: var(--au-text) !important;
   background: #fff !important;
   border-color: var(--au-border) var(--au-border) #fff !important;
@@ -2074,4 +2094,16 @@ html:has(body.lu-body) {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* Dialogs clear the brand bar. Tall dialogs scroll inside the viewport. */
+:root { --lu-dialog-top: 4.75rem; }
+.modal-dialog { margin-top: var(--lu-dialog-top); }
+.modal-dialog-scrollable { height: calc(100% - var(--lu-dialog-top) - .75rem); }
+.modal-content { max-height: calc(100vh - var(--lu-dialog-top) - .75rem); }
+.modal-content > .modal-body { overflow-y: auto; }
+.au-modal-frame {
+  align-items: flex-start;
+  padding-top: var(--lu-dialog-top);
+}
+.au-modal-panel { max-height: calc(100vh - var(--lu-dialog-top) - .75rem); }
 
