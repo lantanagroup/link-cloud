@@ -151,16 +151,19 @@
                             <td>
                                 @if (report.Deleted)
                                 {
-                                    <code class="lu-facility-id">@report.Id</code>
+                                    <span class="lu-clip" title="@report.Id">@report.Id</span>
+                                    <button type="button" class="lu-copy" data-lu-copy="@report.Id" aria-label="Copy report id">Copy</button>
                                     <div class="small text-muted">Deleted</div>
                                 }
                                 else
                                 {
-                                    <a asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id"><code class="lu-facility-id">@report.Id</code></a>
+                                    <a class="lu-clip" title="@report.Id" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">@report.Id</a>
+                                    <button type="button" class="lu-copy" data-lu-copy="@report.Id" aria-label="Copy report id">Copy</button>
                                 }
                             </td>
                             <td>
-                                <a asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId"><code class="lu-facility-id">@report.FacilityId</code></a>
+                                <a class="lu-clip" title="@report.FacilityId" asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId">@report.FacilityId</a>
+                                <button type="button" class="lu-copy" data-lu-copy="@report.FacilityId" aria-label="Copy facility id">Copy</button>
                                 <partial name="_AutomationBadge" model="report.AutomationRunId" />
                             </td>
                             <td class="text-nowrap">
@@ -168,7 +171,13 @@
                                 <div>End @report.PeriodEnd</div>
                             </td>
                             <td class="text-nowrap">@report.Created</td>
-                            <td>@report.Measures</td>
+                            <td>
+                                <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
+                                @if (!string.IsNullOrWhiteSpace(report.Measures))
+                                {
+                                    <button type="button" class="lu-copy" data-lu-copy="@report.Measures" aria-label="Copy measures">Copy</button>
+                                }
+                            </td>
                             <td><span class="badge text-bg-light border">@report.Frequency</span></td>
                             <td class="text-end" data-census="@report.Id">—</td>
                             <td class="text-end" data-population="@report.Id">—</td>
@@ -182,16 +191,14 @@
                             <td class="lu-row-actions">
                                 @if (report.CanResubmit)
                                 {
-                                    <form method="post" data-au-save asp-action="Resubmit" onsubmit="return confirm('Resubmit this report?');">
-                                        <partial name="_ListReturn" model="Model.Query" />
-                                        <input type="hidden" name="rowFacility" value="@report.FacilityId" />
-                                        <input type="hidden" name="targetId" value="@report.Id" />
-                                        <label class="form-check-label small d-block mb-1">
-                                            <input class="form-check-input me-1" type="checkbox" name="bypassSubmission" value="true" />
-                                            Bypass submission
-                                        </label>
-                                        <button type="submit" class="btn btn-sm btn-warning">Resubmit</button>
-                                    </form>
+                                    <div>
+                                        <div class="d-none" data-resubmit-fields>
+                                            <partial name="_ListReturn" model="Model.Query" />
+                                            <input type="hidden" name="rowFacility" value="@report.FacilityId" />
+                                            <input type="hidden" name="targetId" value="@report.Id" />
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-warning" data-resubmit-open aria-haspopup="dialog" aria-controls="resubmitDialog" data-report-id="@report.Id" data-facility-id="@report.FacilityId" data-period="Start @report.PeriodStart, end @report.PeriodEnd">Resubmit</button>
+                                    </div>
                                 }
                                 @if (report.CanAbort)
                                 {
@@ -247,6 +254,24 @@
             </nav>
         }
         </div>
+    </div>
+</div>
+<div class="modal fade" id="resubmitDialog" tabindex="-1" aria-labelledby="resubmitTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="post" id="resubmitForm" class="modal-content" data-au-save asp-action="Resubmit">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="resubmitTitle">Resubmit report</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <p id="resubmitSummary" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-outline-secondary" name="bypassSubmission" value="true">Regenerate without submitting</button>
+                <button type="submit" class="btn btn-sm btn-warning">Resubmit</button>
+            </div>
+        </form>
     </div>
 </div>
 <script>

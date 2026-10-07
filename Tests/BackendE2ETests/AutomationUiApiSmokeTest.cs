@@ -9,9 +9,9 @@ using Xunit;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// Smoke test that exercises the Automation.UI /api/runs endpoints against the
+/// Smoke test that exercises the Link.UI /api/runs endpoints against the
 /// running docker-compose stack. Does not use <see cref="BackendE2ETestFixture"/>
-/// because it talks to Automation.UI over HTTP rather than directly to Link
+/// because it talks to Link.UI over HTTP rather than directly to the other Link
 /// services -- the test is validating the API contract and the run lifecycle,
 /// not the generation/validation internals.
 ///
@@ -61,7 +61,7 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
     }
 
     /// <summary>
-    /// POSTs the seeded AdHoc Report [System] scenario to Automation.UI's
+    /// POSTs the seeded AdHoc Report [System] scenario to Link.UI's
     /// /api/runs/start, polls /api/runs/{id}/status until the run reaches a
     /// terminal state, and asserts it succeeded.
     /// </summary>

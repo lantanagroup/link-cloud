@@ -28,7 +28,7 @@ internal static class AutomationUiScenarioRunner
             BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/")
         };
 
-        output.WriteLine($"Starting Automation.UI run for '{scenarioName}' ({scenarioId}) at {TestConfig.AutomationUiBase}");
+        output.WriteLine($"Starting Link.UI run for '{scenarioName}' ({scenarioId}) at {TestConfig.AutomationUiBase}");
 
         using var startResponse = await http.PostAsJsonAsync("api/runs/start",
             new StartScenarioApiRequest

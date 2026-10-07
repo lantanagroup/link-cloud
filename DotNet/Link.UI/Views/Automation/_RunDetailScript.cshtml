@@ -1104,6 +1104,8 @@
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
+            if (window.luPaintTimes) window.luPaintTimes(document.getElementById('started'));
+            if (window.luPaintTimes) window.luPaintTimes(document.getElementById('finished'));
             document.getElementById('pipelineDuration').textContent = run.duration || '-';
             currentFinishedAt = run.finishedAt || currentFinishedAt;
 

@@ -1860,10 +1860,7 @@ public sealed partial class ConfigurationService
     {
         if (value is null)
             return string.Empty;
-        var utc = value.Value.Kind == DateTimeKind.Local
-            ? value.Value.ToUniversalTime()
-            : DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
-        return utc.ToString("yyyy-MM-dd HH:mm") + " UTC";
+        return LinkUiTime.IsoUtc(value);
     }
 
     private static T? Client<T>(IServiceProvider services, string? url) where T : class =>

@@ -12,7 +12,7 @@
     string FormatWhen(DateTimeOffset? value)
     {
         if (value is null) return "—";
-        return value.Value.UtcDateTime.ToString("MMM d, yyyy h:mm tt") + " UTC";
+        return LinkUiTime.IsoUtc(value.Value);
     }
     string FormatMs(double? ms)
     {
