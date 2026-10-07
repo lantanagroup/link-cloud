@@ -43,6 +43,9 @@ builder.Services.Configure<LogsLinkOptions>(builder.Configuration.GetSection(Log
 builder.Services.AddScoped(LogsService.Create);
 builder.Services.AddScoped(ConfigurationService.Create);
 builder.Services.AddScoped(SystemService.Create);
+builder.Services.AddSingleton(sp => AutomationRunReader.Create(
+    sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<ILogger<AutomationRunReader>>()));
 
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 
@@ -69,28 +72,55 @@ builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((_, cl
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
+var automationUiAddress = ResolveAutomationUiAddress(builder.Configuration);
+var proxyRoutes = new List<RouteConfig>
+{
+    new()
+    {
+        RouteId = "admin-bff-api",
+        ClusterId = "admin-bff",
+        Match = new RouteMatch { Path = "/api/{**catch-all}" }
+    }
+};
+var proxyClusters = new List<ClusterConfig>
+{
+    new()
+    {
+        ClusterId = "admin-bff",
+        Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["primary"] = new DestinationConfig { Address = adminBffAddress }
+        }
+    }
+};
+
+if (automationUiAddress is not null)
+{
+    // RunHub stays in Automation.UI. This proxy lets the browser subscribe on the Link.UI origin.
+    proxyRoutes.Add(new RouteConfig
+    {
+        RouteId = "automation-run-hub",
+        ClusterId = "automation-ui",
+        Match = new RouteMatch { Path = "/hubs/runs/{**catch-all}" }
+    });
+    proxyRoutes.Add(new RouteConfig
+    {
+        RouteId = "automation-run-hub-root",
+        ClusterId = "automation-ui",
+        Match = new RouteMatch { Path = "/hubs/runs" }
+    });
+    proxyClusters.Add(new ClusterConfig
+    {
+        ClusterId = "automation-ui",
+        Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["primary"] = new DestinationConfig { Address = automationUiAddress }
+        }
+    });
+}
+
 builder.Services.AddReverseProxy()
-    .LoadFromMemory(
-        new[]
-        {
-            new RouteConfig
-            {
-                RouteId = "admin-bff-api",
-                ClusterId = "admin-bff",
-                Match = new RouteMatch { Path = "/api/{**catch-all}" }
-            }
-        },
-        new[]
-        {
-            new ClusterConfig
-            {
-                ClusterId = "admin-bff",
-                Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["primary"] = new DestinationConfig { Address = adminBffAddress }
-                }
-            }
-        })
+    .LoadFromMemory(proxyRoutes, proxyClusters)
     .AddTransforms(transformBuilder =>
     {
         // Admin.BFF login builds its post-auth RedirectUri from Referer by stripping the
@@ -218,6 +248,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
+app.UseWebSockets();
 app.UseRouting();
 
 if (app.Environment.IsDevelopment())
@@ -244,3 +275,8 @@ static string ResolveAdminBffAddress(IConfiguration configuration)
 
     return address.TrimEnd('/') + "/";
 }
+
+static string? ResolveAutomationUiAddress(IConfiguration configuration) =>
+    AutomationRules.TryLiveOrigin(configuration["LinkUi:AutomationUiUrl"], out var origin)
+        ? origin
+        : null;

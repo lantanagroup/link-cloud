@@ -1556,6 +1556,15 @@ a.au-scenario-card:hover {
   gap: .5rem;
 }
 
+.lu-live-log {
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: .8rem;
+  margin-bottom: 0;
+}
+
 .lu-row-actions form { margin-bottom: .35rem; }
 .lu-row-actions form:last-child { margin-bottom: 0; }
 
