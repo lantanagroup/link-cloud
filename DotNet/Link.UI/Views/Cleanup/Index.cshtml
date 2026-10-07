@@ -185,17 +185,17 @@
                     <div class="card-body">
                         <dl class="row mb-0 small">
                             <dt class="col-6">Now (UTC)</dt>
-                            <dd class="col-6" id="cleanup-now">@Model.NowUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm")</dd>
+                            <dd class="col-6" id="cleanup-now">@LinkUiTime.IsoUtc(Model.NowUtc)</dd>
                             <dt class="col-6">Next daily teardown</dt>
-                            <dd class="col-6">@Model.NextDailyTeardownUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                            <dd class="col-6">@LinkUiTime.IsoUtc(Model.NextDailyTeardownUtc)</dd>
                             <dt class="col-6">Next weekly purge</dt>
-                            <dd class="col-6">@Model.NextWeeklyPurgeUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+                            <dd class="col-6">@LinkUiTime.IsoUtc(Model.NextWeeklyPurgeUtc)</dd>
                             <dt class="col-6">Last daily</dt>
-                            <dd class="col-6">@(s.LastDailyTeardownAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                            <dd class="col-6">@(s.LastDailyTeardownAt is null ? "never" : LinkUiTime.IsoUtc(s.LastDailyTeardownAt.Value))</dd>
                             <dt class="col-6">Last weekly</dt>
-                            <dd class="col-6">@(s.LastWeeklyPurgeAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "never")</dd>
+                            <dd class="col-6">@(s.LastWeeklyPurgeAt is null ? "never" : LinkUiTime.IsoUtc(s.LastWeeklyPurgeAt.Value))</dd>
                             <dt class="col-6">Last quiesce</dt>
-                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt?.UtcDateTime.ToString("HH:mm:ss") ?? "not yet this process")</dd>
+                            <dd class="col-6" id="cleanup-last-quiesce">@(Model.LastQuiesceAt is null ? "not yet this process" : LinkUiTime.IsoUtc(Model.LastQuiesceAt.Value))</dd>
                         </dl>
                         @if (!string.IsNullOrWhiteSpace(s.LastDailyTeardownResult))
                         {
@@ -267,7 +267,7 @@
                         @foreach (var report in Model.RecentReports)
                         {
                             <tr>
-                                <td class="text-nowrap">@report.FinishedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td class="text-nowrap">@LinkUiTime.IsoUtc(report.FinishedAt)</td>
                                 <td>@report.Label</td>
                                 <td>@report.Trigger</td>
                                 <td>

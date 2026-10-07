@@ -7,11 +7,12 @@
   --au-dark:        #111;
   --au-dark-soft:   #1a1a1a;
   --au-accent:      #4da3ff;
+  --au-accent-fill: #084298;
   --au-accent-soft: #e8f3ff;
-  --au-success:     #28a745;
+  --au-success:     #218838;
   --au-danger:      #dc3545;
   --au-warning:     #ffc107;
-  --au-muted:       #6c757d;
+  --au-muted:       #545c64;
   --au-bg:          #f3f5f8;
   --au-text:        #1c2430;
   --au-border:      #e2e6ec;
@@ -132,9 +133,10 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
    Buttons â€” colour vocabulary
    =================================================================== */
 .btn-au-action {
-  background: var(--au-accent); color: #fff; border: none;
+  background: var(--au-accent-fill); color: #fff; border: none;
 }
-.btn-au-action:hover { background: #3991ee; color: #fff; }
+.btn-au-action:hover,
+.btn-au-action:focus { background: #06357a; color: #fff; }
 
 .btn-au-run {
   background: var(--au-dark); color: #fff; border: none;
@@ -1442,17 +1444,26 @@ a.au-scenario-card:hover {
    Link.UI â€” left-hand vertical shell (phase 1)
    Keeps Automation.UI --au-* tokens; adds sidebar layout.
    =================================================================== */
+html:has(body.lu-body) {
+  height: 100%;
+  overflow: hidden;
+}
+
 .lu-body {
   margin: 0;
   margin-bottom: 0;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--au-bg);
   color: var(--au-text);
 }
 
 .lu-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .lu-sidebar {
@@ -1462,16 +1473,39 @@ a.au-scenario-card:hover {
   color: #fff;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  position: relative;
+  height: 100%;
+  max-height: 100vh;
+  overflow: hidden;
   z-index: 1030;
   box-shadow: 2px 0 8px rgba(0,0,0,.2);
 }
 
 .lu-brand {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
   padding: 1rem 1rem .75rem;
   border-bottom: 1px solid rgba(255,255,255,.12);
+}
+
+.lu-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  flex: 0 0 auto;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: .4rem;
+}
+
+.lu-nav-toggle:focus {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 .lu-brand-link {
@@ -1541,6 +1575,10 @@ a.au-scenario-card:hover {
 .lu-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -1577,7 +1615,9 @@ a.au-scenario-card:hover {
 .lu-footer {
   padding: .75rem 1.25rem 1.25rem;
   font-size: .85rem;
+  color: var(--au-muted);
 }
+.lu-body .text-muted { color: var(--au-muted) !important; }
 
 .lu-facility-id {
   word-break: break-all;
@@ -1585,13 +1625,29 @@ a.au-scenario-card:hover {
 
 @media (max-width: 767.98px) {
   .lu-shell { flex-direction: column; }
+  .lu-nav-toggle { display: inline-flex; }
   .lu-sidebar {
     width: 100%;
     height: auto;
+    max-height: none;
     position: relative;
   }
-  .lu-nav { flex-direction: row; flex-wrap: wrap; }
-  .lu-nav-section-label { width: 100%; }
+  .lu-sidebar:not(.is-open) .lu-nav,
+  .lu-sidebar:not(.is-open) .lu-sidebar-footer {
+    display: none;
+  }
+  .lu-sidebar.is-open { max-height: 50vh; }
+  .lu-sidebar.is-open .lu-nav {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    max-height: calc(50vh - 7rem);
+  }
+  .lu-main {
+    flex: 1 1 auto;
+    height: auto;
+    max-height: none;
+  }
 }
 
 .lu-section-nav {
@@ -1777,7 +1833,7 @@ a.au-scenario-card:hover {
 }
 .lu-admin form[method="post"] .btn-au-action:hover,
 .lu-admin form[method="post"] .btn-au-action:focus {
-  background: #218838;
+  background: #1e7e34;
   color: #fff;
 }
 .lu-admin .btn-outline-danger {
@@ -1885,6 +1941,57 @@ a.au-scenario-card:hover {
   padding: .35rem .75rem .35rem 0;
   background: var(--au-dark);
   flex: 0 0 auto;
+}
+.lu-row-staged {
+  opacity: .72;
+  outline: 2px solid var(--au-warning);
+  background: #fff8e1;
+}
+.lu-remove-note .btn-outline-light {
+  color: #212529;
+  border-color: #212529;
+  background: #fff;
+}
+.lu-remove-note .btn-outline-light:hover,
+.lu-remove-note .btn-outline-light:focus {
+  color: #fff;
+  background: #212529;
+  border-color: #212529;
+}
+.lu-clip {
+  display: inline-block;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .8rem;
+}
+.lu-clip-text {
+  font-family: inherit;
+  font-size: inherit;
+  max-width: 16rem;
+}
+.lu-copy {
+  border: 0;
+  background: transparent;
+  color: var(--au-text);
+  font-size: .75rem;
+  text-decoration: underline;
+  padding: 0 .2rem;
+  vertical-align: bottom;
+}
+#resubmitDialog .modal-footer {
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+#resubmitDialog .modal-footer .btn {
+  white-space: normal;
+}
+@media (max-width: 767.98px) {
+  .lu-clip { max-width: 8rem; }
+  .lu-clip-text { max-width: 10rem; }
 }
 #facilityPanels .lu-staged-flag {
   color: #111;

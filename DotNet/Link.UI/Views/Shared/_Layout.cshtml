@@ -21,8 +21,12 @@
 </head>
 <body class="lu-body@(adminShell ? " lu-admin" : "")">
     <div class="lu-shell">
-        <aside class="lu-sidebar">
+        <aside class="lu-sidebar" id="luSidebar">
             <div class="lu-brand">
+                <button type="button" class="lu-nav-toggle" aria-controls="luSidebar" aria-expanded="false">
+                    <i class="bi bi-list" aria-hidden="true"></i>
+                    <span class="visually-hidden">Menu</span>
+                </button>
                 <a asp-controller="Home" asp-action="Index" class="lu-brand-link">
                     <i class="bi bi-link-45deg me-1"></i> Link.UI
                 </a>
@@ -85,6 +89,23 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/live-region.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            var button = document.querySelector(".lu-nav-toggle");
+            var sidebar = document.getElementById("luSidebar");
+            if (!button || !sidebar) return;
+            button.addEventListener("click", function () {
+                var open = sidebar.classList.toggle("is-open");
+                button.setAttribute("aria-expanded", open ? "true" : "false");
+            });
+            document.addEventListener("keydown", function (event) {
+                if (event.key !== "Escape" || !sidebar.classList.contains("is-open")) return;
+                sidebar.classList.remove("is-open");
+                button.setAttribute("aria-expanded", "false");
+                button.focus();
+            });
+        })();
+    </script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -86,7 +86,7 @@
                                         @if (op.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@op.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="small text-muted">@LinkUiTime.IsoUtc(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
                                             <button type="button" class="btn btn-sm btn-outline-primary btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
@@ -149,7 +149,7 @@
                                         @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@seq.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="small text-muted">@LinkUiTime.IsoUtc(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
                                             <button type="button" class="btn btn-sm btn-outline-primary btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
@@ -218,7 +218,7 @@
                                         @if (suite.IsSystem) { <span class="badge bg-dark">System</span> }
                                         else { <span class="badge bg-light text-dark border">Custom</span> }
                                     </td>
-                                    <td class="small text-muted">@suite.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="small text-muted">@LinkUiTime.IsoUtc(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
                                         <div class="d-inline-flex gap-1">
                                             <button type="button" class="btn btn-sm btn-outline-primary btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
