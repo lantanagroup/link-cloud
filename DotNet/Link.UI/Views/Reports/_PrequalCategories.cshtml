@@ -1,0 +1,39 @@
+@model IReadOnlyList<PrequalCategoryGroup>
+@{
+    var heading = ViewData["Heading"] as string ?? "Categories";
+    var facilityId = ViewData["FacilityId"] as string ?? "";
+    var reportId = ViewData["ReportId"] as string ?? "";
+}
+<div class="au-card card h-100">
+    <div class="card-header">@heading</div>
+    <div class="card-body">
+        @if (Model.Count == 0)
+        {
+            <p class="mb-0">None.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-end">Issues</th>
+                            <th>Guidance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var group in Model)
+                    {
+                        <tr>
+                            <td><a asp-action="Prequal" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId" asp-route-category="@group.Name">@group.Name</a></td>
+                            <td class="text-end">@group.Count</td>
+                            <td>@group.Guidance</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

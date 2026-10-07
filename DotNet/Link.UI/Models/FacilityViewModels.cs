@@ -217,6 +217,7 @@ public sealed class FacilityReportRow
     public bool CanAbort { get; init; }
     public bool CanCleanUp { get; init; }
     public bool CanRestore { get; init; }
+    public bool CanDownload { get; init; }
 }
 
 public sealed class LocationRow

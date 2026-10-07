@@ -1,0 +1,234 @@
+@model ReportsListModel
+@using LantanaGroup.Link.Shared.Application.Enums
+@using Link.UI.Services
+@{
+    ViewData["Title"] = "Reports";
+    var statuses = FacilityViewRules.ParseStatuses(Model.Query.Status);
+    Dictionary<string, string> SortRoute(string column) => Model.Query.ToRoute(
+        page: 1,
+        sortBy: column,
+        sortDir: FacilityViewRules.NextSortDirection(Model.SortBy, Model.SortDir, column));
+    var bar = Model.Paging;
+}
+
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+    <h1 class="h3 mb-0 me-auto">Reports</h1>
+    <a class="btn btn-au-action" asp-action="Generate">Generate report</a>
+</div>
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+@if (TempData["Error"] is string actionError)
+{
+    <div class="alert alert-warning">@actionError</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+
+<div class="au-card card">
+    <div class="card-header">Report schedules</div>
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-md-4 col-xl-3">
+                <label class="form-label" for="facilityId">Facility ID</label>
+                <input id="facilityId" name="facilityId" value="@Model.Query.FacilityId" class="form-control" />
+            </div>
+            <div class="col-12 col-md-4 col-xl-3">
+                <label class="form-label" for="reportId">Report ID</label>
+                <input id="reportId" name="reportId" value="@Model.Query.ReportId" class="form-control" />
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label" for="frequency">Frequency</label>
+                <select id="frequency" name="frequency" class="form-select">
+                    <option value="">Any</option>
+                    @foreach (var frequency in new[] { "Daily", "Weekly", "Monthly", "Adhoc", "Discharge" })
+                    {
+                        if (string.Equals(Model.Query.Frequency, frequency, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@frequency" selected>@frequency</option>
+                        }
+                        else
+                        {
+                            <option value="@frequency">@frequency</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label" for="created">Created</label>
+                <input id="created" name="created" type="date" value="@Model.Query.Created" class="form-control" />
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label" for="periodFrom">Period from</label>
+                <input id="periodFrom" name="periodFrom" type="date" value="@Model.Query.PeriodFrom" class="form-control" />
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <label class="form-label" for="periodTo">Period to</label>
+                <input id="periodTo" name="periodTo" type="date" value="@Model.Query.PeriodTo" class="form-control" />
+            </div>
+            <div class="col-6 col-md-3 col-xl-1">
+                <label class="form-label" for="pageSize">Page</label>
+                <select id="pageSize" name="pageSize" class="form-select">
+                    @foreach (var size in FacilityViewRules.PageSizes)
+                    {
+                        if (Model.Query.PageSize == size)
+                        {
+                            <option value="@size" selected>@size</option>
+                        }
+                        else
+                        {
+                            <option value="@size">@size</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-12">
+                <span class="form-label d-block">Status</span>
+                <div class="d-flex flex-wrap gap-3">
+                    @foreach (var status in Enum.GetValues<ScheduleStatus>())
+                    {
+                        var selected = statuses.Contains(status);
+                        <label class="form-check-label">
+                            <input class="form-check-input me-1" type="checkbox" name="status" value="@status" @(selected ? "checked" : null) />
+                            @FacilityViewRules.StatusLabel(status)
+                        </label>
+                    }
+                    <label class="form-check-label">
+                        <input class="form-check-input me-1" type="checkbox" name="showDeleted" value="true" @(Model.Query.ShowDeleted ? "checked" : null) />
+                        Show deleted
+                    </label>
+                </div>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-au-action">Search</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Clear</a>
+            </div>
+        </form>
+
+        @if (Model.Reports.Count == 0)
+        {
+            <p class="mb-0">No reports found.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th><a asp-all-route-data="@SortRoute("Id")">Report ID</a></th>
+                            <th><a asp-all-route-data="@SortRoute("FacilityId")">Facility</a></th>
+                            <th><a asp-all-route-data="@SortRoute("ReportStartDate")">Reporting period</a></th>
+                            <th><a asp-all-route-data="@SortRoute("CreateDate")">Created</a></th>
+                            <th>Measures</th>
+                            <th><a asp-all-route-data="@SortRoute("Frequency")">Cadence</a></th>
+                            <th class="text-end">Census</th>
+                            <th class="text-end">IP</th>
+                            <th><a asp-all-route-data="@SortRoute("Status")">Status</a></th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var report in Model.Reports)
+                    {
+                        <tr class="@(report.Deleted ? "table-secondary" : null)">
+                            <td>
+                                @if (report.Deleted)
+                                {
+                                    <code class="lu-facility-id">@report.Id</code>
+                                    <div class="small text-muted">Deleted</div>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id"><code class="lu-facility-id">@report.Id</code></a>
+                                }
+                            </td>
+                            <td><a asp-controller="Tenants" asp-action="View" asp-route-id="@report.FacilityId"><code class="lu-facility-id">@report.FacilityId</code></a></td>
+                            <td class="text-nowrap">
+                                <div>Start @report.PeriodStart</div>
+                                <div>End @report.PeriodEnd</div>
+                            </td>
+                            <td class="text-nowrap">@report.Created</td>
+                            <td>@report.Measures</td>
+                            <td><span class="badge text-bg-light border">@report.Frequency</span></td>
+                            <td class="text-end">@(report.CensusCount?.ToString() ?? "—")</td>
+                            <td class="text-end">@(report.InitialPopulationCount?.ToString() ?? "—")</td>
+                            <td>
+                                <span class="badge @FacilityViewRules.StatusBadge(report.Status)">@report.StatusLabel</span>
+                                @if (!string.IsNullOrWhiteSpace(report.Submitted))
+                                {
+                                    <div class="small text-muted">@report.Submitted</div>
+                                }
+                            </td>
+                            <td class="lu-row-actions">
+                                @if (report.CanResubmit)
+                                {
+                                    <form method="post" asp-action="Resubmit" onsubmit="return confirm('Resubmit this report?');">
+                                        <partial name="_ListReturn" model="Model.Query" />
+                                        <input type="hidden" name="rowFacility" value="@report.FacilityId" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <label class="form-check-label small d-block mb-1">
+                                            <input class="form-check-input me-1" type="checkbox" name="bypassSubmission" value="true" />
+                                            Bypass submission
+                                        </label>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Resubmit</button>
+                                    </form>
+                                }
+                                @if (report.CanAbort)
+                                {
+                                    <form method="post" asp-action="Abort" onsubmit="return confirm('Stop this in-progress report? Queued acquisition and normalization work for this report will be dropped. Other reports and census jobs for the facility are not affected. The report will be soft-deleted and can be restored later.');">
+                                        <partial name="_ListReturn" model="Model.Query" />
+                                        <input type="hidden" name="rowFacility" value="@report.FacilityId" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Abort</button>
+                                    </form>
+                                }
+                                @if (report.CanCleanUp)
+                                {
+                                    <form method="post" asp-action="CleanUp" onsubmit="return confirm('Remove this report and its associated acquisition logs? It can be restored later.');">
+                                        <partial name="_ListReturn" model="Model.Query" />
+                                        <input type="hidden" name="rowFacility" value="@report.FacilityId" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Clean up</button>
+                                    </form>
+                                }
+                                @if (report.CanRestore)
+                                {
+                                    <form method="post" asp-action="Restore" onsubmit="return confirm('Restore this report and its acquisition logs?');">
+                                        <partial name="_ListReturn" model="Model.Query" />
+                                        <input type="hidden" name="rowFacility" value="@report.FacilityId" />
+                                        <input type="hidden" name="targetId" value="@report.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Report pages">
+                @if (bar.HasPrevious)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page - 1)">Previous</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+                }
+                <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                @if (bar.HasNext)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-all-route-data="@Model.Query.ToRoute(page: bar.Page + 1)">Next</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+                }
+            </nav>
+        }
+    </div>
+</div>

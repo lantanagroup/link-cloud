@@ -1596,3 +1596,11 @@ a.au-scenario-card:hover {
   .lu-location-row { align-items: flex-start; }
 }
 
+.lu-json {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: .8rem;
+}
+

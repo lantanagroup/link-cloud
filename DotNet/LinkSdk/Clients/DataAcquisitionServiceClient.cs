@@ -190,7 +190,8 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string sortBy = "Id",
         string sortOrder = "Ascending",
         string? searchTerm = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        string? patientId = null) =>
         SendAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(() => Request("data/acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("reportId", reportId)
@@ -199,6 +200,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("sortBy", sortBy)
             .SetQueryParam("sortOrder", sortOrder)
             .SetQueryParam("searchTerm", string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm)
+            .SetQueryParam("patientId", string.IsNullOrWhiteSpace(patientId) ? null : patientId)
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(

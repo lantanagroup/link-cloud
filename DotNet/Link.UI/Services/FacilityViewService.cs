@@ -645,7 +645,7 @@ public sealed class FacilityViewService
         };
     }
 
-    private static FacilityReportRow ToReportRow(ReportScheduleApiModel schedule, int? census, int? population)
+    internal static FacilityReportRow ToReportRow(ReportScheduleApiModel schedule, int? census, int? population)
     {
         var deleted = schedule.IsDeleted == true;
         return new FacilityReportRow
@@ -668,7 +668,8 @@ public sealed class FacilityViewService
             CanResubmit = FacilityViewRules.CanResubmit(schedule.Status, deleted),
             CanAbort = FacilityViewRules.CanAbort(schedule.Status, deleted),
             CanCleanUp = FacilityViewRules.CanCleanUp(schedule.Status, deleted),
-            CanRestore = FacilityViewRules.CanRestore(deleted)
+            CanRestore = FacilityViewRules.CanRestore(deleted),
+            CanDownload = ReportsRules.CanDownload(deleted, schedule.PayloadRootUri)
         };
     }
 

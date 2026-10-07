@@ -28,7 +28,8 @@ public class PipelineDataReaderCancellationTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
             .Returns(() =>
             {
                 calls++;
@@ -72,7 +73,8 @@ public class PipelineDataReaderCancellationTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
             .Returns(() =>
             {
                 calls++;
@@ -168,7 +170,8 @@ public class PipelineDataReaderCancellationTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
             .ReturnsAsync(new LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>
             {
                 StatusCode = 200,
@@ -325,7 +328,8 @@ public class PipelineDataReaderCancellationTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
             .Returns(() =>
             {
                 calls++;
@@ -375,7 +379,8 @@ public class PipelineDataReaderCancellationTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<string?>()))
             .Returns(() =>
             {
                 calls++;

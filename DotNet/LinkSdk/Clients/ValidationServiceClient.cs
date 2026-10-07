@@ -45,4 +45,10 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
 
     public Task<LinkApiResponse<string>> GetValidationResultSummaryAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"validation/result-summaries/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> CategorizeResultsAsync(string resultsJson, bool summarize = true, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("validation/$categorize")
+            .SetQueryParam("summarize", summarize ? "true" : "false")
+            .WithHeader("Content-Type", "application/json")
+            .PostStringAsync(resultsJson, cancellationToken: cancellationToken));
 }

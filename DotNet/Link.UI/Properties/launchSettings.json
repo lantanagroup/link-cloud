@@ -37,6 +37,9 @@
         "ServiceRegistry__DataAcquisitionServiceUrl": "http://localhost:8065",
         "ServiceRegistry__NormalizationServiceUrl": "http://localhost:8068",
         "ServiceRegistry__ReportServiceUrl": "http://localhost:8072",
+        "ServiceRegistry__SubmissionServiceUrl": "http://localhost:8073",
+        "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
+        "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
         "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063"
       }
     }

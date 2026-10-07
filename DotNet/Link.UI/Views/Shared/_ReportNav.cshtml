@@ -1,0 +1,12 @@
+@{
+    var facilityId = ViewData["FacilityId"] as string ?? "";
+    var reportId = ViewData["ReportId"] as string ?? "";
+    var active = ViewData["ReportSection"] as string ?? "report";
+    string Btn(string section) => active == section ? "btn btn-sm btn-au-action" : "btn btn-sm btn-outline-secondary";
+}
+<nav class="lu-section-nav mb-3" aria-label="Report">
+    <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId">Report details</a>
+    <a class="@Btn("prequal")" asp-controller="Reports" asp-action="Prequal" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Prequalification</a>
+    <a class="@Btn("validation")" asp-controller="Reports" asp-action="Validation" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Validation</a>
+    <a class="@Btn("acquisition")" asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Acquisition log</a>
+</nav>

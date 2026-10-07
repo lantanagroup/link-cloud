@@ -1,0 +1,46 @@
+@model ValidationResultPage
+@{
+    ViewData["Title"] = "Validation";
+    ViewData["FacilityId"] = Model.FacilityId;
+    ViewData["ReportId"] = Model.ReportId;
+    ViewData["ReportSection"] = "validation";
+}
+
+<div class="mb-3">
+    <a asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
+</div>
+
+<h1 class="h3">Validation</h1>
+<partial name="_ReportNav" />
+
+@if (!string.IsNullOrWhiteSpace(Model.LoadError))
+{
+    <div class="alert alert-warning">@Model.LoadError</div>
+}
+else if (Model.NotFound || Model.Report is null)
+{
+    <div class="au-card card"><div class="card-body"><p class="mb-0">That report was not found.</p></div></div>
+}
+else
+{
+    <div class="au-card card">
+        <div class="card-header">Result summary</div>
+        <div class="card-body">
+            <p>This count is the validation summary. It does not download the issue list. Issue text is on the prequalification report.</p>
+            @if (!string.IsNullOrWhiteSpace(Model.SummaryError))
+            {
+                <div class="alert alert-warning">@Model.SummaryError</div>
+            }
+            else
+            {
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Issues</dt>
+                    <dd class="col-sm-9">@(Model.IssueCount?.ToString() ?? "—")</dd>
+                    <dt class="col-sm-3">Minimum severity</dt>
+                    <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Severity) ? "—" : Model.Severity)</dd>
+                </dl>
+            }
+            <a class="btn btn-outline-secondary mt-3" asp-action="Prequal" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open prequalification</a>
+        </div>
+    </div>
+}
