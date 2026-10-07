@@ -28,21 +28,32 @@ else if (Model.NotFound)
 }
 else
 {
-    <div class="au-card card">
+    <div id="facilityEditor">
+        @if (!Model.IsCreate)
+        {
+            <div id="facilitySaveBar" class="lu-savebar" role="region" aria-label="Save facility">
+                <span id="facilityDirtyFlag">No unsaved changes</span>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-success" id="facilitySaveButton" disabled>Save</button>
+                    <button type="button" class="btn btn-outline-secondary" id="facilityCancelButton">Cancel</button>
+                </div>
+                <div id="facilitySaveResults" class="w-100 small" role="status"></div>
+            </div>
+        }
+    <div class="au-card card" id="facilityIdentity">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>@heading</span>
             @if (!Model.IsCreate)
             {
                 <span class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm btn-outline-secondary" asp-action="View" asp-route-id="@Model.FacilityId">View</a>
-                    <span class="badge text-bg-secondary">LinkSDK</span>
+                    <a class="btn btn-sm btn-light" asp-action="View" asp-route-id="@Model.FacilityId">View</a>
                 </span>
             }
         </div>
         <div class="card-body">
             @if (!string.IsNullOrWhiteSpace(Model.FormError))
             {
-                <div class="alert alert-warning">@Model.FormError</div>
+                <div class="alert alert-warning" id="facilityFormError">@Model.FormError</div>
             }
             @if (!string.IsNullOrWhiteSpace(Model.VendorWarning))
             {
@@ -177,7 +188,12 @@ else
             <partial name="_NormalizationOperationEditor" model="Model" />
         </div>
         <p class="text-muted small mt-3 mb-0">
-            This page saves facility identity, census, query dispatch, data acquisition, and normalization operations. View opens locations, reports, and reporting plans.
+            Edit any section, then save the facility once. A section with no configuration stays closed until you add it. Remove marks a section, and the delete runs when you save.
         </p>
     }
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/facility-save.js" asp-append-version="true"></script>
 }
