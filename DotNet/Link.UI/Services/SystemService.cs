@@ -316,14 +316,34 @@ public sealed class SystemService
             return page;
         }
 
-        page.Roles = (response.Body ?? [])
-            .Select(role => new RoleRow
+        // GET /account/role returns names only. Claims are on GET /account/role/{id}.
+        var rows = new List<RoleRow>();
+        foreach (var role in response.Body ?? [])
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var detail = await _account.GetRoleAsync(role.Id, cancellationToken);
+            if (!Ok(detail) || detail.Body is null)
             {
-                Id = role.Id,
-                Name = role.Name ?? "",
-                Description = role.Description ?? "",
-                Claims = CleanClaims(role.Claims)
-            })
+                page.ClaimsError = FailMessage("Account", detail.StatusCode, detail.RawBody);
+                rows.Add(new RoleRow
+                {
+                    Id = role.Id,
+                    Name = role.Name ?? "",
+                    Description = role.Description ?? ""
+                });
+                continue;
+            }
+
+            rows.Add(new RoleRow
+            {
+                Id = detail.Body.Id == Guid.Empty ? role.Id : detail.Body.Id,
+                Name = detail.Body.Name ?? role.Name ?? "",
+                Description = detail.Body.Description ?? role.Description ?? "",
+                Claims = CleanClaims(detail.Body.Claims)
+            });
+        }
+
+        page.Roles = rows
             .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var catalog = await _account.GetClaimsAsync(cancellationToken);
