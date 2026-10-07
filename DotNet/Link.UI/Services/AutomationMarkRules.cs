@@ -2,21 +2,92 @@ namespace Link.UI.Services;
 
 /// <summary>
 /// Which facilities an automation run owns, and how the Tenants, Reports, and Logs
-/// pages turn that into a badge and an Automation / All filter.
-/// The lookup is one cached read. These rules do not call a service per row.
+/// pages turn that into a badge and a Real / Automation / All filter.
+/// Real is the default. The lookup is one cached read. These rules do not call a service per row.
 /// </summary>
 public static class AutomationMarkRules
 {
+    public const string Real = "real";
     public const string All = "all";
     public const string Automation = "automation";
     public const int MaxFacilitySearches = 40;
     public const string NotOwnedNote = "That facility is not an automation facility.";
+    public const string OwnedFacilityNote = "That facility is an automation facility. Choose All or Automation to see it.";
+    public const string HiddenNote = "Automation facilities are hidden. Choose All to include them.";
 
     public static bool IsAutomation(string? scope) =>
         string.Equals(scope?.Trim(), Automation, StringComparison.OrdinalIgnoreCase);
 
-    public static string NormalizeScope(string? scope) =>
-        IsAutomation(scope) ? Automation : All;
+    public static bool IsReal(string? scope) => NormalizeScope(scope) == Real;
+
+    /// <summary>
+    /// Admin lists default to real facilities. All includes automation. Unknown values stay on real.
+    /// </summary>
+    public static string NormalizeScope(string? scope)
+    {
+        var value = scope?.Trim();
+        if (string.Equals(value, Automation, StringComparison.OrdinalIgnoreCase))
+            return Automation;
+        if (string.Equals(value, All, StringComparison.OrdinalIgnoreCase))
+            return All;
+        return Real;
+    }
+
+    public static bool Visible(string? scope, bool owned)
+    {
+        var normalized = NormalizeScope(scope);
+        if (normalized == Automation)
+            return owned;
+        if (normalized == All)
+            return true;
+        return !owned;
+    }
+
+    /// <summary>Query value for a non-default scope. Real is omitted so the URL stays the default.</summary>
+    public static string? ScopeForQuery(string? scope)
+    {
+        var normalized = NormalizeScope(scope);
+        return normalized == Real ? null : normalized;
+    }
+
+    public static void AddScope(IDictionary<string, string> route, string? scope)
+    {
+        var query = ScopeForQuery(scope);
+        if (query is not null)
+            route["scope"] = query;
+    }
+
+    /// <summary>
+    /// Drops automation-owned rows from one already-loaded page.
+    /// The upstream total is left alone. Callers say so with <see cref="HiddenNote"/>.
+    /// </summary>
+    public static List<T> DropOwned<T>(
+        IReadOnlyList<T> rows,
+        Func<T, string?> facilityId,
+        AutomationOwnershipIndex ownership,
+        out bool hidAny)
+    {
+        hidAny = false;
+        var kept = new List<T>(rows.Count);
+        foreach (var row in rows)
+        {
+            if (ownership.Contains(facilityId(row)))
+                hidAny = true;
+            else
+                kept.Add(row);
+        }
+
+        return kept;
+    }
+
+    public static string? WithHiddenNote(string? note, bool hidAny)
+    {
+        if (!hidAny)
+            return note;
+        if (string.IsNullOrWhiteSpace(note))
+            return HiddenNote;
+        return note.Trim() + " " + HiddenNote;
+    }
 
     public static string? SearchNote(bool truncated, bool partialPages)
     {
@@ -44,9 +115,11 @@ public static class AutomationMarkRules
         foreach (var run in runs)
         {
             var runId = CanonicalRunId(run.RunId.ToString("D"));
-            // A normal run's facility id is the run id, even when the created flag is unset.
-            Consider(claims, runId, runId, run.CreatedAt, rank: 1);
-            if (run.AutomationCreatedFacility)
+            // FacilityClassification is the only ownership predicate. A normal run's facility id
+            // is the run id, even when the created flag is unset.
+            if (FacilityClassification.RunOwns(run.RunId, run.FacilityId, run.AutomationCreatedFacility, runId))
+                Consider(claims, runId, runId, run.CreatedAt, rank: 1);
+            if (FacilityClassification.RunOwns(run.RunId, run.FacilityId, run.AutomationCreatedFacility, run.FacilityId))
                 Consider(claims, run.FacilityId, runId, run.CreatedAt, rank: 2);
         }
 

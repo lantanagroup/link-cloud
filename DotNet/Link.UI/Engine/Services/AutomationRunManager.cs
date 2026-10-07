@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
+using Link.UI.Services;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -211,6 +212,7 @@ public class AutomationRunManager : IAutomationRunManager
             QueueCancellationCleanup(
                 runId,
                 state.FacilityId,
+                state.AutomationCreatedFacility,
                 state.ReportId,
                 state.FhirDataLoader,
                 state.ExecutionTask,
@@ -248,6 +250,7 @@ public class AutomationRunManager : IAutomationRunManager
         QueueCancellationCleanup(
             runId,
             summary.FacilityId,
+            summary.AutomationCreatedFacility,
             summary.ReportId,
             fhirDataLoader: null,
             executionTask: null,
@@ -266,18 +269,20 @@ public class AutomationRunManager : IAutomationRunManager
     private void QueueCancellationCleanup(
         Guid runId,
         string? facilityId,
+        bool automationCreatedFacility,
         string? reportId,
         FhirDataLoader? fhirDataLoader,
         Task? executionTask,
         Action<string>? writeLog)
     {
         _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(
-            runId, facilityId, reportId, fhirDataLoader, executionTask, writeLog));
+            runId, facilityId, automationCreatedFacility, reportId, fhirDataLoader, executionTask, writeLog));
     }
 
     private async Task CleanupCancelledRunInBackgroundAsync(
         Guid runId,
         string? facilityId,
+        bool automationCreatedFacility,
         string? reportId,
         FhirDataLoader? fhirDataLoader,
         Task? executionTask,
@@ -297,6 +302,16 @@ public class AutomationRunManager : IAutomationRunManager
                 : new RunAutomationOutput(message =>
                     _logger.LogInformation("Cancel cleanup {RunId}: {Message}", runId, message.SanitizeForLog()));
             output.WriteLine("Cancellation requested. Aborting pipeline work for this facility...");
+            if (!string.IsNullOrWhiteSpace(facilityId)
+                && !FacilityClassification.RunOwns(runId, facilityId, automationCreatedFacility, facilityId))
+            {
+                output.WriteLine("This facility was not created for this run. It was left alone.");
+                _logger.LogInformation(
+                    "Cancel cleanup left facility {FacilityId} alone. Run {RunId} does not own it.",
+                    facilityId.SanitizeForLog(),
+                    runId);
+                facilityId = null;
+            }
 
             using var scope = _hostServices.CreateScope();
             var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();

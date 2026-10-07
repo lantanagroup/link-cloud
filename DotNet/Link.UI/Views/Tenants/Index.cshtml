@@ -2,11 +2,20 @@
 @using Link.UI.Services
 @{
     ViewData["Title"] = "Tenants";
+    var scopeQuery = AutomationMarkRules.ScopeForQuery(Model.Scope);
+    var emptyFacilities = !LinkUiFeatures.Value.AutomationEnabled
+        ? "No tenants found."
+        : AutomationMarkRules.NormalizeScope(Model.Scope) switch
+        {
+            AutomationMarkRules.Automation => "No automation facilities.",
+            AutomationMarkRules.Real => "No real facilities.",
+            _ => "No tenants found."
+        };
 }
 
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span>All facilities</span>
+        <span>Facilities</span>
         <a class="btn btn-sm btn-success" asp-action="Create">New facility</a>
     </div>
     <div class="card-body">
@@ -65,7 +74,7 @@
         }
         else if (Model.LoadedSuccessfully && Model.Tenants.Count == 0)
         {
-            <div class="alert alert-info mb-0">@(Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "No automation facilities." : "No tenants found.")</div>
+            <div class="alert alert-info mb-0">@emptyFacilities</div>
         }
         else if (Model.LoadedSuccessfully)
         {
@@ -102,9 +111,9 @@
                                         {
                                             <input type="hidden" name="includeDeleted" value="true" />
                                         }
-                                        @if (Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope))
+                                        @if (scopeQuery is not null)
                                         {
-                                            <input type="hidden" name="scope" value="automation" />
+                                            <input type="hidden" name="scope" value="@scopeQuery" />
                                         }
                                         <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
                                     </form>
@@ -122,7 +131,7 @@
             <nav class="d-flex flex-wrap align-items-center gap-2 mt-2" aria-label="Tenant pages">
                 @if (Model.Page > 1)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "automation" : null })">Previous</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page - 1, pageSize = Model.PageSize, scope = scopeQuery })">Previous</a>
                 }
                 else
                 {
@@ -131,7 +140,7 @@
                 <span class="small text-muted">Page @Model.Page of @(Model.TotalPages == 0 ? 1 : Model.TotalPages) (@Model.TotalCount)</span>
                 @if (Model.Page < Model.TotalPages)
                 {
-                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = Link.UI.Services.AutomationMarkRules.IsAutomation(Model.Scope) ? "automation" : null })">Next</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Index", new { search = Model.Search, includeDeleted = Model.IncludeDeleted ? true : (bool?)null, page = Model.Page + 1, pageSize = Model.PageSize, scope = scopeQuery })">Next</a>
                 }
                 else
                 {

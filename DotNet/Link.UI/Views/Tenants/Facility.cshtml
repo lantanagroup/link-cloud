@@ -8,6 +8,14 @@
     <a asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Back to tenants</a>
 </div>
 
+@if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model.AutomationRunId))
+{
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
+        <span>This is an automation facility. Edits here change a throwaway facility, not a hospital.</span>
+        <partial name="_AutomationBadge" model="Model.AutomationRunId" />
+    </div>
+}
+
 @if (TempData["Message"] is string message)
 {
     <div class="alert alert-success">@message</div>

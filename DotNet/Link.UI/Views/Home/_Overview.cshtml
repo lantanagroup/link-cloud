@@ -21,14 +21,7 @@
             <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index" asp-route-scope="@Model.RealScope">
                 <div class="au-kpi-value">@HomeOverviewRules.PrimaryFacilityText(facilities, Model.AutomationVisible)</div>
                 <div class="au-kpi-label">Facilities</div>
-                @{
-                    var facilityNote = HomeOverviewRules.PrimaryFacilityNote(facilities, Model.AutomationVisible);
-                }
-                @if (facilityNote is not null)
-                {
-                    <div class="au-kpi-note">@facilityNote</div>
-                }
-                else if (facilities.Reachable)
+                @if (facilities.Reachable)
                 {
                     <div class="au-kpi-note">Open the facility list</div>
                 }
@@ -134,33 +127,44 @@
         <div class="col-12">
             <div class="au-card card mb-0">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="Metrics" asp-action="Index">Service health</a>
-                    <a class="home-card-link small" asp-controller="Metrics" asp-action="Index">Open</a>
-                </div>
-                <div class="card-body">
-                    @if (!pulse.Reachable)
+                    @if (Model.AutomationVisible)
                     {
-                        <div class="alert alert-warning">@(string.IsNullOrWhiteSpace(pulse.Message) ? "Service metrics could not be read." : pulse.Message)</div>
-                    }
-                    else if (pulse.Chips.Count == 0)
-                    {
-                        <p class="text-muted">No pipeline metrics yet.</p>
+                        <a class="home-card-link" asp-controller="Metrics" asp-action="Index">Service health</a>
+                        <a class="home-card-link small" asp-controller="Metrics" asp-action="Index">Open</a>
                     }
                     else
                     {
-                        <div class="row g-2">
-                            @foreach (var chip in pulse.Chips)
-                            {
-                                var slow = chip.ApiP95Ms is > HomeOverviewRules.SlowApiMs;
-                                <div class="col-6 col-md-4 col-xl-2">
-                                    <a class="au-service-chip @(slow ? "home-chip-slow" : "")" asp-controller="Metrics" asp-action="Index" title="@chip.Name API latency and CPU">
-                                        <div class="au-service-name">@chip.Name</div>
-                                        <div class="au-service-value">@HomeOverviewRules.LatencyText(chip.ApiP95Ms)</div>
-                                        <div class="au-service-hint">CPU @HomeOverviewRules.CpuText(chip.CpuPercent)</div>
-                                    </a>
-                                </div>
-                            }
-                        </div>
+                        <a class="home-card-link" asp-controller="System" asp-action="Health">Service health</a>
+                        <a class="home-card-link small" asp-controller="System" asp-action="Health">Open</a>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (Model.AutomationVisible)
+                    {
+                        @if (!pulse.Reachable)
+                        {
+                            <div class="alert alert-warning">@(string.IsNullOrWhiteSpace(pulse.Message) ? "Service metrics could not be read." : pulse.Message)</div>
+                        }
+                        else if (pulse.Chips.Count == 0)
+                        {
+                            <p class="text-muted">No pipeline metrics yet.</p>
+                        }
+                        else
+                        {
+                            <div class="row g-2 mb-3">
+                                @foreach (var chip in pulse.Chips)
+                                {
+                                    var slow = chip.ApiP95Ms is > HomeOverviewRules.SlowApiMs;
+                                    <div class="col-6 col-md-4 col-xl-2">
+                                        <a class="au-service-chip @(slow ? "home-chip-slow" : "")" asp-controller="Metrics" asp-action="Index" title="@chip.Name API latency and CPU">
+                                            <div class="au-service-name">@chip.Name</div>
+                                            <div class="au-service-value">@HomeOverviewRules.LatencyText(chip.ApiP95Ms)</div>
+                                            <div class="au-service-hint">CPU @HomeOverviewRules.CpuText(chip.CpuPercent)</div>
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        }
                     }
                     <p class="mb-2">
                         @if (health.Reachable)
@@ -172,16 +176,19 @@
                             <span class="text-muted">@health.Message</span>
                         }
                     </p>
-                    <p class="mb-0">
-                        @if (health.ApiHealthReachable)
-                        {
-                            <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
-                        }
-                        else
-                        {
-                            <span class="text-muted">@health.ApiHealthText</span>
-                        }
-                    </p>
+                    @if (Model.AutomationVisible)
+                    {
+                        <p class="mb-0">
+                            @if (health.ApiHealthReachable)
+                            {
+                                <a asp-controller="ApiHealth" asp-action="Index">@health.ApiHealthText</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">@health.ApiHealthText</span>
+                            }
+                        </p>
+                    }
                 </div>
             </div>
         </div>
@@ -208,6 +215,7 @@
                             <a class="home-row" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id">
                                 <span class="badge @report.Badge">@report.Status</span>
                                 <code class="lu-facility-id">@report.FacilityId</code>
+                                <partial name="_AutomationBadge" model="report.AutomationRunId" />
                                 <span class="text-muted small">@report.When</span>
                             </a>
                         }

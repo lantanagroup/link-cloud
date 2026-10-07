@@ -321,11 +321,11 @@ public class HomeOverviewTests
         overview[..gate].Should().NotContain("automation");
 
         var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/HomeOverviewService.cs"));
-        service.Should().Contain("IFacilityClassification");
-        service.Should().Contain("classification.AutomationVisible");
-        var seam = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/FacilityClassification.cs"));
-        seam.Should().Contain("AutomationOwnershipLookup");
-        seam.Should().Contain("LinkUi:AutomationEnabled");
+        service.Should().Contain("_features.Value.AutomationEnabled");
+        service.Should().Contain("CacheKey + \":off\"");
+        service.Should().Contain("AutomationOwnershipLookup");
+        var options = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/LinkUiFeatureOptions.cs"));
+        options.Should().Contain("bool AutomationEnabled");
     }
 
     [Fact]
@@ -360,7 +360,7 @@ public class HomeOverviewTests
     }
 
     [Fact]
-    public void Hidden_automation_keeps_real_counts_and_drops_the_split()
+    public void Hidden_automation_keeps_the_total_and_drops_the_split()
     {
         var known = HomeOverviewRules.Facilities(
             true,
@@ -370,18 +370,46 @@ public class HomeOverviewTests
             new AutomationOwnershipIndex(
                 ["owned"],
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["owned"] = "run" }));
-        var hidden = HomeOverviewRules.ForAudience(known, automationVisible: false);
-        hidden.Automation.Should().BeNull();
-        hidden.Regular.Should().Be(2);
-        HomeOverviewRules.PrimaryFacilityText(hidden, false).Should().Be("2");
-        HomeOverviewRules.PrimaryFacilityNote(hidden, false).Should().BeNull();
+        known.Regular.Should().Be(2);
+        HomeOverviewRules.PrimaryFacilityText(known, true).Should().Be("2");
 
-        var unknown = HomeOverviewRules.Facilities(true, null, false, ["a", "b"], AutomationOwnershipIndex.Empty);
-        var hiddenUnknown = HomeOverviewRules.ForAudience(unknown, false);
-        hiddenUnknown.Automation.Should().BeNull();
-        HomeOverviewRules.PrimaryFacilityText(hiddenUnknown, false).Should().Be("—");
-        HomeOverviewRules.PrimaryFacilityNote(hiddenUnknown, false).Should().Be("Facility classification could not be read.");
-        HomeOverviewRules.PrimaryFacilityNote(hiddenUnknown, false).Should().NotContain("automation");
+        var hidden = HomeOverviewRules.Facilities(
+            true,
+            null,
+            false,
+            ["owned", "real-a", "real-b"],
+            AutomationOwnershipIndex.Empty,
+            classify: false);
+        hidden.Automation.Should().BeNull();
+        hidden.Regular.Should().BeNull();
+        hidden.Total.Should().Be(3);
+        hidden.Message.Should().BeNull();
+        HomeOverviewRules.PrimaryFacilityText(hidden, false).Should().Be("3");
+
+        var now = DateTimeOffset.Parse("2026-10-07T15:00:00Z");
+        var quietActivity = HomeOverviewRules.Activity(true, 1, now.AddHours(-1), true, 0, true, 0, []);
+        var quietHealth = HomeOverviewRules.Health(true, null, [("account", "Healthy")], true, null, null, null, null, null);
+        var quietLogs = HomeOverviewRules.Logs(true, null, 0, null, true, null);
+        HomeOverviewRules.Issues(
+            true,
+            false,
+            false,
+            quietActivity,
+            quietHealth,
+            quietLogs,
+            HomeOverviewRules.Pulse(false, "Service metrics could not be read.", null),
+            now).Should().BeEmpty();
+        HomeOverviewRules.Issues(
+            true,
+            false,
+            true,
+            quietActivity,
+            quietHealth,
+            quietLogs,
+            HomeOverviewRules.Pulse(true, null, []),
+            now).Should().ContainSingle(issue =>
+                issue.Title == "Automation ownership could not be read"
+                && issue.Href == HomeOverviewRules.AutomationTenantsHref);
     }
 
     [Fact]
