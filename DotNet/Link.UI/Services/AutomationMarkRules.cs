@@ -3,7 +3,7 @@ namespace Link.UI.Services;
 /// <summary>
 /// Which facilities an automation run owns, and how the Tenants, Reports, and Logs
 /// pages turn that into a badge and an All / Real / Automation filter.
-/// Real is the default. The lookup is one cached read. These rules do not call a service per row.
+/// All is the default. The lookup is one cached read. These rules do not call a service per row.
 /// </summary>
 public static class AutomationMarkRules
 {
@@ -21,16 +21,17 @@ public static class AutomationMarkRules
     public static bool IsReal(string? scope) => NormalizeScope(scope) == Real;
 
     /// <summary>
-    /// Admin lists default to real facilities. All includes automation. Unknown values stay on real.
+    /// Admin lists default to every facility. Real and Automation are explicit.
+    /// Unknown values stay on All. With automation disabled, callers keep scope unset and do not use this default.
     /// </summary>
     public static string NormalizeScope(string? scope)
     {
         var value = scope?.Trim();
         if (string.Equals(value, Automation, StringComparison.OrdinalIgnoreCase))
             return Automation;
-        if (string.Equals(value, All, StringComparison.OrdinalIgnoreCase))
-            return All;
-        return Real;
+        if (string.Equals(value, Real, StringComparison.OrdinalIgnoreCase))
+            return Real;
+        return All;
     }
 
     public static bool Visible(string? scope, bool owned)
@@ -43,11 +44,11 @@ public static class AutomationMarkRules
         return !owned;
     }
 
-    /// <summary>Query value for a non-default scope. Real is omitted so the URL stays the default.</summary>
+    /// <summary>Query value for a non-default scope. All is omitted so the URL stays the default.</summary>
     public static string? ScopeForQuery(string? scope)
     {
         var normalized = NormalizeScope(scope);
-        return normalized == Real ? null : normalized;
+        return normalized == All ? null : normalized;
     }
 
     public static void AddScope(IDictionary<string, string> route, string? scope)
