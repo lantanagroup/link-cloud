@@ -4,9 +4,9 @@
     var active = ViewData["ReportSection"] as string ?? "report";
     string Btn(string section) => active == section ? "btn btn-sm lu-nav-current" : "btn btn-sm btn-au-neutral";
 }
-<nav class="lu-section-nav mb-3" aria-label="Report">
-    <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId">Report details</a>
-    <a class="@Btn("prequal")" asp-controller="Reports" asp-action="Prequal" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Prequalification</a>
-    <a class="@Btn("validation")" asp-controller="Reports" asp-action="Validation" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Validation</a>
-    <a class="@Btn("acquisition")" asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId">Acquisition log</a>
+<nav class="lu-section-nav" aria-label="Report">
+    <a class="@Btn("report")" asp-controller="Tenants" asp-action="Report" asp-route-id="@facilityId" asp-route-reportId="@reportId"><i class="bi bi-file-earmark-text me-1"></i>Report details</a>
+    <a class="@Btn("prequal")" asp-controller="Reports" asp-action="Prequal" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId"><i class="bi bi-list-check me-1"></i>Prequalification</a>
+    <a class="@Btn("validation")" asp-controller="Reports" asp-action="Validation" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId"><i class="bi bi-shield-check me-1"></i>Validation</a>
+    <a class="@Btn("acquisition")" asp-controller="Reports" asp-action="Acquisition" asp-route-facilityId="@facilityId" asp-route-reportId="@reportId"><i class="bi bi-journal-text me-1"></i>Acquisition log</a>
 </nav>

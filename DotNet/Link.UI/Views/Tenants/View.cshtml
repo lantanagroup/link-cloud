@@ -72,15 +72,15 @@ else
     </div>
 
     <nav class="lu-section-nav mb-3" aria-label="Facility sections">
-        @foreach (var section in new[] { ("reports", "Reports"), ("hsloc", "HSLOC locations"), ("locations", "Org locations"), ("encounters", "Encounters") })
+        @foreach (var section in new[] { ("reports", "Reports", "bi-file-earmark"), ("hsloc", "HSLOC locations", "bi-geo-alt"), ("locations", "Org locations", "bi-building"), ("encounters", "Encounters", "bi-person") })
         {
             <a class="btn btn-sm @(Model.Section == section.Item1 ? "lu-nav-current" : "btn-au-neutral")"
-               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1)">@(section.Item2)</a>
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute(section.Item1)"><i class="bi @(section.Item3) me-1"></i>@(section.Item2)</a>
         }
         @if (Model.DmrpEnabled)
         {
             <a class="btn btn-sm @(Model.Section == "plans" ? "lu-nav-current" : "btn-au-neutral")"
-               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans")">Reporting plans</a>
+               asp-action="View" asp-route-id="@Model.FacilityId" asp-all-route-data="@Model.Query.SectionRoute("plans")"><i class="bi bi-calendar3 me-1"></i>Reporting plans</a>
         }
     </nav>
 

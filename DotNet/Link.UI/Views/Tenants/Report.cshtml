@@ -30,8 +30,9 @@
 
 @if (!string.IsNullOrWhiteSpace(Model.ReportId))
 {
-    <partial name="_ReportIdentity" />
     <partial name="_ReportNav" />
+    <h1 class="h3">Report</h1>
+    <partial name="_ReportIdentity" />
 }
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {

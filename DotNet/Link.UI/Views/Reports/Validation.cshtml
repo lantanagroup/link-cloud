@@ -11,9 +11,9 @@
     <a class="btn btn-sm btn-au-neutral" asp-controller="Tenants" asp-action="View" asp-route-id="@Model.FacilityId" asp-route-section="reports"><i class="bi bi-arrow-left me-1"></i>Back to facility</a>
 </div>
 
+<partial name="_ReportNav" />
 <h1 class="h3">Validation</h1>
 <partial name="_ReportIdentity" />
-<partial name="_ReportNav" />
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
