@@ -285,7 +285,20 @@ public class HomeOverviewTests
         index.Should().Contain("data-au-refresh=\"15000\"");
         index.Should().Contain("data-au-refresh-url=\"@Url.Action(\"Overview\", \"Home\")\"");
         index.Should().Contain("id=\"homeOverview\"");
+        index.Should().Contain("ViewData[\"Title\"] = \"Dashboard\"");
+        index.Should().Contain(">Dashboard</h1>");
+        index.Should().NotContain(">Home</h1>");
         index.Should().NotContain("Welcome");
+
+        var layout = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_Layout.cshtml"));
+        layout.Should().Contain("bi-house-door me-2\"></i>Dashboard");
+        layout.Should().NotContain(">Home<");
+        layout.Should().Contain("asp-controller=\"Home\"");
+
+        var controller = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/HomeController.cs"));
+        controller.Should().Contain("class HomeController");
+        controller.Should().Contain("[HttpGet(\"/dashboard\")]");
+        controller.Should().Contain("ViewData[\"Title\"] = \"Dashboard\"");
 
         var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/live-region.js"));
         js.Should().Contain("data-au-refresh-url");
