@@ -210,7 +210,7 @@ public class RunMetricsSnapshotServiceTests
                         {
                             ["exported_job"] = "DataAcquisition",
                             ["http_request_method"] = "GET",
-                            ["http_route"] = "api/data/{facilityId}/QueryPlan"
+                            ["http_route"] = "api/data-acquisition/{facilityId}/QueryPlan"
                         })
                     ];
                 if (query.Contains("http_route", StringComparison.Ordinal))
@@ -220,7 +220,7 @@ public class RunMetricsSnapshotServiceTests
                         {
                             ["exported_job"] = "DataAcquisition",
                             ["http_request_method"] = "GET",
-                            ["http_route"] = "api/data/{facilityId}/QueryPlan"
+                            ["http_route"] = "api/data-acquisition/{facilityId}/QueryPlan"
                         })
                     ];
                 return [];

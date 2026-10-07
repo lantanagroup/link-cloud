@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Rewrite;
 
 namespace LantanaGroup.Link.DataAcquisition.Infrastructure;
 
+// See dev-docs/data-acquisition-route-prefix.md
 /// <summary>
 /// Serves the deprecated /api/data prefix by rewriting it to /api/data-acquisition before routing.
 /// </summary>
