@@ -69,7 +69,7 @@ public class AutomationRulesTests
     }
 
     [Fact]
-    public void Paging_and_the_live_origin_stay_inside_the_known_set()
+    public void Paging_stays_inside_the_known_set()
     {
         AutomationRules.NormalizeSortBy("RunName").Should().Be("runName");
         AutomationRules.NormalizeSortBy("drop").Should().Be("createdAt");
@@ -81,11 +81,6 @@ public class AutomationRulesTests
         AutomationRules.IsDescending("ASC").Should().BeFalse();
         AutomationRules.FormatDuration(0).Should().Be("—");
         AutomationRules.FormatDuration(90).Should().Be("1:30");
-
-        AutomationRules.TryLiveOrigin(" http://localhost:5255/hubs ", out var origin).Should().BeTrue();
-        origin.Should().Be("http://localhost:5255/");
-        AutomationRules.TryLiveOrigin("ftp://localhost", out _).Should().BeFalse();
-        AutomationRules.TryLiveOrigin(" ", out _).Should().BeFalse();
     }
 
     private static Link.UI.Models.AutomationRunRow Row(string status, DateTimeOffset created, DateTimeOffset? finished) =>

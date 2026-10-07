@@ -23,22 +23,6 @@ public static class AutomationRules
         "CollectingMetrics"
     ];
 
-    public static bool TryLiveOrigin(string? address, out string origin)
-    {
-        origin = string.Empty;
-        if (string.IsNullOrWhiteSpace(address))
-            return false;
-
-        if (!Uri.TryCreate(address.Trim(), UriKind.Absolute, out var uri))
-            return false;
-
-        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
-            return false;
-
-        origin = uri.GetLeftPart(UriPartial.Authority).TrimEnd('/') + "/";
-        return true;
-    }
-
     public static string NormalizeSortBy(string? sortBy) =>
         (sortBy ?? string.Empty).Trim().ToLowerInvariant() switch
         {

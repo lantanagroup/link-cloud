@@ -24,6 +24,9 @@ public class ShellAccessGateTests
     [InlineData("/")]
     [InlineData("/Tenants")]
     [InlineData("/css/site.css")]
+    [InlineData("/hubs/link")]
+    [InlineData("/hubs/runs")]
+    [InlineData("/hubs/cleanup")]
     public void Anonymous_off_blocks_the_shell(string path)
     {
         var decision = ShellAccessGate.Evaluate(false, false, path, user: null, out var message);
@@ -71,9 +74,37 @@ public class ShellAccessGateTests
 
         ShellAccessGate.Evaluate(false, true, "/logout", user: null, out _)
             .Should().Be(ShellAccessGate.Decision.Continue);
+    }
 
-        ShellAccessGate.Evaluate(false, true, "/hubs/link", user: null, out _)
+    [Theory]
+    [InlineData("/hubs/link")]
+    [InlineData("/hubs/runs")]
+    [InlineData("/hubs/cleanup")]
+    public void Require_session_signs_in_before_a_hub_connects(string path)
+    {
+        ShellAccessGate.Evaluate(
+                false,
+                true,
+                path,
+                new AdminBffUser { IsAuthenticated = false },
+                out _)
+            .Should().Be(ShellAccessGate.Decision.RedirectToLogin);
+
+        ShellAccessGate.Evaluate(
+                false,
+                true,
+                path,
+                new AdminBffUser { IsAuthenticated = true, Email = "ada@example.com" },
+                out _)
             .Should().Be(ShellAccessGate.Decision.Continue);
+    }
+
+    [Fact]
+    public void Anonymous_on_leaves_the_hubs_open()
+    {
+        ShellAccessGate.Evaluate(true, false, "/hubs/runs", user: null, out var message)
+            .Should().Be(ShellAccessGate.Decision.Continue);
+        message.Should().BeNull();
     }
 
     [Fact]
