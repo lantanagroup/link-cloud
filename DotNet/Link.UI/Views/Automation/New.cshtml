@@ -22,12 +22,12 @@
     <div class="alert alert-danger" id="startError">@Model.Error</div>
 }
 
-<form method="post" class="au-card card">
+<form method="post" class="au-card card" data-au-save="navigate">
     <div class="card-body row g-3">
         @Html.AntiForgeryToken()
         <div class="col-12 col-md-8">
             <label class="form-label" for="choice">Run</label>
-            <select id="choice" name="choice" class="form-select" required @(ready ? null : "disabled")>
+            <select id="choice" name="choice" class="form-select" @(ready ? null : "disabled")>
                 <option value="">Select a run</option>
                 <optgroup label="Built-in">
                     @foreach (var option in Model.BuiltIn)
