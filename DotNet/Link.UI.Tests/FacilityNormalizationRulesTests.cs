@@ -332,4 +332,93 @@ public class FacilityNormalizationRulesTests
         FacilityNormalizationRules.TryTestResource("""{"resourceType":"Patient","id":"1"}""", out var json, out error).Should().BeTrue(error);
         json.Should().Contain("Patient");
     }
+
+    [Fact]
+    public void Vendor_presets_are_kept_when_the_form_does_not_post_them()
+    {
+        var catalog = new[] { Guid.NewGuid() };
+        var existing = Guid.NewGuid();
+        FacilityNormalizationRules.TryVendorPresets(false, true, true, null, catalog, [existing], out var preserved, out var error)
+            .Should().BeTrue(error);
+        preserved.Should().BeNull();
+
+        FacilityNormalizationRules.TryVendorPresets(false, false, false, ["not-a-guid"], catalog, [], out var created, out error)
+            .Should().BeTrue(error);
+        created.Should().BeEmpty();
+
+        FacilityNormalizationRules.TryVendorPresets(true, false, true, [], catalog, [], out _, out error)
+            .Should().BeFalse();
+        error.Should().Contain("not saved");
+
+        FacilityNormalizationRules.TryVendorPresets(true, true, true, [existing.ToString(), existing.ToString()], catalog, [existing], out var kept, out error)
+            .Should().BeTrue(error);
+        kept.Should().Equal(existing);
+
+        FacilityNormalizationRules.TryVendorPresets(true, true, true, [], catalog, [existing], out var cleared, out error)
+            .Should().BeTrue(error);
+        cleared.Should().BeEmpty();
+
+        FacilityNormalizationRules.TryVendorPresets(true, true, true, [Guid.NewGuid().ToString()], catalog, [existing], out _, out error)
+            .Should().BeFalse();
+        error.Should().Contain("vendor version");
+    }
+
+    [Fact]
+    public void A_stored_operation_keeps_its_vendor_preset_ids()
+    {
+        var version = Guid.NewGuid();
+        var input = FacilityNormalizationRules.FromOperation(new NormalizationOperationApiModel
+        {
+            Id = Guid.NewGuid(),
+            OperationType = "CopyProperty",
+            OperationJson = """{"Name":"Stored","SourceFhirPath":"id","TargetFhirPath":"identifier"}""",
+            VendorPresets = [new NormalizationOperationVendorPresetApiModel { VendorVersionId = version }]
+        });
+
+        input.VendorVersionIds.Should().Equal(version.ToString());
+    }
+
+    [Fact]
+    public void Extension_csv_groups_urls_and_stops_on_a_conflict()
+    {
+        var csv = """
+            resource type,extension url
+            Patient,http://example.org/a
+            Patient,http://example.org/a
+            Encounter,"http://example.org/b"
+            """;
+        FacilityNormalizationRules.TryParseExtensionCsv(csv, Catalog, out var groups, out var error).Should().BeTrue(error);
+        groups.Should().HaveCount(2);
+        groups[0].ResourceType.Should().Be("Patient");
+        groups[0].Urls.Should().Equal("http://example.org/a");
+        groups[1].Urls.Should().Equal("http://example.org/b");
+
+        FacilityNormalizationRules.TryParseExtensionCsv("Patient,ftp://example.org/a\n", Catalog, out _, out error).Should().BeFalse();
+        error.Should().Contain("http");
+
+        FacilityNormalizationRules.TryParseExtensionCsv("Slot,http://example.org/a\n", Catalog, out _, out error).Should().BeFalse();
+        error.Should().Contain("no extension URL");
+
+        FacilityNormalizationRules.TryParseExtensionCsv("resource type,url\nSlot,http://example.org/a\n", Catalog, out _, out error)
+            .Should().BeFalse();
+        error.Should().Contain("Slot");
+
+        var existing = new NormalizationOperationApiModel
+        {
+            OperationType = "RemoveExtensions",
+            OperationJson = """{"ExtensionUrls":["http://example.org/a"]}""",
+            OperationResourceTypes =
+            [
+                new NormalizationOperationResourceTypeApiModel
+                {
+                    Resource = new NormalizationResourceApiModel { ResourceName = "Patient" }
+                }
+            ]
+        };
+        FacilityNormalizationRules.HasExtensionConflict([existing], groups, out error).Should().BeTrue();
+        error.Should().Contain("http://example.org/a");
+
+        var other = new List<ExtensionUrlGroup> { new("Encounter", ["http://example.org/c"]) };
+        FacilityNormalizationRules.HasExtensionConflict([existing], other, out error).Should().BeFalse();
+    }
 }

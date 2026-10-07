@@ -364,6 +364,8 @@ public sealed class NormalizationOperationInput
     public List<CodeSystemMapInput>? Maps { get; set; }
     public List<ExtensionUrlInput>? ExtensionUrls { get; set; }
     public string? TestResource { get; set; }
+    public bool VendorPresetsPosted { get; set; }
+    public List<string>? VendorVersionIds { get; set; }
 }
 
 public sealed class ConditionInput

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Link.UI.Models;
@@ -11,6 +12,8 @@ namespace Link.UI.Services;
 public static class FacilityNormalizationRules
 {
     public const int PageSize = 20;
+    public const int MaxImportCharacters = 64 * 1024;
+    public const int MaxImportUrls = 200;
     public const int SequencePageSize = 200;
     public const string HslocSystem = "https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html";
     public const string HslocName = "HSLOC Location Mapping";
@@ -138,6 +141,12 @@ public static class FacilityNormalizationRules
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            VendorVersionIds = model.VendorPresets
+                .Select(preset => preset.VendorVersionId)
+                .Where(presetId => presetId != Guid.Empty)
+                .Distinct()
+                .Select(presetId => presetId.ToString())
                 .ToList(),
             MaxIterations = 15
         };
@@ -891,4 +900,259 @@ public static class FacilityNormalizationRules
     }
 
     private static bool HasProperty(JsonElement element, string name) => Child(element, name) is not null;
+
+    public static bool TryVendorPresets(
+        bool posted,
+        bool vendorListLoaded,
+        bool isUpdate,
+        IEnumerable<string>? postedIds,
+        IEnumerable<Guid> catalogIds,
+        IEnumerable<Guid> existingIds,
+        out List<Guid>? vendorVersionIds,
+        out string? error)
+    {
+        vendorVersionIds = null;
+        if (posted && !vendorListLoaded)
+        {
+            error = "Vendor versions could not be loaded, so the operation was not saved.";
+            return false;
+        }
+
+        if (!posted)
+        {
+            vendorVersionIds = isUpdate ? null : [];
+            error = null;
+            return true;
+        }
+
+        var allowed = new HashSet<Guid>();
+        foreach (var id in catalogIds.Concat(existingIds))
+        {
+            if (id != Guid.Empty)
+                allowed.Add(id);
+        }
+
+        var chosen = new List<Guid>();
+        foreach (var raw in postedIds ?? [])
+        {
+            var text = raw?.Trim();
+            if (string.IsNullOrEmpty(text))
+                continue;
+            if (!Guid.TryParse(text, out var id) || id == Guid.Empty || !allowed.Contains(id))
+            {
+                error = "Each vendor preset must be a vendor version on this page.";
+                return false;
+            }
+
+            if (!chosen.Contains(id))
+                chosen.Add(id);
+        }
+
+        vendorVersionIds = chosen;
+        error = null;
+        return true;
+    }
+
+    public static bool TryParseExtensionCsv(
+        string? text,
+        IReadOnlyCollection<string> resourceCatalog,
+        out IReadOnlyList<ExtensionUrlGroup> groups,
+        out string? error)
+    {
+        groups = Array.Empty<ExtensionUrlGroup>();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            error = "Choose a CSV file.";
+            return false;
+        }
+
+        if (text.Length > MaxImportCharacters)
+        {
+            error = "The CSV must be 64 KB or smaller.";
+            return false;
+        }
+
+        var grouped = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var order = new List<string>();
+        var headerChecked = false;
+        var urlCount = 0;
+        foreach (var rawLine in text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
+        {
+            if (string.IsNullOrWhiteSpace(rawLine))
+                continue;
+            if (!TrySplitCsv(rawLine, out var fields))
+            {
+                error = "A CSV row has an unmatched quote.";
+                return false;
+            }
+
+            if (fields.Count < 2 || string.IsNullOrWhiteSpace(fields[0]) || string.IsNullOrWhiteSpace(fields[1]))
+            {
+                error = "Each row needs a resource type and an extension URL.";
+                return false;
+            }
+
+            var typeField = fields[0].Trim().TrimStart('\uFEFF');
+            var url = fields[1].Trim();
+            var canonical = resourceCatalog.FirstOrDefault(item =>
+                string.Equals(item, typeField, StringComparison.OrdinalIgnoreCase));
+            if (!headerChecked)
+            {
+                headerChecked = true;
+                if (typeField.Equals("resource type", StringComparison.OrdinalIgnoreCase) || canonical is null)
+                    continue;
+            }
+
+            if (canonical is null)
+            {
+                error = $"Resource type {typeField} is not in the facility catalog.";
+                return false;
+            }
+
+            if (url.Length > 2000 || url.Any(char.IsWhiteSpace))
+            {
+                error = "Each extension URL must be a single token of 2000 characters or fewer.";
+                return false;
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                error = "Each extension URL must be an absolute http or https URL.";
+                return false;
+            }
+
+            if (!grouped.TryGetValue(canonical, out var urls))
+            {
+                urls = [];
+                grouped[canonical] = urls;
+                order.Add(canonical);
+            }
+
+            if (urls.Contains(url, StringComparer.Ordinal))
+                continue;
+            if (urlCount >= MaxImportUrls)
+            {
+                error = "A CSV can import at most 200 extension URLs.";
+                return false;
+            }
+
+            urls.Add(url);
+            urlCount++;
+        }
+
+        if (order.Count == 0)
+        {
+            error = "The CSV has no extension URL rows.";
+            return false;
+        }
+
+        groups = order.Select(type => new ExtensionUrlGroup(type, grouped[type])).ToList();
+        error = null;
+        return true;
+    }
+
+    public static bool HasExtensionConflict(
+        IEnumerable<NormalizationOperationApiModel>? existing,
+        IReadOnlyList<ExtensionUrlGroup> groups,
+        out string? error)
+    {
+        var wanted = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var group in groups)
+        {
+            foreach (var url in group.Urls)
+                wanted.Add(ExtensionKey(group.ResourceType, url));
+        }
+
+        var hits = new List<string>();
+        foreach (var model in existing ?? [])
+        {
+            if (!string.Equals(CanonicalType(model.OperationType), "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var input = FromOperation(model);
+            if (input.ParseFailed)
+            {
+                error = "An existing remove-extensions operation could not be read, so nothing was imported.";
+                return true;
+            }
+
+            foreach (var type in input.ResourceTypes ?? [])
+            {
+                foreach (var row in input.ExtensionUrls ?? [])
+                {
+                    var url = row.Url?.Trim();
+                    if (string.IsNullOrEmpty(url))
+                        continue;
+                    var key = ExtensionKey(type, url);
+                    if (wanted.Contains(key) && !hits.Contains(key, StringComparer.Ordinal))
+                        hits.Add(type.Trim() + "::" + url);
+                }
+            }
+        }
+
+        if (hits.Count > 0)
+        {
+            error = "Import stopped because these extension URLs already exist: " + string.Join(", ", hits.Take(5)) + ".";
+            return true;
+        }
+
+        error = null;
+        return false;
+    }
+
+    private static string ExtensionKey(string resourceType, string url) =>
+        resourceType.Trim().ToLowerInvariant() + "::" + url.Trim();
+
+    private static bool TrySplitCsv(string line, out List<string> fields)
+    {
+        fields = [];
+        var current = new StringBuilder();
+        var quoted = false;
+        for (var i = 0; i < line.Length; i++)
+        {
+            var character = line[i];
+            if (quoted)
+            {
+                if (character != '"')
+                {
+                    current.Append(character);
+                    continue;
+                }
+
+                if (i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    current.Append('"');
+                    i++;
+                    continue;
+                }
+
+                quoted = false;
+                continue;
+            }
+
+            if (character == '"')
+            {
+                quoted = true;
+                continue;
+            }
+
+            if (character == ',')
+            {
+                fields.Add(current.ToString().Trim());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(character);
+        }
+
+        if (quoted)
+            return false;
+
+        fields.Add(current.ToString().Trim());
+        return true;
+    }
 }
+
+public sealed record ExtensionUrlGroup(string ResourceType, IReadOnlyList<string> Urls);

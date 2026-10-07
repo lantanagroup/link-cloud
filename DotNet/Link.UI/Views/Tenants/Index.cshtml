@@ -13,14 +13,29 @@
         {
             <div class="alert alert-success">@message</div>
         }
-        <form method="get" class="row g-2 mb-3">
-            <div class="col-md-6">
-                <input type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
+        @if (TempData["Error"] is string error)
+        {
+            <div class="alert alert-warning">@error</div>
+        }
+        <form method="get" class="row g-2 mb-3 align-items-center">
+            <div class="col-12 col-md-6">
+                <label class="visually-hidden" for="tenantSearch">Search facilities</label>
+                <input id="tenantSearch" type="search" name="search" value="@Model.Search" class="form-control" placeholder="Search facilities..." />
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="includeDeleted" name="includeDeleted" value="true" @(Model.IncludeDeleted ? "checked" : null) />
+                    <label class="form-check-label" for="includeDeleted">Include deleted</label>
+                </div>
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-au-action">Search</button>
             </div>
         </form>
+        @if (!string.IsNullOrWhiteSpace(Model.DeletedNote))
+        {
+            <div class="alert alert-warning">@Model.DeletedNote</div>
+        }
 
         @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
         {
@@ -38,6 +53,7 @@
                         <tr>
                             <th>Facility Id</th>
                             <th>Name</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -48,6 +64,24 @@
                             <td>
                                 <a asp-action="View" asp-route-id="@tenant.FacilityId">@tenant.DisplayName</a>
                                 <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId">Configuration</a></div>
+                            </td>
+                            <td>
+                                @if (tenant.IsDeleted)
+                                {
+                                    <span class="badge text-bg-secondary">Deleted</span>
+                                    <form method="post" asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2" onsubmit="return confirm('Restore this facility, its reports, and its logs?');">
+                                        <input type="hidden" name="search" value="@Model.Search" />
+                                        @if (Model.IncludeDeleted)
+                                        {
+                                            <input type="hidden" name="includeDeleted" value="true" />
+                                        }
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Restore</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-success">Active</span>
+                                }
                             </td>
                         </tr>
                     }

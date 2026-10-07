@@ -293,6 +293,20 @@ public sealed class FacilityViewService
                 : Fail(FacilityFormRules.ServiceMessage("Admin", response.StatusCode, response.RawBody));
         });
 
+    public async Task<FacilityViewAction> RestoreFacilityAsync(string? facilityId, CancellationToken cancellationToken)
+    {
+        var id = facilityId?.Trim() ?? string.Empty;
+        if (!FacilityFormRules.IsValidFacilityId(id, _options.NumericOnlyFacilityId))
+            return Fail(FacilityFormRules.FacilityIdRule(_options.NumericOnlyFacilityId));
+        if (_admin is null)
+            return Fail(AdminNotConfigured);
+
+        var response = await _admin.RestoreAggregateFacilityAsync(id, cancellationToken);
+        return response.IsSuccessStatusCode
+            ? Done("Facility restored.")
+            : Fail(FacilityFormRules.ServiceMessage("Admin", response.StatusCode, response.RawBody));
+    }
+
     private async Task<bool> LoadFacilityAsync(FacilityViewModel page, CancellationToken cancellationToken)
     {
         if (!FacilityFormRules.IsValidFacilityId(page.FacilityId, _options.NumericOnlyFacilityId))
