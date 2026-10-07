@@ -179,12 +179,6 @@ public static class AutomationMarkRules
     private readonly record struct Claim(string RunId, DateTimeOffset SeenAt, int Rank);
 }
 
-public sealed record AutomationRunMark(
-    Guid RunId,
-    string? FacilityId,
-    bool AutomationCreatedFacility,
-    DateTimeOffset CreatedAt);
-
 public sealed record AutomationTombstoneMark(string FacilityId, string RunId, DateTimeOffset CreatedAt);
 
 public sealed record RowPage<T>(IReadOnlyList<T> Items, int Page, int Size, int Total, int Pages);
@@ -210,6 +204,9 @@ public sealed class AutomationOwnershipIndex
     }
 
     public bool Contains(string? facilityId) => RunIdFor(facilityId) is not null;
+
+    /// <summary>Owned facility ids. The dashboard posts these to the tenant count and does not render them.</summary>
+    public IReadOnlyCollection<string> FacilityIds => _runByFacility.Keys;
 
     public string? RunIdFor(string? facilityId)
     {

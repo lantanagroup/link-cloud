@@ -1,6 +1,16 @@
 namespace Link.UI.Services;
 
 /// <summary>
+/// A run row the engine and the dashboard both use to decide ownership.
+/// The dashboard posts these facility ids to the tenant count. It does not send them to the browser.
+/// </summary>
+public sealed record AutomationRunMark(
+    Guid RunId,
+    string? FacilityId,
+    bool AutomationCreatedFacility,
+    DateTimeOffset CreatedAt);
+
+/// <summary>
 /// Whether a facility is automation-owned (a throwaway) or real.
 /// The decision uses durable run and tombstone rows only.
 /// Automation stores the facility name as the facility id. There is no name prefix,

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using LantanaGroup.Automation;
 using LantanaGroup.Automation.Helpers;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Sdk.ApiClient;
