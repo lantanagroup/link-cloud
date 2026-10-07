@@ -515,7 +515,8 @@ public sealed class AutomationRunReader
             document.FacilityId,
             document.AutomationCreatedFacility,
             document.ReportId,
-            document.GeneratedTemplateCacheVersionNumber);
+            document.GeneratedTemplateCacheVersionNumber,
+            document.RetentionNotice);
 
     [BsonIgnoreExtraElements]
     private sealed class AutomationRunDocument
@@ -554,6 +555,8 @@ public sealed class AutomationRunReader
         public DateTimeOffset? FinishedAt { get; set; }
 
         public string? Error { get; set; }
+
+        public string? RetentionNotice { get; set; }
 
         public string? Duration { get; set; }
 

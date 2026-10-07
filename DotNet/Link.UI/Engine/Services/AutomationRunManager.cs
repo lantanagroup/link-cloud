@@ -187,6 +187,8 @@ public class AutomationRunManager : IAutomationRunManager
             state.Status = AutomationRunStatus.Cancelled;
             state.Error = "Cancelled by user.";
             state.FinishedAt = DateTimeOffset.UtcNow;
+            state.RetentionNotice ??= RunCleanupGate.DataKeptNotice(
+                state.Options.CleanupFhirData, state.Options.CleanupServiceData);
             queueCleanup = true;
         }
 
@@ -242,6 +244,7 @@ public class AutomationRunManager : IAutomationRunManager
         summary.Status = AutomationRunStatus.Cancelled;
         summary.Error = "Cancelled by user (no active execution in this process).";
         summary.FinishedAt = DateTimeOffset.UtcNow;
+        summary.RetentionNotice ??= RunCleanupGate.DataKeptNotice(summary.RunConfigurationJson);
 
         await _snapshotStore.UpsertRunSummaryAsync(summary, summary.FacilityId, summary.ReportId, cancellationToken);
         await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
@@ -843,6 +846,7 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
+                RetentionNotice = state.RetentionNotice,
                 FacilityId = state.FacilityId,
                 AutomationCreatedFacility = state.AutomationCreatedFacility,
                 ReportId = state.ReportId,

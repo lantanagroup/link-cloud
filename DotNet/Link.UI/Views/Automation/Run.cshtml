@@ -102,6 +102,7 @@ else
                     </div>
                 </div>
                 <div id="runError" class="alert alert-danger mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.Error) ? "d-none" : "")">@run?.Error</div>
+                <div id="runRetention" class="alert alert-info mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.RetentionNotice) ? "d-none" : "")" role="status">@run?.RetentionNotice</div>
                 <div class="mt-3 d-flex flex-wrap gap-2" id="runActions">
                     @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
                     {
