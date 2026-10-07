@@ -15,8 +15,8 @@
 
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
     <div>
-        <h1 class="h3 mb-1">Automation runs</h1>
-        <p class="text-muted mb-0">Counts and history from runs stored here. A new run stands up a throwaway facility, runs, and tears it down.</p>
+        <h1 class="h3 mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h1>
+        <p class="text-muted mb-0">Dashboard overview and run history. A new run stands up a throwaway facility, runs, and tears it down.</p>
     </div>
     <div class="d-flex flex-wrap gap-2 align-items-center">
         <a class="btn btn-au-action" asp-action="New">New run</a>
@@ -39,7 +39,7 @@
     <div class="col-6 col-md-3">
         <div class="au-kpi-card">
             <div class="au-kpi-value" id="kpiTotal">@stats.TotalRuns</div>
-            <div class="au-kpi-label">Runs in 14 days</div>
+            <div class="au-kpi-label">Total runs</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
@@ -51,7 +51,7 @@
     <div class="col-6 col-md-3">
         <div class="au-kpi-card">
             <div class="au-kpi-value" id="kpiDuration">@AutomationRules.FormatDuration(stats.AvgDurationSeconds)</div>
-            <div class="au-kpi-label">Average duration</div>
+            <div class="au-kpi-label">Avg duration</div>
         </div>
     </div>
 </div>
@@ -59,25 +59,25 @@
 <div class="row g-3 mb-3">
     <div class="col-12 col-lg-4">
         <div class="au-card card h-100">
-            <div class="card-header">Status</div>
-            <div class="card-body">
+            <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
+            <div class="card-body d-flex align-items-center justify-content-center position-relative" style="min-height:240px;">
                 <canvas id="statusChart" height="180"></canvas>
-                <p id="statusEmpty" class="text-muted mb-0 @(stats.TotalRuns == 0 ? "" : "d-none")">No runs in the last 14 days.</p>
+                <p id="statusEmpty" class="text-muted small mb-0 @(stats.TotalRuns == 0 ? "" : "d-none")">No runs yet</p>
             </div>
         </div>
     </div>
     <div class="col-12 col-lg-8">
         <div class="au-card card h-100">
-            <div class="card-header">Runs per day</div>
-            <div class="card-body">
+            <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Runs Per Day (Last 14 Days)</div>
+            <div class="card-body" style="min-height:240px;">
                 <canvas id="dayChart" height="180"></canvas>
             </div>
         </div>
     </div>
 </div>
 
-<div class="au-card card mb-3" id="activeCard">
-    <div class="card-header">Active runs</div>
+<div class="au-card card mb-3" id="activeCard" style="@(Model.ActiveRuns.Count == 0 ? "display:none" : "")">
+    <div class="card-header"><i class="bi bi-activity me-2"></i>Active Runs</div>
     <div class="card-body">
         <div class="row g-2" id="activeRuns">
             @foreach (var run in Model.ActiveRuns)
@@ -100,12 +100,12 @@
 
 <div class="au-card card">
     <div class="card-header d-flex justify-content-between">
-        <span>Run history</span>
+        <span><i class="bi bi-clock-history me-2"></i>Recent Runs</span>
         <span class="text-muted" id="historyCount">@Model.TotalCount</span>
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-sm align-middle mb-2">
+            <table class="table au-table table-sm align-middle mb-2">
                 <thead>
                     <tr>
                         <th><a href="@Url.Action("Index", new { sortBy = "runName", sortDir = SortDirFor("runName"), pageSize = Model.PageSize })">Run@(SortMark("runName"))</a></th>
@@ -138,7 +138,7 @@
                 </tbody>
             </table>
         </div>
-        <p id="historyEmpty" class="text-muted mb-2 @(Model.RecentRuns.Count == 0 ? "" : "d-none")">No runs stored.</p>
+        <p id="historyEmpty" class="text-muted mb-2 @(Model.RecentRuns.Count == 0 ? "" : "d-none")">No runs yet. Start one from New run.</p>
         <div class="d-flex flex-wrap gap-2 align-items-center" id="historyPager">
             @if (Model.PageNumber > 1)
             {
