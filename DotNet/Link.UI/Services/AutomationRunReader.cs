@@ -64,11 +64,10 @@ public sealed class AutomationRunReader
 
     public static AutomationRunReader Create(IConfiguration configuration, ILogger<AutomationRunReader> logger)
     {
-        var live = AutomationRules.TryLiveOrigin(configuration["LinkUi:AutomationUiUrl"], out _);
         var connectionString = configuration["MongoDB:ConnectionString"];
         var databaseName = configuration["MongoDB:DatabaseName"];
         if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(databaseName))
-            return new AutomationRunReader(null, live, NotConfiguredMessage, logger);
+            return new AutomationRunReader(null, liveConfigured: true, NotConfiguredMessage, logger);
 
         try
         {
@@ -78,7 +77,7 @@ public sealed class AutomationRunReader
             var database = new MongoClient(settings).GetDatabase(databaseName.Trim());
             return new AutomationRunReader(
                 database.GetCollection<AutomationRunDocument>(CollectionName),
-                live,
+                liveConfigured: true,
                 null,
                 logger);
         }
@@ -87,7 +86,7 @@ public sealed class AutomationRunReader
             logger.LogWarning(
                 "Automation storage settings could not be read ({ExceptionType}).",
                 ex.GetType().Name);
-            return new AutomationRunReader(null, live, SettingsRejectedMessage, logger);
+            return new AutomationRunReader(null, liveConfigured: true, SettingsRejectedMessage, logger);
         }
     }
 
@@ -221,6 +220,73 @@ public sealed class AutomationRunReader
             return UnreachableRun(runId);
         }
     }
+
+    public async Task<AutomationScenarioList> ListScenariosAsync(CancellationToken cancellationToken)
+    {
+        if (_runs is null)
+        {
+            return new AutomationScenarioList
+            {
+                StorageConfigured = false,
+                StorageReachable = false,
+                Message = _unavailableMessage
+            };
+        }
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            var collection = _runs.Database.GetCollection<ScenarioChoiceDocument>("automation_scenarios");
+            var projection = Builders<ScenarioChoiceDocument>.Projection
+                .Include(row => row.Id)
+                .Include(row => row.Name)
+                .Include(row => row.IsSystemScenario);
+            var documents = await collection
+                .Find(FilterDefinition<ScenarioChoiceDocument>.Empty, new FindOptions { MaxTime = TimeSpan.FromSeconds(8) })
+                .Project<ScenarioChoiceDocument>(projection)
+                .Limit(LinkAutomationStartRules.ScenarioListLimit)
+                .ToListAsync(timeout.Token);
+
+            return new AutomationScenarioList
+            {
+                StorageConfigured = true,
+                StorageReachable = true,
+                Truncated = documents.Count >= LinkAutomationStartRules.ScenarioListLimit,
+                Scenarios = documents
+                    .Select(document => new AutomationScenarioChoice
+                    {
+                        Id = document.Id,
+                        Name = document.Name ?? string.Empty,
+                        IsSystemScenario = document.IsSystemScenario
+                    })
+                    .ToList()
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return UnreachableScenarios();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Automation scenarios could not be listed ({ExceptionType}).",
+                ex.GetType().Name);
+            return UnreachableScenarios();
+        }
+    }
+
+    private AutomationScenarioList UnreachableScenarios() =>
+        new()
+        {
+            StorageConfigured = true,
+            StorageReachable = false,
+            Message = UnreachableMessage
+        };
 
     private AutomationRunPage UnreachableRun(Guid runId) =>
         new()
@@ -374,5 +440,17 @@ public sealed class AutomationRunReader
         public string? Duration { get; set; }
 
         public int? GeneratedTemplateCacheVersionNumber { get; set; }
+    }
+
+    [BsonIgnoreExtraElements]
+    private sealed class ScenarioChoiceDocument
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.String)]
+        public Guid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public bool IsSystemScenario { get; set; }
     }
 }

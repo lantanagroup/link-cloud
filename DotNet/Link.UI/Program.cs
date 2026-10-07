@@ -1,4 +1,6 @@
 ﻿using System.Reflection;
+using Automation.UI.Services;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -8,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using Link.UI.Hubs;
 using Link.UI.Models;
 using Link.UI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Transforms;
@@ -72,7 +75,6 @@ builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((_, cl
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 
-var automationUiAddress = ResolveAutomationUiAddress(builder.Configuration);
 var proxyRoutes = new List<RouteConfig>
 {
     new()
@@ -93,31 +95,6 @@ var proxyClusters = new List<ClusterConfig>
         }
     }
 };
-
-if (automationUiAddress is not null)
-{
-    // RunHub stays in Automation.UI. This proxy lets the browser subscribe on the Link.UI origin.
-    proxyRoutes.Add(new RouteConfig
-    {
-        RouteId = "automation-run-hub",
-        ClusterId = "automation-ui",
-        Match = new RouteMatch { Path = "/hubs/runs/{**catch-all}" }
-    });
-    proxyRoutes.Add(new RouteConfig
-    {
-        RouteId = "automation-run-hub-root",
-        ClusterId = "automation-ui",
-        Match = new RouteMatch { Path = "/hubs/runs" }
-    });
-    proxyClusters.Add(new ClusterConfig
-    {
-        ClusterId = "automation-ui",
-        Destinations = new Dictionary<string, DestinationConfig>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["primary"] = new DestinationConfig { Address = automationUiAddress }
-        }
-    });
-}
 
 builder.Services.AddReverseProxy()
     .LoadFromMemory(proxyRoutes, proxyClusters)
@@ -155,7 +132,27 @@ builder.Services.AddControllersWithViews()
     .AddJsonOptions(opts =>
     {
         opts.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    })
+    .ConfigureApplicationPartManager(manager =>
+    {
+        // The engine assembly also contains the old web UI. Those controllers stay unmapped.
+        var imported = manager.ApplicationParts
+            .Where(part => string.Equals(part.Name, "Automation.UI", StringComparison.Ordinal))
+            .ToList();
+        foreach (var part in imported)
+            manager.ApplicationParts.Remove(part);
     });
+
+// RunHub and CleanupHub carry [Authorize]. The shell gate is the sign-in check.
+// This policy lets the attribute succeed after the gate has already allowed the request.
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAssertion(_ => true)
+        .Build();
+});
+
+var automationEngine = LinkAutomationEngine.Add(builder.Services, builder.Configuration);
 
 builder.Services.AddProblemDetails(options =>
 {
@@ -250,6 +247,7 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseWebSockets();
 app.UseRouting();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
@@ -262,8 +260,28 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapHub<LinkStubHub>("/hubs/link");
+app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<CleanupHub>("/hubs/cleanup");
 app.MapHealthChecks("/health");
 app.MapReverseProxy();
+
+if (automationEngine.Ready)
+{
+    try
+    {
+        app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(
+            "Automation indexes could not be ensured ({ExceptionType}).",
+            ex.GetType().Name);
+    }
+}
+else
+{
+    app.Logger.LogWarning("Automation run engine is off. {Message}", automationEngine.Message);
+}
 
 app.Run();
 
@@ -276,7 +294,4 @@ static string ResolveAdminBffAddress(IConfiguration configuration)
     return address.TrimEnd('/') + "/";
 }
 
-static string? ResolveAutomationUiAddress(IConfiguration configuration) =>
-    AutomationRules.TryLiveOrigin(configuration["LinkUi:AutomationUiUrl"], out var origin)
-        ? origin
-        : null;
+

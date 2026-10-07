@@ -68,13 +68,12 @@ public static class ShellAccessGate
 
     /// <summary>
     /// Paths that must render or redirect without a session: login/logout endpoints,
-    /// the post-logout landing, static files, and the SignalR stub.
+    /// the post-logout landing, and static files. Hubs use the same sign-in rule as pages.
     /// </summary>
     public static bool IsSessionPublic(PathString path) =>
         IsAnonymousPublic(path)
         || path.StartsWithSegments("/Auth")
         || path.StartsWithSegments("/logout")
         || path.StartsWithSegments("/swagger")
-        || path.StartsWithSegments("/hubs")
         || Path.HasExtension(path.Value);
 }
