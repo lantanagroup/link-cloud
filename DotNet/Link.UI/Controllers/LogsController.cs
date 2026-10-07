@@ -69,6 +69,22 @@ public sealed class LogsController : Controller
         return Back(query, result);
     }
 
+    [HttpPost("Acquisition/disable-facility")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DisableFacility(AcquisitionQuery query, CancellationToken cancellationToken)
+    {
+        var result = await _logs.ChangeFacilityLogsAsync(query.FacilityId, restore: false, cancellationToken);
+        return Back(query, result);
+    }
+
+    [HttpPost("Acquisition/restore-facility")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreFacility(AcquisitionQuery query, CancellationToken cancellationToken)
+    {
+        var result = await _logs.ChangeFacilityLogsAsync(query.FacilityId, restore: true, cancellationToken);
+        return Back(query, result);
+    }
+
     [HttpPost("Acquisition/{id:long}/process")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ProcessOne(long id, CancellationToken cancellationToken)

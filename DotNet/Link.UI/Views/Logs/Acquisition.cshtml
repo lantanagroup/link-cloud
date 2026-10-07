@@ -165,6 +165,26 @@
     </div>
 </div>
 
+@if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">This facility</div>
+        <div class="card-body">
+            <p>These actions change every acquisition log for <code class="lu-facility-id">@search.FacilityId</code>, including logs outside this search.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" asp-action="DisableFacility" onsubmit="return confirm('Disable every acquisition log for this facility?');">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Disable logs</button>
+                </form>
+                <form method="post" asp-action="RestoreFacility" onsubmit="return confirm('Restore every acquisition log for this facility?');">
+                    <partial name="_AcquisitionFields" model="query" />
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Restore logs</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
 {
     <div class="alert alert-warning mt-3">@Model.LoadError</div>

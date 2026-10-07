@@ -406,6 +406,16 @@ public sealed class FacilityHubService
             (page, token) => _normalization!.SaveAsync(page, input, token),
             "Operation saved.");
 
+    public Task<FacilityWriteResult> ImportExtensionUrlsAsync(
+        string? facilityId,
+        string? csv,
+        bool fileTooLarge,
+        CancellationToken cancellationToken) =>
+        WriteNormalizationAsync(facilityId, null, null, 1, cancellationToken,
+            (page, error) => page.NormalizationError = error,
+            (page, token) => _normalization!.ImportExtensionUrlsAsync(page, csv, fileTooLarge, token),
+            "Extension URLs imported.");
+
     public Task<FacilityWriteResult> DeleteOperationAsync(
         string? facilityId,
         string? operationId,

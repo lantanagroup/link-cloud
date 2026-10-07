@@ -1,4 +1,6 @@
-﻿namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+﻿using LantanaGroup.Link.Shared.Application.Models.Tenant;
+
+namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 
 public class NormalizationOperationApiModel
 {
@@ -10,6 +12,14 @@ public class NormalizationOperationApiModel
     public string Description { get; set; } = string.Empty;
     public bool IsDisabled { get; set; }
     public List<NormalizationOperationResourceTypeApiModel> OperationResourceTypes { get; set; } = [];
+    public List<NormalizationOperationVendorPresetApiModel> VendorPresets { get; set; } = [];
+}
+
+public class NormalizationOperationVendorPresetApiModel
+{
+    public Guid Id { get; set; }
+    public Guid VendorVersionId { get; set; }
+    public VendorVersionModel? VendorVersion { get; set; }
 }
 
 public class CreateNormalizationOperationRequestApiModel
@@ -31,7 +41,6 @@ public class UpdateNormalizationOperationRequestApiModel
 
     /// <summary>
     /// Null leaves vendor presets alone. An empty list removes them.
-    /// Facility operations are not vendor operations, so the editor sends null.
     /// </summary>
     public List<Guid>? VendorVersionIds { get; set; }
 }

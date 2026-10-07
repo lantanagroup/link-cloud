@@ -81,6 +81,7 @@ public sealed class FacilityNormalizationService
             return page.Normalization.ResourceWarning ?? "Normalization has no resource types yet.";
 
         Guid? id = null;
+        var existingPresetIds = new List<Guid>();
         if (!string.IsNullOrWhiteSpace(input.OperationId))
         {
             if (!Guid.TryParse(input.OperationId, out var parsed))
@@ -95,6 +96,7 @@ public sealed class FacilityNormalizationService
             if (!string.Equals(existingType, postedType, StringComparison.OrdinalIgnoreCase))
                 return "Operation type cannot be changed.";
 
+            existingPresetIds.AddRange(existing.VendorPresets.Select(preset => preset.VendorVersionId));
             id = parsed;
         }
 
@@ -107,9 +109,21 @@ public sealed class FacilityNormalizationService
                 out var error))
             return error;
 
+        if (!FacilityNormalizationRules.TryVendorPresets(
+                input.VendorPresetsPosted,
+                page.VendorListLoaded,
+                id is not null,
+                input.VendorVersionIds,
+                page.Vendors.Select(vendor => vendor.Id),
+                existingPresetIds,
+                out var vendorIds,
+                out var vendorError))
+            return vendorError;
+
         if (id is null)
         {
-            var created = await _client.CreateOperationAsync(request!, cancellationToken);
+            request!.VendorVersionIds = vendorIds ?? [];
+            var created = await _client.CreateOperationAsync(request, cancellationToken);
             if (!created.IsSuccessStatusCode)
             {
                 Log("Normalization operation create", facilityId, created);
@@ -126,12 +140,101 @@ public sealed class FacilityNormalizationService
             ResourceTypes = request.ResourceTypes,
             Operation = request.Operation,
             IsDisabled = isDisabled,
-            VendorVersionIds = null
+            VendorVersionIds = vendorIds
         }, cancellationToken);
         if (!updated.IsSuccessStatusCode)
         {
             Log("Normalization operation update", facilityId, updated);
             return FacilityFormRules.ServiceMessage("Normalization", updated.StatusCode, updated.RawBody);
+        }
+
+        return null;
+    }
+
+    public async Task<string?> ImportExtensionUrlsAsync(
+        FacilityHubViewModel page,
+        string? csv,
+        bool fileTooLarge,
+        CancellationToken cancellationToken)
+    {
+        if (fileTooLarge)
+            return "The CSV must be 64 KB or smaller.";
+
+        if (page.Normalization.ResourceTypes.Count == 0)
+            return page.Normalization.ResourceWarning ?? "Normalization has no resource types yet.";
+
+        if (!FacilityNormalizationRules.TryParseExtensionCsv(
+                csv,
+                page.Normalization.ResourceTypes,
+                out var groups,
+                out var error))
+            return error;
+
+        var facilityId = page.FacilityId!;
+        var found = await _client.SearchOperationsAsync(
+            facilityId: facilityId,
+            operationType: "RemoveExtensions",
+            includeDisabled: true,
+            pageSize: FacilityNormalizationRules.MaxImportUrls,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+        List<NormalizationOperationApiModel> records;
+        if (found.StatusCode == StatusCodes.Status204NoContent)
+        {
+            records = [];
+        }
+        else if (!found.IsSuccessStatusCode || found.Body is null)
+        {
+            Log("Normalization extension import", facilityId, found);
+            return FacilityFormRules.ServiceMessage("Normalization", found.StatusCode, found.RawBody);
+        }
+        else
+        {
+            records = found.Body.Records ?? [];
+            var metadata = found.Body.Metadata;
+            if (metadata is not null && (metadata.TotalPages > 1 || metadata.TotalCount > records.Count))
+                return "Too many remove-extensions operations to check for conflicts, so nothing was imported.";
+        }
+
+        if (FacilityNormalizationRules.HasExtensionConflict(records, groups, out var conflict))
+            return conflict;
+
+        var created = 0;
+        foreach (var group in groups)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var input = new NormalizationOperationInput
+            {
+                OperationType = "RemoveExtensions",
+                Name = "Remove Extensions - " + group.ResourceType,
+                Description = "Imported extension URLs.",
+                ResourceTypes = [group.ResourceType],
+                ExtensionUrls = group.Urls.Select(url => new ExtensionUrlInput { Url = url }).ToList()
+            };
+            if (!FacilityNormalizationRules.TryBuild(
+                    input,
+                    facilityId,
+                    page.Normalization.ResourceTypes,
+                    out var request,
+                    out _,
+                    out var buildError))
+            {
+                return created == 0
+                    ? buildError
+                    : $"Imported {created} operation(s), then the next one was not created: {buildError}";
+            }
+
+            var response = await _client.CreateOperationAsync(request!, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log("Normalization extension import", facilityId, response);
+                var message = FacilityFormRules.ServiceMessage("Normalization", response.StatusCode, response.RawBody);
+                return created == 0
+                    ? message
+                    : $"Imported {created} operation(s), then create failed: {message}";
+            }
+
+            created++;
         }
 
         return null;
