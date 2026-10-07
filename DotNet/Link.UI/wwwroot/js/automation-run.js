@@ -79,14 +79,32 @@
             error.textContent = run.error || "";
             error.classList.toggle("d-none", !run.error);
         }
+
+        var actions = document.getElementById("runActions");
+        if (actions) {
+            actions.replaceChildren();
+            if (run.facilityId) {
+                var acquisition = document.createElement("a");
+                acquisition.className = "btn btn-sm btn-outline-secondary";
+                acquisition.href = "/Logs/Acquisition?facilityId=" + encodeURIComponent(run.facilityId);
+                acquisition.textContent = "Acquisition log";
+                actions.append(acquisition);
+            }
+        }
     }
+
+    var refreshTicket = 0;
 
     function refresh() {
         if (!runId) return;
+        var ticket = ++refreshTicket;
         fetch("/Automation/Runs/" + runId + "/status", { headers: { "Accept": "application/json" } })
             .then(function (response) { return response.ok ? response.json() : null; })
-            .then(apply)
-            .catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+            .then(function (page) {
+                if (ticket !== refreshTicket) return;
+                apply(page);
+            })
+            .catch(function () { });
     }
 
     function appendLog(line) {
@@ -110,17 +128,37 @@
         .withAutomaticReconnect()
         .build();
 
+    function catchUp() {
+        return connection.invoke("SubscribeRun", runId).then(function () {
+            setLive("Live", "bg-success");
+            refresh();
+        });
+    }
+
     connection.on("status", refresh);
     connection.on("dashboardUpdate", refresh);
     connection.on("log", appendLog);
     connection.onreconnecting(function () { setLive("Reconnecting", "bg-warning text-dark"); });
     connection.onreconnected(function () {
-        setLive("Live", "bg-success");
-        connection.invoke("SubscribeRun", runId).catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        catchUp().catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
     });
     connection.onclose(function () { setLive("Live updates unavailable", "bg-secondary"); });
+
+    // A status broadcast can land before this page subscribes, and later summary
+    // writes do not always broadcast. Keep reading the stored run until it ends.
+    var poll = setInterval(function () {
+        var node = document.getElementById("runStatus");
+        var label = node ? node.textContent : "";
+        if (label === "Succeeded" || label === "Failed" || label === "Cancelled") {
+            clearInterval(poll);
+            refresh();
+            return;
+        }
+        refresh();
+    }, 2000);
+
+    refresh();
     connection.start()
-        .then(function () { return connection.invoke("SubscribeRun", runId); })
-        .then(function () { setLive("Live", "bg-success"); })
+        .then(catchUp)
         .catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
 })();

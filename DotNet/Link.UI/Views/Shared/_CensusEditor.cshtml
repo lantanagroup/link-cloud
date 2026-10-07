@@ -1,0 +1,46 @@
+@model Link.UI.Models.FacilityHubViewModel
+<div class="accordion-item">
+    <h2 class="accordion-header" id="censusHeading">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#censusPanel" aria-expanded="true" aria-controls="censusPanel">
+            Census configuration
+        </button>
+    </h2>
+    <div id="censusPanel" class="accordion-collapse collapse show" aria-labelledby="censusHeading">
+        <div class="accordion-body">
+            @if (!Model.CensusConfigured)
+            {
+                <p class="text-muted mb-0">Census service URL is not configured (ServiceRegistry:CensusServiceUrl).</p>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(Model.CensusError))
+                {
+                    <div class="alert alert-warning">@Model.CensusError</div>
+                }
+                else if (!Model.CensusExists)
+                {
+                    <div class="alert alert-info">No census configuration for this facility.</div>
+                }
+                <form method="post" asp-controller="Tenants" asp-action="SaveCensus" asp-route-id="@Model.FacilityId">
+                    <input type="hidden" name="censusExists" value="@(Model.CensusExists ? "true" : "false")" />
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="censusEnabled" name="enabled" value="true" @(Model.CensusEnabled ? "checked" : null) />
+                        <label class="form-check-label" for="censusEnabled">Enabled</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="scheduledTrigger">Scheduled trigger</label>
+                        <input id="scheduledTrigger" name="scheduledTrigger" value="@Model.CensusTrigger" class="form-control" placeholder="0 0 6 * * ?" />
+                        <div class="form-text">Quartz cron expression.</div>
+                    </div>
+                    <button type="submit" class="btn btn-au-action">@(Model.CensusExists ? "Save census" : "Add census")</button>
+                </form>
+                @if (Model.CensusExists)
+                {
+                    <form method="post" asp-controller="Tenants" asp-action="DeleteCensus" asp-route-id="@Model.FacilityId" class="mt-2" onsubmit="return confirm('Delete the census configuration?');">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Delete census</button>
+                    </form>
+                }
+            }
+        </div>
+    </div>
+</div>

@@ -128,6 +128,9 @@
                                     </label>
                                 </div>
                             }
+                            <div class="mt-2">
+                                <a class="btn btn-sm btn-outline-secondary" id="editMeasuresLink" data-base="@Url.Action("Index", "Measures")" href="@Url.Action("Index", "Measures")">Edit measures</a>
+                            </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label d-block">Facility configuration</label>
@@ -189,6 +192,16 @@
                                     <option value="@orm.Id" data-name="@orm.Name" data-is-default="@orm.IsDefault.ToString().ToLower()">@FormatTemplateOption(orm.Name, orm.IsDefault, orm.IsSystem)</option>
                                 }
                             </select>
+                        </div>
+                        <div class="col-12 facility-alacarte">
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-secondary" id="editQueryPlanLink" data-base="@Url.Action("Index", "QueryPlans")" href="@Url.Action("Index", "QueryPlans")">Edit query plan</a>
+                                <a class="btn btn-sm btn-outline-secondary" id="editNormalizationLink" data-base="@Url.Action("Index", "Normalizations")" href="@Url.Action("Index", "Normalizations")">Edit normalization</a>
+                                <a class="btn btn-sm btn-outline-secondary" id="editOrganizationMapLink" data-base="@Url.Action("Index", "OrganizationResourceMaps")" href="@Url.Action("Index", "OrganizationResourceMaps")">Edit organization map</a>
+                            </div>
+                        </div>
+                        <div class="col-12" id="editFacilityTemplateRow">
+                            <a class="btn btn-sm btn-outline-secondary" id="editFacilityTemplateLink" data-base="@Url.Action("Index", "FacilityTemplates")" href="@Url.Action("Index", "FacilityTemplates")">Edit facility template</a>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="Seed">Seed</label>
@@ -925,6 +938,30 @@
                 }
             }
             refreshCohortPatientConfigOptions();
+            syncTemplateEditorLinks();
+        }
+
+        function editorHref(base, selectId) {
+            var select = document.getElementById(selectId);
+            var id = select && select.value ? select.value : "";
+            return id ? base + "?edit=" + encodeURIComponent(id) : base;
+        }
+
+        function syncTemplateEditorLinks() {
+            var queryPlan = document.getElementById("editQueryPlanLink");
+            var normalization = document.getElementById("editNormalizationLink");
+            var organization = document.getElementById("editOrganizationMapLink");
+            var facility = document.getElementById("editFacilityTemplateLink");
+            if (queryPlan) queryPlan.href = editorHref(queryPlan.getAttribute("data-base") || queryPlan.href.split("?")[0], "QueryPlanTemplate");
+            if (normalization) normalization.href = editorHref(normalization.getAttribute("data-base") || normalization.href.split("?")[0], "NormalizationSuite");
+            if (organization) organization.href = editorHref(organization.getAttribute("data-base") || organization.href.split("?")[0], "OrganizationResourceMap");
+            if (facility) facility.href = editorHref(facility.getAttribute("data-base") || facility.href.split("?")[0], "FacilityTemplate");
+            var measures = document.getElementById("editMeasuresLink");
+            if (measures) {
+                var base = measures.getAttribute("data-base") || measures.href.split("?")[0];
+                var checked = document.querySelectorAll(".measure-checkbox:checked");
+                measures.href = checked.length === 1 ? base + "?edit=" + encodeURIComponent(checked[0].value) : base;
+            }
         }
 
         function refreshCohortPatientConfigOptions() {
@@ -1449,6 +1486,7 @@
             cb.addEventListener('change', function () {
                 refreshAllPredicted();
                 rerenderImportedEligEditors();
+                syncTemplateEditorLinks();
             });
         });
         document.getElementById('ReportMethod').addEventListener('change', function () {
@@ -1484,9 +1522,13 @@
         ['QueryPlanTemplate', 'NormalizationSuite', 'OrganizationResourceMap'].forEach(function (id) {
             document.getElementById(id).addEventListener('change', function () {
                 legacyFacilityMode = false;
+                syncTemplateEditorLinks();
             });
         });
-        document.getElementById('FacilityTemplate').addEventListener('change', syncFacilityModeUi);
+        document.getElementById('FacilityTemplate').addEventListener('change', function () {
+            syncFacilityModeUi();
+            syncTemplateEditorLinks();
+        });
         var reportingWindowEl = document.getElementById('ReportingWindowMinutes');
         if (reportingWindowEl) {
             reportingWindowEl.addEventListener('change', function () {
