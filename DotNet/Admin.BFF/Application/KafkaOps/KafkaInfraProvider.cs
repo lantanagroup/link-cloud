@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 
@@ -13,6 +14,7 @@ public sealed record ProcessResult(int ExitCode, string Output, string Error);
 public interface IKubernetesResourceClient
 {
     Task<string?> GetAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken);
+    Task<IReadOnlyList<string>> ListAsync(string apiVersion, string plural, string namespaceName, CancellationToken cancellationToken);
     Task ApplyAsync(string apiVersion, string plural, string namespaceName, string name, string body, CancellationToken cancellationToken);
     Task DeleteAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken);
 }
@@ -25,8 +27,27 @@ public interface IKafkaInfraProvider
     Task ScaleGroupAsync(string groupId, int replicas, CancellationToken cancellationToken);
     Task AddBrokerAsync(CancellationToken cancellationToken);
     Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken);
-    Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken);
-    Task CancelReassignmentAsync(CancellationToken cancellationToken);
+    Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken);
+    Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken);
+    Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken);
+    Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken);
+}
+
+public static class KafkaRebalanceNames
+{
+    public static string For(Guid id) => "link-ops-" + id.ToString("N");
+
+    public static void Require(string? name)
+    {
+        const string prefix = "link-ops-";
+        if (string.IsNullOrWhiteSpace(name) || name.Length != prefix.Length + 32 || !name.StartsWith(prefix, StringComparison.Ordinal))
+            throw new KafkaOpsRejectedException("The rebalance name is invalid.");
+        foreach (var ch in name.AsSpan(prefix.Length))
+        {
+            if (ch is not (>= '0' and <= '9' or >= 'a' and <= 'f'))
+                throw new KafkaOpsRejectedException("The rebalance name is invalid.");
+        }
+    }
 }
 
 public sealed class ProcessRunner : IProcessRunner
@@ -61,14 +82,19 @@ public sealed class ProcessRunner : IProcessRunner
 
 public sealed class UnconfiguredKubernetesClient : IKubernetesResourceClient
 {
+    private const string NotConfigured = "Kubernetes is not configured. DevOps must enable the Strimzi provider before brokers or replicas can change.";
+
     public Task<string?> GetAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken) =>
-        throw new KafkaOpsRejectedException("Kubernetes is not configured. DevOps must enable the Strimzi provider before brokers or replicas can change.");
+        throw new KafkaOpsRejectedException(NotConfigured);
+
+    public Task<IReadOnlyList<string>> ListAsync(string apiVersion, string plural, string namespaceName, CancellationToken cancellationToken) =>
+        throw new KafkaOpsRejectedException(NotConfigured);
 
     public Task ApplyAsync(string apiVersion, string plural, string namespaceName, string name, string body, CancellationToken cancellationToken) =>
-        throw new KafkaOpsRejectedException("Kubernetes is not configured. DevOps must enable the Strimzi provider before brokers or replicas can change.");
+        throw new KafkaOpsRejectedException(NotConfigured);
 
     public Task DeleteAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken) =>
-        throw new KafkaOpsRejectedException("Kubernetes is not configured. DevOps must enable the Strimzi provider before brokers or replicas can change.");
+        throw new KafkaOpsRejectedException(NotConfigured);
 }
 
 public sealed class DisabledKafkaInfraProvider : IKafkaInfraProvider
@@ -85,8 +111,16 @@ public sealed class DisabledKafkaInfraProvider : IKafkaInfraProvider
     public Task ScaleGroupAsync(string groupId, int replicas, CancellationToken cancellationToken) => Refuse();
     public Task AddBrokerAsync(CancellationToken cancellationToken) => Refuse();
     public Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken) => Refuse();
-    public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken) => Refuse();
-    public Task CancelReassignmentAsync(CancellationToken cancellationToken) => Refuse();
+    public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken) => Refuse();
+    public Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken) => Refuse();
+    public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // No query is added. A reassignment started outside this console stays invisible, so the answer is unknown.
+        return Task.FromResult(new ReassignmentListing());
+    }
 
     private Task Refuse() => throw new KafkaOpsRejectedException(Detail);
 }
@@ -129,33 +163,70 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         return ComposeAsync(cancellationToken, null, "stop", prefix + brokerId);
     }
 
-    public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken)
+    public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken)
     {
+        KafkaRebalanceNames.Require(rebalanceName);
         var throttle = _options.ReassignmentThrottleBytesPerSecond > 0
             ? " --throttle " + _options.ReassignmentThrottleBytesPerSecond
             : "";
-        var script = "cat > /tmp/link-ops-reassign.json && /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
-                     _options.BrokerService + ":9092 --reassignment-json-file /tmp/link-ops-reassign.json --execute" + throttle;
+        var file = "/tmp/" + rebalanceName + ".json";
+        var script = "cat > " + file + " && /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
+                     _options.BrokerService + ":9092 --reassignment-json-file " + file + " --execute" + throttle;
         return ComposeAsync(cancellationToken, reassignmentJson, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
-    public Task CancelReassignmentAsync(CancellationToken cancellationToken)
+    public Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken)
     {
+        KafkaRebalanceNames.Require(rebalanceName);
+        var file = "/tmp/" + rebalanceName + ".json";
         var script = "/opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " + _options.BrokerService +
-                     ":9092 --reassignment-json-file /tmp/link-ops-reassign.json --cancel";
+                     ":9092 --reassignment-json-file " + file + " --cancel";
         return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
+    public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(rebalanceName))
+            return Task.CompletedTask;
+        KafkaRebalanceNames.Require(rebalanceName);
+        RequireToken(_options.BrokerService, "service");
+        var file = "/tmp/" + rebalanceName + ".json";
+        var script = "if [ -f " + file + " ]; then /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
+                     _options.BrokerService + ":9092 --reassignment-json-file " + file + " --verify; fi";
+        return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
+    }
+
+    public async Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            RequireToken(_options.BrokerService, "service");
+            var script = "/opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
+                         _options.BrokerService + ":9092 --list";
+            var result = await RunComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
+            return ReassignmentListText.Read(result);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ReassignmentListing();
+        }
+    }
+
     private async Task ComposeAsync(CancellationToken cancellationToken, string? stdin, params string[] args)
+    {
+        var result = await RunComposeAsync(cancellationToken, stdin, args);
+        if (result.ExitCode != 0)
+            throw new KafkaOpsRejectedException("The local compose command failed. " + Trim(result.Error) + " " + Trim(result.Output));
+    }
+
+    private async Task<ProcessResult> RunComposeAsync(CancellationToken cancellationToken, string? stdin, params string[] args)
     {
         RequireToken(_options.ComposeProject, "project");
         var arguments = new List<string> { "compose", "-p", _options.ComposeProject };
         foreach (var path in ComposeFiles())
             arguments.AddRange(["-f", path]);
         arguments.AddRange(args);
-        var result = await _process.RunAsync("docker", arguments, stdin, cancellationToken);
-        if (result.ExitCode != 0)
-            throw new KafkaOpsRejectedException("The local compose command failed. " + Trim(result.Error) + " " + Trim(result.Output));
+        return await _process.RunAsync("docker", arguments, stdin, cancellationToken);
     }
 
     private string? DeploymentName(string groupId)
@@ -273,28 +344,106 @@ public sealed class StrimziKafkaInfraProvider : IKafkaInfraProvider
             cancellationToken);
     }
 
-    public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken)
+    public async Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken)
     {
+        KafkaRebalanceNames.Require(rebalanceName);
+        var existing = await _kubernetes.GetAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), rebalanceName, cancellationToken);
+        if (existing is not null && !refresh)
+            throw new KafkaOpsRejectedException("KafkaRebalance " + rebalanceName + " already exists.");
+
         var leaving = LeavingBroker(reassignmentJson);
         var mode = leaving is null ? "add-brokers" : "remove-brokers";
         var brokers = leaving is null ? ArrivingBrokers(reassignmentJson) : new[] { leaving.Value };
-        var name = "link-ops-" + mode;
+        var annotation = refresh ? "refresh" : "approve";
         var body = JsonSerializer.Serialize(new
         {
             apiVersion = "kafka.strimzi.io/v1beta2",
             kind = "KafkaRebalance",
             metadata = new
             {
-                name,
-                annotations = new Dictionary<string, string> { ["strimzi.io/rebalance"] = "approve" }
+                name = rebalanceName,
+                annotations = new Dictionary<string, string> { ["strimzi.io/rebalance"] = annotation }
             },
             spec = new { mode, brokers }
         });
-        return _kubernetes.ApplyAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), name, body, cancellationToken);
+        await _kubernetes.ApplyAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), rebalanceName, body, cancellationToken);
     }
 
-    public Task CancelReassignmentAsync(CancellationToken cancellationToken) =>
-        _kubernetes.DeleteAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), "link-ops-remove-brokers", cancellationToken);
+    public Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken)
+    {
+        KafkaRebalanceNames.Require(rebalanceName);
+        return _kubernetes.DeleteAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), rebalanceName, cancellationToken);
+    }
+
+    public async Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(rebalanceName))
+            return;
+        KafkaRebalanceNames.Require(rebalanceName);
+        var existing = await _kubernetes.GetAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), rebalanceName, cancellationToken);
+        if (existing is null)
+            return;
+        await _kubernetes.DeleteAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), rebalanceName, cancellationToken);
+    }
+
+    public async Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var bodies = await _kubernetes.ListAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), cancellationToken);
+            var names = new List<string>();
+            foreach (var body in bodies)
+            {
+                if (!KafkaRebalanceInFlight(body, out var name))
+                    continue;
+                if (!names.Contains(name, StringComparer.Ordinal))
+                    names.Add(name);
+            }
+
+            return new ReassignmentListing { Known = true, Topics = names };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ReassignmentListing();
+        }
+    }
+
+    private static bool KafkaRebalanceInFlight(string body, out string name)
+    {
+        name = "";
+        using var document = JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? throw new JsonException("KafkaRebalance body is empty.") : body);
+        var root = document.RootElement;
+        if (root.TryGetProperty("metadata", out var metadata) && metadata.TryGetProperty("name", out var nameElement))
+            name = nameElement.GetString() ?? "";
+        if (string.IsNullOrWhiteSpace(name))
+            throw new JsonException("KafkaRebalance has no name.");
+
+        var active = ConditionTrue(root, "Rebalancing") || ConditionTrue(root, "PendingProposal") || ConditionTrue(root, "ProposalReady");
+        if (!root.TryGetProperty("status", out _) || active)
+            return true;
+        var finished = ConditionTrue(root, "Ready") || ConditionTrue(root, "Stopped");
+        return !finished;
+    }
+
+    private static bool ConditionTrue(JsonElement root, string type)
+    {
+        if (!root.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.Object)
+            return false;
+        if (!status.TryGetProperty("conditions", out var conditions) || conditions.ValueKind != JsonValueKind.Array)
+            return false;
+        foreach (var condition in conditions.EnumerateArray())
+        {
+            if (!condition.TryGetProperty("type", out var typeElement))
+                continue;
+            if (!string.Equals(typeElement.GetString(), type, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (condition.TryGetProperty("status", out var statusElement)
+                && string.Equals(statusElement.GetString(), "True", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
 
     private async Task<int> ReadReplicasAsync(string pool, CancellationToken cancellationToken)
     {
@@ -348,6 +497,82 @@ public sealed class StrimziKafkaInfraProvider : IKafkaInfraProvider
         if (!document.RootElement.TryGetProperty("arrivingBroker", out var arriving))
             return [];
         return [arriving.GetInt32()];
+    }
+}
+
+public static class ReassignmentListText
+{
+    public static ReassignmentListing Read(ProcessResult result)
+    {
+        if (result.ExitCode != 0)
+            return new ReassignmentListing();
+
+        var text = ((result.Output ?? "") + "\n" + (result.Error ?? "")).Trim();
+        if (text.Length == 0)
+            return new ReassignmentListing();
+        if (text.Contains("no partition reassignment", StringComparison.OrdinalIgnoreCase))
+            return new ReassignmentListing { Known = true };
+
+        var topics = new List<string>();
+        var partitions = new List<string>();
+        var sawPartitions = false;
+        var start = text.IndexOf('{');
+        var end = text.LastIndexOf('}');
+        if (start >= 0 && end > start)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(text.Substring(start, end - start + 1));
+                if (document.RootElement.TryGetProperty("partitions", out var entries) && entries.ValueKind == JsonValueKind.Array)
+                {
+                    sawPartitions = true;
+                    foreach (var entry in entries.EnumerateArray())
+                    {
+                        if (entry.TryGetProperty("topic", out var topic) && topic.ValueKind == JsonValueKind.String)
+                        {
+                            var name = topic.GetString();
+                            Add(topics, name);
+                            if (entry.TryGetProperty("partition", out var number) && number.TryGetInt32(out var id))
+                                AddKey(partitions, name, id);
+                        }
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                sawPartitions = false;
+            }
+        }
+
+        foreach (Match match in Regex.Matches(text, @"(?m)^(.+)-(\d+)\s*:\s*replicas\s*:", RegexOptions.CultureInvariant))
+        {
+            var name = match.Groups[1].Value.Trim();
+            Add(topics, name);
+            if (int.TryParse(match.Groups[2].Value, out var id))
+                AddKey(partitions, name, id);
+        }
+
+        if (topics.Count > 0 || partitions.Count > 0)
+            return new ReassignmentListing { Known = true, Topics = topics, Partitions = partitions };
+        if (sawPartitions)
+            return new ReassignmentListing { Known = true };
+        return new ReassignmentListing();
+    }
+
+    private static void Add(List<string> topics, string? topic)
+    {
+        if (string.IsNullOrWhiteSpace(topic) || topics.Contains(topic, StringComparer.Ordinal))
+            return;
+        topics.Add(topic);
+    }
+
+    private static void AddKey(List<string> partitions, string? topic, int partition)
+    {
+        if (string.IsNullOrWhiteSpace(topic))
+            return;
+        var key = topic + "\n" + partition;
+        if (!partitions.Contains(key, StringComparer.Ordinal))
+            partitions.Add(key);
     }
 }
 
