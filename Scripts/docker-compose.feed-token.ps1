@@ -4,11 +4,16 @@
 param(
     [string]$RepoRoot,
     [string]$EnvFile,
-    [string]$AzExecutable
+    [string]$AzExecutable,
+    [string]$InstallDirectory,
+    [string]$ZipPackage,
+    [string]$WingetExecutable,
+    [switch]$SkipUserPathUpdate
 )
 
 $ErrorActionPreference = 'Stop'
 $AzureDevOpsResource = '499b84ac-1321-427f-aa17-267ca6975798'
+$AzureCliZipUri = 'https://aka.ms/installazurecliwindowszipx64'
 
 function Get-FeedTokenRepoRoot {
     if ($RepoRoot) {
@@ -18,10 +23,12 @@ function Get-FeedTokenRepoRoot {
 }
 
 function Update-FeedTokenSessionPath {
+    if ($SkipUserPathUpdate) { return }
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $env:Path = "$userPath;$machinePath"
     $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'AzureCLI\bin'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Azure CLI\wbin'),
         (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'),
         (Join-Path ${env:ProgramFiles} 'Microsoft SDKs\Azure\CLI2\wbin')
@@ -52,21 +59,103 @@ function Find-AzExecutable {
         return $existing.Source
     }
 
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    $installedFromZip = Install-FeedTokenAzFromZip
+    if ($installedFromZip) { return $installedFromZip }
+
+    return Install-FeedTokenAzWithWinget
+}
+
+function Add-FeedTokenUserPath {
+    param([string]$Directory)
+    $parts = @($env:PATH -split ';' | Where-Object { $_ })
+    if ($parts -notcontains $Directory) {
+        $env:PATH = "$Directory;$env:PATH"
+    }
+    if ($SkipUserPathUpdate) { return }
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $userParts = @()
+    if ($userPath) { $userParts = @($userPath -split ';' | Where-Object { $_ }) }
+    if ($userParts -notcontains $Directory) {
+        if ($userPath) {
+            [Environment]::SetEnvironmentVariable('Path', "$Directory;$userPath", 'User')
+        } else {
+            [Environment]::SetEnvironmentVariable('Path', $Directory, 'User')
+        }
+    }
+}
+
+function Install-FeedTokenAzFromZip {
+    if (-not [Environment]::Is64BitOperatingSystem) {
+        Write-Host "The per-user Azure CLI ZIP is 64-bit only, so it was not installed."
+        return $null
+    }
+    $root = $InstallDirectory
+    if (-not $root) { $root = Join-Path $env:LOCALAPPDATA 'AzureCLI' }
+    $package = $ZipPackage
+    $downloaded = $null
+    try {
+        if (-not $package) {
+            $downloaded = Join-Path ([System.IO.Path]::GetTempPath()) ("azure-cli-" + [guid]::NewGuid().ToString('n') + ".zip")
+            Write-Host "Azure CLI (az) is not installed. Downloading the per-user ZIP into $root."
+            $previousProtocol = [Net.ServicePointManager]::SecurityProtocol
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $previousProgress = $ProgressPreference
+            $ProgressPreference = 'SilentlyContinue'
+            try {
+                Invoke-WebRequest -Uri $AzureCliZipUri -OutFile $downloaded -UseBasicParsing
+            } finally {
+                $ProgressPreference = $previousProgress
+                [Net.ServicePointManager]::SecurityProtocol = $previousProtocol
+            }
+            $package = $downloaded
+        } elseif (-not (Test-Path -LiteralPath $package)) {
+            Write-Host "The per-user Azure CLI ZIP was not found at $package."
+            return $null
+        } else {
+            Write-Host "Azure CLI (az) is not installed. Installing the per-user ZIP into $root."
+        }
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        Expand-Archive -LiteralPath $package -DestinationPath $root -Force
+        $azCmd = Get-ChildItem -LiteralPath $root -Filter az.cmd -Recurse -File | Select-Object -First 1
+        if (-not $azCmd) {
+            Write-Host "The per-user Azure CLI ZIP did not contain bin\az.cmd."
+            return $null
+        }
+        Add-FeedTokenUserPath -Directory $azCmd.Directory.FullName
+        return $azCmd.FullName
+    } catch {
+        Write-Host "The per-user Azure CLI ZIP could not be installed. $($_.Exception.Message)"
+        return $null
+    } finally {
+        if ($downloaded -and (Test-Path -LiteralPath $downloaded)) {
+            Remove-Item -LiteralPath $downloaded -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Install-FeedTokenAzWithWinget {
+    $winget = $WingetExecutable
     if (-not $winget) {
-        Write-Host "Azure CLI (az) is not installed and winget is not available, so it cannot be installed for the current user."
-        Write-Host "Install Azure CLI yourself (no admin) from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token.ps1."
+        $found = Get-Command winget -ErrorAction SilentlyContinue
+        if ($found) { $winget = $found.Source }
+    }
+    if (-not $winget) {
+        Write-Host "The per-user Azure CLI ZIP is not available and winget is not available."
+        Write-Host "Install Azure CLI from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token.ps1."
         exit 1
     }
 
-    Write-Host "Azure CLI (az) is not installed. Installing it for the current user with winget."
+    Write-Host "The per-user ZIP install did not produce az. Trying winget, which installs the machine-wide MSI and needs an administrator."
     # winget writes progress to the success stream. This function's caller
     # captures that stream, so the progress must not become part of the az path.
-    & winget install --id Microsoft.AzureCLI --scope user --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *>&1 | Out-Host
+    & $winget install --exact --id Microsoft.AzureCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *>&1 | Out-Host
     $wingetCode = $LASTEXITCODE
     # 0x8A15002B: the package is already installed.
     if ($wingetCode -ne 0 -and $wingetCode -ne -1978335189) {
-        Write-Host "winget could not install Azure CLI (exit $wingetCode). Install it for the current user from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token.ps1."
+        Write-Host "winget could not install Azure CLI (exit $wingetCode). That installer needs an administrator. Install Azure CLI from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token.ps1."
         exit 1
     }
 
@@ -76,7 +165,7 @@ function Find-AzExecutable {
         return $installed.Source
     }
 
-    Write-Host "winget finished, but az is still not on PATH. Open a new shell, or install Azure CLI for the current user from https://aka.ms/installazurecliwindows, then run Scripts/docker-compose.feed-token.ps1."
+    Write-Host "winget finished, but az is still not on PATH. Open a new shell, or install Azure CLI from https://aka.ms/installazurecliwindows, then run Scripts/docker-compose.feed-token.ps1."
     exit 1
 }
 

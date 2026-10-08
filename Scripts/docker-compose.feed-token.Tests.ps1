@@ -338,6 +338,96 @@ exit 0
     $noisyDockerCalls = $global:LinkCloudFeedTokenHooks['DockerCalls'].Count
     Write-Result (($global:LASTEXITCODE -eq 3) -and ($noisyDockerCalls -eq 1)) 'compose starts docker after a fetch script prints extra output'
 
+    # Per-user ZIP install, then winget without --scope user. Neither test changes the real user PATH.
+    $userPathBefore = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $toolDir = Join-Path $repo 'az-tools'
+    New-Item -ItemType Directory -Path $toolDir | Out-Null
+    $payload = Join-Path $toolDir 'payload.cmd'
+    @"
+@echo off
+if /I "%~1"=="account" (
+  if /I "%~2"=="show" exit /b 0
+  if /I "%~2"=="get-access-token" (
+    echo {"accessToken":"$sentinel","expires_on":1893456000}
+    exit /b 0
+  )
+)
+exit /b 0
+"@ | Set-Content -Encoding ASCII -Path $payload
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zipPath = Join-Path $repo 'azure-cli.zip'
+    $zipArchive = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
+    try {
+        $entry = $zipArchive.CreateEntry('bin/az.cmd')
+        $entryStream = $entry.Open()
+        try {
+            $payloadBytes = [System.IO.File]::ReadAllBytes($payload)
+            $entryStream.Write($payloadBytes, 0, $payloadBytes.Length)
+        } finally { $entryStream.Dispose() }
+    } finally { $zipArchive.Dispose() }
+    $runner = Join-Path $repo 'run-install.ps1'
+    @'
+param(
+    [string]$RepoRoot,
+    [string]$EnvFile,
+    [string]$InstallDirectory,
+    [string]$ZipPackage,
+    [string]$WingetExecutable,
+    [switch]$SkipUserPathUpdate
+)
+$env:PATH = $env:LINK_CLOUD_TEST_PATH
+& $env:LINK_CLOUD_TEST_SCRIPT -RepoRoot $RepoRoot -EnvFile $EnvFile -InstallDirectory $InstallDirectory -ZipPackage $ZipPackage -WingetExecutable $WingetExecutable -SkipUserPathUpdate:$SkipUserPathUpdate
+exit $LASTEXITCODE
+'@ | Set-Content -Encoding ASCII -Path $runner
+    $fetchScriptPath = Join-Path $PSScriptRoot 'docker-compose.feed-token.ps1'
+    $restricted = "$toolDir;C:\Windows\System32;C:\Windows"
+    $env:LINK_CLOUD_TEST_PATH = $restricted
+    $env:LINK_CLOUD_TEST_SCRIPT = $fetchScriptPath
+    $installRoot = Join-Path $repo 'az-install'
+    $zipEnv = Join-Path $repo 'zip.env'
+    $zipOut = Join-Path $repo 'zip-out.txt'
+    $zipErr = Join-Path $repo 'zip-err.txt'
+    $zipArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -InstallDirectory "{3}" -ZipPackage "{4}" -SkipUserPathUpdate' -f $runner, $repo, $zipEnv, $installRoot, $zipPath
+    $zipProc = Start-Process -FilePath powershell.exe -ArgumentList $zipArgs -Wait -PassThru -RedirectStandardOutput $zipOut -RedirectStandardError $zipErr -WindowStyle Hidden
+    $zipText = ''
+    if (Test-Path $zipOut) { $zipText += [System.IO.File]::ReadAllText($zipOut) }
+    if (Test-Path $zipErr) { $zipText += [System.IO.File]::ReadAllText($zipErr) }
+    Write-Result ($zipProc.ExitCode -eq 0) 'per-user zip install fetches a token'
+    Write-Result (Test-Path -LiteralPath (Join-Path $installRoot 'bin\az.cmd')) 'per-user zip install extracts az.cmd'
+    Write-Result ((Test-Path -LiteralPath $zipEnv) -and -not $zipText.Contains($sentinel)) 'per-user zip install does not print the token'
+    $wingetCmd = Join-Path $toolDir 'winget.cmd'
+    @"
+@echo off
+echo %*> "%~dp0winget-args.txt"
+copy /Y "%~dp0payload.cmd" "%~dp0az.cmd" >nul
+exit /b 0
+"@ | Set-Content -Encoding ASCII -Path $wingetCmd
+    $wingetEnv = Join-Path $repo 'winget.env'
+    $wingetOut = Join-Path $repo 'winget-out.txt'
+    $wingetErr = Join-Path $repo 'winget-err.txt'
+    $missingZip = Join-Path $repo 'missing-azure-cli.zip'
+    $wingetArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -InstallDirectory "{3}" -ZipPackage "{4}" -WingetExecutable "{5}" -SkipUserPathUpdate' -f $runner, $repo, $wingetEnv, $installRoot, $missingZip, $wingetCmd
+    $wingetProc = Start-Process -FilePath powershell.exe -ArgumentList $wingetArgs -Wait -PassThru -RedirectStandardOutput $wingetOut -RedirectStandardError $wingetErr -WindowStyle Hidden
+    $wingetText = ''
+    if (Test-Path $wingetOut) { $wingetText += [System.IO.File]::ReadAllText($wingetOut) }
+    if (Test-Path $wingetErr) { $wingetText += [System.IO.File]::ReadAllText($wingetErr) }
+    $wingetArgText = ''
+    $wingetArgFile = Join-Path $toolDir 'winget-args.txt'
+    if (Test-Path $wingetArgFile) { $wingetArgText = [System.IO.File]::ReadAllText($wingetArgFile) }
+    $scriptText = [System.IO.File]::ReadAllText($fetchScriptPath)
+    Write-Result ($wingetProc.ExitCode -eq 0) 'winget fallback fetches a token after the zip is missing'
+    Write-Result ($scriptText.Contains('needs an administrator')) 'winget fallback says the MSI needs an administrator'
+    Write-Result ($scriptText.Contains('per-user ZIP')) 'zip install tells the user it is using the ZIP'
+    Write-Result ($wingetArgText.Contains('Microsoft.AzureCLI') -and -not $wingetArgText.Contains('--scope')) 'winget fallback does not pass --scope user'
+    Write-Result (-not $wingetText.Contains($sentinel)) 'winget fallback does not print the token'
+    $userPathAfter = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if ($userPathBefore -ne $userPathAfter) {
+        [Environment]::SetEnvironmentVariable('Path', $userPathBefore, 'User')
+    }
+    Write-Result ($userPathBefore -eq $userPathAfter) 'install tests do not change the user PATH'
+    Remove-Item Env:LINK_CLOUD_TEST_PATH -ErrorAction SilentlyContinue
+    Remove-Item Env:LINK_CLOUD_TEST_SCRIPT -ErrorAction SilentlyContinue
+
     # Messages collected above must not contain the sentinel either.
     $hookText = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
     Write-Result (-not $hookText.Contains($sentinel)) 'hook messages do not contain the token'

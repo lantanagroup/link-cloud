@@ -101,11 +101,11 @@ if ! az_bin=$(find_az); then
     winget_bin=$(command -v winget.exe)
   fi
   if [ -z "$winget_bin" ]; then
-    fail "Azure CLI (az) is not installed and winget is not available, so it cannot be installed for the current user. Install Azure CLI yourself (no admin) from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token-fetch.sh."
+    fail "Azure CLI (az) is not installed and winget is not available. On Windows, Scripts/docker-compose.feed-token.ps1 installs the per-user ZIP. Otherwise install Azure CLI from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token-fetch.sh."
   fi
-  printf '%s\n' "Azure CLI (az) is not installed. Installing it for the current user with winget." >&2
+  printf '%s\n' "Azure CLI (az) is not installed. Trying winget, which may need an administrator. On Windows, Scripts/docker-compose.feed-token.ps1 installs the per-user ZIP instead." >&2
   set +e
-  "$winget_bin" install --id Microsoft.AzureCLI --scope user --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+  "$winget_bin" install --exact --id Microsoft.AzureCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
   winget_code=$?
   set -e
   if [ "$winget_code" -ne 0 ] && [ "$winget_code" -ne 255 ]; then
@@ -114,7 +114,7 @@ if ! az_bin=$(find_az); then
   fi
   refresh_path
   if ! az_bin=$(find_az); then
-    fail "winget could not make Azure CLI available. Install it for the current user from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token-fetch.sh."
+    fail "winget could not make Azure CLI available. That installer may need an administrator. Install Azure CLI from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token-fetch.sh."
   fi
 fi
 
