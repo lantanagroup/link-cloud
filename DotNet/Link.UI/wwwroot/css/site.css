@@ -21,6 +21,7 @@
   --lu-chart-donut-size: 150px;
   --lu-chart-dashboard-height: 168px;
   --lu-chart-dashboard-donut: 168px;
+  --lu-chart-dashboard-donut-box: 200px;
   --au-card-shadow: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
   --au-radius:      .5rem;
   --au-focus:       0 0 0 .2rem rgba(17, 17, 17, .16);
@@ -92,6 +93,10 @@ pre code, a > code { color: inherit; }
 .page-link:hover,
 .page-link:focus {
   color: #111;
+  border-color: #e0e0e0;
+}
+.bg-light {
+  background-color: #f8f8f8 !important;
 }
 .page-link:hover,
 .page-link:focus {
@@ -1971,9 +1976,9 @@ a.lu-clip {
 }
 .au-dash .lu-chart-donut {
   width: var(--lu-chart-dashboard-donut);
-  height: var(--lu-chart-dashboard-donut);
+  height: var(--lu-chart-dashboard-donut-box);
   max-width: var(--lu-chart-dashboard-donut);
-  max-height: var(--lu-chart-dashboard-donut);
+  max-height: var(--lu-chart-dashboard-donut-box);
 }
 .au-dash #activeCard .border { padding: .4rem .6rem !important; }
 .au-dash #activeCard .btn { margin-top: .25rem !important; padding-top: .1rem; padding-bottom: .1rem; }
