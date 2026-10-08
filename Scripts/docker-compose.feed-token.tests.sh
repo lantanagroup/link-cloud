@@ -1,0 +1,396 @@
+#!/bin/bash
+# Bash wrapper tests. They mock az and docker. They do not need a network.
+set -u
+passed=0
+failed=0
+sentinel='unit-test-feed-token-sentinel'
+root=$(cd "$(dirname "$0")" && pwd)
+repo=$(mktemp -d)
+log="$repo/docker-log"
+
+pass() { passed=$((passed + 1)); printf '%s\n' "PASS $1"; }
+fail() { failed=$((failed + 1)); printf '%s\n' "FAIL $1"; }
+
+cleanup() { rm -rf "$repo"; }
+trap cleanup EXIT
+
+cat > "$repo/docker-mock" <<'EOF'
+#!/bin/bash
+printf 'ARGC:%s\n' "$#" >> "$LINK_CLOUD_MOCK_LOG"
+i=1
+for arg in "$@"; do
+  printf 'ARG:%s\n' "$arg" >> "$LINK_CLOUD_MOCK_LOG"
+  i=$((i + 1))
+done
+if [ -n "${AZURE_ARTIFACTS_PAT:-}" ]; then
+  if [ "$AZURE_ARTIFACTS_PAT" = "$LINK_CLOUD_MOCK_SENTINEL" ]; then
+    printf '%s\n' 'TOKEN:match' >> "$LINK_CLOUD_MOCK_LOG"
+  else
+    printf '%s\n' 'TOKEN:other' >> "$LINK_CLOUD_MOCK_LOG"
+  fi
+else
+  printf '%s\n' 'TOKEN:absent' >> "$LINK_CLOUD_MOCK_LOG"
+fi
+exit "${LINK_CLOUD_MOCK_EXIT:-0}"
+EOF
+chmod +x "$repo/docker-mock"
+
+cat > "$repo/fetch-ok" <<EOF
+#!/bin/bash
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=\${LINK_CLOUD_MOCK_EXPIRES}" > "\$1/.azure-artifacts.env"
+chmod 600 "\$1/.azure-artifacts.env"
+exit 0
+EOF
+chmod +x "$repo/fetch-ok"
+
+cat > "$repo/fetch-fail" <<'EOF'
+#!/bin/bash
+printf '%s\n' 'mock fetch failed' >&2
+exit 1
+EOF
+chmod +x "$repo/fetch-fail"
+
+export LINK_CLOUD_DOCKER_EXE="$repo/docker-mock"
+export LINK_CLOUD_MOCK_LOG="$log"
+export LINK_CLOUD_MOCK_SENTINEL="$sentinel"
+export LINK_CLOUD_SKIP_RELOAD=1
+export LINK_CLOUD_NOW_EPOCH=1700000000
+unset LINK_CLOUD_REPO_ROOT_OVERRIDE || true
+unset AZURE_ARTIFACTS_PAT || true
+
+# shellcheck disable=SC1091
+. "$root/docker-compose.feed-token-profile.sh"
+
+reset_log() { : > "$log"; }
+
+# Missing file and fetch failure.
+reset_log
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$repo"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+rm -f "$repo/.azure-artifacts.env"
+set +e
+docker compose up >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+err=$(cat "$repo/err.txt")
+if [ "$code" -ne 0 ]; then pass 'missing file fetch failure is non-zero'; else fail 'missing file fetch failure is non-zero'; fi
+if [ ! -s "$log" ]; then pass 'missing file fetch failure does not call docker'; else fail 'missing file fetch failure does not call docker'; fi
+printf '%s' "$err" | grep -F 'Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"' >/dev/null && pass 'bash missing message has the PowerShell setup line' || fail 'bash missing message has the PowerShell setup line'
+printf '%s' "$err" | grep -F 'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh' >/dev/null && pass 'bash missing message has the Git Bash setup line' || fail 'bash missing message has the Git Bash setup line'
+printf '%s' "$err" | grep -F 'link-cloud-feed-token' >/dev/null && pass 'bash missing message has a profile line' || fail 'bash missing message has a profile line'
+printf '%s' "$err" | grep -F "$sentinel" >/dev/null && fail 'bash missing message does not contain the token' || pass 'bash missing message does not contain the token'
+
+# Valid token, spaces, exit code, no fetch.
+reset_log
+export LINK_CLOUD_MOCK_EXIT=9
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$repo/.azure-artifacts.env"
+set +e
+docker compose up 'my service' >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 9 ]; then pass 'bash docker exit code is propagated'; else fail 'bash docker exit code is propagated'; fi
+grep -F 'ARG:compose' "$log" >/dev/null && grep -F 'ARG:up' "$log" >/dev/null && grep -F 'ARG:my service' "$log" >/dev/null && pass 'bash args with spaces are passed through' || fail 'bash args with spaces are passed through'
+grep -F 'TOKEN:match' "$log" >/dev/null && pass 'bash token is visible to the docker child' || fail 'bash token is visible to the docker child'
+if [ -z "${AZURE_ARTIFACTS_PAT:-}" ]; then pass 'bash token is not kept in the parent shell'; else fail 'bash token is not kept in the parent shell'; fi
+calls=$(grep -c '^ARGC:' "$log" || true)
+calls=${calls:-0}
+if [ "$calls" -eq 1 ]; then pass 'bash docker is invoked once'; else fail 'bash docker is invoked once'; fi
+
+# Near expiry refreshes. fetch-ok writes a fresh expiry.
+reset_log
+unset LINK_CLOUD_MOCK_EXIT || true
+export LINK_CLOUD_MOCK_EXIT=0
+export LINK_CLOUD_MOCK_EXPIRES=1700003600
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-ok"
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700000599' > "$repo/.azure-artifacts.env"
+before=$(wc -c < "$repo/.azure-artifacts.env" | tr -d ' ')
+set +e
+docker compose ps >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+after=$(sed -n 's/^AZURE_ARTIFACTS_PAT_EXPIRES_ON=//p' "$repo/.azure-artifacts.env")
+if [ "$code" -eq 0 ] && [ "$after" = "1700003600" ]; then pass 'bash near-expiry token refreshes'; else fail 'bash near-expiry token refreshes'; fi
+
+# A refresh can return a token that is valid but under 10 minutes.
+reset_log
+export LINK_CLOUD_MOCK_EXIT=0
+export LINK_CLOUD_MOCK_EXPIRES=1700000400
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-ok"
+export LINK_CLOUD_NOW_EPOCH=1700000000
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700000599' > "$repo/.azure-artifacts.env"
+set +e
+docker compose ps >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 0 ]; then pass 'bash short cached token still runs docker'; else fail 'bash short cached token still runs docker'; fi
+
+# Outside the repo.
+reset_log
+export LINK_CLOUD_REPO_ROOT_OVERRIDE=""
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+set +e
+docker compose logs >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+grep -F 'ARG:compose' "$log" >/dev/null && grep -F 'ARG:logs' "$log" >/dev/null && pass 'bash outside the repo passes compose through' || fail 'bash outside the repo passes compose through'
+grep -F 'TOKEN:absent' "$log" >/dev/null && pass 'bash outside the repo does not set the token' || fail 'bash outside the repo does not set the token'
+
+# Non-compose.
+reset_log
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$repo"
+export LINK_CLOUD_MOCK_EXIT=4
+set +e
+docker version >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 4 ]; then pass 'bash non-compose exit code is propagated'; else fail 'bash non-compose exit code is propagated'; fi
+grep -F 'ARG:version' "$log" >/dev/null && pass 'bash non-compose command is passed through' || fail 'bash non-compose command is passed through'
+grep -F 'TOKEN:absent' "$log" >/dev/null && pass 'bash non-compose command does not set the token' || fail 'bash non-compose command does not set the token'
+
+# Global docker options still reach the compose token path.
+reset_log
+export LINK_CLOUD_MOCK_EXIT=0
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+export LINK_CLOUD_NOW_EPOCH=1700000000
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$repo/.azure-artifacts.env"
+set +e
+docker --context desktop-linux compose build automation-ui >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 0 ]; then pass 'bash docker global option runs compose'; else fail 'bash docker global option runs compose'; fi
+grep -F 'TOKEN:match' "$log" >/dev/null && pass 'bash docker global option sets the token' || fail 'bash docker global option sets the token'
+grep -F 'ARG:--context' "$log" >/dev/null && grep -F 'ARG:desktop-linux' "$log" >/dev/null && grep -F 'ARG:compose' "$log" >/dev/null && grep -F 'ARG:build' "$log" >/dev/null && grep -F 'ARG:automation-ui' "$log" >/dev/null && pass 'bash docker global option keeps the original arguments' || fail 'bash docker global option keeps the original arguments'
+reset_log
+set +e
+docker --context desktop-linux version >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+grep -F 'ARG:version' "$log" >/dev/null && grep -F 'TOKEN:absent' "$log" >/dev/null && pass 'bash docker global option on a non-compose command is passed through' || fail 'bash docker global option on a non-compose command is passed through'
+
+# Installer idempotence.
+install_dir="$repo/home-link"
+profile_path="$repo/bashrc"
+export LINK_CLOUD_INSTALL_DIR="$install_dir"
+export LINK_CLOUD_PROFILE_PATH="$profile_path"
+bash "$root/docker-compose.feed-token-install.sh" >"$repo/install-out.txt"
+bash "$root/docker-compose.feed-token-install.sh" >"$repo/install-out.txt"
+count=$(grep -c 'link-cloud-feed-token' "$profile_path" 2>/dev/null || true)
+count=${count:-0}
+if [ "$count" -eq 1 ]; then pass 'bash installer adds the profile line once'; else fail 'bash installer adds the profile line once'; fi
+grep -F "$install_dir/docker-compose.feed-token.sh" "$profile_path" >/dev/null && pass 'bash installer profile line uses the install directory' || fail 'bash installer profile line uses the install directory'
+grep -F '. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token' "$root/docker-compose.feed-token-install.sh" >/dev/null && pass 'bash default install line stays the documented snippet' || fail 'bash default install line stays the documented snippet'
+if bash -c 'set -eu; . "$1"; type compose >/dev/null' bash "$profile_path"; then
+  pass 'bash installer profile loads the copied script'
+else
+  fail 'bash installer profile loads the copied script'
+fi
+if [ -f "$install_dir/docker-compose.feed-token.sh" ]; then pass 'bash installer copies the profile script'; else fail 'bash installer copies the profile script'; fi
+
+grep -F '.azure-artifacts.env' "$root/../.dockerignore" >/dev/null && pass 'dockerignore excludes the local token file' || fail 'dockerignore excludes the local token file'
+grep -F 'MINGW*' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'git bash fetch delegates before writing a token' || fail 'git bash fetch delegates before writing a token'
+grep -F 'file_mode_is_600' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'fetch script rejects a token file that is not mode 600' || fail 'fetch script rejects a token file that is not mode 600'
+if grep -F 'env AZURE_ARTIFACTS_PAT' "$root/docker-compose.feed-token-profile.sh" >/dev/null; then
+  fail 'bash wrapper does not pass the token to env'
+else
+  pass 'bash wrapper does not pass the token to env'
+fi
+grep -F 'AZURE_ARTIFACTS_PAT="$token"' "$root/docker-compose.feed-token-profile.sh" >/dev/null && pass 'bash wrapper sets the token only for the docker command' || fail 'bash wrapper sets the token only for the docker command'
+if grep -F 'link_cloud_read_field' "$root/docker-compose.feed-token-profile.sh" >/dev/null; then
+  fail 'bash wrapper reads the token file once'
+else
+  pass 'bash wrapper reads the token file once'
+fi
+pair_file="$repo/pair.env"
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$pair_file"
+token=''
+expires=''
+link_cloud_load_token "$pair_file"
+if [ "$token" = "$sentinel" ] && [ "$expires" = '1893456000' ]; then
+  pass 'bash reads the token and expiry from one file'
+else
+  fail 'bash reads the token and expiry from one file'
+fi
+unset token expires
+
+mv_home="$repo/mv-fail"
+mkdir -p "$mv_home/bin" "$mv_home/tmp"
+cat > "$mv_home/bin/uname" <<'EOF'
+#!/bin/bash
+printf '%s\n' Linux
+exit 0
+EOF
+cat > "$mv_home/bin/az" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = account ] && [ "\${2:-}" = show ]; then
+  exit 0
+fi
+if [ "\${1:-}" = account ] && [ "\${2:-}" = get-access-token ]; then
+  printf '%s\n' '{"accessToken":"${sentinel}","expires_on":"1893456000"}'
+  exit 0
+fi
+exit 1
+EOF
+chmod +x "$mv_home/bin/uname" "$mv_home/bin/az"
+old_path=$PATH
+trace_root="$repo/trace-root"
+mkdir -p "$trace_root"
+set +e
+PATH="$mv_home/bin:$old_path" env SHELLOPTS=xtrace bash "$root/docker-compose.feed-token-fetch.sh" "$trace_root" >"$repo/fetch-xtrace-out.txt" 2>"$repo/fetch-xtrace-err.txt"
+trace_code=$?
+set -e
+trace_files=$(find "$trace_root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$trace_code" -eq 0 ] && [ "$trace_files" -eq 1 ]; then
+  pass 'inherited xtrace still writes the token file'
+else
+  fail 'inherited xtrace still writes the token file'
+fi
+if grep -F "$sentinel" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" >/dev/null 2>&1; then
+  fail 'inherited xtrace does not print the token'
+else
+  pass 'inherited xtrace does not print the token'
+fi
+mkdir -p "$mv_home/root"
+cat > "$mv_home/bin/mv" <<'EOF'
+#!/bin/bash
+exit 1
+EOF
+chmod +x "$mv_home/bin/mv"
+set +e
+PATH="$mv_home/bin:$old_path" TMPDIR="$mv_home/tmp" bash "$root/docker-compose.feed-token-fetch.sh" "$mv_home/root" >"$mv_home/out.txt" 2>"$mv_home/err.txt"
+mv_code=$?
+set -e
+PATH=$old_path
+left=$(find "$mv_home/root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$mv_code" -ne 0 ] && [ "$left" -eq 0 ]; then
+  pass 'failed token move removes the temporary file'
+else
+  fail 'failed token move removes the temporary file'
+fi
+if grep -F "$sentinel" "$mv_home/out.txt" "$mv_home/err.txt" >/dev/null 2>&1; then
+  fail 'failed token move does not print the token'
+else
+  pass 'failed token move does not print the token'
+fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$repo/.azure-artifacts.env"
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$repo"
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-fail"
+reset_log
+set +e
+set -x
+docker compose ps >"$repo/xtrace-out.txt" 2>"$repo/xtrace-err.txt"
+xcode=$?
+case $- in
+  *x*) tracing=1 ;;
+  *) tracing=0 ;;
+esac
+set +x
+set -e
+if [ "$xcode" -eq 0 ] && [ "$tracing" -eq 1 ]; then
+  pass 'bash xtrace stays enabled after compose'
+else
+  fail 'bash xtrace stays enabled after compose'
+fi
+if grep -F "$sentinel" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" >/dev/null 2>&1; then
+  fail 'bash xtrace does not print the token'
+else
+  pass 'bash xtrace does not print the token'
+fi
+if (
+  unset LINK_CLOUD_DOCKER_EXE
+  docker() { echo WRAP; }
+  # shellcheck disable=SC1090
+  . "$root/docker-compose.feed-token-profile.sh"
+  unset LINK_CLOUD_DOCKER_EXE
+  # shellcheck disable=SC1090
+  . "$root/docker-compose.feed-token-profile.sh"
+  [ "$LINK_CLOUD_DOCKER_EXE" != docker ]
+); then
+  pass 'bash wrapper does not cache the docker function'
+else
+  fail 'bash wrapper does not cache the docker function'
+fi
+mode_root="$repo/mode-root"
+mkdir -p "$mode_root/bin"
+cp "$mv_home/bin/uname" "$mode_root/bin/uname"
+cp "$mv_home/bin/az" "$mode_root/bin/az"
+cat > "$mode_root/bin/stat" <<'EOF'
+#!/bin/bash
+printf '%s\n' 644
+exit 0
+EOF
+chmod +x "$mode_root/bin/stat"
+set +e
+PATH="$mode_root/bin:$old_path" bash "$root/docker-compose.feed-token-fetch.sh" "$mode_root" >"$mode_root/out.txt" 2>"$mode_root/err.txt"
+mode_code=$?
+set -e
+mode_left=$(find "$mode_root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$mode_code" -ne 0 ] && [ "$mode_left" -eq 0 ]; then
+  pass 'token is not written when the temp file is not mode 600'
+else
+  fail 'token is not written when the temp file is not mode 600'
+fi
+if grep -F "$sentinel" "$mode_root/out.txt" "$mode_root/err.txt" >/dev/null 2>&1; then
+  fail 'rejected temp file does not print the token'
+else
+  pass 'rejected temp file does not print the token'
+fi
+
+saved_skip="${LINK_CLOUD_SKIP_RELOAD:-}"
+unset LINK_CLOUD_SKIP_RELOAD
+reload_root="$repo/reload-root"
+mkdir -p "$reload_root/Scripts"
+: > "$reload_root/docker-compose.yml"
+: > "$reload_root/Scripts/docker-compose.feed-token.ps1"
+printf '%s\n' 'touch "$LINK_CLOUD_RELOAD_MARK"' | cat - "$root/docker-compose.feed-token-profile.sh" > "$reload_root/Scripts/docker-compose.feed-token-profile.sh"
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$reload_root"
+export LINK_CLOUD_RELOAD_MARK="$reload_root/sourced"
+rm -f "$LINK_CLOUD_RELOAD_MARK"
+export LINK_CLOUD_MOCK_EXIT=0
+set +e
+docker version >"$reload_root/out.txt" 2>"$reload_root/err.txt"
+version_code=$?
+set -e
+if [ "$version_code" -eq 0 ] && [ ! -f "$LINK_CLOUD_RELOAD_MARK" ]; then
+  pass 'non-compose docker does not load the checkout script'
+else
+  fail 'non-compose docker does not load the checkout script'
+fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$reload_root/.azure-artifacts.env"
+rm -f "$LINK_CLOUD_RELOAD_MARK"
+export LINK_CLOUD_MOCK_EXIT=0
+set +e
+docker compose version >"$reload_root/out2.txt" 2>"$reload_root/err2.txt"
+compose_code=$?
+set -e
+if [ "$compose_code" -eq 0 ] && [ -f "$LINK_CLOUD_RELOAD_MARK" ]; then
+  pass 'compose loads the checkout script'
+else
+  fail 'compose loads the checkout script'
+fi
+export LINK_CLOUD_RELOAD_MARK2="$reload_root/sourced2"
+rm -f "$LINK_CLOUD_RELOAD_MARK2"
+printf '%s\n' 'touch "$LINK_CLOUD_RELOAD_MARK2"' | cat - "$root/docker-compose.feed-token-profile.sh" > "$reload_root/Scripts/docker-compose.feed-token-profile.sh"
+set +e
+docker compose version >"$reload_root/out3.txt" 2>"$reload_root/err3.txt"
+second_code=$?
+set -e
+if [ "$second_code" -eq 0 ] && [ -f "$LINK_CLOUD_RELOAD_MARK2" ]; then
+  pass 'compose reloads a changed checkout script'
+else
+  fail 'compose reloads a changed checkout script'
+fi
+export LINK_CLOUD_SKIP_RELOAD="$saved_skip"
+
+# Output files must not contain the sentinel.
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" "$reload_root/out.txt" "$reload_root/err.txt" "$reload_root/out2.txt" "$reload_root/err2.txt" "$reload_root/out3.txt" "$reload_root/err3.txt" >/dev/null 2>&1; then
+  fail 'bash test output does not contain the token'
+else
+  pass 'bash test output does not contain the token'
+fi
+
+printf '%s\n' "PASSED=$passed FAILED=$failed TOTAL=$((passed + failed))"
+if [ "$failed" -ne 0 ]; then
+  exit 1
+fi
+exit 0
