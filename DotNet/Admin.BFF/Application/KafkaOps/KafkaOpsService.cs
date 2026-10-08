@@ -45,6 +45,7 @@ public sealed class KafkaTopicsResponse
     public int Cap { get; set; }
     public bool ReadOnly { get; set; }
     public string? Error { get; set; }
+    public string? GroupsError { get; set; }
 }
 
 public sealed class KafkaTopicRow
@@ -63,6 +64,7 @@ public sealed class KafkaTopicRow
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public double ProduceRatePerSecond { get; set; }
     public long TotalLag { get; set; }
+    public bool LagKnown { get; set; } = true;
     public int MaxReplicas { get; set; }
     public List<string> Groups { get; set; } = [];
     public string? Error { get; set; }
@@ -162,6 +164,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             var described = await _broker.DescribeTopicsAsync(names, probeAlter: false, cancellationToken);
             var byName = described.ToDictionary(topic => topic.Topic, StringComparer.OrdinalIgnoreCase);
             var groups = await SafeGroupsAsync(includeTestGroups: false, cancellationToken);
+            var groupsKnown = groups is not null;
+            if (!groupsKnown)
+                response.GroupsError = "Subscribed groups could not be read, so lag is unknown.";
             foreach (var entry in KafkaTopicCatalog.Topics)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -171,8 +176,10 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                 var partitions = main?.Partitions ?? 0;
                 var retryPartitions = retry?.Partitions ?? 0;
                 var rate = await ProduceRateAsync(entry.Topic, main?.HighWatermarks.Sum() ?? 0, cancellationToken);
-                var lag = groups?.Where(group => entry.Groups.Contains(group.GroupId, StringComparer.Ordinal))
-                    .Sum(group => group.Partitions.Where(partition => partition.Topic == entry.Topic).Sum(partition => partition.Lag)) ?? 0;
+                var lag = groupsKnown
+                    ? groups!.Where(group => entry.Groups.Contains(group.GroupId, StringComparer.Ordinal))
+                        .Sum(group => group.Partitions.Where(partition => partition.Topic == entry.Topic).Sum(partition => partition.Lag))
+                    : 0;
                 response.Topics.Add(new KafkaTopicRow
                 {
                     Topic = entry.Topic,
@@ -189,6 +196,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     Configs = main?.Configs ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                     ProduceRatePerSecond = rate,
                     TotalLag = lag,
+                    LagKnown = groupsKnown,
                     MaxReplicas = partitions,
                     Groups = entry.Groups.ToList(),
                     Error = main?.Error
@@ -202,7 +210,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             return response;
         }
 
-        await _cache.SetAsync(cacheKey, response, TimeSpan.FromSeconds(Math.Clamp(_options.Value.CacheSeconds, 5, 10)), ExpirationType.Absolute, cancellationToken);
+        if (response.GroupsError is null)
+            await _cache.SetAsync(cacheKey, response, TimeSpan.FromSeconds(Math.Clamp(_options.Value.CacheSeconds, 5, 10)), ExpirationType.Absolute, cancellationToken);
         return response;
     }
 
@@ -229,11 +238,16 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
 
     public async Task<KafkaCapabilitiesResponse> GetCapabilitiesAsync(CancellationToken cancellationToken)
     {
+        var cacheKey = Key("view:capabilities");
+        var cached = await _cache.GetAsync<KafkaCapabilitiesResponse>(cacheKey, cancellationToken);
+        if (cached is not null && cached.Error is null && cached.Topics.Count > 0)
+            return cached;
+
         try
         {
             var names = KafkaTopicCatalog.Topics.Select(topic => topic.Topic).ToList();
             var described = await _broker.DescribeTopicsAsync(names, probeAlter: true, cancellationToken);
-            return new KafkaCapabilitiesResponse
+            var response = new KafkaCapabilitiesResponse
             {
                 Topics = described.Select(topic => new TopicCapability
                 {
@@ -243,6 +257,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     Error = topic.Error
                 }).ToList()
             };
+            if (response.Topics.Count > 0)
+                await _cache.SetAsync(cacheKey, response, TimeSpan.FromSeconds(Math.Clamp(_options.Value.CacheSeconds, 5, 10)), ExpirationType.Absolute, cancellationToken);
+            return response;
         }
         catch (Exception ex)
         {
@@ -334,23 +351,17 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         if (record.Kind != KafkaChangeKind.PartitionIncrease)
             return await ExecuteInfraAsync(user, record, cancellationToken);
 
+        EnsureActor(user, record.Kind);
         var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
 
-        var plan = await PlanAsync(record.Topic, record.RequestedPartitions, record.QuietWindowOverride, record.OverrideReason, cancellationToken);
-        if (!plan.Accepted)
-        {
-            record.Status = KafkaChangeStatus.Failed;
-            record.Failure = string.Join(" ", plan.Errors);
-            record.ClosedUtc = DateTimeOffset.UtcNow;
-            await SaveAsync(record, cancellationToken);
-            await AuditAsync(record, "execution-refused", cancellationToken);
-            throw new KafkaOpsRejectedException(record.Failure);
-        }
-
         try
         {
+            var plan = await PlanExcludingAsync(record, cancellationToken);
+            if (!plan.Accepted)
+                throw new KafkaOpsRejectedException(string.Join(" ", plan.Errors));
+
             await _broker.IncreasePartitionsAsync(record.Topic, record.RequestedPartitions, cancellationToken);
             if (record.RetryTopic.Length > 0)
                 await _broker.IncreasePartitionsAsync(record.RetryTopic, record.RequestedPartitions, cancellationToken);
@@ -358,12 +369,11 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         }
         catch (Exception ex)
         {
-            record.Status = KafkaChangeStatus.Failed;
-            record.Failure = ex.Message;
-            record.ClosedUtc = DateTimeOffset.UtcNow;
-            await SaveAsync(record, cancellationToken);
-            await AuditAsync(record, "execution-failed", cancellationToken);
-            throw new KafkaOpsRejectedException("The partition increase failed. " + ex.Message);
+            var reason = ex is KafkaOpsRejectedException
+                ? ex.Message
+                : "The partition increase failed. " + ex.Message;
+            await PersistFailedAsync(record, reason, cancellationToken);
+            throw new KafkaOpsRejectedException(reason);
         }
 
         record.Status = KafkaChangeStatus.Converging;
@@ -565,20 +575,45 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         }
     }
 
+    private async Task<PartitionPlan> PlanExcludingAsync(ChangeRequestRecord record, CancellationToken cancellationToken)
+    {
+        var (request, _) = await BuildPlanRequestAsync(
+            record.Topic,
+            record.RequestedPartitions,
+            record.QuietWindowOverride,
+            record.OverrideReason,
+            cancellationToken,
+            record.Id);
+        return PartitionChangePlanner.Evaluate(request);
+    }
+
+    private async Task PersistFailedAsync(ChangeRequestRecord record, string reason, CancellationToken cancellationToken)
+    {
+        record.Status = KafkaChangeStatus.Failed;
+        record.Failure = reason;
+        record.ClosedUtc = DateTimeOffset.UtcNow;
+        await SaveAsync(record, cancellationToken);
+        await AuditAsync(record, "execution-failed", cancellationToken);
+    }
+
     private async Task<(PartitionPlanRequest Request, KafkaTopicsResponse Topics)> BuildPlanRequestAsync(
         string topic,
         int requestedPartitions,
         bool overrideQuietWindow,
         string? overrideReason,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? excludeRequestId = null)
     {
         var topics = await GetTopicsAsync(cancellationToken);
         if (topics.Error is not null)
             throw new KafkaOpsRejectedException(topics.Error);
 
-        var family = KafkaTopicCatalog.MainName(topic);
+        var requestedName = (topic ?? "").Trim();
+        var family = KafkaTopicCatalog.MainName(requestedName);
         var row = topics.Topics.FirstOrDefault(candidate => string.Equals(candidate.Topic, family, StringComparison.OrdinalIgnoreCase));
-        var groups = await SafeGroupsAsync(includeTestGroups: false, cancellationToken) ?? [];
+        var groups = await SafeGroupsAsync(includeTestGroups: false, cancellationToken);
+        if (groups is null)
+            throw new KafkaOpsRejectedException("Subscribed groups could not be read, so lag and member config were not checked. The plan is refused.");
         var subscribed = KafkaTopicCatalog.GroupsOf(family);
         var snapshots = new List<GroupSafetySnapshot>();
         var lag = 0L;
@@ -598,10 +633,12 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
 
         var quiet = await QuietWindowAsync(family, row?.ProduceRatePerSecond ?? 0, lag, cancellationToken);
         var records = await OpenRecordsAsync(cancellationToken);
+        if (excludeRequestId is Guid excluded)
+            records = records.Where(record => record.Id != excluded).ToList();
         var now = DateTimeOffset.UtcNow;
         var request = new PartitionPlanRequest
         {
-            Topic = family,
+            Topic = requestedName,
             CurrentPartitions = row?.Partitions ?? 0,
             RetryTopicExists = row is { RetryPartitions: > 0 },
             RetryPartitions = row?.RetryPartitions ?? 0,

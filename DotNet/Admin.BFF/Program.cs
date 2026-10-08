@@ -105,7 +105,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.RegisterKafkaProducer<string, object>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
 
     builder.Services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { CompressionType = Confluent.Kafka.CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig());
+    builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, new Confluent.Kafka.ProducerConfig { AllowAutoCreateTopics = false });
 
     builder.Services.Configure<KafkaOpsOptions>(builder.Configuration.GetSection(KafkaOpsOptions.SectionName));
     builder.Services.AddSingleton<KafkaBrokerGateway>();
