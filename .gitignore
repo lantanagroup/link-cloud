@@ -446,3 +446,4 @@ Scripts/AzureAppConfig/config-key-inventory.json
 # Short-lived Azure DevOps token for local docker compose. Written by
 # Scripts/docker-compose.feed-token.ps1. Never commit it.
 .azure-artifacts.env
+.azure-artifacts.*.tmp

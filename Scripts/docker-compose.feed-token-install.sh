@@ -5,10 +5,17 @@ set -eu
 source_root=$(cd "$(dirname "$0")" && pwd)
 install_dir=${LINK_CLOUD_INSTALL_DIR:-"$HOME/.link-cloud"}
 profile_path=${LINK_CLOUD_PROFILE_PATH:-"$HOME/.bashrc"}
-line='. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token'
 
 mkdir -p "$install_dir"
 cp "$source_root/docker-compose.feed-token-profile.sh" "$install_dir/docker-compose.feed-token.sh"
+
+if [ "$install_dir" = "$HOME/.link-cloud" ]; then
+  line='. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token'
+else
+  install_abs=$(cd "$install_dir" && pwd)
+  quoted=$(printf '%s' "$install_abs/docker-compose.feed-token.sh" | sed "s/'/'\\\\''/g")
+  line=". '${quoted}' # link-cloud-feed-token"
+fi
 
 if [ -f "$profile_path" ] && grep -q 'link-cloud-feed-token' "$profile_path"; then
   printf '%s\n' "The profile line is already in $profile_path."
