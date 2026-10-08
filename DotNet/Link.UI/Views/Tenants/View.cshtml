@@ -54,7 +54,7 @@ else
                     @foreach (var report in Model.Enrolled)
                     {
                         <tr>
-                            <td><span class="badge text-bg-light border">@report.Cadence</span></td>
+                            <td>@report.Cadence</td>
                             <td>
                                 @if (report.Measures.Count == 0)
                                 {

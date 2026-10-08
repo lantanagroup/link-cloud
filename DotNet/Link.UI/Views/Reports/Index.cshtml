@@ -169,13 +169,10 @@
                             <td>
                                 <span class="lu-measures">
                                     <span class="lu-clip lu-clip-text" title="@report.Measures">@report.Measures</span>
-                                    @if (!string.IsNullOrWhiteSpace(report.Measures))
-                                    {
-                                        <partial name="_CopyButton" model="@(new CopyTarget { Value = report.Measures, Label = "Copy measures" })" />
-                                    }
+
                                 </span>
                             </td>
-                            <td><span class="badge text-bg-light border">@report.Frequency</span></td>
+                            <td>@report.Frequency</td>
                             <td class="text-end" data-census="@report.Id">—</td>
                             <td class="text-end" data-population="@report.Id">—</td>
                             <td>

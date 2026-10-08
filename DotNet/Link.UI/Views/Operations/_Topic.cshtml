@@ -151,10 +151,10 @@ else
                 </div>
             </div>
             <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-sm btn-au-neutral" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                <button class="btn btn-sm btn-au-neutral lu-icon-btn" type="submit" formaction="/Operations/Kafka/plan" title="Preview partition increase" aria-label="Preview partition increase"><i class="bi bi-eye" aria-hidden="true"></i></button>
                 @if (!Model.Topics.ReadOnly)
                 {
-                    <button class="btn btn-sm btn-success" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    <button class="btn btn-sm btn-success lu-icon-btn" id="plan-submit" type="submit" formaction="/Operations/Kafka/requests" title="Submit partition increase" aria-label="Submit partition increase"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
                 }
             </div>
         </form>
