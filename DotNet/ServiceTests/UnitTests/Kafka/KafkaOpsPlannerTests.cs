@@ -248,11 +248,13 @@ public class KafkaOpsPlannerTests
         var busy = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
         Assert.True(busy.Known);
         Assert.Equal(["ops-proof-log"], busy.Topics);
+        Assert.Equal(["ops-proof-log\n0", "ops-proof-log\n1"], busy.Partitions);
 
         process.Output = "{\"version\":1,\"partitions\":[{\"topic\":\"ops-proof-members\",\"partition\":0,\"replicas\":[0,1]}]}";
         var json = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
         Assert.True(json.Known);
         Assert.Equal(["ops-proof-members"], json.Topics);
+        Assert.Equal(["ops-proof-members\n0"], json.Partitions);
 
         process.Output = "{\"version\":1,\"partitions\":[]}";
         var emptyJson = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);

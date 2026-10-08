@@ -950,7 +950,7 @@ public class KafkaOpsServiceGuardTests
         broker.Eligible.Add(0);
         broker.RolesKnown = true;
         broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
-        broker.Placements.Add(new PartitionPlacement { Topic = "ReportScheduled", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 1, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
         var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
         await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
         await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
@@ -968,10 +968,15 @@ public class KafkaOpsServiceGuardTests
 
         var again = await service.CancelAsync(User("alice", ManageScaling), created.Id, CancellationToken.None);
         await service.ApproveAsync(User("bob", ManageScaling), again.Id, CancellationToken.None);
-        broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ReadyToAcquire"] };
+        broker.Reassignments = new ReassignmentListing
+        {
+            Known = true,
+            Topics = ["ReadyToAcquire"],
+            Partitions = ["ReadyToAcquire\n0"]
+        };
         broker.Placements.Clear();
-        ApplyAssignment(broker, stored.OriginalAssignmentJson, topic => topic == "ReadyToAcquire");
-        ApplyAssignment(broker, stored.ReassignmentJson, topic => topic != "ReadyToAcquire");
+        ApplyAssignment(broker, stored.OriginalAssignmentJson, (topic, partition) => topic == "ReadyToAcquire" && partition == 0);
+        ApplyAssignment(broker, stored.ReassignmentJson, (topic, partition) => topic == "ReadyToAcquire" && partition == 1);
 
         var done = await service.ExecuteAsync(User("carol", ManageScaling), again.Id, CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.Cancelled, done.Status);
@@ -1138,18 +1143,19 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal("", warnedStored.Failure);
     }
 
-    private static void ApplyAssignment(FakeBroker broker, string json, Func<string, bool> take)
+    private static void ApplyAssignment(FakeBroker broker, string json, Func<string, int, bool> take)
     {
         using var document = JsonDocument.Parse(json);
         foreach (var partition in document.RootElement.GetProperty("partitions").EnumerateArray())
         {
             var topic = partition.GetProperty("topic").GetString() ?? "";
-            if (!take(topic))
+            var id = partition.GetProperty("partition").GetInt32();
+            if (!take(topic, id))
                 continue;
             broker.Placements.Add(new PartitionPlacement
             {
                 Topic = topic,
-                Partition = partition.GetProperty("partition").GetInt32(),
+                Partition = id,
                 Leader = partition.GetProperty("replicas").EnumerateArray().First().GetInt32(),
                 Replicas = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList(),
                 Isr = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList()
