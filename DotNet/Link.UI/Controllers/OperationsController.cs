@@ -47,6 +47,39 @@ public sealed class OperationsController : Controller
         return View("Kafka", page with { Plan = plan.Value, Error = plan.Error ?? page.Error, Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
     }
 
+    [HttpPost("Kafka/family/plan")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PlanFamily(KafkaChangeForm form, CancellationToken cancellationToken)
+    {
+        var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
+        var plan = await _kafka.PlanFamilyAsync(form.Topic ?? "", form.OverrideQuietWindow, form.OverrideReason, cancellationToken);
+        return View("Kafka", page with { Plan = plan.Value, Error = plan.Error ?? page.Error, Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } });
+    }
+
+    [HttpPost("Kafka/family")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateFamily(KafkaChangeForm form, CancellationToken cancellationToken)
+    {
+        var page = WithDraft(await LoadAsync(null, null, null, null, null, QueryFrom(form), cancellationToken), form);
+        page = page with { Query = page.Query with { View = ThroughputKafkaPageQuery.Topic, Advanced = true } };
+        if (string.IsNullOrWhiteSpace(form.Reason))
+            return View("Kafka", page with { Error = "A reason is required." });
+        if (!string.Equals((form.Confirmation ?? "").Trim(), form.Topic ?? "", StringComparison.Ordinal))
+            return View("Kafka", page with { Error = "Type the topic name to confirm. Adding partitions cannot be reversed." });
+
+        var created = await _kafka.CreateFamilyAsync(
+            form.Topic ?? "",
+            form.Reason,
+            form.OverrideQuietWindow,
+            form.OverrideReason,
+            form.Confirmation,
+            Guid.NewGuid().ToString("N"),
+            cancellationToken);
+        if (created.Value is null)
+            return View("Kafka", page with { Error = created.Error });
+        return Redirect(page.Query.Href(topic: form.Topic) + "&requestId=" + created.Value.Id.ToString("D"));
+    }
+
     [HttpPost("Kafka/requests")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(KafkaChangeForm form, CancellationToken cancellationToken)
@@ -154,8 +187,18 @@ public sealed class OperationsController : Controller
 
     [HttpPost("Kafka/requests/{id:guid}/cancel")]
     [ValidateAntiForgeryToken]
-    public Task<IActionResult> Cancel(Guid id, KafkaChangeForm form, CancellationToken cancellationToken) =>
-        Mutate(id, form, () => _kafka.CancelAsync(id, cancellationToken), cancellationToken);
+    public async Task<IActionResult> Cancel(Guid id, KafkaChangeForm form, CancellationToken cancellationToken)
+    {
+        var call = await _kafka.CancelAsync(id, cancellationToken);
+        var query = QueryFrom(form);
+        if (call.Value is null)
+        {
+            var page = await LoadAsync(id, null, null, null, call.Error, query, cancellationToken);
+            return View("Kafka", page);
+        }
+
+        return Redirect(query.Href() + "&requestId=" + call.Value.Id.ToString("D"));
+    }
 
     private async Task<IActionResult> BrokerPlan(KafkaChangeForm form, Func<int, CancellationToken, Task<KafkaOpsCall<BrokerMovePlan>>> action, CancellationToken cancellationToken)
     {

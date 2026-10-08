@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using Claim = System.Security.Claims.Claim;
 using Moq;
@@ -29,6 +30,8 @@ public class KafkaOpsServiceGuardTests
         Assert.True(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.PartitionIncrease));
         Assert.False(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.PartitionIncrease));
         Assert.False(KafkaOpsExecution.Allows(false, false, KafkaChangeKind.PartitionIncrease));
+        Assert.True(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.CompleteTopicFamily));
+        Assert.False(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.CompleteTopicFamily));
         Assert.True(KafkaOpsExecution.Allows(false, true, KafkaChangeKind.ScaleReplicas));
         Assert.False(KafkaOpsExecution.Allows(true, false, KafkaChangeKind.ScaleReplicas));
         Assert.False(KafkaOpsExecution.Allows(false, false, KafkaChangeKind.ScaleReplicas));
@@ -333,22 +336,24 @@ public class KafkaOpsServiceGuardTests
     {
         var created = 0;
         var broken = new Mock<IAdminClient>();
-        broken.Setup(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
+        broken.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
             .ThrowsAsync(new KafkaException(ErrorCode.NotCoordinatorForGroup));
         var healthy = new Mock<IAdminClient>();
-        healthy.Setup(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
-            .ReturnsAsync(new ListConsumerGroupsResult { Valid = [] });
+        healthy.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult());
         var factory = new Mock<IKafkaAdminClientFactory>();
         factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
             .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
 
         var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
         await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
-        var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
-
-        Assert.Empty(groups);
         Assert.Equal(2, created);
         broken.Verify(client => client.Dispose(), Times.Once);
+
+        var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
+        Assert.Equal(2, created);
+        Assert.NotEmpty(groups);
+        Assert.All(groups, group => Assert.Empty(group.Members));
     }
 
     [Fact]
@@ -356,7 +361,7 @@ public class KafkaOpsServiceGuardTests
     {
         var created = 0;
         var client = new Mock<IAdminClient>();
-        client.Setup(item => item.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
+        client.Setup(item => item.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
             .ThrowsAsync(new InvalidOperationException("groups down"));
         var factory = new Mock<IKafkaAdminClientFactory>();
         factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
@@ -367,12 +372,171 @@ public class KafkaOpsServiceGuardTests
             });
         var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
 
-        for (var attempt = 0; attempt < 3; attempt++)
-            await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
         Assert.Equal(1, created);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
         Assert.Equal(2, created);
+        client.Verify(item => item.Dispose(), Times.Once);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(2, created);
+    }
+
+    [Fact]
+    public async Task PartialGroupError_RebuildsWithoutListingGroups()
+    {
+        var created = 0;
+        var broken = new Mock<IAdminClient>();
+        broken.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.NotCoordinatorForGroup) }
+                ]
+            });
+        var healthy = new Mock<IAdminClient>();
+        healthy.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult());
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
+            .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(2, created);
+        broken.Verify(client => client.Dispose(), Times.Once);
+        broken.Verify(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task MissingCatalogGroups_RenderWithNoMembers()
+    {
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.GroupIdNotFound) }
+                ]
+            });
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(admin.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
+
+        Assert.Contains(groups, group => group.GroupId == "Report" && group.Members.Count == 0 && group.State == "Empty");
+        Assert.All(groups, group => Assert.Empty(group.Members));
+        Assert.Equal(1, factory.Invocations.Count(invocation => invocation.Method.Name == "Create"));
+    }
+
+    [Fact]
+    public async Task PartitionLeaderError_RebuildsTheClient()
+    {
+        var created = 0;
+        var broken = GroupAdmin(new Error(ErrorCode.LeaderNotAvailable));
+        var healthy = GroupAdmin(new Error(ErrorCode.NoError));
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
+            .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(2, created);
+        broken.Verify(client => client.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task FailureCounter_IsNotClearedByAnotherOperation()
+    {
+        var created = 0;
+        var client = new Mock<IAdminClient>();
+        client.Setup(item => item.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ThrowsAsync(new InvalidOperationException("groups down"));
+        var partition = new PartitionMetadata(0, 1, [1], [1], new Error(ErrorCode.NoError));
+        client.Setup(item => item.GetMetadata(It.IsAny<string>(), It.IsAny<TimeSpan>()))
+            .Returns(new Metadata([], [new TopicMetadata("ReadyToAcquire", [partition, partition, partition, partition], new Error(ErrorCode.NoError))], -1, ""));
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
+            .Returns(() =>
+            {
+                created++;
+                return client.Object;
+            });
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        await gateway.IncreasePartitionsAsync("ReadyToAcquire", 4, CancellationToken.None);
+        Assert.Equal(1, created);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(2, created);
+    }
+
+    [Fact]
+    public async Task AdminCalls_DoNotOverlap()
+    {
+        var current = 0;
+        var peak = 0;
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .Returns(async () =>
+            {
+                var now = Interlocked.Increment(ref current);
+                int snapshot;
+                while ((snapshot = Volatile.Read(ref peak)) < now
+                    && Interlocked.CompareExchange(ref peak, now, snapshot) != snapshot)
+                {
+                }
+
+                await Task.Delay(60);
+                Interlocked.Decrement(ref current);
+                return new DescribeConsumerGroupsResult();
+            });
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(admin.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Task.WhenAll(
+            gateway.DescribeGroupsAsync(false, 1, CancellationToken.None),
+            gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+
+        Assert.Equal(1, peak);
+    }
+
+    [Fact]
+    public void Console_DoesNotListConsumerGroups()
+    {
+        var root = Path.Combine(RepoRoot(), "DotNet", "Admin.BFF");
+        foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+            Assert.DoesNotContain("ListConsumerGroupsAsync", File.ReadAllText(file), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReadOnly_RefusesCreateApproveRejectAndCancelWith403()
+    {
+        var (service, _, _) = NewService(requireSecondApprover: true, production: true);
+        var endpoints = new KafkaOpsEndpoints(service, NullLogger<KafkaOpsEndpoints>.Instance);
+        var user = Operator();
+        var http = new DefaultHttpContext();
+        var id = Guid.NewGuid();
+        var change = new ChangeRequestBody { Topic = "ReadyToAcquire", Partitions = 4, Reason = "raise it", Confirmation = "ReadyToAcquire" };
+        var reason = new ReasonBody { Reason = "because" };
+
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Create", user, http, change, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "CreateFamily", user, "ReadyToAcquire", change, http, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "CreateScale", user, "DataAcquisitionWorker", new ScaleBody { Replicas = 1, Reason = "scale" }, http, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "CreateAddBroker", user, reason, http, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "CreateDecommission", user, 3, reason, http, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "CreateRebalance", user, 3, reason, http, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Approve", user, id, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Reject", user, id, new RejectBody { Reason = "no" }, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Cancel", user, id, CancellationToken.None));
     }
 
     [Fact]
@@ -486,6 +650,261 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(0, infra.RemoveCalls);
     }
 
+    [Fact]
+    public async Task CompleteFamily_RaisesSiblingsOnly_AndDoesNotStartTheRateLimit()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: false);
+        broker.SetCount("ReadyToAcquire", 4);
+        broker.SetCount("ReadyToAcquire-Retry", 3);
+        broker.SetCount("ReadyToAcquire-Error", 3);
+
+        var plan = await service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None);
+        Assert.True(plan.Accepted);
+        Assert.Equal(4, plan.CurrentPartitions);
+        Assert.Equal(4, plan.RequestedPartitions);
+        Assert.Equal(["ReadyToAcquire-Retry", "ReadyToAcquire-Error"], plan.TopicsToRaise);
+        Assert.DoesNotContain("ReadyToAcquire", plan.TopicsToRaise);
+
+        var created = await service.CreateFamilyAsync(User("alice", ManageTopics), "ReadyToAcquire", "catch the family up", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        var executed = await service.ExecuteAsync(User("alice", ManageTopics), created.Id, CancellationToken.None);
+
+        Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
+        Assert.Null(executed.PartitionsChangedUtc);
+        Assert.DoesNotContain(broker.Increases, increase => increase.Topic == "ReadyToAcquire");
+        Assert.Contains(broker.Increases, increase => increase.Topic == "ReadyToAcquire-Retry" && increase.Count == 4);
+        Assert.Contains(broker.Increases, increase => increase.Topic == "ReadyToAcquire-Error" && increase.Count == 4);
+        Assert.Equal(4, broker.Increases.Single(increase => increase.Topic == "ReadyToAcquire-Retry").Count);
+    }
+
+    [Fact]
+    public async Task CompleteFamily_RefusesAnEvenFamily()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: false);
+        broker.SetCount("ReadyToAcquire", 4);
+        broker.SetCount("ReadyToAcquire-Retry", 4);
+        broker.SetCount("ReadyToAcquire-Error", 4);
+
+        var plan = await service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None);
+        Assert.False(plan.Accepted);
+        Assert.Contains(plan.Errors, error => error.Contains("No sibling is behind", StringComparison.Ordinal));
+        var refused = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateFamilyAsync(User("alice", ManageTopics), "ReadyToAcquire", "catch the family up", false, null, "ReadyToAcquire", null, CancellationToken.None));
+        Assert.Contains("No sibling is behind", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReassignmentInFlight_RefusesPartitionRebalanceDecommissionAndBrokerAdd()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        var pending = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ops-proof-log"] };
+
+        var plan = await service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None);
+        Assert.Contains(plan.Errors, error => error.Contains("ops-proof-log", StringComparison.Ordinal));
+        var family = await service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None);
+        Assert.Contains(family.Errors, error => error.Contains("ops-proof-log", StringComparison.Ordinal));
+
+        var create = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateAsync(User("alice", ManageTopics), "ReportScheduled", 4, "raise it", false, null, "ReportScheduled", null, CancellationToken.None));
+        Assert.Contains("ops-proof-log", create.Message, StringComparison.Ordinal);
+
+        var decommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() => service.PlanDecommissionAsync(3, CancellationToken.None));
+        Assert.Contains("ops-proof-log", decommission.Message, StringComparison.Ordinal);
+        var rebalance = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() => service.PlanRebalanceAsync(3, CancellationToken.None));
+        Assert.Contains("ops-proof-log", rebalance.Message, StringComparison.Ordinal);
+        var add = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateAddBrokerAsync(User("pat", ManageScaling), "add a broker", null, CancellationToken.None));
+        Assert.Contains("ops-proof-log", add.Message, StringComparison.Ordinal);
+
+        var approve = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("bob", ManageTopics), pending.Id, CancellationToken.None));
+        Assert.Contains("ops-proof-log", approve.Message, StringComparison.Ordinal);
+        var execute = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageTopics), pending.Id, CancellationToken.None));
+        Assert.Contains("ops-proof-log", execute.Message, StringComparison.Ordinal);
+        Assert.Equal(KafkaChangeStatus.Pending, (await service.GetAsync(pending.Id, CancellationToken.None))!.Status);
+
+        broker.Reassignments = new ReassignmentListing { Known = true };
+        var scale = await service.PlanScaleAsync("DataAcquisitionWorker", 1, CancellationToken.None);
+        Assert.DoesNotContain(scale.Errors, error => error.Contains("reassignment", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task TimedOutDecommission_StaysOpenWithoutStoppingOrCancelling()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true, scaleTimeoutSeconds: 30);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+        var stored = (await service.GetAsync(created.Id, CancellationToken.None))!;
+        stored.ExecutedUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+
+        await service.TrackAsync(CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.TimedOut, stored.Status);
+        Assert.Contains("broker was not removed", stored.Failure, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, infra.CancelCalls);
+        Assert.Equal(0, infra.RemoveCalls);
+
+        broker.Reassignments = new ReassignmentListing { Known = false };
+        await service.TrackAsync(CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.TimedOut, stored.Status);
+        Assert.Equal(0, infra.CancelCalls);
+        Assert.Equal(0, infra.RemoveCalls);
+
+        var blocked = await service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None);
+        Assert.Contains(blocked.Errors, error => error.Contains("ReadyToAcquire", StringComparison.Ordinal));
+
+        broker.Reassignments = new ReassignmentListing { Known = true };
+        await service.TrackAsync(CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Failed, stored.Status);
+        Assert.Contains("ended before the replicas matched", stored.Failure, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, infra.RemoveCalls);
+        Assert.Equal(0, infra.CancelCalls);
+    }
+
+    [Fact]
+    public async Task TimedOutDecommission_CompletesWhenTheReplicasFinishMoving()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true, scaleTimeoutSeconds: 30);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+        var stored = (await service.GetAsync(created.Id, CancellationToken.None))!;
+        stored.ExecutedUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+        broker.Reassignments = new ReassignmentListing { Known = false };
+
+        await service.TrackAsync(CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.TimedOut, stored.Status);
+
+        broker.Placements.Clear();
+        await service.TrackAsync(CancellationToken.None);
+
+        Assert.Equal(KafkaChangeStatus.Done, stored.Status);
+        Assert.Equal(0, infra.RemoveCalls);
+        Assert.Equal(0, infra.CancelCalls);
+        Assert.Contains("not stopped", stored.Progress, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CancelReassignment_NeedsAnotherPerson_AndChecksTheOriginalReplicas()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        var endpoints = new KafkaOpsEndpoints(service, NullLogger<KafkaOpsEndpoints>.Instance);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, await StatusAsync(endpoints, "Cancel", User("sam", ManageTopics), created.Id, null));
+        var cancel = await service.CancelAsync(User("alice", ManageScaling), created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeKind.CancelReassignment, cancel.Kind);
+        Assert.Equal(KafkaChangeStatus.Pending, cancel.Status);
+        var self = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("alice", ManageScaling), cancel.Id, CancellationToken.None));
+        Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
+        await service.ApproveAsync(User("bob", ManageScaling), cancel.Id, CancellationToken.None);
+
+        broker.Placements.Clear();
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 0], Isr = [1, 2, 0] });
+        var mismatch = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageScaling), cancel.Id, CancellationToken.None));
+        Assert.Contains("did not return", mismatch.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(KafkaChangeStatus.Failed, (await service.GetAsync(cancel.Id, CancellationToken.None))!.Status);
+        Assert.Equal(1, infra.CancelCalls);
+
+        broker.Placements.Clear();
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var again = await service.CancelAsync(User("alice", ManageScaling), created.Id, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), again.Id, CancellationToken.None);
+        var done = await service.ExecuteAsync(User("carol", ManageScaling), again.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Cancelled, done.Status);
+        Assert.Contains("original assignment", done.Progress, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(KafkaChangeStatus.Cancelled, (await service.GetAsync(created.Id, CancellationToken.None))!.Status);
+        Assert.Equal(2, infra.CancelCalls);
+        Assert.Equal(created.RebalanceName, infra.LastRebalanceName);
+    }
+
+    [Fact]
+    public async Task PreferredElection_UsesPreferredOnTheAdminPath_AndWarnsWithoutFailing()
+    {
+        Assert.Equal(ElectionType.Preferred, KafkaLeaderElection.Kind);
+        Assert.NotEqual(ElectionType.Unclean, KafkaLeaderElection.Kind);
+
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        infra.Name = "LocalCompose";
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1], Isr = [1] });
+        var created = await service.CreateRebalanceAsync(User("alice", ManageScaling), 3, "spread onto the new broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        var executed = await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+        ReplacePlacements(broker, executed.ReassignmentJson);
+        await service.TrackAsync(CancellationToken.None);
+        var stored = (await service.GetAsync(created.Id, CancellationToken.None))!;
+        Assert.Equal(KafkaChangeStatus.Done, stored.Status);
+        Assert.Equal([ElectionType.Preferred], broker.Elections);
+        Assert.Contains("Preferred leaders", stored.Progress, StringComparison.Ordinal);
+        Assert.Equal("", stored.Warning);
+        Assert.Equal(1, infra.ReleaseCalls);
+
+        infra.Name = "Strimzi";
+        broker.Elections.Clear();
+        broker.Placements.Clear();
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1], Isr = [1] });
+        var skipped = await service.CreateRebalanceAsync(User("alice", ManageScaling), 3, "spread onto the new broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), skipped.Id, CancellationToken.None);
+        var skippedRun = await service.ExecuteAsync(User("carol", ManageScaling), skipped.Id, CancellationToken.None);
+        ReplacePlacements(broker, skippedRun.ReassignmentJson);
+        await service.TrackAsync(CancellationToken.None);
+        var skippedStored = (await service.GetAsync(skipped.Id, CancellationToken.None))!;
+        Assert.Equal(KafkaChangeStatus.Done, skippedStored.Status);
+        Assert.Empty(broker.Elections);
+        Assert.Contains("skipped", skippedStored.Progress, StringComparison.OrdinalIgnoreCase);
+
+        infra.Name = "LocalCompose";
+        broker.ElectionError = new InvalidOperationException("election refused");
+        broker.Placements.Clear();
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1], Isr = [1] });
+        var warned = await service.CreateRebalanceAsync(User("alice", ManageScaling), 3, "spread onto the new broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), warned.Id, CancellationToken.None);
+        var warnedRun = await service.ExecuteAsync(User("carol", ManageScaling), warned.Id, CancellationToken.None);
+        ReplacePlacements(broker, warnedRun.ReassignmentJson);
+        await service.TrackAsync(CancellationToken.None);
+        var warnedStored = (await service.GetAsync(warned.Id, CancellationToken.None))!;
+        Assert.Equal(KafkaChangeStatus.Done, warnedStored.Status);
+        Assert.Contains("did not finish", warnedStored.Warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("", warnedStored.Failure);
+    }
+
+    private static void ReplacePlacements(FakeBroker broker, string reassignmentJson)
+    {
+        broker.Placements.Clear();
+        using var document = JsonDocument.Parse(reassignmentJson);
+        foreach (var partition in document.RootElement.GetProperty("partitions").EnumerateArray())
+        {
+            broker.Placements.Add(new PartitionPlacement
+            {
+                Topic = partition.GetProperty("topic").GetString() ?? "",
+                Partition = partition.GetProperty("partition").GetInt32(),
+                Leader = partition.GetProperty("replicas").EnumerateArray().First().GetInt32(),
+                Replicas = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList(),
+                Isr = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList()
+            });
+        }
+    }
+
     private static List<BrokerSnapshot> RoleBrokers() =>
     [
         new BrokerSnapshot { Id = 1, State = "up" },
@@ -534,7 +953,50 @@ public class KafkaOpsServiceGuardTests
     private const string ManageTopics = nameof(LinkSystemPermissions.CanManageKafkaTopics);
     private const string ManageScaling = nameof(LinkSystemPermissions.CanManageScaling);
 
-    private static (KafkaOpsService Service, FakeBroker Broker, FlipInfra Infra) NewService(bool requireSecondApprover, int scaleTimeoutSeconds = 180)
+    private static Mock<IAdminClient> GroupAdmin(Error offsetError)
+    {
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult
+            {
+                ConsumerGroupDescriptions = [new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.NoError) }]
+            });
+        admin.Setup(client => client.ListConsumerGroupOffsetsAsync(It.IsAny<IEnumerable<ConsumerGroupTopicPartitions>>(), It.IsAny<ListConsumerGroupOffsetsOptions>()))
+            .ReturnsAsync(
+            [
+                new ListConsumerGroupOffsetsResult
+                {
+                    Group = "Report",
+                    Partitions = [new TopicPartitionOffsetError(new TopicPartition("ReadyToAcquire", 0), Offset.Unset, offsetError)]
+                }
+            ]);
+        return admin;
+    }
+
+    private static async Task<int> Invoke(KafkaOpsEndpoints endpoints, string method, params object?[] args)
+    {
+        var found = typeof(KafkaOpsEndpoints).GetMethod(method, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(found);
+        var task = (Task<IResult>)found!.Invoke(endpoints, args)!;
+        var result = await task;
+        return (result as IStatusCodeHttpResult)?.StatusCode ?? 0;
+    }
+
+    private static ClaimsPrincipal Operator()
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "pat"),
+                new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, ManageTopics),
+                new Claim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, ManageScaling)
+            ],
+            "test",
+            ClaimTypes.Name,
+            ClaimTypes.Role);
+        return new ClaimsPrincipal(identity);
+    }
+
+    private static (KafkaOpsService Service, FakeBroker Broker, FlipInfra Infra) NewService(bool requireSecondApprover, int scaleTimeoutSeconds = 180, bool production = false)
     {
         var broker = new FakeBroker();
         var infra = new FlipInfra();
@@ -549,11 +1011,14 @@ public class KafkaOpsServiceGuardTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["Authentication:EnableAnonymousAccess"] = "false" })
             .Build();
+        var host = new TestHost();
+        if (production)
+            host.EnvironmentName = "Production";
         var service = new KafkaOpsService(
             broker,
             new SameReferenceCache(),
             options,
-            new TestHost(),
+            host,
             NullLogger<KafkaOpsService>.Instance,
             configuration,
             Array.Empty<IProducer<string, AuditEventMessage>>(),
@@ -637,8 +1102,11 @@ public class KafkaOpsServiceGuardTests
         public bool Enabled { get; set; } = true;
         public bool ThrowOnScale { get; set; }
         public int RemoveCalls { get; private set; }
-        public string Name => "Test";
+        public string Name { get; set; } = "Test";
         public string Detail => "Infrastructure is disabled for this test.";
+        public int CancelCalls { get; private set; }
+        public int ReleaseCalls { get; private set; }
+        public string LastRebalanceName { get; private set; } = "";
 
         public Task ScaleGroupAsync(string groupId, int replicas, CancellationToken cancellationToken)
         {
@@ -655,9 +1123,24 @@ public class KafkaOpsServiceGuardTests
             return Task.CompletedTask;
         }
 
-        public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken)
+        {
+            LastRebalanceName = rebalanceName;
+            return Task.CompletedTask;
+        }
 
-        public Task CancelReassignmentAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken)
+        {
+            CancelCalls++;
+            LastRebalanceName = rebalanceName;
+            return Task.CompletedTask;
+        }
+
+        public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken)
+        {
+            ReleaseCalls++;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeBroker : IKafkaBrokerGateway
@@ -669,6 +1152,10 @@ public class KafkaOpsServiceGuardTests
         public List<(string Topic, int Count)> Increases { get; } = [];
         public string? FailIncreaseTopic { get; set; }
         public List<PartitionPlacement> Placements { get; } = [];
+        public ReassignmentListing Reassignments { get; set; } = new() { Known = true };
+        public List<ElectionType> Elections { get; } = [];
+        public Exception? ElectionError { get; set; }
+        public void SetCount(string topic, int count) => _counts[topic] = count;
         public int ControllerId { get; set; } = 1;
         public bool RolesKnown { get; set; } = true;
         public List<int> Eligible { get; } = [0, 1, 2];
@@ -695,6 +1182,17 @@ public class KafkaOpsServiceGuardTests
             if (GroupError is not null)
                 throw GroupError;
             return Task.FromResult<IReadOnlyList<GroupView>>(Groups.ToList());
+        }
+
+        public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Reassignments);
+
+        public Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken)
+        {
+            Elections.Add(KafkaLeaderElection.Kind);
+            if (ElectionError is not null)
+                throw ElectionError;
+            return Task.CompletedTask;
         }
 
         public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken)
