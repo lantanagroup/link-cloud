@@ -599,10 +599,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
     /// Tests the connection against the saved sFTP configuration:
     /// <c>POST /api/data/{organizationId}/sftp-configurations/test-connection</c>.
     /// </summary>
-    public Task<LinkApiResponse> TestSavedSftpConnectionAsync(
+    public Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSavedSftpConnectionAsync(
         string organizationId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"data/{organizationId}/sftp-configurations/test-connection")
+        SendAsync<SftpTestConnectionResultApiModel>(() => Request($"data/{organizationId}/sftp-configurations/test-connection")
             .PostJsonAsync(new { }, cancellationToken: cancellationToken));
 
     /// <summary>Reads one sFTP acquisition log: <c>GET /api/data/sftp-logs/{logId}</c>.</summary>
