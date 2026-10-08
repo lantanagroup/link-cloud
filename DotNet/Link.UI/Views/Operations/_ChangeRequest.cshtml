@@ -5,7 +5,7 @@
 }
 @if (request is not null)
 {
-    var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" && request.Status is "Executing" or "Converging" or "TimedOut";
+    var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" && request.Status is "Executing" or "Converging";
     <div class="au-card card mt-3" id="kafka-request-progress" data-status-url="/Operations/Kafka/requests/@request.Id.ToString("D")">
         <div class="card-header">Change request</div>
         <div class="card-body">
@@ -16,14 +16,6 @@
             @if (request.Kind == "PartitionIncrease")
             {
                 <p>@request.Topic from @request.BeforePartitions to @request.RequestedPartitions. Replica ceiling @request.MaxReplicas. Retry @request.RetryTopic increases with it, and so does the error topic.</p>
-            }
-            else if (request.Kind == "CompleteTopicFamily")
-            {
-                <p>@request.Topic stays at @request.BeforePartitions. Retry and error topics are raised to that count. The main topic is not changed.</p>
-            }
-            else if (request.Kind == "CancelReassignment")
-            {
-                <p>Cancel the in-flight reassignment. A different person must approve it before it runs.</p>
             }
             else if (request.Kind == "ScaleReplicas")
             {
@@ -38,10 +30,6 @@
             @if (!string.IsNullOrWhiteSpace(request.Failure))
             {
                 <p id="kafka-request-failure">@request.Failure</p>
-            }
-            @if (!string.IsNullOrWhiteSpace(request.Warning))
-            {
-                <p>@request.Warning</p>
             }
             <p><span>Opened </span><span>@LinkUiTime.Display(request.CreatedUtc)</span></p>
             @if (request.ApprovedUtc is not null)
