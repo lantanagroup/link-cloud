@@ -193,6 +193,22 @@ try {
     Write-Result ($LASTEXITCODE -eq 4) 'non-compose exit code is propagated'
     Write-Result ($global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'absent') 'non-compose command does not set the token'
 
+    # Global docker options still reach the compose token path.
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $repo
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = $now
+    Write-TokenFile -Repo $repo -Token $sentinel -Expires ($now + 3600)
+    Set-DockerHook -ExitCode 0
+    Set-FetchHook -ExitCode 1
+    docker --context desktop-linux compose build automation-ui
+    $withContext = @($global:LinkCloudFeedTokenHooks['DockerCalls'][0])
+    Write-Result ($global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 0) 'docker global option does not refresh a valid token'
+    Write-Result ($global:LinkCloudFeedTokenHooks['DockerSaw'] -eq 'match') 'docker global option sets the token'
+    Write-Result ($withContext.Count -eq 5 -and $withContext[0] -eq '--context' -and $withContext[1] -eq 'desktop-linux' -and $withContext[2] -eq 'compose' -and $withContext[3] -eq 'build' -and $withContext[4] -eq 'automation-ui') 'docker global option keeps the original arguments'
+    docker --context desktop-linux version
+    $contextVersion = @($global:LinkCloudFeedTokenHooks['DockerCalls'][1])
+    Write-Result ($contextVersion.Count -eq 3 -and $contextVersion[2] -eq 'version') 'docker global option on a non-compose command is passed through'
+
     # Message text matches the image restore helper.
     $restore = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.restore-feed.sh'))
     $expectedMessage = Get-LinkCloudFeedTokenMissingMessage

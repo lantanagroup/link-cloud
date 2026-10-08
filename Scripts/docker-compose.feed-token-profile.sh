@@ -95,7 +95,29 @@ link_cloud_token_unexpired() {
   [ "$remaining" -gt 0 ]
 }
 
-compose() {
+link_cloud_is_compose() {
+  local expect_value=0
+  local arg
+  for arg in "$@"; do
+    if [ "$expect_value" -eq 1 ]; then
+      expect_value=0
+      continue
+    fi
+    case "$arg" in
+      compose) return 0 ;;
+      --) return 1 ;;
+      --context|--config|--host|--log-level|--tlscacert|--tlscert|--tlskey|-c|-H|-l)
+        expect_value=1
+        ;;
+      --*=*|-c*|-H*|-l*) ;;
+      -*) ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+
+link_cloud_launch() {
   local root envfile now token expires
   root=$(find_link_cloud_root) || {
     printf '%s\n' "compose is only available inside the link-cloud repo." >&2
@@ -130,8 +152,12 @@ compose() {
     printf '%s\n' "docker was not found on PATH." >&2
     return 1
   fi
-  AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" compose "$@"
+  AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" "$@"
   return $?
+}
+
+compose() {
+  link_cloud_launch compose "$@"
 }
 
 docker() {
@@ -156,11 +182,10 @@ docker() {
     fi
   fi
 
-  if [ "${1:-}" = "compose" ]; then
+  if link_cloud_is_compose "$@"; then
     root=$(find_link_cloud_root || true)
     if [ -n "$root" ]; then
-      shift
-      compose "$@"
+      link_cloud_launch "$@"
       return $?
     fi
   fi

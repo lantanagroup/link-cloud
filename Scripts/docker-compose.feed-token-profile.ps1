@@ -166,7 +166,8 @@ function Test-LinkCloudFeedTokenUnexpired {
 function Invoke-LinkCloudCompose {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [string[]]$ComposeArguments
+        [string[]]$ComposeArguments,
+        [string[]]$DockerArguments
     )
     if (-not $ComposeArguments) {
         $ComposeArguments = @()
@@ -199,7 +200,11 @@ function Invoke-LinkCloudCompose {
     $savedCode = 1
     try {
         $env:AZURE_ARTIFACTS_PAT = $token
-        $dockerArgs = @('compose') + @($ComposeArguments)
+        if ($PSBoundParameters.ContainsKey('DockerArguments')) {
+            $dockerArgs = @($DockerArguments)
+        } else {
+            $dockerArgs = @('compose') + @($ComposeArguments)
+        }
         Invoke-LinkCloudDockerProcess -ArgumentList $dockerArgs
         $savedCode = $global:LASTEXITCODE
     } finally {
@@ -223,6 +228,40 @@ function global:compose {
     Invoke-LinkCloudCompose -RepoRoot $root -ComposeArguments @($args)
 }
 
+function Test-LinkCloudComposeCommand {
+    param([string[]]$Arguments)
+    $needsValue = @{
+        '--context' = $true
+        '--config' = $true
+        '--host' = $true
+        '--log-level' = $true
+        '--tlscacert' = $true
+        '--tlscert' = $true
+        '--tlskey' = $true
+        '-c' = $true
+        '-H' = $true
+        '-l' = $true
+    }
+    $expectValue = $false
+    foreach ($arg in $Arguments) {
+        if ($expectValue) {
+            $expectValue = $false
+            continue
+        }
+        if ($arg -eq 'compose') { return $true }
+        if ($arg -eq '--') { return $false }
+        if ($arg -match '^--[^=]+=') { continue }
+        if ($needsValue.ContainsKey($arg)) {
+            $expectValue = $true
+            continue
+        }
+        if ($arg -match '^-(c|H|l).+') { continue }
+        if ($arg.StartsWith('-')) { continue }
+        return $false
+    }
+    return $false
+}
+
 function global:docker {
     $hooks = $global:LinkCloudFeedTokenHooks
     $skipReload = $hooks -and $hooks.ContainsKey('SkipReload') -and $hooks['SkipReload']
@@ -244,17 +283,9 @@ function global:docker {
         }
     }
 
-    $first = ''
-    if ($args.Count -gt 0) {
-        $first = [string]$args[0]
-    }
     $root = Find-LinkCloudRepoRoot
-    if ($root -and $first -eq 'compose') {
-        $rest = @()
-        if ($args.Count -gt 1) {
-            $rest = @($args[1..($args.Count - 1)])
-        }
-        compose @rest
+    if ($root -and (Test-LinkCloudComposeCommand -Arguments @($args))) {
+        Invoke-LinkCloudCompose -RepoRoot $root -DockerArguments @($args)
         return
     }
     Invoke-LinkCloudDockerProcess -ArgumentList @($args)
