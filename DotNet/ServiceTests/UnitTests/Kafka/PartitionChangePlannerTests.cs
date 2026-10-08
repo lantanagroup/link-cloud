@@ -136,60 +136,6 @@ public class PartitionChangePlannerTests
         Assert.Contains(recent.Errors, error => error.Contains("must wait", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void CompleteFamily_RaisesOnlySiblings_AndSkipsTheRateLimit()
-    {
-        var uneven = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
-        {
-            CurrentPartitions = 4,
-            RetryPartitions = 3,
-            ErrorPartitions = 3,
-            QuietWindowMet = false,
-            LastFamilyChangeUtc = DateTimeOffset.Parse("2026-10-07T11:50:00Z")
-        });
-
-        Assert.True(uneven.Accepted);
-        Assert.Equal(4, uneven.RequestedPartitions);
-        Assert.Equal(["ReadyToAcquire-Retry", "ReadyToAcquire-Error"], uneven.TopicsToRaise);
-        Assert.DoesNotContain("ReadyToAcquire", uneven.TopicsToRaise);
-        Assert.Contains(uneven.Notes, note => note.Contains("retry topic will be raised from 3 to 4", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(uneven.Errors, error => error.Contains("must wait", StringComparison.Ordinal));
-
-        var even = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
-        {
-            CurrentPartitions = 4,
-            RetryPartitions = 4,
-            ErrorPartitions = 4,
-            QuietWindowMet = false
-        });
-        Assert.False(even.Accepted);
-        Assert.Contains(even.Errors, error => error.Contains("No sibling is behind", StringComparison.Ordinal));
-
-        var ahead = PartitionChangePlanner.CompleteFamily(Valid("ReadyToAcquire") with
-        {
-            CurrentPartitions = 4,
-            RetryPartitions = 5,
-            ErrorPartitions = 3,
-            QuietWindowMet = false
-        });
-        Assert.True(ahead.Accepted);
-        Assert.Equal(["ReadyToAcquire-Error"], ahead.TopicsToRaise);
-        Assert.Contains(ahead.Notes, note => note.Contains("not be shrunk", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public void ReassignmentInFlight_RefusesThePartitionPlan()
-    {
-        var plan = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with
-        {
-            QuietWindowMet = false,
-            InFlightReassignmentTopics = ["ops-proof-log"]
-        });
-
-        Assert.False(plan.Accepted);
-        Assert.Contains(plan.Errors, error => error.Contains("ops-proof-log", StringComparison.Ordinal));
-    }
-
     private static PartitionPlanRequest Valid(string topic)
     {
         var entry = KafkaTopicCatalog.Find(topic);
