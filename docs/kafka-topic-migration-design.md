@@ -675,3 +675,23 @@ These run after slice 1 is built. Nothing here touches a deployed host.
 The reason is that Link services can't switch topic names at runtime (2.1). Moving traffic would need two coordinated redeploys of every producer and consumer per migration, or a new routing layer in .NET and Java.
 
 If the architect requires zero-stop migrations, the alternative is to fund that routing layer first (3.1). Everything else in this document is decided.
+
+## 14. Corrections from the broker proof
+
+These replace the earlier wording where they differ.
+
+- The backup reader sets `group.id` to `link-kafka-ops-migration-reader` and does not commit.
+- An absent topic, including `DescribeTopicsException` when every topic is `UnknownTopicOrPart`, is described as missing.
+- Journal restore assigns `Offset.Beginning`. Reconcile is retried until it succeeds.
+- Preflight does not count the migration's own record as another open migration.
+- The hold point is ticked. Its timeout and abort roll back. A waiting tick does not append a timeline note.
+- NeedsAttention accepts forward, original, and delete-foreign. Delete-foreign of an empty topic does not finish the migration. Forward against a topic that has records returns 400 and names `kafka-topics.sh --delete`. Recover-original deletes an empty new topic only for a second person who is not the executor.
+- A group with no committed offsets has no lag. `Dead` is treated as `Empty`. A group that never committed does not have to be `Stable` before consumers are started.
+- Operator commands wait up to 8 seconds for the executor lease, then return 409 with `Retry-After`. Go runs one step and continues in the background. The lease is released when the process stops.
+- Recreate passes only `DynamicTopicConfig` overrides. The backup topic sets `min.insync.replicas` to min(2, replication factor).
+- After a Redis flush, a fence below the stored record fence is raised to that fence and the save returns 409.
+- Holds are read from the migration store, so a second host sees them.
+- Backup verify requires a read through the frozen end on every partition, equal counts, and an equal order-sensitive digest.
+- The request is stored only when the client sends the dry-run plan hash and it matches.
+- Abort, go, and recover on a finished migration are rejected.
+- The catalog guard treats the shared retry, redrive, and error producers in `DeadLetterExceptionHandler.cs`, `RetryJob.cs`, and `TransientExceptionHandler.cs` as covered sibling helpers. Any other unbound produce still fails the guard.

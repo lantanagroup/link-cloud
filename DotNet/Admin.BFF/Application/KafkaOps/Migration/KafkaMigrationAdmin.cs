@@ -132,6 +132,10 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
                 TopicCollection.OfTopicNames([topic]),
                 new DescribeTopicsOptions { IncludeAuthorizedOperations = true, RequestTimeout = TimeSpan.FromSeconds(20) });
         }
+        catch (DescribeTopicsException ex) when (TopicMissing(ex))
+        {
+            return null;
+        }
         catch (KafkaException ex) when (ex.Error.Code is ErrorCode.UnknownTopicOrPart)
         {
             return null;
@@ -179,7 +183,12 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
 
         var configs = await DescribeConfigsAsync(topic, cancellationToken);
         foreach (var row in configs)
+        {
+            // CreateTopics rejects static defaults. Keep the overrides the topic actually sets.
+            if (!string.Equals(row.Source, "DynamicTopicConfig", StringComparison.Ordinal))
+                continue;
             facts.Configs[row.Name] = row.Value;
+        }
         await WatermarksAsync(facts, topic, cancellationToken);
         return facts;
     }
@@ -297,7 +306,7 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
             [group],
             new DescribeConsumerGroupsOptions { IncludeAuthorizedOperations = true, RequestTimeout = TimeSpan.FromSeconds(15) });
         var item = described.ConsumerGroupDescriptions.FirstOrDefault();
-        if (item is null || item.Error.Code is ErrorCode.GroupIdNotFound)
+        if (item is null || item.Error.Code is ErrorCode.GroupIdNotFound || item.State == ConsumerGroupState.Dead)
             return new MigrationGroupFacts { GroupId = group, State = "Empty" };
         if (item.Error.IsError)
             return null;
@@ -365,13 +374,30 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
             SourceTopic = record.Topic,
             TargetPartitions = record.TargetPartitions,
             RequireComputedTargetEqualsPartition = false,
-            Source = source,
-            Destination = destination
+            Source = source.Records,
+            Destination = destination.Records
         });
-        if (!produce || !outcome.Ok || outcome.Written.Count == 0)
+        if (!outcome.Ok)
             return outcome;
-        await ProduceAsync(record.BackupTopic, outcome.Written, sourceFacts.Configs, cancellationToken);
-        return outcome;
+        if (produce && outcome.Written.Count > 0)
+        {
+            await ProduceAsync(record.BackupTopic, outcome.Written, sourceFacts.Configs, cancellationToken);
+            return outcome;
+        }
+
+        var complete = source.ReachedEnd && destination.ReachedEnd;
+        var match = outcome.Written.Count == 0 && complete && LogCopier.Matches(source.Records, destination.Records);
+        return new CopyOutcome
+        {
+            Ok = true,
+            Written = outcome.Written,
+            Counts = outcome.Counts,
+            Digests = outcome.Digests,
+            Total = outcome.Total,
+            ReachedEnd = complete,
+            CountsMatch = match,
+            DigestsMatch = match
+        };
     }
 
     public async Task AppendJournalAsync(MigrationRecord record, CancellationToken cancellationToken)
@@ -392,8 +418,8 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
         await EnsureJournalAsync(cancellationToken);
         var records = new Dictionary<Guid, MigrationRecord>();
         using var consumer = NewReader();
-        consumer.Assign(new TopicPartition(KafkaTopicCatalog.JournalTopicName, 0));
-        consumer.Seek(new TopicPartitionOffset(KafkaTopicCatalog.JournalTopicName, 0, Offset.Beginning));
+        // Seek immediately after Assign fails on this client. The offset belongs on the assignment.
+        consumer.Assign(new TopicPartitionOffset(KafkaTopicCatalog.JournalTopicName, 0, Offset.Beginning));
         var idle = 0;
         while (idle < 2)
         {
@@ -514,26 +540,32 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
         return oldest == long.MaxValue ? 0 : oldest;
     }
 
-    private async Task<List<CopiedRecord>> ReadLogAsync(string topic, MigrationTopicFacts facts, IReadOnlyList<long> frozenEnd, CancellationToken cancellationToken)
+    private async Task<LogRead> ReadLogAsync(string topic, MigrationTopicFacts facts, IReadOnlyList<long> frozenEnd, CancellationToken cancellationToken)
     {
-        var records = new List<CopiedRecord>();
+        var read = new LogRead();
         using var consumer = NewReader();
         var assignments = new List<TopicPartitionOffset>();
+        var ends = new Dictionary<int, long>();
         for (var i = 0; i < facts.PartitionRows.Count; i++)
         {
             var row = facts.PartitionRows[i];
             var end = i < frozenEnd.Count ? frozenEnd[i] : row.HighWatermark;
+            ends[row.Partition] = end;
             if (end <= row.LogStart)
                 continue;
             assignments.Add(new TopicPartitionOffset(topic, row.Partition, new Offset(row.LogStart)));
         }
 
         if (assignments.Count == 0)
-            return records;
-        var ends = facts.PartitionRows.ToDictionary(row => row.Partition, row => row.Partition < frozenEnd.Count ? frozenEnd[row.Partition] : row.HighWatermark);
+        {
+            read.ReachedEnd = true;
+            return read;
+        }
+
+        var pending = new HashSet<int>(assignments.Select(assignment => assignment.Partition.Value));
         consumer.Assign(assignments);
         var idle = 0;
-        while (idle < 3)
+        while (idle < 3 && pending.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var result = consumer.Consume(TimeSpan.FromMilliseconds(400));
@@ -544,9 +576,12 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
             }
 
             idle = 0;
-            if (result.Offset >= ends.GetValueOrDefault(result.Partition.Value))
+            var end = ends.GetValueOrDefault(result.Partition.Value);
+            if (result.Offset + 1 >= end)
+                pending.Remove(result.Partition.Value);
+            if (result.Offset >= end)
                 continue;
-            records.Add(new CopiedRecord
+            read.Records.Add(new CopiedRecord
             {
                 Key = result.Message.Key,
                 Value = result.Message.Value,
@@ -555,15 +590,17 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
                 Offset = result.Offset.Value,
                 Headers = result.Message.Headers?.Select(header => new CopiedHeader { Name = header.Key, Value = header.GetValueBytes() }).ToList() ?? []
             });
-            if (records.Count > 0 && records.All(record => !ends.TryGetValue(record.Partition, out var end) || record.Offset + 1 >= end) && records.Select(record => record.Partition).Distinct().Count() == assignments.Count)
-            {
-                var complete = assignments.All(assignment => records.Any(record => record.Partition == assignment.Partition.Value && record.Offset + 1 >= ends[assignment.Partition.Value]));
-                if (complete)
-                    break;
-            }
         }
 
-        return records;
+        // Idle before the frozen end is an incomplete read. The caller retries. It does not treat the short log as verified.
+        read.ReachedEnd = pending.Count == 0;
+        return read;
+    }
+
+    private sealed class LogRead
+    {
+        public List<CopiedRecord> Records { get; } = [];
+        public bool ReachedEnd { get; set; }
     }
 
     private async Task ProduceAsync(string topic, IReadOnlyList<CopiedRecord> written, IReadOnlyDictionary<string, string> configs, CancellationToken cancellationToken)
@@ -632,9 +669,22 @@ public sealed class KafkaMigrationAdmin : IKafkaMigrationAdmin, IDisposable
 
     private ConsumerConfig ConsumerConfig()
     {
-        var config = new ConsumerConfig { BootstrapServers = Servers(), ClientId = "LinkAdminBFF-migration-read" };
+        // librdkafka rejects a consumer that has no group.id, including an assign-only reader.
+        // This group never commits. Discovery ignores a group with no commits on the topic.
+        var config = new ConsumerConfig
+        {
+            BootstrapServers = Servers(),
+            ClientId = "LinkAdminBFF-migration-read",
+            GroupId = "link-kafka-ops-migration-reader"
+        };
         ApplySasl(config);
         return config;
+    }
+
+    private static bool TopicMissing(DescribeTopicsException ex)
+    {
+        var topics = ex.Results?.TopicDescriptions;
+        return topics is { Count: > 0 } && topics.All(item => item.Error.Code == ErrorCode.UnknownTopicOrPart);
     }
 
     private ProducerConfig ProducerConfig()

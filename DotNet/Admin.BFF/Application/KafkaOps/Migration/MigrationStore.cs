@@ -36,6 +36,11 @@ public sealed class StaleFenceException : Exception
     public StaleFenceException() : base("The executor fencing token is stale.") { }
 }
 
+public sealed class LeaseHeldException : KafkaOpsRejectedException
+{
+    public LeaseHeldException() : base("The executor lease is held.") { }
+}
+
 public sealed class InMemoryMigrationStore : IMigrationStore
 {
     private readonly Dictionary<Guid, (long Fence, string Json)> _items = [];
@@ -70,7 +75,7 @@ public sealed class InMemoryMigrationStore : IMigrationStore
     }
 }
 
-public sealed class InMemoryKafkaOpsLease : IKafkaOpsLease
+public sealed class InMemoryKafkaOpsLease : IKafkaOpsLease, IDisposable
 {
     private int _held;
     private long _token;
@@ -79,8 +84,10 @@ public sealed class InMemoryKafkaOpsLease : IKafkaOpsLease
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (Interlocked.CompareExchange(ref _held, 1, 0) != 0)
-            throw new KafkaOpsRejectedException("The executor lease is held.");
+            throw new LeaseHeldException();
         var token = Interlocked.Increment(ref _token);
         return Task.FromResult(new KafkaOpsLeaseHold(token, () => Interlocked.Exchange(ref _held, 0)));
     }
+
+    public void Dispose() => Interlocked.Exchange(ref _held, 0);
 }

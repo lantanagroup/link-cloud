@@ -12,7 +12,7 @@ public interface IMigrationRuntime
     bool CanMigrate(ClaimsPrincipal user);
     bool CanView(ClaimsPrincipal user);
     bool HasOrphanBlock { get; }
-    Task<MigrationDryRun> PlanAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken);
+    Task<MigrationDryRun> PlanAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken, Guid? exceptId = null);
     Task<MigrationRecord> RequestAsync(ClaimsPrincipal user, MigrationRequestBody body, CancellationToken cancellationToken);
     Task<MigrationRecord> ApproveAsync(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken);
     Task<MigrationRecord> RejectAsync(ClaimsPrincipal user, Guid id, string reason, CancellationToken cancellationToken);
@@ -38,6 +38,7 @@ public sealed class MigrationRequestBody
     public bool BackupSkip { get; set; }
     public bool BackupSkipAcknowledged { get; set; }
     public List<string> AcknowledgedGroups { get; set; } = [];
+    public string PlanHash { get; set; } = "";
 }
 
 public sealed class TopicDetailModel
@@ -126,9 +127,9 @@ public sealed class MigrationRuntime : IMigrationRuntime
     public bool CanView(ClaimsPrincipal user) =>
         _anonymous || KafkaOpsService.Has(user, LinkSystemPermissions.CanViewInfrastructure);
 
-    public async Task<MigrationDryRun> PlanAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken)
+    public async Task<MigrationDryRun> PlanAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken, Guid? exceptId = null)
     {
-        var facts = await FactsAsync(topic, partitions, backupSkip, backupSkipAcknowledged, acknowledgedGroups, cancellationToken);
+        var facts = await FactsAsync(topic, partitions, backupSkip, backupSkipAcknowledged, acknowledgedGroups, exceptId, cancellationToken);
         return MigrationPreflight.Evaluate(facts);
     }
 
@@ -145,6 +146,9 @@ public sealed class MigrationRuntime : IMigrationRuntime
         var dry = await PlanAsync(topic, body.Partitions, body.BackupSkip, body.BackupSkipAcknowledged, body.AcknowledgedGroups, cancellationToken);
         if (!dry.Accepted)
             throw new KafkaOpsRejectedException(dry.Summary);
+        var hashError = MigrationApprovals.ValidatePlanHash(body.PlanHash, dry.PlanHash);
+        if (hashError is not null)
+            throw new KafkaOpsRejectedException(hashError);
         var family = KafkaTopicCatalog.FamilyOf(topic);
         var record = new MigrationRecord
         {
@@ -250,7 +254,11 @@ public sealed class MigrationRuntime : IMigrationRuntime
         if (record.Failure.Length > 0)
             lines.Add(record.Failure);
         if (record.Step == MigrationStep.NeedsAttention)
+        {
             lines.Add("Choose forward to continue at the target count, or original to recreate the empty topic at the old count. Both require the typed topic name. Nothing is deleted unless that action says so.");
+            lines.Add("A foreign topic that already has records is not deleted here. Remove it with kafka-topics.sh --delete --topic " + record.Topic + ", then choose forward.");
+            lines.Add("An empty foreign topic is deleted by a second person who types the topic name. That delete does not finish the migration.");
+        }
         if (record.Step == MigrationStep.H1)
             lines.Add("The executor types the topic name to delete it and continue. Abort rolls back and keeps the backup.");
         foreach (var entry in record.Timeline.TakeLast(12))
@@ -278,11 +286,8 @@ public sealed class MigrationRuntime : IMigrationRuntime
         }
     }
 
-    public Task<IReadOnlyCollection<string>> HoldsAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(_holds.HeldTopics());
-    }
+    public Task<IReadOnlyCollection<string>> HoldsAsync(CancellationToken cancellationToken) =>
+        _holds.HeldTopicsAsync(cancellationToken);
 
     public async Task<TopicDetailModel> DetailAsync(string topic, CancellationToken cancellationToken)
     {
@@ -371,7 +376,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
 
     public async Task TickOpenAsync(long fence, CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref _reconciled, 1) == 0)
+        if (Volatile.Read(ref _reconciled) == 0)
             await ReconcileAsync(cancellationToken);
         foreach (var record in await _store.ListAsync(cancellationToken))
         {
@@ -382,7 +387,9 @@ public sealed class MigrationRuntime : IMigrationRuntime
                 continue;
             }
 
-            if (record.Step is MigrationStep.Planned or MigrationStep.Pending or MigrationStep.Approved or MigrationStep.H1 or MigrationStep.NeedsAttention)
+            // Planned, pending, and approved wait for a person. NeedsAttention waits for a recover command.
+            // The hold point is ticked so its timeout can fire. The tick does not write a timeline note.
+            if (record.Step is MigrationStep.Planned or MigrationStep.Pending or MigrationStep.Approved or MigrationStep.NeedsAttention)
                 continue;
             try
             {
@@ -414,6 +421,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             var names = await _admin.ListLinkMigTopicsAsync(cancellationToken);
             var known = new HashSet<string>(byId.Values.Select(record => record.BackupTopic).Append(KafkaTopicCatalog.JournalTopicName), StringComparer.Ordinal);
             HasOrphanBlock = names.Any(name => !known.Contains(name));
+            Interlocked.Exchange(ref _reconciled, 1);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -436,15 +444,63 @@ public sealed class MigrationRuntime : IMigrationRuntime
         }
 
         var actor = KafkaOpsService.UserName(user);
-        return await WithLease(fence => DriveAsync(record, command, actor, typedName, fence, cancellationToken, 40), cancellationToken);
+        var requested = command;
+        var steps = requested == MigrationCommand.Go && !execute ? 1 : 40;
+        var result = await WithLease(fence => DriveAsync(record, command, actor, typedName, fence, cancellationToken, steps), cancellationToken);
+        if (requested == MigrationCommand.Go && result.Step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected or MigrationStep.NeedsAttention or MigrationStep.H1))
+            Continue(result.Id);
+        return result;
+    }
+
+    private void Continue(Guid id)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var record = await _store.GetAsync(id, CancellationToken.None);
+                if (record is null)
+                    return;
+                for (var n = 0; n < 80 && StepRuns(record.Step); n++)
+                {
+                    var before = record.StepSequence;
+                    record = await WithLease(fence => DriveAsync(record, MigrationCommand.Tick, record.Executor, null, fence, CancellationToken.None, 1), CancellationToken.None);
+                    if (!StepRuns(record.Step))
+                        return;
+                    if (record.StepSequence == before)
+                        await Task.Delay(500);
+                }
+            }
+            catch (LeaseHeldException)
+            {
+                _logger.LogDebug("Migration {MigrationId} continuation waited for the executor lease.", id);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Migration {MigrationId} continuation stopped.", id);
+            }
+        });
+    }
+
+    private static bool StepRuns(MigrationStep step) =>
+        step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected or MigrationStep.NeedsAttention or MigrationStep.H1
+            or MigrationStep.Planned or MigrationStep.Pending or MigrationStep.Approved);
+
+    private static bool StepOpen(MigrationStep step, bool admitRecover)
+    {
+        if (step is MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected)
+            return false;
+        if (step == MigrationStep.NeedsAttention)
+            return admitRecover;
+        return true;
     }
 
     private async Task<MigrationRecord> DriveAsync(MigrationRecord record, MigrationCommand command, string? actor, string? typed, long fence, CancellationToken cancellationToken, int maxSteps)
     {
-        for (var i = 0; i < maxSteps && record.Step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected or MigrationStep.NeedsAttention); i++)
+        var admitRecover = command is MigrationCommand.RecoverForward or MigrationCommand.RecoverOriginal or MigrationCommand.DeleteForeign;
+        for (var i = 0; i < maxSteps && StepOpen(record.Step, admitRecover); i++)
         {
-            if (record.Step == MigrationStep.H1 && command != MigrationCommand.Go)
-                break;
+            admitRecover = false;
             var seen = await ObserveAsync(record, cancellationToken);
             var tick = MigrationMachine.Describe(record, seen, command, actor, typed, DateTimeOffset.UtcNow, Limits());
             command = MigrationCommand.Tick;
@@ -543,7 +599,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         };
         if (record.Step == MigrationStep.A1)
         {
-            var dry = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, [], cancellationToken);
+            var dry = await PlanAsync(record.Topic, record.TargetPartitions, record.BackupSkipped, record.BackupSkipped, [], cancellationToken, record.Id);
             seen.PreflightOk = dry.Accepted;
             seen.PreflightError = dry.Accepted ? "" : dry.Summary;
             seen.LivePlanHash = dry.PlanHash;
@@ -599,27 +655,23 @@ public sealed class MigrationRuntime : IMigrationRuntime
                 var described = await _admin.DescribeGroupAsync(group, record.Topic, Math.Max(seen.Partitions, record.ActiveTarget), cancellationToken);
                 if (described is null)
                     continue;
-                var lag = 0L;
-                for (var i = 0; i < seen.HighWatermarks.Count; i++)
-                    lag += Math.Max(0, seen.HighWatermarks[i] - (i < described.Committed.Count ? Math.Max(0, described.Committed[i]) : 0));
                 seen.Groups[group] = new GroupObservation
                 {
                     State = described.State,
                     Members = described.Members,
-                    Lag = lag,
+                    Lag = MigrationGroups.Lag(seen.HighWatermarks, described.Committed),
                     Committed = described.Committed
                 };
             }
 
             seen.ConsumersStable = record.StopConsumers.All(name => seen.WorkloadReplicas.GetValueOrDefault(name) > 0)
-                && seen.Groups.Values.All(group => string.Equals(group.State, "Stable", StringComparison.OrdinalIgnoreCase));
+                && seen.Groups.Values.All(group => MigrationGroups.Ready(group.State, group.Members, group.Committed));
             if (record.Step is MigrationStep.B6 or MigrationStep.B7 && !record.BackupSkipped)
             {
                 var inspection = await _admin.InspectBackupAsync(record, cancellationToken);
-                var sealedBackup = inspection.Ok && inspection.Written.Count == 0;
-                seen.BackupVerified = sealedBackup;
-                seen.CountsMatch = sealedBackup;
-                seen.DigestMatch = sealedBackup;
+                seen.BackupVerified = inspection.Ok && inspection.Written.Count == 0 && inspection.ReachedEnd && inspection.CountsMatch && inspection.DigestsMatch;
+                seen.CountsMatch = inspection.CountsMatch;
+                seen.DigestMatch = inspection.DigestsMatch;
                 seen.HeaderConsistent = inspection.Ok;
                 if (!inspection.Ok)
                 {
@@ -647,7 +699,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         return seen;
     }
 
-    private async Task<MigrationFacts> FactsAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, CancellationToken cancellationToken)
+    private async Task<MigrationFacts> FactsAsync(string topic, int partitions, bool backupSkip, bool backupSkipAcknowledged, IReadOnlyList<string> acknowledgedGroups, Guid? exceptId, CancellationToken cancellationToken)
     {
         var described = await _admin.DescribeAsync(topic, cancellationToken);
         var family = KafkaTopicCatalog.FamilyOf(topic);
@@ -665,7 +717,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
                     GroupId = discovered.GroupId,
                     Active = discovered.Members > 0 || string.Equals(discovered.State, "Stable", StringComparison.OrdinalIgnoreCase),
                     Mapped = (KafkaTopicCatalog.Find(topic)?.Groups ?? []).Contains(discovered.GroupId, StringComparer.Ordinal),
-                    Lag = 0,
+                    Lag = MigrationGroups.Lag(described?.HighWatermarks ?? [], discovered.Committed),
                     Acknowledged = acked.Contains(discovered.GroupId)
                 });
             }
@@ -692,7 +744,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
             }
         }
 
-        var openMigration = (await _store.ListAsync(cancellationToken)).Any(record => record.Step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected));
+        var openMigration = (await _store.ListAsync(cancellationToken)).Any(record => record.Id != exceptId && record.Step is not (MigrationStep.Done or MigrationStep.RolledBack or MigrationStep.Rejected));
         var reassignment = await _infra.ListInFlightReassignmentsAsync(cancellationToken);
         return new MigrationFacts
         {
@@ -791,11 +843,7 @@ public sealed class MigrationRuntime : IMigrationRuntime
         cancellationToken.ThrowIfCancellationRequested();
         foreach (var record in records)
         {
-            var arm = record.Step is MigrationStep.A4 or MigrationStep.B1 or MigrationStep.B2 or MigrationStep.B3 or MigrationStep.B4
-                or MigrationStep.B5 or MigrationStep.B6 or MigrationStep.B7 or MigrationStep.H1
-                or MigrationStep.C1 or MigrationStep.C2 or MigrationStep.C3 or MigrationStep.C4 or MigrationStep.C5
-                or MigrationStep.D1 or MigrationStep.NeedsAttention;
-            _holds.Set(record.Topic, record.Id, arm);
+            _holds.Set(record.Topic, record.Id, MigrationHoldRegistry.Armed(record.Step));
         }
     }
 
@@ -847,8 +895,19 @@ public sealed class MigrationRuntime : IMigrationRuntime
 
     private async Task<MigrationRecord> WithLease(Func<long, Task<MigrationRecord>> action, CancellationToken cancellationToken)
     {
-        await using var hold = await _lease.AcquireAsync(cancellationToken);
-        return await action(hold.Fence);
+        var deadline = DateTime.UtcNow.AddSeconds(8);
+        while (true)
+        {
+            try
+            {
+                await using var hold = await _lease.AcquireAsync(cancellationToken);
+                return await action(hold.Fence);
+            }
+            catch (LeaseHeldException) when (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+            }
+        }
     }
 
     private static List<string> Diff(IEnumerable<TopicConfigRow> left, IEnumerable<TopicConfigRow> right, string label)

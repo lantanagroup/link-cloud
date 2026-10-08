@@ -94,7 +94,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     }
                 };
 
-                MigrationHoldGuard.RefuseIfHeld(_holds, nameof(KafkaTopic.ReportScheduled));
+                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.ReportScheduled), CancellationToken.None);
                 await _producer.ProduceAsync(nameof(KafkaTopic.ReportScheduled), message);
                 _logger.LogKafkaProducerReportScheduled(correlationId);
 

@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             using (consumer)
             {
                 foreach (var topic in topics)
-                    MigrationHoldGuard.RefuseIfHeld(_holds, topic);
+                    await MigrationHoldGuard.RefuseIfHeldAsync(_holds, topic, cancellationToken);
                 consumer.Subscribe(topics);
                 try
                 {

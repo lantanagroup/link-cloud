@@ -182,6 +182,8 @@ public sealed class KafkaMigrationForm
     public string? Confirmation { get; set; }
     public bool BackupSkip { get; set; }
     public bool BackupSkipAcknowledged { get; set; }
+    public string? PlanHash { get; set; }
+    public string? Action { get; set; }
     public Guid MigrationId { get; set; }
     public string? Workload { get; set; }
     public string? BackupName { get; set; }

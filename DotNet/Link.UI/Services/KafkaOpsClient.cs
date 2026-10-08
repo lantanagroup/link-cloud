@@ -228,11 +228,11 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
         return SendAsync<KafkaMigrationPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/migrations/plan", new { partitions, backupSkip, backupSkipAcknowledged }, cancellationToken, keepBodyOnFailure: true);
     }
 
-    public Task<KafkaOpsCall<KafkaMigrationRecord>> RequestMigrationAsync(string topic, int partitions, string reason, string confirmation, bool backupSkip, bool backupSkipAcknowledged, CancellationToken cancellationToken)
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RequestMigrationAsync(string topic, int partitions, string reason, string confirmation, bool backupSkip, bool backupSkipAcknowledged, string planHash, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
             return Task.FromResult(new KafkaOpsCall<KafkaMigrationRecord> { Status = 403, Error = "Fixture mode does not run a migration." });
-        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations", new { topic, partitions, reason, confirmation, backupSkip, backupSkipAcknowledged }, cancellationToken);
+        return SendAsync<KafkaMigrationRecord>(HttpMethod.Post, "api/ops/kafka/migrations", new { topic, partitions, reason, confirmation, backupSkip, backupSkipAcknowledged, planHash }, cancellationToken);
     }
 
     public Task<KafkaOpsCall<KafkaMigrationRecord>> GetMigrationAsync(Guid id, CancellationToken cancellationToken)
@@ -257,8 +257,8 @@ public sealed class KafkaOpsClient : IKafkaTopicHoldSource
     public Task<KafkaOpsCall<KafkaMigrationRecord>> AbortMigrationAsync(Guid id, CancellationToken cancellationToken) =>
         PostMigrationAsync(id, "abort", new { }, cancellationToken);
 
-    public Task<KafkaOpsCall<KafkaMigrationRecord>> RecoverMigrationAsync(Guid id, string confirmation, CancellationToken cancellationToken) =>
-        PostMigrationAsync(id, "recover", new { confirmation }, cancellationToken);
+    public Task<KafkaOpsCall<KafkaMigrationRecord>> RecoverMigrationAsync(Guid id, string confirmation, string action, CancellationToken cancellationToken) =>
+        PostMigrationAsync(id, "recover", new { confirmation, action }, cancellationToken);
 
     public Task<KafkaOpsCall<KafkaMigrationRecord>> ManualStepAsync(Guid id, string workload, CancellationToken cancellationToken) =>
         PostMigrationAsync(id, "manual-step", new { workload }, cancellationToken);

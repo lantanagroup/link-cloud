@@ -332,10 +332,36 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     private static string? Correlation(HttpContext http) =>
         http.Request.Headers["X-Correlation-Id"].FirstOrDefault();
 
-    private IResult StatusFor(KafkaOpsRejectedException ex) =>
-        Problem(ex.Message, ex is KafkaOpsForbiddenException
+    private IResult StatusFor(KafkaOpsRejectedException ex)
+    {
+        if (ex is LeaseHeldException)
+            return Conflict(ex.Message);
+        return Problem(ex.Message, ex is KafkaOpsForbiddenException
             ? StatusCodes.Status403Forbidden
             : StatusCodes.Status400BadRequest);
+    }
+
+    private IResult Conflict(string detail)
+    {
+        logger.LogInformation("Kafka ops request refused: {Detail}", detail.Sanitize());
+        return new RetryAfterProblem(detail, 5);
+    }
+
+    private sealed class RetryAfterProblem(string detail, int seconds) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+            httpContext.Response.Headers.RetryAfter = seconds.ToString();
+            await httpContext.Response.WriteAsJsonAsync(new
+            {
+                type = "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                title = "Conflict",
+                status = StatusCodes.Status409Conflict,
+                detail
+            });
+        }
+    }
 
     private static bool TryToken(string? value, out string name)
     {
@@ -479,8 +505,16 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     private Task<IResult> AbortMigration(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken) =>
         Migrate(user, () => migrations!.CommandAsync(user, id, MigrationCommand.Abort, null, cancellationToken));
 
-    private Task<IResult> RecoverMigration(ClaimsPrincipal user, Guid id, MigrationCommandBody body, CancellationToken cancellationToken) =>
-        Migrate(user, () => migrations!.CommandAsync(user, id, MigrationCommand.RecoverOriginal, body.Confirmation, cancellationToken));
+    private Task<IResult> RecoverMigration(ClaimsPrincipal user, Guid id, MigrationCommandBody body, CancellationToken cancellationToken)
+    {
+        var command = (body.Action ?? "").Trim().ToLowerInvariant() switch
+        {
+            "forward" => MigrationCommand.RecoverForward,
+            "deleteforeign" or "delete-foreign" or "foreign" => MigrationCommand.DeleteForeign,
+            _ => MigrationCommand.RecoverOriginal
+        };
+        return Migrate(user, () => migrations!.CommandAsync(user, id, command, body.Confirmation, cancellationToken));
+    }
 
     private Task<IResult> ManualStep(ClaimsPrincipal user, Guid id, ManualStepBody body, CancellationToken cancellationToken) =>
         Migrate(user, () => migrations!.ManualStepAsync(user, id, (body.Workload ?? "").SanitizeAndRemove(), cancellationToken));
@@ -562,6 +596,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         {
             return StatusFor(ex);
         }
+        catch (StaleFenceException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     private static readonly Regex TopicName = new("^[A-Za-z0-9._-]+$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -583,6 +621,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 public sealed class MigrationCommandBody
 {
     public string? Confirmation { get; set; }
+    public string? Action { get; set; }
 }
 
 public sealed class ManualStepBody

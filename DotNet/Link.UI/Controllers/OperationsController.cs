@@ -38,7 +38,7 @@ public sealed class OperationsController : Controller
         if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
             return await MigrateError(form, "Type the topic name to confirm the migration.", cancellationToken);
 
-        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, cancellationToken);
+        var created = await _kafka.RequestMigrationAsync(form.Topic ?? "", form.Partitions, form.Reason ?? "", form.Confirmation ?? "", form.BackupSkip, form.BackupSkipAcknowledged, form.PlanHash ?? "", cancellationToken);
         if (created.Value is null)
             return await MigrateError(form, created.Error ?? "The migration was not requested.", cancellationToken);
 
@@ -77,7 +77,7 @@ public sealed class OperationsController : Controller
         if (!string.Equals((form.Confirmation ?? "").Trim(), (form.Topic ?? "").Trim(), StringComparison.Ordinal))
             return await MigrateError(form, "Type the topic name to recover the original partition count.", cancellationToken);
 
-        return await MigrationPost(form, () => _kafka.RecoverMigrationAsync(form.MigrationId, form.Confirmation ?? "", cancellationToken), cancellationToken);
+        return await MigrationPost(form, () => _kafka.RecoverMigrationAsync(form.MigrationId, form.Confirmation ?? "", form.Action ?? "original", cancellationToken), cancellationToken);
     }
 
     [HttpPost("Kafka/migrations/manual")]
