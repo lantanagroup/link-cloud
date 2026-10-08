@@ -320,6 +320,40 @@ public class EncounterMappingController : Controller
     }
 
     /// <summary>
+    /// DELETE /api/data/encounter-mappings/facilities/{facilityId}
+    /// Removes every encounter mapping for this facility. A facility with none is a no-op.
+    /// </summary>
+    [HttpDelete("facilities/{facilityId}")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteByFacilityIdAsync(string facilityId)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(facilityId))
+                throw new BadRequestException("facilityId is required.");
+
+            facilityId = facilityId.SanitizeAndRemove();
+            if (string.IsNullOrWhiteSpace(facilityId))
+                throw new BadRequestException("facilityId is required.");
+
+            await _manager.DeleteByFacilityIdAsync(facilityId);
+            return Accepted();
+        }
+        catch (BadRequestException ex)
+        {
+            _logger.LogError(ex, "BadRequestException occurred.");
+            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An exception occurred while deleting EncounterMappings for facilityId {facilityId}", facilityId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// POST /api/data/encounter-mappings
     /// </summary>
     [HttpPost]

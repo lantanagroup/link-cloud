@@ -781,6 +781,44 @@ public static partial class FacilityConfigurationService
         output.WriteLine("Facility cleanup complete.");
     }
 
+    /// <summary>
+    /// Removes census config and the acquisition mappings a run wrote for one facility.
+    /// Each call is scoped to <paramref name="facilityId"/>. A missing row is success.
+    /// </summary>
+    public static async Task DeleteRunConfigurationsAsync(
+        ICensusServiceClient censusClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new InvalidOperationException("A facility id is required.");
+
+        var census = await censusClient.DeleteCensusConfigAsync(facilityId, cancellationToken);
+        EnsureDelete(census, $"census config delete for '{facilityId}'");
+
+        var orgLocation = await dataAcqClient.DeleteOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        EnsureDelete(orgLocation, $"org-location config delete for '{facilityId}'");
+
+        // Encounter rows point at location mappings. Remove them first.
+        var encounterMappings = await dataAcqClient.DeleteEncounterMappingsAsync(facilityId, cancellationToken);
+        EnsureDelete(encounterMappings, $"encounter mapping delete for '{facilityId}'");
+
+        var locationMappings = await dataAcqClient.DeleteOrganizationLocationMappingsAsync(facilityId, cancellationToken);
+        EnsureDelete(locationMappings, $"location mapping delete for '{facilityId}'");
+
+        output.WriteLine($"Removed census config, org-location config, location mappings, and encounter mappings for facility '{facilityId}'.");
+    }
+
+    private static void EnsureDelete(LinkApiResponse response, string operation)
+    {
+        if (response.IsSuccessStatusCode || response.StatusCode == (int)HttpStatusCode.NotFound)
+            return;
+
+        throw new InvalidOperationException($"{operation} failed (HTTP {response.StatusCode}).");
+    }
+
     public static async Task SoftDeleteRunDataAsync(
         IReportServiceClient reportClient,
         IDataAcquisitionServiceClient dataAcqClient,

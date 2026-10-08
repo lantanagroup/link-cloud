@@ -1350,7 +1350,9 @@ internal sealed class RunExecutor
                     output,
                     facilityId,
                     reportId,
-                    runSucceeded: true);
+                    runSucceeded: true,
+                    services.GetRequiredService<ICensusServiceClient>(),
+                    cancellationToken);
             }
 
             var retentionNotice = RunCleanupGate.SuccessNotice(removedFhir, removedService, serviceKeptUnowned);

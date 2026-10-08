@@ -398,7 +398,166 @@ public class RunCleanupHelperTests
             new NullOutput(),
             Guid.NewGuid().ToString(),
             Guid.NewGuid().ToString(),
-            runSucceeded: false);
+            runSucceeded: false,
+            new Mock<ICensusServiceClient>(MockBehavior.Strict).Object);
+    }
+
+    [Fact]
+    public async Task CleanupAfterRun_removes_census_and_mappings_for_that_facility_only()
+    {
+        var facilityId = "f1a8c3b1-a643-4d74-9d97-e3c6dbe8b936";
+        var otherId = "234db403-c799-4c12-b059-6c19a5689022";
+        var (facility, normalization, da, query, report, census) = ServiceClients();
+
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            new TestScenarioConfig { CleanupServiceData = true, CleanupFhirData = false },
+            facility.Object,
+            normalization.Object,
+            da.Object,
+            query.Object,
+            report.Object,
+            new FhirDataLoader("http://localhost"),
+            new NullOutput(),
+            facilityId,
+            Guid.NewGuid().ToString(),
+            runSucceeded: true,
+            census.Object);
+
+        census.Verify(c => c.DeleteCensusConfigAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+        da.Verify(c => c.DeleteOrganizationLocationConfigurationsAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+        da.Verify(c => c.DeleteOrganizationLocationMappingsAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+        da.Verify(c => c.DeleteEncounterMappingsAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+        census.Verify(c => c.DeleteCensusConfigAsync(otherId, It.IsAny<CancellationToken>()), Times.Never);
+        da.Verify(c => c.DeleteOrganizationLocationConfigurationsAsync(otherId, It.IsAny<CancellationToken>()), Times.Never);
+        da.Verify(c => c.DeleteOrganizationLocationMappingsAsync(otherId, It.IsAny<CancellationToken>()), Times.Never);
+        da.Verify(c => c.DeleteEncounterMappingsAsync(otherId, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CleanupAfterRun_skips_census_and_mappings_when_service_cleanup_is_off()
+    {
+        var census = new Mock<ICensusServiceClient>(MockBehavior.Strict);
+        var da = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+
+        await RunCleanupHelper.CleanupAfterRunAsync(
+            new TestScenarioConfig { CleanupServiceData = false, CleanupFhirData = false },
+            new Mock<IFacilityServiceClient>(MockBehavior.Strict).Object,
+            new Mock<INormalizationServiceClient>(MockBehavior.Strict).Object,
+            da.Object,
+            new Mock<IQueryDispatchServiceClient>(MockBehavior.Strict).Object,
+            new Mock<IReportServiceClient>(MockBehavior.Strict).Object,
+            new FhirDataLoader("http://localhost"),
+            new NullOutput(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            runSucceeded: true,
+            census.Object);
+    }
+
+    [Fact]
+    public async Task DeleteRunConfigurations_accepts_a_missing_census_config()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var census = new Mock<ICensusServiceClient>();
+        var da = new Mock<IDataAcquisitionServiceClient>();
+        census.Setup(c => c.DeleteCensusConfigAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 404 });
+        da.Setup(c => c.DeleteOrganizationLocationConfigurationsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 202 });
+        da.Setup(c => c.DeleteOrganizationLocationMappingsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 202 });
+        da.Setup(c => c.DeleteEncounterMappingsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 202 });
+
+        await FacilityConfigurationService.DeleteRunConfigurationsAsync(
+            census.Object, da.Object, new NullOutput(), facilityId);
+
+        da.Verify(c => c.DeleteEncounterMappingsAsync(facilityId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteRunConfigurations_removes_encounter_rows_before_location_mappings()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var order = new List<string>();
+        var census = new Mock<ICensusServiceClient>();
+        var da = new Mock<IDataAcquisitionServiceClient>();
+        var ok = new LinkApiResponse { StatusCode = 202 };
+        census.Setup(c => c.DeleteCensusConfigAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ok);
+        da.Setup(c => c.DeleteOrganizationLocationConfigurationsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ok);
+        da.Setup(c => c.DeleteEncounterMappingsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("encounter"))
+            .ReturnsAsync(ok);
+        da.Setup(c => c.DeleteOrganizationLocationMappingsAsync(facilityId, It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("location"))
+            .ReturnsAsync(ok);
+
+        await FacilityConfigurationService.DeleteRunConfigurationsAsync(
+            census.Object, da.Object, new NullOutput(), facilityId);
+
+        order.Should().Equal("encounter", "location");
+    }
+
+    [Fact]
+    public async Task DeleteRunConfigurations_stops_when_census_delete_fails()
+    {
+        var facilityId = Guid.NewGuid().ToString();
+        var census = new Mock<ICensusServiceClient>();
+        var da = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+        census.Setup(c => c.DeleteCensusConfigAsync(facilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LinkApiResponse { StatusCode = 500 });
+
+        var act = async () => await FacilityConfigurationService.DeleteRunConfigurationsAsync(
+            census.Object, da.Object, new NullOutput(), facilityId);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        da.Verify(
+            c => c.DeleteOrganizationLocationConfigurationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteRunConfigurations_refuses_a_blank_facility_id()
+    {
+        var census = new Mock<ICensusServiceClient>(MockBehavior.Strict);
+        var da = new Mock<IDataAcquisitionServiceClient>(MockBehavior.Strict);
+
+        var act = async () => await FacilityConfigurationService.DeleteRunConfigurationsAsync(
+            census.Object, da.Object, new NullOutput(), "  ");
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    private static (
+        Mock<IFacilityServiceClient> Facility,
+        Mock<INormalizationServiceClient> Normalization,
+        Mock<IDataAcquisitionServiceClient> DataAcquisition,
+        Mock<IQueryDispatchServiceClient> QueryDispatch,
+        Mock<IReportServiceClient> Report,
+        Mock<ICensusServiceClient> Census) ServiceClients()
+    {
+        var ok = new LinkApiResponse { StatusCode = 202 };
+        var facility = new Mock<IFacilityServiceClient>();
+        facility.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        var normalization = new Mock<INormalizationServiceClient>();
+        normalization.Setup(c => c.DeleteFacilityOperationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        var da = new Mock<IDataAcquisitionServiceClient>();
+        da.Setup(c => c.DeleteQueryPlanAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.DeleteFhirListConfigurationAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.DeleteFhirQueryConfigurationAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.SoftDeleteLogsByFacilityAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.DeleteOrganizationLocationConfigurationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.DeleteOrganizationLocationMappingsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        da.Setup(c => c.DeleteEncounterMappingsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        var query = new Mock<IQueryDispatchServiceClient>();
+        query.Setup(c => c.DeleteQueryDispatchConfigurationAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        var report = new Mock<IReportServiceClient>();
+        report.Setup(c => c.SoftDeleteScheduleAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>())).ReturnsAsync(ok);
+        var census = new Mock<ICensusServiceClient>();
+        census.Setup(c => c.DeleteCensusConfigAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(ok);
+        return (facility, normalization, da, query, report, census);
     }
 
     [Fact]
