@@ -23,6 +23,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapPost("/topics/{topic}/partitions/plan", Plan)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/family/plan", PlanFamily)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/family", CreateFamily)
+            .RequireAuthorization(PolicyNames.CanManageKafkaTopics);
         group.MapGet("/cluster", GetCluster)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/infra", GetInfra)
@@ -95,6 +99,40 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         }
     }
 
+    private async Task<IResult> PlanFamily(ClaimsPrincipal user, string topic, PartitionPlanBody body, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var plan = await kafkaOps.PlanFamilyAsync(name, body.OverrideQuietWindow, body.OverrideReason, cancellationToken);
+            return plan.Accepted ? Results.Ok(plan) : Results.BadRequest(plan);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> CreateFamily(ClaimsPrincipal user, string topic, ChangeRequestBody body, HttpContext http, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanManage(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var record = await kafkaOps.CreateFamilyAsync(user, name, body.Reason ?? "", body.OverrideQuietWindow, body.OverrideReason, body.Confirmation, Correlation(http), cancellationToken);
+            return Results.Created($"/api/ops/kafka/change-requests/{record.Id}", record);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
     private async Task<IResult> Create(ClaimsPrincipal user, HttpContext http, ChangeRequestBody body, CancellationToken cancellationToken)
     {
         if (!kafkaOps.CanManage(user))
@@ -109,7 +147,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         }
         catch (KafkaOpsRejectedException ex)
         {
-            return Problem(ex.Message, StatusCodes.Status400BadRequest);
+            return StatusFor(ex);
         }
     }
 

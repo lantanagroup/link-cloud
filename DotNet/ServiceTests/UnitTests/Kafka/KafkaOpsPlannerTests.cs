@@ -113,7 +113,7 @@ public class KafkaOpsPlannerTests
 
         await provider.AddBrokerAsync(CancellationToken.None);
         await provider.ScaleGroupAsync("Report", 2, CancellationToken.None);
-        await provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", CancellationToken.None);
+        await provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", "link-ops-0123456789abcdef0123456789abcdef", false, CancellationToken.None);
 
         Assert.Contains("\"replicas\":4", kubernetes.Applied["kafkanodepools/link-brokers"], StringComparison.Ordinal);
         await provider.RemoveBrokerAsync(1, CancellationToken.None);
@@ -122,8 +122,35 @@ public class KafkaOpsPlannerTests
         Assert.Contains("[1]", removed, StringComparison.Ordinal);
         Assert.Contains("\"replicas\":2", removed, StringComparison.Ordinal);
         Assert.Contains("\"replicas\":2", kubernetes.Applied["deployments/report"], StringComparison.Ordinal);
-        Assert.Contains("remove-brokers", kubernetes.Applied["kafkarebalances/link-ops-remove-brokers"], StringComparison.Ordinal);
-        Assert.Contains("strimzi.io/rebalance", kubernetes.Applied["kafkarebalances/link-ops-remove-brokers"], StringComparison.Ordinal);
+        Assert.Contains("remove-brokers", kubernetes.Applied["kafkarebalances/link-ops-0123456789abcdef0123456789abcdef"], StringComparison.Ordinal);
+        Assert.Contains("\"approve\"", kubernetes.Applied["kafkarebalances/link-ops-0123456789abcdef0123456789abcdef"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StrimziRebalance_RefusesAnExistingName_RefreshesTheSameOne_AndDeletesIt()
+    {
+        var kubernetes = new RecordingKubernetes();
+        var provider = new StrimziKafkaInfraProvider(kubernetes, new KafkaOpsOptions { KubernetesNamespace = "kafka", KafkaNodePool = "link-brokers" });
+        const string first = "link-ops-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string second = "link-ops-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+        await provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", first, false, CancellationToken.None);
+        await provider.ApplyReassignmentAsync("""{"arrivingBroker":4,"partitions":[]}""", second, false, CancellationToken.None);
+        Assert.NotEqual(first, second);
+        Assert.True(kubernetes.Applied.ContainsKey("kafkarebalances/" + first));
+        Assert.True(kubernetes.Applied.ContainsKey("kafkarebalances/" + second));
+
+        kubernetes.Bodies["kafkarebalances/" + first] = kubernetes.Applied["kafkarebalances/" + first];
+        var collision = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", first, false, CancellationToken.None));
+        Assert.Contains("already exists", collision.Message, StringComparison.Ordinal);
+
+        await provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", first, true, CancellationToken.None);
+        Assert.Contains("\"refresh\"", kubernetes.Applied["kafkarebalances/" + first], StringComparison.Ordinal);
+        Assert.DoesNotContain("kafkarebalances/link-ops-remove-brokers", string.Join(" ", kubernetes.Applied.Keys), StringComparison.Ordinal);
+
+        await provider.ReleaseRebalanceAsync(first, CancellationToken.None);
+        Assert.Contains("kafkarebalances/" + first, kubernetes.Deleted);
     }
 
     [Fact]
@@ -185,19 +212,116 @@ public class KafkaOpsPlannerTests
         Assert.Contains("stop", process.Arguments, StringComparison.Ordinal);
         Assert.Contains("broker-2", process.Arguments, StringComparison.Ordinal);
 
-        await provider.ApplyReassignmentAsync("{}", CancellationToken.None);
+        await provider.ApplyReassignmentAsync("{}", "link-ops-0123456789abcdef0123456789abcdef", false, CancellationToken.None);
         Assert.Contains("exec", process.Arguments, StringComparison.Ordinal);
         Assert.Contains("-T", process.Arguments, StringComparison.Ordinal);
         Assert.Contains("broker-0", process.Arguments, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalCompose_ListsReassignmentsOnTheSameExecChannel()
+    {
+        var process = new RecordingProcess();
+        var provider = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions
+        {
+            ComposeProject = "kafka-ops-proof",
+            BrokerService = "broker-0"
+        });
+
+        process.Output = "No partition reassignments found.";
+        var clear = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.True(clear.Known);
+        Assert.Empty(clear.Topics);
+        Assert.Contains("exec", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("-T", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("broker-0", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("kafka-reassign-partitions.sh", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("--list", process.Arguments, StringComparison.Ordinal);
+        Assert.DoesNotContain("--verify", process.Arguments, StringComparison.Ordinal);
+
+        process.Output = "Current partition reassignments:\nops-proof-log-0: replicas: 1,2,3. adding: 3.\nops-proof-log-1: replicas: 0,1,2.";
+        var busy = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.True(busy.Known);
+        Assert.Equal(["ops-proof-log"], busy.Topics);
+
+        process.Output = "{\"version\":1,\"partitions\":[{\"topic\":\"ops-proof-members\",\"partition\":0,\"replicas\":[0,1]}]}";
+        var json = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.True(json.Known);
+        Assert.Equal(["ops-proof-members"], json.Topics);
+
+        process.Output = "{\"version\":1,\"partitions\":[]}";
+        var emptyJson = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.True(emptyJson.Known);
+        Assert.Empty(emptyJson.Topics);
+
+        process.Output = "";
+        var silent = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.False(silent.Known);
+
+        process.Output = "No partition reassignments found.";
+        process.ExitCode = 1;
+        var failed = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.False(failed.Known);
+
+        process.ExitCode = 0;
+        process.Output = "Error: the admin client timed out";
+        var unrecognized = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.False(unrecognized.Known);
+    }
+
+    [Fact]
+    public async Task Strimzi_ListsRebalancesThatAreNotFinished()
+    {
+        var kubernetes = new RecordingKubernetes();
+        var provider = new StrimziKafkaInfraProvider(kubernetes, new KafkaOpsOptions { KubernetesNamespace = "kafka" });
+        kubernetes.Listed.Add(Rebalance("link-ops-active", "ProposalReady"));
+        kubernetes.Listed.Add(Rebalance("link-ops-done", "Ready"));
+        kubernetes.Listed.Add(Rebalance("link-ops-stopped", "Stopped"));
+        kubernetes.Listed.Add(Rebalance("link-ops-both", "Ready", "Rebalancing"));
+        kubernetes.Listed.Add("{\"metadata\":{\"name\":\"link-ops-new\"}}");
+
+        var listing = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.True(listing.Known);
+        Assert.Equal(["link-ops-active", "link-ops-both", "link-ops-new"], listing.Topics);
+
+        kubernetes.ListError = new InvalidOperationException("the list timed out");
+        var unknown = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.False(unknown.Known);
+    }
+
+    [Fact]
+    public async Task Disabled_CannotConfirmReassignments()
+    {
+        var provider = new DisabledKafkaInfraProvider("Broker and replica changes are disabled.");
+        var listing = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
+        Assert.False(listing.Known);
+        Assert.Empty(listing.Topics);
+    }
+
+    private static string Rebalance(string name, params string[] trueConditions)
+    {
+        var conditions = string.Join(",", trueConditions.Select(type => "{\"type\":\"" + type + "\",\"status\":\"True\"}"));
+        return "{\"metadata\":{\"name\":\"" + name + "\"},\"status\":{\"conditions\":[" + conditions + "]}}";
     }
 
     private sealed class RecordingKubernetes : IKubernetesResourceClient
     {
         public Dictionary<string, string> Bodies { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, string> Applied { get; } = new(StringComparer.Ordinal);
+        public List<string> Deleted { get; } = [];
+
+        public List<string> Listed { get; } = [];
+        public Exception? ListError { get; set; }
 
         public Task<string?> GetAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken) =>
             Task.FromResult<string?>(Bodies.TryGetValue(plural + "/" + name, out var body) ? body : null);
+
+        public Task<IReadOnlyList<string>> ListAsync(string apiVersion, string plural, string namespaceName, CancellationToken cancellationToken)
+        {
+            if (ListError is not null)
+                throw ListError;
+            return Task.FromResult<IReadOnlyList<string>>(Listed.ToList());
+        }
 
         public Task ApplyAsync(string apiVersion, string plural, string namespaceName, string name, string body, CancellationToken cancellationToken)
         {
@@ -205,19 +329,25 @@ public class KafkaOpsPlannerTests
             return Task.CompletedTask;
         }
 
-        public Task DeleteAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public Task DeleteAsync(string apiVersion, string plural, string namespaceName, string name, CancellationToken cancellationToken)
+        {
+            Deleted.Add(plural + "/" + name);
+            Bodies.Remove(plural + "/" + name);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingProcess : IProcessRunner
     {
         public string Arguments { get; private set; } = "";
-        public int ExitCode { get; private set; }
+        public int ExitCode { get; set; }
+        public string Output { get; set; } = "";
+        public string Error { get; set; } = "";
 
         public Task<ProcessResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string? standardInput, CancellationToken cancellationToken)
         {
             Arguments = fileName + " " + string.Join(" ", arguments);
-            return Task.FromResult(new ProcessResult(ExitCode, "", ""));
+            return Task.FromResult(new ProcessResult(ExitCode, Output, Error));
         }
     }
 }
