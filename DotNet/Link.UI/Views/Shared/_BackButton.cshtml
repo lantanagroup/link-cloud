@@ -1,7 +1,12 @@
 @model BackLink
 @{
     var origin = ReturnUrlRules.FromQuery(Context.Request);
+    var current = Context.Request.Path.Value ?? "/";
+    var show = BackLinkRules.Show(current, Model.FallbackHref, origin);
     var href = string.IsNullOrWhiteSpace(origin) ? Model.FallbackHref : origin;
-    var label = origin is null ? Model.FallbackLabel : ReturnUrlRules.Label(origin) ?? Model.FallbackLabel;
+    var label = BackLinkRules.LabelFor(origin, Model.FallbackHref, Model.FallbackLabel);
 }
-<a class="btn btn-sm btn-au-neutral" href="@href"><i class="bi bi-arrow-left me-1"></i>@label</a>
+@if (show)
+{
+    <a class="btn btn-sm btn-au-neutral" href="@href"><i class="bi bi-arrow-left me-1"></i>@label</a>
+}

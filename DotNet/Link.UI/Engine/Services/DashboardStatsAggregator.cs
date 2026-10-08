@@ -50,9 +50,14 @@ public sealed class DashboardStatsAggregator
         };
 
         var completedWithDuration = merged
-            .Where(r => r.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed && r.FinishedAt.HasValue)
-            .Select(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds)
-            .Where(d => d > 0)
+            .Select(r => Link.UI.Services.AutomationRules.DurationSeconds(
+                r.Duration,
+                r.Status.ToString(),
+                r.StartedAt,
+                r.FinishedAt,
+                r.CreatedAt))
+            .Where(seconds => seconds is > 0)
+            .Select(seconds => seconds!.Value)
             .ToList();
 
         stats.AvgDurationSeconds = completedWithDuration.Count > 0

@@ -196,8 +196,9 @@
         if (status) {
             var sampled = payload.sampledAt ? new Date(payload.sampledAt) : new Date();
             var hotCount = services.filter(isHot).length;
-            status.textContent = 'Live · ' + sampled.toISOString() + ' · ' + hotCount + ' hot · not saved';
-            if (window.luPaintTimes) window.luPaintTimes(status);
+            var shown = window.luLocalInstant ? window.luLocalInstant(sampled) : { text: String(sampled), title: "" };
+            status.textContent = 'Live · ' + shown.text + ' · ' + hotCount + ' hot · not saved';
+            if (shown.title) status.setAttribute("title", shown.title);
         }
         var hottest = services.slice().sort(function (a, b) { return heat(b) - heat(a); })[0];
         var hottestEl = $('livePulseHottest');

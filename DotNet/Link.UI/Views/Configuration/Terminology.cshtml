@@ -40,7 +40,7 @@
                         <tr>
                             <td class="text-break">@row.Url</td>
                             <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
-                            <td><code>@row.Id</code></td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
                         </tr>
                     }
                     </tbody>
@@ -79,7 +79,7 @@
                         <tr>
                             <td class="text-break">@row.Url</td>
                             <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
-                            <td><code>@row.Id</code></td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
                         </tr>
                     }
                     </tbody>

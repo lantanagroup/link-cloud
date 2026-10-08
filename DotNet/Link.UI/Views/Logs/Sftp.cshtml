@@ -164,13 +164,15 @@ else
                                 <td>@row.RetryAttempts</td>
                                 <td>@row.FileCount</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="SftpDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open</a>
-                                    @if (row.CanReset)
-                                    {
-                                        <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
-                                            <button type="submit" class="btn btn-sm btn-au-neutral">Reset</button>
-                                        </form>
-                                    }
+                                    <div class="lu-row-actions">
+                                        <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="SftpDetail" asp-route-id="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Open" aria-label="Open"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                        @if (row.CanReset)
+                                        {
+                                            <form method="post" data-au-save asp-action="ResetSftp" asp-route-id="@row.Id" class="d-inline" onsubmit="return confirm('Reset this SFTP log for retry?');">
+                                                <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Reset" aria-label="Reset"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
+                                            </form>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
