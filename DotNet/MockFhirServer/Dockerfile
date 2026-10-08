@@ -13,28 +13,10 @@ COPY ["Directory.Packages.props", "./"]
 COPY ["nuget.config", "./"]
 COPY ["DotNet/Automation/Automation.csproj", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/MockFhirServer.csproj", "DotNet/MockFhirServer/"]
-ARG FEED_ACCESSTOKEN
+COPY ["Scripts/docker-compose.restore-feed.sh", "Scripts/docker-compose.restore-feed.sh"]
 RUN --mount=type=cache,id=nuget,sharing=locked,target=/root/.nuget/packages \
     --mount=type=secret,id=feed_accesstoken,required=false \
-    token=""; \
-    if [ -f /run/secrets/feed_accesstoken ]; then token="$(cat /run/secrets/feed_accesstoken)"; fi; \
-    if [ -z "$token" ]; then token="$FEED_ACCESSTOKEN"; fi; \
-    if [ -n "$token" ]; then \
-      rm -rf /root/.nuget/packages/lantanagroup.thetis.generation.abstractions \
-             /root/.nuget/packages/lantanagroup.thetis.generation.engine; \
-      cp nuget.config nuget.config.feed; \
-      dotnet nuget update source Shared_BOTW_Feed \
-        --username docker \
-        --password "$token" \
-        --store-password-in-clear-text \
-        --configfile nuget.config.feed; \
-      dotnet restore "DotNet/MockFhirServer/MockFhirServer.csproj" \
-        --configfile nuget.config.feed \
-        /p:RestorePackagesWithLockFile=false; \
-      rm -f nuget.config.feed; \
-    else \
-      dotnet restore "DotNet/MockFhirServer/MockFhirServer.csproj" /p:RestorePackagesWithLockFile=false; \
-    fi
+    sh Scripts/docker-compose.restore-feed.sh "DotNet/MockFhirServer/MockFhirServer.csproj"
 
 COPY ["DotNet/Automation/", "DotNet/Automation/"]
 COPY ["DotNet/MockFhirServer/", "DotNet/MockFhirServer/"]
