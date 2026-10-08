@@ -122,6 +122,77 @@ global:
     description: "Whether the .NET clients send SASL credentials at all. When false, KafkaConnection.CreateConsumerConfig/CreateProducerConfig skip the security protocol, username, password and mechanism entirely, producing an unauthenticated connection."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaOps:MaxPartitionsPerTopic"
+    description: "Upper bound for a partition increase requested through the Admin BFF operations API."
+    required: false
+    defaultValue: "24"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:RequireSecondApprover"
+    description: "When true, every partition change needs a second person. Order-sensitive topics, quiet-window overrides, and broker removal always need a second person."
+    required: false
+    defaultValue: "false"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ReadOnly"
+    description: "When true, the operations API refuses partition changes. When the key is absent, a Production host refuses writes and every other host allows them."
+    required: false
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:MetadataRefreshIntervalMs"
+    description: "Metadata refresh interval the partition flow uses for the quiet window and the convergence alert. Two times this interval is the quiet window."
+    required: false
+    defaultValue: "30000"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ExpectedConfigVersion"
+    description: "Consumer client-id suffix version that must be running before a partition increase is allowed."
+    required: false
+    defaultValue: "1"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:CacheSeconds"
+    description: "Seconds to cache topic and group views. Clamped to 5-10."
+    required: false
+    defaultValue: "8"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:VerificationWindowSeconds"
+    description: "How long to watch lag, committed offsets, and the error topic after a partition increase converges."
+    required: false
+    defaultValue: "900"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:RateLimitMinutes"
+    description: "Minimum minutes between partition increases for the same topic family."
+    required: false
+    defaultValue: "30"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ConvergenceAlertMultiple"
+    description: "Raise an alert when convergence takes longer than this multiple of the metadata refresh interval."
+    required: false
+    defaultValue: "3"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:InfraProvider"
+    description: "Who starts brokers and scales consumer replicas. Disabled refuses those buttons. Strimzi and LocalCompose stay off until this key is set. LocalCompose is refused on a Production host."
+    required: false
+    defaultValue: "Disabled"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ScaleTimeoutSeconds"
+    description: "How long to wait for a replica change or a broker add to become stable before the request needs attention."
+    required: false
+    defaultValue: "180"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ComposeProject"
+    description: "Compose project name used only when KafkaOps:InfraProvider is LocalCompose. Empty unless a local proof host sets it."
+    required: false
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:KubernetesNamespace"
+    description: "Namespace for Strimzi KafkaNodePool, KafkaRebalance, and consumer Deployment resources. Used only when KafkaOps:InfraProvider is Strimzi."
+    required: false
+    defaultValue: "kafka"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:KafkaNodePool"
+    description: "Strimzi KafkaNodePool name whose spec.replicas is the broker count. Used only when the Strimzi provider is enabled."
+    required: false
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ConsumerDeployments"
+    description: "Comma-separated group=deployment pairs that map a consumer group id to the Deployment the Strimzi provider scales."
+    required: false
+    consumers: ["AdminBFF"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false

@@ -13,7 +13,10 @@
         CanGenerateEvents,
         CanViewAccounts,
         CanAdministerAccounts,
-        IsLinkAdmin
+        IsLinkAdmin,
+        CanViewInfrastructure,
+        CanManageKafkaTopics,
+        CanManageScaling
     }
 
     public enum LinkTenantPermissions
