@@ -1,0 +1,15 @@
+@model ThroughputKafkaPageQuery
+<input type="hidden" name="q" value="@Model.Q" />
+<input type="hidden" name="sort" value="@Model.Sort" />
+<input type="hidden" name="dir" value="@Model.Dir" />
+<input type="hidden" name="page" value="@Model.Page" />
+<input type="hidden" name="pageSize" value="@Model.PageSize" />
+<input type="hidden" name="family" value="@Model.Family" />
+<input type="hidden" name="keyClass" value="@Model.KeyClass" />
+<input type="hidden" name="view" value="@Model.View" />
+<input type="hidden" name="group" value="@Model.Group" />
+<input type="hidden" name="topic" value="@Model.TopicName" />
+<input type="hidden" name="broker" value="@Model.Broker" />
+<input type="hidden" name="tests" value="@(Model.Tests ? "true" : "false")" />
+<input type="hidden" name="advanced" value="@(Model.Advanced ? "true" : "false")" />
+<input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />

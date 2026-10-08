@@ -79,6 +79,12 @@ builder.Services.AddHttpClient<IAdminBffUserService, AdminBffUserService>((_, cl
     client.BaseAddress = new Uri(adminBffAddress);
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services.AddSingleton<KafkaOpsFixture>();
+builder.Services.AddHttpClient<KafkaOpsClient>((_, client) =>
+{
+    client.BaseAddress = new Uri(adminBffAddress);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 var proxyRoutes = new List<RouteConfig>
 {

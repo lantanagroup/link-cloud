@@ -189,6 +189,35 @@ public static class StatusPills
         return ForLog(status);
     }
 
+    public static string ForKafka(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "au-badge-muted";
+        if (status.Equals("Stable", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("up", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Done", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+            return "au-badge-success";
+        if (status.Equals("Failed", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Dead", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("offline", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("missing", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Rejected", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("NeedsAttention", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("TimedOut", StringComparison.OrdinalIgnoreCase))
+            return "au-badge-danger";
+        if (status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Empty", StringComparison.OrdinalIgnoreCase))
+            return "au-badge-warning";
+        if (status.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Executing", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Converging", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("Verifying", StringComparison.OrdinalIgnoreCase)
+            || status.Contains("Rebalance", StringComparison.OrdinalIgnoreCase))
+            return "au-badge-active";
+        return "au-badge-muted";
+    }
+
     public static string ForSeverity(string? severity)
     {
         if (string.IsNullOrWhiteSpace(severity))

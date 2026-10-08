@@ -1,0 +1,473 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+
+namespace Link.UI.Services;
+
+public sealed class KafkaOpsClient
+{
+    private static readonly JsonSerializerOptions Json = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly HttpClient _http;
+    private readonly IHttpContextAccessor _httpContext;
+    private readonly KafkaOpsFixture _fixture;
+
+    public KafkaOpsClient(HttpClient http, IHttpContextAccessor httpContext, KafkaOpsFixture fixture)
+    {
+        _http = http;
+        _httpContext = httpContext;
+        _fixture = fixture;
+    }
+
+    public Task<KafkaOpsCall<KafkaTopicsResponse>> GetTopicsAsync(CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Topics());
+        return SendAsync<KafkaTopicsResponse>(HttpMethod.Get, "api/ops/kafka/topics", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaGroupsResponse>> GetGroupsAsync(bool includeTestGroups, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Groups(includeTestGroups));
+        return SendAsync<KafkaGroupsResponse>(HttpMethod.Get, "api/ops/kafka/groups?includeTestGroups=" + (includeTestGroups ? "true" : "false"), null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<KafkaCapabilitiesResponse>> GetCapabilitiesAsync(CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Capabilities());
+        return SendAsync<KafkaCapabilitiesResponse>(HttpMethod.Get, "api/ops/kafka/capabilities", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<ClusterSnapshot>> GetClusterAsync(CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Cluster());
+        return SendAsync<ClusterSnapshot>(HttpMethod.Get, "api/ops/kafka/cluster", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<InfraStatus>> GetInfraAsync(CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Infra());
+        return SendAsync<InfraStatus>(HttpMethod.Get, "api/ops/kafka/infra", null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<PartitionPlan>> PlanAsync(string topic, int partitions, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanPartitions(topic, partitions, overrideQuietWindow, overrideReason));
+        return SendAsync<PartitionPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/partitions/plan", new
+        {
+            partitions,
+            overrideQuietWindow,
+            overrideReason
+        }, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateAsync(string topic, int partitions, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreatePartitions(topic, partitions, reason, overrideQuietWindow, overrideReason, confirmation, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests", new
+        {
+            topic,
+            partitions,
+            reason,
+            overrideQuietWindow,
+            overrideReason,
+            confirmation
+        }, cancellationToken, correlationId);
+    }
+
+    public Task<KafkaOpsCall<ReplicaScalePlan>> PlanScaleAsync(string groupId, int replicas, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanScale(groupId, replicas));
+        return SendAsync<ReplicaScalePlan>(HttpMethod.Post, "api/ops/kafka/groups/" + Uri.EscapeDataString(groupId) + "/replicas/plan", new { replicas }, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateScaleAsync(string groupId, int replicas, string reason, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateScale(groupId, replicas, reason, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/groups/" + Uri.EscapeDataString(groupId) + "/replicas", new { replicas, reason }, cancellationToken, correlationId);
+    }
+
+    public Task<KafkaOpsCall<BrokerMovePlan>> PlanDecommissionAsync(int brokerId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanDecommission(brokerId));
+        return SendAsync<BrokerMovePlan>(HttpMethod.Post, "api/ops/kafka/brokers/" + brokerId + "/decommission/plan", null, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateDecommissionAsync(int brokerId, string reason, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateBroker("DecommissionBroker", brokerId, reason, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/brokers/" + brokerId + "/decommission", new { reason }, cancellationToken, correlationId);
+    }
+
+    public Task<KafkaOpsCall<BrokerMovePlan>> PlanRebalanceAsync(int brokerId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanRebalance(brokerId));
+        return SendAsync<BrokerMovePlan>(HttpMethod.Post, "api/ops/kafka/brokers/" + brokerId + "/rebalance/plan", null, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateRebalanceAsync(int brokerId, string reason, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateBroker("Rebalance", brokerId, reason, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/brokers/" + brokerId + "/rebalance", new { reason }, cancellationToken, correlationId);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateAddBrokerAsync(string reason, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateBroker("AddBroker", -1, reason, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/brokers", new { reason }, cancellationToken, correlationId);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Get(id));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Get, "api/ops/kafka/change-requests/" + id.ToString("D"), null, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> ApproveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Approve(id));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests/" + id.ToString("D") + "/approve", new { }, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> RejectAsync(Guid id, string reason, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Reject(id, reason));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests/" + id.ToString("D") + "/reject", new { reason }, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> ExecuteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Execute(id));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests/" + id.ToString("D") + "/execute", new { }, cancellationToken);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CancelAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.Cancel(id));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/change-requests/" + id.ToString("D") + "/cancel", new { }, cancellationToken);
+    }
+
+    private async Task<KafkaOpsCall<T>> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken cancellationToken, string? correlationId = null, bool keepBodyOnFailure = false)
+    {
+        using var request = new HttpRequestMessage(method, path);
+        var cookie = _httpContext.HttpContext?.Request.Headers.Cookie.ToString();
+        if (!string.IsNullOrWhiteSpace(cookie))
+            request.Headers.TryAddWithoutValidation("Cookie", cookie);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (!string.IsNullOrWhiteSpace(correlationId))
+            request.Headers.TryAddWithoutValidation("X-Correlation-Id", correlationId);
+        if (body is not null)
+            request.Content = JsonContent.Create(body);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var text = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            T? failed = default;
+            if (keepBodyOnFailure && !string.IsNullOrWhiteSpace(text))
+            {
+                try
+                {
+                    failed = JsonSerializer.Deserialize<T>(text, Json);
+                }
+                catch (JsonException)
+                {
+                    failed = default;
+                }
+            }
+
+            return new KafkaOpsCall<T>
+            {
+                Status = (int)response.StatusCode,
+                Value = failed,
+                Error = ProblemDetail(text) ?? "The operations service returned " + (int)response.StatusCode + "."
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+            return new KafkaOpsCall<T> { Status = (int)response.StatusCode };
+
+        var value = JsonSerializer.Deserialize<T>(text, Json);
+        return new KafkaOpsCall<T> { Status = (int)response.StatusCode, Value = value };
+    }
+
+    private static string? ProblemDetail(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            if (document.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                return detail.GetString();
+            if (document.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array)
+            {
+                var messages = errors.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString())
+                    .Where(item => !string.IsNullOrWhiteSpace(item));
+                var joined = string.Join(" ", messages);
+                if (joined.Length > 0)
+                    return joined;
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+}
+
+public sealed class KafkaOpsCall<T>
+{
+    public int Status { get; init; }
+    public T? Value { get; init; }
+    public string? Error { get; init; }
+    public bool Ok => Error is null && Value is not null;
+}
+
+public sealed class KafkaTopicsResponse
+{
+    public List<KafkaTopicRow> Topics { get; set; } = [];
+    public int Cap { get; set; }
+    public bool ReadOnly { get; set; }
+    public string? Error { get; set; }
+    public string? GroupsError { get; set; }
+}
+
+public sealed class KafkaTopicRow
+{
+    public string Topic { get; set; } = "";
+    public string Family { get; set; } = "";
+    public string KeyClass { get; set; } = "";
+    public string KeyShape { get; set; } = "";
+    public bool HardBlocked { get; set; }
+    public bool OrderSensitive { get; set; }
+    public int Partitions { get; set; }
+    public int RetryPartitions { get; set; }
+    public int ErrorPartitions { get; set; }
+    public bool RetryBehind { get; set; }
+    public int ReplicationFactor { get; set; }
+    public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public double ProduceRatePerSecond { get; set; }
+    public long TotalLag { get; set; }
+    public bool LagKnown { get; set; } = true;
+    public int MaxReplicas { get; set; }
+    public List<string> Groups { get; set; } = [];
+    public string? Error { get; set; }
+}
+
+public sealed class KafkaGroupsResponse
+{
+    public List<KafkaGroupRow> Groups { get; set; } = [];
+    public string? Error { get; set; }
+}
+
+public sealed class KafkaCapabilitiesResponse
+{
+    public List<KafkaTopicCapability> Topics { get; set; } = [];
+    public string? Error { get; set; }
+}
+
+public sealed class KafkaTopicCapability
+{
+    public string Topic { get; set; } = "";
+    public List<string> AuthorizedOperations { get; set; } = [];
+    public bool? CanAlterPartitions { get; set; }
+    public string? Error { get; set; }
+}
+
+public sealed class KafkaGroupRow
+{
+    public string GroupId { get; set; } = "";
+    public string State { get; set; } = "";
+    public List<KafkaMemberRow> Members { get; set; } = [];
+    public List<KafkaPartitionLagRow> Partitions { get; set; } = [];
+    public long TotalLag { get; set; }
+    public List<string> UnownedPartitions { get; set; } = [];
+    public int MembersOnExpectedConfig { get; set; }
+}
+
+public sealed class KafkaMemberRow
+{
+    public string ClientId { get; set; } = "";
+    public string Host { get; set; } = "";
+    public List<string> Assignment { get; set; } = [];
+    public bool AdvertisesExpectedConfig { get; set; }
+}
+
+public sealed class KafkaPartitionLagRow
+{
+    public string Topic { get; set; } = "";
+    public int Partition { get; set; }
+    public long HighWatermark { get; set; }
+    public long Committed { get; set; }
+    public long Lag { get; set; }
+    public bool Owned { get; set; }
+    public string GroupId { get; set; } = "";
+}
+
+public sealed class PartitionPlan
+{
+    public bool Accepted { get; set; }
+    public List<string> Errors { get; set; } = [];
+    public List<string> Notes { get; set; } = [];
+    public string Topic { get; set; } = "";
+    public string Family { get; set; } = "";
+    public string RetryTopic { get; set; } = "";
+    public string ErrorTopic { get; set; } = "";
+    public string KeyClass { get; set; } = "";
+    public string KeyShape { get; set; } = "";
+    public bool HardBlocked { get; set; }
+    public int CurrentPartitions { get; set; }
+    public int RequestedPartitions { get; set; }
+    public int MaxReplicas { get; set; }
+    public bool SecondApproverRequired { get; set; }
+    public bool QuietWindowRequired { get; set; }
+    public bool QuietWindowMet { get; set; }
+    public bool Irreversible { get; set; } = true;
+    public List<string> AffectedGroups { get; set; } = [];
+    public string Summary { get; set; } = "";
+}
+
+public sealed class ChangeRequestRecord
+{
+    public Guid Id { get; set; }
+    public string Kind { get; set; } = "PartitionIncrease";
+    public string GroupId { get; set; } = "";
+    public int DesiredReplicas { get; set; }
+    public int BeforeReplicas { get; set; }
+    public int BrokerId { get; set; } = -1;
+    public string Progress { get; set; } = "";
+    public string Topic { get; set; } = "";
+    public string Family { get; set; } = "";
+    public string RetryTopic { get; set; } = "";
+    public int BeforePartitions { get; set; }
+    public int RequestedPartitions { get; set; }
+    public int MaxReplicas { get; set; }
+    public string KeyClass { get; set; } = "";
+    public bool SecondApproverRequired { get; set; }
+    public string Reason { get; set; } = "";
+    public string OverrideReason { get; set; } = "";
+    public string Requester { get; set; } = "";
+    public string Approver { get; set; } = "";
+    public string DryRunSummary { get; set; } = "";
+    public string CorrelationId { get; set; } = "";
+    public string Status { get; set; } = "";
+    public DateTimeOffset CreatedUtc { get; set; }
+    public DateTimeOffset? ApprovedUtc { get; set; }
+    public DateTimeOffset? ExecutedUtc { get; set; }
+    public DateTimeOffset? ConvergedUtc { get; set; }
+    public DateTimeOffset? ClosedUtc { get; set; }
+    public string Failure { get; set; } = "";
+    public bool AlertRaised { get; set; }
+    public List<GroupProgressRow> Groups { get; set; } = [];
+}
+
+public sealed class GroupProgressRow
+{
+    public string GroupId { get; set; } = "";
+    public int AssignedPartitions { get; set; }
+    public int ExpectedPartitions { get; set; }
+    public bool Complete { get; set; }
+}
+
+public sealed class ClusterSnapshot
+{
+    public int BrokerCount { get; set; }
+    public int? ControllerId { get; set; }
+    public int UnderReplicatedPartitions { get; set; }
+    public int OfflinePartitions { get; set; }
+    public int IsrShrunkPartitions { get; set; }
+    public bool LogDirsAvailable { get; set; }
+    public string LogDirDetail { get; set; } = "";
+    public List<BrokerSnapshot> Brokers { get; set; } = [];
+    public List<PartitionPlacement> Placements { get; set; } = [];
+    public string? Error { get; set; }
+}
+
+public sealed class BrokerSnapshot
+{
+    public int Id { get; set; }
+    public string Host { get; set; } = "";
+    public int Port { get; set; }
+    public string Rack { get; set; } = "";
+    public string State { get; set; } = "";
+    public int PartitionCount { get; set; }
+    public int LeaderCount { get; set; }
+    public long LogDirBytes { get; set; } = -1;
+}
+
+public sealed class PartitionPlacement
+{
+    public string Topic { get; set; } = "";
+    public int Partition { get; set; }
+    public int Leader { get; set; }
+    public List<int> Replicas { get; set; } = [];
+    public List<int> Isr { get; set; } = [];
+}
+
+public sealed class InfraStatus
+{
+    public string Provider { get; set; } = "Disabled";
+    public bool Enabled { get; set; }
+    public string Detail { get; set; } = "";
+}
+
+public sealed class ReplicaScalePlan
+{
+    public bool Accepted { get; set; }
+    public List<string> Errors { get; set; } = [];
+    public List<string> Notes { get; set; } = [];
+    public string GroupId { get; set; } = "";
+    public int CurrentMembers { get; set; }
+    public int DesiredMembers { get; set; }
+    public int PartitionCount { get; set; }
+    public int Ceiling { get; set; }
+    public bool SecondApproverRequired { get; set; }
+    public string Summary { get; set; } = "";
+}
+
+public sealed class BrokerMovePlan
+{
+    public bool Accepted { get; set; }
+    public bool AlreadyEmpty { get; set; }
+    public List<string> Errors { get; set; } = [];
+    public List<string> Notes { get; set; } = [];
+    public int BrokerId { get; set; }
+    public List<ReplicaMove> Moves { get; set; } = [];
+    public bool SecondApproverRequired { get; set; } = true;
+    public string Summary { get; set; } = "";
+}
+
+public sealed class ReplicaMove
+{
+    public string Topic { get; set; } = "";
+    public int Partition { get; set; }
+    public int FromBroker { get; set; }
+    public int ToBroker { get; set; }
+    public List<int> Replicas { get; set; } = [];
+}
