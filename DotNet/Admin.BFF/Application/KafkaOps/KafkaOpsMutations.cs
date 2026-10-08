@@ -229,9 +229,12 @@ public sealed partial class KafkaOpsService
             if (!_infra.Enabled)
                 throw new KafkaOpsRejectedException(_infra.Detail);
 
-            var inFlight = new HashSet<string>(listing.Topics, StringComparer.Ordinal);
+            var inFlightTopics = new HashSet<string>(listing.Topics, StringComparer.Ordinal);
+            var inFlightPartitions = new HashSet<string>(listing.Partitions, StringComparer.Ordinal);
             var original = ReadMoves(record.OriginalAssignmentJson);
-            var stillMoving = original.Where(move => inFlight.Contains(move.Topic)).ToList();
+            var stillMoving = inFlightPartitions.Count > 0
+                ? original.Where(move => inFlightPartitions.Contains(move.Topic + "\n" + move.Partition)).ToList()
+                : original.Where(move => inFlightTopics.Contains(move.Topic)).ToList();
             var alreadyMoved = original.Count - stillMoving.Count;
             await _infra.CancelReassignmentAsync(record.RebalanceName, cancellationToken);
             var cluster = await _broker.DescribeClusterAsync(cancellationToken);

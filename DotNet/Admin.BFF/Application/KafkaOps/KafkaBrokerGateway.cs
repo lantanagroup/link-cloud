@@ -51,6 +51,7 @@ public sealed class ReassignmentListing
 {
     public bool Known { get; set; }
     public List<string> Topics { get; set; } = [];
+    public List<string> Partitions { get; set; } = [];
 }
 
 public static class KafkaLeaderElection
