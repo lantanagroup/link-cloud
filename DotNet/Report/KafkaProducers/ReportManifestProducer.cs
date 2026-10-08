@@ -185,7 +185,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     try
                     {
                         await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
-                            payloadUri: payloadUri?.ToString(), cancellationToken: cancellationToken);
+                            payloadUri: payloadUri?.ToString(), cancellationToken: CancellationToken.None);
                     }
                     catch (Exception ex)
                     {

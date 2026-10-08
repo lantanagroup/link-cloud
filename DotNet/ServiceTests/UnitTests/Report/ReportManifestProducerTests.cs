@@ -310,6 +310,33 @@ public class ReportManifestProducerTests
     }
 
     /// <summary>
+    /// Cancelling the caller must not cancel the submission produce. A cancelled wait
+    /// would release the claim while the record can still land on the broker.
+    /// </summary>
+    [Fact]
+    public async Task Produce_CancelledCaller_DoesNotReleaseTheClaimForTheSubmissionWait()
+    {
+        var harness = new Harness();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.Is<CancellationToken>(token => token.IsCancellationRequested)))
+            .ThrowsAsync(new OperationCanceledException(cancelled.Token));
+
+        Assert.True(await harness.Producer.Produce(harness.Schedule, cancellationToken: cancelled.Token));
+
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
     /// Two completions of the last patient must upload and produce one manifest.
     /// The claim returns true only for the first caller.
     /// </summary>
