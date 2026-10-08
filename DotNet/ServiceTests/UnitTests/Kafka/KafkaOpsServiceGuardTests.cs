@@ -797,6 +797,37 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
+    public async Task DisabledProvider_RefusesMovesUntilAnInfraProviderIsEnabled()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: false);
+        broker.Reassignments = new ReassignmentListing { Known = false };
+        infra.Reassignments = new ReassignmentListing { Known = false };
+        infra.Enabled = false;
+        infra.Name = "Disabled";
+
+        var plan = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None));
+        Assert.Contains("cannot confirm no reassignment is in flight", plan.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("enable an infra provider to allow this", plan.Message, StringComparison.OrdinalIgnoreCase);
+
+        var family = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanFamilyAsync("ReadyToAcquire", false, null, CancellationToken.None));
+        Assert.Contains("enable an infra provider to allow this", family.Message, StringComparison.OrdinalIgnoreCase);
+        var decommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanDecommissionAsync(3, CancellationToken.None));
+        Assert.Contains("enable an infra provider to allow this", decommission.Message, StringComparison.OrdinalIgnoreCase);
+        var rebalance = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanRebalanceAsync(3, CancellationToken.None));
+        Assert.Contains("enable an infra provider to allow this", rebalance.Message, StringComparison.OrdinalIgnoreCase);
+        var add = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.CreateAddBrokerAsync(User("pat", ManageScaling), "add a broker", null, CancellationToken.None));
+        Assert.Contains("enable an infra provider to allow this", add.Message, StringComparison.OrdinalIgnoreCase);
+
+        var scale = await service.PlanScaleAsync("DataAcquisitionWorker", 1, CancellationToken.None);
+        Assert.DoesNotContain(scale.Errors, error => error.Contains("infra provider", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task TimedOutDecommission_StaysOpenWithoutStoppingOrCancelling()
     {
         var (service, broker, infra) = NewService(requireSecondApprover: true, scaleTimeoutSeconds: 30);
