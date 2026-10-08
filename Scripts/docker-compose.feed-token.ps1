@@ -7,6 +7,7 @@ param(
     [string]$AzExecutable,
     [string]$InstallDirectory,
     [string]$ZipPackage,
+    [string]$ZipUri,
     [string]$WingetExecutable,
     [switch]$SkipUserPathUpdate
 )
@@ -59,6 +60,21 @@ function Find-AzExecutable {
         return $existing.Source
     }
 
+    # A Git Bash window keeps the PATH from before the ZIP install. The user
+    # registry is updated, but this process does not see it. Use the CLI
+    # already on disk instead of downloading it again.
+    if (-not $ZipPackage) {
+        $localRoot = $InstallDirectory
+        if (-not $localRoot) { $localRoot = Join-Path $env:LOCALAPPDATA 'AzureCLI' }
+        if (Test-Path -LiteralPath $localRoot) {
+            $localAz = Get-ChildItem -LiteralPath $localRoot -Filter az.cmd -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($localAz) {
+                Add-FeedTokenUserPath -Directory $localAz.Directory.FullName
+                return $localAz.FullName
+            }
+        }
+    }
+
     $installedFromZip = Install-FeedTokenAzFromZip
     if ($installedFromZip) { return $installedFromZip }
 
@@ -102,7 +118,9 @@ function Install-FeedTokenAzFromZip {
             $previousProgress = $ProgressPreference
             $ProgressPreference = 'SilentlyContinue'
             try {
-                Invoke-WebRequest -Uri $AzureCliZipUri -OutFile $downloaded -UseBasicParsing
+                $uri = $AzureCliZipUri
+                if ($ZipUri) { $uri = $ZipUri }
+                Invoke-WebRequest -Uri $uri -OutFile $downloaded -UseBasicParsing
             } finally {
                 $ProgressPreference = $previousProgress
                 [Net.ServicePointManager]::SecurityProtocol = $previousProtocol
@@ -151,8 +169,15 @@ function Install-FeedTokenAzWithWinget {
     Write-Host "The per-user ZIP install did not produce az. Trying winget, which installs the machine-wide MSI and needs an administrator."
     # winget writes progress to the success stream. This function's caller
     # captures that stream, so the progress must not become part of the az path.
-    & $winget install --exact --id Microsoft.AzureCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *>&1 | Out-Host
-    $wingetCode = $LASTEXITCODE
+    # Continue keeps redirected native stderr from stopping the script.
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $winget install --exact --id Microsoft.AzureCLI --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *>&1 | Out-Host
+        $wingetCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
     # 0x8A15002B: the package is already installed.
     if ($wingetCode -ne 0 -and $wingetCode -ne -1978335189) {
         Write-Host "winget could not install Azure CLI (exit $wingetCode). That installer needs an administrator. Install Azure CLI from https://aka.ms/installazurecliwindows and then run Scripts/docker-compose.feed-token.ps1."
@@ -191,18 +216,28 @@ if (-not $EnvFile) {
 
 $az = Find-AzExecutable
 
+# Windows PowerShell turns redirected native stderr into error records.
+# With ErrorAction Stop, "az account show" for a signed-out user would
+# stop the script before device-code sign-in. File writes below stay terminating.
+$previousErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 & $az account show --output none
-if ($LASTEXITCODE -ne 0) {
+$showCode = $LASTEXITCODE
+if ($showCode -ne 0) {
     Write-Host "No Azure CLI session. Starting device-code sign-in. Complete it in a browser, or cancel and this script will stop."
-    & $az login --use-device-code --allow-no-subscriptions
-    if ($LASTEXITCODE -ne 0) {
+    & $az login --use-device-code --allow-no-subscriptions | Out-Host
+    $loginCode = $LASTEXITCODE
+    if ($loginCode -ne 0) {
+        $ErrorActionPreference = $previousErrorAction
         Write-Host "Azure sign-in did not complete. Run 'az login' and then Scripts/docker-compose.feed-token.ps1."
         exit 1
     }
 }
 
 $raw = & $az account get-access-token --resource $AzureDevOpsResource --output json
-if ($LASTEXITCODE -ne 0 -or -not $raw) {
+$tokenCode = $LASTEXITCODE
+$ErrorActionPreference = $previousErrorAction
+if ($tokenCode -ne 0 -or -not $raw) {
     Write-Host "az account get-access-token failed. Run 'az login' and then Scripts/docker-compose.feed-token.ps1."
     exit 1
 }

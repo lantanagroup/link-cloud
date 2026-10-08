@@ -372,11 +372,14 @@ param(
     [string]$EnvFile,
     [string]$InstallDirectory,
     [string]$ZipPackage,
+    [string]$ZipUri,
     [string]$WingetExecutable,
+    [string]$AzExecutable,
     [switch]$SkipUserPathUpdate
 )
 $env:PATH = $env:LINK_CLOUD_TEST_PATH
-& $env:LINK_CLOUD_TEST_SCRIPT -RepoRoot $RepoRoot -EnvFile $EnvFile -InstallDirectory $InstallDirectory -ZipPackage $ZipPackage -WingetExecutable $WingetExecutable -SkipUserPathUpdate:$SkipUserPathUpdate
+$ErrorActionPreference = 'Stop'
+& $env:LINK_CLOUD_TEST_SCRIPT -RepoRoot $RepoRoot -EnvFile $EnvFile -InstallDirectory $InstallDirectory -ZipPackage $ZipPackage -ZipUri $ZipUri -WingetExecutable $WingetExecutable -AzExecutable $AzExecutable -SkipUserPathUpdate:$SkipUserPathUpdate *>&1 | Out-Host
 exit $LASTEXITCODE
 '@ | Set-Content -Encoding ASCII -Path $runner
     $fetchScriptPath = Join-Path $PSScriptRoot 'docker-compose.feed-token.ps1'
@@ -419,6 +422,53 @@ exit /b 0
     Write-Result ($scriptText.Contains('needs an administrator')) 'winget fallback says the MSI needs an administrator'
     Write-Result ($scriptText.Contains('per-user ZIP')) 'zip install tells the user it is using the ZIP'
     Write-Result ($wingetArgText.Contains('Microsoft.AzureCLI') -and -not $wingetArgText.Contains('--scope')) 'winget fallback does not pass --scope user'
+
+    $signedOut = Join-Path $toolDir 'signed-out-az.cmd'
+    @'
+@echo off
+if /I "%~1"=="account" (
+  if /I "%~2"=="show" (
+    echo not signed in 1>&2
+    exit /b 1
+  )
+  if /I "%~2"=="get-access-token" (
+    echo {"accessToken":"unit-test-feed-token-sentinel","expires_on":1893456000}
+    exit /b 0
+  )
+)
+if /I "%~1"=="login" (
+  echo device code 1>&2
+  exit /b 0
+)
+exit /b 1
+'@ | Set-Content -Encoding ASCII -Path $signedOut
+    $signedOutEnv = Join-Path $repo 'signed-out.env'
+    $signedOutOut = Join-Path $repo 'signed-out-out.txt'
+    $signedOutErr = Join-Path $repo 'signed-out-err.txt'
+    $signedOutArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -AzExecutable "{3}" -SkipUserPathUpdate' -f $runner, $repo, $signedOutEnv, $signedOut
+    $signedOutProc = Start-Process -FilePath powershell.exe -ArgumentList $signedOutArgs -Wait -PassThru -RedirectStandardOutput $signedOutOut -RedirectStandardError $signedOutErr -WindowStyle Hidden
+    $signedOutText = ''
+    if (Test-Path $signedOutOut) { $signedOutText += [IO.File]::ReadAllText($signedOutOut) }
+    if (Test-Path $signedOutErr) { $signedOutText += [IO.File]::ReadAllText($signedOutErr) }
+    Write-Result ($signedOutProc.ExitCode -eq 0 -and (Test-Path -LiteralPath $signedOutEnv)) 'signed-out az stderr still reaches device-code sign-in'
+    Write-Result (-not $signedOutText.Contains($sentinel)) 'signed-out az run does not print the token'
+
+    $staleAz = Join-Path $toolDir 'az.cmd'
+    if (Test-Path -LiteralPath $staleAz) { Remove-Item -LiteralPath $staleAz -Force }
+    $reuseRoot = Join-Path $repo 'reuse-cli'
+    $reuseBin = Join-Path $reuseRoot 'bin'
+    New-Item -ItemType Directory -Path $reuseBin | Out-Null
+    Copy-Item -LiteralPath $payload -Destination (Join-Path $reuseBin 'az.cmd')
+    $reuseEnv = Join-Path $repo 'reuse.env'
+    $reuseOut = Join-Path $repo 'reuse-out.txt'
+    $reuseErr = Join-Path $repo 'reuse-err.txt'
+    $reuseArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoRoot "{1}" -EnvFile "{2}" -InstallDirectory "{3}" -ZipUri "http://127.0.0.1:9/azure-cli.zip" -SkipUserPathUpdate' -f $runner, $repo, $reuseEnv, $reuseRoot
+    $reuseProc = Start-Process -FilePath powershell.exe -ArgumentList $reuseArgs -Wait -PassThru -RedirectStandardOutput $reuseOut -RedirectStandardError $reuseErr -WindowStyle Hidden
+    $reuseText = ''
+    if (Test-Path $reuseOut) { $reuseText += [IO.File]::ReadAllText($reuseOut) }
+    if (Test-Path $reuseErr) { $reuseText += [IO.File]::ReadAllText($reuseErr) }
+    Write-Result ($reuseProc.ExitCode -eq 0 -and (Test-Path -LiteralPath $reuseEnv) -and (Test-Path -LiteralPath (Join-Path $reuseBin 'az.cmd')) -and -not $reuseText.Contains('Downloading the per-user ZIP')) 'existing per-user CLI is reused without downloading'
+    Write-Result (-not $reuseText.Contains($sentinel)) 'reused per-user CLI does not print the token'
     Write-Result (-not $wingetText.Contains($sentinel)) 'winget fallback does not print the token'
     $userPathAfter = [Environment]::GetEnvironmentVariable('Path', 'User')
     if ($userPathBefore -ne $userPathAfter) {
