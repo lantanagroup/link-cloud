@@ -149,6 +149,7 @@ public class PartitionChangePlannerTests
         });
 
         Assert.True(uneven.Accepted);
+        Assert.False(uneven.SecondApproverRequired);
         Assert.Equal(4, uneven.RequestedPartitions);
         Assert.Equal(["ReadyToAcquire-Retry", "ReadyToAcquire-Error"], uneven.TopicsToRaise);
         Assert.DoesNotContain("ReadyToAcquire", uneven.TopicsToRaise);
@@ -175,6 +176,15 @@ public class PartitionChangePlannerTests
         Assert.True(ahead.Accepted);
         Assert.Equal(["ReadyToAcquire-Error"], ahead.TopicsToRaise);
         Assert.Contains(ahead.Notes, note => note.Contains("not be shrunk", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LogTopicIncrease_RequiresASecondApprover()
+    {
+        var plan = PartitionChangePlanner.Evaluate(Valid("ReadyToAcquire") with { RequireSecondApprover = false });
+        Assert.True(plan.Accepted, string.Join(" ", plan.Errors));
+        Assert.False(plan.QuietWindowRequired);
+        Assert.True(plan.SecondApproverRequired);
     }
 
     [Fact]

@@ -217,7 +217,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
                 continue;
             }
 
-            ThrowIfGroupFailed(group.Error);
+            ThrowIfGroupFailed(group.GroupId, group.Error);
             var view = new GroupView
             {
                 GroupId = group.GroupId ?? "",
@@ -512,11 +512,21 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     private static bool IsMissingGroup(Error? error) =>
         error is { Code: ErrorCode.GroupIdNotFound };
 
-    private static void ThrowIfGroupFailed(Error? error)
+    private static void ThrowIfGroupFailed(string? groupId, Error? error)
     {
         if (error is null || error.Code == ErrorCode.NoError || IsMissingGroup(error))
             return;
-        throw new KafkaException(error);
+        throw new KafkaException(new Error(error.Code, GroupFailureText(groupId, error)));
+    }
+
+    private static string GroupFailureText(string? groupId, Error error)
+    {
+        var who = string.IsNullOrWhiteSpace(groupId) ? "unknown group" : groupId.Trim();
+        var reason = (error.Reason ?? "").Trim();
+        var code = error.Code.ToString();
+        if (string.IsNullOrWhiteSpace(reason) || reason.EndsWith(':'))
+            return who + " " + code + ": no error detail returned by broker";
+        return who + " " + code + ": " + reason;
     }
 
     private static void ThrowIfStale(Error? error)
@@ -531,7 +541,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         {
             if (IsMissingGroup(group.Error))
                 continue;
-            ThrowIfGroupFailed(group.Error);
+            ThrowIfGroupFailed(group.GroupId, group.Error);
         }
     }
 

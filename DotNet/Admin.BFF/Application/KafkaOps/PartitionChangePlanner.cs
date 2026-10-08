@@ -161,7 +161,7 @@ public static class PartitionChangePlanner
                 plan.Notes.Add("Quiet-window override requested: " + request.OverrideReason.Trim());
         }
 
-        plan.SecondApproverRequired = !hardBlocked && (quietRequired || request.OverrideQuietWindow || request.RequireSecondApprover);
+        plan.SecondApproverRequired = !hardBlocked;
         if (plan.SecondApproverRequired)
             plan.Notes.Add("A different person must approve this request before it can run.");
 
