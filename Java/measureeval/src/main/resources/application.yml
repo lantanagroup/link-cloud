@@ -82,10 +82,18 @@ spring:
 
     consumer:
       group-id: ${spring.application.name}
+      client-id: ${spring.application.name}-${HOSTNAME:local}-c1
+      auto-offset-reset: earliest
+      properties:
+        "[partition.assignment.strategy]": org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        "[metadata.max.age.ms]": 30000
+        "[max.partition.fetch.bytes]": 10485760
 
     producer:
-      client-id: ${spring.application.name}
+      client-id: ${spring.application.name}-${HOSTNAME:local}-p
+      acks: all
       properties:
+        enable.idempotence: true
         max.request.size: 10485760
 
     retry:

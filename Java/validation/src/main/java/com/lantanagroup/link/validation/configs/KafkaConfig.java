@@ -64,11 +64,13 @@ public class KafkaConfig {
     }
 
     @Bean
-    public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
+    public Deserializer<?> keyDeserializer() {
+        // The key is a partition string. Facility and patient come from the value, with KafkaKeyLegacy
+        // for a legacy JSON or plain key. A colon key must not be deserialized into an id object.
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.READY_FOR_VALIDATION, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
-                Topics.READY_FOR_VALIDATION_RETRY, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper),
-                Topics.READY_FOR_VALIDATION_ERROR, new JsonDeserializer<>(ReadyForValidation.Key.class, objectMapper));
+                Topics.READY_FOR_VALIDATION, new StringDeserializer(),
+                Topics.READY_FOR_VALIDATION_RETRY, new StringDeserializer(),
+                Topics.READY_FOR_VALIDATION_ERROR, new StringDeserializer());
         return new ErrorHandlingDeserializer<>(
                 new DelegatingByTopicDeserializer(byPattern(deserializers), new VoidDeserializer()));
     }

@@ -51,8 +51,17 @@ spring:
     bootstrap-servers: localhost:9092
     consumer:
       group-id: validation
+      client-id: validation-${HOSTNAME:local}-c1
+      auto-offset-reset: earliest
+      properties:
+        "[partition.assignment.strategy]": org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        "[metadata.max.age.ms]": 30000
+        "[max.partition.fetch.bytes]": 10485760
     producer:
-      client-id: validation-service
+      client-id: validation-${HOSTNAME:local}-p
+      acks: all
+      properties:
+        enable.idempotence: true
     retry:
       # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
       # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
