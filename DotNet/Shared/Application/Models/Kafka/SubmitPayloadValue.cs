@@ -9,6 +9,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka
         public required List<string> ReportTypes { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+        public string? FacilityId { get; set; }
+        public Guid? ReportScheduleId { get; set; }
         public string? PatientId { get; set; }
     }
 }
