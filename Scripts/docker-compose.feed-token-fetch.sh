@@ -125,7 +125,7 @@ set -e
 if [ "$show_code" -ne 0 ]; then
   printf '%s\n' "No Azure CLI session. Starting device-code sign-in. Complete it in a browser, or cancel and this script will stop." >&2
   set +e
-  "$az_bin" login --use-device-code
+  "$az_bin" login --use-device-code --allow-no-subscriptions
   login_code=$?
   set -e
   if [ "$login_code" -ne 0 ]; then

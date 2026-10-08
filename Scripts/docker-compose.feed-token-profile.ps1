@@ -150,6 +150,19 @@ function Test-LinkCloudFeedTokenFresh {
     return (([int64]$Read.Expires - $Now) -ge 600)
 }
 
+function Test-LinkCloudFeedTokenUnexpired {
+    param(
+        $Read,
+        [int64]$Now
+    )
+    if ($null -eq $Read) { return $false }
+    if ([string]::IsNullOrEmpty([string]$Read.Token)) { return $false }
+    if ([int64]$Read.Expires -le 0) { return $false }
+    # A refresh can return the cached token while it is still valid. That
+    # result is usable. The 10 minute check only decides whether to try.
+    return (([int64]$Read.Expires - $Now) -gt 0)
+}
+
 function Invoke-LinkCloudCompose {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
@@ -172,7 +185,7 @@ function Invoke-LinkCloudCompose {
             $read = Read-LinkCloudFeedTokenFile -Path $envFile
             $now = Get-LinkCloudNowEpoch
         }
-        $fresh = ($fetchCode -eq 0) -and (Test-LinkCloudFeedTokenFresh -Read $read -Now $now)
+        $fresh = ($fetchCode -eq 0) -and (Test-LinkCloudFeedTokenUnexpired -Read $read -Now $now)
         if (-not $fresh) {
             Write-LinkCloudMessage (Get-LinkCloudFeedTokenMissingMessage)
             $global:LASTEXITCODE = 1

@@ -112,6 +112,19 @@ set -e
 after=$(sed -n 's/^AZURE_ARTIFACTS_PAT_EXPIRES_ON=//p' "$repo/.azure-artifacts.env")
 if [ "$code" -eq 0 ] && [ "$after" = "1700003600" ]; then pass 'bash near-expiry token refreshes'; else fail 'bash near-expiry token refreshes'; fi
 
+# A refresh can return a token that is valid but under 10 minutes.
+reset_log
+export LINK_CLOUD_MOCK_EXIT=0
+export LINK_CLOUD_MOCK_EXPIRES=1700000400
+export LINK_CLOUD_FETCH_SCRIPT="$repo/fetch-ok"
+export LINK_CLOUD_NOW_EPOCH=1700000000
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700000599' > "$repo/.azure-artifacts.env"
+set +e
+docker compose ps >"$repo/out.txt" 2>"$repo/err.txt"
+code=$?
+set -e
+if [ "$code" -eq 0 ]; then pass 'bash short cached token still runs docker'; else fail 'bash short cached token still runs docker'; fi
+
 # Outside the repo.
 reset_log
 export LINK_CLOUD_REPO_ROOT_OVERRIDE=""
@@ -151,6 +164,12 @@ if [ -f "$install_dir/docker-compose.feed-token.sh" ]; then pass 'bash installer
 grep -F '.azure-artifacts.env' "$root/../.dockerignore" >/dev/null && pass 'dockerignore excludes the local token file' || fail 'dockerignore excludes the local token file'
 grep -F 'MINGW*' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'git bash fetch delegates before writing a token' || fail 'git bash fetch delegates before writing a token'
 grep -F 'file_mode_is_600' "$root/docker-compose.feed-token-fetch.sh" >/dev/null && pass 'fetch script rejects a token file that is not mode 600' || fail 'fetch script rejects a token file that is not mode 600'
+if grep -F 'env AZURE_ARTIFACTS_PAT' "$root/docker-compose.feed-token-profile.sh" >/dev/null; then
+  fail 'bash wrapper does not pass the token to env'
+else
+  pass 'bash wrapper does not pass the token to env'
+fi
+grep -F 'AZURE_ARTIFACTS_PAT="$token"' "$root/docker-compose.feed-token-profile.sh" >/dev/null && pass 'bash wrapper sets the token only for the docker command' || fail 'bash wrapper sets the token only for the docker command'
 
 # Output files must not contain the sentinel.
 if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" >/dev/null 2>&1; then
