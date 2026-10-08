@@ -3,6 +3,7 @@
 # and was being copied into each of ~16 images.
 
 # Local / agent output
+.azure-artifacts.env
 artifacts/
 TestResults/
 .tmp*/
@@ -22,7 +23,10 @@ Azure_Pipelines/
 docs/
 Java/
 Web/
-Scripts/
+# Local scripts are not part of the image build, except the feed restore
+# helper the feed-gated Dockerfiles run before dotnet restore.
+Scripts/*
+!Scripts/docker-compose.restore-feed.sh
 Tests/
 **/*Tests/
 Prompt Staging/
