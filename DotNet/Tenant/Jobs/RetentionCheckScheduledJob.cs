@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Models.Messages;
 using Quartz;
@@ -48,7 +49,7 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 var message = new Message<string, object>
                 {
-                    Key = tenant,
+                    Key = KafkaKeys.ForFacility(tenant),
                     Headers = headers,
                     Value = new RetentionCheckScheduledMessage()
                     {

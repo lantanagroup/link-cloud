@@ -57,6 +57,7 @@ namespace QueryDispatch.Domain.Managers
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = patientDispatch.FacilityId,
+                    PatientId = patientDispatch.PatientId,
                     ServiceName = QueryDispatchConstants.ServiceName,
                     Action = AuditEventType.Create,
                     EventDate = DateTime.UtcNow,
@@ -66,6 +67,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
+                    Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                     Value = auditMessage,
                     Headers = headers
                 });
@@ -105,6 +107,7 @@ namespace QueryDispatch.Domain.Managers
                 var auditMessage = new AuditEventMessage
                 {
                     FacilityId = facilityId,
+                    PatientId = patientId,
                     ServiceName = QueryDispatchConstants.ServiceName,
                     Action = AuditEventType.Delete,
                     EventDate = DateTime.UtcNow,
@@ -114,6 +117,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
+                    Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                     Value = auditMessage,
                     Headers = headers
                 });

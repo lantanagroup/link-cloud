@@ -38,6 +38,13 @@ public partial class ReportSchedule
 
     public bool EndOfReportPeriodJobHasRun { get; set; }
 
+    /// <summary>
+    /// 0 none, 1 claimed, 2 emitted. Written only by the manifest claim statements.
+    /// </summary>
+    public int ManifestState { get; set; }
+
+    public DateTime? ManifestClaimedAt { get; set; }
+
     public AdHocType? AdHocType { get; set; }
 
     public Frequency Frequency { get; set; }

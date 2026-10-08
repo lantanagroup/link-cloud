@@ -56,7 +56,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.GetAsync(PatientCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var producer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);
 
         var ex = await Assert.ThrowsAsync<DeadLetterException>(() =>
@@ -77,7 +77,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         producer.Verify(
             item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -107,13 +107,13 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var producer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
         producer
             .Setup(item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+            .ReturnsAsync(new DeliveryResult<string, ResourcesNormalizedValue>());
 
         var listener = BuildListener(resourceCache, producer);
 
@@ -134,7 +134,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         producer.Verify(
             item => item.ProduceAsync(
                 KafkaTopic.ResourcesNormalized.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -160,7 +160,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.GetAsync(EncounterCacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
 
-        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var producer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
         var listener = BuildListener(resourceCache, producer);
 
         var ex = await Assert.ThrowsAsync<DeadLetterException>(() =>
@@ -175,7 +175,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         producer.Verify(
             item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -191,13 +191,13 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             .Setup(item => item.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var producer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
         producer
             .Setup(item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourcesNormalizedValue>());
+            .ReturnsAsync(new DeliveryResult<string, ResourcesNormalizedValue>());
 
         var listener = BuildListener(resourceCache, producer);
 
@@ -209,7 +209,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         producer.Verify(
             item => item.ProduceAsync(
                 KafkaTopic.ResourcesNormalized.ToString(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -221,7 +221,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         await abort.AbortAsync(FacilityId, reportId: null, TimeSpan.FromDays(14));
 
         var purger = new Mock<IResourceCachePurger>();
-        var producer = new Mock<IProducer<ResourceKey, ResourcesNormalizedValue>>();
+        var producer = new Mock<IProducer<string, ResourcesNormalizedValue>>();
         var resourceCache = new Mock<IResourceCache>();
         var listener = BuildListener(resourceCache, producer, abort, purger.Object);
 
@@ -233,7 +233,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         producer.Verify(
             item => item.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
         resourceCache.Verify(
@@ -243,12 +243,12 @@ public class ResourcesAcquiredListenerEmptyCacheTests
 
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCache> resourceCache,
-        Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> producer,
+        Mock<IProducer<string, ResourcesNormalizedValue>> producer,
         IPipelineAbortRegistry? abortRegistry = null,
         IResourceCachePurger? purger = null,
-        Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
+        Mock<IProducer<string, MappingOutcomeEvaluatedValue>>? mappingOutcomeProducer = null)
     {
-        mappingOutcomeProducer ??= new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>();
+        mappingOutcomeProducer ??= new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>();
         var sequenceQueries = new Mock<IOperationSequenceQueries>();
         sequenceQueries
             .Setup(item => item.Search(
@@ -269,11 +269,11 @@ public class ResourcesAcquiredListenerEmptyCacheTests
         var scopeFactory = new Mock<IServiceScopeFactory>();
         scopeFactory.Setup(item => item.CreateScope()).Returns(scope.Object);
 
-        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         deadLetterHandler.SetupProperty(item => item.Topic);
-        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         transientHandler.SetupProperty(item => item.Topic);
-        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
+        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
         var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
@@ -283,7 +283,7 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
             new ServiceInformation { ServiceConfigName = "Normalization" },
             scopeFactory.Object,
-            Mock.Of<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>(),
+            Mock.Of<IKafkaConsumerFactory<string, ResourcesAcquiredValue>>(),
             consumeExceptionHandler.Object,
             deadLetterHandler.Object,
             transientHandler.Object,
@@ -303,24 +303,26 @@ public class ResourcesAcquiredListenerEmptyCacheTests
             mappingOutcomeProducer.Object);
     }
 
-    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
+    private static ConsumeResult<string, ResourcesAcquiredValue> BuildConsumeResult(List<string> cacheKeys)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(CorrelationId))
         };
 
-        return new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+        return new ConsumeResult<string, ResourcesAcquiredValue>
         {
             Topic = "ResourcesAcquired",
             Partition = new Partition(0),
             Offset = new Offset(0),
-            Message = new Message<ResourceKey, ResourcesAcquiredValue>
+            Message = new Message<string, ResourcesAcquiredValue>
             {
                 Headers = headers,
-                Key = new ResourceKey { FacilityId = FacilityId, PatientId = PatientId },
+                Key = KafkaKeys.ForPatient(FacilityId, PatientId),
                 Value = new ResourcesAcquiredValue
                 {
+                    FacilityId = FacilityId,
+                    PatientId = PatientId,
                     QueryType = "Initial",
                     ReportableEvent = "Adhoc",
                     ScheduledReports = new List<ScheduledReport> { new() { ReportTrackingId = "tracking-1" } },
