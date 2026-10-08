@@ -363,10 +363,10 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                 throw new KafkaOpsRejectedException(string.Join(" ", plan.Errors));
 
             await _broker.IncreasePartitionsAsync(record.Topic, record.RequestedPartitions, cancellationToken);
+            record.PartitionsChangedUtc = DateTimeOffset.UtcNow;
             if (record.RetryTopic.Length > 0)
                 await _broker.IncreasePartitionsAsync(record.RetryTopic, record.RequestedPartitions, cancellationToken);
             await _broker.IncreasePartitionsAsync(KafkaTopicCatalog.ErrorName(record.Topic), record.RequestedPartitions, cancellationToken);
-            record.PartitionsChangedUtc = DateTimeOffset.UtcNow;
         }
         catch (Exception ex)
         {
