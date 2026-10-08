@@ -23,7 +23,7 @@
     <div id="cleanupFlash"></div>
     @if (TempData["Cleanup"] is string cleanup && !string.IsNullOrWhiteSpace(cleanup))
     {
-        <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <div class="alert au-note alert-dismissible fade show" role="alert">
             <i class="bi bi-recycle me-1"></i> @cleanup
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -39,7 +39,7 @@
     <div class="au-card au-cleanup-activity mb-4" id="cleanup-activity-card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-activity me-2"></i>Live activity</span>
-            <span id="cleanup-activity-badge" class="badge text-bg-secondary">Idle</span>
+            <span id="cleanup-activity-badge" class="badge au-badge-muted">Idle</span>
         </div>
         <div class="card-body">
             <p id="cleanup-activity-label" class="fw-semibold mb-1">No cleanup pass running</p>
@@ -271,7 +271,7 @@
                                 <td>@report.Label</td>
                                 <td>@report.Trigger</td>
                                 <td>
-                                    <span class="badge @(report.Status == "failed" ? "text-bg-danger" : "text-bg-success")">@report.Status</span>
+                                    <span class="badge @(report.Status == "failed" ? "au-badge-danger" : report.Status == "running" ? "au-badge-active" : "au-badge-success")">@report.Status</span>
                                 </td>
                                 <td class="small">
                                     quiesced @report.QuiescedFacilityIds.Count/@report.QuiesceCandidateCount,
@@ -279,7 +279,7 @@
                                     purged @report.PurgedRunIds.Count/@report.HistoryPurgeCandidateCount
                                 </td>
                                 <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-au-neutral cleanup-open-report" data-report-id="@report.Id" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")">View</button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn cleanup-open-report" data-report-id="@report.Id" title="View" aria-label="@($"View {report.Label} finished {report.FinishedAt.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC")"><i class="bi bi-eye" aria-hidden="true"></i></button>
                                 </td>
                             </tr>
                         }

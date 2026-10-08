@@ -9,7 +9,7 @@
 <partial name="_Alerts" />
 
 <div class="au-card card mb-3">
-    <div class="card-header"><code>@Model.Name</code></div>
+    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Package", Value = Model.Name, CopyLabel = "Copy package" })" /></div>
     <div class="card-body">
         @if (!string.IsNullOrWhiteSpace(Model.LoadError))
         {
@@ -54,7 +54,7 @@
                         {
                             <tr>
                                 <td>@row.ResourceType</td>
-                                <td><code>@row.Id</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = row.Id, Compact = true, CopyLabel = "Copy id" })" /></td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Name) ? "—" : row.Name)</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Version) ? "—" : row.Version)</td>
                                 <td>

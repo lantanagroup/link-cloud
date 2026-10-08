@@ -15,8 +15,8 @@
     <div>
         <h3 class="fw-bold mb-0"><i class="bi bi-card-checklist me-2"></i>Generation Manifest</h3>
         <div class="small text-muted">
-            Run: <a asp-action="Run" asp-route-id="@runId" class="text-decoration-none">@run.RunName</a>
-            <code class="ms-1">@runId</code>
+            <a asp-action="Run" asp-route-id="@runId" class="text-decoration-none">@run.RunName</a>
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Run", Value = runId.ToString(), CopyLabel = "Copy run id" })" />
         </div>
     </div>
     <partial name="_BackButton" model="@(new BackLink(Url.Action("Run", new { id = runId })!, "Back to run"))" />
@@ -34,7 +34,7 @@
 <!-- ── Nav Tabs ── -->
 <ul class="lu-section-nav" role="tablist">
     <li><button class="active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
-    <li><button data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge bg-secondary ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
+    <li><button data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge au-badge-muted ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
     @if (isComplete)
     {
         <li><button data-bs-toggle="tab" data-bs-target="#tab-comparison" type="button" id="comparisonTab">
@@ -212,7 +212,7 @@
             return;
         }
 
-        banner.innerHTML = `<div class="alert alert-info py-2 small mb-0">
+        banner.innerHTML = `<div class="alert au-note py-2 small mb-0">
             <i class="bi bi-info-circle me-1"></i>
             Patient bundles are replayed from <strong>generation templates v${cacheVersion}</strong> (the same ABS templates used to generate this run).
         </div>`;
@@ -236,7 +236,7 @@
     function renderBadgeSet(items) {
         if (!items?.length) return '<span class="text-muted small">None</span>';
         return '<div class="d-flex flex-wrap gap-1">' +
-            items.map(t => `<span class="badge" style="background:#e8f4ff;color:var(--au-dark);border:1px solid #c5ddf5;font-weight:500;">${escapeHtml(t)}</span>`).join('') +
+            items.map(t => `<span class="badge au-badge-muted">${escapeHtml(t)}</span>`).join('') +
             '</div>';
     }
 
@@ -417,7 +417,7 @@
                         <tr>
                             <th>
                                 <button type="button"
-                                        class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                        class="btn btn-sm p-0 text-white text-decoration-none patient-sort-button"
                                         aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
                                     Patient
                                     ${patientSortIcon()}
@@ -435,7 +435,7 @@
 
             html += `
                 <tr>
-                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td>${window.luLabeledId('Patient', pid)}</td>
                     <td>${badge}</td>
                 </tr>`;
         });
@@ -573,7 +573,7 @@
                     <tr>
                         <th>
                             <button type="button"
-                                class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                class="btn btn-sm p-0 text-white text-decoration-none patient-sort-button"
                                 aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
                             Patient
                             ${patientSortIcon()}
@@ -593,10 +593,10 @@
                 || fallbackInpatientPatternByPatient?.[pid]
                 || defaultScheduledPattern;
             const types = Object.entries(counts).sort(([,a],[,b]) => b - a)
-                .map(([t, c]) => `<span class="badge me-1 mb-1" style="background:#e8f4ff;color:var(--au-dark);border:1px solid #c5ddf5;font-weight:500;" data-bs-toggle="tooltip" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
+                .map(([t, c]) => `<span class="badge au-badge-muted me-1 mb-1" data-bs-toggle="tooltip" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
                 .join('');
             html += `<tr>
-                <td><code>${escapeHtml(pid)}</code></td>
+                <td>${window.luLabeledId('Patient', pid)}</td>
                 <td>${formatScheduledPattern(inpatientPattern)}</td>
                 <td>${escapeHtml(patientConfigLabelForId(pid))}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
@@ -723,7 +723,7 @@
         let html = '';
 
         // ── Pipeline explanation ──
-        html += `<div class="alert border small mb-3" style="background:#f8fafc;border-color:#dbe4f0;">
+        html += `<div class="alert au-note border small mb-3">
             <div class="d-flex align-items-center mb-2">
                 <i class="bi bi-diagram-3 me-2" style="color:var(--au-accent);"></i>
                 <strong>Prediction Pipeline</strong>
@@ -734,11 +734,11 @@
                 <i class="bi bi-arrow-right text-muted"></i>
                 <span class="badge au-badge-muted">2</span><span><strong>Query Plan Acquires</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
-                <span class="badge bg-success">3</span><span><strong>CQL References</strong></span>
+                <span class="badge au-badge-success">3</span><span><strong>CQL References</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
                 <span class="badge bg-dark">4</span><span><strong>Prediction (Expected in ABS)</strong></span>
                 <span class="mx-1 text-muted">vs</span>
-                <span class="badge bg-secondary">5</span><span><strong>Actual ABS</strong></span>
+                <span class="badge au-badge-muted">5</span><span><strong>Actual ABS</strong></span>
             </div>
             <div class="text-muted">
                 <strong>Prediction</strong> includes Organization Resource Map scope when configured (org-location filtering),
@@ -929,7 +929,7 @@
                 detailHtml += '</tbody></table>';
 
                 html += `<tr class="${rowClass} comp-patient-row" data-pid="${escapeHtml(pid)}">
-                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td>${window.luLabeledId('Patient', pid)}</td>
                     <td class="text-end">${gTotal.toLocaleString()}</td>
                     <td class="text-end fw-semibold" style="color:var(--au-accent);">${eTotal.toLocaleString()}</td>
                     <td class="text-end">${aTotal > 0 ? aTotal.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
