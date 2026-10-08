@@ -16,15 +16,20 @@ mkdir -p "$RESULTS"
 rm -f "$RESULTS/partitions.tsv"
 export KAFKA_PROOF_RESULTS="$RESULTS"
 
+if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]]; then
+  echo "JAVA_HOME is unset or does not contain bin/java."
+  exit 1
+fi
+if [[ -z "${MAVEN_HOME:-}" || ! -x "${MAVEN_HOME}/bin/mvn" ]]; then
+  echo "MAVEN_HOME is unset or does not contain bin/mvn."
+  exit 1
+fi
+
 echo "Running .NET proof tests against $KAFKA_BOOTSTRAP"
 dotnet test "$ROOT/DotNet/KafkaKeyProof.Tests/KafkaKeyProof.Tests.csproj" --nologo --filter "FullyQualifiedName~KafkaPartitionProofTests|FullyQualifiedName~KafkaBrokerProofTests"
 
-if [[ -n "${JAVA_HOME:-}" && -x "${MAVEN_HOME:-}/bin/mvn" ]]; then
-  echo "Running Java proof tests"
-  (cd "$ROOT/Java" && "$MAVEN_HOME/bin/mvn" -pl shared,measureeval -am test -Dtest=KafkaKeyGoldenTest,KafkaPartitionProofTest -DfailIfNoTests=false)
-else
-  echo "JAVA_HOME or MAVEN_HOME is unset. Java proof tests were not run."
-fi
+echo "Running Java proof tests"
+(cd "$ROOT/Java" && "$MAVEN_HOME/bin/mvn" -pl shared,measureeval -am test -Dtest=KafkaKeyGoldenTest,KafkaPartitionProofTest "-Dsurefire.failIfNoSpecifiedTests=false")
 
 if [[ ! -s "$RESULTS/partitions.tsv" ]]; then
   echo "No partition results were written."
@@ -67,8 +72,12 @@ for lineno, line in enumerate(text.splitlines(), 1):
     rows[(topic, count, key)][runtime] = partition
 failed = False
 for identity, by_runtime in sorted(rows.items()):
+    if "dotnet" not in by_runtime or "java" not in by_runtime:
+        print("MISMATCH", identity, "missing runtime", by_runtime)
+        failed = True
+        continue
     values = set(by_runtime.values())
-    if "dotnet" in by_runtime and "java" in by_runtime and len(values) != 1:
+    if len(values) != 1:
         print("MISMATCH", identity, by_runtime)
         failed = True
     else:
