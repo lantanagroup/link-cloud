@@ -23,6 +23,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapPost("/topics/{topic}/partitions/plan", Plan)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/family/plan", PlanFamily)
+            .RequireAuthorization(PolicyNames.CanViewInfrastructure);
+        group.MapPost("/topics/{topic}/family", CreateFamily)
+            .RequireAuthorization(PolicyNames.CanManageKafkaTopics);
         group.MapGet("/cluster", GetCluster)
             .RequireAuthorization(PolicyNames.CanViewInfrastructure);
         group.MapGet("/infra", GetInfra)
@@ -95,6 +99,40 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         }
     }
 
+    private async Task<IResult> PlanFamily(ClaimsPrincipal user, string topic, PartitionPlanBody body, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanView(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var plan = await kafkaOps.PlanFamilyAsync(name, body.OverrideQuietWindow, body.OverrideReason, cancellationToken);
+            return plan.Accepted ? Results.Ok(plan) : Results.BadRequest(plan);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
+    private async Task<IResult> CreateFamily(ClaimsPrincipal user, string topic, ChangeRequestBody body, HttpContext http, CancellationToken cancellationToken)
+    {
+        if (!kafkaOps.CanManage(user))
+            return Results.Forbid();
+        if (!TryTopic(topic, out var name, out var invalid))
+            return Problem(invalid, StatusCodes.Status400BadRequest);
+        try
+        {
+            var record = await kafkaOps.CreateFamilyAsync(user, name, body.Reason ?? "", body.OverrideQuietWindow, body.OverrideReason, body.Confirmation, Correlation(http), cancellationToken);
+            return Results.Created($"/api/ops/kafka/change-requests/{record.Id}", record);
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return StatusFor(ex);
+        }
+    }
+
     private async Task<IResult> Create(ClaimsPrincipal user, HttpContext http, ChangeRequestBody body, CancellationToken cancellationToken)
     {
         if (!kafkaOps.CanManage(user))
@@ -109,7 +147,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         }
         catch (KafkaOpsRejectedException ex)
         {
-            return Problem(ex.Message, StatusCodes.Status400BadRequest);
+            return StatusFor(ex);
         }
     }
 
@@ -173,7 +211,14 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     {
         if (!kafkaOps.CanView(user))
             return Results.Forbid();
-        return Results.Ok(kafkaOps.Infra);
+        try
+        {
+            return Results.Ok(await kafkaOps.PlanAddBrokerAsync(cancellationToken));
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status400BadRequest);
+        }
     }
 
     private async Task<IResult> CreateAddBroker(ClaimsPrincipal user, ReasonBody body, HttpContext http, CancellationToken cancellationToken)
@@ -257,12 +302,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     private static string? Correlation(HttpContext http) =>
         http.Request.Headers["X-Correlation-Id"].FirstOrDefault();
 
-    private IResult StatusFor(KafkaOpsRejectedException ex)
-    {
-        var forbidden = ex.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase)
-            || ex.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase);
-        return Problem(ex.Message, forbidden ? StatusCodes.Status403Forbidden : StatusCodes.Status400BadRequest);
-    }
+    private IResult StatusFor(KafkaOpsRejectedException ex) =>
+        Problem(ex.Message, ex is KafkaOpsForbiddenException
+            ? StatusCodes.Status403Forbidden
+            : StatusCodes.Status400BadRequest);
 
     private static bool TryToken(string? value, out string name)
     {
@@ -280,6 +323,8 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 
     private async Task<IResult> Execute(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
     {
+        if (kafkaOps.ReadOnly)
+            return Problem("Kafka changes are read-only in this environment.", StatusCodes.Status403Forbidden);
         var existing = await kafkaOps.GetAsync(id, cancellationToken);
         if (existing is null)
             return Problem("That change request was not found or it has expired.", StatusCodes.Status404NotFound);

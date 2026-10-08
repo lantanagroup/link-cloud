@@ -69,6 +69,31 @@ public sealed class KafkaOpsClient
         }, cancellationToken, keepBodyOnFailure: true);
     }
 
+    public Task<KafkaOpsCall<PartitionPlan>> PlanFamilyAsync(string topic, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.PlanFamily(topic, overrideQuietWindow, overrideReason));
+        return SendAsync<PartitionPlan>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/family/plan", new
+        {
+            overrideQuietWindow,
+            overrideReason
+        }, cancellationToken, keepBodyOnFailure: true);
+    }
+
+    public Task<KafkaOpsCall<ChangeRequestRecord>> CreateFamilyAsync(string topic, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string correlationId, CancellationToken cancellationToken)
+    {
+        if (_fixture.Active)
+            return Task.FromResult(_fixture.CreateFamily(topic, reason, overrideQuietWindow, overrideReason, confirmation, correlationId));
+        return SendAsync<ChangeRequestRecord>(HttpMethod.Post, "api/ops/kafka/topics/" + Uri.EscapeDataString(topic) + "/family", new
+        {
+            topic,
+            reason,
+            overrideQuietWindow,
+            overrideReason,
+            confirmation
+        }, cancellationToken, correlationId);
+    }
+
     public Task<KafkaOpsCall<ChangeRequestRecord>> CreateAsync(string topic, int partitions, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string correlationId, CancellationToken cancellationToken)
     {
         if (_fixture.Active)
@@ -349,6 +374,8 @@ public sealed class PartitionPlan
     public bool QuietWindowRequired { get; set; }
     public bool QuietWindowMet { get; set; }
     public bool Irreversible { get; set; } = true;
+    public bool FamilyCompletion { get; set; }
+    public List<string> TopicsToRaise { get; set; } = [];
     public List<string> AffectedGroups { get; set; } = [];
     public string Summary { get; set; } = "";
 }
@@ -383,6 +410,7 @@ public sealed class ChangeRequestRecord
     public DateTimeOffset? ConvergedUtc { get; set; }
     public DateTimeOffset? ClosedUtc { get; set; }
     public string Failure { get; set; } = "";
+    public string Warning { get; set; } = "";
     public bool AlertRaised { get; set; }
     public List<GroupProgressRow> Groups { get; set; } = [];
 }

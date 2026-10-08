@@ -390,8 +390,8 @@
       },
       "librdkafka.redist": {
         "type": "Transitive",
-        "resolved": "2.14.2",
-        "contentHash": "8GRCTOKqCfwAyMSWmJ8c/wJc4PYm1lXAnRUWKQhaUtkz+JJUnDygxwtWPDqBMgS2YMxcrkaubFPTkhddt3RPOQ=="
+        "resolved": "2.16.0",
+        "contentHash": "cr/wX7+G/rqOwN88Imxxco+OMGG6XslgSFh9xMb3utHY7/iWfssD2AY9MF7rsGdGm+mGuRw+1IQ+Zslris9IoQ=="
       },
       "Microsoft.AspNetCore.Cryptography.Internal": {
         "type": "Transitive",
@@ -2077,7 +2077,7 @@
           "Azure.Monitor.OpenTelemetry.AspNetCore": "[1.4.0, )",
           "Azure.Security.KeyVault.Secrets": "[4.8.0, )",
           "Azure.Storage.Blobs": "[12.29.0, )",
-          "Confluent.Kafka": "[2.14.2, )",
+          "Confluent.Kafka": "[2.16.0, )",
           "Confluent.Kafka.Extensions.Diagnostics": "[0.5.0, )",
           "Confluent.Kafka.Extensions.OpenTelemetry": "[0.4.0, )",
           "DistributedLock.Redis": "[1.1.1, )",
@@ -2217,11 +2217,11 @@
       },
       "Confluent.Kafka": {
         "type": "CentralTransitive",
-        "requested": "[2.14.2, )",
-        "resolved": "2.14.2",
-        "contentHash": "ngjb+jon9UvPig2zLWW2pQHZhWUUWgOdEdyK72UXGDs9waLghNC90mn4dd/ODESfHvBqW0s9+nUP6eb+/5HtBQ==",
+        "requested": "[2.16.0, )",
+        "resolved": "2.16.0",
+        "contentHash": "BREXaSYr9BrXpaJ7S4TTSIhI6q5amIjxoxJGbvKLQjAG/08hs223UDt60j42JdCgtD+aFYuduG/oP/tHqNJt8w==",
         "dependencies": {
-          "librdkafka.redist": "2.14.2"
+          "librdkafka.redist": "2.16.0"
         }
       },
       "Confluent.Kafka.Extensions.Diagnostics": {

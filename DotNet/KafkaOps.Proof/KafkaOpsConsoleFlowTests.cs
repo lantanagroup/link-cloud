@@ -56,7 +56,8 @@ public class KafkaOpsConsoleFlowTests
             KafkaTopicCatalog.ErrorName("ReadyToAcquire")
         };
         const string memberTopic = "ops-proof-members";
-        var groups = new[] { "ops-proof-g1", "ops-proof-g2", "ops-proof-g3" };
+        // The console describes only catalog group ids, so the readers use three catalog groups that do not read ReadyToAcquire.
+        var groups = new[] { "Audit", "Census", "Notification" };
         var consumers = new List<IConsumer<string, string>>();
 
         using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrap }).Build();
@@ -201,7 +202,23 @@ public class KafkaOpsConsoleFlowTests
                 ["Authentication:EnableAnonymousAccess"] = "false"
             }).Build(),
             Array.Empty<IProducer<string, AuditEventMessage>>(),
-            new DisabledKafkaInfraProvider("Infrastructure is disabled for this test."));
+            new QuietClusterInfra());
+
+    // The kit has no console-run reassignment, and the proof script verifies its own moves completed. Report a known, empty list.
+    private sealed class QuietClusterInfra : IKafkaInfraProvider
+    {
+        private readonly DisabledKafkaInfraProvider _inner = new("Infrastructure is disabled for this test.");
+        public string Name => _inner.Name;
+        public bool Enabled => _inner.Enabled;
+        public string Detail => _inner.Detail;
+        public Task ScaleGroupAsync(string groupId, int replicas, CancellationToken cancellationToken) => _inner.ScaleGroupAsync(groupId, replicas, cancellationToken);
+        public Task AddBrokerAsync(CancellationToken cancellationToken) => _inner.AddBrokerAsync(cancellationToken);
+        public Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken) => _inner.RemoveBrokerAsync(brokerId, cancellationToken);
+        public Task ApplyReassignmentAsync(string reassignmentJson, string rebalanceName, bool refresh, CancellationToken cancellationToken) => _inner.ApplyReassignmentAsync(reassignmentJson, rebalanceName, refresh, cancellationToken);
+        public Task CancelReassignmentAsync(string rebalanceName, CancellationToken cancellationToken) => _inner.CancelReassignmentAsync(rebalanceName, cancellationToken);
+        public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken) => _inner.ReleaseRebalanceAsync(rebalanceName, cancellationToken);
+        public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken) => Task.FromResult(new ReassignmentListing { Known = true });
+    }
 
     private static ClaimsPrincipal User(string name, string permission)
     {

@@ -102,7 +102,7 @@ public sealed class KafkaOpsFixture
             plan.Notes.Add("One facility can never use more than one partition. A quiet window keeps in-flight keys on the partition they already use.");
         else if (string.Equals(plan.KeyClass, "Patient", StringComparison.Ordinal))
             plan.Notes.Add("A patient key is {facilityId}:{patientId}. Raising the partition count remaps which partition that patient uses.");
-        plan.SecondApproverRequired = !plan.HardBlocked && (plan.QuietWindowRequired || overrideQuietWindow);
+        plan.SecondApproverRequired = !plan.HardBlocked;
         plan.Accepted = plan.Errors.Count == 0;
         plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);
         return plan.Accepted ? Ok(plan) : Bad(plan);
@@ -148,6 +148,70 @@ public sealed class KafkaOpsFixture
         lock (_gate)
             _requests[record.Id] = record;
         return Ok(record);
+    }
+
+    public KafkaOpsCall<PartitionPlan> PlanFamily(string topic, bool overrideQuietWindow, string? overrideReason)
+    {
+        var row = FindTopic(topic);
+        var plan = new PartitionPlan
+        {
+            Topic = topic,
+            Family = row?.Family ?? topic,
+            FamilyCompletion = true,
+            RetryTopic = topic + "-Retry",
+            ErrorTopic = topic + "-Error",
+            KeyClass = row?.KeyClass ?? "Facility",
+            KeyShape = row?.KeyShape ?? "{facilityId}",
+            CurrentPartitions = row?.Partitions ?? 0,
+            RequestedPartitions = row?.Partitions ?? 0,
+            MaxReplicas = row?.Partitions ?? 0,
+            AffectedGroups = row?.Groups.ToList() ?? []
+        };
+        if (row is null)
+            plan.Errors.Add("The topic is not in the catalog.");
+        else
+        {
+            if (row.RetryPartitions > 0 && row.RetryPartitions < row.Partitions)
+                plan.TopicsToRaise.Add(plan.RetryTopic);
+            if (row.ErrorPartitions > 0 && row.ErrorPartitions < row.Partitions)
+                plan.TopicsToRaise.Add(plan.ErrorTopic);
+            if (plan.TopicsToRaise.Count == 0)
+                plan.Errors.Add("No sibling is behind the main topic.");
+        }
+
+        plan.Notes.Add("This catches sibling topics up to the main topic. The main topic is not changed.");
+        plan.Accepted = plan.Errors.Count == 0;
+        plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);
+        return plan.Accepted ? Ok(plan) : Bad(plan);
+    }
+
+    public KafkaOpsCall<ChangeRequestRecord> CreateFamily(string topic, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string correlationId)
+    {
+        if (!string.Equals((confirmation ?? "").Trim(), topic, StringComparison.Ordinal))
+            return Fail<ChangeRequestRecord>("Type the topic name to confirm. Adding partitions cannot be reversed.");
+        if (string.IsNullOrWhiteSpace(reason))
+            return Fail<ChangeRequestRecord>("A reason is required.");
+        var plan = PlanFamily(topic, overrideQuietWindow, overrideReason);
+        if (plan.Value is not { Accepted: true })
+            return Fail<ChangeRequestRecord>(plan.Error ?? plan.Value?.Summary ?? "The dry run was refused.");
+        return Store(new ChangeRequestRecord
+        {
+            Id = Guid.NewGuid(),
+            Kind = "CompleteTopicFamily",
+            Topic = topic,
+            Family = plan.Value.Family,
+            RetryTopic = plan.Value.RetryTopic,
+            BeforePartitions = plan.Value.CurrentPartitions,
+            RequestedPartitions = plan.Value.RequestedPartitions,
+            MaxReplicas = plan.Value.MaxReplicas,
+            Reason = reason.Trim(),
+            Requester = "anonymous",
+            Status = "Pending",
+            SecondApproverRequired = true,
+            DryRunSummary = plan.Value.Summary,
+            CorrelationId = correlationId,
+            CreatedUtc = DateTimeOffset.UtcNow
+        });
     }
 
     public KafkaOpsCall<ReplicaScalePlan> PlanScale(string groupId, int replicas)
@@ -369,14 +433,23 @@ public sealed class KafkaOpsFixture
             if (!_requests.TryGetValue(id, out var record))
                 return Fail<ChangeRequestRecord>("The change request was not found.");
             if (record.Kind is not ("DecommissionBroker" or "Rebalance"))
-                return Fail<ChangeRequestRecord>("Only a broker move can be cancelled.");
-            if (record.Status is not ("Executing" or "Converging"))
-                return Fail<ChangeRequestRecord>("The reassignment is not in progress.");
-            record.Status = "Cancelled";
-            record.Progress = "Reassignment cancelled.";
-            record.Failure = "Cancelled by anonymous";
-            record.ClosedUtc = DateTimeOffset.UtcNow;
-            return Ok(record);
+                return Fail<ChangeRequestRecord>("Only an in-flight reassignment can be cancelled.");
+            if (record.Status is not ("Executing" or "Converging" or "TimedOut"))
+                return Fail<ChangeRequestRecord>("This request is not in flight.");
+            return Store(new ChangeRequestRecord
+            {
+                Id = Guid.NewGuid(),
+                Kind = "CancelReassignment",
+                Topic = record.Topic,
+                Family = record.Family,
+                BrokerId = record.BrokerId,
+                Requester = "anonymous",
+                Status = "Pending",
+                SecondApproverRequired = true,
+                Reason = "Cancel the in-flight reassignment.",
+                DryRunSummary = "Cancel the reassignment and check that replicas return to the original assignment.",
+                CreatedUtc = DateTimeOffset.UtcNow
+            });
         }
     }
 

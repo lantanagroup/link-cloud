@@ -45,6 +45,7 @@ public class ConsumerGroupOffsetQueryTests
             },
             CancellationToken.None);
 
+        Assert.Equal(1, ConsumerGroupOffsetQueries.MaxParallel);
         Assert.InRange(peak, 1, ConsumerGroupOffsetQueries.MaxParallel);
     }
 
