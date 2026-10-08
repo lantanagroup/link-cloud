@@ -5,8 +5,11 @@ import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.KafkaIdentity;
+import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -37,7 +40,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 @Service
-public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
+public class ReadyForValidationConsumer extends AbstractAsyncConsumer<String, ReadyForValidation> {
     private final Logger _logger = LoggerFactory.getLogger(ReadyForValidationConsumer.class);
     private final FhirContext fhirContext;
     private final ReportClient reportClient;
@@ -77,23 +80,27 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
 
     @KafkaListener(topics = Topics.READY_FOR_VALIDATION, containerFactory = "manualAckListenerContainerFactory")
     public void consume(
-            ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record,
+            ConsumerRecord<String, ReadyForValidation> record,
             Acknowledgment acknowledgment) {
         doConsume(record, acknowledgment);
     }
 
     @Override
-    protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
+    protected void process(ConsumerRecord<String, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
+        ReadyForValidation value = record.value();
+        String facilityId = KafkaIdentity.facility(value == null ? null : value.getFacilityId(), record.key());
+        String patientId = KafkaIdentity.patient(value == null ? null : value.getPatientId(), record.key());
+        if (facilityId == null || facilityId.isBlank()) {
+            throw new ValidationException("Facility ID is null or empty.");
+        }
         _logger.info("Processing {} message for facility {}, patient {}, report {}",
                 LogUtils.sanitize(record.topic()),
-                LogUtils.sanitize(record.key().getFacilityId()),
-                LogUtils.sanitize(record.value().getPatientId()),
-                LogUtils.sanitize(record.value().getReportTrackingId()));
-        String facilityId = record.key().getFacilityId();
-        String patientId = record.value().getPatientId();
-        String reportId = record.value().getReportTrackingId();
-        String payloadUri = record.value().getPayloadUri();
+                LogUtils.sanitize(facilityId),
+                LogUtils.sanitize(patientId),
+                LogUtils.sanitize(value.getReportTrackingId()));
+        String reportId = value.getReportTrackingId();
+        String payloadUri = value.getPayloadUri();
         Bundle bundle;
         try (Timer fetchTimer = Timer.start()) {
             bundle = getBundleFromBlobStorage(payloadUri);
@@ -129,7 +136,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
             return;
         }
-        // Replay guard. The offset is acknowledged even when process() throws (AsyncListener), so a
+        // Replay guard. The offset is acknowledged when recovery publishes the failed record, so a
         // failure after this append - producing ValidationComplete, say - sends the record to the retry
         // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
         // pre-qual OperationOutcome already present in it means we appended one previously and must not
@@ -303,6 +310,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             List<Result> results,
             org.apache.kafka.common.header.Headers inboundHeaders) {
         ValidationComplete value = new ValidationComplete();
+        value.setFacilityId(facilityId);
         value.setPatientId(patientId);
         value.setReportTrackingId(reportId);
         value.setValid(results.stream()
@@ -318,12 +326,13 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         Headers.copyMetricsMode(inboundHeaders, headers);
         try {
             // Use .get() to make the send synchronous and wait for broker confirmation
-            validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers)).get();
+            validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null,
+                    KafkaKeys.forPatient(facilityId, patientId), value, headers)).get();
         } catch (Exception e) {
             _logger.error("Failed to send ValidationComplete record for patient {} in report {}",
                     LogUtils.sanitize(patientId), LogUtils.sanitize(reportId), e);
-            // Throwing the exception ensures AsyncListener's catch block handles it
-            // (e.g., sending the source record to the Error topic)
+            // Throwing ensures the consumer recoverer handles it
+            // (sending the source record to the retry or error topic, not the shared main topic)
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
         }
     }

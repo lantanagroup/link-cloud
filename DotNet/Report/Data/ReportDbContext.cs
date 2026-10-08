@@ -116,6 +116,7 @@ public partial class ReportDbContext : DbContext
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.EnableSubmission).HasDefaultValue(true);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.ManifestState).HasDefaultValue(ReportScheduleManifest.None);
 
             entity.Property(e => e.ReportStartDate).HasColumnType("datetimeoffset(7)");
             entity.Property(e => e.ReportEndDate).HasColumnType("datetimeoffset(7)");

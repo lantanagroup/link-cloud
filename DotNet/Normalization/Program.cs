@@ -83,19 +83,18 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, ResourcesAcquiredValue>, KafkaConsumerFactory<string, ResourcesAcquiredValue>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourcesAcquiredValue>, KafkaProducerFactory<string, ResourcesAcquiredValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourcesNormalizedValue>, KafkaProducerFactory<string, ResourcesNormalizedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<string, MappingOutcomeEvaluatedValue>>();
 
-    builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedValue>(
+    builder.Services.RegisterKafkaProducer<string, ResourcesNormalizedValue>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
-    builder.Services.RegisterKafkaProducer<ResourceKey, MappingOutcomeEvaluatedValue>(
+    builder.Services.RegisterKafkaProducer<string, MappingOutcomeEvaluatedValue>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());

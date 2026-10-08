@@ -13,6 +13,8 @@ import java.util.List;
 @Getter
 @Setter
 public class ReadyForValidation {
+    private String facilityId;
+
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String patientId;
 

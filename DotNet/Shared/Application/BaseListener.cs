@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -40,6 +41,12 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 
     }
 
+    /// <summary>
+    /// False when this service does not host a consumer for its retry topic.
+    /// Failures then go to the error topic instead of a topic nobody reads.
+    /// </summary>
+    protected virtual bool RetryFailures => true;
+
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await base.StartAsync(cancellationToken);
@@ -53,13 +60,17 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
     private async Task StartConsumerLoop(CancellationToken cancellationToken)
     {
         var settings = CreateConsumerConfig();
-        using var consumer = KafkaConsumerFactory.CreateConsumer(settings);
+        var assignmentTracker = new KafkaAssignmentTracker();
+        using var consumer = KafkaConsumerFactory.CreateConsumer(settings, assignmentTracker: assignmentTracker);
 
         try
         {
-            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", ServiceInformation.ServiceConfigName, this.TopicName);
+            var serviceName = string.IsNullOrWhiteSpace(ServiceInformation.ServiceConfigName)
+                ? ServiceInformation.ServiceName
+                : ServiceInformation.ServiceConfigName;
+            Logger.LogInformation("Starting Consumer Loop for {ServiceName} on topic {topic}", serviceName, this.TopicName);
 
-            consumer.Subscribe(new string[] { this.TopicName });
+            consumer.Subscribe(KafkaTopicNames.Subscription(this.TopicName, serviceName));
 
             ConsumeResult<ConsumeKeyType, ConsumeValueType>? consumeResult = null;
 
@@ -70,21 +81,33 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                     await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         consumeResult = result;
+                        var accounted = false;
 
                         try
                         {
                             if (consumeResult != null)
                             {
                                 await ExecuteListenerAsync(consumeResult, consumeCancellationToken);
+                                accounted = true;
                             }
                         }
                         catch (DeadLetterException ex)
                         {
                             DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            accounted = true;
                         }
                         catch (TransientException ex)
                         {
-                            TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            if (RetryFailures)
+                            {
+                                TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            }
+                            else
+                            {
+                                DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            }
+
+                            accounted = true;
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
@@ -96,12 +119,24 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                                 "Unhandled exception in listener for {ServiceName} on topic {Topic}",
                                 ServiceInformation.ServiceConfigName, this.TopicName);
 
-                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            if (RetryFailures)
+                            {
+                                TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            }
+                            else
+                            {
+                                DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            }
+
+                            accounted = true;
                         }
                         finally
                         {
-                            if (!consumeCancellationToken.IsCancellationRequested)
+                            if (accounted && consumeResult != null && !consumeCancellationToken.IsCancellationRequested)
+                            {
+                                assignmentTracker.MarkProcessed(consumeResult);
                                 consumer.SafeCommit(consumeResult, Logger);
+                            }
                         }
                     }, cancellationToken);
                 }
@@ -134,6 +169,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         ServiceInformation.ServiceConfigName, this.TopicName);
                 }
             }
+
+            consumer.Close();
         }
         catch (OperationCanceledException oce)
         {

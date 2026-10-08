@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.AuditEvent
 
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, object>
                 {
-                    Key = model.FacilityId ?? string.Empty,
+                    Key = KafkaKeys.ForAudit(model.FacilityId, model.PatientId, AccountConstants.ServiceName),
                     Value = model,
                     Headers = headers
                 }, cancellationToken);
