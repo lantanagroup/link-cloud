@@ -21,8 +21,10 @@ Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` fr
 `docker compose` inside this repo passes a short-lived Azure CLI token to those images only as the BuildKit secret `feed_accesstoken`. One-time setup from the repo root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"
 ```
+
+The calling shell expands `"$PROFILE"` before Windows PowerShell starts, so PowerShell 7 updates the PowerShell 7 profile. A direct run of the script, with no `-ProfilePath`, still uses that process's own profile.
 
 Git Bash:
 
