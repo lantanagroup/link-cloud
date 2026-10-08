@@ -278,6 +278,7 @@ function Test-LinkCloudComposeCommand {
     return $false
 }
 
+# Pipeline input is buffered until the producer finishes. A producer that never ends does not start docker.
 function global:docker {
     $hooks = $global:LinkCloudFeedTokenHooks
     $skipReload = $hooks -and $hooks.ContainsKey('SkipReload') -and $hooks['SkipReload']
