@@ -31,8 +31,11 @@ $profileDir = Split-Path -Parent $ProfilePath
 if ($profileDir -and -not (Test-Path -LiteralPath $profileDir)) {
     New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
 }
+# UTF-8 with a BOM is readable by Windows PowerShell and PowerShell 7.
+# AppendAllText would write UTF-8 bytes onto a UTF-16 profile and break the new line.
+$utf8Bom = New-Object System.Text.UTF8Encoding $true
 if (-not (Test-Path -LiteralPath $ProfilePath)) {
-    [System.IO.File]::WriteAllText($ProfilePath, $profileLine + [Environment]::NewLine)
+    [System.IO.File]::WriteAllText($ProfilePath, $profileLine + [Environment]::NewLine, $utf8Bom)
     Write-Host "Added the profile line to $ProfilePath."
     Write-Host "Open a new PowerShell window in the repo. docker compose will fetch a short-lived Azure DevOps token when it needs one."
     exit 0
@@ -44,7 +47,8 @@ if ($existing -notmatch [regex]::Escape($marker)) {
     if ($existing.Length -gt 0 -and -not $existing.EndsWith("`n")) {
         $prefix = [Environment]::NewLine
     }
-    [System.IO.File]::AppendAllText($ProfilePath, $prefix + $profileLine + [Environment]::NewLine)
+    $updated = $existing + $prefix + $profileLine + [Environment]::NewLine
+    [System.IO.File]::WriteAllText($ProfilePath, $updated, $utf8Bom)
     Write-Host "Added the profile line to $ProfilePath."
 } else {
     Write-Host "The profile line is already in $ProfilePath."

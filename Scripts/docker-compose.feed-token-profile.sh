@@ -81,6 +81,20 @@ link_cloud_token_fresh() {
   [ "$remaining" -ge 600 ]
 }
 
+# A refresh can return the cached token while it is still valid.
+# That result is usable. The 10 minute check only decides whether to try.
+link_cloud_token_unexpired() {
+  local token=$1
+  local expires=$2
+  local now=$3
+  local remaining
+  if [ -z "$token" ] || [ -z "$expires" ]; then
+    return 1
+  fi
+  remaining=$((expires - now))
+  [ "$remaining" -gt 0 ]
+}
+
 compose() {
   local root envfile now token expires
   root=$(find_link_cloud_root) || {
@@ -107,7 +121,7 @@ compose() {
     token=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT")
     expires=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT_EXPIRES_ON")
     now=$(link_cloud_now)
-    if ! link_cloud_token_fresh "$token" "$expires" "$now"; then
+    if ! link_cloud_token_unexpired "$token" "$expires" "$now"; then
       link_cloud_missing_message >&2
       return 1
     fi
@@ -116,7 +130,7 @@ compose() {
     printf '%s\n' "docker was not found on PATH." >&2
     return 1
   fi
-  env AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" compose "$@"
+  AZURE_ARTIFACTS_PAT="$token" "$LINK_CLOUD_DOCKER_EXE" compose "$@"
   return $?
 }
 

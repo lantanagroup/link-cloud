@@ -60,7 +60,9 @@ function Find-AzExecutable {
     }
 
     Write-Host "Azure CLI (az) is not installed. Installing it for the current user with winget."
-    & winget install --id Microsoft.AzureCLI --scope user --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+    # winget writes progress to the success stream. This function's caller
+    # captures that stream, so the progress must not become part of the az path.
+    & winget install --id Microsoft.AzureCLI --scope user --silent --accept-package-agreements --accept-source-agreements --disable-interactivity *>&1 | Out-Host
     $wingetCode = $LASTEXITCODE
     # 0x8A15002B: the package is already installed.
     if ($wingetCode -ne 0 -and $wingetCode -ne -1978335189) {
@@ -103,7 +105,7 @@ $az = Find-AzExecutable
 & $az account show --output none
 if ($LASTEXITCODE -ne 0) {
     Write-Host "No Azure CLI session. Starting device-code sign-in. Complete it in a browser, or cancel and this script will stop."
-    & $az login --use-device-code
+    & $az login --use-device-code --allow-no-subscriptions
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Azure sign-in did not complete. Run 'az login' and then Scripts/docker-compose.feed-token.ps1."
         exit 1

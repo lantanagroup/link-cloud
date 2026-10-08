@@ -120,6 +120,29 @@ try {
     Invoke-LinkCloudCompose -RepoRoot $repo -ComposeArguments @('ps')
     Write-Result ($global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 1) 'token with under 10 minutes left calls fetch'
 
+    # Azure CLI can return the cached token with under 10 minutes left.
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $repo
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = $now
+    Write-TokenFile -Repo $repo -Token $sentinel -Expires ($now + 599)
+    Set-DockerHook -ExitCode 0
+    Set-FetchHook -ExitCode 0 -Expires ($now + 400) -WriteFile
+    Invoke-LinkCloudCompose -RepoRoot $repo -ComposeArguments @('ps')
+    Write-Result ($global:LinkCloudFeedTokenHooks['FetchCalls'] -eq 1) 'short cached token still calls fetch'
+    Write-Result ($global:LinkCloudFeedTokenHooks['DockerCalls'].Count -eq 1) 'short cached token still runs docker'
+
+    # An expired result from fetch does not start docker.
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $repo
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = $now
+    Write-TokenFile -Repo $repo -Token $sentinel -Expires ($now + 599)
+    Set-DockerHook -ExitCode 0
+    Set-FetchHook -ExitCode 0 -Expires ($now - 1) -WriteFile
+    Invoke-LinkCloudCompose -RepoRoot $repo -ComposeArguments @('ps')
+    $expiredFetch = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
+    Write-Result ($global:LinkCloudFeedTokenHooks['DockerCalls'].Count -eq 0) 'expired fetch result does not call docker'
+    Write-Result ($expiredFetch.Contains('Azure token missing.')) 'expired fetch result prints the missing-token message'
+
     # Valid token does not fetch.
     Reset-Hooks
     $global:LinkCloudFeedTokenHooks['RepoRoot'] = $repo
@@ -209,6 +232,10 @@ try {
         if ($ignoreLine.Trim() -eq '.azure-artifacts.env') { $tokenIgnored = $true }
     }
     Write-Result $tokenIgnored 'dockerignore excludes the local token file'
+    $fetchScript = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.feed-token.ps1'))
+    $bashFetch = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.feed-token-fetch.sh'))
+    Write-Result ($fetchScript.Contains('--allow-no-subscriptions') -and $bashFetch.Contains('--allow-no-subscriptions')) 'login allows an account with no Azure subscription'
+    Write-Result ($fetchScript.Contains('*>&1 | Out-Host')) 'winget progress is not part of the az path'
 
     # Installer is idempotent and does not touch the real profile.
     $profilePath = Join-Path $repo 'profile.ps1'
@@ -221,6 +248,12 @@ try {
     Write-Result ($markerCount -eq 1) 'installer adds the profile line once'
     Write-Result ($profileText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'installer writes the profile snippet'
     Write-Result (Test-Path -LiteralPath (Join-Path $installDir 'docker-compose.feed-token-profile.ps1')) 'installer copies the profile script'
+    $utf16Profile = Join-Path $repo 'profile-utf16.ps1'
+    $utf16 = New-Object System.Text.UnicodeEncoding $false, $true
+    [System.IO.File]::WriteAllText($utf16Profile, "Write-Host 'kept'`r`n", $utf16)
+    & $installer -ProfilePath $utf16Profile -InstallDir $installDir | Out-Null
+    $utf16Text = [System.IO.File]::ReadAllText($utf16Profile)
+    Write-Result ($utf16Text.Contains('kept') -and $utf16Text.Contains('link-cloud-feed-token')) 'installer keeps an existing UTF-16 profile readable'
 
     # Fetch script with a mock az. The sentinel must not appear in the child output.
     $mockDir = Join-Path $repo 'mock-az'
