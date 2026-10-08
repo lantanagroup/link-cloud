@@ -25,21 +25,18 @@ namespace LantanaGroup.Link.Notification.Listeners
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly INotificationFactory _notificationFactory;
         private readonly IKafkaConsumerFactory _kafkaConsumerFactory;
-        private readonly ITransientExceptionHandler<NotificationRequestedListener, string, NotificationMessage> _transientExceptionHandler;
         private readonly IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage> _deadLetterExceptionHandler;
+        private static readonly TimeSpan ConsumeLoopBackoff = TimeSpan.FromSeconds(1);
 
         public NotificationRequestedListener(ILogger<NotificationRequestedListener> logger, INotificationFactory notificationFactory, 
             IKafkaConsumerFactory kafkaConsumerFactory, IServiceScopeFactory scopeFactory,
-            ITransientExceptionHandler<NotificationRequestedListener, string, NotificationMessage> transientExceptionHandler,
             IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage> deadLetterExceptionHandler)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));           
             _notificationFactory = notificationFactory ?? throw new ArgumentNullException(nameof(notificationFactory));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
-            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
             _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
-            _transientExceptionHandler.Topic = nameof(KafkaTopic.NotificationRequested);
             _deadLetterExceptionHandler.Topic = KafkaTopicNames.Error(nameof(KafkaTopic.NotificationRequested));
         }
 
@@ -167,13 +164,6 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
                                     accounted = true;
                                 }
-                                catch (TransientException ex) when (result != null)
-                                {
-                                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                                    var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
-                                    _transientExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                                    accounted = true;
-                                }
                                 catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
                                     throw;
@@ -188,9 +178,9 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     }
 
                                     var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
-                                    _transientExceptionHandler.HandleException(
+                                    _deadLetterExceptionHandler.HandleException(
                                         result,
-                                        new TransientException("Notification Exception thrown: " + ex.Message, ex),
+                                        new DeadLetterException("Notification Exception thrown: " + ex.Message, ex),
                                         facilityId ?? string.Empty);
                                     accounted = true;
                                 }
@@ -219,6 +209,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                 ? System.Text.Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
                                 : null;
                             _deadLetterExceptionHandler.HandleConsumeException(ex, KafkaIdentity.Facility(null, rawKey) ?? string.Empty);
+                            await PauseBeforeNextConsumeAsync(cancellationToken);
                         }
                         catch (OperationCanceledException)
                         {
@@ -228,6 +219,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                         {
                             Activity.Current?.SetStatus(ActivityStatusCode.Error);
                             _logger.LogConsumerException(nameof(KafkaTopic.NotificationRequested), ex.Message);
+                            await PauseBeforeNextConsumeAsync(cancellationToken);
                         }
                     }
 
@@ -243,6 +235,11 @@ namespace LantanaGroup.Link.Notification.Listeners
                     _consumer.Dispose();
                 }
             }
+        }
+
+        private static Task PauseBeforeNextConsumeAsync(CancellationToken cancellationToken)
+        {
+            return Task.Delay(ConsumeLoopBackoff, cancellationToken);
         }
 
     }

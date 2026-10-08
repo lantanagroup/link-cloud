@@ -16,6 +16,9 @@ public class KafkaTopicAndAssignmentTests
         Assert.True(KafkaTopicNames.TryMainFromRetry("PatientEvent-Retry-Report", out var main, out var service));
         Assert.Equal("PatientEvent", main);
         Assert.Equal("Report", service);
+        Assert.Equal("PatientListsAcquired", KafkaTopicNames.Main("PatientListsAcquired"));
+        Assert.Equal("PatientListsAcquired", KafkaTopicNames.Main("PatientListsAcquired-Redrive-Census"));
+        Assert.Equal("PatientListsAcquired", KafkaTopicNames.Main("PatientListsAcquired-Retry-Census"));
     }
 
     [Fact]

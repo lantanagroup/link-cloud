@@ -20,7 +20,7 @@ namespace UnitTests.Notification;
 public class NotificationRequestedListenerTests
 {
     [Fact]
-    public async Task ProcessingException_IsRetried_AndTheNextMessageIsStillConsumed()
+    public async Task ProcessingException_GoesToTheErrorTopic_AndTheNextMessageIsStillConsumed()
     {
         var consumed = 0;
         var consumer = new Mock<IConsumer<string, NotificationMessage>>();
@@ -98,15 +98,20 @@ public class NotificationRequestedListenerTests
         var scopes = new Mock<IServiceScopeFactory>();
         scopes.Setup(s => s.CreateScope()).Returns(scope.Object);
 
-        var retried = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var transient = new Mock<ITransientExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
-        transient
+        var deadLettered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ConsumeResult<string, NotificationMessage>? failed = null;
+        var deadLetter = new Mock<IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+        deadLetter.SetupProperty(h => h.Topic);
+        deadLetter
             .Setup(h => h.HandleException(
                 It.IsAny<ConsumeResult<string, NotificationMessage>>(),
-                It.IsAny<TransientException>(),
+                It.IsAny<DeadLetterException>(),
                 It.IsAny<string>()))
-            .Callback(() => retried.TrySetResult());
-        var deadLetter = new Mock<IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+            .Callback<ConsumeResult<string, NotificationMessage>, DeadLetterException, string>((result, _, _) =>
+            {
+                failed = result;
+                deadLettered.TrySetResult();
+            });
 
         var notifications = new Mock<INotificationFactory>();
         notifications
@@ -133,21 +138,66 @@ public class NotificationRequestedListenerTests
             notifications.Object,
             factory.Object,
             scopes.Object,
-            transient.Object,
             deadLetter.Object);
 
         using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(8));
         await listener.StartAsync(stop.Token);
 
-        await Task.WhenAll(retried.Task, sent.Task).WaitAsync(TimeSpan.FromSeconds(7));
+        await Task.WhenAll(deadLettered.Task, sent.Task).WaitAsync(TimeSpan.FromSeconds(7));
 
+        Assert.Equal("NotificationRequested-Error", deadLetter.Object.Topic);
+        Assert.Equal("first", failed?.Message.Value.Subject);
+        Assert.Null(failed?.Message.Key);
         deadLetter.Verify(
             h => h.HandleException(
                 It.IsAny<ConsumeResult<string, NotificationMessage>>(),
-                It.IsAny<Exception>(),
+                It.IsAny<DeadLetterException>(),
                 It.IsAny<string>()),
-            Times.Never);
+            Times.Once);
         Assert.True(consumed >= 2);
+    }
+
+    [Fact]
+    public async Task RepeatingConsumeFailure_WaitsBeforeReadingAgain()
+    {
+        var stamps = new List<DateTime>();
+        var secondRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumer = new Mock<IConsumer<string, NotificationMessage>>();
+        consumer
+            .Setup(c => c.Consume(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                stamps.Add(DateTime.UtcNow);
+                if (stamps.Count == 1)
+                {
+                    throw new InvalidOperationException("broker unavailable");
+                }
+
+                secondRead.TrySetResult();
+                throw new OperationCanceledException();
+            });
+
+        var factory = new Mock<IKafkaConsumerFactory>();
+        factory
+            .Setup(f => f.CreateNotificationRequestedConsumer(false, It.IsAny<KafkaAssignmentTracker>()))
+            .Returns(consumer.Object);
+
+        var deadLetter = new Mock<IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+        deadLetter.SetupProperty(h => h.Topic);
+
+        var listener = new NotificationRequestedListener(
+            Mock.Of<ILogger<NotificationRequestedListener>>(),
+            Mock.Of<INotificationFactory>(),
+            factory.Object,
+            Mock.Of<IServiceScopeFactory>(),
+            deadLetter.Object);
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await listener.StartAsync(stop.Token);
+        await secondRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(stamps.Count >= 2);
+        Assert.True(stamps[1] - stamps[0] >= TimeSpan.FromMilliseconds(750));
     }
 
     private static ConsumeResult<string, NotificationMessage> Message(string subject) =>

@@ -163,13 +163,20 @@ public class PatientListsAcquiredListener : BackgroundService
                         }
                         catch (DeadLetterException ex)
                         {
-                            _nonTransientExceptionHandler.Topic = rawmessage?.Topic + "-Error";
+                            if (!string.IsNullOrWhiteSpace(rawmessage?.Topic))
+                            {
+                                _nonTransientExceptionHandler.Topic = KafkaTopicNames.Error(KafkaTopicNames.Main(rawmessage.Topic));
+                            }
+
                             _nonTransientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
                             accounted = true;
                         }
                         catch (TransientException ex)
                         {
-                            _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
+                            if (!string.IsNullOrWhiteSpace(rawmessage?.Topic))
+                            {
+                                _transientExceptionHandler.Topic = KafkaTopicNames.Main(rawmessage.Topic) + "-Retry";
+                            }
                             _transientExceptionHandler.HandleException(rawmessage, ex, FacilityIdOf(rawmessage?.Message));
                             accounted = true;
                         }
