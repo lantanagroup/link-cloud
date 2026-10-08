@@ -35,6 +35,7 @@
         if (host.dataset.facilityId) params.set("facilityId", host.dataset.facilityId);
         if (host.dataset.reportId) params.set("reportId", host.dataset.reportId);
         if (host.dataset.patientId) params.set("patientId", host.dataset.patientId);
+        if (host.getAttribute("data-header-owns-ids") === "yes") params.set("headerOwnsIds", "true");
         var search = host.querySelector("[data-da-search]");
         var term = search ? search.value.trim() : "";
         if (term) params.set("searchTerm", term);

@@ -67,13 +67,13 @@ else
                     }
                     else
                     {
-                        <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@Model.FacilityName</a>
+                        <a asp-action="View" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Open facility</a>
                     }
                 </dd>
                 <dt class="col-sm-3">Cadence</dt><dd class="col-sm-9">@report.Frequency</dd>
                 <dt class="col-sm-3">Measures</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(report.Measures) ? "—" : report.Measures)</dd>
                 <dt class="col-sm-3">Reporting period</dt><dd class="col-sm-9">@report.PeriodStart to @report.PeriodEnd</dd>
-                <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><span class="badge @Link.UI.Services.FacilityViewRules.StatusBadge(report.Status)">@report.StatusLabel</span></dd>
+                <dt class="col-sm-3">Status</dt><dd class="col-sm-9"><span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span></dd>
                 <dt class="col-sm-3">Patients in census</dt><dd class="col-sm-9">@(report.CensusCount?.ToString() ?? "—")</dd>
                 <dt class="col-sm-3">Patients in IP</dt><dd class="col-sm-9">@(report.InitialPopulationCount?.ToString() ?? "—")</dd>
             </dl>

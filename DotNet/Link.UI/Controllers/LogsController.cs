@@ -36,7 +36,7 @@ public sealed class LogsController : Controller
     }
 
     [HttpGet("Acquisition/panel")]
-    public async Task<IActionResult> AcquisitionPanel(AcquisitionQuery query, Guid? runId, CancellationToken cancellationToken)
+    public async Task<IActionResult> AcquisitionPanel(AcquisitionQuery query, Guid? runId, bool headerOwnsIds, CancellationToken cancellationToken)
     {
         query ??= new AcquisitionQuery();
         if (runId is Guid id)
@@ -59,12 +59,14 @@ public sealed class LogsController : Controller
                 var empty = NotOwnedAcquisition(query);
                 empty.ScopeNote = "This run has no facility yet.";
                 empty.Embedded = true;
+                empty.HeaderOwnsIds = headerOwnsIds;
                 empty.RunId = id;
                 return PartialView("_AcquisitionLogList", empty);
             }
 
             var owned = await AcquisitionPage(query, cancellationToken);
             owned.Embedded = true;
+            owned.HeaderOwnsIds = headerOwnsIds;
             owned.RunId = id;
             return PartialView("_AcquisitionLogList", owned);
         }
@@ -74,6 +76,7 @@ public sealed class LogsController : Controller
 
         var page = await AcquisitionPage(query, cancellationToken);
         page.Embedded = true;
+        page.HeaderOwnsIds = headerOwnsIds;
         return PartialView("_AcquisitionLogList", page);
     }
 

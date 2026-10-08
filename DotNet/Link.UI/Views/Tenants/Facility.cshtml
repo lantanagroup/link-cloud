@@ -1,6 +1,7 @@
 @model Link.UI.Models.FacilityHubViewModel
 @{
-    var heading = Model.IsCreate ? "New facility" : (Model.FacilityName ?? Model.FacilityId ?? "Facility");
+    var titleName = Model.IsCreate ? null : LabeledIdRules.DisplayName(Model.FacilityName, Model.FacilityId);
+    var heading = Model.IsCreate ? "New facility" : (titleName ?? "Facility");
     ViewData["Title"] = heading;
 }
 
@@ -11,6 +12,7 @@
         <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
+<h1 class="h3 mb-3">@heading</h1>
 
 @if (LinkUiFeatures.Value.AutomationEnabled && !string.IsNullOrWhiteSpace(Model.AutomationRunId))
 {

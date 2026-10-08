@@ -149,6 +149,7 @@ public sealed class AcquisitionLogListPage
     public IReadOnlyList<AcquisitionListRow> Logs { get; set; } = [];
     public string? ScopeNote { get; set; }
     public bool Embedded { get; set; }
+    public bool HeaderOwnsIds { get; set; }
     public Guid? RunId { get; set; }
 }
 

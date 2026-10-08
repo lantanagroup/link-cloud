@@ -22,7 +22,7 @@
 
     @* --- Summary bar --- *@
     <div class="au-table-toolbar mb-3 rounded border bg-white" id="healthToolbar">
-        <input type="search" id="healthSearch" class="form-control form-control-sm" placeholder="Filter tests by name, service, or reason…" />
+        <input type="search" id="healthSearch" data-lu-query="q" class="form-control form-control-sm" placeholder="Filter tests by name, service, or reason…" />
         <select id="healthResult" class="form-select form-select-sm" style="max-width:12rem;">
             <option value="">All results</option>
             <option value="pass">Passed</option>
@@ -74,13 +74,7 @@
         var allSkipped = totalCount > 0 && runnableCount == 0;
         var serviceBadgeText = allSkipped ? "SKIPPED" : $"{passCount}/{runnableCount}";
         var staleOnly = !service.IsIncludedInLatestRun;
-        var serviceBadgeClass = failCount > 0
-            ? (staleOnly ? "border border-danger text-danger bg-transparent" : "au-badge-danger")
-            : allSkipped
-                ? (staleOnly ? "border border-secondary text-muted bg-transparent" : "au-badge-skip")
-                : (passCount == runnableCount && runnableCount > 0
-                    ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
-                    : (staleOnly ? "border border-secondary text-muted bg-transparent" : "au-badge-muted"));
+        var serviceBadgeClass = StatusPills.ForApiSummary(failCount, allSkipped, passCount, runnableCount, staleOnly);
 
         <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName" data-service-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
             <h2 class="accordion-header au-health-header">
@@ -118,9 +112,7 @@
                                     || (ep.LastResult == null && ep.Definition.AlwaysSkipReason != null);
                                 var isStale = ep.LastResult != null && !service.IsIncludedInLatestRun;
                                 var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
-                                var badgeClass = isStale
-                                    ? (isSkipped ? "border border-secondary text-muted bg-transparent" : (hasPassed == true ? "border border-success text-success bg-transparent" : "border border-danger text-danger bg-transparent"))
-                                    : (isSkipped ? "au-badge-skip" : (hasPassed == null ? "au-badge-muted" : (hasPassed == true ? "au-badge-success" : "au-badge-danger")));
+                                var badgeClass = StatusPills.ForApiStep(isStale, isSkipped, hasPassed);
                                 var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "N/A" : (hasPassed == true ? "PASS" : "FAIL"));
 
                                 @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
@@ -295,12 +287,11 @@
     let currentSeedRunId = null;
     let currentSeedRunStartedAt = null;
 
-    function setSeedRunStatusBadge(status) {
+    function paintSeedRun(status) {
         const badge = document.getElementById('seedRunStatus');
         if (!badge) return;
-        const s = String(status || '').toLowerCase();
         badge.textContent = status || 'Unknown';
-        badge.className = `badge ms-2 ${s === 'succeeded' ? 'au-badge-success' : s === 'failed' || s === 'cancelled' ? 'au-badge-danger' : 'au-badge-muted'}`;
+        badge.className = 'badge ms-2 ' + window.luStatusPills.forRun(status);
     }
 
     function clearSeedRunPoll() {
@@ -397,7 +388,7 @@
             try {
                 const page = await getJson(`/Automation/Runs/${encodeURIComponent(seedRunId)}/status`);
                 const s = page && page.run ? page.run : {};
-                setSeedRunStatusBadge(s.status || 'Unknown');
+                paintSeedRun(s.status || 'Unknown');
                 const started = s.startedAt || s.createdAt;
                 if (started) {
                     const parsed = new Date(started);
@@ -433,7 +424,7 @@
                 if (!Number.isNaN(parsed.getTime())) currentSeedRunStartedAt = parsed;
             }
             bindSeedRun(seedRun.runId, seedRun.runName || 'ApiHealthScenario');
-            setSeedRunStatusBadge(seedRun.status || 'Running');
+            paintSeedRun(seedRun.status || 'Running');
         } catch {
             // best effort
         }
@@ -454,7 +445,7 @@
         const placeholderText = 'N/A';
         const skipped = result.skipped === true;
         const passed = result.passed;
-        const badgeClass = skipped ? 'au-badge-skip' : (passed ? 'au-badge-success' : 'au-badge-danger');
+        const badgeClass = window.luStatusPills.forApiStep(!!skipped, skipped ? null : passed === true, !included);
         const badgeText  = skipped ? 'SKIP' : (passed ? 'PASS' : 'FAIL');
         const serviceName = getServiceNameForRow(row);
         const included = isIncludedService(serviceName);
@@ -463,10 +454,6 @@
         row.dataset.included = included ? 'true' : 'false';
         row.dataset.stale = included ? 'false' : 'true';
         row.querySelector('.cell-result').innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
-        if (!included) {
-            const badge = row.querySelector('.cell-result .badge');
-            if (badge) toHollowBadgeClass(badge);
-        }
         row.querySelector('.cell-status').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<code class="small">${result.actualStatusCode || placeholderText} / ${result.expectedStatusCode}</code>`;
         row.querySelector('.cell-reason').innerHTML = skipped
             ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
@@ -537,32 +524,11 @@
         return card && card.id && card.id.startsWith('svc-') ? card.id.substring(4) : '';
     }
 
-    function toSolidBadgeClass(badge) {
-        if (badge.classList.contains('border-success')) {
-            badge.className = 'badge au-badge-success';
-            return;
-        }
-        if (badge.classList.contains('border-danger')) {
-            badge.className = 'badge au-badge-danger';
-            return;
-        }
-        if (badge.classList.contains('border-secondary')) {
-            badge.className = 'badge au-badge-skip';
-        }
-    }
-
-    function toHollowBadgeClass(badge) {
-        if (badge.classList.contains('au-badge-success')) {
-            badge.className = 'badge border border-success text-success bg-transparent';
-            return;
-        }
-        if (badge.classList.contains('au-badge-danger')) {
-            badge.className = 'badge border border-danger text-danger bg-transparent';
-            return;
-        }
-        if (badge.classList.contains('au-badge-skip')) {
-            badge.className = 'badge border border-secondary text-muted bg-transparent';
-        }
+    function paintInclusion(badge, included) {
+        const tone = included
+            ? window.luStatusPills.solidFromClass(badge.className)
+            : window.luStatusPills.hollowFromClass(badge.className);
+        badge.className = 'badge ' + tone;
     }
 
     function setRowInclusion(row, included) {
@@ -571,8 +537,7 @@
         const badge = row.querySelector('.cell-result .badge');
         if (!badge) return;
         if (badge.classList.contains('au-badge-muted')) return;
-        if (included) toSolidBadgeClass(badge);
-        else toHollowBadgeClass(badge);
+        paintInclusion(badge, included);
     }
 
     function setServiceInclusion(serviceName, included) {
@@ -688,13 +653,7 @@
             const allSkipped = st > 0 && runnable === 0;
 
             badge.textContent = allSkipped ? 'SKIPPED' : `${sp}/${runnable}`;
-            const cls = sf > 0
-                ? (!included ? 'border border-danger text-danger bg-transparent' : 'au-badge-danger')
-                : allSkipped
-                    ? (!included ? 'border border-secondary text-muted bg-transparent' : 'au-badge-skip')
-                    : (sp === runnable && runnable > 0
-                        ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
-                        : (!included ? 'border border-secondary text-muted bg-transparent' : 'au-badge-muted'));
+            const cls = window.luStatusPills.forApiSummary(sf, allSkipped, sp, runnable, !included);
             badge.className = `badge svc-summary ms-2 ${cls}`;
         });
     }
@@ -938,11 +897,9 @@
 
             let html = '<div class="table-responsive"><table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th><th>Commit #</th><th>Build</th><th>Version</th><th>Product Version</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
-                const badge = r.skipped
-                    ? '<span class="badge au-badge-skip">SKIP</span>'
-                    : r.passed
-                        ? '<span class="badge au-badge-success">PASS</span>'
-                        : '<span class="badge au-badge-danger">FAIL</span>';
+                const historyTone = window.luStatusPills.forApiStep(!!r.skipped, r.passed === true, false);
+                const historyLabel = r.skipped ? 'SKIP' : (r.passed ? 'PASS' : 'FAIL');
+                const badge = `<span class="badge ${historyTone}">${historyLabel}</span>`;
                 const normalizedError = normalizeText(r.errorMessage);
                 const normalizedSkipReason = normalizeText(r.skipReason);
                 const error = r.skipped && normalizedSkipReason
@@ -1066,10 +1023,10 @@
 
     .row-running td { opacity: 0.5; }
     .row-error td { border-top: none; }
-    .row-detail td { border-top: none; background: #f8fafb; }
+    .row-detail td { border-top: none; background: #f8f8f8; }
     .row-detail pre { white-space: pre-wrap; word-wrap: break-word; word-break: break-all; }
     .row-detail code { word-break: break-all; }
-    .row-group-header td { background: #f8f9fa; font-size: .8rem; padding: .35rem .75rem; border-bottom: 1px solid #dee2e6; color: #555; letter-spacing: .02em; }
+    .row-group-header td { background: #f8f8f8; font-size: .8rem; padding: .35rem .75rem; border-bottom: 1px solid #e0e0e0; color: #555; letter-spacing: .02em; }
     .au-error-lines { white-space: pre-line; }
     tr[data-endpoint-key][data-informational="false"] { cursor: pointer; }
     tr[data-endpoint-key][data-informational="false"]:hover { background: rgba(0,0,0,.03) !important; }

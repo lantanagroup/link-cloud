@@ -4,9 +4,9 @@
     var runId = live.getAttribute("data-run-id");
     var logLines = [];
 
-    function setLive(text, badge) {
+    function setLive(text) {
         live.textContent = text;
-        live.className = "badge " + badge;
+        live.className = "badge " + window.luStatusPills.forConnection(text);
     }
 
     function text(id, value) {
@@ -25,21 +25,11 @@
         if (window.luPaintTimes) window.luPaintTimes(node);
     }
 
-    function statusPill(label) {
-        var value = (label || "").toLowerCase();
-        if (value === "succeeded") return "badge au-badge-success";
-        if (value === "failed") return "badge au-badge-danger";
-        if (value === "cancelled" || value === "canceled") return "badge au-badge-warning";
-        if (value === "running" || value === "queued" || value === "live window" || value === "finalizing" || value === "collecting")
-            return "badge au-badge-active";
-        return "badge au-badge-muted";
-    }
-
     function paintStatus(id, label) {
         var node = document.getElementById(id);
         if (!node) return;
         node.textContent = label || "Unknown";
-        node.className = statusPill(label);
+        node.className = "badge " + window.luStatusPills.forRun(label);
     }
 
     function apply(page) {
@@ -154,7 +144,7 @@
     }
 
     if (live.getAttribute("data-live") !== "yes" || typeof signalR === "undefined" || !runId) {
-        if (live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "au-badge-muted");
+        if (live.getAttribute("data-live") === "yes") setLive("Live updates unavailable");
         return;
     }
 
@@ -165,7 +155,7 @@
 
     function catchUp() {
         return connection.invoke("SubscribeRun", runId).then(function () {
-            setLive("Live", "au-badge-active");
+            setLive("Live");
             refresh();
         });
     }
@@ -173,11 +163,11 @@
     connection.on("status", refresh);
     connection.on("dashboardUpdate", refresh);
     connection.on("log", appendLog);
-    connection.onreconnecting(function () { setLive("Reconnecting", "au-badge-warning"); });
+    connection.onreconnecting(function () { setLive("Reconnecting"); });
     connection.onreconnected(function () {
-        catchUp().catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+        catchUp().catch(function () { setLive("Live updates unavailable"); });
     });
-    connection.onclose(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+    connection.onclose(function () { setLive("Live updates unavailable"); });
 
     // A status broadcast can land before this page subscribes, and later summary
     // writes do not always broadcast. Keep reading the stored run until it ends.
@@ -197,5 +187,5 @@
     refresh();
     connection.start()
         .then(catchUp)
-        .catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+        .catch(function () { setLive("Live updates unavailable"); });
 })();
