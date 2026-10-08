@@ -611,7 +611,12 @@ public sealed partial class KafkaOpsService
         var names = new List<string>();
         var listing = await LiveReassignmentsAsync(cancellationToken);
         if (!listing.Known)
-            throw new KafkaOpsRejectedException("Cannot confirm no reassignment is in flight.");
+        {
+            var detail = "Cannot confirm no reassignment is in flight.";
+            if (!_infra.Enabled)
+                detail += " Enable an infra provider to allow this.";
+            throw new KafkaOpsRejectedException(detail);
+        }
 
         foreach (var topic in listing.Topics)
         {
