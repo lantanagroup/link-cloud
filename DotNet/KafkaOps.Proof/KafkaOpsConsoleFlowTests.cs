@@ -16,12 +16,13 @@ namespace KafkaOps.Proof;
 
 public class KafkaOpsConsoleFlowTests
 {
-    [Fact]
+    [BrokerRequiredFact]
     public async Task TwoPeopleApproveAndExecute_AndThreeGroupsAreListed()
     {
-        var bootstrap = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
-        if (string.IsNullOrWhiteSpace(bootstrap))
-            return;
+        var configured = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
+        if (string.IsNullOrWhiteSpace(configured))
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is not set.");
+        var bootstrap = configured;
 
         var catalogTopics = new[]
         {
@@ -141,9 +142,18 @@ public class KafkaOpsConsoleFlowTests
 
             foreach (var topic in catalogTopics)
             {
-                var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(20));
-                var describedTopic = metadata.Topics.Single(item => item.Topic == topic);
-                Assert.Equal(4, describedTopic.Partitions.Count);
+                var deadline = DateTime.UtcNow.AddSeconds(30);
+                var count = 0;
+                while (true)
+                {
+                    var metadata = admin.GetMetadata(topic, TimeSpan.FromSeconds(10));
+                    count = metadata.Topics.Single(item => item.Topic == topic).Partitions.Count;
+                    if (count == 4 || DateTime.UtcNow >= deadline)
+                        break;
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+
+                Assert.Equal(4, count);
             }
         }
         finally
@@ -153,6 +163,15 @@ public class KafkaOpsConsoleFlowTests
                 consumer.Close();
                 consumer.Dispose();
             }
+        }
+    }
+
+    private sealed class BrokerRequiredFactAttribute : FactAttribute
+    {
+        public BrokerRequiredFactAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP")))
+                Skip = "KAFKA_BOOTSTRAP is not set.";
         }
     }
 

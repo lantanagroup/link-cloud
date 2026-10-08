@@ -48,6 +48,8 @@ public class ProofKitTests
             Assert.Contains("KAFKA_PROOF_ALLOW", text, StringComparison.Ordinal);
             Assert.Contains("down -v", text, StringComparison.Ordinal);
             Assert.Contains("--remove-orphans", text, StringComparison.Ordinal);
+            Assert.Contains("docker volume ls -q --filter \"label=com.docker.compose.project=", text, StringComparison.Ordinal);
+            Assert.Contains("docker volume rm", text, StringComparison.Ordinal);
             Assert.Contains("extra-broker", text, StringComparison.Ordinal);
             Assert.Contains("ops-proof-consumers", text, StringComparison.Ordinal);
             Assert.Contains("broker-3", text, StringComparison.Ordinal);
@@ -55,6 +57,10 @@ public class ProofKitTests
             Assert.Contains("KafkaOpsConsoleFlowTests", text, StringComparison.Ordinal);
             Assert.Contains("exit 2", text, StringComparison.Ordinal);
         }
+
+        var flow = File.ReadAllText(Path.Combine(root, "DotNet", "KafkaOps.Proof", "KafkaOpsConsoleFlowTests.cs"));
+        Assert.Contains("Skip = \"KAFKA_BOOTSTRAP is not set.\"", flow, StringComparison.Ordinal);
+        Assert.Contains("AddSeconds(30)", flow, StringComparison.Ordinal);
 
         var windows = File.ReadAllText(Path.Combine(root, "Scripts", "kafka-ops-proof", "run-proof.ps1"));
         Assert.DoesNotContain("Write-Error", windows, StringComparison.Ordinal);

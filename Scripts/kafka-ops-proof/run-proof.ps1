@@ -75,7 +75,13 @@ function Invoke-Broker {
 if ($Down) {
     & docker compose -p $project -f $compose -f $publishFile --profile extra-broker down -v --remove-orphans --timeout 30
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Output "Stopped project $project and removed its volumes, including the extra broker."
+    $left = @( & docker volume ls -q --filter "label=com.docker.compose.project=$project" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } )
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($left.Count -gt 0) {
+        & docker volume rm @left
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    Write-Output "Stopped project $project and removed its volumes, including volumes left by scaled consumers and the extra broker."
     exit 0
 }
 

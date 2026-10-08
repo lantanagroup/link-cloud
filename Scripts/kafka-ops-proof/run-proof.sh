@@ -40,7 +40,11 @@ for arg in "$@"; do
     --publish) publish_flag=1 ;;
     --down)
       docker compose -p "$project" -f "$compose" -f "$publish" --profile extra-broker down -v --remove-orphans --timeout 30
-      echo "Stopped project $project and removed its volumes, including the extra broker."
+      mapfile -t leftover < <(docker volume ls -q --filter "label=com.docker.compose.project=${project}")
+      if ((${#leftover[@]} > 0)); then
+        docker volume rm "${leftover[@]}"
+      fi
+      echo "Stopped project $project and removed its volumes, including volumes left by scaled consumers and the extra broker."
       exit 0
       ;;
     *) echo "Unknown argument: $arg" >&2; exit 2 ;;
