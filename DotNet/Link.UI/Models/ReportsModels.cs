@@ -133,6 +133,40 @@ public sealed class ValidationResultPage : ReportSectionPage
     public string? SummaryError { get; set; }
 }
 
+public sealed class ValidationPage : ReportSectionPage
+{
+    public long? IssueCount { get; set; }
+    public string? Severity { get; set; }
+    public string? SummaryError { get; set; }
+    public string? IssuesError { get; set; }
+    public bool TooLarge { get; set; }
+    public string? PrequalStatus { get; set; }
+    public IReadOnlyList<ValidationSeverityCount> SeverityCounts { get; set; } = [];
+    public IReadOnlyList<string> SeverityOptions { get; set; } = [];
+    public IReadOnlyList<string> CategoryOptions { get; set; } = [];
+    public ValidationIssueQuery Query { get; set; } = new();
+    public IReadOnlyList<ValidationIssueRow> Issues { get; set; } = [];
+    public PageBar Paging { get; set; } = new();
+}
+
+public sealed class ValidationSeverityCount
+{
+    public string Name { get; init; } = string.Empty;
+    public int Count { get; init; }
+}
+
+public sealed class ValidationIssueQuery
+{
+    public string? Text { get; init; }
+    public string? Severity { get; init; }
+    public string? Code { get; init; }
+    public string? Category { get; init; }
+    public string Sort { get; init; } = "severity";
+    public bool Descending { get; init; } = true;
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = ReportsRules.DefaultIssuePageSize;
+}
+
 public sealed class PrequalPage : ReportSectionPage
 {
     public string? Category { get; set; }

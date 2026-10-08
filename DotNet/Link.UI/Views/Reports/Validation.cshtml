@@ -1,10 +1,18 @@
-@model ValidationResultPage
+@model ValidationPage
 @{
     ViewData["Title"] = "Validation";
     ViewData["FacilityId"] = Model.FacilityId;
     ViewData["FacilityName"] = Model.FacilityName;
     ViewData["ReportId"] = Model.ReportId;
     ViewData["ReportSection"] = "validation";
+    var query = Model.Query;
+    var bar = Model.Paging;
+    var origin = ReturnUrlRules.FromQuery(Context.Request);
+    string Href(int? page = null, string? sort = null, string? dir = null) =>
+        ReportsRules.IssueHref(query, Model.FacilityId, Model.ReportId, origin, page, sort, dir);
+    string Mark(string column) => string.Equals(query.Sort, column, StringComparison.OrdinalIgnoreCase)
+        ? (query.Descending ? " ↓" : " ↑")
+        : "";
 }
 
 <div class="mb-3">
@@ -25,24 +33,196 @@ else if (Model.NotFound || Model.Report is null)
 }
 else
 {
-    <div class="au-card card">
-        <div class="card-header">Result summary</div>
+    <div class="au-card card mb-3">
+        <div class="card-header">Summary</div>
         <div class="card-body">
-            <p>This count is the validation summary. It does not download the issue list. Issue text is on the prequalification report.</p>
             @if (!string.IsNullOrWhiteSpace(Model.SummaryError))
             {
                 <div class="alert alert-warning">@Model.SummaryError</div>
             }
-            else
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Issues</dt>
+                <dd class="col-sm-8">@(Model.IssueCount?.ToString() ?? "—")</dd>
+                <dt class="col-sm-4">Minimum severity</dt>
+                <dd class="col-sm-8">
+                    @if (string.IsNullOrWhiteSpace(Model.Severity))
+                    {
+                        <span>—</span>
+                    }
+                    else
+                    {
+                        <span class="badge @StatusPills.ForSeverity(Model.Severity)">@Model.Severity</span>
+                    }
+                </dd>
+                <dt class="col-sm-4">Prequalification</dt>
+                <dd class="col-sm-8">
+                    @if (string.IsNullOrWhiteSpace(Model.PrequalStatus))
+                    {
+                        <span>—</span>
+                    }
+                    else
+                    {
+                        <span class="badge @StatusPills.ForSeverity(Model.PrequalStatus)">@Model.PrequalStatus</span>
+                    }
+                </dd>
+            </dl>
+            @if (Model.SeverityCounts.Count > 0)
             {
-                <dl class="row mb-0">
-                    <dt class="col-sm-3">Issues</dt>
-                    <dd class="col-sm-9">@(Model.IssueCount?.ToString() ?? "—")</dd>
-                    <dt class="col-sm-3">Minimum severity</dt>
-                    <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Severity) ? "—" : Model.Severity)</dd>
-                </dl>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    @foreach (var count in Model.SeverityCounts)
+                    {
+                        <span class="badge @StatusPills.ForSeverity(count.Name)">@count.Name @count.Count</span>
+                    }
+                </div>
             }
-            <a class="btn btn-au-neutral mt-3" asp-action="Prequal" asp-route-facilityId="@Model.FacilityId" asp-route-reportId="@Model.ReportId">Open prequalification</a>
+        </div>
+    </div>
+
+    <div class="au-card card">
+        <div class="card-header">Issues</div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end mb-3" data-au-filter="400" data-au-target="validationIssues" action="/Reports/Validation">
+                <input type="hidden" name="facilityId" value="@Model.FacilityId" />
+                <input type="hidden" name="reportId" value="@Model.ReportId" />
+                <input type="hidden" name="sort" value="@query.Sort" />
+                <input type="hidden" name="dir" value="@(query.Descending ? "desc" : "asc")" />
+                <input type="hidden" name="page" value="@bar.Page" />
+                <partial name="_ReturnField" />
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="issueSearch">Search</label>
+                    <input id="issueSearch" name="q" value="@query.Text" class="form-control" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="issueSeverity">Severity</label>
+                    <select id="issueSeverity" name="severity" class="form-select">
+                        @if (query.Severity is null)
+                        {
+                            <option value="" selected>Any</option>
+                        }
+                        else
+                        {
+                            <option value="">Any</option>
+                        }
+                        @foreach (var severity in Model.SeverityOptions)
+                        {
+                            if (string.Equals(severity, query.Severity, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@severity" selected>@severity</option>
+                            }
+                            else
+                            {
+                                <option value="@severity">@severity</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="issueCode">Code</label>
+                    <input id="issueCode" name="code" value="@query.Code" class="form-control" />
+                </div>
+                <div class="col-12 col-md-2">
+                    <label class="form-label" for="issueCategory">Category</label>
+                    <select id="issueCategory" name="category" class="form-select">
+                        @if (query.Category is null)
+                        {
+                            <option value="" selected>All categories</option>
+                        }
+                        else
+                        {
+                            <option value="">All categories</option>
+                        }
+                        @foreach (var category in Model.CategoryOptions)
+                        {
+                            if (string.Equals(category, query.Category, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@category" selected>@category</option>
+                            }
+                            else
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="issuePageSize">Page size</label>
+                    <select id="issuePageSize" name="pageSize" class="form-select">
+                        @foreach (var size in ReportsRules.IssuePageSizes)
+                        {
+                            if (query.PageSize == size)
+                            {
+                                <option value="@size" selected>@size</option>
+                            }
+                            else
+                            {
+                                <option value="@size">@size</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-au-neutral"><i class="bi bi-search me-1"></i>Search</button>
+                    <a class="btn btn-au-neutral" href="@ReportsRules.IssueHref(new ValidationIssueQuery(), Model.FacilityId, Model.ReportId, origin, 1, "severity", "desc")">Clear</a>
+                </div>
+            </form>
+
+            <div id="validationIssues">
+                @if (!string.IsNullOrWhiteSpace(Model.IssuesError))
+                {
+                    <div class="alert alert-warning mb-0">@Model.IssuesError</div>
+                }
+                else if (Model.Issues.Count == 0)
+                {
+                    <p class="au-empty mb-0">No validation issues match this search.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><a href="@Href(1, "patient", ReportsRules.NextIssueDir(query.Sort, query.Descending, "patient"))">Patient@(Mark("patient"))</a></th>
+                                    <th scope="col"><a href="@Href(1, "severity", ReportsRules.NextIssueDir(query.Sort, query.Descending, "severity"))">Severity@(Mark("severity"))</a></th>
+                                    <th scope="col"><a href="@Href(1, "code", ReportsRules.NextIssueDir(query.Sort, query.Descending, "code"))">Code@(Mark("code"))</a></th>
+                                    <th scope="col"><a href="@Href(1, "message", ReportsRules.NextIssueDir(query.Sort, query.Descending, "message"))">Message@(Mark("message"))</a></th>
+                                    <th scope="col"><a href="@Href(1, "location", ReportsRules.NextIssueDir(query.Sort, query.Descending, "location"))">Location@(Mark("location"))</a></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var issue in Model.Issues)
+                            {
+                                <tr>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = issue.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
+                                    <td><span class="badge @StatusPills.ForSeverity(issue.Severity)">@(string.IsNullOrWhiteSpace(issue.Severity) ? "—" : issue.Severity)</span></td>
+                                    <td>@issue.Code</td>
+                                    <td>@issue.Message</td>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = issue.Location, Compact = true, CopyLabel = "Copy location" })" /></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <nav class="d-flex flex-wrap align-items-center gap-2" aria-label="Issue pages">
+                        @if (bar.HasPrevious)
+                        {
+                            <a class="btn btn-sm btn-au-neutral" href="@Href(bar.Page - 1)">Previous</a>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-au-neutral" disabled>Previous</button>
+                        }
+                        <span class="small text-muted">Page @bar.Page of @(bar.TotalPages == 0 ? 1 : bar.TotalPages) (@bar.TotalCount)</span>
+                        @if (bar.HasNext)
+                        {
+                            <a class="btn btn-sm btn-au-neutral" href="@Href(bar.Page + 1)">Next</a>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-au-neutral" disabled>Next</button>
+                        }
+                    </nav>
+                }
+            </div>
         </div>
     </div>
 }

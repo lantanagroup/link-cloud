@@ -98,6 +98,76 @@ public class ReportsRulesTests
     }
 
     [Fact]
+    public void Issues_page_sort_and_filter_without_sending_the_whole_list()
+    {
+        var issues = new List<ValidationIssueRow>();
+        for (var index = 0; index < 2000; index++)
+        {
+            var severity = index % 3 == 0 ? "error" : index % 3 == 1 ? "warning" : "information";
+            issues.Add(new ValidationIssueRow
+            {
+                PatientId = "patient-" + index.ToString("0000"),
+                Severity = severity,
+                Code = index % 5 == 0 ? "code-a" : "code-b",
+                Message = index % 10 == 2 ? "clock skew " + index : "message " + index,
+                Location = "Observation/" + index,
+                Categories = index % 10 == 2
+                    ? [new ValidationCategoryRow { Title = "Timing", Acceptable = false }]
+                    : index % 4 == 0
+                        ? []
+                        : [new ValidationCategoryRow { Title = "Optional", Acceptable = true }]
+            });
+        }
+
+        var query = ReportsRules.NormalizeIssueQuery("clock", null, "code-b", "Timing", "patient", "asc", 1, 7);
+        query.PageSize.Should().Be(ReportsRules.DefaultIssuePageSize);
+        query.Sort.Should().Be("patient");
+        query.Descending.Should().BeFalse();
+
+        var slice = ReportsRules.SliceIssues(issues, query);
+        slice.Total.Should().Be(200);
+        slice.Page.Should().HaveCount(ReportsRules.DefaultIssuePageSize);
+        slice.Page.Should().OnlyContain(issue => issue.Message.Contains("clock", StringComparison.OrdinalIgnoreCase));
+        slice.Severities.Should().Equal("error", "warning", "information");
+        slice.Categories.Should().Contain("Timing");
+        ReportsRules.IssueStanding(issues).Should().Be("Unacceptable");
+
+        var first = ReportsRules.SliceIssues(issues, ReportsRules.NormalizeIssueQuery(null, "error", null, null, "severity", "desc", 1, 25));
+        first.Page.Should().HaveCount(25);
+        first.Page.Should().OnlyContain(issue => issue.Severity == "error");
+        first.Total.Should().Be(issues.Count(issue => issue.Severity == "error"));
+        var second = ReportsRules.SliceIssues(issues, ReportsRules.NormalizeIssueQuery(null, "error", null, null, "severity", "desc", 2, 25));
+        second.Page.Should().HaveCount(25);
+        second.Page[0].PatientId.Should().NotBe(first.Page[0].PatientId);
+
+        ReportsRules.IssueHref(query, "fac", "rep", "/Reports?status=Submitted", 2, "code", "desc")
+            .Should().Contain("returnUrl=%2FReports%3Fstatus%3DSubmitted")
+            .And.Contain("page=2")
+            .And.Contain("sort=code")
+            .And.Contain("dir=desc");
+    }
+
+    [Fact]
+    public void Validation_is_one_tab_and_prequalification_redirects()
+    {
+        var root = Root();
+        File.Exists(Path.Combine(root, "Views", "Reports", "Prequal.cshtml")).Should().BeFalse();
+        var nav = File.ReadAllText(Path.Combine(root, "Views", "Shared", "_ReportNav.cshtml"));
+        nav.Should().Contain(">Validation</a>");
+        nav.Should().NotContain("Prequalification");
+        nav.Should().Contain(">Acquisition log</a>");
+        var page = File.ReadAllText(Path.Combine(root, "Views", "Reports", "Validation.cshtml"));
+        page.Should().Contain("data-au-filter");
+        page.Should().Contain("All categories");
+        page.Should().Contain("id=\"validationIssues\"");
+        page.Should().NotContain("Open prequalification");
+        page.Should().NotContain("does not download the issue list");
+        var controller = File.ReadAllText(Path.Combine(root, "Controllers", "ReportsController.cs"));
+        controller.Should().Contain("LocalRedirect");
+        controller.Should().Contain("/Reports/Validation");
+    }
+
+    [Fact]
     public void Log_page_size_outside_the_allowed_set_uses_the_default()
     {
         ReportsRules.ClampLogPageSize(7).Should().Be(ReportsRules.DefaultLogPageSize);
@@ -117,6 +187,15 @@ public class ReportsRulesTests
             ReportsRules.ReportingLabel(status).Should().Be(expected);
         else
             label.Should().Be(expected);
+    }
+
+    private static string Root()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DotNet", "Link.UI", "Link.UI.csproj")))
+            dir = dir.Parent;
+        dir.Should().NotBeNull();
+        return Path.Combine(dir!.FullName, "DotNet", "Link.UI");
     }
 
     private static ValidationIssueRow Issue(string patient, ValidationCategoryRow? category = null) => new()
