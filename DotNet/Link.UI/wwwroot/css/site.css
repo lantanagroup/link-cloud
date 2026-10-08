@@ -107,6 +107,11 @@ pre code, a > code { color: inherit; }
   background-color: #111;
   border-color: #111;
 }
+.page-item.disabled .page-link {
+  color: var(--au-muted);
+  background-color: #fff;
+  border-color: #e0e0e0;
+}
 .progress-bar {
   background-color: #111;
 }
