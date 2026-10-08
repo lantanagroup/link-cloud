@@ -7,7 +7,7 @@
 
     var user = Context.Items[AdminBffUserService.HttpContextItemKey] as AdminBffUser
         ?? await UserService.GetCurrentUserAsync(Context.RequestAborted);
-    var adminShell = Ctrl("Tenants") || Ctrl("Reports") || Ctrl("Logs") || Ctrl("Configuration") || Ctrl("System");
+    var adminShell = Ctrl("Tenants") || Ctrl("Reports") || Ctrl("Logs") || Ctrl("Configuration") || Ctrl("System") || Ctrl("Operations");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -64,6 +64,9 @@
                 </a>
                 <a class="lu-nav-link @(Ctrl("System") ? "active" : "")" asp-controller="System" asp-action="Index">
                     <i class="bi bi-gear me-2"></i>System
+                </a>
+                <a class="lu-nav-link @(Ctrl("Operations") ? "active" : "")" asp-controller="Operations" asp-action="Index">
+                    <i class="bi bi-speedometer2 me-2"></i>Operations
                 </a>
                 @if (LinkUiFeatures.Value.AutomationEnabled)
                 {

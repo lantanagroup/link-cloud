@@ -1,0 +1,242 @@
+{
+  "topics": {
+    "cap": 48,
+    "readOnly": false,
+    "topics": [
+      {
+        "topic": "DataAcquisitionRequested",
+        "family": "DataAcquisitionRequested",
+        "keyClass": "Facility",
+        "keyShape": "{facilityId}",
+        "hardBlocked": true,
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "produceRatePerSecond": 0,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": ["DataAcquisition"]
+      },
+      {
+        "topic": "ResourcesAcquired",
+        "family": "ResourcesAcquired",
+        "keyClass": "Patient",
+        "keyShape": "{facilityId}:{patientId}",
+        "hardBlocked": false,
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "produceRatePerSecond": 4.5,
+        "totalLag": 12,
+        "maxReplicas": 3,
+        "groups": ["Normalization"]
+      },
+      {
+        "topic": "ReadyToAcquire",
+        "family": "ReadyToAcquire",
+        "keyClass": "Log",
+        "keyShape": "{logId}",
+        "hardBlocked": false,
+        "orderSensitive": false,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "produceRatePerSecond": 0,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": ["DataAcquisitionWorker"]
+      },
+      {
+        "topic": "ReportScheduled",
+        "family": "ReportScheduled",
+        "keyClass": "Facility",
+        "keyShape": "{facilityId}",
+        "hardBlocked": false,
+        "orderSensitive": true,
+        "partitions": 3,
+        "retryPartitions": 3,
+        "errorPartitions": 3,
+        "replicationFactor": 3,
+        "configs": { "retention.ms": "604800000", "cleanup.policy": "delete", "min.insync.replicas": "2" },
+        "produceRatePerSecond": 0,
+        "totalLag": 0,
+        "maxReplicas": 3,
+        "groups": ["QueryDispatch", "Report"]
+      }
+    ]
+  },
+  "groups": {
+    "groups": [
+      {
+        "groupId": "Normalization",
+        "state": "Stable",
+        "totalLag": 12,
+        "unownedPartitions": [],
+        "membersOnExpectedConfig": 1,
+        "members": [
+          {
+            "clientId": "normalization-host-a-c1",
+            "host": "normalization-0",
+            "assignment": ["ResourcesAcquired-0", "ResourcesAcquired-1", "ResourcesAcquired-2"],
+            "advertisesExpectedConfig": true
+          }
+        ],
+        "partitions": [
+          { "topic": "ResourcesAcquired", "partition": 0, "highWatermark": 40, "committed": 36, "lag": 4, "owned": true },
+          { "topic": "ResourcesAcquired", "partition": 1, "highWatermark": 40, "committed": 34, "lag": 6, "owned": true },
+          { "topic": "ResourcesAcquired", "partition": 2, "highWatermark": 40, "committed": 38, "lag": 2, "owned": true }
+        ]
+      },
+      {
+        "groupId": "Report",
+        "state": "Stable",
+        "totalLag": 0,
+        "unownedPartitions": [],
+        "membersOnExpectedConfig": 1,
+        "members": [
+          {
+            "clientId": "report-host-a-c1",
+            "host": "report-0",
+            "assignment": ["ReportScheduled-0", "ReportScheduled-1", "ReportScheduled-2"],
+            "advertisesExpectedConfig": true
+          }
+        ],
+        "partitions": [
+          { "topic": "ReportScheduled", "partition": 0, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true },
+          { "topic": "ReportScheduled", "partition": 1, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true },
+          { "topic": "ReportScheduled", "partition": 2, "highWatermark": 8, "committed": 8, "lag": 0, "owned": true }
+        ]
+      },
+      {
+        "groupId": "DataAcquisitionWorker",
+        "state": "Stable",
+        "totalLag": 0,
+        "unownedPartitions": [],
+        "membersOnExpectedConfig": 1,
+        "members": [
+          {
+            "clientId": "dataacquisition-host-a-c1",
+            "host": "dataacquisition-0",
+            "assignment": ["ReadyToAcquire-0", "ReadyToAcquire-1", "ReadyToAcquire-2"],
+            "advertisesExpectedConfig": true
+          }
+        ],
+        "partitions": [
+          { "topic": "ReadyToAcquire", "partition": 0, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true },
+          { "topic": "ReadyToAcquire", "partition": 1, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true },
+          { "topic": "ReadyToAcquire", "partition": 2, "highWatermark": 3, "committed": 3, "lag": 0, "owned": true }
+        ]
+      }
+    ]
+  },
+  "capabilities": {
+    "topics": [
+      { "topic": "DataAcquisitionRequested", "authorizedOperations": ["Describe", "Read"], "canAlterPartitions": false },
+      { "topic": "ResourcesAcquired", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true },
+      { "topic": "ReadyToAcquire", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true },
+      { "topic": "ReportScheduled", "authorizedOperations": ["Describe", "Read", "Alter"], "canAlterPartitions": true }
+    ]
+  },
+  "cluster": {
+    "brokerCount": 3,
+    "controllerId": 0,
+    "underReplicatedPartitions": 0,
+    "offlinePartitions": 0,
+    "isrShrunkPartitions": 0,
+    "logDirsAvailable": false,
+    "logDirDetail": "Log directory sizes are not available from this client. Emptiness is checked from replica and leader metadata.",
+    "brokers": [
+      { "id": 0, "host": "broker-0", "port": 9092, "rack": "a", "state": "up", "partitionCount": 4, "leaderCount": 2, "logDirBytes": -1 },
+      { "id": 1, "host": "broker-1", "port": 9092, "rack": "b", "state": "up", "partitionCount": 4, "leaderCount": 1, "logDirBytes": -1 },
+      { "id": 2, "host": "broker-2", "port": 9092, "rack": "c", "state": "up", "partitionCount": 4, "leaderCount": 1, "logDirBytes": -1 }
+    ],
+    "placements": [
+      { "topic": "ResourcesAcquired", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
+      { "topic": "ResourcesAcquired", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
+      { "topic": "ResourcesAcquired", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
+      { "topic": "ReadyToAcquire", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
+      { "topic": "ReadyToAcquire", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
+      { "topic": "ReadyToAcquire", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
+      { "topic": "ReportScheduled", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
+      { "topic": "ReportScheduled", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
+      { "topic": "ReportScheduled", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] },
+      { "topic": "DataAcquisitionRequested", "partition": 0, "leader": 0, "replicas": [0, 1, 2], "isr": [0, 1, 2] },
+      { "topic": "DataAcquisitionRequested", "partition": 1, "leader": 1, "replicas": [1, 2, 0], "isr": [1, 2, 0] },
+      { "topic": "DataAcquisitionRequested", "partition": 2, "leader": 2, "replicas": [2, 0, 1], "isr": [2, 0, 1] }
+    ]
+  },
+  "infra": {
+    "provider": "Disabled",
+    "enabled": false,
+    "detail": "Broker and replica changes are disabled. DevOps must enable an infrastructure provider before replicas or brokers can change."
+  },
+  "requests": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "kind": "PartitionIncrease",
+      "topic": "ReadyToAcquire",
+      "family": "ReadyToAcquire",
+      "retryTopic": "ReadyToAcquire-Retry",
+      "beforePartitions": 3,
+      "requestedPartitions": 6,
+      "maxReplicas": 6,
+      "keyClass": "Log",
+      "secondApproverRequired": false,
+      "reason": "Recorded log-topic increase",
+      "requester": "recorded",
+      "approver": "recorded",
+      "dryRunSummary": "The main topic, its retry topic, and its error topic increase together.",
+      "correlationId": "recorded-partition",
+      "status": "Approved",
+      "createdUtc": "2026-10-08T15:00:00Z",
+      "approvedUtc": "2026-10-08T15:00:00Z",
+      "groups": [
+        { "groupId": "DataAcquisitionWorker", "assignedPartitions": 3, "expectedPartitions": 6, "complete": false }
+      ]
+    },
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "kind": "ScaleReplicas",
+      "groupId": "Normalization",
+      "beforeReplicas": 1,
+      "desiredReplicas": 2,
+      "reason": "Recorded scale out",
+      "requester": "recorded",
+      "approver": "recorded",
+      "dryRunSummary": "The ceiling for Normalization is 3.",
+      "correlationId": "recorded-scale",
+      "status": "Converging",
+      "progress": "Waiting until the group is Stable and every partition is assigned.",
+      "createdUtc": "2026-10-08T15:05:00Z",
+      "approvedUtc": "2026-10-08T15:05:00Z",
+      "executedUtc": "2026-10-08T15:06:00Z",
+      "groups": [
+        { "groupId": "Normalization", "assignedPartitions": 3, "expectedPartitions": 3, "complete": true }
+      ]
+    },
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "kind": "DecommissionBroker",
+      "brokerId": 2,
+      "reason": "Recorded broker removal",
+      "requester": "recorded",
+      "approver": "recorded",
+      "secondApproverRequired": true,
+      "dryRunSummary": "Replicas move off broker 2. The broker is not stopped until it is empty and the cluster is green.",
+      "correlationId": "recorded-decommission",
+      "status": "Converging",
+      "progress": "Moving replicas. The broker is not stopped until it is empty and the cluster is green.",
+      "createdUtc": "2026-10-08T15:10:00Z",
+      "approvedUtc": "2026-10-08T15:10:00Z",
+      "executedUtc": "2026-10-08T15:11:00Z"
+    }
+  ]
+}

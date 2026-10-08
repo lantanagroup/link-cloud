@@ -372,7 +372,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             {
                 var meta = await _store.GetRunMetaAsync(runId);
                 if (meta is not null && meta.StartedAt != default)
-                    duration = Link.UI.Services.AutomationRules.FormatWallClock(DateTimeOffset.UtcNow - meta.StartedAt);
+                    duration = Link.UI.Services.RunDuration.FormatWallClock(DateTimeOffset.UtcNow - meta.StartedAt);
             }
             catch (Exception ex)
             {
