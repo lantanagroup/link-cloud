@@ -25,9 +25,10 @@ function Get-FeedTokenRepoRoot {
 
 function Update-FeedTokenSessionPath {
     if ($SkipUserPathUpdate) { return }
+    $prior = $env:Path
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $env:Path = "$userPath;$machinePath"
+    $env:Path = "$prior;$userPath;$machinePath"
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA 'AzureCLI\bin'),
         (Join-Path $env:LOCALAPPDATA 'Programs\Azure CLI\wbin'),
