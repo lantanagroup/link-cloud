@@ -392,9 +392,21 @@
         return url;
     }
 
+    function runInlineScripts(node) {
+        // A parsed fragment does not run its scripts. Recreate inline scripts in
+        // the swapped section so controls such as paste-from-clipboard bind.
+        Array.prototype.slice.call(node.querySelectorAll("script")).forEach(function (old) {
+            if (old.getAttribute("src")) return;
+            var script = document.createElement("script");
+            script.textContent = old.textContent;
+            old.replaceWith(script);
+        });
+    }
+
     function swapItem(url, itemId) {
         var item = document.getElementById(itemId);
         if (!item) return Promise.resolve(false);
+        var stayOpen = !!item.querySelector(".accordion-collapse.show");
         item.setAttribute("aria-busy", "true");
         return fetch(url, { headers: { "X-Requested-With": "fetch" }, credentials: "same-origin" })
             .then(function (res) {
@@ -406,6 +418,16 @@
                 var fresh = doc.getElementById(itemId);
                 if (!fresh) throw new Error("missing");
                 item.replaceWith(fresh);
+                if (stayOpen) {
+                    var body = fresh.querySelector(".accordion-collapse");
+                    var button = fresh.querySelector(".accordion-button");
+                    if (body) body.classList.add("show");
+                    if (button) {
+                        button.classList.remove("collapsed");
+                        button.setAttribute("aria-expanded", "true");
+                    }
+                }
+                runInlineScripts(fresh);
                 history.replaceState(null, "", url);
                 fresh.querySelectorAll("form[data-au-save]").forEach(classify);
                 decorateAll();
