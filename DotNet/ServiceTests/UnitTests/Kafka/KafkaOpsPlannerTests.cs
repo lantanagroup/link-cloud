@@ -239,6 +239,11 @@ public class KafkaOpsPlannerTests
         Assert.Contains("--list", process.Arguments, StringComparison.Ordinal);
         Assert.DoesNotContain("--verify", process.Arguments, StringComparison.Ordinal);
 
+        await provider.ReleaseRebalanceAsync("link-ops-0123456789abcdef0123456789abcdef", CancellationToken.None);
+        Assert.Contains("--verify", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("if [ -f /tmp/link-ops-0123456789abcdef0123456789abcdef.json ]", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("broker-0:9092", process.Arguments, StringComparison.Ordinal);
+
         process.Output = "Current partition reassignments:\nops-proof-log-0: replicas: 1,2,3. adding: 3.\nops-proof-log-1: replicas: 0,1,2.";
         var busy = await provider.ListInFlightReassignmentsAsync(CancellationToken.None);
         Assert.True(busy.Known);

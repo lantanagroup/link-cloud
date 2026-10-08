@@ -184,7 +184,17 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
     }
 
-    public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task ReleaseRebalanceAsync(string rebalanceName, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(rebalanceName))
+            return Task.CompletedTask;
+        KafkaRebalanceNames.Require(rebalanceName);
+        RequireToken(_options.BrokerService, "service");
+        var file = "/tmp/" + rebalanceName + ".json";
+        var script = "if [ -f " + file + " ]; then /opt/kafka/bin/kafka-reassign-partitions.sh --bootstrap-server " +
+                     _options.BrokerService + ":9092 --reassignment-json-file " + file + " --verify; fi";
+        return ComposeAsync(cancellationToken, null, "exec", "-T", _options.BrokerService, "bash", "-lc", script);
+    }
 
     public async Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
     {
