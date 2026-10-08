@@ -96,8 +96,10 @@
                                 <partial name="_AutomationBadge" model="tenant.AutomationRunId" />
                             </td>
                             <td>
-                                <a asp-action="View" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@tenant.DisplayName</a>
-                                <div class="small"><a asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Configuration</a></div>
+                                <span class="d-inline-flex align-items-center gap-2">
+                                    <a asp-action="View" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@tenant.DisplayName</a>
+                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Facility" asp-route-id="@tenant.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i></a>
+                                </span>
                             </td>
                             <td>
                                 @if (tenant.IsDeleted)

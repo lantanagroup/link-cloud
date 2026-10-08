@@ -1,4 +1,5 @@
 using System.Globalization;
+using Automation.UI.Models.ApiHealth;
 using LantanaGroup.Link.Shared.Application.Models;
 using Link.UI.Models;
 using Microsoft.AspNetCore.Http;
@@ -18,6 +19,8 @@ public static class HomeOverviewRules
     public const double SlowApiMs = 2000;
     public const int IssueLimit = 8;
     public const int ChipLimit = 8;
+
+    public const string ApiHealthScenarioName = "ApiHealthScenario";
     public static readonly TimeSpan CardBudget = TimeSpan.FromSeconds(6);
 
     public static readonly string[] ErrorLogStatuses = ["Failed", "MaxRetriesReached"];
@@ -286,6 +289,65 @@ public static class HomeOverviewRules
         var at = string.IsNullOrWhiteSpace(when) ? "" : " · " + when.Trim();
         return "Latest API health run: " + scope + at;
     }
+
+    public sealed record ApiHealthSighting(Guid RunId, string Mode, string? Service, DateTimeOffset At);
+
+    /// <summary>
+    /// The dashboard chip follows the newest API health activity. A page start,
+    /// an execution that has finished, and an ApiHealthScenario automation run
+    /// are the same kind of run.
+    /// </summary>
+    public static ApiHealthSighting? ChooseLatestApiHealth(
+        ApiHealthLatestRunContext? stored,
+        ApiHealthExecutionRunStatus? execution,
+        AutomationRunRow? scenario)
+    {
+        ApiHealthSighting? best = null;
+
+        void Consider(Guid id, string? mode, string? service, DateTimeOffset at)
+        {
+            if (id == Guid.Empty || at == default)
+                return;
+
+            if (best is null || at > best.At)
+                best = new ApiHealthSighting(id, NormalizeApiMode(mode), service, at);
+        }
+
+        if (stored is not null)
+            Consider(stored.RunId, stored.RunMode, stored.ServiceName, stored.StartedAt);
+
+        if (execution is not null)
+        {
+            var at = execution.StartedAt;
+            if (execution.FinishedAt is DateTimeOffset finished && finished > at)
+                at = finished;
+            Consider(execution.RunId, execution.RunMode, execution.ServiceName, at);
+        }
+
+        if (scenario is not null)
+        {
+            var at = scenario.CreatedAt;
+            if (scenario.StartedAt is DateTimeOffset started && started > at)
+                at = started;
+            if (scenario.FinishedAt is DateTimeOffset finished && finished > at)
+                at = finished;
+
+            var mode = "All";
+            string? service = null;
+            if (execution is not null && execution.SeedRunId == scenario.RunId)
+            {
+                mode = execution.RunMode;
+                service = execution.ServiceName;
+            }
+
+            Consider(scenario.RunId, mode, service, at);
+        }
+
+        return best;
+    }
+
+    private static string NormalizeApiMode(string? mode) =>
+        string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "Single";
 
     public static RunCard Runs(bool reachable, string? message, int activeCount, IEnumerable<AutomationRunRow>? active, IEnumerable<AutomationRunRow>? recent)
     {

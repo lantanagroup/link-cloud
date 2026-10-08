@@ -83,6 +83,72 @@ public class AutomationRulesTests
         AutomationRules.FormatDuration(90).Should().Be("1:30");
     }
 
+    [Fact]
+    public void Finished_run_without_a_stored_span_still_has_a_duration()
+    {
+        var started = new DateTimeOffset(2026, 10, 7, 20, 0, 0, TimeSpan.Zero);
+        var finished = started.AddSeconds(60);
+        var row = AutomationRules.ToRow(
+            Guid.Parse("e4174381-bde8-4668-af6f-5135d43b2753"),
+            "Adhoc Report Test",
+            "AdhocReportTest",
+            "Succeeded",
+            1,
+            1,
+            false,
+            started,
+            started,
+            finished,
+            null,
+            "  ",
+            null,
+            false,
+            null,
+            null);
+
+        row.Duration.Should().Be("1:00");
+
+        var running = AutomationRules.ToRow(
+            Guid.NewGuid(),
+            "Sample",
+            "Custom",
+            "Running",
+            1,
+            1,
+            false,
+            started,
+            started,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null);
+        running.Duration.Should().BeNull();
+
+        var stored = AutomationRules.ToRow(
+            Guid.NewGuid(),
+            "Sample",
+            "Custom",
+            "Failed",
+            1,
+            1,
+            false,
+            started,
+            started,
+            finished,
+            null,
+            "2m 5s",
+            null,
+            false,
+            null,
+            null);
+        stored.Duration.Should().Be("2m 5s");
+
+        AutomationRules.ResolveDuration(null, "Cancelled", started, started, started).Should().Be("0:00");
+    }
+
     private static Link.UI.Models.AutomationRunRow Row(string status, DateTimeOffset created, DateTimeOffset? finished) =>
         AutomationRules.ToRow(
             Guid.NewGuid(),

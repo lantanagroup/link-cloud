@@ -1594,7 +1594,7 @@
 
             importedUploadStatus.style.display = '';
             importedUploadStatus.textContent = (isBusy ? '⏳ ' : '') + message;
-            importedUploadStatus.className = isBusy ? 'small text-primary' : 'small text-muted';
+            importedUploadStatus.className = isBusy ? 'small text-dark' : 'small text-muted';
         }
 
         function hasImportedRows() {
@@ -1834,7 +1834,7 @@
             }
 
             var sourceLabel = row.source === 'Bundle'
-                ? '<span class="badge bg-info text-dark"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
+                ? '<span class="badge au-badge-muted"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
                 : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
             var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
             var detectBtn = '<button type="button" class="btn btn-sm btn-au-neutral btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';

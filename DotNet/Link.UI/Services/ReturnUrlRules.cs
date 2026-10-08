@@ -47,13 +47,32 @@ public static class ReturnUrlRules
     }
 
     /// <summary>
+    /// The page a person can open again. Refresh fragments collapse onto that page.
+    /// </summary>
+    public static string CanonicalPath(string? path)
+    {
+        var value = string.IsNullOrWhiteSpace(path) ? "/" : path.Trim();
+        if (value.Length == 0 || value[0] != '/')
+            value = "/" + value.TrimStart('/');
+
+        var bare = value.Split('?', 2)[0].TrimEnd('/');
+        if (bare.Length == 0)
+            bare = "/";
+
+        var key = bare.ToLowerInvariant();
+        if (key is "/" or "/home" or "/home/index" or "/home/overview" or "/home/overview/data" or "/dashboard")
+            return "/";
+        if (key is "/automation/recent" or "/automation/data")
+            return "/Automation";
+        return bare;
+    }
+
+    /// <summary>
     /// The current page, including its query, so a detail link can come back to this search.
     /// </summary>
     public static string Here(HttpRequest request)
     {
-        var path = request.Path.HasValue ? request.Path.Value! : "/";
-        if (string.IsNullOrEmpty(path))
-            path = "/";
+        var path = CanonicalPath(request.Path.HasValue ? request.Path.Value : "/");
 
         if (request.Query.Count == 0)
             return path;
@@ -102,7 +121,7 @@ public static class ReturnUrlRules
         if (path.Length == 0)
             path = "/";
 
-        if (path is "/" or "/home" or "/home/index" or "/dashboard")
+        if (path is "/" or "/home" or "/home/index" or "/home/overview" or "/home/overview/data" or "/dashboard")
             return "Back to dashboard";
         if (path is "/reports" or "/reports/index" or "/reports/generate")
             return "Back to reports";
@@ -118,7 +137,7 @@ public static class ReturnUrlRules
             return "Back to report";
         if (path.StartsWith("/tenants/", StringComparison.Ordinal))
             return "Back to facility";
-        if (path is "/automation" or "/automation/index")
+        if (path is "/automation" or "/automation/index" or "/automation/recent" or "/automation/data")
             return "Back to runs";
         if (path.StartsWith("/automation/run", StringComparison.Ordinal))
             return "Back to run";

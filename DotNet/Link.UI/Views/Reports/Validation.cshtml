@@ -81,7 +81,7 @@ else
     <div class="au-card card">
         <div class="card-header">Issues</div>
         <div class="card-body">
-            <form method="get" class="row g-2 align-items-end mb-3" data-au-filter="400" data-au-target="validationIssues" action="/Reports/Validation">
+            <form method="get" class="row g-2 align-items-end mb-3 lu-issue-filters" data-au-filter="400" data-au-target="validationIssues" action="/Reports/Validation">
                 <input type="hidden" name="facilityId" value="@Model.FacilityId" />
                 <input type="hidden" name="reportId" value="@Model.ReportId" />
                 <input type="hidden" name="sort" value="@query.Sort" />
@@ -120,7 +120,7 @@ else
                     <label class="form-label" for="issueCode">Code</label>
                     <input id="issueCode" name="code" value="@query.Code" class="form-control" />
                 </div>
-                <div class="col-12 col-md-2">
+                <div class="col-12 col-md-2 col-category">
                     <label class="form-label" for="issueCategory">Category</label>
                     <select id="issueCategory" name="category" class="form-select">
                         @if (query.Category is null)

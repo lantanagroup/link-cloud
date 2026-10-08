@@ -618,7 +618,7 @@
         card.querySelectorAll(runnableRowSelector).forEach(row => {
             if (row.dataset.included === 'false') return;
             row.classList.add('row-running');
-            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
+            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-dark"></span>';
         });
     }
 
@@ -787,7 +787,7 @@
                         applyLatestRunContext('All', null);
                         document.querySelectorAll(runnableRowSelector).forEach(row => {
                             row.classList.add('row-running');
-                            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
+                            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-dark"></span>';
                         });
                     }
                 }

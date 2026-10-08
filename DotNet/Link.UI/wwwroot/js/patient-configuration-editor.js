@@ -636,7 +636,7 @@
             var el = $(id);
             if (!el) return;
             el.textContent = on ? 'From baseline' : 'Empty';
-            el.className = 'pc-section-badge ' + (on ? 'bg-primary text-white' : 'bg-light text-muted border');
+            el.className = 'pc-section-badge ' + (on ? 'au-badge-active' : 'bg-light text-muted border');
         }
         setBadge('pcBadgeDemo', sectionHasValue(['PcGender', 'PcMinAge', 'PcMaxAge']));
         setBadge('pcBadgeEnc', sectionHasValue(['PcEncClass', 'PcEncStatus', 'PcStayPattern', 'PcDischarge', 'PcHospitalization']));
@@ -651,12 +651,12 @@
         if (mixBadge) {
             if (exact && anyCount) {
                 mixBadge.textContent = 'Exact counts';
-                mixBadge.className = 'pc-section-badge bg-primary text-white';
+                mixBadge.className = 'pc-section-badge au-badge-active';
             } else {
                 var min = val('PcResMin') || '50';
                 var max = val('PcResMax') || min;
                 mixBadge.textContent = min + '–' + max;
-                mixBadge.className = 'pc-section-badge bg-primary text-white';
+                mixBadge.className = 'pc-section-badge au-badge-active';
             }
         }
         refreshPredicted();

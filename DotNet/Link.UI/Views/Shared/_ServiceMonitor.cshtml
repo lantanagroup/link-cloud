@@ -2,6 +2,7 @@
 <div class="au-pulse @(Model.Compact ? "au-pulse-compact mb-3" : "mb-4")"
      id="liveUtilizationCard"
      data-url="@Model.PollUrl"
+     data-health-url="@Model.HealthUrl"
      data-compact="@(Model.Compact ? "yes" : null)"
      title="CPU is percent of this machine. Polls Prometheus about every five seconds while this page is open. Not saved.">
     <div class="au-pulse-head">

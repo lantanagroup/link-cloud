@@ -14,6 +14,23 @@
         if (node) node.textContent = value || "—";
     }
 
+    function statusPill(label) {
+        var value = (label || "").toLowerCase();
+        if (value === "succeeded") return "badge au-badge-success";
+        if (value === "failed") return "badge au-badge-danger";
+        if (value === "cancelled" || value === "canceled") return "badge au-badge-warning";
+        if (value === "running" || value === "queued" || value === "live window" || value === "finalizing" || value === "collecting")
+            return "badge au-badge-active";
+        return "badge au-badge-muted";
+    }
+
+    function paintStatus(id, label) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = label || "Unknown";
+        node.className = statusPill(label);
+    }
+
     function apply(page) {
         if (!page) return;
         var message = document.getElementById("runMessage");
@@ -32,9 +49,8 @@
         if (message) message.classList.add("d-none");
         var title = document.getElementById("runTitle");
         if (title) title.textContent = run.runName || "Run";
-        text("runStatus", run.statusLabel);
-        var statusNode = document.getElementById("status");
-        if (statusNode && run.statusLabel) statusNode.textContent = run.statusLabel;
+        paintStatus("runStatus", run.statusLabel);
+        paintStatus("status", run.statusLabel);
         text("runName", run.runName);
         text("facilityId", run.facilityId);
         text("scheduleFacilityId", run.facilityId);
@@ -56,36 +72,23 @@
         text("runDuration", run.duration);
         text("runTemplates", run.templateVersion ? "v" + run.templateVersion : "");
 
-        var facility = document.getElementById("runFacility");
-        if (facility) {
-            facility.replaceChildren();
-            if (run.facilityId) {
-                var link = document.createElement("a");
-                link.href = "/Tenants/Facility/" + encodeURIComponent(run.facilityId);
-                link.textContent = run.facilityId;
-                facility.append(link);
-                if (run.throwawayFacility) {
-                    var badge = document.createElement("span");
-                    badge.className = "badge bg-secondary ms-1";
-                    badge.textContent = "Automation facility";
-                    facility.append(badge);
-                }
-            } else {
-                facility.textContent = "—";
-            }
+        var facilityValue = document.getElementById("facilityValue");
+        if (facilityValue) {
+            facilityValue.textContent = run.facilityId || "—";
+            if (run.facilityId) facilityValue.setAttribute("title", run.facilityId);
+            if (facilityValue.tagName === "A" && run.facilityId)
+                facilityValue.setAttribute("href", "/Tenants/Facility/" + encodeURIComponent(run.facilityId));
+            var facilityBadge = document.getElementById("runFacilityBadge");
+            if (facilityBadge) facilityBadge.classList.toggle("d-none", !run.throwawayFacility);
         }
 
-        var report = document.getElementById("runReport");
-        if (report) {
-            report.replaceChildren();
-            if (run.reportId) {
-                var reportLink = document.createElement("a");
+        var reportValue = document.getElementById("reportValue");
+        if (reportValue) {
+            reportValue.textContent = run.reportId || "—";
+            if (run.reportId) reportValue.setAttribute("title", run.reportId);
+            if (reportValue.tagName === "A" && run.reportId) {
                 var facilityQuery = run.facilityId ? "?facilityId=" + encodeURIComponent(run.facilityId) : "";
-                reportLink.href = "/Reports" + facilityQuery;
-                reportLink.textContent = run.reportId;
-                report.append(reportLink);
-            } else {
-                report.textContent = "—";
+                reportValue.setAttribute("href", "/Reports" + facilityQuery);
             }
         }
 
