@@ -282,7 +282,9 @@ function Test-LinkCloudComposeCommand {
 function global:docker {
     $hooks = $global:LinkCloudFeedTokenHooks
     $skipReload = $hooks -and $hooks.ContainsKey('SkipReload') -and $hooks['SkipReload']
-    if (-not $skipReload) {
+    $composeCommand = Test-LinkCloudComposeCommand -Arguments @($args)
+    # Only compose reloads the checkout script. Other docker commands must not run it.
+    if (-not $skipReload -and $composeCommand) {
         $reloadRoot = Find-LinkCloudRepoRoot
         if ($reloadRoot) {
             $repoProfile = Join-Path $reloadRoot 'Scripts\docker-compose.feed-token-profile.ps1'

@@ -177,7 +177,8 @@ compose() {
 
 docker() {
   local root repo_profile current repo_full
-  if [ -z "${LINK_CLOUD_SKIP_RELOAD:-}" ]; then
+  # Only compose reloads the checkout script. Other docker commands must not run it.
+  if [ -z "${LINK_CLOUD_SKIP_RELOAD:-}" ] && link_cloud_is_compose "$@"; then
     root=$(find_link_cloud_root || true)
     if [ -n "$root" ]; then
       repo_profile="$root/Scripts/docker-compose.feed-token-profile.sh"

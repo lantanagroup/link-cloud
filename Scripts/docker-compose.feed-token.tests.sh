@@ -336,8 +336,42 @@ else
   pass 'rejected temp file does not print the token'
 fi
 
+saved_skip="${LINK_CLOUD_SKIP_RELOAD:-}"
+unset LINK_CLOUD_SKIP_RELOAD
+reload_root="$repo/reload-root"
+mkdir -p "$reload_root/Scripts"
+: > "$reload_root/docker-compose.yml"
+: > "$reload_root/Scripts/docker-compose.feed-token.ps1"
+printf '%s\n' 'touch "$LINK_CLOUD_RELOAD_MARK"' | cat - "$root/docker-compose.feed-token-profile.sh" > "$reload_root/Scripts/docker-compose.feed-token-profile.sh"
+export LINK_CLOUD_REPO_ROOT_OVERRIDE="$reload_root"
+export LINK_CLOUD_RELOAD_MARK="$reload_root/sourced"
+rm -f "$LINK_CLOUD_RELOAD_MARK"
+export LINK_CLOUD_MOCK_EXIT=0
+set +e
+docker version >"$reload_root/out.txt" 2>"$reload_root/err.txt"
+version_code=$?
+set -e
+if [ "$version_code" -eq 0 ] && [ ! -f "$LINK_CLOUD_RELOAD_MARK" ]; then
+  pass 'non-compose docker does not load the checkout script'
+else
+  fail 'non-compose docker does not load the checkout script'
+fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1700003600' > "$reload_root/.azure-artifacts.env"
+rm -f "$LINK_CLOUD_RELOAD_MARK"
+export LINK_CLOUD_MOCK_EXIT=0
+set +e
+docker compose version >"$reload_root/out2.txt" 2>"$reload_root/err2.txt"
+compose_code=$?
+set -e
+if [ "$compose_code" -eq 0 ] && [ -f "$LINK_CLOUD_RELOAD_MARK" ]; then
+  pass 'compose loads the checkout script'
+else
+  fail 'compose loads the checkout script'
+fi
+export LINK_CLOUD_SKIP_RELOAD="$saved_skip"
+
 # Output files must not contain the sentinel.
-if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" >/dev/null 2>&1; then
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" "$reload_root/out.txt" "$reload_root/err.txt" "$reload_root/out2.txt" "$reload_root/err2.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
 else
   pass 'bash test output does not contain the token'

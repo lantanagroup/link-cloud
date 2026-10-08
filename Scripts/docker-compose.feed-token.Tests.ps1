@@ -228,13 +228,25 @@ try {
     $copyRoot = Join-Path $repo 'reload-copy'
     $copyScripts = Join-Path $copyRoot 'Scripts'
     New-Item -ItemType Directory -Path $copyScripts | Out-Null
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1') -Destination (Join-Path $copyScripts 'docker-compose.feed-token-profile.ps1')
+    $copyProfile = Join-Path $copyScripts 'docker-compose.feed-token-profile.ps1'
+    $copyBody = "`$global:LinkCloudFeedTokenHooks['Reloaded'] = `$true`r`n" + [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1'))
+    [System.IO.File]::WriteAllText($copyProfile, $copyBody)
     Reset-Hooks
     $global:LinkCloudFeedTokenHooks['SkipReload'] = $false
     $global:LinkCloudFeedTokenHooks['RepoRoot'] = $copyRoot
+    $global:LinkCloudFeedTokenHooks['Reloaded'] = $false
     Set-DockerHook -ExitCode 0
     'hello' | docker exec -i db
-    Write-Result ($global:LinkCloudFeedTokenHooks['Stdin'] -eq 'hello') 'docker wrapper forwards pipeline input through reload'
+    Write-Result ((-not $global:LinkCloudFeedTokenHooks['Reloaded']) -and ($global:LinkCloudFeedTokenHooks['Stdin'] -eq 'hello')) 'non-compose docker does not load the checkout script'
+    Write-TokenFile -Repo $copyRoot -Token $sentinel -Expires ($now + 3600)
+    Reset-Hooks
+    $global:LinkCloudFeedTokenHooks['SkipReload'] = $false
+    $global:LinkCloudFeedTokenHooks['RepoRoot'] = $copyRoot
+    $global:LinkCloudFeedTokenHooks['NowEpoch'] = $now
+    $global:LinkCloudFeedTokenHooks['Reloaded'] = $false
+    Set-DockerHook -ExitCode 0
+    docker compose version
+    Write-Result ($global:LinkCloudFeedTokenHooks['Reloaded'] -eq $true) 'compose loads the checkout script'
     $global:LinkCloudFeedTokenHooks['SkipReload'] = $true
 
     # Message text matches the image restore helper.
