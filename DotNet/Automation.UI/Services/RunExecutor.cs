@@ -471,7 +471,7 @@ internal sealed class RunExecutor
                 output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             var facilityClient = services.GetRequiredService<IFacilityServiceClient>();
@@ -614,7 +614,7 @@ internal sealed class RunExecutor
                         $"Facility '{facilityId}' could not be read after applying the DMRP-derived schedule.");
                 }
 
-                await _snapshotStore.SetDomainAsync(
+                await _orchestrator.WriteDomainAsync(
                     state.RunId,
                     "dmrp",
                     new
@@ -881,7 +881,7 @@ internal sealed class RunExecutor
 
                 // Persist the submitted-patient override before validators run so the
                 // dashboard reflects prediction scope even when a later validator fails.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -982,7 +982,7 @@ internal sealed class RunExecutor
             try
             {
                 var absSnapshot = AbsUploadSnapshot.Build(internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -996,7 +996,7 @@ internal sealed class RunExecutor
             try
             {
                 var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalPackage);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
@@ -1016,7 +1016,7 @@ internal sealed class RunExecutor
             // localise a discrepancy. Results are persisted after each validator so partial results
             // stay visible in the dashboard even when a later validator fails.
             var validatorRunner = new ValidatorRunner((results, ct) =>
-                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
+                _orchestrator.WriteDomainAsync(state.RunId, "validatorResults", results, ct));
 
             Task RunValidator(string name, Func<Task> action) =>
                 validatorRunner.RunAsync(name, action, cancellationToken);
@@ -1043,7 +1043,7 @@ internal sealed class RunExecutor
             // snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
+                await _orchestrator.WriteDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             if (isLiveSimulation)
@@ -1109,33 +1109,38 @@ internal sealed class RunExecutor
             {
                 var logs = new List<string>();
 
+                // Each Loki call stamps its own end time. Refresh coverage here so a
+                // later resource type does not start after the run began.
+                TimeSpan LookbackForThisRequest() =>
+                    LokiEvidenceQuery.LookbackForRequest(
+                        lookback,
+                        LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
+
+                Task<List<string>> QueryAsync(IReadOnlyList<string> filters, int limit, int maxPages) =>
+                    lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        LookbackForThisRequest(),
+                        additionalContainsFilters: filters,
+                        limit: limit,
+                        maxPages: maxPages,
+                        cancellationToken: queryToken);
+
                 if (evidenceRequiredResourceTypes.Count > 0)
                 {
                     foreach (var resourceType in evidenceRequiredResourceTypes)
                     {
                         queryToken.ThrowIfCancellationRequested();
                         var resourceTypeFilter = LokiEvidenceQuery.ResourceTypeContainsFilter(resourceType);
-                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        var logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 5000, maxPages: 20);
 
                         if (logsForResourceType.Count == 0)
                         {
                             queryToken.ThrowIfCancellationRequested();
                             output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType} returned no lines. Retrying with a smaller page size.");
-                            logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
-                                LokiScraper.Components.Normalization,
-                                normalizationSummaryMarker,
-                                lookback,
-                                additionalContainsFilters: [.. runScopeFilters, resourceTypeFilter],
-                                limit: 500,
-                                maxPages: 40,
-                                cancellationToken: queryToken);
+                            logsForResourceType = await QueryAsync([.. runScopeFilters, resourceTypeFilter], limit: 500, maxPages: 40);
                         }
 
                         output.WriteLine($"[Normalization Suite] Loki evidence for ResourceType={resourceType}: {logsForResourceType.Count} line(s).");
@@ -1146,27 +1151,13 @@ internal sealed class RunExecutor
                     {
                         output.WriteLine("[Normalization Suite] Per-type Loki filters returned 0 lines; retrying without ResourceType filter.");
                         queryToken.ThrowIfCancellationRequested();
-                        logs = await lokiScraper.QueryServiceLogsAsync(
-                            LokiScraper.Components.Normalization,
-                            normalizationSummaryMarker,
-                            lookback,
-                            additionalContainsFilters: runScopeFilters,
-                            limit: 5000,
-                            maxPages: 20,
-                            cancellationToken: queryToken);
+                        logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                     }
                 }
                 else
                 {
                     queryToken.ThrowIfCancellationRequested();
-                    logs = await lokiScraper.QueryServiceLogsAsync(
-                        LokiScraper.Components.Normalization,
-                        normalizationSummaryMarker,
-                        lookback,
-                        additionalContainsFilters: runScopeFilters,
-                        limit: 5000,
-                        maxPages: 20,
-                        cancellationToken: queryToken);
+                    logs = await QueryAsync(runScopeFilters, limit: 5000, maxPages: 20);
                 }
 
                 return logs
@@ -1176,46 +1167,18 @@ internal sealed class RunExecutor
 
             async Task PersistNormalizationEvidenceAsync(NormalizationEvidenceSnapshot evidence, CancellationToken ct)
             {
-                var plan = NormalizationDiagnosticsWriter.PlanPersistence(evidence);
-                for (var index = 0; index < plan.Chunks.Count; index++)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    try
-                    {
-                        await _snapshotStore.SetDomainAsync(
-                            state.RunId,
-                            NormalizationEvidenceSnapshot.ChunkDomain(index + 1),
-                            plan.Chunks[index],
-                            ct);
-                    }
-                    catch (Exception ex) when (!ct.IsCancellationRequested)
-                    {
-                        output.WriteLine(
-                            $"[Normalization Suite] Failed to persist evidence chunk {index + 1}: {ex.Message}");
-                        output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
-                        return;
-                    }
-                }
-
                 try
                 {
-                    await _snapshotStore.SetDomainAsync(
+                    await _orchestrator.WriteDomainAsync(
                         state.RunId,
                         NormalizationEvidenceSnapshot.Domain,
-                        plan.Header,
+                        RunHistorySlim.SlimNormalizationEvidence(evidence),
                         ct);
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     output.WriteLine($"[Normalization Suite] Failed to persist evidence snapshot: {ex.Message}");
                     output.WriteLine("[Normalization Suite] Suite validation continues with the collected Loki lines. The snapshot write does not fail the suite.");
-                    return;
-                }
-
-                if (plan.Chunks.Count > 0)
-                {
-                    output.WriteLine(
-                        $"[Normalization Suite] Evidence snapshot is stored as {plan.Chunks.Count} chunk(s) in the snapshot store. Operation counts stay on the header.");
                 }
             }
 
@@ -1238,7 +1201,10 @@ internal sealed class RunExecutor
                         (lookback, queryToken) => QueryNormalizationSummaryLogsAsync(lookback, queryToken),
                         (delay, ct) => Task.Delay(delay, ct),
                         output,
-                        cancellationToken);
+                        cancellationToken,
+                        coverageNow: () => LokiEvidenceQuery.CoverageSince(
+                            state.StartedAt ?? state.CreatedAt,
+                            DateTimeOffset.UtcNow));
                     output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
                     var normalizationEvidence = NormalizationDiagnosticsWriter.Build(
@@ -1931,7 +1897,8 @@ internal sealed class RunExecutor
                 _snapshotStore,
                 _generatedTemplateCache,
                 liveShape,
-                state.Options.MeasureBundleJsons);
+                state.Options.MeasureBundleJsons,
+                _orchestrator);
         _liveInjector.OpenSession(
             state.RunId,
             windowStart,

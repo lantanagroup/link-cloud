@@ -51,6 +51,9 @@ public record QueryLogSummaryModel
     public DateTime? CompletionDate { get; init; }
 
     [DataMember]
+    public long? CompletionTimeMilliseconds { get; init; }
+
+    [DataMember]
     public int? RetryAttempts { get; init; }
 
     [DataMember]
@@ -92,6 +95,7 @@ public record QueryLogSummaryModel
             ExecutionDate = log.ExecutionDate,
             CreateDate = log.CreateDate,
             CompletionDate = log.CompletionDate,
+            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             RetryAttempts = log.RetryAttempts,
             Status = log.Status,
             ReportTrackingId = log.ReportTrackingId,
