@@ -41,6 +41,7 @@ public static class KafkaKeys
             throw new ArgumentException("Service name is required.", nameof(serviceName));
         }
 
+        LinkMessageKey.RejectUnpairedSurrogates(serviceName);
         return serviceName;
     }
 

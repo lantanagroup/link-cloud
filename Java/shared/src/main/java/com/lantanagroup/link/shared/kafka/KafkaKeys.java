@@ -33,6 +33,7 @@ public final class KafkaKeys {
         if (isEmpty(serviceName)) {
             throw new IllegalArgumentException("Service name is required.");
         }
+        rejectUnpairedSurrogates(serviceName);
         return serviceName;
     }
 
@@ -62,7 +63,24 @@ public final class KafkaKeys {
         return value == null || value.isEmpty();
     }
 
+    private static void rejectUnpairedSurrogates(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            if (Character.isHighSurrogate(character)) {
+                if (i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(i + 1))) {
+                    throw new IllegalArgumentException("Identifier contains an unpaired surrogate.");
+                }
+                i++;
+                continue;
+            }
+            if (Character.isLowSurrogate(character)) {
+                throw new IllegalArgumentException("Identifier contains an unpaired surrogate.");
+            }
+        }
+    }
+
     private static String escape(String value) {
+        rejectUnpairedSurrogates(value);
         StringBuilder builder = new StringBuilder(value.length() + 8);
         for (int i = 0; i < value.length(); i++) {
             char character = value.charAt(i);

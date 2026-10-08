@@ -39,6 +39,20 @@ public class KafkaKeysTests
     }
 
     [Fact]
+    public void ForPatient_RejectsUnpairedSurrogatesAndKeepsPairs()
+    {
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForPatient("\uD800", "patient"));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForPatient("facility", "\uDFFF"));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForPatient("a\uD800b", "patient"));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForPatient("ok\uD83D", "patient"));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForFacility("\uDC00"));
+        Assert.Throws<ArgumentException>(() => KafkaKeys.ForService("\uD800"));
+        Assert.Equal(
+            "{\"facilityId\":\"\U0001F600\",\"patientId\":\"patient-proof\"}",
+            KafkaKeys.ForPatient("\U0001F600", "patient-proof"));
+    }
+
+    [Fact]
     public void ForAudit_UsesPatientThenFacilityThenService()
     {
         Assert.Equal("{\"facilityId\":\"fac\",\"patientId\":\"pat\"}", KafkaKeys.ForAudit("fac", "pat", "QueryDispatch"));

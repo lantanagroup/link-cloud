@@ -57,6 +57,30 @@ class KafkaKeysTest {
     }
 
     @Test
+    void rejectsUnpairedSurrogatesAndKeepsPairs() {
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forPatient("\uD800", "patient"));
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forPatient("facility", "\uDFFF"));
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forPatient("a\uD800b", "patient"));
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forPatient("ok\uD83D", "patient"));
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forFacility("\uDC00"));
+        assertThrows(IllegalArgumentException.class, () -> KafkaKeys.forService("\uD800"));
+        assertEquals(
+                "{\"facilityId\":\"\uD83D\uDE00\",\"patientId\":\"patient-proof\"}",
+                KafkaKeys.forPatient("\uD83D\uDE00", "patient-proof"));
+    }
+
+    @Test
+    void serviceNameKeyIsNotAFacility() {
+        assertNull(KafkaKeyLegacy.tryReadFacility("Audit"));
+        assertNull(KafkaKeyLegacy.tryReadFacility("  QueryDispatch  "));
+        assertNull(KafkaIdentity.facility(null, "DataAcquisitionWorker"));
+        assertNull(KafkaKeyLegacy.tryReadFacility("measureeval"));
+        assertNull(KafkaKeyLegacy.tryReadFacility("ValidationService"));
+        assertEquals("facility-1", KafkaIdentity.facility(null, "facility-1"));
+        assertEquals("Audit", KafkaKeyLegacy.tryReadFacility("{\"facilityId\":\"Audit\"}"));
+    }
+
+    @Test
     void canonicalKeyEscapesQuotesSlashesAndKeepsNonAscii() {
         assertEquals(
                 "{\"facilityId\":\"a/b\\\"c\\\\d\",\"patientId\":\"患者\"}",

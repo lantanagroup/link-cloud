@@ -117,6 +117,7 @@ public class KafkaBrokerProofTests
 
         using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrap }).Build();
         await admin.CreatePartitionsAsync([new PartitionsSpecification { Topic = topic, IncreaseTo = 4 }], new CreatePartitionsOptions());
+        await WaitUntilProducerSeesPartitions(producer, topic, 4, timeout.Token);
 
         var after = await producer.ProduceAsync(topic, new Message<string, string> { Key = key, Value = "after" }, timeout.Token);
         var again = await producer.ProduceAsync(topic, new Message<string, string> { Key = key, Value = "again" }, timeout.Token);
@@ -155,6 +156,30 @@ public class KafkaBrokerProofTests
         }
 
         return null;
+    }
+
+    private static async Task WaitUntilProducerSeesPartitions(IProducer<string, string> producer, string topic, int expected, CancellationToken cancellationToken)
+    {
+        // DependentAdminClientBuilder uses the producer's handle, so this refresh is the cache ProduceAsync partitions with.
+        using var metadataClient = new DependentAdminClientBuilder(producer.Handle).Build();
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var metadata = metadataClient.GetMetadata(topic, TimeSpan.FromSeconds(2));
+            var topicMeta = metadata.Topics.FirstOrDefault(item => item.Topic == topic);
+            if (topicMeta != null
+                && topicMeta.Error.Code == ErrorCode.NoError
+                && topicMeta.Partitions.Count >= expected
+                && topicMeta.Partitions.All(partition => partition.Error.Code == ErrorCode.NoError))
+            {
+                return;
+            }
+
+            await Task.Delay(200, cancellationToken);
+        }
+
+        throw new TimeoutException("Producer did not observe " + expected + " partitions for " + topic + ".");
     }
 
     private static async Task CreateTopic(string bootstrap, string topic, int partitions, CancellationToken cancellationToken)

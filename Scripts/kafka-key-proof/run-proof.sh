@@ -34,12 +34,36 @@ fi
 echo "Partition results:"
 cat "$RESULTS/partitions.tsv"
 
-python - "$RESULTS/partitions.tsv" <<'PY'
+PYTHON=""
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON="python"
+else
+  echo "python3 or python is required to compare partition results."
+  exit 1
+fi
+
+"$PYTHON" - "$RESULTS/partitions.tsv" <<'PY'
 import sys
 from collections import defaultdict
+raw = open(sys.argv[1], "rb").read()
+if raw.startswith(b"\xef\xbb\xbf"):
+    print("MISMATCH partition results start with a UTF-8 BOM, so the first row would not compare")
+    sys.exit(1)
+text = raw.decode("utf-8")
 rows = defaultdict(dict)
-for line in open(sys.argv[1], encoding="utf-8"):
-    runtime, topic, count, key, partition = line.rstrip("\n").split("\t")
+for lineno, line in enumerate(text.splitlines(), 1):
+    if line == "":
+        continue
+    parts = line.split("\t")
+    if len(parts) != 5:
+        print("MISMATCH line", lineno, "expected 5 fields")
+        sys.exit(1)
+    runtime, topic, count, key, partition = parts
+    if runtime not in ("dotnet", "java"):
+        print("MISMATCH line", lineno, "runtime", runtime)
+        sys.exit(1)
     rows[(topic, count, key)][runtime] = partition
 failed = False
 for identity, by_runtime in sorted(rows.items()):

@@ -9,7 +9,7 @@ public class KafkaKeyGoldenTests
     public void FixtureMatchesCanonicalBytesAndMurmur2Partitions()
     {
         var root = FindRepoRoot();
-        var path = Path.Combine(root, "tests", "fixtures", "kafka-key-golden.json");
+        var path = GoldenFixturePath(root);
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var mismatches = new List<string>();
         foreach (var row in document.RootElement.EnumerateArray())
@@ -54,5 +54,31 @@ public class KafkaKeyGoldenTests
         }
 
         throw new InvalidOperationException("Could not find the repository root.");
+    }
+
+    private static string GoldenFixturePath(string root)
+    {
+        var tests = ChildDirectory(root, "tests");
+        var fixtures = ChildDirectory(tests, "fixtures");
+        var match = Directory.EnumerateFiles(fixtures)
+            .FirstOrDefault(path => string.Equals(Path.GetFileName(path), "kafka-key-golden.json", StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+        {
+            throw new FileNotFoundException("Kafka key golden fixture was not found under the repository root.");
+        }
+
+        return match;
+    }
+
+    private static string ChildDirectory(string parent, string name)
+    {
+        var match = Directory.EnumerateDirectories(parent)
+            .FirstOrDefault(path => string.Equals(Path.GetFileName(path), name, StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+        {
+            throw new DirectoryNotFoundException("Could not find a " + name + " directory under " + parent + ".");
+        }
+
+        return match;
     }
 }
