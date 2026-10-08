@@ -88,4 +88,10 @@
 		<ProjectReference Include="..\Link.Authorization\Link.Authorization.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Include="..\..\Tests\fixtures\kafka-service-names.json">
+			<LogicalName>LantanaGroup.Link.Shared.kafka-service-names.json</LogicalName>
+		</EmbeddedResource>
+	</ItemGroup>
+
 </Project>

@@ -1,14 +1,21 @@
 package com.lantanagroup.link.shared.kafka;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class KafkaKeysTest {
 
@@ -78,6 +85,51 @@ class KafkaKeysTest {
         assertNull(KafkaKeyLegacy.tryReadFacility("ValidationService"));
         assertEquals("facility-1", KafkaIdentity.facility(null, "facility-1"));
         assertEquals("Audit", KafkaKeyLegacy.tryReadFacility("{\"facilityId\":\"Audit\"}"));
+    }
+
+    @Test
+    void serviceNamesComeFromTheSharedFixture() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.exists(root.resolve("topics.txt"))) {
+            root = root.getParent();
+        }
+        if (root == null) {
+            throw new IllegalStateException("Could not find the repository root.");
+        }
+        Path tests = childIgnoreCase(root, "tests");
+        Path fixtures = childIgnoreCase(tests, "fixtures");
+        Path file;
+        try (var files = Files.list(fixtures)) {
+            file = files
+                    .filter(path -> path.getFileName().toString().equalsIgnoreCase("kafka-service-names.json"))
+                    .findFirst()
+                    .orElseThrow();
+        }
+        String onDisk = Files.readString(file).replace("\r\n", "\n");
+        String onClasspath;
+        try (InputStream in = KafkaKeyLegacy.class.getResourceAsStream("/kafka-service-names.json")) {
+            if (in == null) {
+                throw new IllegalStateException("Service name list is missing.");
+            }
+            onClasspath = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
+        }
+        assertEquals(onDisk, onClasspath);
+        JsonNode names = new ObjectMapper().readTree(onDisk);
+        assertTrue(names.isArray());
+        for (JsonNode name : names) {
+            assertNull(KafkaKeyLegacy.tryReadFacility(name.asText()));
+        }
+        assertNull(KafkaKeyLegacy.tryReadFacility("measureeval"));
+        assertNull(KafkaKeyLegacy.tryReadFacility("ValidationService"));
+    }
+
+    private static Path childIgnoreCase(Path parent, String name) throws Exception {
+        try (var children = Files.list(parent)) {
+            return children
+                    .filter(path -> Files.isDirectory(path) && path.getFileName().toString().equalsIgnoreCase(name))
+                    .findFirst()
+                    .orElseThrow();
+        }
     }
 
     @Test

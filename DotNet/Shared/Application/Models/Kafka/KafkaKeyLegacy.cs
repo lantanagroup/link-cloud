@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -9,25 +10,28 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 public static class KafkaKeyLegacy
 {
     // Plain keys produced for a service (health checks, audits with no facility) are not facility ids.
-    private static readonly HashSet<string> ServiceNames = new(StringComparer.Ordinal)
+    // The names live in one fixture so the .NET and Java readers stay the same list.
+    private static readonly HashSet<string> ServiceNames = LoadServiceNames();
+
+    private static HashSet<string> LoadServiceNames()
     {
-        "Account",
-        "Audit",
-        "Census",
-        "DataAcquisition",
-        "DataAcquisitionWorker",
-        "LinkAdminBFF",
-        "MockDmrpApi",
-        "Normalization",
-        "Notification",
-        "QueryDispatch",
-        "Report",
-        "Submission",
-        "Tenant",
-        "Terminology",
-        "ValidationService",
-        "measureeval"
-    };
+        const string resource = "LantanaGroup.Link.Shared.kafka-service-names.json";
+        using var stream = typeof(KafkaKeyLegacy).Assembly.GetManifestResourceStream(resource)
+            ?? throw new InvalidOperationException("Service name list is missing.");
+        var names = JsonSerializer.Deserialize<string[]>(stream)
+            ?? throw new InvalidOperationException("Service name list is empty.");
+        if (names.Length == 0 || names.Any(name => string.IsNullOrEmpty(name)))
+        {
+            throw new InvalidOperationException("Service name list is empty.");
+        }
+
+        if (names.Distinct(StringComparer.Ordinal).Count() != names.Length)
+        {
+            throw new InvalidOperationException("Service name list contains a duplicate.");
+        }
+
+        return new HashSet<string>(names, StringComparer.Ordinal);
+    }
 
     public static bool TryReadFacility(string? key, out string facilityId)
     {

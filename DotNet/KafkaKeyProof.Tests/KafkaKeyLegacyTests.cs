@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
@@ -72,10 +73,52 @@ public class KafkaKeyLegacyTests
         }
 
         Assert.NotEmpty(names);
+        var fixture = ReadServiceNameFixture(root);
         foreach (var name in names)
+        {
+            Assert.Contains(name, fixture);
+            Assert.False(KafkaKeyLegacy.TryReadFacility(name, out _), name);
+        }
+
+        Assert.Contains("measureeval", fixture);
+        Assert.Contains("ValidationService", fixture);
+        foreach (var name in fixture)
         {
             Assert.False(KafkaKeyLegacy.TryReadFacility(name, out _), name);
         }
+    }
+
+    [Fact]
+    public void ServiceNamesComeFromTheSharedFixture()
+    {
+        var root = FindRepoRoot();
+        var file = ReadFixtureText(root);
+        using var stream = typeof(KafkaKeyLegacy).Assembly.GetManifestResourceStream("LantanaGroup.Link.Shared.kafka-service-names.json");
+        Assert.NotNull(stream);
+        using var reader = new StreamReader(stream!);
+        var embedded = reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Equal(file, embedded);
+        var names = JsonSerializer.Deserialize<string[]>(file);
+        Assert.NotNull(names);
+        Assert.Equal(names!.Length, names.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    private static HashSet<string> ReadServiceNameFixture(string root)
+    {
+        var names = JsonSerializer.Deserialize<string[]>(ReadFixtureText(root));
+        Assert.NotNull(names);
+        return new HashSet<string>(names!, StringComparer.Ordinal);
+    }
+
+    private static string ReadFixtureText(string root)
+    {
+        var tests = Directory.EnumerateDirectories(root).First(dir =>
+            string.Equals(Path.GetFileName(dir), "tests", StringComparison.OrdinalIgnoreCase));
+        var fixtures = Directory.EnumerateDirectories(tests).First(dir =>
+            string.Equals(Path.GetFileName(dir), "fixtures", StringComparison.OrdinalIgnoreCase));
+        var file = Directory.EnumerateFiles(fixtures).First(path =>
+            string.Equals(Path.GetFileName(path), "kafka-service-names.json", StringComparison.OrdinalIgnoreCase));
+        return File.ReadAllText(file).Replace("\r\n", "\n", StringComparison.Ordinal);
     }
 
     [Fact]
