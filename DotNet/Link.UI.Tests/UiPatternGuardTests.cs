@@ -152,15 +152,16 @@ public class UiPatternGuardTests
         css.Should().Contain("fill='%23111'");
 
         var vendor = File.ReadAllText(Path.Combine(Root(), "wwwroot", "lib", "bootstrap", "dist", "css", "bootstrap.css"));
+        vendor = Regex.Replace(vendor, @"@charset\s+""[^""]+"";", "", RegexOptions.IgnoreCase);
         var misses = new List<string>();
         var covered = 0;
         foreach (var rule in CssRules(vendor))
         {
             var parts = rule.Selector.Split(',')
                 .Select(part => part.Trim())
-                .Where(part => part.Length > 0 && !NormSelector(part).Equals(".btn:hover", StringComparison.Ordinal))
+                .Where(part => part.Length > 0)
                 .ToList();
-            if (!parts.Any(IsVendorInteraction))
+            if (parts.Count == 0)
                 continue;
 
             var leaked = Declarations(rule.Body)
@@ -202,17 +203,64 @@ public class UiPatternGuardTests
         interaction.SelectMany(rule => ColorsIn(rule.Body)).Where(IsVisibleCoolTint).Should().BeEmpty();
     }
 
-    private static bool IsVendorInteraction(string selector)
+    [Fact]
+    public void Labeled_id_value_is_readable_on_dark_headers()
     {
-        if (selector.Contains(":focus", StringComparison.Ordinal)
-            || selector.Contains(":hover", StringComparison.Ordinal)
-            || selector.Contains(":active", StringComparison.Ordinal)
-            || selector.Contains(":disabled", StringComparison.Ordinal))
-            return true;
+        var headers = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views"))
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!lines[i].Contains("card-header", StringComparison.Ordinal))
+                    continue;
 
-        return selector.Contains(".input-group-text", StringComparison.Ordinal)
-            || selector.Contains(".modal-header", StringComparison.Ordinal)
-            || selector.Contains(".modal-footer", StringComparison.Ordinal);
+                var window = string.Join('\n', lines.Skip(i).Take(12));
+                var bodyAt = window.IndexOf("card-body", StringComparison.Ordinal);
+                if (bodyAt >= 0)
+                    window = window[..bodyAt];
+                if (!window.Contains("_LabeledId", StringComparison.Ordinal))
+                    continue;
+
+                headers.Add(Rel(file) + ":" + (i + 1));
+            }
+        }
+
+        headers.Should().NotBeEmpty();
+        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
+        var effective = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var rule in CssRules(css))
+        {
+            foreach (var part in rule.Selector.Split(','))
+            {
+                var key = NormSelector(part);
+                if (key is not (".au-card .card-header .lu-facility-id"
+                    or ".au-card .card-header .lu-clip"
+                    or ".au-card .card-header .lu-labeled-id"))
+                    continue;
+
+                if (!effective.TryGetValue(key, out var props))
+                {
+                    props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    effective[key] = props;
+                }
+
+                foreach (var declaration in Declarations(rule.Body))
+                    props[declaration.Name] = declaration.Value;
+            }
+        }
+
+        effective.Should().ContainKey(".au-card .card-header .lu-labeled-id");
+        effective[".au-card .card-header .lu-labeled-id"]["min-width"].Should().Contain("12ch");
+        foreach (var key in new[] { ".au-card .card-header .lu-facility-id", ".au-card .card-header .lu-clip" })
+        {
+            effective.Should().ContainKey(key);
+            effective[key]["color"].Should().Be("#fff");
+            var width = effective[key]["min-width"];
+            width.Should().Contain("ch");
+            var digits = new string(width.TakeWhile(char.IsDigit).ToArray());
+            int.Parse(digits).Should().BeGreaterThanOrEqualTo(12);
+        }
     }
 
     private static string NormSelector(string selector)
