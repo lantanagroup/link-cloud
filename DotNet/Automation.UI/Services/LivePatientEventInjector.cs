@@ -9,7 +9,8 @@ namespace Automation.UI.Services;
 public sealed class LivePatientEventInjector(
     ISnapshotStore snapshotStore,
     IHubContext<RunHub> hub,
-    ILogger<LivePatientEventInjector> logger) : ILivePatientEventInjector
+    ILogger<LivePatientEventInjector> logger,
+    RunSnapshotOrchestrator? snapshotWrites = null) : ILivePatientEventInjector
 {
     public const string SnapshotDomain = "liveSimulation";
 
@@ -416,7 +417,10 @@ public sealed class LivePatientEventInjector(
         try
         {
             var diagnostics = session.LastDiagnostics ?? session.Tracker.ToDiagnostics();
-            await snapshotStore.SetDomainAsync(session.Tracker.RunId, SnapshotDomain, diagnostics, cancellationToken);
+            if (snapshotWrites != null)
+                await snapshotWrites.WriteDomainAsync(session.Tracker.RunId, SnapshotDomain, diagnostics, cancellationToken);
+            else
+                await snapshotStore.SetDomainAsync(session.Tracker.RunId, SnapshotDomain, diagnostics, cancellationToken);
         }
         catch (Exception ex)
         {
