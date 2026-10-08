@@ -20,7 +20,6 @@
     var patientConfigurations = (List<PatientConfiguration>?)ViewBag.PatientConfigurations ?? [];
     var measureTemplates = (List<MeasureTemplate>?)ViewBag.MeasureTemplates ?? [];
     var facilityTemplates = (List<FacilityTemplate>?)ViewBag.FacilityTemplates ?? [];
-    var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
     var scheduledPatternOptions = Enum.GetValues<ScheduledInpatientPattern>()
         .Select(p =>
         {
@@ -119,7 +118,7 @@
                                         @mt.Name
                                         @if (mt.IsSystem)
                                         {
-                                            <span class="badge bg-dark ms-1">System</span>
+                                            <span class="ms-1">System</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(mt.Version))
                                         {
@@ -480,10 +479,6 @@
 <script src="~/js/patient-configuration-editor.js" asp-append-version="true"></script>
 <script>
     (function () {
-        var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-                        clinicalScenarios,
-                        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
-
         var QUALIFYING = 'Qualifying', NON_QUALIFYING = 'NonQualifying';
         var scheduledPatternOptions = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
                         scheduledPatternOptions,
@@ -837,10 +832,12 @@
             var fb = el.parentElement.querySelector('.invalid-feedback');
             if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
             fb.textContent = msg; fb.style.display = 'block';
+            if (window.luSectionValidity) window.luSectionValidity.mark(el, msg);
         }
         function clearFieldErrors() {
             document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
             document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+            if (window.luSectionValidity) window.luSectionValidity.sync(document.getElementById('scenarioConfigArea') || document);
         }
 
         function getUploadedOrganizationConflictMessage() {
@@ -1108,7 +1105,6 @@
         function measureCheckboxForFamily(family) {
             return document.querySelector('.measure-checkbox[data-family="' + family + '"]');
         }
-        function sid(v) { return String(v || '').toLowerCase(); }
 
         function normalizeEligMap(raw) {
             var n = {};
@@ -1140,14 +1136,6 @@
             var normalized = normalizeScheduledPattern(pattern);
             var match = scheduledPatternOptions.find(function (o) { return o.value === normalized; });
             return match ? !!match.expectedInReport : true;
-        }
-
-        function buildScheduledPatternEditor(pattern) {
-            var selected = normalizeScheduledPattern(pattern);
-            var options = scheduledPatternOptions.map(function (o) {
-                return '<option value="' + o.value + '" title="' + escAttr(o.hint || o.label) + '" ' + (o.value === selected ? 'selected' : '') + '>' + esc(o.label) + '</option>';
-            }).join('');
-            return '<select class="form-select form-select-sm cohort-scheduled-pattern">' + options + '</select>';
         }
 
         function qualificationInputsFromIntent(intent, clinicalScenarioId) {
@@ -1195,42 +1183,6 @@
 
         function refreshAllPredicted() {
             Array.prototype.forEach.call(cohortRows.children, renderRowPredicted);
-        }
-
-        function syncPatternColumns() {
-            document.querySelectorAll('.cohort-pattern-col').forEach(function (el) { el.style.display = ''; });
-            cohortRows.querySelectorAll('.cohort-pattern-cell').forEach(function (el) { el.style.display = ''; });
-        }
-
-        // ---- Cohort row builders ----
-        function buildScenarioSelect(ids) {
-            var set = new Set((ids || []).map(sid));
-            var all = set.size === 0;
-
-            var opts = clinicalScenarioCatalog.map(function (sc) {
-                var id = sid(sc.scenarioId),
-                    lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
-
-                return '<div class="form-check mb-1 cohort-scenario-item">' +
-                    '<label class="form-check-label small">' +
-                    '<input class="form-check-input cohort-scenario-option me-1" ' +
-                    'type="checkbox" value="' + id + '" ' +
-                    ((all || set.has(id)) ? 'checked' : '') + ' />' +
-                    esc(lbl) +
-                    '</label></div>';
-            }).join('');
-
-            return '<div class="dropdown cohort-scenarios-dropdown">' +
-                '<button type="button" class="btn btn-sm btn-au-neutral dropdown-toggle w-100 text-start cohort-scenarios-toggle" ' +
-                'data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button>' +
-                '<div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' +
-                    '<div class="d-flex gap-2 mb-2">' +
-                        '<button type="button" class="btn btn-sm btn-au-neutral cohort-scenarios-select-all">Select All</button>' +
-                        '<button type="button" class="btn btn-sm btn-au-neutral cohort-scenarios-deselect-all">Deselect All</button>' +
-                    '</div>' +
-                    opts +
-                '</div>' +
-            '</div>';
         }
 
         function findPatientConfig(id) {
@@ -1834,8 +1786,8 @@
             }
 
             var sourceLabel = row.source === 'Bundle'
-                ? '<span class="badge au-badge-muted"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
-                : '<span class="badge au-badge-muted"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
+                ? '<span><i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>Bundle</span>'
+                : '<span><i class="bi bi-cloud-arrow-down me-1" aria-hidden="true"></i>By ID</span>';
             var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
             var detectBtn = '<button type="button" class="btn btn-sm btn-au-neutral btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
             var tr = document.createElement('tr');
@@ -2364,7 +2316,7 @@
                     populate(data);
                     var isSystem = data.isSystemScenario === true;
                     var isView = mode === 'view' || isSystem;
-                    modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge au-badge-muted ms-2">System</span>' : '');
+                    modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="ms-2">System</span>' : '');
                     setEditable(!isView);
                     openModal();
                 } catch (err) {

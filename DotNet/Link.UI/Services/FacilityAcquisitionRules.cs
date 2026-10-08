@@ -929,6 +929,58 @@ public static class FacilityAcquisitionRules
         return true;
     }
 
+    public const string OvernightWindowHint = "Overnight window (crosses midnight)";
+
+    /// <summary>
+    /// A min later than max is a midnight-crossing window. The acquisition service already accepts it.
+    /// </summary>
+    public static string? PullWindowHint(string? minText, string? maxText)
+    {
+        if (!TryClock(minText, out var minSpan) || !TryClock(maxText, out var maxSpan) || minSpan <= maxSpan)
+            return null;
+
+        return OvernightWindowHint;
+    }
+
+    /// <summary>
+    /// Secret names are not echoed. A blank post keeps the name already stored on the query.
+    /// </summary>
+    public static void KeepBlankSecrets(FhirQueryPanel? saved, FhirQueryPanel posted)
+    {
+        if (saved is null)
+            return;
+
+        posted.UserName = KeepSecret(posted.UserName, saved.UserName);
+        posted.Password = KeepSecret(posted.Password, saved.Password);
+        posted.AuthKey = KeepSecret(posted.AuthKey, saved.AuthKey);
+        posted.ClientId = KeepSecret(posted.ClientId, saved.ClientId);
+        posted.ClientSecret = KeepSecret(posted.ClientSecret, saved.ClientSecret);
+
+        if (posted.CustomHeaders is null || saved.CustomHeaders is null)
+            return;
+
+        var previous = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in saved.CustomHeaders)
+        {
+            var key = row.Key?.Trim();
+            var value = row.Value?.Trim();
+            if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value))
+                continue;
+            previous.TryAdd(key, value);
+        }
+
+        foreach (var row in posted.CustomHeaders)
+        {
+            if (row.Remove || string.IsNullOrWhiteSpace(row.Key) || !string.IsNullOrWhiteSpace(row.Value))
+                continue;
+            if (previous.TryGetValue(row.Key.Trim(), out var value))
+                row.Value = value;
+        }
+    }
+
+    private static string? KeepSecret(string? posted, string? saved) =>
+        string.IsNullOrWhiteSpace(posted) ? saved : posted;
+
     private static bool TryPullPair(string? minText, string? maxText, out string? min, out string? max, out string? error)
     {
         var minBlank = string.IsNullOrWhiteSpace(minText);
