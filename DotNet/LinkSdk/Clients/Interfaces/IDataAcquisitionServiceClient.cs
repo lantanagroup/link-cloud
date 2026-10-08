@@ -195,6 +195,12 @@ public interface IDataAcquisitionServiceClient
     /// <summary>Deletes one organization/location mapping: <c>DELETE /api/data/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse> DeleteOrganizationLocationMappingAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>Deletes every organization/location mapping for one facility: <c>DELETE /api/data/location-mappings/facility/{facilityId}</c>.</summary>
+    Task<LinkApiResponse> DeleteOrganizationLocationMappingsAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes every encounter mapping for one facility: <c>DELETE /api/data/encounter-mappings/facilities/{facilityId}</c>.</summary>
+    Task<LinkApiResponse> DeleteEncounterMappingsAsync(string facilityId, CancellationToken cancellationToken = default);
+
     /// <summary>Saves the resolved organization/location mapping: <c>PUT /api/data/location-mappings/{id}</c>.</summary>
     Task<LinkApiResponse> UpdateOrganizationLocationMappingAsync(int id, object request, CancellationToken cancellationToken = default);
 

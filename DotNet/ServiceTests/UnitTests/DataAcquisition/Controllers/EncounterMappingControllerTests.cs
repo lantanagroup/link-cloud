@@ -739,4 +739,58 @@ public class EncounterMappingControllerTests
     }
 
     #endregion
+
+    #region DELETE /encounter-mappings/facilities/{facilityId}
+
+    [Fact]
+    public async Task DeleteByFacilityIdAsync_DeletesOnlyThatFacility()
+    {
+        var mocker = new AutoMocker();
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.DeleteByFacilityIdAsync(FacilityId);
+
+        var accepted = Assert.IsType<AcceptedResult>(result);
+        Assert.Equal((int)HttpStatusCode.Accepted, accepted.StatusCode);
+        mocker.GetMock<IEncounterMappingManager>().Verify(
+            m => m.DeleteByFacilityIdAsync(FacilityId),
+            Times.Once);
+        mocker.GetMock<IEncounterMappingManager>().Verify(
+            m => m.DeleteByFacilityIdAsync(It.Is<string>(id => id != FacilityId)),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteByFacilityIdAsync_EmptyFacilityId_ReturnsBadRequest()
+    {
+        var mocker = new AutoMocker();
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.DeleteByFacilityIdAsync("  ");
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
+        mocker.GetMock<IEncounterMappingManager>().Verify(
+            m => m.DeleteByFacilityIdAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteByFacilityIdAsync_MissingFacility_IsANoOp()
+    {
+        var mocker = new AutoMocker();
+        mocker.GetMock<IEncounterMappingManager>()
+            .Setup(m => m.DeleteByFacilityIdAsync("missing-facility"))
+            .Returns(Task.CompletedTask);
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.DeleteByFacilityIdAsync("missing-facility");
+
+        Assert.IsType<AcceptedResult>(result);
+        mocker.GetMock<IEncounterMappingManager>().Verify(
+            m => m.DeleteByFacilityIdAsync("missing-facility"),
+            Times.Once);
+    }
+
+    #endregion
 }

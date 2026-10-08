@@ -94,6 +94,14 @@ public static class FacilitySetupHelper
         string facilityId) =>
         FacilityConfigurationService.CleanupFacilityAsync(facilityClient, normalizationClient, dataAcqClient, queryDispatchClient, output, facilityId);
 
+    public static Task DeleteRunConfigurationsAsync(
+        ICensusServiceClient censusClient,
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        FacilityConfigurationService.DeleteRunConfigurationsAsync(censusClient, dataAcqClient, output, facilityId, cancellationToken);
+
     public static Task SoftDeleteRunDataAsync(
         IReportServiceClient reportClient,
         IDataAcquisitionServiceClient dataAcqClient,

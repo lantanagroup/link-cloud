@@ -32,7 +32,9 @@ public static class RunCleanupHelper
         IAutomationOutput output,
         string facilityId,
         string? reportId,
-        bool runSucceeded)
+        bool runSucceeded,
+        ICensusServiceClient censusClient,
+        CancellationToken cancellationToken = default)
     {
         if (!runSucceeded)
             return;
@@ -42,6 +44,9 @@ public static class RunCleanupHelper
             await FacilitySetupHelper.CleanupFacilityAsync(
                 facilityClient, normalizationClient, dataAcqClient, queryDispatchClient,
                 output, facilityId);
+
+            await FacilitySetupHelper.DeleteRunConfigurationsAsync(
+                censusClient, dataAcqClient, output, facilityId, cancellationToken);
 
             await FacilitySetupHelper.SoftDeleteRunDataAsync(
                 reportClient, dataAcqClient, queryDispatchClient,
