@@ -479,6 +479,32 @@ public class DataAcquisitionServiceClientTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task DeleteOrganizationLocationMappingsAsync_DeletesMappingsForOneFacility()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.DeleteOrganizationLocationMappingsAsync("facility-a");
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/data/location-mappings/facility/facility-a", request.Path);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteEncounterMappingsAsync_DeletesMappingsForOneFacility()
+    {
+        using var http = new FakeHttpBoundary(string.Empty, 202);
+        using var client = CreateClient(http.BaseUrl);
+
+        await client.DeleteEncounterMappingsAsync("facility-a");
+        var request = http.SingleRequest();
+
+        Assert.Equal("DELETE", request.Method);
+        Assert.Equal("/api/data/encounter-mappings/facilities/facility-a", request.Path);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SearchAcquisitionLogsAsync_RepeatsStatusFilters()
     {
         using var http = new FakeHttpBoundary("""{"records":[],"metadata":{"pageSize":10,"pageNumber":1,"totalCount":0,"totalPages":0}}""");

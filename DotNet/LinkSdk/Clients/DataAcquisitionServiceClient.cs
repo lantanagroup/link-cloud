@@ -507,6 +507,18 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync(() => Request($"data/location-mappings/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> DeleteOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/location-mappings/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteEncounterMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/encounter-mappings/facilities/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     /// <summary>
     /// Saves the resolved organization/location mapping (including a Cerner "Site" search result):
     /// <c>PUT /api/data/location-mappings/{id}</c>.
