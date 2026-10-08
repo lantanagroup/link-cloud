@@ -32,6 +32,8 @@ COPY ["DotNet/Automation.Link/", "DotNet/Automation.Link/"]
 COPY ["DotNet/Normalization.Engine/", "DotNet/Normalization.Engine/"]
 COPY ["DotNet/Automation.UI/", "DotNet/Automation.UI/"]
 COPY ["DotNet/Link.UI/Engine/", "DotNet/Link.UI/Engine/"]
+COPY ["DotNet/Link.UI/Services/AutomationRules.cs", "DotNet/Link.UI/Services/AutomationRules.cs"]
+COPY ["DotNet/Link.UI/Models/AutomationModels.cs", "DotNet/Link.UI/Models/AutomationModels.cs"]
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
