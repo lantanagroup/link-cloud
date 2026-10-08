@@ -1,4 +1,5 @@
 using System.Text;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -1537,10 +1538,9 @@ public sealed partial class ConfigurationService
                 EnabledNotifications = enabled,
                 Channels = channels
             };
-            var response = creating
-                ? await _notification.CreateConfigurationAsync(model, cancellationToken)
-                : await _notification.UpdateConfigurationAsync(model, cancellationToken);
-            return Ok(response)
+            var response = await FacilityConfigurationService.SaveNotificationConfigurationAsync(
+                _notification, model, creating, cancellationToken);
+            return response.Success
                 ? ConfigurationAction.Ok(creating
                     ? "Notification configuration for " + facilityId + " was created."
                     : "Notification configuration for " + facilityId + " was updated.")
@@ -1562,8 +1562,9 @@ public sealed partial class ConfigurationService
 
         try
         {
-            var response = await _notification.DeleteConfigurationAsync(parsed.ToString(), cancellationToken);
-            return Ok(response)
+            var response = await FacilityConfigurationService.DeleteNotificationConfigurationAsync(
+                _notification, parsed.ToString(), cancellationToken);
+            return response.Success
                 ? ConfigurationAction.Ok("Notification configuration was deleted.")
                 : ConfigurationAction.Fail(Fail("Notification", response.StatusCode, response.RawBody));
         }
