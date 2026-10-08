@@ -43,6 +43,9 @@ public partial class ReportSchedule
     /// </summary>
     public int ManifestState { get; set; }
 
+    /// <summary>Owner of a claimed row. Release and emitted updates require this token.</summary>
+    public Guid? ManifestClaimToken { get; set; }
+
     public DateTime? ManifestClaimedAt { get; set; }
 
     public AdHocType? AdHocType { get; set; }

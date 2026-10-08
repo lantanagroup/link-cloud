@@ -44,7 +44,7 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
-            KafkaClientDefaults.ApplyConsumer(config, _kafkaConnection.ClientId, _kafkaConnection.StaticMembership);
+            KafkaClientDefaults.ApplyConsumer(config, _kafkaConnection.ClientId, _kafkaConnection.StaticMembership, typeof(TConsumerValue).Name);
 
             var consumerBuilder = new ConsumerBuilder<TConsumerKey, TConsumerValue>(config);
 
