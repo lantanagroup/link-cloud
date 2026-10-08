@@ -48,7 +48,26 @@ public class DataAcquisitionLogsTests
 
         var modal = Read("DotNet/Link.UI/Views/Shared/_DataAcquisitionLogsModal.cshtml");
         modal.Should().Contain("id=\"dataAcqLogModal\"");
+        modal.Should().Contain("data-da-host");
+        modal.Should().Contain("data-da-list");
         modal.Should().Contain("data-acquisition-logs.js");
+
+        var report = Read("DotNet/Link.UI/Views/Reports/Acquisition.cshtml");
+        report.Should().Contain("data-da-host");
+        report.Should().Contain("data-da-autoload");
+        report.Should().NotContain("Open in Logs");
+        report.Should().NotContain("Logs for this report");
+        report.Should().Contain("_ReportIdentity");
+        report.Should().Contain("_BackButton");
+
+        list.Should().Contain("Facility actions");
+        list.Should().Contain("data-da-col=\"facility\"");
+        list.Should().Contain("data-da-col=\"report\"");
+        list.Should().Contain("Open in Logs");
+        Read("DotNet/Link.UI/Views/Logs/Acquisition.cshtml").Should().Contain("btn-check");
+        Read("DotNet/Link.UI/Views/Logs/Acquisition.cshtml").Should().NotContain("multiple size");
+        Read("DotNet/Link.UI/Controllers/ReportsController.cs").Should().Contain("LoadSectionAsync");
+        Read("DotNet/Link.UI/Services/ReportsService.cs").Should().NotContain("SearchAcquisitionLogsAsync");
 
         Read("DotNet/Link.UI/Views/Automation/Run.cshtml").Should().Contain("name=\"_DataAcquisitionLogsModal\"");
         Read("DotNet/Link.UI/Views/Tenants/View.cshtml").Should().Contain("name=\"_DataAcquisitionLogsModal\"");
@@ -57,6 +76,8 @@ public class DataAcquisitionLogsTests
         var module = Read("DotNet/Link.UI/wwwroot/js/data-acquisition-logs.js");
         module.Should().Contain("12000");
         module.Should().Contain("searchTerm");
+        module.Should().Contain("data-da-host");
+        module.Should().Contain("restoreChecked");
 
         var controller = Read("DotNet/Link.UI/Controllers/LogsController.cs");
         controller.Should().Contain("AcquisitionLogPanelRules.AllowsRunEntry");

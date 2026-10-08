@@ -189,12 +189,11 @@ public sealed class ReportsController : Controller
         string? facilityId,
         string? reportId,
         string? patientId,
-        int page,
-        int pageSize,
         CancellationToken cancellationToken)
     {
-        var model = await _reports.LoadAcquisitionAsync(facilityId, reportId, patientId, page, pageSize, cancellationToken);
+        var model = await _reports.LoadSectionAsync(facilityId, reportId, cancellationToken);
         ViewData["Title"] = "Acquisition log";
+        ViewData["PatientId"] = FacilityViewRules.Clean(patientId);
         return View(model);
     }
 

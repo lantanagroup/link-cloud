@@ -27,16 +27,40 @@
     string Mark(string column) => string.Equals(search.SortBy, column, StringComparison.OrdinalIgnoreCase)
         ? (search.SortDir == "asc" ? " ↑" : " ↓")
         : "";
+    var hideFacility = Model.Embedded && !string.IsNullOrWhiteSpace(search.FacilityId);
+    var hideReport = Model.Embedded && !string.IsNullOrWhiteSpace(search.ReportId);
+    string OpenLogs()
+    {
+        var route = query.ToRoute();
+        if (route.Count == 0)
+            return "/Logs/Acquisition";
+        return "/Logs/Acquisition?" + string.Join("&", route.Select(pair =>
+            Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+    }
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.ScopeNote))
 {
     <p class="small text-muted mt-3">@Model.ScopeNote</p>
 }
+@if (Model.Embedded)
+{
+    <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+        @if (hideFacility)
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = search.FacilityId, CopyLabel = "Copy facility id" })" />
+        }
+        @if (hideReport)
+        {
+            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = search.ReportId, CopyLabel = "Copy report id" })" />
+        }
+        <a class="btn btn-sm btn-au-neutral" href="@OpenLogs()">Open in Logs</a>
+    </div>
+}
 @if (!string.IsNullOrWhiteSpace(search.FacilityId) && string.IsNullOrWhiteSpace(search.Error))
 {
-    <div class="au-card card mt-3">
-        <div class="card-header">This facility</div>
+    <details class="au-card card mt-3 au-facility-actions">
+        <summary class="card-header">Facility actions</summary>
         <div class="card-body">
             <p>These actions change every acquisition log for <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = search.FacilityId, CopyLabel = "Copy facility id" })" />, including logs outside this search.</p>
             <div class="d-flex flex-wrap gap-2">
@@ -50,7 +74,7 @@
                 </form>
             </div>
         </div>
-    </div>
+    </details>
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.LoadError))
@@ -119,9 +143,15 @@ else
                                 <tr>
                                     <th scope="col"><input class="form-check-input" type="checkbox" data-au-select-page aria-label="Select all logs on this page" /></th>
                                     <th scope="col"><a href="@Href(SortRoute("Id", false))" @(Model.Embedded ? "data-da-panel" : null)>Id@(Mark("Id"))</a></th>
-                                    <th scope="col"><a href="@Href(SortRoute("FacilityId", false))" @(Model.Embedded ? "data-da-panel" : null)>Facility@(Mark("FacilityId"))</a></th>
+                                    @if (!hideFacility)
+                                    {
+                                        <th scope="col" data-da-col="facility"><a href="@Href(SortRoute("FacilityId", false))" @(Model.Embedded ? "data-da-panel" : null)>Facility@(Mark("FacilityId"))</a></th>
+                                    }
                                     <th scope="col"><a href="@Href(SortRoute("PatientId", false))" @(Model.Embedded ? "data-da-panel" : null)>Patient@(Mark("PatientId"))</a></th>
-                                    <th scope="col">Report</th>
+                                    @if (!hideReport)
+                                    {
+                                        <th scope="col" data-da-col="report">Report</th>
+                                    }
                                     <th scope="col"><a href="@Href(SortRoute("Status", false))" @(Model.Embedded ? "data-da-panel" : null)>Status@(Mark("Status"))</a></th>
                                     <th scope="col"><a href="@Href(SortRoute("QueryPhase", false))" @(Model.Embedded ? "data-da-panel" : null)>Phase@(Mark("QueryPhase"))</a></th>
                                     <th scope="col"><a href="@Href(SortRoute("QueryType", false))" @(Model.Embedded ? "data-da-panel" : null)>Type@(Mark("QueryType"))</a></th>
@@ -156,14 +186,20 @@ else
                                         <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }), ReturnUrl = Model.Embedded ? null : ReturnUrlRules.Here(Context.Request) })" />
                                         @(row.Deleted ? " (deleted)" : "")
                                     </td>
-                                    <td>
-                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
-                                        <partial name="_AutomationBadge" model="row.AutomationRunId" />
-                                    </td>
+                                    @if (!hideFacility)
+                                    {
+                                        <td data-da-col="facility">
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = row.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" />
+                                            <partial name="_AutomationBadge" model="row.AutomationRunId" />
+                                        </td>
+                                    }
                                     <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
-                                    <td>
-                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = row.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = row.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = row.FacilityId, reportId = row.ReportId }) : null })" />
-                                    </td>
+                                    @if (!hideReport)
+                                    {
+                                        <td data-da-col="report">
+                                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = row.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = row.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = row.FacilityId, reportId = row.ReportId }) : null })" />
+                                        </td>
+                                    }
                                     <td>@row.Status</td>
                                     <td>@row.Phase</td>
                                     <td>@row.QueryType</td>

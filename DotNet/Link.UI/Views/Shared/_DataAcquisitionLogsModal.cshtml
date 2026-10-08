@@ -1,5 +1,6 @@
 @model DataAcquisitionLogsModal
 <div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true"
+     data-da-host
      data-panel-url="@Url.Action("AcquisitionPanel", "Logs")"
      data-run-id="@Model.RunId"
      data-facility-id="@Model.FacilityId">
@@ -14,10 +15,11 @@
                 <label class="visually-hidden" for="daLogSearch">Filter logs</label>
                 <input type="search"
                        id="daLogSearch"
+                       data-da-search
                        class="form-control form-control-sm mb-2"
                        placeholder="Filter by patient, id, status, phase, or resource"
                        autocomplete="off" />
-                <div id="dataAcqLogList">
+                <div id="dataAcqLogList" data-da-list>
                     <p class="text-muted mb-0">Loading logs…</p>
                 </div>
             </div>
