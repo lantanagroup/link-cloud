@@ -6,7 +6,13 @@ namespace UnitTests.Kafka;
 [Trait("Category", "UnitTests")]
 public class KafkaCatalogConsistencyTests
 {
-    private static readonly string[] TopicsFileGaps =
+    /// <summary>
+    /// These topics are in topics.txt with an error topic. Their retry or redrive
+    /// topic is created from kafka-retry-services.txt, so topics.txt has no shared
+    /// {topic}-Retry line. Cerner uses CernerPatientsAcquired-Retry-Census.
+    /// Notification is redrive-only.
+    /// </summary>
+    private static readonly string[] SharedRetryNotListed =
     [
         "CernerPatientsAcquired",
         "NotificationRequested"
@@ -22,20 +28,24 @@ public class KafkaCatalogConsistencyTests
             .ToList();
 
         var names = lines.Select(line => line.Split(':')[0]).ToHashSet(StringComparer.Ordinal);
+        var retryServices = File.ReadAllLines(Path.Combine(root, "kafka-retry-services.txt"))
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith('#'))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("CernerPatientsAcquired:Census", retryServices);
+        Assert.Contains("NotificationRequested:~Notification", retryServices);
+
         foreach (var entry in KafkaTopicCatalog.Topics)
         {
-            if (TopicsFileGaps.Contains(entry.Topic, StringComparer.Ordinal))
-            {
-                Assert.DoesNotContain(entry.Topic, names);
-                continue;
-            }
-
             Assert.Contains(entry.Topic, names);
-            if (entry.Groups.Count > 0)
-            {
+            if (entry.Groups.Count == 0)
+                continue;
+
+            Assert.Contains(KafkaTopicCatalog.ErrorName(entry.Topic), names);
+            if (SharedRetryNotListed.Contains(entry.Topic, StringComparer.Ordinal))
+                Assert.DoesNotContain(KafkaTopicCatalog.RetryName(entry.Topic), names);
+            else
                 Assert.Contains(KafkaTopicCatalog.RetryName(entry.Topic), names);
-                Assert.Contains(KafkaTopicCatalog.ErrorName(entry.Topic), names);
-            }
         }
 
         foreach (var name in names)
@@ -48,8 +58,7 @@ public class KafkaCatalogConsistencyTests
         foreach (var subscription in ListenerSubscriptions(root, unresolved))
         {
             Assert.NotNull(KafkaTopicCatalog.Find(subscription.Topic));
-            if (!names.Contains(subscription.Topic))
-                Assert.Contains(subscription.Topic, TopicsFileGaps);
+            Assert.Contains(subscription.Topic, names);
             var main = KafkaTopicCatalog.MainName(subscription.Topic);
             var groups = KafkaTopicCatalog.GroupsOf(main);
             Assert.Contains(subscription.Group, groups);
@@ -263,6 +272,7 @@ public class KafkaCatalogConsistencyTests
     private static bool IsGeneratedOrTest(string file) =>
         file.Contains($"{Path.DirectorySeparatorChar}ServiceTests{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
         || file.Contains($"{Path.DirectorySeparatorChar}tests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+        || file.Contains($".Tests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
         || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
         || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
 

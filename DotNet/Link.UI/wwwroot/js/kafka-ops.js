@@ -20,9 +20,12 @@
             delete charts[canvasId];
         }
         if (!canvas || typeof Chart === "undefined" || !rows) return;
-        var empty = rows.length === 0;
-        canvas.classList.toggle("d-none", empty);
-        if (empty) return;
+        if (window.luChartFrame) window.luChartFrame.fit(canvas);
+        if (rows.length === 0) {
+            if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId);
+            return;
+        }
+        if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
         charts[canvasId] = new Chart(canvas, {
             type: "bar",
             data: {
