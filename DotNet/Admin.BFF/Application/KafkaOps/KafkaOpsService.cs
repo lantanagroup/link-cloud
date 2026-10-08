@@ -19,6 +19,8 @@ public interface IKafkaOpsService
     Task<KafkaCapabilitiesResponse> GetCapabilitiesAsync(CancellationToken cancellationToken);
     Task<PartitionPlan> PlanAsync(string topic, int requestedPartitions, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CreateAsync(ClaimsPrincipal user, string topic, int requestedPartitions, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string? correlationId, CancellationToken cancellationToken);
+    Task<PartitionPlan> PlanFamilyAsync(string topic, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken);
+    Task<ChangeRequestRecord> CreateFamilyAsync(ClaimsPrincipal user, string topic, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string? correlationId, CancellationToken cancellationToken);
     Task<ClusterSnapshot> GetClusterAsync(CancellationToken cancellationToken);
     Task<ReplicaScalePlan> PlanScaleAsync(string groupId, int desiredMembers, CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CreateScaleAsync(ClaimsPrincipal user, string groupId, int desiredMembers, string reason, string? correlationId, CancellationToken cancellationToken);
@@ -60,6 +62,7 @@ public sealed class KafkaTopicRow
     public int RetryPartitions { get; set; }
     public int ErrorPartitions { get; set; }
     public bool RetryBehind { get; set; }
+    public bool ErrorBehind { get; set; }
     public int ReplicationFactor { get; set; }
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public double ProduceRatePerSecond { get; set; }
@@ -192,6 +195,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     RetryPartitions = retryPartitions,
                     ErrorPartitions = error?.Partitions ?? 0,
                     RetryBehind = retryPartitions > 0 && retryPartitions < partitions,
+                    ErrorBehind = (error?.Partitions ?? 0) > 0 && (error?.Partitions ?? 0) < partitions,
                     ReplicationFactor = main?.ReplicationFactor ?? 0,
                     Configs = main?.Configs ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                     ProduceRatePerSecond = rate,
@@ -274,6 +278,58 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         return PartitionChangePlanner.Evaluate(request);
     }
 
+    public async Task<PartitionPlan> PlanFamilyAsync(string topic, bool overrideQuietWindow, string? overrideReason, CancellationToken cancellationToken)
+    {
+        var (request, _) = await BuildPlanRequestAsync(topic, 0, overrideQuietWindow, overrideReason, cancellationToken);
+        return PartitionChangePlanner.CompleteFamily(request);
+    }
+
+    public async Task<ChangeRequestRecord> CreateFamilyAsync(ClaimsPrincipal user, string topic, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string? correlationId, CancellationToken cancellationToken)
+    {
+        EnsureWritable();
+        EnsureActor(user, KafkaChangeKind.CompleteTopicFamily);
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new KafkaOpsRejectedException("A reason is required.");
+
+        var plan = await PlanFamilyAsync(topic, overrideQuietWindow, overrideReason, cancellationToken);
+        if (!plan.Accepted)
+            throw new KafkaOpsRejectedException(string.Join(" ", plan.Errors));
+        if (!string.Equals((confirmation ?? "").Trim(), plan.Topic, StringComparison.Ordinal))
+            throw new KafkaOpsRejectedException("Type the topic name to confirm. Adding partitions cannot be reversed.");
+
+        var now = DateTimeOffset.UtcNow;
+        var record = new ChangeRequestRecord
+        {
+            Id = Guid.NewGuid(),
+            Kind = KafkaChangeKind.CompleteTopicFamily,
+            Environment = _environment.EnvironmentName,
+            Topic = plan.Topic,
+            Family = plan.Family,
+            RetryTopic = plan.RetryTopic,
+            BeforePartitions = plan.CurrentPartitions,
+            RequestedPartitions = plan.RequestedPartitions,
+            MaxReplicas = plan.MaxReplicas,
+            KeyClass = plan.KeyClass.ToString(),
+            SecondApproverRequired = plan.SecondApproverRequired,
+            QuietWindowOverride = plan.QuietWindowOverride,
+            Reason = reason.Trim(),
+            OverrideReason = overrideReason?.Trim() ?? "",
+            Requester = UserName(user),
+            DryRunSummary = plan.Summary,
+            CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? Guid.NewGuid().ToString("N") : correlationId.Trim(),
+            Status = plan.SecondApproverRequired ? KafkaChangeStatus.Pending : KafkaChangeStatus.Approved,
+            CreatedUtc = now,
+            ApprovedUtc = plan.SecondApproverRequired ? null : now,
+            AffectedGroups = plan.AffectedGroups
+        };
+        if (!plan.SecondApproverRequired)
+            record.Approver = record.Requester;
+
+        await SaveAsync(record, cancellationToken);
+        await AuditAsync(record, "requested", cancellationToken);
+        return record;
+    }
+
     public async Task<ChangeRequestRecord> CreateAsync(ClaimsPrincipal user, string topic, int requestedPartitions, string reason, bool overrideQuietWindow, string? overrideReason, string? confirmation, string? correlationId, CancellationToken cancellationToken)
     {
         EnsureWritable();
@@ -323,6 +379,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         EnsureWritable();
         var record = await RequireAsync(id, cancellationToken);
         EnsureActor(user, record.Kind);
+        if (record.Kind != KafkaChangeKind.CancelReassignment)
+            await EnsureNoReassignmentAsync(record.Id, cancellationToken);
         var error = ChangeRequestWorkflow.Approve(record, UserName(user), DateTimeOffset.UtcNow);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
@@ -340,6 +398,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
         await SaveAsync(record, cancellationToken);
+        if (OwnsRebalanceResource(record))
+            await ReleaseRebalanceAsync(record, cancellationToken);
         await AuditAsync(record, "rejected", cancellationToken);
         return record;
     }
@@ -348,10 +408,13 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     {
         EnsureWritable();
         var record = await RequireAsync(id, cancellationToken);
-        if (record.Kind != KafkaChangeKind.PartitionIncrease)
+        if (record.Kind == KafkaChangeKind.CancelReassignment)
+            return await ExecuteCancelAsync(user, record, cancellationToken);
+        if (record.Kind is not (KafkaChangeKind.PartitionIncrease or KafkaChangeKind.CompleteTopicFamily))
             return await ExecuteInfraAsync(user, record, cancellationToken);
 
         EnsureActor(user, record.Kind);
+        await EnsureNoReassignmentAsync(record.Id, cancellationToken);
         var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
@@ -362,11 +425,22 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             if (!plan.Accepted)
                 throw new KafkaOpsRejectedException(string.Join(" ", plan.Errors));
 
-            await _broker.IncreasePartitionsAsync(record.Topic, record.RequestedPartitions, cancellationToken);
-            record.PartitionsChangedUtc = DateTimeOffset.UtcNow;
-            if (record.RetryTopic.Length > 0)
-                await _broker.IncreasePartitionsAsync(record.RetryTopic, record.RequestedPartitions, cancellationToken);
-            await _broker.IncreasePartitionsAsync(KafkaTopicCatalog.ErrorName(record.Topic), record.RequestedPartitions, cancellationToken);
+            if (record.Kind == KafkaChangeKind.CompleteTopicFamily)
+            {
+                if (plan.TopicsToRaise.Contains(record.Topic, StringComparer.Ordinal))
+                    throw new KafkaOpsRejectedException("The main topic cannot be changed by a family completion.");
+                foreach (var sibling in plan.TopicsToRaise)
+                    await _broker.IncreasePartitionsAsync(sibling, plan.RequestedPartitions, cancellationToken);
+                record.RequestedPartitions = plan.RequestedPartitions;
+            }
+            else
+            {
+                await _broker.IncreasePartitionsAsync(record.Topic, record.RequestedPartitions, cancellationToken);
+                record.PartitionsChangedUtc = DateTimeOffset.UtcNow;
+                if (record.RetryTopic.Length > 0)
+                    await _broker.IncreasePartitionsAsync(record.RetryTopic, record.RequestedPartitions, cancellationToken);
+                await _broker.IncreasePartitionsAsync(KafkaTopicCatalog.ErrorName(record.Topic), record.RequestedPartitions, cancellationToken);
+            }
         }
         catch (Exception ex)
         {
@@ -401,9 +475,11 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             var record = await _cache.GetAsync<ChangeRequestRecord>(RequestKey(id), cancellationToken);
             if (record is null)
                 continue;
-            if (record.Status == KafkaChangeStatus.Converging && record.Kind == KafkaChangeKind.PartitionIncrease)
+            if (record.Status == KafkaChangeStatus.Converging && record.Kind is KafkaChangeKind.PartitionIncrease or KafkaChangeKind.CompleteTopicFamily)
                 await TrackConvergenceAsync(record, cancellationToken);
             else if (record.Status == KafkaChangeStatus.Converging)
+                await TrackInfraAsync(record, cancellationToken);
+            else if (record.Status == KafkaChangeStatus.TimedOut && BlocksForReassignment(record))
                 await TrackInfraAsync(record, cancellationToken);
             else if (record.Status == KafkaChangeStatus.Verifying)
                 await TrackVerificationAsync(record, cancellationToken);
@@ -585,7 +661,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             record.OverrideReason,
             cancellationToken,
             record.Id);
-        return PartitionChangePlanner.Evaluate(request);
+        return record.Kind == KafkaChangeKind.CompleteTopicFamily
+            ? PartitionChangePlanner.CompleteFamily(request)
+            : PartitionChangePlanner.Evaluate(request);
     }
 
     private async Task PersistFailedAsync(ChangeRequestRecord record, string reason, CancellationToken cancellationToken)
@@ -594,6 +672,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         record.Failure = reason;
         record.ClosedUtc = DateTimeOffset.UtcNow;
         await SaveAsync(record, cancellationToken);
+        if (OwnsRebalanceResource(record))
+            await ReleaseRebalanceAsync(record, cancellationToken);
         await AuditAsync(record, "execution-failed", cancellationToken);
     }
 
@@ -655,11 +735,12 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             EnvironmentChangeInFlight = records.Any(Open),
             FamilyChangeInFlight = records.Any(record => Open(record) && string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase)),
             LastFamilyChangeUtc = records
-                .Where(record => string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase) && record.PartitionsChangedUtc is not null)
+                .Where(record => record.Kind != KafkaChangeKind.CompleteTopicFamily && string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase) && record.PartitionsChangedUtc is not null)
                 .Select(record => record.PartitionsChangedUtc)
                 .OrderByDescending(value => value)
                 .FirstOrDefault(),
             RateLimitMinutes = _options.Value.RateLimitMinutes,
+            InFlightReassignmentTopics = (await InFlightReassignmentTopicsAsync(excludeRequestId, cancellationToken)).ToList(),
             Now = now,
             ExpectedConfigVersion = _options.Value.ExpectedConfigVersion,
             MetadataRefreshIntervalMs = _options.Value.MetadataRefreshIntervalMs,

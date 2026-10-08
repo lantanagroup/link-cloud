@@ -22,10 +22,12 @@ public enum KafkaChangeStatus
 public enum KafkaChangeKind
 {
     PartitionIncrease,
+    CompleteTopicFamily,
     ScaleReplicas,
     AddBroker,
     DecommissionBroker,
-    Rebalance
+    Rebalance,
+    CancelReassignment
 }
 
 public sealed class GroupProgress
@@ -46,6 +48,10 @@ public sealed class ChangeRequestRecord
     public int BeforeReplicas { get; set; }
     public int BrokerId { get; set; } = -1;
     public string ReassignmentJson { get; set; } = "";
+    public string OriginalAssignmentJson { get; set; } = "";
+    public string RebalanceName { get; set; } = "";
+    public Guid TargetRequestId { get; set; }
+    public string Warning { get; set; } = "";
     public string Progress { get; set; } = "";
     public string Topic { get; set; } = "";
     public string Family { get; set; } = "";
