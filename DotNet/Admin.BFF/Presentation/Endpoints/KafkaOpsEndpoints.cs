@@ -211,7 +211,14 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
     {
         if (!kafkaOps.CanView(user))
             return Results.Forbid();
-        return Results.Ok(kafkaOps.Infra);
+        try
+        {
+            return Results.Ok(await kafkaOps.PlanAddBrokerAsync(cancellationToken));
+        }
+        catch (KafkaOpsRejectedException ex)
+        {
+            return Problem(ex.Message, StatusCodes.Status400BadRequest);
+        }
     }
 
     private async Task<IResult> CreateAddBroker(ClaimsPrincipal user, ReasonBody body, HttpContext http, CancellationToken cancellationToken)
@@ -316,6 +323,8 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 
     private async Task<IResult> Execute(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
     {
+        if (kafkaOps.ReadOnly)
+            return Problem("Kafka changes are read-only in this environment.", StatusCodes.Status403Forbidden);
         var existing = await kafkaOps.GetAsync(id, cancellationToken);
         if (existing is null)
             return Problem("That change request was not found or it has expired.", StatusCodes.Status404NotFound);
