@@ -144,18 +144,7 @@
                             <td>@user.Email</td>
                             <td>@string.Join(", ", user.Roles)</td>
                             <td>
-                                @if (user.IsDeleted)
-                                {
-                                    <span class="badge au-badge-muted">Deleted</span>
-                                }
-                                else if (!user.IsActive)
-                                {
-                                    <span class="badge au-badge-warning">Deactivated</span>
-                                }
-                                else
-                                {
-                                    <span class="badge au-badge-success">Active</span>
-                                }
+                                <span class="badge @StatusPills.ForAccountState(user.IsDeleted, user.IsActive)">@(user.IsDeleted ? "Deleted" : user.IsActive ? "Active" : "Deactivated")</span>
                             </td>
                             <td class="text-nowrap">
                                 <div class="lu-row-actions">

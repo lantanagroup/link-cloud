@@ -1,15 +1,5 @@
 @model HealthPage
 @using Link.UI.Services
-@{
-    string HealthBadge(string? status)
-    {
-        var value = status?.Trim().ToLowerInvariant();
-        return value is "healthy" or "ok" ? "au-badge-success"
-            : value is "degraded" or "warning" ? "au-badge-warning"
-            : value is "unhealthy" or "error" or "failed" ? "au-badge-danger"
-            : "au-badge-muted";
-    }
-}
 
 <div class="mb-3">
     <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to system"))" />
@@ -77,7 +67,7 @@
                     {
                         <tr>
                             <td>@report.Service</td>
-                            <td><span class="badge @HealthBadge(report.Status)">@report.Status</span></td>
+                            <td><span class="badge @StatusPills.ForHealth(report.Status)">@report.Status</span></td>
                             <td>@report.Duration</td>
                             <td>
                                 @if (report.Entries.Count == 0)
@@ -111,11 +101,7 @@
         if (!card) return;
         var url = card.getAttribute("data-health-url");
         function badge(status) {
-            var value = String(status || "").toLowerCase();
-            if (value === "healthy" || value === "ok") return "au-badge-success";
-            if (value === "degraded" || value === "warning") return "au-badge-warning";
-            if (value === "unhealthy" || value === "error" || value === "failed") return "au-badge-danger";
-            return "au-badge-muted";
+            return window.luStatusPills.forHealth(status);
         }
         function text(value) {
             return document.createTextNode(value == null ? "" : String(value));

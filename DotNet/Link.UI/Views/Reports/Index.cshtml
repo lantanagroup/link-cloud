@@ -177,7 +177,7 @@
                             <td class="text-end" data-census="@report.Id">—</td>
                             <td class="text-end" data-population="@report.Id">—</td>
                             <td>
-                                <span class="badge @FacilityViewRules.StatusBadge(report.Status)">@report.StatusLabel</span>
+                                <span class="badge @StatusPills.ForSchedule(report.Status)">@report.StatusLabel</span>
                                 @if (!string.IsNullOrWhiteSpace(report.Submitted))
                                 {
                                     <div class="small text-muted">@report.Submitted</div>
