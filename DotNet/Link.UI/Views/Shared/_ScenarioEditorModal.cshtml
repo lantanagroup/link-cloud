@@ -2117,7 +2117,23 @@
 
         importedRows.addEventListener('click', function (e) {
             var rm = e.target.closest('.btn-remove-imported');
-            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); syncNhsnOrganizationFromUploadedPatients(); return; }
+            if (rm) {
+                var row = rm.closest('tr');
+                var bundleId = (row.dataset.uploadedBundleId || '').trim();
+                var fileName = row.dataset.fileName || '';
+                row.remove();
+                reindexImported();
+                updateImportedSummary();
+                syncNhsnOrganizationFromUploadedPatients();
+                // Unsaved uploads have no scenario reference yet, so they would stay in blob
+                // storage. Discard refuses to delete a bundle a saved scenario still cites.
+                if (bundleId) {
+                    postJson(discardUploadedBundleUrl, { uploadedBundleId: bundleId }).catch(function (err) {
+                        showError('Failed to discard uploaded bundle for "' + fileName + '" after removing the imported row: ' + (err.message || 'Unknown error'));
+                    });
+                }
+                return;
+            }
             var det = e.target.closest('.btn-detect-imported');
             if (det) { classifyImportedRow(det.closest('tr')); return; }
         });

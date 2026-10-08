@@ -202,11 +202,96 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Section_warning_keeps_the_add_editor_visible()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        var start = js.IndexOf("function collapseEmpty(", StringComparison.Ordinal);
+        var end = js.IndexOf("function saveNameFor(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = js.Substring(start, end - start);
+        var warn = body.IndexOf("alert-warning", StringComparison.Ordinal);
+        var hide = body.IndexOf("form.classList.add(\"d-none\")", StringComparison.Ordinal);
+        warn.Should().BeGreaterThan(-1);
+        hide.Should().BeGreaterThan(warn);
+    }
+
+    [Fact]
+    public void Saved_sftp_test_reads_the_result_body()
+    {
+        var service = File.ReadAllText(RepoFile("DotNet/Link.UI/Services/FacilityAcquisitionService.cs"));
+        var start = service.IndexOf("Task<string?> TestSavedSftpAsync(", StringComparison.Ordinal);
+        var end = service.IndexOf("Task<string?> TestSftpAsync(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = service.Substring(start, end - start);
+        body.Should().Contain("response.Body is not { Success: true }");
+        body.Should().Contain("response.Body?.Message");
+
+        var client = File.ReadAllText(RepoFile("DotNet/LinkSdk/Clients/DataAcquisitionServiceClient.cs"));
+        client.Should().Contain("SendAsync<SftpTestConnectionResultApiModel>(() => Request($\"data/{organizationId}/sftp-configurations/test-connection\")");
+    }
+
+    [Fact]
+    public void Facility_section_swap_runs_inline_scripts_and_stays_open()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        var start = js.IndexOf("function runInlineScripts(", StringComparison.Ordinal);
+        var end = js.IndexOf("function updateCounts(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = js.Substring(start, end - start);
+        body.Should().Contain("function swapItem(");
+        body.Should().Contain("runInlineScripts(fresh)");
+        body.Should().Contain("createElement(\"script\")");
+        body.Should().Contain("old.textContent");
+        body.Should().Contain("accordion-collapse.show");
+        body.Should().Contain("aria-expanded\", \"true\"");
+    }
+
+    [Fact]
+    public void Test_operation_redirects_back_to_the_facility_page()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/TenantsController.cs"));
+        var start = text.IndexOf("Task<IActionResult> TestOperation(", StringComparison.Ordinal);
+        var end = text.IndexOf("Task<IActionResult> View(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = text.Substring(start, end - start);
+        body.Should().Contain("RedirectNormalizationStay(result, operation)");
+        body.Should().NotContain("return await FromResult(result, id ?? \"Facility\");");
+
+        var redirect = text.IndexOf("RedirectNormalizationStay(", StringComparison.Ordinal);
+        redirect.Should().BeGreaterThan(-1);
+        text.Should().Contain("TempData[\"NormalizationTestResult\"]");
+        text.Should().Contain("RestoreNormalizationTempData(page)");
+        var import = text.IndexOf("Task<IActionResult> ImportExtensionUrls(", StringComparison.Ordinal);
+        var importEnd = text.IndexOf("Task<IActionResult> DeleteOperation(", import, StringComparison.Ordinal);
+        import.Should().BeGreaterThan(-1);
+        importEnd.Should().BeGreaterThan(import);
+        text.Substring(import, importEnd - import).Should().Contain("RedirectNormalizationStay(result, operationId: null)");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
         text.Should().Contain("auReportCountsBound");
         text.Should().Contain("lu-content");
+    }
+
+    [Fact]
+    public void Patient_configuration_section_badges_keep_a_gap_after_the_header()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/patient-configuration-editor.js"));
+        var assignments = js.Split('\n')
+            .Where(line => line.Contains("pc-section-badge", StringComparison.Ordinal))
+            .ToList();
+        assignments.Should().NotBeEmpty();
+        assignments.Should().OnlyContain(line => line.Contains("ms-2", StringComparison.Ordinal));
+
+        var markup = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_PatientConfigurationEditor.cshtml"));
+        Count(markup, "pc-section-badge bg-light text-muted border ms-2").Should().Be(4);
     }
 
     private static int Count(string text, string value)

@@ -297,29 +297,46 @@ public class UiPatternGuardTests
             .ToList();
         buttonClasses.Should().NotBeEmpty();
 
+        var extraClasses = parsed
+            .Where(rule => rule.Classes.Contains("btn"))
+            .SelectMany(rule => rule.Classes)
+            .Where(name => name != "btn" && !name.StartsWith("btn-", StringComparison.Ordinal) && name != "disabled")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var failures = new List<string>();
         foreach (var button in buttonClasses)
         {
-            foreach (var state in new string?[] { null, "hover", "focus", "active", "disabled" })
+            var elements = new List<HashSet<string>>
             {
-                var element = new HashSet<string>(StringComparer.Ordinal) { "btn", button };
-                if (state == "disabled")
-                    element.Add("disabled");
-                if (!TryResolvePaint(parsed, vars, element, state, out var color, out var background, out var transparent)
-                    || transparent
-                    || RelativeLuminance(background) >= 0.2)
-                    continue;
+                new(StringComparer.Ordinal) { "btn", button }
+            };
+            foreach (var extra in extraClasses)
+                elements.Add(new HashSet<string>(StringComparer.Ordinal) { "btn", button, extra });
 
-                var label = "." + button + " " + (state ?? "rest");
-                if (color is null)
+            foreach (var classes in elements)
+            {
+                foreach (var state in new string?[] { null, "hover", "focus", "active", "disabled" })
                 {
-                    failures.Add(label + " dark fill " + Format(background) + " has no text color");
-                    continue;
-                }
+                    var element = new HashSet<string>(classes, StringComparer.Ordinal);
+                    if (state == "disabled")
+                        element.Add("disabled");
+                    if (!TryResolvePaint(parsed, vars, element, state, out var color, out var background, out var transparent)
+                        || transparent
+                        || RelativeLuminance(background) >= 0.2)
+                        continue;
 
-                var contrast = Contrast(RelativeLuminance(color.Value), RelativeLuminance(background));
-                if (contrast < 4.5)
-                    failures.Add(label + " " + Format(color.Value) + " on " + Format(background) + " contrast " + contrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+                    var label = "." + string.Join(".", element.OrderBy(name => name, StringComparer.Ordinal)) + " " + (state ?? "rest");
+                    if (color is null)
+                    {
+                        failures.Add(label + " dark fill " + Format(background) + " has no text color");
+                        continue;
+                    }
+
+                    var contrast = Contrast(RelativeLuminance(color.Value), RelativeLuminance(background));
+                    if (contrast < 4.5)
+                        failures.Add(label + " " + Format(color.Value) + " on " + Format(background) + " contrast " + contrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+                }
             }
         }
 
@@ -811,8 +828,9 @@ public class UiPatternGuardTests
         js.Should().Contain("URLSearchParams");
         js.Should().Contain("history.replaceState");
         js.Should().Contain("popstate");
-        js.Should().Contain("params.get('q')");
-        js.Should().Contain("params.get('sort')");
+        js.Should().Contain("params.get(prefix + key)");
+        js.Should().Contain("q: get('q')");
+        js.Should().Contain("put('sort'");
         js.Should().NotContain("sortBy");
         js.Should().NotContain("pageNumber");
 
@@ -1222,6 +1240,29 @@ public class UiPatternGuardTests
         var cool = h is >= 165 and <= 340 && s >= 0.12;
         var oldGreen = h is >= 145 and < 165 && s >= 0.40;
         return cool || oldGreen;
+    }
+
+    [Fact]
+    public void Data_tables_on_one_page_do_not_share_search_keys()
+    {
+        var js = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "au-data-table.js"));
+        js.Should().Contain("function queryPrefix(shell)");
+        js.Should().Contain("if (index <= 0) return '';");
+        js.Should().Contain("params.get(prefix + key)");
+        js.Should().Contain("params.set(prefix + key, value)");
+        js.Should().Contain("readQuery(shell)");
+        js.Should().NotContain("params.get('q')");
+        js.Should().NotContain("params.set('q'");
+    }
+
+    [Fact]
+    public void Removing_an_imported_upload_asks_to_discard_the_bundle()
+    {
+        var view = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_ScenarioEditorModal.cshtml"));
+        view.Should().Contain("postJson(discardUploadedBundleUrl, { uploadedBundleId: bundleId })");
+        var handler = view[(view.IndexOf("var rm = e.target.closest('.btn-remove-imported')", StringComparison.Ordinal))..];
+        handler.Should().Contain("row.dataset.uploadedBundleId");
+        handler.Should().Contain("if (bundleId)");
     }
 
     private static (double H, double S, double L) RgbToHsl(int r, int g, int b)

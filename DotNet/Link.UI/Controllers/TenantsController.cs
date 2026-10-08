@@ -89,6 +89,8 @@ public sealed class TenantsController : Controller
                 }
             }
 
+            await MergeExactIdAsync(search, includeDeleted, active, all, cancellationToken);
+
             var activeKeys = new HashSet<string>(active.Keys, StringComparer.OrdinalIgnoreCase);
             var tenants = all
                 .Select(kvp => new TenantListItem
@@ -202,6 +204,7 @@ public sealed class TenantsController : Controller
             operationPage ?? 1);
         if (!page.IsCreate && !page.NotFound && string.IsNullOrWhiteSpace(page.LoadError) && !string.IsNullOrWhiteSpace(page.FacilityId))
             page.Notification = await _configuration.LoadFacilityNotificationAsync(page.FacilityId, cancellationToken);
+        RestoreNormalizationTempData(page);
         await StampAsync(page.FacilityId, runId => page.AutomationRunId = runId, cancellationToken);
         var editor = planEdit.Sanitize();
         if (string.Equals(editor, "add", StringComparison.OrdinalIgnoreCase)
@@ -393,7 +396,8 @@ public sealed class TenantsController : Controller
         }
 
         var result = await _hub.ImportExtensionUrlsAsync(id, text, tooLarge, cancellationToken);
-        return await FromResult(result, id ?? "Facility");
+        return RedirectNormalizationStay(result, operationId: null)
+            ?? await FromResult(result, id ?? "Facility");
     }
 
     [HttpPost]
@@ -438,8 +442,10 @@ public sealed class TenantsController : Controller
         string? testResource,
         CancellationToken cancellationToken)
     {
-        var result = await _hub.TestOperationAsync(id, operationId.Sanitize(), testResource, cancellationToken);
-        return await FromResult(result, id ?? "Facility");
+        var operation = operationId.Sanitize();
+        var result = await _hub.TestOperationAsync(id, operation, testResource, cancellationToken);
+        return RedirectNormalizationStay(result, operation)
+            ?? await FromResult(result, id ?? "Facility");
     }
 
     [HttpGet]
@@ -509,6 +515,63 @@ public sealed class TenantsController : Controller
         return await FromResult(result, id ?? "Facility");
     }
 
+    private async Task MergeExactIdAsync(
+        string? search,
+        bool includeDeleted,
+        Dictionary<string, string> active,
+        Dictionary<string, string> all,
+        CancellationToken cancellationToken)
+    {
+        if (!TenantListSearch.ShouldLookupExactId(search, all.Keys))
+            return;
+
+        var term = search!.Trim();
+        var activeFull = await _facilityServiceClient.GetFacilityListAsync(
+            search: null,
+            includeDeleted: false,
+            cancellationToken: cancellationToken);
+        if (!TryMapFacilities(activeFull, out var activeById))
+            return;
+
+        if (TryFind(activeById, term, out var activeId, out var activeName))
+        {
+            TenantListSearch.AddExact(active, all, includeDeleted, activeId, activeName, isDeleted: false);
+            return;
+        }
+
+        if (!includeDeleted)
+            return;
+
+        var deletedFull = await _facilityServiceClient.GetFacilityListAsync(
+            search: null,
+            includeDeleted: true,
+            cancellationToken: cancellationToken);
+        if (!TryMapFacilities(deletedFull, out var allById))
+            return;
+        if (TryFind(allById, term, out var deletedId, out var deletedName))
+            TenantListSearch.AddExact(active, all, includeDeleted: true, deletedId, deletedName, isDeleted: true);
+    }
+
+    private static bool TryFind(
+        Dictionary<string, string> facilities,
+        string term,
+        out string id,
+        out string name)
+    {
+        foreach (var pair in facilities)
+        {
+            if (!string.Equals(pair.Key, term, StringComparison.OrdinalIgnoreCase))
+                continue;
+            id = pair.Key;
+            name = pair.Value;
+            return true;
+        }
+
+        id = "";
+        name = "";
+        return false;
+    }
+
     private static bool TryMapFacilities(
         LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse<Dictionary<string, string>> response,
         out Dictionary<string, string> facilities)
@@ -545,6 +608,60 @@ public sealed class TenantsController : Controller
             ErrorMessage = "Unable to load tenants. " + detail +
                            " Confirm ServiceRegistry:TenantService:TenantServiceUrl and Link token settings."
         };
+    }
+
+    private IActionResult? RedirectNormalizationStay(FacilityWriteResult result, string? operationId)
+    {
+        if (result.RedirectToList || result.RedirectFacilityId is not null || result.Page is null)
+            return null;
+
+        var page = result.Page;
+        if (page.NotFound || string.IsNullOrWhiteSpace(page.FacilityId))
+            return null;
+
+        var panel = page.Normalization;
+        var hasResult = !string.IsNullOrWhiteSpace(panel.TestResult);
+        var hasError = !string.IsNullOrWhiteSpace(page.NormalizationError);
+        if (!hasResult && !hasError)
+            return null;
+
+        if (hasResult)
+        {
+            TempData["NormalizationTestResult"] = panel.TestResult;
+            TempData["NormalizationTestFailed"] = panel.TestFailed ? "1" : "0";
+        }
+
+        var posted = panel.Editor.TestResource;
+        if (!string.IsNullOrEmpty(posted) && posted.Length <= 4000)
+            TempData["NormalizationTestResource"] = posted;
+
+        if (hasError)
+            TempData["NormalizationError"] = page.NormalizationError;
+
+        var openId = panel.EditorOpen
+            ? (string.IsNullOrWhiteSpace(operationId) ? panel.Editor.OperationId : operationId)
+            : null;
+        return RedirectToAction(nameof(Facility), new { id = page.FacilityId, operationId = openId });
+    }
+
+    private void RestoreNormalizationTempData(FacilityHubViewModel page)
+    {
+        if (TempData["NormalizationError"] is string error && string.IsNullOrWhiteSpace(page.NormalizationError))
+            page.NormalizationError = error;
+
+        if (TempData["NormalizationTestResult"] is string testResult)
+        {
+            page.Normalization.TestResult = testResult;
+            page.Normalization.TestFailed = string.Equals(
+                TempData["NormalizationTestFailed"] as string,
+                "1",
+                StringComparison.Ordinal);
+        }
+
+        if (TempData["NormalizationTestResource"] is string resource
+            && page.Normalization.EditorOpen
+            && string.IsNullOrEmpty(page.Normalization.Editor.TestResource))
+            page.Normalization.Editor.TestResource = resource;
     }
 
     private async Task<IActionResult> FromResult(FacilityWriteResult result, string title)
