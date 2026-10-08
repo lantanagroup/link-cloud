@@ -296,9 +296,48 @@ if grep -F "$sentinel" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" >/dev/null 
 else
   pass 'bash xtrace does not print the token'
 fi
+if (
+  unset LINK_CLOUD_DOCKER_EXE
+  docker() { echo WRAP; }
+  # shellcheck disable=SC1090
+  . "$root/docker-compose.feed-token-profile.sh"
+  unset LINK_CLOUD_DOCKER_EXE
+  # shellcheck disable=SC1090
+  . "$root/docker-compose.feed-token-profile.sh"
+  [ "$LINK_CLOUD_DOCKER_EXE" != docker ]
+); then
+  pass 'bash wrapper does not cache the docker function'
+else
+  fail 'bash wrapper does not cache the docker function'
+fi
+mode_root="$repo/mode-root"
+mkdir -p "$mode_root/bin"
+cp "$mv_home/bin/uname" "$mode_root/bin/uname"
+cp "$mv_home/bin/az" "$mode_root/bin/az"
+cat > "$mode_root/bin/stat" <<'EOF'
+#!/bin/bash
+printf '%s\n' 644
+exit 0
+EOF
+chmod +x "$mode_root/bin/stat"
+set +e
+PATH="$mode_root/bin:$old_path" bash "$root/docker-compose.feed-token-fetch.sh" "$mode_root" >"$mode_root/out.txt" 2>"$mode_root/err.txt"
+mode_code=$?
+set -e
+mode_left=$(find "$mode_root" -name '.azure-artifacts.*' -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$mode_code" -ne 0 ] && [ "$mode_left" -eq 0 ]; then
+  pass 'token is not written when the temp file is not mode 600'
+else
+  fail 'token is not written when the temp file is not mode 600'
+fi
+if grep -F "$sentinel" "$mode_root/out.txt" "$mode_root/err.txt" >/dev/null 2>&1; then
+  fail 'rejected temp file does not print the token'
+else
+  pass 'rejected temp file does not print the token'
+fi
 
 # Output files must not contain the sentinel.
-if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" >/dev/null 2>&1; then
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
 else
   pass 'bash test output does not contain the token'

@@ -36,7 +36,8 @@ find_link_cloud_root() {
 }
 
 if [ -z "${LINK_CLOUD_DOCKER_EXE:-}" ]; then
-  LINK_CLOUD_DOCKER_EXE=$(command -v docker || true)
+  # type -P ignores a shell function, so the wrapper does not call itself.
+  LINK_CLOUD_DOCKER_EXE=$(type -P docker || true)
 fi
 
 link_cloud_now() {

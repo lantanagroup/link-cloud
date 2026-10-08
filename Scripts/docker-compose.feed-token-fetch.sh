@@ -157,11 +157,13 @@ tmp=$(mktemp "${root}/.azure-artifacts.XXXXXXXXXX")
 # A failed mv would otherwise leave the token next to the env file.
 trap 'rm -f "$tmp"' EXIT
 chmod 600 "$tmp" || true
-printf '%s\n' "AZURE_ARTIFACTS_PAT=${token}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=${expires}" > "$tmp"
-unset token expires
+# Check the empty file before the token is written.
 if ! file_mode_is_600 "$tmp"; then
+  unset token expires
   fail "The token file could not be limited to the current user, so it was not kept."
 fi
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${token}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=${expires}" > "$tmp"
+unset token expires
 mv "$tmp" "$env_file"
 trap - EXIT
 chmod 600 "$env_file" || true
