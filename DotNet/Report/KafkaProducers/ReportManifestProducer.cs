@@ -169,7 +169,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         Notes = $"Failed to upload to blob storage: {ex}"
                     };
                     await _auditableEventOccurredProducer.ProduceAsync(auditEvent);
-                    return false;
+                    throw new TransientException($"Failed to upload report manifest (ReportId = {schedule.Id}).", ex);
                 }
 
                 _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
