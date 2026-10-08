@@ -1,7 +1,7 @@
 @model VendorListPage
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Configuration</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to configuration"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Vendors</h1>

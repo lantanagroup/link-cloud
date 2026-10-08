@@ -16,7 +16,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to logs"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">SFTP acquisition log</h1>
@@ -158,7 +158,7 @@ else
                                 </td>
                                 <td>@row.AcquisitionType</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.SubType) ? "—" : row.SubType)</td>
-                                <td>@row.Status</td>
+                                <td><span class="badge @StatusPills.ForLog(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
                                 <td class="text-nowrap">@row.Scheduled</td>
                                 <td class="text-nowrap">@row.Processed</td>
                                 <td>@row.RetryAttempts</td>

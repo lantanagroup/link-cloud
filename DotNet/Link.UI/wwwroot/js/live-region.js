@@ -412,7 +412,8 @@
             var shown = copy.parentElement && copy.parentElement.querySelector
                 ? copy.parentElement.querySelector(".lu-facility-id, .lu-clip")
                 : null;
-            if (shown && shown.textContent && shown.textContent.trim()) value = shown.textContent.trim();
+            var shownText = shown && shown.textContent ? shown.textContent.trim() : "";
+            if (shownText && shownText !== "—" && shownText !== "-") value = shownText;
             var icon = copy.querySelector("i");
             var label = copy.getAttribute("aria-label") || "Copy";
             var done = function () {

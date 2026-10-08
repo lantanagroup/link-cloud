@@ -98,7 +98,7 @@
         </div>
     </div>
 
-    <partial name="_ServiceMonitor" model="@(new ServiceMonitorModel(Url.Action("LiveUtilization", "Metrics")!, detail: "Click a service to pin CPU, RAM, and API p95. Hot services glow. Pulse view keeps the rest of Performance in sight."))" />
+    <partial name="_ServiceMonitor" model="@(new ServiceMonitorModel(Url.Action("LiveUtilization", "Metrics")!, detail: "Click a service to pin CPU, RAM, and API p95. Hot services glow. Pulse view keeps the rest of Performance in sight.", healthUrl: Url.Action("HealthStatus", "System")))" />
 
     <div class="au-card mb-4">
         <div class="card-header"><i class="bi bi-layers me-2"></i>How each pipeline step is doing</div>

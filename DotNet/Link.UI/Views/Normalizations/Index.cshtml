@@ -26,19 +26,19 @@
         </div>
     </div>
 
-    <ul class="nav nav-tabs mb-3" id="normTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
+    <ul class="lu-section-nav" id="normTabs" role="tablist">
+        <li role="presentation">
+            <button class="active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
                 <i class="bi bi-gear me-1"></i>Operations <span class="badge bg-secondary">@operations.Count</span>
             </button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
+        <li role="presentation">
+            <button id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
                 <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge bg-secondary">@sequences.Count</span>
             </button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
+        <li role="presentation">
+            <button id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
                 <i class="bi bi-box me-1"></i>Suites <span class="badge bg-secondary">@suites.Count</span>
             </button>
         </li>
@@ -80,7 +80,7 @@
                                             <br /><small class="text-muted">@op.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge bg-info text-dark">@op.OperationType</span></td>
+                                    <td><span class="badge au-badge-muted">@op.OperationType</span></td>
                                     <td><small class="text-muted">@string.Join(", ", op.ResourceTypes)</small></td>
                                     <td>
                                         @if (op.IsSystem) { <span class="badge bg-dark">System</span> }

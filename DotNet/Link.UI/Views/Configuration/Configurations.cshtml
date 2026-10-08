@@ -16,7 +16,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Notifications"><i class="bi bi-arrow-left me-1"></i>Notifications</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Notifications")!, "Back to notifications"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Notification configuration</h1>

@@ -126,14 +126,14 @@
                 <input type="hidden" id="QpIsSystem" value="false" />
 
                 @* ---- Tabs: Visual Editor / JSON Import ---- *@
-                <ul class="nav nav-tabs mb-3" id="qpEditorTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="tab-visual" data-bs-toggle="tab" data-bs-target="#pane-visual" type="button" role="tab">
+                <ul class="lu-section-nav" id="qpEditorTabs" role="tablist">
+                    <li role="presentation">
+                        <button class="active" id="tab-visual" data-bs-toggle="tab" data-bs-target="#pane-visual" type="button" role="tab">
                             <i class="bi bi-pencil-square me-1"></i>Visual Editor
                         </button>
                     </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="tab-json" data-bs-toggle="tab" data-bs-target="#pane-json" type="button" role="tab">
+                    <li role="presentation">
+                        <button id="tab-json" data-bs-toggle="tab" data-bs-target="#pane-json" type="button" role="tab">
                             <i class="bi bi-filetype-json me-1"></i>Import JSON
                         </button>
                     </li>
@@ -271,9 +271,9 @@
         text-transform:uppercase; letter-spacing:.03em; flex-shrink:0;
         width:80px; text-align:center; display:inline-block;
     }
-    .qp-param-type-badge.variable { background:#e3f2fd; color:#1565c0; }
-    .qp-param-type-badge.literal { background:#fff3e0; color:#e65100; }
-    .qp-param-type-badge.resourceids { background:#e8f5e9; color:#2e7d32; }
+    .qp-param-type-badge.variable { background:var(--au-bg); color:#111; }
+    .qp-param-type-badge.literal { background:#fff3e0; color:#111; }
+    .qp-param-type-badge.resourceids { background:#eaf6ee; color:var(--au-success); }
     .qp-ref-options { display:flex; align-items:center; gap:.75rem; padding:.4rem 0; }
     .qp-ref-options label { font-size:.78rem; color:var(--au-muted); margin-bottom:0; white-space:nowrap; }
     .qp-ref-options input { width:70px; font-size:.82rem; }
