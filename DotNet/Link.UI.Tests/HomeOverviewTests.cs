@@ -444,6 +444,7 @@ public class HomeOverviewTests
         service.Should().NotContain("GetFacilityListAsync");
         service.Should().NotContain("CountReportsAsync");
         service.Should().Contain("GetFacilityCountsAsync");
+        service.Should().Contain("RealFacilityScope");
         service.Should().Contain("LoadActivityCountsAsync");
         service.Should().Contain("LoadAcquisitionCountsAsync");
         service.Should().Contain("LoadAuditErrorsAsync");
@@ -466,6 +467,9 @@ public class HomeOverviewTests
         known.Regular.Should().Be(2);
         HomeOverviewRules.PrimaryFacilityText(known, true).Should().Be("2");
         HomeOverviewRules.PrimaryFacilityLabel(known, true).Should().Be("Real facilities");
+        HomeOverviewRules.RealFacilityScope(true, known.Regular).Should().Be(AutomationMarkRules.Real);
+        HomeOverviewRules.RealFacilityScope(true, null).Should().BeNull();
+        HomeOverviewRules.RealFacilityScope(false, 2).Should().BeNull();
 
         var hidden = HomeOverviewRules.Facilities(
             true,

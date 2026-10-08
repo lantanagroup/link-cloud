@@ -3,12 +3,12 @@
 namespace Link.UI.Controllers;
 
 /// <summary>
-/// Placeholder sections for left-nav groups not yet ported (phase 1).
+/// Old placeholder routes. Each one redirects to the section that replaced it.
 /// </summary>
 public sealed class PlaceholderController : Controller
 {
     [HttpGet]
-    public IActionResult Reports() => ComingSoon("Reports");
+    public IActionResult Reports() => RedirectToAction("Index", "Reports");
 
     [HttpGet]
     public IActionResult Configuration() => RedirectToAction("Index", "Configuration");
@@ -21,12 +21,5 @@ public sealed class PlaceholderController : Controller
 
     [HttpGet]
     public IActionResult Automation() => RedirectToAction("Index", "Automation");
-
-    private IActionResult ComingSoon(string section)
-    {
-        ViewData["Title"] = section;
-        ViewData["Section"] = section;
-        return View("~/Views/Shared/ComingSoon.cshtml");
-    }
 }
 
