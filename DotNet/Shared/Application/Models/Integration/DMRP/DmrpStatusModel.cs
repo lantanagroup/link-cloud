@@ -1,8 +1,11 @@
-namespace LantanaGroup.Link.DMRP.Models;
+namespace LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 
 /// <summary>
 /// Whether DMRP is enabled in this deployment, and whether facility saves write through to the Mock DMRP API.
 /// </summary>
+/// <remarks>
+/// Tenant answers it at <c>api/dmrp/dmrp-status</c>; the Admin UI and Automation read it there.
+/// </remarks>
 public class DmrpStatusModel
 {
     /// <summary>

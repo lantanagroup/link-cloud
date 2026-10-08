@@ -1,6 +1,6 @@
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.MockDmrp;
-using LantanaGroup.Link.DMRP.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
