@@ -409,7 +409,9 @@ public class PatientCensusServiceTests
         var tag = Guid.NewGuid().ToString("N")[..8];
         var facilityId = $"CensusTest_QueryAuth_{tag}";
 
-        // The EHR credentials live only on the query config; census must read every List with them.
+        // FhirListConfiguration has no Authentication any more, so the stale list-level key behind LEGLINK-1429
+        // can't be planted here; the compiler now prevents that path. This pins that every List read uses the
+        // query configuration's credentials.
         await SeedFhirListAndQueryConfigAsync(
             dbContext,
             facilityId,
