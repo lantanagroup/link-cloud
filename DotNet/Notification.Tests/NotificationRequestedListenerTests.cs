@@ -237,6 +237,9 @@ public class NotificationRequestedListenerTests
         var services = new Mock<IServiceProvider>();
         services.Setup(s => s.GetService(typeof(IValidateEmailAddressCommand))).Returns(validate.Object);
         services.Setup(s => s.GetService(typeof(ICreateNotificationCommand))).Returns(create.Object);
+        services.Setup(s => s.GetService(typeof(IGetNotificationQuery))).Returns(Mock.Of<IGetNotificationQuery>());
+        services.Setup(s => s.GetService(typeof(ISendNotificationCommand))).Returns(Mock.Of<ISendNotificationCommand>());
+        services.Setup(s => s.GetService(typeof(IGetFacilityConfigurationQuery))).Returns(Mock.Of<IGetFacilityConfigurationQuery>());
         var scope = new Mock<IServiceScope>();
         scope.Setup(s => s.ServiceProvider).Returns(services.Object);
         var scopes = new Mock<IServiceScopeFactory>();
@@ -278,6 +281,7 @@ public class NotificationRequestedListenerTests
             c => c.Seek(It.Is<TopicPartitionOffset>(offset => offset.Topic == "NotificationRequested" && offset.Offset.Value == 0)),
             Times.AtLeastOnce);
         consumer.Verify(c => c.Commit(It.IsAny<ConsumeResult<string, NotificationMessage>>()), Times.Never);
+        create.Verify(c => c.Execute(It.IsAny<CreateNotificationModel>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     private static ConsumeResult<string, NotificationMessage> Message(string subject) =>
