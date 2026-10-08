@@ -51,7 +51,10 @@ if (-not (Test-Path -LiteralPath $ProfilePath)) {
     exit 0
 }
 
-$existing = [System.IO.File]::ReadAllText($ProfilePath)
+# Get-Content follows this host's encoding and still honors a byte-order mark.
+# ReadAllText would treat a BOM-less ANSI profile as UTF-8 and corrupt it on rewrite.
+$existing = Get-Content -Raw -LiteralPath $ProfilePath
+if ($null -eq $existing) { $existing = '' }
 if ($existing -notmatch [regex]::Escape($marker)) {
     $prefix = ''
     if ($existing.Length -gt 0 -and -not $existing.EndsWith("`n")) {
