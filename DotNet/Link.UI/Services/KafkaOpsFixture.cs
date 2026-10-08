@@ -102,7 +102,7 @@ public sealed class KafkaOpsFixture
             plan.Notes.Add("One facility can never use more than one partition. A quiet window keeps in-flight keys on the partition they already use.");
         else if (string.Equals(plan.KeyClass, "Patient", StringComparison.Ordinal))
             plan.Notes.Add("A patient key is {facilityId}:{patientId}. Raising the partition count remaps which partition that patient uses.");
-        plan.SecondApproverRequired = !plan.HardBlocked && (plan.QuietWindowRequired || overrideQuietWindow);
+        plan.SecondApproverRequired = !plan.HardBlocked;
         plan.Accepted = plan.Errors.Count == 0;
         plan.Summary = plan.Accepted ? string.Join(" ", plan.Notes) : string.Join(" ", plan.Errors);
         return plan.Accepted ? Ok(plan) : Bad(plan);
