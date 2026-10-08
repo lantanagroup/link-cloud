@@ -366,6 +366,20 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             _logger.LogDebug(ex, "Could not extract pipeline duration for run {RunId}", runId);
         }
 
+        if (string.IsNullOrWhiteSpace(duration))
+        {
+            try
+            {
+                var meta = await _store.GetRunMetaAsync(runId);
+                if (meta is not null && meta.StartedAt != default)
+                    duration = Link.UI.Services.AutomationRules.FormatWallClock(DateTimeOffset.UtcNow - meta.StartedAt);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not measure wall-clock duration for run {RunId}", runId);
+            }
+        }
+
         try
         {
             await _store.CompleteRunAsync(runId, duration);
