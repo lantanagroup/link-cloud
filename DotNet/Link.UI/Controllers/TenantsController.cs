@@ -89,6 +89,8 @@ public sealed class TenantsController : Controller
                 }
             }
 
+            await MergeExactIdAsync(search, includeDeleted, active, all, cancellationToken);
+
             var activeKeys = new HashSet<string>(active.Keys, StringComparer.OrdinalIgnoreCase);
             var tenants = all
                 .Select(kvp => new TenantListItem
@@ -507,6 +509,63 @@ public sealed class TenantsController : Controller
     {
         var result = await _hub.SoftDeleteAsync(id, cancellationToken);
         return await FromResult(result, id ?? "Facility");
+    }
+
+    private async Task MergeExactIdAsync(
+        string? search,
+        bool includeDeleted,
+        Dictionary<string, string> active,
+        Dictionary<string, string> all,
+        CancellationToken cancellationToken)
+    {
+        if (!TenantListSearch.ShouldLookupExactId(search, all.Keys))
+            return;
+
+        var term = search!.Trim();
+        var activeFull = await _facilityServiceClient.GetFacilityListAsync(
+            search: null,
+            includeDeleted: false,
+            cancellationToken: cancellationToken);
+        if (!TryMapFacilities(activeFull, out var activeById))
+            return;
+
+        if (TryFind(activeById, term, out var activeId, out var activeName))
+        {
+            TenantListSearch.AddExact(active, all, includeDeleted, activeId, activeName, isDeleted: false);
+            return;
+        }
+
+        if (!includeDeleted)
+            return;
+
+        var deletedFull = await _facilityServiceClient.GetFacilityListAsync(
+            search: null,
+            includeDeleted: true,
+            cancellationToken: cancellationToken);
+        if (!TryMapFacilities(deletedFull, out var allById))
+            return;
+        if (TryFind(allById, term, out var deletedId, out var deletedName))
+            TenantListSearch.AddExact(active, all, includeDeleted: true, deletedId, deletedName, isDeleted: true);
+    }
+
+    private static bool TryFind(
+        Dictionary<string, string> facilities,
+        string term,
+        out string id,
+        out string name)
+    {
+        foreach (var pair in facilities)
+        {
+            if (!string.Equals(pair.Key, term, StringComparison.OrdinalIgnoreCase))
+                continue;
+            id = pair.Key;
+            name = pair.Value;
+            return true;
+        }
+
+        id = "";
+        name = "";
+        return false;
     }
 
     private static bool TryMapFacilities(
