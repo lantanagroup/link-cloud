@@ -194,6 +194,11 @@ public class UiPatternGuardTests
         covered.Should().BeGreaterThan(40);
         misses.Distinct().Should().BeEmpty();
 
+        var layout = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_Layout.cshtml"));
+        layout.Should().Contain("bootstrap.min.css");
+        var min = File.ReadAllText(Path.Combine(Root(), "wwwroot", "lib", "bootstrap", "dist", "css", "bootstrap.min.css"));
+        Loaded_stylesheet_matches_the_expanded_color_tokens(vendor, min);
+
         var interaction = siteRules.Where(rule => rule.Selector.Contains(":focus", StringComparison.Ordinal)
             || rule.Selector.Contains(":focus-visible", StringComparison.Ordinal)
             || rule.Selector.Contains(":hover", StringComparison.Ordinal)
@@ -261,6 +266,369 @@ public class UiPatternGuardTests
             var digits = new string(width.TakeWhile(char.IsDigit).ToArray());
             int.Parse(digits).Should().BeGreaterThanOrEqualTo(12);
         }
+    }
+
+    [Fact]
+    public void Dark_buttons_use_light_text()
+    {
+        var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
+        var rules = CssRules(css).ToList();
+        var vars = RootVars(rules);
+        var parsed = new List<CompoundRule>();
+        var order = 0;
+        foreach (var rule in rules)
+        {
+            var props = Declarations(rule.Body).ToList();
+            foreach (var part in rule.Selector.Split(','))
+            {
+                if (!TryCompound(part, out var classes, out var pseudo))
+                    continue;
+                var spec = (classes.Count * 10) + (pseudo is null ? 0 : 1);
+                parsed.Add(new CompoundRule(order, classes, pseudo, spec, props));
+            }
+
+            order++;
+        }
+
+        var buttonClasses = parsed
+            .SelectMany(rule => rule.Classes)
+            .Where(name => name.StartsWith("btn-", StringComparison.Ordinal) && name != "btn-check")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        buttonClasses.Should().NotBeEmpty();
+
+        var failures = new List<string>();
+        foreach (var button in buttonClasses)
+        {
+            foreach (var state in new string?[] { null, "hover", "focus", "active", "disabled" })
+            {
+                var element = new HashSet<string>(StringComparer.Ordinal) { "btn", button };
+                if (state == "disabled")
+                    element.Add("disabled");
+                if (!TryResolvePaint(parsed, vars, element, state, out var color, out var background, out var transparent)
+                    || transparent
+                    || RelativeLuminance(background) >= 0.2)
+                    continue;
+
+                var label = "." + button + " " + (state ?? "rest");
+                if (color is null)
+                {
+                    failures.Add(label + " dark fill " + Format(background) + " has no text color");
+                    continue;
+                }
+
+                var contrast = Contrast(RelativeLuminance(color.Value), RelativeLuminance(background));
+                if (contrast < 4.5)
+                    failures.Add(label + " " + Format(color.Value) + " on " + Format(background) + " contrast " + contrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+
+        if (!TryResolveSelectorColor(rules, vars, ".au-card .card-header .lu-id-label", ".lu-id-label", out var labelColor))
+            failures.Add("card-header id label has no color");
+        else
+        {
+            var dark = ResolveSolid(vars["--au-dark"], vars);
+            var labelContrast = Contrast(RelativeLuminance(labelColor), RelativeLuminance(dark));
+            if (labelContrast < 4.5)
+                failures.Add("card-header id label " + Format(labelColor) + " on " + Format(dark) + " contrast " + labelContrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        string.Join(" | ", failures).Should().BeEmpty();
+    }
+
+    private sealed record CompoundRule(int Order, HashSet<string> Classes, string? Pseudo, int Spec, List<(string Name, string Value)> Props);
+
+    private static bool TryCompound(string selector, out HashSet<string> classes, out string? pseudo)
+    {
+        classes = new HashSet<string>(StringComparer.Ordinal);
+        pseudo = null;
+        var text = Regex.Replace(selector.Trim(), @"\s+", " ");
+        if (text.Length == 0
+            || text.Contains(' ')
+            || text.Contains('>')
+            || text.Contains('+')
+            || text.Contains('~')
+            || text.Contains('[')
+            || text.Contains("::", StringComparison.Ordinal)
+            || text.Contains(":not", StringComparison.OrdinalIgnoreCase)
+            || text.Contains(":checked", StringComparison.OrdinalIgnoreCase)
+            || text.Contains(":first", StringComparison.OrdinalIgnoreCase)
+            || text.Contains(":last", StringComparison.OrdinalIgnoreCase)
+            || text.Contains(":nth", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var state = Regex.Match(text, @":(hover|focus-visible|focus|active|disabled)$", RegexOptions.IgnoreCase);
+        if (state.Success)
+        {
+            pseudo = state.Groups[1].Value.Equals("focus-visible", StringComparison.OrdinalIgnoreCase) ? "focus" : state.Groups[1].Value.ToLowerInvariant();
+            text = text[..state.Index];
+        }
+
+        if (text.Contains(':') || !Regex.IsMatch(text, @"^(\.[A-Za-z_][\w-]*)+$"))
+            return false;
+
+        foreach (Match match in Regex.Matches(text, @"\.([A-Za-z_][\w-]*)"))
+            classes.Add(match.Groups[1].Value.ToLowerInvariant());
+        return classes.Count > 0;
+    }
+
+    private static bool TryResolvePaint(
+        List<CompoundRule> rules,
+        Dictionary<string, string> vars,
+        HashSet<string> element,
+        string? state,
+        out (int R, int G, int B)? color,
+        out (int R, int G, int B) background,
+        out bool transparent)
+    {
+        color = null;
+        background = default;
+        transparent = true;
+        (bool Important, int Spec, int Order)? colorWin = null;
+        (bool Important, int Spec, int Order)? bgWin = null;
+        foreach (var rule in rules)
+        {
+            if (rule.Pseudo is not null && rule.Pseudo != state)
+                continue;
+            if (!rule.Classes.IsSubsetOf(element))
+                continue;
+
+            foreach (var decl in rule.Props)
+            {
+                var important = decl.Value.Contains("!important", StringComparison.OrdinalIgnoreCase);
+                var value = Regex.Replace(decl.Value, @"!important", "", RegexOptions.IgnoreCase).Trim();
+                var win = (important, rule.Spec, rule.Order);
+                if (decl.Name == "color")
+                {
+                    if (!TrySolidColor(value, vars, out var parsed))
+                        continue;
+                    if (colorWin is null || CompareWin(win, colorWin.Value) >= 0)
+                    {
+                        colorWin = win;
+                        color = parsed;
+                    }
+                }
+                else if (decl.Name is "background-color" or "background")
+                {
+                    var solid = TrySolidColor(value, vars, out var parsed);
+                    var clear = !solid && IsClear(value, vars);
+                    if (!solid && !clear)
+                        continue;
+                    if (bgWin is null || CompareWin(win, bgWin.Value) >= 0)
+                    {
+                        bgWin = win;
+                        transparent = clear;
+                        background = parsed;
+                    }
+                }
+            }
+        }
+
+        return bgWin is not null;
+    }
+
+    private static bool TryResolveSelectorColor(
+        List<(string Selector, string Body)> rules,
+        Dictionary<string, string> vars,
+        string specific,
+        string general,
+        out (int R, int G, int B) color)
+    {
+        color = default;
+        (int Spec, int Order)? win = null;
+        var order = 0;
+        foreach (var rule in rules)
+        {
+            foreach (var part in rule.Selector.Split(','))
+            {
+                var key = NormSelector(part);
+                var spec = key == NormSelector(specific) ? 30 : key == NormSelector(general) ? 10 : 0;
+                if (spec == 0)
+                    continue;
+                foreach (var decl in Declarations(rule.Body))
+                {
+                    if (decl.Name != "color" || !TrySolidColor(decl.Value, vars, out var parsed))
+                        continue;
+                    if (win is null || spec > win.Value.Spec || (spec == win.Value.Spec && order >= win.Value.Order))
+                    {
+                        win = (spec, order);
+                        color = parsed;
+                    }
+                }
+            }
+
+            order++;
+        }
+
+        return win is not null;
+    }
+
+    private static int CompareWin((bool Important, int Spec, int Order) left, (bool Important, int Spec, int Order) right)
+    {
+        var important = left.Important.CompareTo(right.Important);
+        if (important != 0)
+            return important;
+        var spec = left.Spec.CompareTo(right.Spec);
+        return spec != 0 ? spec : left.Order.CompareTo(right.Order);
+    }
+
+    private static Dictionary<string, string> RootVars(List<(string Selector, string Body)> rules)
+    {
+        var vars = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in rules)
+        {
+            if (!rule.Selector.Split(',').Any(part => NormSelector(part) == ":root"))
+                continue;
+            foreach (var decl in Declarations(rule.Body))
+            {
+                if (decl.Name.StartsWith("--", StringComparison.Ordinal))
+                    vars[decl.Name] = decl.Value;
+            }
+        }
+
+        return vars;
+    }
+
+    private static string ResolveVars(string value, Dictionary<string, string> vars)
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            var next = Regex.Replace(value, @"var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)", match =>
+                vars.TryGetValue(match.Groups[1].Value, out var resolved) ? resolved : match.Value);
+            if (next == value)
+                break;
+            value = next;
+        }
+
+        return value;
+    }
+
+    private static bool IsClear(string value, Dictionary<string, string> vars)
+    {
+        var text = ResolveVars(value, vars).Trim().ToLowerInvariant();
+        return text is "transparent" or "none" || text.StartsWith("transparent", StringComparison.Ordinal) || text.StartsWith("none", StringComparison.Ordinal);
+    }
+
+    private static bool TrySolidColor(string value, Dictionary<string, string> vars, out (int R, int G, int B) color)
+    {
+        color = default;
+        var text = ResolveVars(value, vars).ToLowerInvariant();
+        var hex = Regex.Match(text, @"#([0-9a-f]{3,8})");
+        if (hex.Success)
+        {
+            var digits = hex.Groups[1].Value;
+            if (digits.Length is 4 or 8)
+            {
+                var alpha = digits.Length == 4 ? new string(digits[3], 2) : digits[6..];
+                if (!int.TryParse(alpha, System.Globalization.NumberStyles.HexNumber, null, out var channel) || channel < 250)
+                    return false;
+                digits = digits.Length == 4 ? digits[..3] : digits[..6];
+            }
+
+            if (digits.Length == 3)
+                digits = string.Concat(digits.Select(ch => new string(ch, 2)));
+            if (digits.Length != 6 || !int.TryParse(digits, System.Globalization.NumberStyles.HexNumber, null, out var packed))
+                return false;
+            color = ((packed >> 16) & 255, (packed >> 8) & 255, packed & 255);
+            return true;
+        }
+
+        var rgb = Regex.Match(text, @"rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([0-9.]+)\s*)?\)");
+        if (!rgb.Success)
+            return false;
+        if (rgb.Groups[4].Success
+            && double.TryParse(rgb.Groups[4].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var alphaChannel)
+            && alphaChannel < 0.99)
+            return false;
+        color = (int.Parse(rgb.Groups[1].Value), int.Parse(rgb.Groups[2].Value), int.Parse(rgb.Groups[3].Value));
+        return true;
+    }
+
+    private static (int R, int G, int B) ResolveSolid(string value, Dictionary<string, string> vars)
+    {
+        TrySolidColor(value, vars, out var color).Should().BeTrue();
+        return color;
+    }
+
+    private static double Channel(int value)
+    {
+        var s = value / 255d;
+        return s <= 0.04045 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+    }
+
+    private static double RelativeLuminance((int R, int G, int B) color) =>
+        (0.2126 * Channel(color.R)) + (0.7152 * Channel(color.G)) + (0.0722 * Channel(color.B));
+
+    private static double Contrast(double left, double right)
+    {
+        var lighter = Math.Max(left, right);
+        var darker = Math.Min(left, right);
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static string Format((int R, int G, int B) color) =>
+        "#" + color.R.ToString("x2") + color.G.ToString("x2") + color.B.ToString("x2");
+
+    private static void Loaded_stylesheet_matches_the_expanded_color_tokens(string expanded, string loaded)
+    {
+        var expandedTokens = ColorTokens(expanded).GroupBy(token => token).ToDictionary(group => group.Key, group => group.Count());
+        var loadedTokens = ColorTokens(loaded).GroupBy(token => token).ToDictionary(group => group.Key, group => group.Count());
+        foreach (var token in loadedTokens)
+        {
+            expandedTokens.Should().ContainKey(token.Key);
+            expandedTokens[token.Key].Should().Be(token.Value);
+        }
+
+        var extras = expandedTokens
+            .Where(token => !loadedTokens.TryGetValue(token.Key, out var count) || count != token.Value)
+            .Select(token => token.Key)
+            .ToList();
+        extras.Should().OnlyContain(token => token.EndsWith(",0)", StringComparison.Ordinal));
+    }
+
+    private static List<string> ColorTokens(string css)
+    {
+        css = Regex.Replace(css, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        css = Regex.Replace(css, @"@charset\s+""[^""]+"";", "", RegexOptions.IgnoreCase);
+        var list = new List<string>();
+        foreach (Match match in Regex.Matches(css, @"#([0-9a-fA-F]{3,8})\b|rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([0-9.]+)\s*)?\)|hsla?\(\s*([0-9.]+)\s*,\s*([0-9.]+)%\s*,\s*([0-9.]+)%\s*(?:,\s*([0-9.]+)\s*)?\)"))
+        {
+            if (match.Groups[1].Success)
+                list.Add(CanonHex(match.Groups[1].Value));
+            else if (match.Groups[2].Success)
+                list.Add("rgb(" + match.Groups[2].Value + "," + match.Groups[3].Value + "," + match.Groups[4].Value + AlphaSuffix(match.Groups[5]) + ")");
+            else
+                list.Add("hsl(" + match.Groups[6].Value + "," + match.Groups[7].Value + "%," + match.Groups[8].Value + "%" + AlphaSuffix(match.Groups[9]) + ")");
+        }
+
+        list.Sort(StringComparer.Ordinal);
+        return list;
+    }
+
+    private static string CanonHex(string digits)
+    {
+        digits = digits.ToLowerInvariant();
+        var alpha = "";
+        if (digits.Length is 4 or 8)
+        {
+            alpha = digits.Length == 4 ? new string(digits[3], 2) : digits[6..];
+            digits = digits.Length == 4 ? digits[..3] : digits[..6];
+        }
+
+        if (digits.Length == 3)
+            digits = string.Concat(digits.Select(ch => new string(ch, 2)));
+        return "#" + digits + (alpha.Length == 2 && alpha != "ff" ? alpha : "");
+    }
+
+    private static string AlphaSuffix(Group alpha)
+    {
+        if (!alpha.Success)
+            return "";
+        var number = double.Parse(alpha.Value, System.Globalization.CultureInfo.InvariantCulture);
+        var text = Math.Abs(number) < 0.0000001
+            ? "0"
+            : number.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+        return "," + text;
     }
 
     private static string NormSelector(string selector)
