@@ -469,6 +469,12 @@ public static class HomeOverviewRules
     public static string PrimaryFacilityLabel(FacilityCard card, bool automationVisible) =>
         card.Reachable && automationVisible && card.Regular is int ? "Real facilities" : "Facilities";
 
+    /// <summary>
+    /// Scope query for the real-facilities tile. Set only when that tile's number is the real split.
+    /// </summary>
+    public static string? RealFacilityScope(bool automationVisible, int? regular) =>
+        automationVisible && regular is int ? AutomationMarkRules.Real : null;
+
     public static ActivityCard Activity(
         bool inFlightReachable,
         long inFlight,
