@@ -582,6 +582,44 @@ public class UiPatternGuardTests
     }
 
     [Fact]
+    public void Disabled_pager_links_are_not_focusable()
+    {
+        var item = new Regex(@"<li\b[^>]*>.*?</li>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        var anchor = new Regex(@"<a\b[^>]*>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+        var hits = new List<string>();
+        foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
+        {
+            var text = File.ReadAllText(file);
+            foreach (Match block in item.Matches(text))
+            {
+                var end = block.Value.IndexOf('>');
+                if (end < 0)
+                    continue;
+                var open = block.Value[..(end + 1)];
+                if (!open.Contains("page-item", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!Regex.IsMatch(open, @"\bdisabled\b", RegexOptions.IgnoreCase))
+                    continue;
+
+                foreach (Match link in anchor.Matches(block.Value))
+                {
+                    if (!link.Value.Contains("page-link", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var unfocusable = link.Value.Contains("tabindex=\"-1\"", StringComparison.Ordinal)
+                        && link.Value.Contains("aria-disabled=\"true\"", StringComparison.Ordinal);
+                    if (!unfocusable)
+                    {
+                        var line = text.Take(block.Index).Count(character => character == '\n') + 1;
+                        hits.Add(Rel(file) + ":" + line + " disabled pager link is focusable");
+                    }
+                }
+            }
+        }
+
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Chart_canvases_use_the_shared_frame()
     {
         var hits = new List<string>();
