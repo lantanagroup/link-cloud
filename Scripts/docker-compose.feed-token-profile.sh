@@ -176,24 +176,21 @@ compose() {
 }
 
 docker() {
-  local root repo_profile current repo_full
-  # Only compose reloads the checkout script. Other docker commands must not run it.
-  if [ -z "${LINK_CLOUD_SKIP_RELOAD:-}" ] && link_cloud_is_compose "$@"; then
+  local root repo_profile status
+  # Only compose reloads the checkout script, and it re-reads that script on every call.
+  # Other docker commands must not run it. The flag stops the reload from calling itself.
+  if [ -z "${LINK_CLOUD_SKIP_RELOAD:-}" ] && [ -z "${LINK_CLOUD_SOURCING:-}" ] && link_cloud_is_compose "$@"; then
     root=$(find_link_cloud_root || true)
     if [ -n "$root" ]; then
       repo_profile="$root/Scripts/docker-compose.feed-token-profile.sh"
-      current=""
-      if [ -n "${BASH_SOURCE[0]:-}" ]; then
-        current=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")
-      fi
-      if [ -f "$repo_profile" ] && [ -n "$current" ]; then
-        repo_full=$(cd "$(dirname "$repo_profile")" && pwd)/$(basename "$repo_profile")
-        if [ "$repo_full" != "$current" ]; then
-          # shellcheck disable=SC1090
-          . "$repo_profile"
-          docker "$@"
-          return $?
-        fi
+      if [ -f "$repo_profile" ]; then
+        LINK_CLOUD_SOURCING=1
+        # shellcheck disable=SC1090
+        . "$repo_profile"
+        docker "$@"
+        status=$?
+        unset LINK_CLOUD_SOURCING
+        return "$status"
       fi
     fi
   fi

@@ -368,10 +368,22 @@ if [ "$compose_code" -eq 0 ] && [ -f "$LINK_CLOUD_RELOAD_MARK" ]; then
 else
   fail 'compose loads the checkout script'
 fi
+export LINK_CLOUD_RELOAD_MARK2="$reload_root/sourced2"
+rm -f "$LINK_CLOUD_RELOAD_MARK2"
+printf '%s\n' 'touch "$LINK_CLOUD_RELOAD_MARK2"' | cat - "$root/docker-compose.feed-token-profile.sh" > "$reload_root/Scripts/docker-compose.feed-token-profile.sh"
+set +e
+docker compose version >"$reload_root/out3.txt" 2>"$reload_root/err3.txt"
+second_code=$?
+set -e
+if [ "$second_code" -eq 0 ] && [ -f "$LINK_CLOUD_RELOAD_MARK2" ]; then
+  pass 'compose reloads a changed checkout script'
+else
+  fail 'compose reloads a changed checkout script'
+fi
 export LINK_CLOUD_SKIP_RELOAD="$saved_skip"
 
 # Output files must not contain the sentinel.
-if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" "$reload_root/out.txt" "$reload_root/err.txt" "$reload_root/out2.txt" "$reload_root/err2.txt" >/dev/null 2>&1; then
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" "$repo/fetch-xtrace-out.txt" "$repo/fetch-xtrace-err.txt" "$repo/xtrace-out.txt" "$repo/xtrace-err.txt" "$mode_root/out.txt" "$mode_root/err.txt" "$reload_root/out.txt" "$reload_root/err.txt" "$reload_root/out2.txt" "$reload_root/err2.txt" "$reload_root/out3.txt" "$reload_root/err3.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
 else
   pass 'bash test output does not contain the token'
