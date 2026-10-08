@@ -811,8 +811,9 @@ public class UiPatternGuardTests
         js.Should().Contain("URLSearchParams");
         js.Should().Contain("history.replaceState");
         js.Should().Contain("popstate");
-        js.Should().Contain("params.get('q')");
-        js.Should().Contain("params.get('sort')");
+        js.Should().Contain("params.get(prefix + key)");
+        js.Should().Contain("q: get('q')");
+        js.Should().Contain("put('sort'");
         js.Should().NotContain("sortBy");
         js.Should().NotContain("pageNumber");
 
@@ -1222,6 +1223,19 @@ public class UiPatternGuardTests
         var cool = h is >= 165 and <= 340 && s >= 0.12;
         var oldGreen = h is >= 145 and < 165 && s >= 0.40;
         return cool || oldGreen;
+    }
+
+    [Fact]
+    public void Data_tables_on_one_page_do_not_share_search_keys()
+    {
+        var js = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "au-data-table.js"));
+        js.Should().Contain("function queryPrefix(shell)");
+        js.Should().Contain("if (index <= 0) return '';");
+        js.Should().Contain("params.get(prefix + key)");
+        js.Should().Contain("params.set(prefix + key, value)");
+        js.Should().Contain("readQuery(shell)");
+        js.Should().NotContain("params.get('q')");
+        js.Should().NotContain("params.set('q'");
     }
 
     private static (double H, double S, double L) RgbToHsl(int r, int g, int b)
