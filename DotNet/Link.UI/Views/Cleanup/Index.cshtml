@@ -491,7 +491,10 @@
         html += listBlock('Purged run ids', report.purgedRunIds || report.PurgedRunIds);
         html += listBlock('Failed facilities', report.failedFacilityIds || report.FailedFacilityIds);
         html += listBlock('Failed run ids', report.failedRunIds || report.FailedRunIds);
-        if (body) body.innerHTML = html;
+        if (body) {
+            body.innerHTML = html;
+            if (window.luPaintTimes) window.luPaintTimes(body);
+        }
         var modalEl = document.getElementById('cleanupReportModal');
         if (window.bootstrap && modalEl) {
             bootstrap.Modal.getOrCreateInstance(modalEl).show();

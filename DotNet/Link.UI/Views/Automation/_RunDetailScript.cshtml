@@ -24,6 +24,7 @@
                 const host = document.getElementById('advancedPerformanceHost');
                 if (host) {
                     host.innerHTML = html;
+                    if (window.luPaintTimes) window.luPaintTimes(host);
                     advancedPanelLoaded = true;
                 }
                 return true;
