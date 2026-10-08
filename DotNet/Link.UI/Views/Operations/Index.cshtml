@@ -1,0 +1,16 @@
+@{
+    ViewData["Title"] = "Operations";
+    ViewData["OperationsSection"] = "home";
+}
+
+<partial name="_BackButton" model="@(new BackLink("/Home", "Dashboard"))" />
+<h1 class="h3 mt-3">Throughput and scaling</h1>
+<p class="text-muted">Cluster health, consumer replicas, and brokers.</p>
+<partial name="_Nav" />
+<div class="au-card card mt-3">
+    <div class="card-header">Kafka</div>
+    <div class="card-body">
+        <p>Overview, one topic, consumer replicas, and brokers. Adding partitions is permanent and sits behind an advanced confirmation.</p>
+        <a class="btn btn-success" asp-action="Kafka">Open Kafka</a>
+    </div>
+</div>

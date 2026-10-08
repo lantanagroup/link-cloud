@@ -1,0 +1,36 @@
+# Host reachability for the isolated proof host. Broker config stays in compose.yml.
+# These proxies publish host ports and forward to each broker HOST listener.
+# They do not change broker-0, so a second start does not recreate the controller.
+services:
+  host-proxy-0:
+    image: alpine/socat
+    command: ["TCP-LISTEN:19094,fork,reuseaddr", "TCP:broker-0:9094"]
+    ports:
+      - "${KAFKA_PROOF_PORT:-19094}:19094"
+    depends_on:
+      - broker-0
+
+  host-proxy-1:
+    image: alpine/socat
+    command: ["TCP-LISTEN:19095,fork,reuseaddr", "TCP:broker-1:9094"]
+    ports:
+      - "19095:19095"
+    depends_on:
+      - broker-1
+
+  host-proxy-2:
+    image: alpine/socat
+    command: ["TCP-LISTEN:19096,fork,reuseaddr", "TCP:broker-2:9094"]
+    ports:
+      - "19096:19096"
+    depends_on:
+      - broker-2
+
+  host-proxy-3:
+    image: alpine/socat
+    profiles: ["extra-broker"]
+    command: ["TCP-LISTEN:19097,fork,reuseaddr", "TCP:broker-3:9094"]
+    ports:
+      - "19097:19097"
+    depends_on:
+      - broker-3
