@@ -14,7 +14,7 @@
 }
 
 <div class="au-card card">
-    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = Model.Id, CopyLabel = "Copy id" })" /></div>
     <div class="card-body">
         <form method="post" data-au-save enctype="multipart/form-data" class="row g-3">
             <div class="col-12">

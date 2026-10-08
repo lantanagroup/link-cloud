@@ -147,7 +147,7 @@ else
                 <ul class="mb-0">
                     @foreach (var resourceId in Model.AcquiredIds)
                     {
-                        <li><code>@resourceId</code></li>
+                        <li><partial name="_LabeledId" model="@(new LabeledId { Label = "Resource", Value = resourceId, Compact = true, CopyLabel = "Copy resource id" })" /></li>
                     }
                 </ul>
                 @if (Model.AcquiredHidden > 0)
@@ -185,7 +185,7 @@ else
                         {
                             <tr>
                                 <td>@row.ResourceType</td>
-                                <td><code>@row.ResourceId</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Resource", Value = row.ResourceId, Compact = true, CopyLabel = "Copy resource id" })" /></td>
                                 <td>@(string.IsNullOrWhiteSpace(row.Phase) ? "—" : row.Phase)</td>
                             </tr>
                         }

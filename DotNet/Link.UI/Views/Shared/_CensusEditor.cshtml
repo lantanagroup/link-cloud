@@ -19,7 +19,7 @@
                 }
                 else if (!Model.CensusExists)
                 {
-                    <div class="alert alert-info">No census configuration for this facility.</div>
+                    <div class="alert au-note">No census configuration for this facility.</div>
                 }
                 <form method="post" data-au-save asp-controller="Tenants" asp-action="SaveCensus" asp-route-id="@Model.FacilityId">
                     <input type="hidden" name="censusExists" value="@(Model.CensusExists ? "true" : "false")" />

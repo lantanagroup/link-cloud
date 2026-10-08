@@ -18,6 +18,20 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script>
+        window.luLabeledId = function (label, value) {
+            var raw = value == null ? "" : String(value);
+            var trimmed = raw.trim();
+            if (!trimmed || trimmed === "—" || trimmed === "-") return '<span class="text-muted">—</span>';
+            var safe = trimmed.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            var name = String(label || "Id").toLowerCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            var shown = String(label || "Id").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            return '<span class="lu-labeled-id lu-labeled-id-compact"><span class="lu-id-label visually-hidden">' + shown
+                + '</span><span class="lu-id-value"><code class="lu-facility-id" title="' + safe + '">' + safe
+                + '</code><button type="button" class="btn btn-sm btn-au-neutral lu-copy" data-lu-copy="' + safe
+                + '" title="Copy ' + name + '" aria-label="Copy ' + name + '"><i class="bi bi-copy" aria-hidden="true"></i></button></span></span>';
+        };
+    </script>
 </head>
 <body class="lu-body@(adminShell ? " lu-admin" : "")">
     <div class="lu-shell">

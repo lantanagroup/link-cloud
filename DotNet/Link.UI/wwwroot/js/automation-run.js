@@ -14,6 +14,17 @@
         if (node) node.textContent = value || "—";
     }
 
+    function showInstant(id, value) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        if (!value) {
+            node.textContent = "—";
+            return;
+        }
+        node.textContent = String(value);
+        if (window.luPaintTimes) window.luPaintTimes(node);
+    }
+
     function statusPill(label) {
         var value = (label || "").toLowerCase();
         if (value === "succeeded") return "badge au-badge-success";
@@ -55,20 +66,16 @@
         text("facilityId", run.facilityId);
         text("scheduleFacilityId", run.facilityId);
         text("headerReportId", run.reportId);
-        text("started", run.startedAt ? new Date(run.startedAt).toISOString().replace(".000Z", "Z") : "");
-        text("finished", run.finishedAt ? new Date(run.finishedAt).toISOString().replace(".000Z", "Z") : "");
+        showInstant("started", run.startedAt);
+        showInstant("finished", run.finishedAt);
         text("pipelineDuration", run.duration);
         var detailError = document.getElementById("error");
         if (detailError) detailError.textContent = run.error || "-";
         text("runScenario", run.scenario);
         text("runPatients", String(run.patientCount || 0));
         text("runSeed", String(run.seed || 0));
-        text("runStarted", run.startedAt ? new Date(run.startedAt).toISOString().replace(".000Z", "Z") : "");
-        text("runFinished", run.finishedAt ? new Date(run.finishedAt).toISOString().replace(".000Z", "Z") : "");
-        ["started", "finished", "runStarted", "runFinished"].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el && window.luPaintTimes) window.luPaintTimes(el);
-        });
+        showInstant("runStarted", run.startedAt);
+        showInstant("runFinished", run.finishedAt);
         text("runDuration", run.duration);
         text("runTemplates", run.templateVersion ? "v" + run.templateVersion : "");
 
@@ -147,7 +154,7 @@
     }
 
     if (live.getAttribute("data-live") !== "yes" || typeof signalR === "undefined" || !runId) {
-        if (live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "bg-secondary");
+        if (live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "au-badge-muted");
         return;
     }
 
@@ -158,7 +165,7 @@
 
     function catchUp() {
         return connection.invoke("SubscribeRun", runId).then(function () {
-            setLive("Live", "bg-success");
+            setLive("Live", "au-badge-active");
             refresh();
         });
     }
@@ -166,11 +173,11 @@
     connection.on("status", refresh);
     connection.on("dashboardUpdate", refresh);
     connection.on("log", appendLog);
-    connection.onreconnecting(function () { setLive("Reconnecting", "bg-warning text-dark"); });
+    connection.onreconnecting(function () { setLive("Reconnecting", "au-badge-warning"); });
     connection.onreconnected(function () {
-        catchUp().catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        catchUp().catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
     });
-    connection.onclose(function () { setLive("Live updates unavailable", "bg-secondary"); });
+    connection.onclose(function () { setLive("Live updates unavailable", "au-badge-muted"); });
 
     // A status broadcast can land before this page subscribes, and later summary
     // writes do not always broadcast. Keep reading the stored run until it ends.
@@ -180,6 +187,8 @@
         if (label === "Succeeded" || label === "Failed" || label === "Cancelled") {
             clearInterval(poll);
             refresh();
+            connection.stop();
+            live.remove();
             return;
         }
         refresh();
@@ -188,5 +197,5 @@
     refresh();
     connection.start()
         .then(catchUp)
-        .catch(function () { setLive("Live updates unavailable", "bg-secondary"); });
+        .catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
 })();

@@ -106,7 +106,7 @@ else if (Model.Searched)
                         {
                             <tr>
                                 <td class="text-break">@row.System</td>
-                                <td><code>@row.Code</code></td>
+                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Code", Value = row.Code, Compact = true, CopyLabel = "Copy code" })" /></td>
                                 <td>@row.Display</td>
                                 <td><span class="badge @StatusPills.ForTerm(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
                             </tr>

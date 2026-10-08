@@ -98,7 +98,7 @@
         <div id="facilityReportResults" data-au-refresh="12000">
         @if (!string.IsNullOrWhiteSpace(Model.SectionNote))
         {
-            <div class="alert alert-info">@Model.SectionNote</div>
+            <div class="alert au-note">@Model.SectionNote</div>
         }
 
         @if (Model.Reports.Count == 0)

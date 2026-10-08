@@ -34,7 +34,7 @@
     </div>
 
     <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
-        <span class="badge bg-secondary" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
+        <span class="badge au-badge-muted" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
         <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
         <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
         <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
@@ -50,7 +50,7 @@
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <strong>Seed Run</strong>
-                <span id="seedRunStatus" class="badge bg-secondary ms-2">Starting</span>
+                <span id="seedRunStatus" class="badge au-badge-muted ms-2">Starting</span>
                 <div class="small text-muted" id="seedRunMeta"></div>
             </div>
             <a id="seedRunLink" class="btn btn-sm btn-au-neutral" target="_blank" style="display:none;">
@@ -80,7 +80,7 @@
                 ? (staleOnly ? "border border-secondary text-muted bg-transparent" : "au-badge-skip")
                 : (passCount == runnableCount && runnableCount > 0
                     ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
-                    : (staleOnly ? "border border-secondary text-muted bg-transparent" : "bg-secondary"));
+                    : (staleOnly ? "border border-secondary text-muted bg-transparent" : "au-badge-muted"));
 
         <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName" data-service-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
             <h2 class="accordion-header au-health-header">
@@ -120,7 +120,7 @@
                                 var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
                                 var badgeClass = isStale
                                     ? (isSkipped ? "border border-secondary text-muted bg-transparent" : (hasPassed == true ? "border border-success text-success bg-transparent" : "border border-danger text-danger bg-transparent"))
-                                    : (isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger")));
+                                    : (isSkipped ? "au-badge-skip" : (hasPassed == null ? "au-badge-muted" : (hasPassed == true ? "au-badge-success" : "au-badge-danger")));
                                 var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "N/A" : (hasPassed == true ? "PASS" : "FAIL"));
 
                                 @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
@@ -200,7 +200,7 @@
                                                 {
                                                     <dt class="col-sm-2 text-muted">Trace</dt>
                                                     <dd class="col-sm-10">
-                                                        <code class="user-select-all">@ep.LastResult.TraceId</code>
+                                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Trace", Value = ep.LastResult.TraceId, Compact = true, CopyLabel = "Copy trace id" })" />
                                                     </dd>
                                                 }
                                                 <dt class="col-sm-2 text-muted">Response</dt>
@@ -268,6 +268,13 @@
     }
 
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+    function localWhen(value) {
+        if (window.luLocalInstant) return window.luLocalInstant(value);
+        return { text: value == null ? '' : String(value), title: '' };
+    }
+    function labeledId(label, value) {
+        return window.luLabeledId(label, value);
+    }
     function normalizeText(str) {
         if (str === null || str === undefined) return '';
         return String(str)
@@ -293,7 +300,7 @@
         if (!badge) return;
         const s = String(status || '').toLowerCase();
         badge.textContent = status || 'Unknown';
-        badge.className = `badge ms-2 ${s === 'succeeded' ? 'au-badge-success' : s === 'failed' || s === 'cancelled' ? 'au-badge-danger' : 'bg-secondary'}`;
+        badge.className = `badge ms-2 ${s === 'succeeded' ? 'au-badge-success' : s === 'failed' || s === 'cancelled' ? 'au-badge-danger' : 'au-badge-muted'}`;
     }
 
     function clearSeedRunPoll() {
@@ -339,7 +346,7 @@
         }
         if (badge) {
             badge.textContent = 'Starting';
-            badge.className = 'badge bg-secondary ms-2';
+            badge.className = 'badge au-badge-muted ms-2';
         }
     }
 
@@ -482,7 +489,7 @@
         detailRow.className = 'row-detail';
         detailRow.dataset.detailFor = result.endpointKey;
         detailRow.style.display = 'none';
-        const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code></dd>` : '';
+        const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10">${labeledId('Trace', result.traceId)}</dd>` : '';
         const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
         const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
         const normalizedError = normalizeText(result.errorMessage);
@@ -492,7 +499,7 @@
             ${requestBodyHtml}
             <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || 'N/A'} (expected ${result.expectedStatusCode})</dd>
             ${traceHtml}${responseHtml}${errorHtml}
-            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${result.durationMs}ms</dd>
+            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10" title="${escapeHtml(localWhen(result.executedAt).title)}">${escapeHtml(localWhen(result.executedAt).text)} | ${result.durationMs}ms</dd>
         </dl></td>`;
 
         // Insert after error row if it exists, otherwise after main row
@@ -563,7 +570,7 @@
         row.dataset.stale = included ? 'false' : 'true';
         const badge = row.querySelector('.cell-result .badge');
         if (!badge) return;
-        if (badge.classList.contains('bg-secondary')) return;
+        if (badge.classList.contains('au-badge-muted')) return;
         if (included) toSolidBadgeClass(badge);
         else toHollowBadgeClass(badge);
     }
@@ -593,7 +600,7 @@
     function resetRowToPending(row) {
         row.classList.remove('row-running');
         setRowInclusion(row, row.dataset.included !== 'false');
-        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">N/A</span>';
+        row.querySelector('.cell-result').innerHTML = '<span class="badge au-badge-muted">N/A</span>';
         row.querySelector('.cell-status').innerHTML = '<span class="text-muted">N/A</span>';
         row.querySelector('.cell-reason').innerHTML = '<span class="text-muted">N/A</span>';
         row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">N/A</span>';
@@ -687,7 +694,7 @@
                     ? (!included ? 'border border-secondary text-muted bg-transparent' : 'au-badge-skip')
                     : (sp === runnable && runnable > 0
                         ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
-                        : (!included ? 'border border-secondary text-muted bg-transparent' : 'bg-secondary'));
+                        : (!included ? 'border border-secondary text-muted bg-transparent' : 'au-badge-muted'));
             badge.className = `badge svc-summary ms-2 ${cls}`;
         });
     }
@@ -947,15 +954,16 @@
                 const build = r.build ? `<code class="text-break">${escapeHtml(r.build)}</code>` : '<span class="text-muted">N/A</span>';
                 const version = r.version ? `<code class="text-break">${escapeHtml(r.version)}</code>` : '<span class="text-muted">N/A</span>';
                 const productVersion = r.productVersion ? `<code class="text-break">${escapeHtml(r.productVersion)}</code>` : '<span class="text-muted">N/A</span>';
-                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toISOString()}</small></td><td>${error}</td><td>${commit}</td><td>${build}</td><td>${version}</td><td>${productVersion}</td></tr>`;
+                const when = localWhen(r.executedAt);
+                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small title="${escapeHtml(when.title)}">${escapeHtml(when.text)}</small></td><td>${error}</td><td>${commit}</td><td>${build}</td><td>${version}</td><td>${productVersion}</td></tr>`;
                 // Expandable detail row
-                const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
+                const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10">${labeledId('Trace', r.traceId)}</dd>` : '';
                 const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
                 const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
                 html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="9" class="ps-3 py-2"><dl class="row mb-0 small">
                     <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'N/A')} ${escapeHtml(r.requestUrl || 'N/A')}</code></dd>
                     ${requestBodyHtml}${traceHtml}${responseHtml}
-                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${r.durationMs}ms</dd>
+                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10" title="${escapeHtml(when.title)}">${escapeHtml(when.text)} | ${r.durationMs}ms</dd>
                 </dl></td></tr>`;
             });
             html += '</tbody></table></div>';

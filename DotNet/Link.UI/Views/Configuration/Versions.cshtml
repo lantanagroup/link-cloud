@@ -46,8 +46,7 @@
                     <thead>
                         <tr>
                             <th scope="col">Version</th>
-                            <th scope="col"><span class="visually-hidden">Save</span></th>
-                            <th scope="col"><span class="visually-hidden">Delete</span></th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -59,16 +58,16 @@
                                 <input form="@formId" name="version" value="@row.Version" class="form-control form-control-sm" maxlength="255" required aria-label="Version @row.Version" />
                             </td>
                             <td>
-                                <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
-                                    <input type="hidden" name="versionId" value="@row.Id" />
-                                    <button type="submit" class="btn btn-sm btn-success">Save</button>
-                                    <button type="button" class="btn btn-sm btn-au-neutral" data-lu-cancel>Cancel</button>
-                                </form>
-                            </td>
-                            <td>
-                                <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
-                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                                </form>
+                                <div class="lu-row-actions">
+                                    <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVersion" asp-route-vendorId="@Model.VendorId">
+                                        <input type="hidden" name="versionId" value="@row.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Version"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Version"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                    </form>
+                                    <form method="post" data-au-save asp-action="DeleteVersion" asp-route-versionId="@row.Id" asp-route-vendorId="@Model.VendorId" onsubmit="return confirm('Delete this version?');">
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Version"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     }

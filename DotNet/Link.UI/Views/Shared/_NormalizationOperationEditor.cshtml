@@ -43,11 +43,11 @@
                 }
                 @if (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.VendorWarning))
                 {
-                    <div class="alert alert-info">@Model.VendorWarning</div>
+                    <div class="alert au-note">@Model.VendorWarning</div>
                 }
                 @if (!string.IsNullOrWhiteSpace(panel.ResourceWarning))
                 {
-                    <div class="alert alert-info">@panel.ResourceWarning</div>
+                    <div class="alert au-note">@panel.ResourceWarning</div>
                 }
                 @if (panel.ReadFailed)
                 {
@@ -59,7 +59,7 @@
                     {
                     @if (panel.Operations.Count == 0)
                     {
-                        <div class="alert alert-info">No normalization operations for this facility.</div>
+                        <div class="alert au-note">No normalization operations for this facility.</div>
                     }
                     else
                     {
@@ -79,10 +79,10 @@
                                             <div class="small">@(row.IsDisabled ? "Disabled" : "Enabled")</div>
                                         </div>
                                         <div class="d-flex flex-wrap gap-2 align-items-start">
-                                            <a class="btn btn-au-neutral btn-sm" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber > 1 ? panel.PageNumber : null)">Edit</a>
+                                            <a class="btn btn-au-neutral btn-sm lu-icon-btn" data-facility-swap="normalizationPanel" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-operationId="@row.Id" asp-route-sequenceType="@panel.SequenceType" asp-route-operationPage="@(panel.PageNumber > 1 ? panel.PageNumber : null)" title="Edit" aria-label="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                                             <form method="post" data-au-save asp-action="DeleteOperation" asp-route-id="@Model.FacilityId" onsubmit="return confirm('Delete this operation?');">
                                                 <input type="hidden" name="operationId" value="@row.Id" />
-                                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                                <button type="submit" class="btn btn-danger btn-sm lu-icon-btn" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </form>
                                         </div>
                                     </div>

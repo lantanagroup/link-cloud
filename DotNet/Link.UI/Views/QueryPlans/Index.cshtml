@@ -46,7 +46,7 @@
                                 <strong>@t.Name</strong>
                                 @if (t.IsDefault)
                                 {
-                                    <span class="badge bg-success ms-1">Default</span>
+                                    <span class="badge au-badge-success ms-1">Default</span>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(t.Description))
                                 {
@@ -75,20 +75,16 @@
                             </td>
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
-                                <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-au-neutral btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
-                                        @(t.IsSystem ? "View" : "Edit")
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-au-neutral btn-qp-clone" data-id="@t.Id">Clone</button>
+                                <div class="lu-row-actions">
+                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-qp-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                     @if (!t.IsDefault)
                                     {
-                                        <button type="button" class="btn btn-sm btn-success btn-qp-default" data-id="@t.Id" title="Set as default">
-                                            <i class="bi bi-star"></i>
-                                        </button>
+                                        <button type="button" class="btn btn-sm btn-success lu-icon-btn btn-qp-default" data-id="@t.Id" title="Set as default" aria-label="Set as default"><i class="bi bi-star" aria-hidden="true"></i></button>
                                     }
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-danger btn-qp-delete" data-id="@t.Id">Delete</button>
+                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-qp-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     }
                                 </div>
                             </td>
@@ -344,7 +340,7 @@
             '<input class="form-control qp-p-literal" placeholder="literal value" value="' + esc(p.literal) + '" style="flex:1;min-width:100px;" title="Literal value (e.g. order, imaging,laboratory)" />' +
             '<input class="form-control qp-p-resource" placeholder="resource" value="' + esc(p.resource) + '" style="width:95px;" title="Resource type for ResourceIds (e.g. Encounter)" />' +
             '<input class="form-control qp-p-paged" placeholder="paged" value="' + esc(p.pagedValue) + '" style="width:60px;" title="Page size for ResourceIds" />' +
-            '<button type="button" class="btn btn-sm btn-danger qp-remove-param-btn" title="Remove parameter">&times;</button>';
+            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-param-btn" title="Remove parameter" aria-label="Remove parameter"><i class="bi bi-x-lg" aria-hidden="true"></i></button>';
 
         container.appendChild(row);
 
@@ -390,7 +386,7 @@
                 '<option value="Reference"' + (isRef ? ' selected' : '') + '>Reference</option>' +
             '</select>' +
             '<div style="flex:1;"></div>' +
-            '<button type="button" class="btn btn-sm btn-danger qp-remove-query-btn" title="Remove query"><i class="bi bi-trash"></i></button>';
+            '<button type="button" class="btn btn-sm btn-danger lu-icon-btn qp-remove-query-btn" title="Remove query" aria-label="Remove query"><i class="bi bi-trash" aria-hidden="true"></i></button>';
         card.appendChild(header);
 
         // Body

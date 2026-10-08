@@ -2,6 +2,7 @@
 @{
     var run = Model.Run;
     var detail = Model.Detail;
+    var liveRun = Model.LiveConfigured && Model.Found && detail?.Status.IsTerminal() != true && run?.Status is not ("Succeeded" or "Failed" or "Cancelled");
 }
 @await Html.PartialAsync("_Nav")
 
@@ -14,7 +15,10 @@
         </div>
     }
     <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
-        <span id="liveStatus" class="badge bg-secondary" data-live="@(Model.LiveConfigured && Model.Found ? "yes" : "no")" data-run-id="@Model.RequestedId">@(Model.LiveConfigured && Model.Found ? "Connecting" : "Live updates are off")</span>
+        @if (liveRun)
+        {
+            <span id="liveStatus" class="badge au-badge-active" data-live="yes" data-run-id="@Model.RequestedId">Connecting</span>
+        }
         @if (detail is null)
         {
             <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to runs"))" />
@@ -60,7 +64,7 @@ else
                             <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = run?.FacilityId, Compact = true, CopyLabel = "Copy facility id", ValueElementId = "facilityValue", LinkHref = string.IsNullOrWhiteSpace(run?.FacilityId) ? null : Url.Action("Facility", "Tenants", new { id = run!.FacilityId }) })" />
                             @if (run?.ThrowawayFacility == true)
                             {
-                                <span class="badge bg-secondary" id="runFacilityBadge">Automation facility</span>
+                                <span class="badge au-badge-muted" id="runFacilityBadge">Automation facility</span>
                             }
                         </div>
                     </div>
@@ -88,7 +92,7 @@ else
                     </div>
                 </div>
                 <div id="runError" class="alert alert-danger mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.Error) ? "d-none" : "")">@run?.Error</div>
-                <div id="runRetention" class="alert alert-info mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.RetentionNotice) ? "d-none" : "")" role="status">@run?.RetentionNotice</div>
+                <div id="runRetention" class="alert au-note mt-3 mb-0 @(string.IsNullOrWhiteSpace(run?.RetentionNotice) ? "d-none" : "")" role="status">@run?.RetentionNotice</div>
                 <div class="mt-3 d-flex flex-wrap gap-2" id="runActions">
                     @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
                     {

@@ -13,15 +13,15 @@
 }
 
 <div class="au-card card">
-    <div class="card-header"><code>@Model.Id</code></div>
+    <div class="card-header"><partial name="_LabeledId" model="@(new LabeledId { Label = "Id", Value = Model.Id, CopyLabel = "Copy id" })" /></div>
     <div class="card-body">
         <dl class="row mb-0">
             <dt class="col-sm-3">Type</dt>
             <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Type) ? "—" : Model.Type)</dd>
             <dt class="col-sm-3">Facility</dt>
-            <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.FacilityId) ? "—" : Model.FacilityId)</dd>
+            <dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></dd>
             <dt class="col-sm-3">Correlation</dt>
-            <dd class="col-sm-9 text-break">@(string.IsNullOrWhiteSpace(Model.CorrelationId) ? "—" : Model.CorrelationId)</dd>
+            <dd class="col-sm-9 text-break"><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = Model.CorrelationId, Compact = true, CopyLabel = "Copy correlation id" })" /></dd>
             <dt class="col-sm-3">Created</dt>
             <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.CreatedOn) ? "—" : Model.CreatedOn)</dd>
             <dt class="col-sm-3">Sent</dt>
