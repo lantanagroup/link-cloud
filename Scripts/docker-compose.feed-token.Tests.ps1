@@ -75,8 +75,8 @@ function Set-FetchHook {
     }.GetNewClosure()
 }
 
-$profile = Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1'
-. $profile
+$profileScript = Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1'
+. $profileScript
 
 $repo = New-TempRepo
 try {
@@ -331,6 +331,18 @@ try {
     & $installer -ProfilePath $ansiProfile -InstallDir $installDir | Out-Null
     $ansiText = Get-Content -Raw -LiteralPath $ansiProfile
     Write-Result (($null -ne $ansiText) -and $ansiText.Contains([char]0x00E9) -and $ansiText.Contains('link-cloud-feed-token')) 'installer keeps an ANSI profile readable'
+    $utf8Dir = Join-Path $repo ('caf' + [char]0x00E9)
+    New-Item -ItemType Directory -Path $utf8Dir -Force | Out-Null
+    $utf8Profile = Join-Path $utf8Dir 'profile.ps1'
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllBytes($utf8Profile, $utf8NoBom.GetBytes("Write-Host 'caf$([char]0x00E9)'`r`n"))
+    $setupArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -ProfilePath "{1}" -InstallDir "{2}"' -f $installer, $utf8Profile, $installDir
+    $utf8Out = Join-Path $repo 'utf8-out.txt'
+    $utf8Err = Join-Path $repo 'utf8-err.txt'
+    $utf8Proc = Start-Process -FilePath powershell.exe -ArgumentList $setupArgs -Wait -PassThru -RedirectStandardOutput $utf8Out -RedirectStandardError $utf8Err -WindowStyle Hidden
+    $utf8Text = ''
+    if (Test-Path -LiteralPath $utf8Profile) { $utf8Text = [System.IO.File]::ReadAllText($utf8Profile) }
+    Write-Result ($utf8Proc.ExitCode -eq 0 -and $utf8Text.Contains([char]0x00E9) -and $utf8Text.Contains('link-cloud-feed-token') -and -not $utf8Text.Contains([char]0x00C3)) 'documented setup keeps a BOM-less UTF-8 profile on a non-ASCII path'
 
     # Fetch script with a mock az. The sentinel must not appear in the child output.
     $mockDir = Join-Path $repo 'mock-az'
