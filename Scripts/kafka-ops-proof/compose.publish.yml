@@ -1,0 +1,6 @@
+# Opt-in host port for the isolated proof host. The main compose file publishes nothing.
+# Use only with run-proof -Publish. Do not point this at a shared broker.
+services:
+  broker-0:
+    ports:
+      - "${KAFKA_PROOF_PORT:-19094}:9092"
