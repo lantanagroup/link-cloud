@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,30 @@ public sealed class KafkaAssignmentTracker
     {
         ArgumentNullException.ThrowIfNull(result);
         _processed[result.TopicPartition] = new Offset(result.Offset.Value + 1);
+    }
+
+    /// <summary>
+    /// Stores the offset a listener just committed. A later revoke commits this value
+    /// when it is ahead of the last processed offset, and never an older one.
+    /// </summary>
+    public void RememberCommitted(TopicPartitionOffset committed)
+    {
+        if (committed.Offset.IsSpecial)
+        {
+            return;
+        }
+
+        _processed.AddOrUpdate(
+            committed.TopicPartition,
+            committed.Offset,
+            (_, existing) => !existing.IsSpecial && existing.Value >= committed.Offset.Value
+                ? existing
+                : committed.Offset);
+    }
+
+    internal IReadOnlyList<TopicPartitionOffset> OffsetsCommittedFor(IReadOnlyList<TopicPartitionOffset> revoked)
+    {
+        return OffsetsForRevoked(revoked, new Dictionary<TopicPartition, Offset>(_processed));
     }
 
     public void OnRevoked<TKey, TValue>(IConsumer<TKey, TValue> consumer, IReadOnlyList<TopicPartitionOffset> revoked, ILogger? logger = null)
@@ -55,5 +80,28 @@ public sealed class KafkaAssignmentTracker
         }
 
         consumer.SafeCommit(batch, logger);
+    }
+}
+
+internal static class KafkaAssignmentRegistry
+{
+    private static readonly ConditionalWeakTable<object, KafkaAssignmentTracker> Trackers = new();
+
+    public static void Register(object consumer, KafkaAssignmentTracker tracker)
+    {
+        Trackers.Add(consumer, tracker);
+    }
+
+    public static void Remember(object consumer, IEnumerable<TopicPartitionOffset> offsets)
+    {
+        if (!Trackers.TryGetValue(consumer, out var tracker))
+        {
+            return;
+        }
+
+        foreach (var offset in offsets)
+        {
+            tracker.RememberCommitted(offset);
+        }
     }
 }

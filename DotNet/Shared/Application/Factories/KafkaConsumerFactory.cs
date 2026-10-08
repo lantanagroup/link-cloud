@@ -64,7 +64,13 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 consumerBuilder.SetPartitionsLostHandler((consumer, lost) => assignmentTracker.OnRevoked(consumer, lost, _logger));
             }
 
-            return consumerBuilder.Build();
+            var consumer = consumerBuilder.Build();
+            if (assignmentTracker != null)
+            {
+                KafkaAssignmentRegistry.Register(consumer, assignmentTracker);
+            }
+
+            return consumer;
         }
         catch (Exception ex)
         {
