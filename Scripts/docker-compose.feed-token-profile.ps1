@@ -99,7 +99,11 @@ function Invoke-LinkCloudDockerProcess {
     }
     $hooks = $global:LinkCloudFeedTokenHooks
     if ($hooks -and $hooks.ContainsKey('Docker')) {
-        $code = & $hooks['Docker'] $ArgumentList
+        if ($MyInvocation.ExpectingInput) {
+            $code = $input | & $hooks['Docker'] $ArgumentList
+        } else {
+            $code = & $hooks['Docker'] $ArgumentList
+        }
         if ($null -eq $code) { $code = 0 }
         $global:LASTEXITCODE = [int]$code
         return
@@ -110,7 +114,11 @@ function Invoke-LinkCloudDockerProcess {
         $global:LASTEXITCODE = 1
         return
     }
-    & $exe @ArgumentList
+    if ($MyInvocation.ExpectingInput) {
+        $input | & $exe @ArgumentList
+    } else {
+        & $exe @ArgumentList
+    }
     $global:LASTEXITCODE = $LASTEXITCODE
 }
 
@@ -205,7 +213,11 @@ function Invoke-LinkCloudCompose {
         } else {
             $dockerArgs = @('compose') + @($ComposeArguments)
         }
-        Invoke-LinkCloudDockerProcess -ArgumentList $dockerArgs
+        if ($MyInvocation.ExpectingInput) {
+            $input | Invoke-LinkCloudDockerProcess -ArgumentList $dockerArgs
+        } else {
+            Invoke-LinkCloudDockerProcess -ArgumentList $dockerArgs
+        }
         $savedCode = $global:LASTEXITCODE
     } finally {
         if ($previousSet) {
@@ -225,7 +237,11 @@ function global:compose {
         $global:LASTEXITCODE = 1
         return
     }
-    Invoke-LinkCloudCompose -RepoRoot $root -ComposeArguments @($args)
+    if ($MyInvocation.ExpectingInput) {
+        $input | Invoke-LinkCloudCompose -RepoRoot $root -ComposeArguments @($args)
+    } else {
+        Invoke-LinkCloudCompose -RepoRoot $root -ComposeArguments @($args)
+    }
 }
 
 function Test-LinkCloudComposeCommand {
@@ -276,7 +292,11 @@ function global:docker {
                 if ($repoFull -ne $currentFull) {
                     . $repoProfile
                     $reloaded = Get-Command -Name docker -CommandType Function
-                    & $reloaded @args
+                    if ($MyInvocation.ExpectingInput) {
+                        $input | & $reloaded @args
+                    } else {
+                        & $reloaded @args
+                    }
                     return
                 }
             }
@@ -285,8 +305,16 @@ function global:docker {
 
     $root = Find-LinkCloudRepoRoot
     if ($root -and (Test-LinkCloudComposeCommand -Arguments @($args))) {
-        Invoke-LinkCloudCompose -RepoRoot $root -DockerArguments @($args)
+        if ($MyInvocation.ExpectingInput) {
+            $input | Invoke-LinkCloudCompose -RepoRoot $root -DockerArguments @($args)
+        } else {
+            Invoke-LinkCloudCompose -RepoRoot $root -DockerArguments @($args)
+        }
         return
     }
-    Invoke-LinkCloudDockerProcess -ArgumentList @($args)
+    if ($MyInvocation.ExpectingInput) {
+        $input | Invoke-LinkCloudDockerProcess -ArgumentList @($args)
+    } else {
+        Invoke-LinkCloudDockerProcess -ArgumentList @($args)
+    }
 }

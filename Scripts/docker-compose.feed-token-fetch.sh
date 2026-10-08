@@ -1,6 +1,8 @@
 #!/bin/bash
 # Writes a short-lived Azure DevOps token for local docker compose.
 # The token is stored only in the gitignored env file. This script does not print it.
+# An inherited xtrace would print the token. Turn it off for this process only.
+set +x
 set -eu
 
 resource="499b84ac-1321-427f-aa17-267ca6975798"
@@ -150,8 +152,9 @@ if [ -z "$token" ] || [ -z "$expires" ]; then
 fi
 
 umask 077
-tmp=$(mktemp)
-# A failed mv would otherwise leave the token in the temp directory.
+# Same directory as the env file, so mv is a rename rather than a cross-filesystem copy.
+tmp=$(mktemp "${root}/.azure-artifacts.XXXXXXXXXX")
+# A failed mv would otherwise leave the token next to the env file.
 trap 'rm -f "$tmp"' EXIT
 chmod 600 "$tmp" || true
 printf '%s\n' "AZURE_ARTIFACTS_PAT=${token}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=${expires}" > "$tmp"
