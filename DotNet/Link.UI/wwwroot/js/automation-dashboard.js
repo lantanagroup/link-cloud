@@ -242,6 +242,7 @@
                 host.innerHTML = html;
                 if (window.luPaintTimes) window.luPaintTimes(host);
                 tick();
+                requestAnimationFrame(fitRecentRuns);
             })
             .catch(function () { });
     }
@@ -510,14 +511,28 @@
         var headH = head ? head.getBoundingClientRect().height : 0;
         var rowH = row ? row.getBoundingClientRect().height : 32;
         if (rowH < 8) rowH = 32;
+        var port = document.querySelector(".lu-main");
+        var portBottom = port ? port.getBoundingClientRect().bottom : window.innerHeight;
         var launch = document.getElementById("quickLaunchCard");
         var launchHeader = launch && launch.querySelector(".card-header");
-        var reserve = (launchHeader ? launchHeader.getBoundingClientRect().height : 40) + 16;
-        var available = window.innerHeight - wrap.getBoundingClientRect().top - reserve;
+        var pager = card.querySelector(".border-top");
+        var pagerH = pager ? pager.getBoundingClientRect().height : 0;
+        var headerH = launchHeader ? launchHeader.getBoundingClientRect().height : 40;
+        var chrome = pagerH + headerH + 24;
+        var available = portBottom - wrap.getBoundingClientRect().top - chrome;
         var rows = Math.floor((available - headH) / rowH);
         if (rows < 2) rows = 2;
-        wrap.style.maxHeight = Math.ceil(headH + (rows * rowH)) + "px";
-        wrap.style.overflowY = "auto";
+        function applyHeight(count) {
+            wrap.style.maxHeight = Math.ceil(headH + (count * rowH)) + "px";
+            wrap.style.overflowY = "auto";
+        }
+        applyHeight(rows);
+        var guard = 0;
+        while (launchHeader && guard < 8 && launchHeader.getBoundingClientRect().bottom > portBottom - 4 && rows > 2) {
+            rows -= 1;
+            applyHeight(rows);
+            guard += 1;
+        }
     }
 
     applyRecentFromLocation();
@@ -526,6 +541,8 @@
     tick();
     fitRecentRuns();
     window.addEventListener("resize", fitRecentRuns);
+    window.addEventListener("load", fitRecentRuns);
+    requestAnimationFrame(function () { requestAnimationFrame(fitRecentRuns); });
     setInterval(tick, 1000);
     bindDashboardActions();
 
