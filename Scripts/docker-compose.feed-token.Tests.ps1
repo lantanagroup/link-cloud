@@ -196,6 +196,16 @@ try {
     $composeText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\docker-compose.yml'))
     Write-Result ((-not $composeText.Contains('FEED_ACCESSTOKEN')) -and $composeText.Contains('feed_accesstoken:') -and $composeText.Contains('environment: AZURE_ARTIFACTS_PAT')) 'compose keeps the secret and drops the build arg'
 
+    $ignoreLines = @(Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\.dockerignore'))
+    $excludeAt = 0
+    $includeAt = 0
+    for ($i = 0; $i -lt $ignoreLines.Count; $i++) {
+        $trimmed = $ignoreLines[$i].Trim()
+        if ($trimmed -eq '**/docker-compose*') { $excludeAt = $i }
+        if ($trimmed -eq '!Scripts/docker-compose.restore-feed.sh') { $includeAt = $i }
+    }
+    Write-Result ($includeAt -gt $excludeAt) 'dockerignore keeps the restore helper after the docker-compose exclusion'
+
     # Installer is idempotent and does not touch the real profile.
     $profilePath = Join-Path $repo 'profile.ps1'
     $installDir = Join-Path $repo 'install-dir'
