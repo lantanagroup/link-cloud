@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -15,23 +18,8 @@ public final class KafkaKeyLegacy {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final UUID NIL_UUID = new UUID(0L, 0L);
     // Plain keys produced for a service (health checks, audits with no facility) are not facility ids.
-    private static final Set<String> SERVICE_NAMES = Set.of(
-            "Account",
-            "Audit",
-            "Census",
-            "DataAcquisition",
-            "DataAcquisitionWorker",
-            "LinkAdminBFF",
-            "MockDmrpApi",
-            "Normalization",
-            "Notification",
-            "QueryDispatch",
-            "Report",
-            "Submission",
-            "Tenant",
-            "Terminology",
-            "ValidationService",
-            "measureeval");
+    // The names live in one fixture so the .NET and Java readers stay the same list.
+    private static final Set<String> SERVICE_NAMES = loadServiceNames();
 
     private KafkaKeyLegacy() {
     }
@@ -76,6 +64,27 @@ public final class KafkaKeyLegacy {
             return NIL_UUID.equals(id) ? null : id;
         } catch (IllegalArgumentException ex) {
             return null;
+        }
+    }
+
+    private static Set<String> loadServiceNames() {
+        try (InputStream in = KafkaKeyLegacy.class.getResourceAsStream("/kafka-service-names.json")) {
+            if (in == null) {
+                throw new IllegalStateException("Service name list is missing.");
+            }
+            JsonNode node = MAPPER.readTree(in);
+            if (node == null || !node.isArray() || node.isEmpty()) {
+                throw new IllegalStateException("Service name list is empty.");
+            }
+            Set<String> names = new HashSet<>();
+            for (JsonNode item : node) {
+                if (!item.isTextual() || item.asText().isEmpty() || !names.add(item.asText())) {
+                    throw new IllegalStateException("Service name list contains a blank or duplicate name.");
+                }
+            }
+            return Set.copyOf(names);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Service name list could not be read.", ex);
         }
     }
 
