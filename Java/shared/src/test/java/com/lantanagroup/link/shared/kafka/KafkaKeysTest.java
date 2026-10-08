@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,22 +105,14 @@ class KafkaKeysTest {
                     .findFirst()
                     .orElseThrow();
         }
-        String onDisk = Files.readString(file).replace("\r\n", "\n");
-        String onClasspath;
-        try (InputStream in = KafkaKeyLegacy.class.getResourceAsStream("/kafka-service-names.json")) {
-            if (in == null) {
-                throw new IllegalStateException("Service name list is missing.");
-            }
-            onClasspath = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
-        }
-        assertEquals(onDisk, onClasspath);
-        JsonNode names = new ObjectMapper().readTree(onDisk);
+        JsonNode names = new ObjectMapper().readTree(Files.readString(file));
         assertTrue(names.isArray());
+        Set<String> fromFile = new HashSet<>();
         for (JsonNode name : names) {
+            assertTrue(fromFile.add(name.asText()));
             assertNull(KafkaKeyLegacy.tryReadFacility(name.asText()));
         }
-        assertNull(KafkaKeyLegacy.tryReadFacility("measureeval"));
-        assertNull(KafkaKeyLegacy.tryReadFacility("ValidationService"));
+        assertEquals(fromFile, KafkaKeyLegacy.knownServiceNames());
     }
 
     private static Path childIgnoreCase(Path parent, String name) throws Exception {

@@ -109,18 +109,4 @@
         </dependency>
 
     </dependencies>
-
-    <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-            </resource>
-            <resource>
-                <directory>${project.basedir}/../../Tests/fixtures</directory>
-                <includes>
-                    <include>kafka-service-names.json</include>
-                </includes>
-            </resource>
-        </resources>
-    </build>
 </project>
