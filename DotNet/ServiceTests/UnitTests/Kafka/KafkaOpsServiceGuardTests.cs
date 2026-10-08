@@ -417,6 +417,34 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
+    public async Task AdminCalls_DoNotOverlap()
+    {
+        var current = 0;
+        var peak = 0;
+        var client = new Mock<IAdminClient>();
+        client.Setup(item => item.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .Returns(async (IEnumerable<string> _, DescribeConsumerGroupsOptions _) =>
+            {
+                var now = Interlocked.Increment(ref current);
+                var seen = Volatile.Read(ref peak);
+                while (now > seen)
+                    seen = Interlocked.CompareExchange(ref peak, now, seen);
+                await Task.Delay(60);
+                Interlocked.Decrement(ref current);
+                return new DescribeConsumerGroupsResult();
+            });
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(client.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Task.WhenAll(
+            gateway.DescribeGroupsAsync(false, 1, CancellationToken.None),
+            gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+
+        Assert.Equal(1, peak);
+    }
+
+    [Fact]
     public async Task DescribeConfigsThrow_MakesRolesUnknown_AndRefusesDecommission()
     {
         var admin = new Mock<IAdminClient>();
