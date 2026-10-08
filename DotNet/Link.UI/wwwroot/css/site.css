@@ -18,6 +18,19 @@
   --au-border:      #e2e6ec;
   --au-card-shadow: 0 2px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
   --au-radius:      .5rem;
+  --au-focus:       0 0 0 .2rem rgba(17, 17, 17, .16);
+  --bs-primary: #111;
+  --bs-primary-rgb: 17, 17, 17;
+  --bs-success: var(--au-success);
+  --bs-success-rgb: 40, 167, 69;
+  --bs-info: var(--au-muted);
+  --bs-info-rgb: 84, 92, 100;
+  --bs-link-color: #111;
+  --bs-link-hover-color: #343a40;
+  --bs-link-color-rgb: 17, 17, 17;
+  --bs-link-hover-color-rgb: 52, 58, 64;
+  --bs-code-color: #111;
+  --bs-focus-ring-color: rgba(17, 17, 17, .16);
 }
 
 /* --- Base --- */
@@ -27,14 +40,8 @@ html { font-size: 14px; position: relative; min-height: 100%; }
 body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 a { color: #111; }
 a:hover { color: #343a40; }
-.form-check-input:checked {
-  background-color: #111;
-  border-color: #111;
-}
-.form-check-input:focus {
-  border-color: #111;
-  box-shadow: 0 0 0 .2rem rgba(17,17,17,.16);
-}
+code, kbd, samp { color: #111; }
+pre code, a > code { color: inherit; }
 
 /* Nested page containers sit inside _Layout's container-xl â€” drop the extra gutters. */
 .container .container {
@@ -43,10 +50,69 @@ a:hover { color: #343a40; }
   padding-right: 0;
 }
 
-/* --- Focus ring --- */
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
-.form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 .1rem #fff, 0 0 0 .25rem var(--au-accent);
+/* One focus ring for every control that Bootstrap otherwise paints blue. */
+.btn:focus,
+.btn:active:focus,
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus,
+.form-check-input:checked:focus,
+.form-check-input:indeterminate:focus,
+.btn-close:focus,
+.accordion-button:focus,
+.page-link:focus {
+  border-color: #111;
+  outline: 0;
+  box-shadow: var(--au-focus);
+}
+.form-check-input:checked,
+.form-check-input[type=checkbox]:indeterminate {
+  background-color: #111;
+  border-color: #111;
+}
+.form-switch .form-check-input:focus {
+  border-color: #111;
+  box-shadow: var(--au-focus);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23111'/%3e%3c/svg%3e");
+}
+.page-link,
+.page-link:hover,
+.page-link:focus {
+  color: #111;
+}
+.page-link:hover,
+.page-link:focus {
+  background-color: var(--au-accent-soft);
+}
+.page-item.active .page-link {
+  color: #fff;
+  background-color: #111;
+  border-color: #111;
+}
+.progress-bar {
+  background-color: #111;
+}
+.dropdown-item.active,
+.dropdown-item:active,
+.list-group-item.active {
+  color: #fff;
+  background-color: #111;
+  border-color: #111;
+}
+.alert-info,
+.alert.au-note {
+  color: var(--au-text);
+  background-color: var(--au-accent-soft);
+  border-color: var(--au-border);
+}
+.bg-success {
+  background-color: var(--au-success) !important;
+}
+.bg-success-subtle {
+  background-color: #e9f7ee !important;
+}
+.text-success-emphasis {
+  color: var(--au-success) !important;
 }
 
 /* --- Footer --- */
@@ -1584,7 +1650,7 @@ a.au-scenario-card:hover {
 .pc-intent-chip {
   border: 1px solid var(--au-border);
   background: #fff;
-  color: #234;
+  color: var(--au-muted);
   font-size: .75rem;
   font-weight: 600;
   border-radius: 999px;
@@ -1665,31 +1731,35 @@ a.au-scenario-card:hover {
   color: var(--au-text);
   box-shadow: none;
 }
-.accordion-button:focus {
-  box-shadow: 0 0 0 .2rem rgba(17,17,17,.16);
-}
+
 /* ===================================================================
    Link.UI â€” left-hand vertical shell (phase 1)
    Keeps Automation.UI --au-* tokens; adds sidebar layout.
    =================================================================== */
 html:has(body.lu-body) {
   height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
 .lu-body {
   margin: 0;
   margin-bottom: 0;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   overflow: hidden;
   background: var(--au-bg);
   color: var(--au-text);
 }
 
 .lu-shell {
+  position: fixed;
+  inset: 0;
   display: flex;
-  height: 100vh;
-  max-height: 100vh;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
   min-height: 0;
 }
@@ -1848,7 +1918,8 @@ html:has(body.lu-body) {
 }
 .lu-body .text-muted { color: var(--au-muted) !important; }
 
-.lu-facility-id {
+.lu-facility-id,
+.lu-clip {
   display: inline-block;
   max-width: 11rem;
   overflow: hidden;
@@ -1857,7 +1928,34 @@ html:has(body.lu-body) {
   vertical-align: bottom;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: .8rem;
+  color: #111;
+  text-decoration: none;
 }
+a.lu-clip {
+  text-decoration: underline;
+}
+.lu-id-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .75rem;
+}
+.au-dash .au-kpi-card { padding: .4rem .65rem; }
+.au-dash .au-kpi-value { font-size: 1.2rem; }
+.au-dash .au-kpi-label { margin-top: .05rem; }
+.au-dash h1.h3 { font-size: 1.35rem; }
+.au-dash .card-header { padding: .3rem .7rem; }
+.au-dash .card-body { padding: .45rem .7rem; }
+.au-dash .mb-3 { margin-bottom: .45rem !important; }
+.au-dash .lu-chart,
+.au-dash .lu-chart-donut {
+  height: 88px;
+  max-height: 88px;
+}
+.au-dash .lu-chart-donut { max-width: 120px; }
+.au-dash #recentRunsCard .table-responsive { max-height: 8.5rem; }
+.au-dash #activeCard .border { padding: .4rem .6rem !important; }
+.au-dash #activeCard .btn { margin-top: .25rem !important; padding-top: .1rem; padding-bottom: .1rem; }
 
 @media (max-width: 767.98px) {
   .lu-shell { flex-direction: column; }
@@ -1888,9 +1986,9 @@ html:has(body.lu-body) {
 
 .lu-section-nav {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: .15rem;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   background: var(--au-dark);
   border-radius: var(--au-radius);
