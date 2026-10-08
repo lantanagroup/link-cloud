@@ -86,21 +86,16 @@
                     }
                 </select>
             </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label" for="status">Status</label>
-                <select id="status" name="status" class="form-select" multiple size="4">
+            <div class="col-12">
+                <div class="form-label" id="statusLabel">Status</div>
+                <div class="d-flex flex-wrap gap-2" role="group" aria-labelledby="statusLabel">
                     @foreach (var status in LogsRules.Statuses)
                     {
-                        if (statuses.Any(value => value.Split(',').Any(part => part.Trim().Equals(status, StringComparison.OrdinalIgnoreCase))))
-                        {
-                            <option value="@status" selected>@status</option>
-                        }
-                        else
-                        {
-                            <option value="@status">@status</option>
-                        }
+                        var selected = statuses.Any(value => value.Split(',').Any(part => part.Trim().Equals(status, StringComparison.OrdinalIgnoreCase)));
+                        <input class="btn-check" type="checkbox" name="status" id="status-@status" value="@status" autocomplete="off" @(selected ? "checked" : null) />
+                        <label class="btn btn-sm btn-au-neutral" for="status-@status">@status</label>
                     }
-                </select>
+                </div>
             </div>
             <div class="col-6 col-md-2">
                 <label class="form-label" for="priority">Priority</label>
