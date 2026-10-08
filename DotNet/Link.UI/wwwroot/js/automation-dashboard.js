@@ -23,14 +23,25 @@
         var statusCanvas = document.getElementById("statusChart");
         var dayCanvas = document.getElementById("dayChart");
         var total = stats.totalRuns || 0;
-        if (statusEmpty) statusEmpty.classList.toggle("d-none", total > 0);
-        if (statusCanvas) statusCanvas.classList.toggle("d-none", total === 0);
+        if (total === 0) {
+            if (statusChart) {
+                statusChart.destroy();
+                statusChart = null;
+            }
+            if (window.luChartFrame) window.luChartFrame.collapseEmpty("statusChart", false);
+            if (statusEmpty) statusEmpty.classList.remove("d-none");
+        } else {
+            if (window.luChartFrame) window.luChartFrame.reveal("statusChart");
+            if (statusEmpty) statusEmpty.classList.add("d-none");
+            if (statusCanvas) statusCanvas.classList.remove("d-none");
+        }
 
+        var colors = window.luChartPalette;
         var statusData = {
             labels: ["Succeeded", "Failed", "Cancelled", "Running", "Queued"],
             datasets: [{
                 data: [stats.succeeded || 0, stats.failed || 0, stats.cancelled || 0, stats.running || 0, stats.queued || 0],
-                backgroundColor: ["#28a745", "#dc3545", "#ffc107", "#343a40", "#6c757d"]
+                backgroundColor: colors.dashboardStatus
             }]
         };
         if (statusChart) {
@@ -40,11 +51,26 @@
             statusChart = new Chart(statusCanvas, {
                 type: "doughnut",
                 data: statusData,
-                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: "bottom" } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    layout: { padding: 0 },
+                    plugins: { legend: { position: "right", align: "center", labels: { boxWidth: 12, padding: 8, font: { size: 12 } } } }
+                }
             });
         }
 
         var days = stats.runsPerDay || [];
+        if (!days.length) {
+            if (dayChart) {
+                dayChart.destroy();
+                dayChart = null;
+            }
+            if (window.luChartFrame) window.luChartFrame.collapseEmpty("dayChart");
+        } else if (window.luChartFrame) {
+            window.luChartFrame.reveal("dayChart");
+        }
         var dayData = {
             labels: days.map(function (day) {
                 var text = String(day.date || "");
@@ -52,16 +78,16 @@
                 return match ? match[2] + "/" + match[3] : text;
             }),
             datasets: [
-                { label: "Succeeded", data: days.map(function (day) { return day.succeeded || 0; }), backgroundColor: "#28a745" },
-                { label: "Failed", data: days.map(function (day) { return day.failed || 0; }), backgroundColor: "#dc3545" },
-                { label: "Cancelled", data: days.map(function (day) { return day.cancelled || 0; }), backgroundColor: "#ffc107" },
-                { label: "Other", data: days.map(function (day) { return day.other || 0; }), backgroundColor: "#6c757d" }
+                { label: "Succeeded", data: days.map(function (day) { return day.succeeded || 0; }), backgroundColor: colors.succeeded },
+                { label: "Failed", data: days.map(function (day) { return day.failed || 0; }), backgroundColor: colors.failed },
+                { label: "Cancelled", data: days.map(function (day) { return day.cancelled || 0; }), backgroundColor: colors.cancelled },
+                { label: "Other", data: days.map(function (day) { return day.other || 0; }), backgroundColor: colors.other }
             ]
         };
         if (dayChart) {
             dayChart.data = dayData;
             dayChart.update();
-        } else if (dayCanvas) {
+        } else if (dayCanvas && days.length) {
             dayChart = new Chart(dayCanvas, {
                 type: "bar",
                 data: dayData,
@@ -70,7 +96,8 @@
                     maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
                     animation: false,
-                    plugins: { legend: { position: "bottom" } }
+                    layout: { padding: 0 },
+                    plugins: { legend: { position: "right", align: "center", labels: { boxWidth: 12, padding: 6, font: { size: 12 } } } }
                 }
             });
         }
@@ -116,7 +143,7 @@
             var row = document.createElement("div");
             row.className = "d-flex justify-content-between align-items-center mt-2";
             var badge = document.createElement("span");
-            badge.className = "badge au-badge-active";
+            badge.className = "badge " + window.luStatusPills.forRun(run.status || run.statusLabel);
             badge.textContent = run.statusLabel || run.status || "";
             var time = document.createElement("span");
             time.className = "small text-muted js-elapsed";
@@ -222,6 +249,7 @@
                 host.innerHTML = html;
                 if (window.luPaintTimes) window.luPaintTimes(host);
                 tick();
+                requestAnimationFrame(fitRecentRuns);
             })
             .catch(function () { });
     }
@@ -473,23 +501,61 @@
         applyQuickLaunchSearch();
     }
 
-    function setLive(text, badge) {
+    function setLive(text) {
         var node = document.getElementById("liveStatus");
         if (!node) return;
         node.textContent = text;
-        node.className = "badge " + badge;
+        node.className = "badge " + window.luStatusPills.forConnection(text);
+    }
+
+    function fitRecentRuns() {
+        var card = document.getElementById("recentRunsCard");
+        var wrap = card && card.querySelector(".table-responsive");
+        var table = wrap && wrap.querySelector("table");
+        if (!wrap || !table) return;
+        var head = table.querySelector("thead");
+        var row = table.querySelector("tbody tr");
+        var headH = head ? head.getBoundingClientRect().height : 0;
+        var rowH = row ? row.getBoundingClientRect().height : 32;
+        if (rowH < 8) rowH = 32;
+        var port = document.querySelector(".lu-main");
+        var portBottom = port ? port.getBoundingClientRect().bottom : window.innerHeight;
+        var launch = document.getElementById("quickLaunchCard");
+        var launchHeader = launch && launch.querySelector(".card-header");
+        var pager = card.querySelector(".border-top");
+        var pagerH = pager ? pager.getBoundingClientRect().height : 0;
+        var headerH = launchHeader ? launchHeader.getBoundingClientRect().height : 40;
+        var chrome = pagerH + headerH + 24;
+        var available = portBottom - wrap.getBoundingClientRect().top - chrome;
+        var rows = Math.floor((available - headH) / rowH);
+        if (rows < 2) rows = 2;
+        function applyHeight(count) {
+            wrap.style.maxHeight = Math.ceil(headH + (count * rowH)) + "px";
+            wrap.style.overflowY = "auto";
+        }
+        applyHeight(rows);
+        var guard = 0;
+        while (launchHeader && guard < 8 && launchHeader.getBoundingClientRect().bottom > portBottom - 4 && rows > 2) {
+            rows -= 1;
+            applyHeight(rows);
+            guard += 1;
+        }
     }
 
     applyRecentFromLocation();
     writeRecentQuery();
     draw(readStats());
     tick();
+    fitRecentRuns();
+    window.addEventListener("resize", fitRecentRuns);
+    window.addEventListener("load", fitRecentRuns);
+    requestAnimationFrame(function () { requestAnimationFrame(fitRecentRuns); });
     setInterval(tick, 1000);
     bindDashboardActions();
 
     var live = document.getElementById("liveStatus");
     if (!live || live.getAttribute("data-live") !== "yes" || typeof signalR === "undefined") {
-        if (live && live.getAttribute("data-live") === "yes") setLive("Live updates unavailable", "au-badge-muted");
+        if (live && live.getAttribute("data-live") === "yes") setLive("Live updates unavailable");
         return;
     }
 
@@ -500,19 +566,19 @@
 
     function catchUp() {
         return connection.invoke("SubscribeDashboard").then(function () {
-            setLive("Live", "au-badge-active");
+            setLive("Live");
             refresh();
         });
     }
 
     connection.on("dashboardUpdate", refresh);
-    connection.onreconnecting(function () { setLive("Reconnecting", "bg-warning text-dark"); });
+    connection.onreconnecting(function () { setLive("Reconnecting"); });
     connection.onreconnected(function () {
-        catchUp().catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+        catchUp().catch(function () { setLive("Live updates unavailable"); });
     });
-    connection.onclose(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+    connection.onclose(function () { setLive("Live updates unavailable"); });
     refresh();
     connection.start()
         .then(catchUp)
-        .catch(function () { setLive("Live updates unavailable", "au-badge-muted"); });
+        .catch(function () { setLive("Live updates unavailable"); });
 })();

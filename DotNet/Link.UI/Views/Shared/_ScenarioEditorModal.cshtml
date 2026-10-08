@@ -1885,13 +1885,24 @@
 
             var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
             var status = compareEncounterToPeriod(s, e);
-            var badge = status === 'overlap'
-                ? '<span class="badge rounded-pill au-badge-success mt-1 px-2 py-1" title="Encounter overlaps the report period">&#10003; overlaps period</span>'
+            var tone = window.luStatusPills.forPeriod(status);
+            var note = status === 'overlap'
+                ? 'Encounter overlaps the report period'
                 : status === 'outside-before'
-                    ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter ends before report period start">&#9888; before period</span>'
+                    ? 'Encounter ends before report period start'
                     : status === 'outside-after'
-                        ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter starts after report period end">&#9888; after period</span>'
+                        ? 'Encounter starts after report period end'
                         : '';
+            var text = status === 'overlap'
+                ? '&#10003; overlaps period'
+                : status === 'outside-before'
+                    ? '&#9888; before period'
+                    : status === 'outside-after'
+                        ? '&#9888; after period'
+                        : '';
+            var badge = tone
+                ? '<span class="badge rounded-pill ' + tone + ' mt-1 px-2 py-1" title="' + note + '">' + text + '</span>'
+                : '';
             cell.innerHTML = '<div>' + label + '</div>' + (badge ? '<div>' + badge + '</div>' : '');
         }
 

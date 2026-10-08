@@ -271,7 +271,7 @@
                                 <td>@report.Label</td>
                                 <td>@report.Trigger</td>
                                 <td>
-                                    <span class="badge @(report.Status == "failed" ? "au-badge-danger" : report.Status == "running" ? "au-badge-active" : "au-badge-success")">@report.Status</span>
+                                    <span class="badge @StatusPills.ForCleanup(report.Status)">@report.Status</span>
                                 </td>
                                 <td class="small">
                                     quiesced @report.QuiescedFacilityIds.Count/@report.QuiesceCandidateCount,
@@ -346,11 +346,8 @@
         }
     }
 
-    function badgeClass(status) {
-        if (status === 'running') return 'au-badge-active';
-        if (status === 'completed') return 'au-badge-success';
-        if (status === 'failed') return 'au-badge-danger';
-        return 'au-badge-muted';
+    function cleanupTone(status) {
+        return window.luStatusPills.forCleanup(status);
     }
 
     function badgeText(status) {
@@ -399,7 +396,7 @@
         var current = document.getElementById('cleanup-activity-current');
 
         if (badge) {
-            badge.className = 'badge ' + badgeClass(status);
+            badge.className = 'badge ' + cleanupTone(status);
             badge.textContent = badgeText(status);
         }
         if (label) {

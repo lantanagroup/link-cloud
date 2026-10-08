@@ -104,7 +104,7 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-people me-2"></i>Per-Patient Resource Breakdown</span>
                 <div>
-                    <input type="text" class="form-control form-control-sm" id="patientSearch" placeholder="Search patients…" style="width:220px;display:inline-block;">
+                    <input type="text" class="form-control form-control-sm" id="patientSearch" data-lu-query="patient" placeholder="Search patients…" style="width:220px;display:inline-block;">
                 </div>
             </div>
             <div class="card-body">
@@ -165,10 +165,7 @@
     };
     const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
 
-    const chartColors = [
-        '#343a40','#28a745','#ffc107','#dc3545','#6f42c1','#111','#fd7e14',
-        '#545c64','#e83e8c','#6c757d','#1a1a1a','#adb5bd','#343a40','#868e96'
-    ];
+    const chartColors = window.luChartPalette.manifest;
 
     function escapeHtml(s) {
         if (!s) return '';
@@ -385,6 +382,9 @@
                 }
             });
         }
+        else if (window.luChartFrame) {
+            window.luChartFrame.collapseEmpty('resourceDistChart');
+        }
     }
 
     function renderEligibility(m) {
@@ -513,7 +513,13 @@
 
         if (patientBarChart) {
             patientBarChart.destroy();
+            patientBarChart = null;
         }
+        if (!patientTotals.length) {
+            if (window.luChartFrame) window.luChartFrame.collapseEmpty('patientBarChart');
+            return;
+        }
+        if (window.luChartFrame) window.luChartFrame.reveal('patientBarChart');
 
         patientBarChart = new Chart(chartCanvas, {
             type: 'bar',
@@ -522,7 +528,7 @@
                 datasets: [{
                     label: 'Total Resources',
                     data: patientTotals.map(patient => patient.total),
-                    backgroundColor: 'var(--au-accent)',
+                    backgroundColor: window.luChartPalette.accent,
                     borderRadius: 3
                 }]
             },
@@ -831,7 +837,7 @@
         if (allPatientIds.length > 0) {
             html += `<div class="au-card"><div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-people me-2"></i>Per-Patient Prediction vs ABS</span>
-                <input type="text" class="form-control form-control-sm" id="compPatientSearch" placeholder="Search patients…" style="width:200px;">
+                <input type="text" class="form-control form-control-sm" id="compPatientSearch" data-lu-query="compare" placeholder="Search patients…" style="width:200px;">
             </div><div class="card-body p-0">
                 <div style="max-height:600px;overflow:auto;">
             <table class="au-table table small mb-0" id="compPatientTable" style="table-layout:fixed;min-width:900px;">
@@ -876,7 +882,7 @@
                 const patientTypes = [...new Set([...Object.keys(gCounts), ...Object.keys(eCounts), ...Object.keys(aCounts)])].sort();
                 let detailHtml = `
                     <table class="au-table table table-borderless small mb-0"
-                            style="background:#f8fafc;table-layout:fixed;min-width:900px;">
+                            style="background:#f8f8f8;table-layout:fixed;min-width:900px;">
                         <colgroup>
                             <col style="width:34%">
                             <col style="width:13%">
