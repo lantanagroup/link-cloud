@@ -250,6 +250,29 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Test_operation_redirects_back_to_the_facility_page()
+    {
+        var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Controllers/TenantsController.cs"));
+        var start = text.IndexOf("Task<IActionResult> TestOperation(", StringComparison.Ordinal);
+        var end = text.IndexOf("Task<IActionResult> View(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = text.Substring(start, end - start);
+        body.Should().Contain("RedirectNormalizationStay(result, operation)");
+        body.Should().NotContain("return await FromResult(result, id ?? \"Facility\");");
+
+        var redirect = text.IndexOf("RedirectNormalizationStay(", StringComparison.Ordinal);
+        redirect.Should().BeGreaterThan(-1);
+        text.Should().Contain("TempData[\"NormalizationTestResult\"]");
+        text.Should().Contain("RestoreNormalizationTempData(page)");
+        var import = text.IndexOf("Task<IActionResult> ImportExtensionUrls(", StringComparison.Ordinal);
+        var importEnd = text.IndexOf("Task<IActionResult> DeleteOperation(", import, StringComparison.Ordinal);
+        import.Should().BeGreaterThan(-1);
+        importEnd.Should().BeGreaterThan(import);
+        text.Substring(import, importEnd - import).Should().Contain("RedirectNormalizationStay(result, operationId: null)");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
