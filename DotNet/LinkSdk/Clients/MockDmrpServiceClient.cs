@@ -2,7 +2,6 @@ using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using Microsoft.Extensions.Options;
@@ -31,11 +30,6 @@ public class MockDmrpServiceClient : LinkApiClientBase, IMockDmrpServiceClient
         : base(baseUrl, bearerOptions, tokenServiceSettings, tokenService)
     {
     }
-
-    /// <inheritdoc />
-    public Task<LinkApiResponse<ServiceInformation>> GetInfoAsync(CancellationToken cancellationToken = default) =>
-        SendAsync<ServiceInformation>(() => AnonymousRequest($"{SupportRoute}/info")
-            .GetAsync(cancellationToken: cancellationToken));
 
     /// <inheritdoc />
     public Task<LinkApiResponse<MockDmrpEntryPage>> SearchEntriesAsync(string? facilityId = null,

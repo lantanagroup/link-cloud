@@ -42,8 +42,6 @@ registers it with the mock's root address:
 builder.Services.AddMockDmrpServiceClient(sp => /* the mock's root URL */);
 ```
 
-Its `GetInfoAsync` never sends the Link token, because it is called before the host is known to be the mock.
-
 ### Prerequisites in DI
 
 - `IOptions<ServiceRegistry>` — service base URLs

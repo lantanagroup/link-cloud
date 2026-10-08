@@ -1,5 +1,4 @@
 using LantanaGroup.Link.Sdk.ApiClient;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 
 namespace LantanaGroup.Link.Sdk.Clients;
@@ -14,15 +13,6 @@ namespace LantanaGroup.Link.Sdk.Clients;
 /// </remarks>
 public interface IMockDmrpServiceClient
 {
-    /// <summary>
-    /// Gets the service's build information. Sent without a bearer token.
-    /// </summary>
-    /// <remarks>
-    /// Answers even while the mock is disabled. The caller compares <see cref="ServiceInformation.ServiceName"/>
-    /// to decide whether the host is the mock at all before sending it anything authenticated.
-    /// </remarks>
-    Task<LinkApiResponse<ServiceInformation>> GetInfoAsync(CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Searches entries. Every filter is optional, and a filter left null is not sent.
     /// </summary>

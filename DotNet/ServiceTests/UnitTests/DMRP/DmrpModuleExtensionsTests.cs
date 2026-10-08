@@ -4,7 +4,9 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.DMRP.MockDmrp;
 using LantanaGroup.Link.DMRP.Scheduling;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
@@ -35,11 +37,12 @@ namespace UnitTests.DMRP
         /// </summary>
         private const string ClassicGroup = "HostClassicReportJobs";
 
-        private static WebApplicationBuilder CreateBuilder(bool? enabled)
+        private static WebApplicationBuilder CreateBuilder(bool? enabled,
+                                                           Dictionary<string, string?>? extraSettings = null)
         {
             var builder = WebApplication.CreateBuilder();
 
-            var settings = new Dictionary<string, string?>();
+            var settings = extraSettings ?? new Dictionary<string, string?>();
 
             if (enabled.HasValue)
             {
@@ -131,11 +134,72 @@ namespace UnitTests.DMRP
 
             Assert.Contains(controllers.Controllers, c => c.AsType() == typeof(MeasureMappingsController));
             Assert.Contains(controllers.Controllers, c => c.AsType() == typeof(FacilityReportingPlansController));
+            Assert.Contains(controllers.Controllers, c => c.AsType() == typeof(DmrpStatusController));
         }
+
+        /// <summary>
+        /// Tenant reads the mock's own switch. It turns the write-through on only with an address to write
+        /// to, and anything but a boolean true is off, the same way the mock reads it.
+        /// </summary>
+        [Theory]
+        [InlineData("true", "http://mock-dmrp-api:8080", true)]
+        [InlineData("True", "http://mock-dmrp-api:8080", true)]
+        [InlineData("false", "http://mock-dmrp-api:8080", false)]
+        [InlineData(null, "http://mock-dmrp-api:8080", false)]
+        [InlineData("yes", "http://mock-dmrp-api:8080", false)]
+        [InlineData("true", null, false)]
+        [InlineData("true", " ", false)]
+        public void AddDmrpModule_reads_the_mock_switch(string? mockEnabled, string? baseUrl, bool expected)
+        {
+            var builder = CreateBuilder(enabled: true, MockSettings(mockEnabled, baseUrl));
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(),
+                                                                           ClassicGroup);
+
+            var status = Assert.Single(builder.Services, d => d.ServiceType == typeof(IMockDmrpStatus));
+            Assert.Equal(expected, ((IMockDmrpStatus)status.ImplementationInstance!).IsEnabled);
+        }
+
+        [Fact]
+        public void AddDmrpModule_registers_the_mock_client_only_when_the_mock_is_on()
+        {
+            var on = CreateBuilder(enabled: true, MockSettings("true", "http://mock-dmrp-api:8080"));
+            var off = CreateBuilder(enabled: true, MockSettings("false", "http://mock-dmrp-api:8080"));
+
+            on.AddDmrpModule<TenantDbContext, HostFacilityOperations>(on.Services.AddControllers(), ClassicGroup);
+            off.AddDmrpModule<TenantDbContext, HostFacilityOperations>(off.Services.AddControllers(), ClassicGroup);
+
+            Assert.Contains(on.Services, d => d.ServiceType == typeof(IMockDmrpServiceClient));
+            Assert.DoesNotContain(off.Services, d => d.ServiceType == typeof(IMockDmrpServiceClient));
+        }
+
+        /// <summary>
+        /// With DMRP off the status route still answers, and it says the mock is off whatever its switch says:
+        /// the write-through lives inside the module.
+        /// </summary>
+        [Fact]
+        public void AddDmrpModule_registers_a_switched_off_mock_status_when_disabled()
+        {
+            var builder = CreateBuilder(enabled: false, MockSettings("true", "http://mock-dmrp-api:8080"));
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(),
+                                                                           ClassicGroup);
+
+            var status = Assert.Single(builder.Services, d => d.ServiceType == typeof(IMockDmrpStatus));
+            Assert.False(((IMockDmrpStatus)status.ImplementationInstance!).IsEnabled);
+            Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IMockDmrpServiceClient));
+        }
+
+        private static Dictionary<string, string?> MockSettings(string? mockEnabled, string? baseUrl) => new()
+        {
+            [MockDmrpStatus.EnabledConfigurationKey] = mockEnabled,
+            ["DMRP:Api:BaseUrl"] = baseUrl
+        };
 
         [Theory]
         [InlineData(typeof(MeasureMappingsController), "api/dmrp/measure-mappings")]
         [InlineData(typeof(FacilityReportingPlansController), "api/dmrp/reporting-plans")]
+        [InlineData(typeof(DmrpStatusController), "api/dmrp/dmrp-status")]
         public void Module_controllers_use_the_routes_named_in_the_proposal(Type controller, string expectedRoute)
         {
             var route = controller.GetCustomAttributes(typeof(RouteAttribute), inherit: false)
@@ -440,33 +504,39 @@ namespace UnitTests.DMRP
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IMeasureMappingManager));
             Assert.DoesNotContain(builder.Services, d => d.ServiceType == typeof(IFacilityReportingPlanManager));
 
-            var dmrpAssembly = typeof(MeasureMapping).Assembly;
-            Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
+            AssertOnlyTheStatusControllerIsRoutable(mvcBuilder);
         }
 
         [Theory]
         [InlineData(false)]
         [InlineData(null)]
-        public void AddDmrpModule_removes_the_hosts_auto_discovered_part_when_disabled(bool? enabled)
+        public void AddDmrpModule_serves_only_the_status_route_when_disabled(bool? enabled)
         {
             var builder = CreateBuilder(enabled);
             var mvcBuilder = builder.Services.AddControllers();
 
             // The Tenant build emits [assembly: ApplicationPart("DMRP")] for the project reference, so
             // in the real host the module's assembly is an application part before AddDmrpModule runs.
-            // Recreate that here: the module must strip the part, or its controllers would be routable
-            // without their services and every DMRP request would 500 instead of 404.
+            // Recreate that here: the module must hide every controller but the status one, or they would
+            // be routable without their services and every DMRP request would 500 instead of 404.
             var dmrpAssembly = typeof(MeasureMapping).Assembly;
             mvcBuilder.AddApplicationPart(dmrpAssembly);
 
             var registered = builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(mvcBuilder, ClassicGroup);
 
             Assert.False(registered);
-            Assert.DoesNotContain(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
+            Assert.Single(mvcBuilder.PartManager.ApplicationParts, p => p.Name == dmrpAssembly.GetName().Name);
+            AssertOnlyTheStatusControllerIsRoutable(mvcBuilder);
+        }
 
+        private static void AssertOnlyTheStatusControllerIsRoutable(IMvcBuilder mvcBuilder)
+        {
+            var dmrpAssembly = typeof(MeasureMapping).Assembly;
             var controllers = new ControllerFeature();
             mvcBuilder.PartManager.PopulateFeature(controllers);
-            Assert.DoesNotContain(controllers.Controllers, c => c.Assembly == dmrpAssembly);
+
+            var routable = Assert.Single(controllers.Controllers, c => c.Assembly == dmrpAssembly);
+            Assert.Equal(typeof(DmrpStatusController), routable.AsType());
         }
     }
 }

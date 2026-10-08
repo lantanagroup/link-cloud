@@ -23,26 +23,6 @@ public class MockDmrpServiceClientTests
                                      "\"metadata\":{\"pageSize\":1,\"pageNumber\":1," +
                                      "\"totalCount\":0,\"totalPages\":0}}";
 
-    /// <summary>
-    /// The info route is how a caller decides whether the host is the mock at all, so it is asked
-    /// before anything proves the host is one. A Link token sent there could land with the real DMRP.
-    /// </summary>
-    [Fact]
-    public async System.Threading.Tasks.Task GetInfoAsync_TokenConfigured_SendsNoAuthorization()
-    {
-        using var server = new OneShotServer("{\"serviceName\":\"Link Mock DMRP API\",\"version\":\"1.0.0\"}");
-        using var client = CreateClient(server.BaseUrl, anonymous: false);
-
-        var callTask = client.GetInfoAsync();
-        var request = await server.WaitForRequestAsync();
-        var response = await callTask;
-
-        Assert.Equal("GET", request.Method);
-        Assert.Equal("/api/mock-dmrp/info", request.Path);
-        Assert.Null(request.Authorization);
-        Assert.Equal("Link Mock DMRP API", response.Body?.ServiceName);
-    }
-
     [Fact]
     public async System.Threading.Tasks.Task SearchEntriesAsync_TokenConfigured_SendsTheLinkToken()
     {

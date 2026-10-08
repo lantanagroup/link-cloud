@@ -4,11 +4,15 @@ using LantanaGroup.Link.DMRP.Business.Managers;
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.MockDmrp;
 using LantanaGroup.Link.DMRP.Scheduling;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DMRP.DependencyInjection
 {
@@ -54,13 +58,20 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             {
                 // The host's build emits [assembly: ApplicationPart("DMRP")] for the project reference,
                 // so MVC discovers this module's controllers before AddDmrpModule runs. Left in place
-                // without their services, those controllers turn every DMRP request into a 500; strip
-                // the part so a disabled module has no routes at all.
-                var moduleAssemblyName = typeof(DmrpModuleExtensions).Assembly.GetName().Name;
-                foreach (var part in mvcBuilder.PartManager.ApplicationParts.Where(p => p.Name == moduleAssemblyName).ToList())
+                // without their services, those controllers turn every DMRP request into a 500. So the
+                // disabled module serves one route only: the status the Admin UI reads to learn that
+                // DMRP is off.
+                var moduleAssembly = typeof(DmrpModuleExtensions).Assembly;
+                foreach (var part in mvcBuilder.PartManager.ApplicationParts
+                             .Where(p => p.Name == moduleAssembly.GetName().Name)
+                             .ToList())
                 {
                     mvcBuilder.PartManager.ApplicationParts.Remove(part);
                 }
+
+                mvcBuilder.AddApplicationPart(moduleAssembly);
+                mvcBuilder.PartManager.FeatureProviders.Add(new DmrpStatusOnlyControllerFeatureProvider());
+                builder.Services.TryAddSingleton<IMockDmrpStatus>(new MockDmrpStatus(false));
 
                 // The reconciler needs only Quartz and the settings, both of which the host has
                 // whether or not the module is on.
@@ -121,6 +132,9 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
             builder.Services.TryAddSingleton(TimeProvider.System);
 
+            AddMockDmrpWriteThrough(builder.Services,
+                MockDmrpStatus.FromConfiguration(builder.Configuration, section.Get<DmrpSettings>()!));
+
             if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityTimeZoneSource)))
             {
                 throw new InvalidOperationException(
@@ -169,6 +183,29 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
                     sp.GetRequiredService<THostFacilityOperations>()));
 
             return true;
+        }
+
+        /// <summary>
+        /// Registers what the facility write-through to the Mock DMRP API needs, and the status the Admin UI
+        /// reads from <c>api/dmrp/mock-dmrp-status</c>.
+        /// </summary>
+        /// <remarks>
+        /// The status is always registered, so the route answers whether or not the mock is on. The client is
+        /// registered only when it is, because it cannot be built without <c>DMRP:Api:BaseUrl</c>. It
+        /// authenticates with the host's Link token plumbing (<c>LinkBearerServiceOptions</c>,
+        /// <c>LinkTokenServiceSettings</c>, <c>ICreateSystemToken</c>), which the module cannot supply itself.
+        /// </remarks>
+        private static void AddMockDmrpWriteThrough(IServiceCollection services, MockDmrpStatus status)
+        {
+            services.TryAddSingleton<IMockDmrpStatus>(status);
+
+            if (!status.IsEnabled)
+            {
+                return;
+            }
+
+            services.AddMockDmrpServiceClient(sp =>
+                sp.GetRequiredService<IOptions<DmrpSettings>>().Value.Api.BaseUrl!);
         }
     }
 }
