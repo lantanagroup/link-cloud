@@ -1,0 +1,172 @@
+using Confluent.Kafka;
+using LantanaGroup.Link.Notification.Application.Interfaces;
+using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Application.Notification.Commands;
+using LantanaGroup.Link.Notification.Application.Notification.Queries;
+using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queries;
+using LantanaGroup.Link.Notification.Domain.Entities;
+using LantanaGroup.Link.Notification.Listeners;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+
+namespace UnitTests.Notification;
+
+[Trait("Category", "UnitTests")]
+public class NotificationRequestedListenerTests
+{
+    [Fact]
+    public async Task ProcessingException_IsRetried_AndTheNextMessageIsStillConsumed()
+    {
+        var consumed = 0;
+        var consumer = new Mock<IConsumer<string, NotificationMessage>>();
+        consumer
+            .Setup(c => c.Consume(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                var call = Interlocked.Increment(ref consumed);
+                if (call == 1)
+                {
+                    return Message("first");
+                }
+
+                if (call == 2)
+                {
+                    return Message("second");
+                }
+
+                throw new OperationCanceledException();
+            });
+
+        var factory = new Mock<IKafkaConsumerFactory>();
+        factory
+            .Setup(f => f.CreateNotificationRequestedConsumer(false, It.IsAny<KafkaAssignmentTracker>()))
+            .Returns(consumer.Object);
+
+        var creates = 0;
+        var create = new Mock<ICreateNotificationCommand>();
+        create
+            .Setup(c => c.Execute(It.IsAny<CreateNotificationModel>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (Interlocked.Increment(ref creates) == 1)
+                {
+                    throw new InvalidOperationException("notification store unavailable");
+                }
+
+                return Task.FromResult(Guid.NewGuid().ToString());
+            });
+
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var send = new Mock<ISendNotificationCommand>();
+        send
+            .Setup(c => c.Execute(It.IsAny<SendNotificationModel>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                sent.TrySetResult();
+                return Task.FromResult(true);
+            });
+
+        var validate = new Mock<IValidateEmailAddressCommand>();
+        validate
+            .Setup(c => c.Execute(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var get = new Mock<IGetNotificationQuery>();
+        get
+            .Setup(q => q.Execute(It.IsAny<NotificationId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new NotificationModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                Subject = "subject",
+                Body = "body",
+                Recipients = ["a@b.test"]
+            });
+
+        var services = new Mock<IServiceProvider>();
+        services.Setup(s => s.GetService(typeof(IValidateEmailAddressCommand))).Returns(validate.Object);
+        services.Setup(s => s.GetService(typeof(ICreateNotificationCommand))).Returns(create.Object);
+        services.Setup(s => s.GetService(typeof(IGetNotificationQuery))).Returns(get.Object);
+        services.Setup(s => s.GetService(typeof(ISendNotificationCommand))).Returns(send.Object);
+        services.Setup(s => s.GetService(typeof(IGetFacilityConfigurationQuery))).Returns(Mock.Of<IGetFacilityConfigurationQuery>());
+        var scope = new Mock<IServiceScope>();
+        scope.Setup(s => s.ServiceProvider).Returns(services.Object);
+        var scopes = new Mock<IServiceScopeFactory>();
+        scopes.Setup(s => s.CreateScope()).Returns(scope.Object);
+
+        var retried = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transient = new Mock<ITransientExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+        transient
+            .Setup(h => h.HandleException(
+                It.IsAny<ConsumeResult<string, NotificationMessage>>(),
+                It.IsAny<TransientException>(),
+                It.IsAny<string>()))
+            .Callback(() => retried.TrySetResult());
+        var deadLetter = new Mock<IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+
+        var notifications = new Mock<INotificationFactory>();
+        notifications
+            .Setup(f => f.CreateNotificationModelCreate(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<List<string>>(),
+                It.IsAny<List<string>?>()))
+            .Returns(new CreateNotificationModel());
+        notifications
+            .Setup(f => f.CreateSendNotificationModel(
+                It.IsAny<string>(),
+                It.IsAny<List<string>>(),
+                It.IsAny<List<string>?>(),
+                It.IsAny<string>(),
+                It.IsAny<string>()))
+            .Returns(new SendNotificationModel());
+
+        var listener = new NotificationRequestedListener(
+            Mock.Of<ILogger<NotificationRequestedListener>>(),
+            notifications.Object,
+            factory.Object,
+            scopes.Object,
+            transient.Object,
+            deadLetter.Object);
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await listener.StartAsync(stop.Token);
+
+        await Task.WhenAll(retried.Task, sent.Task).WaitAsync(TimeSpan.FromSeconds(7));
+
+        deadLetter.Verify(
+            h => h.HandleException(
+                It.IsAny<ConsumeResult<string, NotificationMessage>>(),
+                It.IsAny<Exception>(),
+                It.IsAny<string>()),
+            Times.Never);
+        Assert.True(consumed >= 2);
+    }
+
+    private static ConsumeResult<string, NotificationMessage> Message(string subject) =>
+        new()
+        {
+            Topic = "NotificationRequested",
+            Partition = 0,
+            Offset = 0,
+            Message = new Message<string, NotificationMessage>
+            {
+                Key = null,
+                Headers = new Headers(),
+                Value = new NotificationMessage
+                {
+                    NotificationType = "Email",
+                    Subject = subject,
+                    Body = "body",
+                    Recipients = ["a@b.test"]
+                }
+            }
+        };
+}
