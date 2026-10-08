@@ -67,7 +67,7 @@ else
         <div class="card-body">
             @if (!string.IsNullOrWhiteSpace(Model.FormError))
             {
-                <div class="alert alert-warning" id="facilityFormError">@Model.FormError</div>
+                <div class="alert alert-warning lu-section-error" id="facilityFormError">@Model.FormError</div>
             }
             @if (!string.IsNullOrWhiteSpace(Model.VendorWarning))
             {
@@ -145,7 +145,7 @@ else
                 <h2 class="accordion-header" id="dispatchHeading">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#dispatchPanel" aria-expanded="true" aria-controls="dispatchPanel">
                         Query dispatch
-                        <span class="badge text-bg-light ms-2" id="dispatchCount">@Model.Schedules.Count(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration))</span>
+                        <span class="text-muted ms-2" id="dispatchCount">@Model.Schedules.Count(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration))</span>
                     </button>
                 </h2>
                 <div id="dispatchPanel" class="accordion-collapse collapse show" aria-labelledby="dispatchHeading">
@@ -158,7 +158,7 @@ else
                         {
                             @if (!string.IsNullOrWhiteSpace(Model.QueryDispatchError))
                             {
-                                <div class="alert alert-warning">@Model.QueryDispatchError</div>
+                                <div class="alert alert-warning lu-section-error">@Model.QueryDispatchError</div>
                             }
                             else if (!Model.QueryDispatchExists || !Model.Schedules.Any(row => !string.IsNullOrWhiteSpace(row.Event) || !string.IsNullOrWhiteSpace(row.Duration)))
                             {
@@ -210,7 +210,7 @@ else
                         @if (Model.Notification.Configured)
                         {
                             var emailCount = (Model.Notification.Emails ?? "").Split(new[] { '\r', '\n', ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length;
-                            <span class="badge text-bg-light ms-2" id="notificationCount">@emailCount</span>
+                            <span class="text-muted ms-2" id="notificationCount">@emailCount</span>
                         }
                     </button>
                 </h2>
@@ -218,7 +218,7 @@ else
                     <div class="accordion-body">
                         @if (TempData["Error"] is string notificationError)
                         {
-                            <div class="alert alert-warning">@notificationError</div>
+                            <div class="alert alert-warning lu-section-error">@notificationError</div>
                         }
                         @if (!Model.Notification.Configured)
                         {
@@ -228,7 +228,7 @@ else
                         {
                             @if (!string.IsNullOrWhiteSpace(Model.Notification.Error))
                             {
-                                <div class="alert alert-warning">@Model.Notification.Error</div>
+                                <div class="alert alert-warning lu-section-error">@Model.Notification.Error</div>
                             }
                             else if (!Model.Notification.Exists)
                             {

@@ -892,6 +892,7 @@
         form.removeAttribute("data-facility-dirty");
         form.removeAttribute("data-facility-force");
         form.removeAttribute("data-facility-skip");
+        if (window.luSectionValidity) window.luSectionValidity.clear(sectionItem(form));
         if (action.indexOf("Save") === 0) {
             ["censusExists", "queryDispatchExists", "Exists"].forEach(function (name) {
                 var field = form.querySelector("input[name='" + name + "']");
@@ -952,6 +953,8 @@
             lines.push(label + " could not be saved. " + detail);
             lines.push("This section still has your edits. Later sections were not saved.");
             showResults(lines);
+            if (window.luSectionValidity) window.luSectionValidity.mark(sectionItem(form), detail);
+            setExpanded(sectionItem(form), true);
         }
 
         function next() {

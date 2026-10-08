@@ -8,20 +8,25 @@
         || panel.EditorOpen
         || !string.IsNullOrWhiteSpace(panel.TestResult);
     var collapse = open ? "accordion-collapse collapse show" : "accordion-collapse collapse";
-    var button = open ? "accordion-button" : "accordion-button collapsed";
-    var expanded = open ? "true" : "false";
     var editor = panel.Editor;
+    var sectionInvalid = !string.IsNullOrWhiteSpace(Model.NormalizationError)
+        || panel.ReadFailed
+        || (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.FormError))
+        || editor.ParseFailed
+        || panel.SequenceIncomplete;
+    var button = (open ? "accordion-button" : "accordion-button collapsed") + (sectionInvalid ? " lu-section-invalid" : "");
+    var expanded = open ? "true" : "false";
     var editing = editor.OperationId is not null;
     var type = editor.OperationType ?? string.Empty;
 }
 
 <div class="accordion-item" id="normalizationPanel">
     <h2 class="accordion-header" id="normalizationHeading">
-        <button class="@button" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationBody" aria-expanded="@expanded" aria-controls="normalizationBody">
+        <button class="@button" type="button" data-bs-toggle="collapse" data-bs-target="#normalizationBody" aria-expanded="@expanded" aria-invalid="@(sectionInvalid ? "true" : "false")" aria-controls="normalizationBody">
             @(panel.VendorOwned ? "Vendor operation" : "Normalization operations")
             @if (!panel.VendorOwned)
             {
-                <span class="badge text-bg-light ms-2" id="normalizationCount">@panel.Operations.Count</span>
+                <span class="text-muted ms-2" id="normalizationCount">@panel.Operations.Count</span>
             }
         </button>
     </h2>
@@ -35,11 +40,11 @@
             {
                 @if (!string.IsNullOrWhiteSpace(Model.NormalizationError))
                 {
-                    <div class="alert alert-warning">@Model.NormalizationError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.NormalizationError</div>
                 }
                 @if (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.FormError))
                 {
-                    <div class="alert alert-warning" id="vendor-operation-error">@Model.FormError</div>
+                    <div class="alert alert-warning lu-section-error" id="vendor-operation-error">@Model.FormError</div>
                 }
                 @if (panel.VendorOwned && !string.IsNullOrWhiteSpace(Model.VendorWarning))
                 {
@@ -51,7 +56,7 @@
                 }
                 @if (panel.ReadFailed)
                 {
-                    <div class="alert alert-warning">Normalization operations could not be read. Saving is hidden so this page cannot replace them.</div>
+                    <div class="alert alert-warning lu-section-error">Normalization operations could not be read. Saving is hidden so this page cannot replace them.</div>
                 }
                 else
                 {
@@ -147,7 +152,7 @@
                             </div>
                             @if (editor.ParseFailed)
                             {
-                                <div class="alert alert-warning mb-0">This operation could not be read into the form, so it cannot be saved here.</div>
+                                <div class="alert alert-warning lu-section-error mb-0">This operation could not be read into the form, so it cannot be saved here.</div>
                             }
                             else
                             {
@@ -607,7 +612,7 @@
                             {
                                 @if (panel.SequenceIncomplete)
                                 {
-                                    <div class="alert alert-warning">Not every operation for this resource type could be listed, so the sequence cannot be replaced from here.</div>
+                                    <div class="alert alert-warning lu-section-error">Not every operation for this resource type could be listed, so the sequence cannot be replaced from here.</div>
                                 }
                                 <form method="post" data-au-save asp-action="SaveOperationSequence" asp-route-id="@Model.FacilityId">
                                     <input type="hidden" name="ResourceType" value="@panel.SequenceType" />
