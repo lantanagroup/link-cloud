@@ -296,6 +296,7 @@ try {
     $bashFetch = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'docker-compose.feed-token-fetch.sh'))
     Write-Result ($fetchScript.Contains('--allow-no-subscriptions') -and $bashFetch.Contains('--allow-no-subscriptions')) 'login allows an account with no Azure subscription'
     Write-Result ($fetchScript.Contains('*>&1 | Out-Host')) 'winget progress is not part of the az path'
+    Write-Result ($fetchScript.Contains('$env:Path = "$prior;$userPath;$machinePath"')) 'session PATH stays ahead of the registry PATH'
 
     # Installer is idempotent and does not touch the real profile.
     $profilePath = Join-Path $repo 'profile.ps1'
@@ -322,7 +323,7 @@ try {
     Write-Result ($documented.Contains('powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"')) 'documented setup passes the calling shell profile'
     Write-Result ($documented.Contains('Get-ExecutionPolicy -List') -and $documented.Contains('Set-ExecutionPolicy -Scope CurrentUser RemoteSigned')) 'documented setup names the execution policy check'
     $installerText = [System.IO.File]::ReadAllText($installer)
-    Write-Result ($installerText.Contains('Set-ExecutionPolicy -Scope CurrentUser RemoteSigned') -and $installerText.Contains("if (`$scope -eq 'Process')")) 'installer warns from the saved execution policy'
+    Write-Result ($installerText.Contains('Set-ExecutionPolicy -Scope CurrentUser RemoteSigned') -and $installerText.Contains("if (`$scope -eq 'Process')") -and $installerText.Contains("if (-not `$effective) { `$effective = 'Restricted' }")) 'installer warns from the saved execution policy'
     Write-Result ($installerText.Contains('if (-not $ProfilePath)') -and $installerText.Contains('$ProfilePath = $PROFILE')) 'installer defaults to the running host profile'
     Write-Result ($profileText.Contains($installDir) -and $profileText.Contains('docker-compose.feed-token-profile.ps1')) 'installer profile line uses the install directory'
     Write-Result ($installerText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'default install line stays the documented snippet'

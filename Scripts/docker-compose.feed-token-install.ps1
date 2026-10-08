@@ -35,7 +35,8 @@ function Get-ProfileText {
 
 function Write-ProfilePolicyWarning {
     # Ignore Process. The installer is often started with -ExecutionPolicy Bypass.
-    $effective = 'Undefined'
+    # An unset policy is Restricted for a new Windows PowerShell window.
+    $effective = $null
     foreach ($entry in (Get-ExecutionPolicy -List)) {
         $scope = $entry.Scope.ToString()
         if ($scope -eq 'Process') { continue }
@@ -44,8 +45,9 @@ function Write-ProfilePolicyWarning {
         $effective = $value
         break
     }
+    if (-not $effective) { $effective = 'Restricted' }
     if ($effective -eq 'Restricted' -or $effective -eq 'AllSigned') {
-        Write-Host "PowerShell execution policy is $effective, so a new shell will not load this profile. Run Get-ExecutionPolicy -List. If group policy has not locked it, run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned."
+        Write-Host "PowerShell execution policy is $effective, so a new shell will not load this profile. Open a new window without -ExecutionPolicy Bypass and run Get-ExecutionPolicy. If group policy has not locked it, run Set-ExecutionPolicy -Scope CurrentUser RemoteSigned."
     }
 }
 
