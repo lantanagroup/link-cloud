@@ -212,7 +212,7 @@
             return;
         }
         if (body) {
-            body.querySelectorAll(":scope > .alert-info").forEach(function (alert) {
+            body.querySelectorAll(":scope > .au-note").forEach(function (alert) {
                 alert.classList.add("d-none");
             });
         }
@@ -303,8 +303,10 @@
         var rest = (submit.textContent || "").replace(/^Delete\s*/i, "").trim();
         var label = rest || labels[action] || "this row";
         submit.type = "button";
-        submit.className = "btn btn-sm btn-danger";
-        submit.textContent = "Delete";
+        submit.className = "btn btn-sm btn-danger lu-icon-btn";
+        submit.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
+        submit.title = "Delete";
+        submit.setAttribute("aria-label", "Delete " + label);
         submit.addEventListener("click", function () {
             if (!window.confirm("Delete " + label + "? It is deleted when you save the facility.")) return;
             form.setAttribute("data-facility-force", "true");
@@ -702,7 +704,7 @@
             row.setAttribute("data-collection-row", "");
             row.setAttribute("data-email-new", "true");
             row.innerHTML = '<div class="col"><input class="form-control" data-email-input aria-label="Email address" maxlength="254" /></div>'
-                + '<div class="col-auto"><button type="button" class="btn btn-sm btn-danger" data-email-remove>Delete</button></div>';
+                + '<div class="col-auto"><button type="button" class="btn btn-sm btn-danger lu-icon-btn" data-email-remove title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button></div>';
             var box = form.querySelector("#notificationEmails");
             if (box) box.before(row);
             else host.appendChild(row);

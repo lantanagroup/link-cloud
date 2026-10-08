@@ -51,9 +51,8 @@
                         <tr>
                             <th scope="col">Name</th>
                             <th scope="col">Signing key secret name</th>
-                            <th scope="col"><span class="visually-hidden">Save</span></th>
                             <th scope="col">Versions</th>
-                            <th scope="col"><span class="visually-hidden">Delete</span></th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,18 +66,18 @@
                             <td>
                                 <input form="@formId" name="secret" value="@row.SecretId" class="form-control form-control-sm" maxlength="127" autocomplete="off" aria-label="Signing key secret name for @row.Name" />
                             </td>
-                            <td>
-                                <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVendor">
-                                    <input type="hidden" name="id" value="@row.Id" />
-                                    <button type="submit" class="btn btn-sm btn-success">Save</button>
-                                    <button type="button" class="btn btn-sm btn-au-neutral" data-lu-cancel>Cancel</button>
-                                </form>
-                            </td>
                             <td><a asp-action="Versions" asp-route-vendorId="@row.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">Versions</a></td>
                             <td>
-                                <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
-                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                                </form>
+                                <div class="lu-row-actions">
+                                    <form id="@formId" method="post" data-au-save data-lu-panel asp-action="SaveVendor">
+                                        <input type="hidden" name="id" value="@row.Id" />
+                                        <button type="submit" class="btn btn-sm btn-success lu-icon-btn" title="Save" aria-label="Save @row.Name"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                                        <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn" data-lu-cancel title="Cancel" aria-label="Cancel editing @row.Name"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                    </form>
+                                    <form method="post" data-au-save asp-action="DeleteVendor" asp-route-id="@row.Id" onsubmit="return confirm('Delete this vendor?');">
+                                        <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Delete" aria-label="Delete @row.Name"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     }

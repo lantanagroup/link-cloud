@@ -284,16 +284,18 @@
                                 <td>@(run.PatientsPerMinute?.ToString("0.0") ?? "—")</td>
                                 <td>@FormatWhen(run.FinishedAt)</td>
                                 <td class="text-nowrap">
-                                    <a asp-action="Details" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">View</a>
-                                    @if (run.ScenarioId is Guid scenarioId)
-                                    {
-                                        <a asp-action="Scenario" asp-route-id="@scenarioId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral">History</a>
-                                    }
-                                    <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
-                                          onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
-                                    </form>
+                                    <div class="lu-row-actions">
+                                        <a asp-action="Details" asp-route-id="@run.RunId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="View" aria-label="View"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                                        @if (run.ScenarioId is Guid scenarioId)
+                                        {
+                                            <a asp-action="Scenario" asp-route-id="@scenarioId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" class="btn btn-sm btn-au-neutral lu-icon-btn" title="History" aria-label="History"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
+                                        }
+                                        <form asp-action="Delete" asp-route-id="@run.RunId" method="post" class="d-inline"
+                                              onsubmit="return confirm('Remove this result from Performance history? Cards, trends, and compare will drop it. The run log is not deleted.');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         }

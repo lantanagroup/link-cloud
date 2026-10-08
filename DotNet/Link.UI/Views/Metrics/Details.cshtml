@@ -26,7 +26,7 @@
                 }
                 @if (!string.IsNullOrWhiteSpace(Model.BenchmarkKey))
                 {
-                    <span class="ms-2">Saved limits: <code>@Model.BenchmarkKey</code></span>
+                    <span class="ms-2">Saved limits: <partial name="_LabeledId" model="@(new LabeledId { Label = "Benchmark", Value = Model.BenchmarkKey, Compact = true, CopyLabel = "Copy benchmark key" })" /></span>
                 }
             </div>
         </div>

@@ -31,7 +31,7 @@
 @if (Model.Plans.Count > 0)
 {
     <div class="au-card card">
-        <div class="card-header">Plans for <code>@Model.FacilityId</code></div>
+        <div class="card-header d-flex flex-wrap align-items-center gap-2">Plans for <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = Model.FacilityId, Compact = true, CopyLabel = "Copy facility id" })" /></div>
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0 lu-wide-table">
@@ -62,7 +62,7 @@
                                 }
                             </td>
                             <td>
-                                <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@plan.Type">Open editor</a>
+                                <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-controller="Tenants" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-planType="@plan.Type" title="Open editor" aria-label="Open editor"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                             </td>
                         </tr>
                     }

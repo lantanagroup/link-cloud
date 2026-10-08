@@ -555,6 +555,11 @@
     }
 
     window.luPaintTimes = paintTimes;
+    window.luLocalInstant = function (value) {
+        var date = value instanceof Date ? value : parseInstant(String(value || ""));
+        if (!date || isNaN(date.getTime())) return { text: value == null ? "" : String(value), title: "" };
+        return { text: localFormat.format(date), title: utcTitle(date) };
+    };
     document.addEventListener("au-refreshed", function (event) {
         var id = event.detail && event.detail.id;
         paintTimes(id ? document.getElementById(id) : null);

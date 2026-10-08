@@ -21,7 +21,7 @@
         <div class="col-6 col-md-4 col-xl-2">
             <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index" asp-route-scope="@Model.RealScope" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@HomeOverviewRules.PrimaryFacilityText(facilities, Model.AutomationVisible)</div>
-                <div class="au-kpi-label">Facilities</div>
+                <div class="au-kpi-label">@HomeOverviewRules.PrimaryFacilityLabel(facilities, Model.AutomationVisible)</div>
                 @if (facilities.Reachable)
                 {
                     <div class="au-kpi-note">Open the facility list</div>

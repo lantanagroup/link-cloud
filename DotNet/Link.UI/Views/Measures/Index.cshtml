@@ -71,17 +71,13 @@
                             </td>
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
                             <td class="text-nowrap">
-                                <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-au-neutral btn-measure-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
-                                        @(t.IsSystem ? "View" : "Edit")
-                                    </button>
-                                    <a class="btn btn-sm btn-au-neutral" href="@Url.Action("Download", "Measures", new { id = t.Id })" title="Download FHIR bundle">
-                                        <i class="bi bi-download"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-au-neutral btn-measure-clone" data-id="@t.Id">Clone</button>
+                                <div class="lu-row-actions">
+                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-measure-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")" title="@(t.IsSystem ? "View" : "Edit")" aria-label="@(t.IsSystem ? "View" : "Edit")"><i class="bi @(t.IsSystem ? "bi-eye" : "bi-pencil")" aria-hidden="true"></i></button>
+                                    <a class="btn btn-sm btn-au-neutral lu-icon-btn" href="@Url.Action("Download", "Measures", new { id = t.Id })" title="Download FHIR bundle" aria-label="Download FHIR bundle"><i class="bi bi-download" aria-hidden="true"></i></a>
+                                    <button type="button" class="btn btn-sm btn-au-neutral lu-icon-btn btn-measure-clone" data-id="@t.Id" title="Clone" aria-label="Clone"><i class="bi bi-copy" aria-hidden="true"></i></button>
                                     @if (!t.IsSystem)
                                     {
-                                        <button type="button" class="btn btn-sm btn-danger btn-measure-delete" data-id="@t.Id">Delete</button>
+                                        <button type="button" class="btn btn-sm btn-danger lu-icon-btn btn-measure-delete" data-id="@t.Id" title="Delete" aria-label="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     }
                                 </div>
                             </td>
