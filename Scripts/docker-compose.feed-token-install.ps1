@@ -9,6 +9,30 @@ $ErrorActionPreference = 'Stop'
 $marker = 'link-cloud-feed-token'
 $defaultDir = Join-Path $env:USERPROFILE '.link-cloud'
 
+function Get-ProfileText {
+    param([string]$Path)
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -eq 0) { return '' }
+    $encoding = $null
+    if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        $encoding = New-Object System.Text.UnicodeEncoding $false, $true
+    } elseif ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        $encoding = New-Object System.Text.UnicodeEncoding $true, $true
+    } else {
+        $utf8 = New-Object System.Text.UTF8Encoding $false, $true
+        try {
+            $text = $utf8.GetString($bytes)
+            if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) { return $text.Substring(1) }
+            return $text
+        } catch {
+            $encoding = [System.Text.Encoding]::Default
+        }
+    }
+    $text = $encoding.GetString($bytes)
+    if ($text.Length -gt 0 -and [int][char]$text[0] -eq 0xFEFF) { return $text.Substring(1) }
+    return $text
+}
+
 if (-not $ProfilePath) {
     $ProfilePath = $PROFILE
 }
@@ -51,9 +75,10 @@ if (-not (Test-Path -LiteralPath $ProfilePath)) {
     exit 0
 }
 
-# Get-Content follows this host's encoding and still honors a byte-order mark.
-# ReadAllText would treat a BOM-less ANSI profile as UTF-8 and corrupt it on rewrite.
-$existing = Get-Content -Raw -LiteralPath $ProfilePath
+# A BOM selects UTF-16 or UTF-8. BOM-less bytes that are valid UTF-8 stay UTF-8.
+# Anything else is this process's ANSI code page. Windows PowerShell Get-Content
+# would read a BOM-less UTF-8 profile as ANSI and rewrite the characters wrong.
+$existing = Get-ProfileText -Path $ProfilePath
 if ($null -eq $existing) { $existing = '' }
 if ($existing -notmatch [regex]::Escape($marker)) {
     $prefix = ''
