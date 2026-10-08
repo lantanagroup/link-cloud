@@ -667,6 +667,8 @@ public class KafkaOpsServiceGuardTests
         Assert.DoesNotContain("ReadyToAcquire", plan.TopicsToRaise);
 
         var created = await service.CreateFamilyAsync(User("alice", ManageTopics), "ReadyToAcquire", "catch the family up", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        Assert.False(created.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Approved, created.Status);
         var executed = await service.ExecuteAsync(User("alice", ManageTopics), created.Id, CancellationToken.None);
 
         Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
@@ -1033,6 +1035,39 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
+    public async Task PartitionDecommissionAndCancel_RequireASecondApproverWhenTheOptionIsOff()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: false);
+        broker.SetCount("ReadyToAcquire", 3);
+        var created = await service.CreateAsync(User("alice", ManageTopics), "ReadyToAcquire", 4, "raise the log topic", false, null, "ReadyToAcquire", null, CancellationToken.None);
+        Assert.True(created.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Pending, created.Status);
+        var self = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("alice", ManageTopics), created.Id, CancellationToken.None));
+        Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
+        await service.RejectAsync(User("bob", ManageTopics), created.Id, "not now", CancellationToken.None);
+
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var decommission = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        Assert.True(decommission.SecondApproverRequired);
+        var ownDecommission = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None));
+        Assert.Contains("cannot approve", ownDecommission.Message, StringComparison.OrdinalIgnoreCase);
+        await service.ApproveAsync(User("bob", ManageScaling), decommission.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), decommission.Id, CancellationToken.None);
+
+        var cancel = await service.CancelAsync(User("alice", ManageScaling), decommission.Id, CancellationToken.None);
+        Assert.True(cancel.SecondApproverRequired);
+        var ownCancel = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("alice", ManageScaling), cancel.Id, CancellationToken.None));
+        Assert.Contains("cannot approve", ownCancel.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AddBrokerPlan_RefusesWhileAMoveIsUnknownOrInFlight()
     {
         var (service, broker, infra) = NewService(requireSecondApprover: true);
@@ -1074,9 +1109,39 @@ public class KafkaOpsServiceGuardTests
             .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
         var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
 
-        await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        var missing = await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(ErrorCode.NotCoordinatorForGroup, missing.Error.Code);
+        Assert.Contains("Report", missing.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ErrorCode.NotCoordinatorForGroup), missing.Message, StringComparison.Ordinal);
         Assert.Equal(2, created);
         broken.Verify(client => client.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task GroupError_NamesTheGroupAndSaysWhenTheBrokerGaveNoDetail()
+    {
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ThrowsAsync(new DescribeConsumerGroupsException(new DescribeConsumerGroupsReport
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription
+                    {
+                        GroupId = "Report",
+                        Error = new Error(ErrorCode.NotCoordinatorForGroup, "ConsumerGroupDescribe:")
+                    }
+                ]
+            }));
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(admin.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        var error = await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(ErrorCode.NotCoordinatorForGroup, error.Error.Code);
+        Assert.Contains("Report", error.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(ErrorCode.NotCoordinatorForGroup), error.Message, StringComparison.Ordinal);
+        Assert.Contains("no error detail returned by broker", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
