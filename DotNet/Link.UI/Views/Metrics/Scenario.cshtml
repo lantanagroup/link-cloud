@@ -56,12 +56,12 @@
                     <line x1="@padL.ToString("0")" y1="@(padT + plotH)" x2="@(padL + plotW)" y2="@(padT + plotH)" stroke="#dbdbdb" />
                     @Html.Raw($"<text x=\"4\" y=\"{padT + 4}\" class=\"au-trend-axis\">{(int)maxSec}s</text>")
                     @Html.Raw($"<text x=\"4\" y=\"{padT + plotH}\" class=\"au-trend-axis\">0</text>")
-                    <path d="@path" fill="none" stroke="#343a40" stroke-width="2.5" />
+                    <path d="@path" fill="none" style="stroke: var(--au-accent)" stroke-width="2.5" />
                     @for (var i = 0; i < pts.Count; i++)
                     {
                         var p = pts[i];
                         <a asp-action="Details" asp-route-id="@p.RunId">
-                            <circle cx="@X(i)" cy="@Y(p.E2eDurationSeconds)" r="5" fill="#343a40" stroke="#fff" stroke-width="1.5">
+                            <circle cx="@X(i)" cy="@Y(p.E2eDurationSeconds)" r="5" style="fill: var(--au-accent)" stroke="#fff" stroke-width="1.5">
                                 <title>@FormatDuration(p.E2eDurationSeconds) · @LinkUiTime.Title(LinkUiTime.Display(p.FinishedAt))</title>
                             </circle>
                         </a>

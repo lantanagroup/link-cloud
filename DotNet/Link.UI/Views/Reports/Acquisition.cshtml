@@ -26,7 +26,7 @@ else if (Model.NotFound || Model.Report is null)
 }
 else
 {
-    <div data-da-host data-da-autoload="yes"
+    <div data-da-host data-da-autoload="yes" data-header-owns-ids="yes"
          data-panel-url="@Url.Action("AcquisitionPanel", "Logs")"
          data-facility-id="@Model.FacilityId"
          data-report-id="@Model.ReportId"

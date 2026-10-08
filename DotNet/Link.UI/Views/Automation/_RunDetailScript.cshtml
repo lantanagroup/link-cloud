@@ -947,7 +947,7 @@
             const acceptingLabel = document.getElementById('liveAcceptingLabel');
             if (acceptingLabel) {
                 acceptingLabel.textContent = accepting ? 'Injections accepting' : 'Injections closed';
-                acceptingLabel.className = accepting ? 'badge au-badge-active' : 'badge au-badge-muted';
+                acceptingLabel.className = 'badge ' + window.luStatusPills.forAccepting(accepting);
             }
             liveExpectedPopulation = Array.isArray(expected) ? expected : [];
             renderExpectedPopulationList();
