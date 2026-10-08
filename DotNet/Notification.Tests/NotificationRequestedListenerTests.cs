@@ -111,7 +111,8 @@ public class NotificationRequestedListenerTests
             {
                 failed = result;
                 deadLettered.TrySetResult();
-            });
+            })
+            .Returns(true);
 
         var notifications = new Mock<INotificationFactory>();
         notifications
@@ -198,6 +199,85 @@ public class NotificationRequestedListenerTests
 
         Assert.True(stamps.Count >= 2);
         Assert.True(stamps[1] - stamps[0] >= TimeSpan.FromMilliseconds(750));
+    }
+
+    [Fact]
+    public async Task ErrorTopicPublishFailure_DoesNotCommitAndRewinds()
+    {
+        var consumed = 0;
+        var consumer = new Mock<IConsumer<string, NotificationMessage>>();
+        consumer
+            .Setup(c => c.Consume(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                var call = Interlocked.Increment(ref consumed);
+                if (call == 1)
+                {
+                    return Message("first");
+                }
+
+                throw new OperationCanceledException();
+            });
+
+        var factory = new Mock<IKafkaConsumerFactory>();
+        factory
+            .Setup(f => f.CreateNotificationRequestedConsumer(false, It.IsAny<KafkaAssignmentTracker>()))
+            .Returns(consumer.Object);
+
+        var create = new Mock<ICreateNotificationCommand>();
+        create
+            .Setup(c => c.Execute(It.IsAny<CreateNotificationModel>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("notification store unavailable"));
+
+        var validate = new Mock<IValidateEmailAddressCommand>();
+        validate
+            .Setup(c => c.Execute(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var services = new Mock<IServiceProvider>();
+        services.Setup(s => s.GetService(typeof(IValidateEmailAddressCommand))).Returns(validate.Object);
+        services.Setup(s => s.GetService(typeof(ICreateNotificationCommand))).Returns(create.Object);
+        var scope = new Mock<IServiceScope>();
+        scope.Setup(s => s.ServiceProvider).Returns(services.Object);
+        var scopes = new Mock<IServiceScopeFactory>();
+        scopes.Setup(s => s.CreateScope()).Returns(scope.Object);
+
+        var deadLetter = new Mock<IDeadLetterExceptionHandler<NotificationRequestedListener, string, NotificationMessage>>();
+        deadLetter.SetupProperty(h => h.Topic);
+        deadLetter
+            .Setup(h => h.HandleException(
+                It.IsAny<ConsumeResult<string, NotificationMessage>>(),
+                It.IsAny<DeadLetterException>(),
+                It.IsAny<string>()))
+            .Returns(false);
+
+        var notifications = new Mock<INotificationFactory>();
+        notifications
+            .Setup(f => f.CreateNotificationModelCreate(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string?>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<List<string>>(),
+                It.IsAny<List<string>?>()))
+            .Returns(new CreateNotificationModel());
+
+        var listener = new NotificationRequestedListener(
+            Mock.Of<ILogger<NotificationRequestedListener>>(),
+            notifications.Object,
+            factory.Object,
+            scopes.Object,
+            deadLetter.Object);
+
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        await listener.StartAsync(stop.Token);
+        await Task.Delay(TimeSpan.FromMilliseconds(1200));
+
+        consumer.Verify(
+            c => c.Seek(It.Is<TopicPartitionOffset>(offset => offset.Topic == "NotificationRequested" && offset.Offset.Value == 0)),
+            Times.AtLeastOnce);
+        consumer.Verify(c => c.Commit(It.IsAny<ConsumeResult<string, NotificationMessage>>()), Times.Never);
     }
 
     private static ConsumeResult<string, NotificationMessage> Message(string subject) =>

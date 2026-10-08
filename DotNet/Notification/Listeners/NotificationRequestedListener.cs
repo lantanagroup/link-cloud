@@ -161,8 +161,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                 {
                                     Activity.Current?.SetStatus(ActivityStatusCode.Error);
                                     var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
-                                    _deadLetterExceptionHandler.HandleException(result, ex, facilityId ?? string.Empty);
-                                    accounted = true;
+                                    accounted = await PublishErrorOrRewindAsync(result, ex, facilityId ?? string.Empty);
                                 }
                                 catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
@@ -178,11 +177,10 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     }
 
                                     var facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key);
-                                    _deadLetterExceptionHandler.HandleException(
+                                    accounted = await PublishErrorOrRewindAsync(
                                         result,
                                         new DeadLetterException("Notification Exception thrown: " + ex.Message, ex),
                                         facilityId ?? string.Empty);
-                                    accounted = true;
                                 }
                                 finally
                                 {
@@ -191,6 +189,27 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         assignmentTracker.MarkProcessed(result);
                                         _consumer.SafeCommit(result, _logger);
                                     }
+                                }
+
+                                async Task<bool> PublishErrorOrRewindAsync(ConsumeResult<string, NotificationMessage> failed, DeadLetterException error, string facility)
+                                {
+                                    if (_deadLetterExceptionHandler.HandleException(failed, error, facility))
+                                    {
+                                        return true;
+                                    }
+
+                                    // A later commit on this partition would cover this offset.
+                                    try
+                                    {
+                                        _consumer.Seek(failed.TopicPartitionOffset);
+                                    }
+                                    catch (KafkaException seekEx)
+                                    {
+                                        _logger.LogError(seekEx, "Failed to rewind notification {TopicPartitionOffset}.", failed.TopicPartitionOffset);
+                                    }
+
+                                    await Task.Delay(TimeSpan.FromSeconds(1), consumeCancellationToken);
+                                    return false;
                                 }
 
                             }, cancellationToken);
