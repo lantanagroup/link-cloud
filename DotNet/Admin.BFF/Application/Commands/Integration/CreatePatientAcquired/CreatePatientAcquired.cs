@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
-                MigrationHoldGuard.RefuseIfHeld(_holds, nameof(KafkaTopic.PatientListsAcquired));
+                await MigrationHoldGuard.RefuseIfHeldAsync(_holds, nameof(KafkaTopic.PatientListsAcquired), cancellationToken);
                 await _producer.ProduceAsync(nameof(KafkaTopic.PatientListsAcquired), message);
 
                 return correlationId;

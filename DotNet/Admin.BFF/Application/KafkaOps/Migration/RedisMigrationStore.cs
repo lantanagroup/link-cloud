@@ -7,11 +7,13 @@ public sealed class RedisMigrationStore : IMigrationStore
 {
     private readonly IDatabase _database;
     private readonly string _prefix;
+    private readonly string _executorFence;
 
     public RedisMigrationStore(IDatabase database, string environment)
     {
         _database = database;
         _prefix = "kafka-ops:" + environment + ":migration:";
+        _executorFence = "kafka-ops:" + environment + ":executor:fence";
     }
 
     public bool Durable => true;
@@ -23,7 +25,12 @@ public sealed class RedisMigrationStore : IMigrationStore
         var json = System.Text.Json.JsonSerializer.Serialize(record);
         var script = """
             local current = redis.call('GET', KEYS[2])
-            if current and tonumber(ARGV[1]) < tonumber(current) then
+            local token = tonumber(ARGV[1])
+            if current and token < tonumber(current) then
+              local counter = tonumber(redis.call('GET', KEYS[4])) or 0
+              if counter < tonumber(current) then
+                redis.call('SET', KEYS[4], current)
+              end
               return 0
             end
             redis.call('SET', KEYS[1], ARGV[2])
@@ -33,7 +40,7 @@ public sealed class RedisMigrationStore : IMigrationStore
             """;
         var saved = (int)await _database.ScriptEvaluateAsync(
             script,
-            [_prefix + record.Id.ToString("N"), _prefix + record.Id.ToString("N") + ":fence", _prefix + "ids"],
+            [_prefix + record.Id.ToString("N"), _prefix + record.Id.ToString("N") + ":fence", _prefix + "ids", _executorFence],
             [fence, json, record.Id.ToString("N")]);
         if (saved == 0)
             throw new StaleFenceException();
@@ -66,11 +73,12 @@ public sealed class RedisMigrationStore : IMigrationStore
     }
 }
 
-public sealed class RedisKafkaOpsLease : IKafkaOpsLease
+public sealed class RedisKafkaOpsLease : IKafkaOpsLease, IDisposable
 {
     private readonly IDatabase _database;
     private readonly RedisDistributedLock _lock;
     private readonly RedisKey _fenceKey;
+    private IDisposable? _held;
 
     public RedisKafkaOpsLease(IDatabase database, string environment)
     {
@@ -86,8 +94,20 @@ public sealed class RedisKafkaOpsLease : IKafkaOpsLease
     {
         var handle = await _lock.TryAcquireAsync(TimeSpan.Zero, cancellationToken);
         if (handle is null)
-            throw new KafkaOpsRejectedException("The executor lease is held.");
+            throw new LeaseHeldException();
+        _held = handle;
         var token = await _database.StringIncrementAsync(_fenceKey);
-        return new KafkaOpsLeaseHold(token, () => handle.Dispose());
+        return new KafkaOpsLeaseHold(token, () =>
+        {
+            handle.Dispose();
+            if (ReferenceEquals(_held, handle))
+                _held = null;
+        });
+    }
+
+    public void Dispose()
+    {
+        _held?.Dispose();
+        _held = null;
     }
 }

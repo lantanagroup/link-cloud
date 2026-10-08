@@ -138,6 +138,7 @@
         @Html.AntiForgeryToken()
         <input type="hidden" name="topic" value="@topicName" />
         <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+        <input type="hidden" name="planHash" value="@(plan?.PlanHash ?? "")" />
         <div class="col-6 col-md-3">
             <label class="form-label" for="migrate-partitions">Target partitions</label>
             <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@((topic?.Partitions ?? 3) + 1)" />
@@ -227,8 +228,10 @@
                     <label class="form-label" for="migrate-recover">Type the topic name</label>
                     <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
                 </div>
-                <div class="col-auto mt-4">
-                    <button class="btn btn-au-neutral" type="submit">Recover original</button>
+                <div class="col-auto mt-4 d-flex flex-wrap gap-2">
+                    <button class="btn btn-au-neutral" type="submit" name="action" value="original">Recover original</button>
+                    <button class="btn btn-au-neutral" type="submit" name="action" value="forward">Continue forward</button>
+                    <button class="btn btn-au-neutral" type="submit" name="action" value="deleteForeign">Delete empty foreign topic</button>
                 </div>
             </form>
             @if (migration.ManualChecklist)

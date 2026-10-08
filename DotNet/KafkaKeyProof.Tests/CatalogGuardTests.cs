@@ -5,7 +5,7 @@ namespace LantanaGroup.Link.KafkaKeyProof.Tests;
 
 public class CatalogGuardTests
 {
-    private static readonly string[] KnownDynamicGapFiles =
+    private static readonly string[] SharedSiblingHelpers =
     [
         "DeadLetterExceptionHandler.cs",
         "RetryJob.cs",
@@ -16,7 +16,8 @@ public class CatalogGuardTests
     public void EveryProduceAndSubscribeSiteIsInTheCatalog()
     {
         var scan = Scan(FindRepoRoot());
-        Assert.Equal(KnownDynamicGapFiles, scan.DynamicGapFiles);
+        Assert.Empty(scan.DynamicGapFiles);
+        Assert.Equal(SharedSiblingHelpers, scan.SiblingHelpers);
         Assert.False(KafkaTopicCatalog.IsHardBlocked("DataAcquisitionRequested"));
         Assert.False(KafkaTopicCatalog.IsOrderSensitive("ReadyToAcquire"));
         Assert.False(KafkaTopicCatalog.IsOrderSensitive("ReadyForValidation"));
@@ -86,7 +87,7 @@ public class CatalogGuardTests
         unboundScan.Finish();
         Assert.Empty(unboundScan.Producers);
         Assert.Equal(new[] { "UnboundTopicProduce.cs" }, unboundScan.DynamicGapFiles);
-        Assert.NotEqual(KnownDynamicGapFiles, unboundScan.DynamicGapFiles);
+        Assert.Empty(unboundScan.SiblingHelpers);
     }
 
     private static bool CatalogHas(CodeHit hit, bool producers)
@@ -192,10 +193,46 @@ public class CatalogGuardTests
             return;
         }
 
+        if (IsSharedSiblingProduce(path, first))
+        {
+            scan.NoteSiblingHelper(path);
+            return;
+        }
+
         if (!IsKafkaClientProduce(first, args))
             return;
 
         scan.NoteDynamicGap(path);
+    }
+
+    private static bool IsSharedSiblingProduce(string path, string first)
+    {
+        var file = Path.GetFileName(path);
+        if (file == "RetryJob.cs" && IsRetryRedrive(path, first))
+            return true;
+        if (file == "TransientExceptionHandler.cs" && first == "Topic")
+            return true;
+        return file == "DeadLetterExceptionHandler.cs" && first == "Topic";
+    }
+
+    // RetryJob assigns the redrive name to a local, then produces that local.
+    private static bool IsRetryRedrive(string path, string first)
+    {
+        if (first.StartsWith("KafkaTopicNames.Redrive", StringComparison.Ordinal))
+            return true;
+        if (first.Length == 0 || !char.IsLetter(first[0]) && first[0] != '_')
+            return false;
+        foreach (var ch in first)
+        {
+            if (!char.IsLetterOrDigit(ch) && ch != '_')
+                return false;
+        }
+
+        var absolute = Path.IsPathRooted(path)
+            ? path
+            : Path.Combine(FindRepoRoot(), path.Replace('/', Path.DirectorySeparatorChar));
+        var text = File.ReadAllText(absolute);
+        return text.Contains(first + " = KafkaTopicNames.Redrive(", StringComparison.Ordinal);
     }
 
     private static bool IsKafkaClientProduce(string first, List<string> args)
@@ -640,11 +677,19 @@ public class CatalogGuardTests
         public List<CodeHit> Consumers { get; } = new();
         public List<string> Problems { get; } = new();
         public string[] DynamicGapFiles { get; private set; } = [];
+        public string[] SiblingHelpers { get; private set; } = [];
         private readonly HashSet<string> _gaps = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _siblings = new(StringComparer.Ordinal);
 
         public void NoteDynamicGap(string path) => _gaps.Add(Path.GetFileName(path));
 
-        public void Finish() => DynamicGapFiles = _gaps.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        public void NoteSiblingHelper(string path) => _siblings.Add(Path.GetFileName(path));
+
+        public void Finish()
+        {
+            DynamicGapFiles = _gaps.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            SiblingHelpers = _siblings.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        }
     }
 
     private static readonly Regex AssignmentPattern = new(
