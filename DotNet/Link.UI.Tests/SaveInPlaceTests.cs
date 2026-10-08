@@ -240,6 +240,20 @@ public class SaveInPlaceTests
         text.Should().Contain("lu-content");
     }
 
+    [Fact]
+    public void Patient_configuration_section_badges_keep_a_gap_after_the_header()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/patient-configuration-editor.js"));
+        var assignments = js.Split('\n')
+            .Where(line => line.Contains("pc-section-badge", StringComparison.Ordinal))
+            .ToList();
+        assignments.Should().NotBeEmpty();
+        assignments.Should().OnlyContain(line => line.Contains("ms-2", StringComparison.Ordinal));
+
+        var markup = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Shared/_PatientConfigurationEditor.cshtml"));
+        Count(markup, "pc-section-badge bg-light text-muted border ms-2").Should().Be(4);
+    }
+
     private static int Count(string text, string value)
     {
         var count = 0;
