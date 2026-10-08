@@ -233,6 +233,23 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Facility_section_swap_runs_inline_scripts_and_stays_open()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        var start = js.IndexOf("function runInlineScripts(", StringComparison.Ordinal);
+        var end = js.IndexOf("function updateCounts(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = js.Substring(start, end - start);
+        body.Should().Contain("function swapItem(");
+        body.Should().Contain("runInlineScripts(fresh)");
+        body.Should().Contain("createElement(\"script\")");
+        body.Should().Contain("old.textContent");
+        body.Should().Contain("accordion-collapse.show");
+        body.Should().Contain("aria-expanded\", \"true\"");
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
