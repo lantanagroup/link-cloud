@@ -366,6 +366,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             if (record.RetryTopic.Length > 0)
                 await _broker.IncreasePartitionsAsync(record.RetryTopic, record.RequestedPartitions, cancellationToken);
             await _broker.IncreasePartitionsAsync(KafkaTopicCatalog.ErrorName(record.Topic), record.RequestedPartitions, cancellationToken);
+            record.PartitionsChangedUtc = DateTimeOffset.UtcNow;
         }
         catch (Exception ex)
         {
@@ -654,8 +655,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             EnvironmentChangeInFlight = records.Any(Open),
             FamilyChangeInFlight = records.Any(record => Open(record) && string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase)),
             LastFamilyChangeUtc = records
-                .Where(record => string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase) && record.ExecutedUtc is not null)
-                .Select(record => record.ExecutedUtc)
+                .Where(record => string.Equals(record.Family, family, StringComparison.OrdinalIgnoreCase) && record.PartitionsChangedUtc is not null)
+                .Select(record => record.PartitionsChangedUtc)
                 .OrderByDescending(value => value)
                 .FirstOrDefault(),
             RateLimitMinutes = _options.Value.RateLimitMinutes,

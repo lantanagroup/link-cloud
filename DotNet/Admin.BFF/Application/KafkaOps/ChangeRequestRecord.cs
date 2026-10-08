@@ -66,6 +66,7 @@ public sealed class ChangeRequestRecord
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? ApprovedUtc { get; set; }
     public DateTimeOffset? ExecutedUtc { get; set; }
+    public DateTimeOffset? PartitionsChangedUtc { get; set; }
     public DateTimeOffset? ConvergedUtc { get; set; }
     public DateTimeOffset? ClosedUtc { get; set; }
     public string Failure { get; set; } = "";

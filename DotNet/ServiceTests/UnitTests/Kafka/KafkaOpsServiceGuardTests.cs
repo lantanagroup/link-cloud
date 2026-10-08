@@ -103,6 +103,7 @@ public class KafkaOpsServiceGuardTests
 
         var executed = await service.ExecuteAsync(User("carol", ManageTopics), created.Id, CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.Converging, executed.Status);
+        Assert.NotNull(executed.PartitionsChangedUtc);
         Assert.Contains(("ReadyToAcquire", 4), broker.Increases);
         Assert.Contains(("ReadyToAcquire-Retry", 4), broker.Increases);
         Assert.Contains((KafkaTopicCatalog.ErrorName("ReadyToAcquire"), 4), broker.Increases);
@@ -125,9 +126,15 @@ public class KafkaOpsServiceGuardTests
 
         var stored = await service.GetAsync(created.Id, CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.Failed, stored!.Status);
+        Assert.Null(stored.PartitionsChangedUtc);
         Assert.Contains("could not be read", stored.Failure, StringComparison.Ordinal);
         Assert.Contains("could not be read", error.Message, StringComparison.Ordinal);
         Assert.Empty(broker.Increases);
+
+        broker.GroupError = null;
+        var again = await service.PlanAsync("ReadyToAcquire", 4, false, null, CancellationToken.None);
+        Assert.True(again.Accepted);
+        Assert.DoesNotContain(again.Errors, item => item.Contains("minutes", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -240,9 +247,13 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
-    public async Task Decommission_RefusesTheControllerReturnedByTheCluster()
+    public async Task Decommission_UsesProcessRoles_AndRefusesWhenRolesAreUnknown()
     {
         var (service, broker, _) = NewService(requireSecondApprover: true);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
         broker.Placements.Add(new PartitionPlacement
         {
             Topic = "ReadyToAcquire",
@@ -252,12 +263,27 @@ public class KafkaOpsServiceGuardTests
             Isr = [1, 2, 3]
         });
 
-        var refused = await service.PlanDecommissionAsync(1, CancellationToken.None);
-        Assert.False(refused.Accepted);
-        Assert.Contains(refused.Errors, error => error.Contains("controller", StringComparison.OrdinalIgnoreCase));
+        var ordinary = await service.PlanDecommissionAsync(3, CancellationToken.None);
+        Assert.True(ordinary.Accepted);
+        var rotating = await service.PlanDecommissionAsync(2, CancellationToken.None);
+        Assert.True(rotating.Accepted);
+        var controller = await service.PlanDecommissionAsync(0, CancellationToken.None);
+        Assert.False(controller.Accepted);
+        Assert.Contains(controller.Errors, error => error.Contains("controller", StringComparison.OrdinalIgnoreCase));
 
-        var allowed = await service.PlanDecommissionAsync(3, CancellationToken.None);
-        Assert.True(allowed.Accepted);
+        var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        broker.RolesKnown = false;
+
+        var blocked = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None));
+        Assert.Contains("could not be read", blocked.Message, StringComparison.Ordinal);
+        var stored = await service.GetAsync(created.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Failed, stored!.Status);
+
+        var unknown = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanDecommissionAsync(3, CancellationToken.None));
+        Assert.Contains("could not be read", unknown.Message, StringComparison.Ordinal);
     }
 
     private const string ManageTopics = nameof(LinkSystemPermissions.CanManageKafkaTopics);
@@ -385,6 +411,7 @@ public class KafkaOpsServiceGuardTests
         public List<(string Topic, int Count)> Increases { get; } = [];
         public List<PartitionPlacement> Placements { get; } = [];
         public int ControllerId { get; set; } = 1;
+        public bool RolesKnown { get; set; } = true;
         public List<int> Eligible { get; } = [0, 1, 2];
         private readonly Dictionary<string, int> _counts = new(StringComparer.OrdinalIgnoreCase);
 
@@ -424,6 +451,7 @@ public class KafkaOpsServiceGuardTests
             {
                 BrokerCount = 4,
                 ControllerId = ControllerId,
+                ControllerRolesKnown = RolesKnown,
                 ControllerEligibleIds = Eligible.ToList(),
                 Brokers =
                 [

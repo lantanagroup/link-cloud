@@ -4,6 +4,7 @@ public sealed class ClusterSnapshot
 {
     public int BrokerCount { get; set; }
     public int? ControllerId { get; set; }
+    public bool ControllerRolesKnown { get; set; }
     public List<int> ControllerEligibleIds { get; set; } = [];
     public int UnderReplicatedPartitions { get; set; }
     public int OfflinePartitions { get; set; }
