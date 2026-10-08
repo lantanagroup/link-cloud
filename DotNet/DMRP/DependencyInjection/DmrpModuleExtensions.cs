@@ -195,7 +195,7 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
         /// <summary>
         /// Registers what the facility write-through to the Mock DMRP API needs, and the status the Admin UI
-        /// reads from <c>api/dmrp/mock-dmrp-status</c>.
+        /// reads from <c>api/dmrp/dmrp-status</c>.
         /// </summary>
         /// <remarks>
         /// The status is always registered, so the route answers whether or not the mock is on. The client is

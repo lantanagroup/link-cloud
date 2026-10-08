@@ -513,6 +513,9 @@ internal sealed class RunExecutor
                     // Tenant writes a facility's schedule through to the mock as enrollment, so saving the
                     // facility scheduled for the dQM is what enrolls it, the same as saving the Admin UI form.
                     // Seeding the mock here and then saving the facility with no schedule would un-enroll it.
+                    // cleanupMockDmrpEntries stays false on purpose: the entries live as long as the facility,
+                    // and its teardown (a Tenant hard delete) clears them. Deleting them at the end of the run
+                    // would leave a facility Link still has enrolled with no enrollment in the mock.
                     state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(
                         facilityClient,
                         output,
