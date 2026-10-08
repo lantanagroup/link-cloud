@@ -70,6 +70,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     private readonly KafkaConnection _connection;
     private readonly IKafkaAdminClientFactory _clients;
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _adminGate = new(1, 1);
     private IAdminClient? _admin;
     private int _users;
     private int _consecutiveFailures;
@@ -367,10 +368,18 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
     public void Dispose()
     {
-        lock (_gate)
+        _adminGate.Wait();
+        try
         {
-            _admin?.Dispose();
-            _admin = null;
+            lock (_gate)
+            {
+                _admin?.Dispose();
+                _admin = null;
+            }
+        }
+        finally
+        {
+            _adminGate.Release();
         }
     }
 
@@ -421,21 +430,29 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
     private async Task<T> UseClientAsync<T>(Func<IAdminClient, Task<T>> action, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var admin = Borrow();
-        Exception? error = null;
+        await _adminGate.WaitAsync(cancellationToken);
         try
         {
-            return await action(admin);
-        }
-        catch (Exception ex)
-        {
-            error = ex;
-            throw;
+            cancellationToken.ThrowIfCancellationRequested();
+            var admin = Borrow();
+            Exception? error = null;
+            try
+            {
+                return await action(admin);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+                throw;
+            }
+            finally
+            {
+                Release(admin, error);
+            }
         }
         finally
         {
-            Release(admin, error);
+            _adminGate.Release();
         }
     }
 
