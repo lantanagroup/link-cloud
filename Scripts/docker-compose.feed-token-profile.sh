@@ -47,10 +47,21 @@ link_cloud_now() {
   date +%s
 }
 
-link_cloud_read_field() {
+# One read, so a refresh cannot pair an old token with a new expiry.
+link_cloud_load_token() {
   local file=$1
-  local key=$2
-  sed -n "s/^${key}=//p" "$file" | head -n 1
+  local line
+  token=""
+  expires=""
+  if [ ! -f "$file" ]; then
+    return 1
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      AZURE_ARTIFACTS_PAT_EXPIRES_ON=*) expires=${line#AZURE_ARTIFACTS_PAT_EXPIRES_ON=} ;;
+      AZURE_ARTIFACTS_PAT=*) token=${line#AZURE_ARTIFACTS_PAT=} ;;
+    esac
+  done < "$file"
 }
 
 link_cloud_fetch() {
@@ -128,8 +139,7 @@ link_cloud_launch() {
   token=""
   expires=""
   if [ -f "$envfile" ]; then
-    token=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT")
-    expires=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT_EXPIRES_ON")
+    link_cloud_load_token "$envfile"
   fi
   if ! link_cloud_token_fresh "$token" "$expires" "$now"; then
     if ! link_cloud_fetch "$root"; then
@@ -140,8 +150,9 @@ link_cloud_launch() {
       link_cloud_missing_message >&2
       return 1
     fi
-    token=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT")
-    expires=$(link_cloud_read_field "$envfile" "AZURE_ARTIFACTS_PAT_EXPIRES_ON")
+    token=""
+    expires=""
+    link_cloud_load_token "$envfile"
     now=$(link_cloud_now)
     if ! link_cloud_token_unexpired "$token" "$expires" "$now"; then
       link_cloud_missing_message >&2

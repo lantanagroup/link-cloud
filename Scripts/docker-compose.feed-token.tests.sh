@@ -178,7 +178,13 @@ bash "$root/docker-compose.feed-token-install.sh" >"$repo/install-out.txt"
 count=$(grep -c 'link-cloud-feed-token' "$profile_path" 2>/dev/null || true)
 count=${count:-0}
 if [ "$count" -eq 1 ]; then pass 'bash installer adds the profile line once'; else fail 'bash installer adds the profile line once'; fi
-grep -F '. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token' "$profile_path" >/dev/null && pass 'bash installer writes the profile snippet' || fail 'bash installer writes the profile snippet'
+grep -F "$install_dir/docker-compose.feed-token.sh" "$profile_path" >/dev/null && pass 'bash installer profile line uses the install directory' || fail 'bash installer profile line uses the install directory'
+grep -F '. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token' "$root/docker-compose.feed-token-install.sh" >/dev/null && pass 'bash default install line stays the documented snippet' || fail 'bash default install line stays the documented snippet'
+if bash -c 'set -eu; . "$1"; type compose >/dev/null' bash "$profile_path"; then
+  pass 'bash installer profile loads the copied script'
+else
+  fail 'bash installer profile loads the copied script'
+fi
 if [ -f "$install_dir/docker-compose.feed-token.sh" ]; then pass 'bash installer copies the profile script'; else fail 'bash installer copies the profile script'; fi
 
 grep -F '.azure-artifacts.env' "$root/../.dockerignore" >/dev/null && pass 'dockerignore excludes the local token file' || fail 'dockerignore excludes the local token file'
@@ -190,9 +196,62 @@ else
   pass 'bash wrapper does not pass the token to env'
 fi
 grep -F 'AZURE_ARTIFACTS_PAT="$token"' "$root/docker-compose.feed-token-profile.sh" >/dev/null && pass 'bash wrapper sets the token only for the docker command' || fail 'bash wrapper sets the token only for the docker command'
+if grep -F 'link_cloud_read_field' "$root/docker-compose.feed-token-profile.sh" >/dev/null; then
+  fail 'bash wrapper reads the token file once'
+else
+  pass 'bash wrapper reads the token file once'
+fi
+pair_file="$repo/pair.env"
+printf '%s\n' "AZURE_ARTIFACTS_PAT=${sentinel}" 'AZURE_ARTIFACTS_PAT_EXPIRES_ON=1893456000' > "$pair_file"
+token=''
+expires=''
+link_cloud_load_token "$pair_file"
+if [ "$token" = "$sentinel" ] && [ "$expires" = '1893456000' ]; then
+  pass 'bash reads the token and expiry from one file'
+else
+  fail 'bash reads the token and expiry from one file'
+fi
+unset token expires
+
+mv_home="$repo/mv-fail"
+mkdir -p "$mv_home/bin" "$mv_home/tmp"
+cat > "$mv_home/bin/uname" <<'EOF'
+#!/bin/bash
+printf '%s\n' Linux
+exit 0
+EOF
+cat > "$mv_home/bin/az" <<EOF
+#!/bin/bash
+if [ "\${1:-}" = account ] && [ "\${2:-}" = show ]; then
+  exit 0
+fi
+if [ "\${1:-}" = account ] && [ "\${2:-}" = get-access-token ]; then
+  printf '%s\n' '{"accessToken":"${sentinel}","expires_on":"1893456000"}'
+  exit 0
+fi
+exit 1
+EOF
+chmod +x "$mv_home/bin/uname" "$mv_home/bin/az"
+old_path=$PATH
+set +e
+PATH="$mv_home/bin:$PATH" TMPDIR="$mv_home/tmp" bash "$root/docker-compose.feed-token-fetch.sh" "$mv_home/missing" >"$mv_home/out.txt" 2>"$mv_home/err.txt"
+mv_code=$?
+set -e
+PATH=$old_path
+left=$(find "$mv_home/tmp" -type f 2>/dev/null | wc -l | tr -d '[:space:]')
+if [ "$mv_code" -ne 0 ] && [ "$left" -eq 0 ]; then
+  pass 'failed token move removes the temporary file'
+else
+  fail 'failed token move removes the temporary file'
+fi
+if grep -F "$sentinel" "$mv_home/out.txt" "$mv_home/err.txt" >/dev/null 2>&1; then
+  fail 'failed token move does not print the token'
+else
+  pass 'failed token move does not print the token'
+fi
 
 # Output files must not contain the sentinel.
-if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" >/dev/null 2>&1; then
+if grep -F "$sentinel" "$repo/out.txt" "$repo/err.txt" "$repo/install-out.txt" "$log" "$mv_home/out.txt" "$mv_home/err.txt" >/dev/null 2>&1; then
   fail 'bash test output does not contain the token'
 else
   pass 'bash test output does not contain the token'

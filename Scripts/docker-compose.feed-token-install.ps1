@@ -7,13 +7,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $marker = 'link-cloud-feed-token'
-$profileLine = '. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
+$defaultDir = Join-Path $env:USERPROFILE '.link-cloud'
 
 if (-not $ProfilePath) {
     $ProfilePath = $PROFILE
 }
 if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:USERPROFILE '.link-cloud'
+    $InstallDir = $defaultDir
+}
+
+$installFull = [System.IO.Path]::GetFullPath($InstallDir)
+$defaultFull = [System.IO.Path]::GetFullPath($defaultDir)
+if ([string]::Equals($installFull.TrimEnd('\'), $defaultFull.TrimEnd('\'), [System.StringComparison]::OrdinalIgnoreCase)) {
+    $profileLine = '. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token'
+} else {
+    $scriptPath = Join-Path $installFull 'docker-compose.feed-token-profile.ps1'
+    $escaped = $scriptPath.Replace("'", "''")
+    $profileLine = ". '$escaped' # link-cloud-feed-token"
 }
 
 $source = Join-Path $PSScriptRoot 'docker-compose.feed-token-profile.ps1'

@@ -151,14 +151,16 @@ fi
 
 umask 077
 tmp=$(mktemp)
+# A failed mv would otherwise leave the token in the temp directory.
+trap 'rm -f "$tmp"' EXIT
 chmod 600 "$tmp" || true
 printf '%s\n' "AZURE_ARTIFACTS_PAT=${token}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=${expires}" > "$tmp"
 unset token expires
 if ! file_mode_is_600 "$tmp"; then
-  rm -f "$tmp"
   fail "The token file could not be limited to the current user, so it was not kept."
 fi
 mv "$tmp" "$env_file"
+trap - EXIT
 chmod 600 "$env_file" || true
 if ! file_mode_is_600 "$env_file"; then
   rm -f "$env_file"

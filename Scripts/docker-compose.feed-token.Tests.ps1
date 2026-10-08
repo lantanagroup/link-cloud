@@ -262,7 +262,18 @@ try {
     $profileText = [System.IO.File]::ReadAllText($profilePath)
     $markerCount = ([regex]::Matches($profileText, 'link-cloud-feed-token')).Count
     Write-Result ($markerCount -eq 1) 'installer adds the profile line once'
-    Write-Result ($profileText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'installer writes the profile snippet'
+    Write-Result ($profileText.Contains($installDir) -and $profileText.Contains('docker-compose.feed-token-profile.ps1')) 'installer profile line uses the install directory'
+    $installerText = [System.IO.File]::ReadAllText($installer)
+    Write-Result ($installerText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'default install line stays the documented snippet'
+    $loader = Join-Path $repo 'load-profile.ps1'
+    $loaderBody = ". '$profilePath'`r`nif (Get-Command compose -CommandType Function -ErrorAction SilentlyContinue) { 'loaded' }`r`n"
+    [System.IO.File]::WriteAllText($loader, $loaderBody)
+    $loadOut = Join-Path $repo 'profile-load.txt'
+    $loadErr = Join-Path $repo 'profile-load-err.txt'
+    $loadProc = Start-Process -FilePath powershell.exe -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $loader) -Wait -PassThru -RedirectStandardOutput $loadOut -RedirectStandardError $loadErr -WindowStyle Hidden
+    $loadText = ''
+    if (Test-Path $loadOut) { $loadText = [System.IO.File]::ReadAllText($loadOut) }
+    Write-Result ($loadProc.ExitCode -eq 0 -and $loadText.Contains('loaded')) 'installer profile loads the copied script'
     Write-Result (Test-Path -LiteralPath (Join-Path $installDir 'docker-compose.feed-token-profile.ps1')) 'installer copies the profile script'
     $utf16Profile = Join-Path $repo 'profile-utf16.ps1'
     $utf16 = New-Object System.Text.UnicodeEncoding $false, $true
@@ -310,6 +321,8 @@ exit /b 1
     $rules = @($acl.Access)
     $onlyCurrentUser = ($rules.Count -eq 1)
     Write-Result $onlyCurrentUser 'fetch script limits the token file ACL to one entry'
+    $temps = @(Get-ChildItem -LiteralPath $spaceRoot -Force -Filter '.azure-artifacts.*.tmp' -ErrorAction SilentlyContinue)
+    Write-Result ($temps.Count -eq 0) 'fetch script does not leave a temporary token file'
     Write-Result ($spaceRoot.Contains(' ')) 'fetch script accepts a repo path that contains a space'
 
     # A fetch script that prints on the success stream must still return only its exit code.

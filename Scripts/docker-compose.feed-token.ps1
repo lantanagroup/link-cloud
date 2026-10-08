@@ -269,12 +269,23 @@ if ($dir -and -not (Test-Path -LiteralPath $dir)) {
 
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $body = "AZURE_ARTIFACTS_PAT=$token`nAZURE_ARTIFACTS_PAT_EXPIRES_ON=$expires`n"
+$tempFile = $null
 try {
     if (-not (Test-Path -LiteralPath $EnvFile)) {
         [System.IO.File]::WriteAllText($EnvFile, '', $utf8)
     }
     Set-FeedTokenAcl -Path $EnvFile
-    [System.IO.File]::WriteAllText($EnvFile, $body, $utf8)
+    $tempName = '.azure-artifacts.' + [guid]::NewGuid().ToString('n') + '.tmp'
+    if ($dir) {
+        $tempFile = Join-Path $dir $tempName
+    } else {
+        $tempFile = $tempName
+    }
+    [System.IO.File]::WriteAllText($tempFile, '', $utf8)
+    Set-FeedTokenAcl -Path $tempFile
+    [System.IO.File]::WriteAllText($tempFile, $body, $utf8)
+    [System.IO.File]::Replace($tempFile, $EnvFile, [NullString]::Value)
+    $tempFile = $null
 } catch {
     $kept = $false
     if (Test-Path -LiteralPath $EnvFile) {
@@ -291,6 +302,9 @@ try {
     }
     exit 1
 } finally {
+    if ($tempFile -and (Test-Path -LiteralPath $tempFile)) {
+        Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+    }
     Remove-Variable token, parsed, raw, body, expiresRaw -ErrorAction SilentlyContinue
 }
 
