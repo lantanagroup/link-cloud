@@ -462,6 +462,13 @@ public static class HomeOverviewRules
         return card.Total.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// The tile says "Real facilities" only when the number is the real-facility split.
+    /// A total, including the unclassified count used when automation is off, stays "Facilities".
+    /// </summary>
+    public static string PrimaryFacilityLabel(FacilityCard card, bool automationVisible) =>
+        card.Reachable && automationVisible && card.Regular is int ? "Real facilities" : "Facilities";
+
     public static ActivityCard Activity(
         bool inFlightReachable,
         long inFlight,

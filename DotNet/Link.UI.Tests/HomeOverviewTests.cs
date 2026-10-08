@@ -465,6 +465,7 @@ public class HomeOverviewTests
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["owned"] = "run" }));
         known.Regular.Should().Be(2);
         HomeOverviewRules.PrimaryFacilityText(known, true).Should().Be("2");
+        HomeOverviewRules.PrimaryFacilityLabel(known, true).Should().Be("Real facilities");
 
         var hidden = HomeOverviewRules.Facilities(
             true,
@@ -478,6 +479,7 @@ public class HomeOverviewTests
         hidden.Total.Should().Be(3);
         hidden.Message.Should().BeNull();
         HomeOverviewRules.PrimaryFacilityText(hidden, false).Should().Be("3");
+        HomeOverviewRules.PrimaryFacilityLabel(hidden, false).Should().Be("Facilities");
 
         var now = DateTimeOffset.Parse("2026-10-07T15:00:00Z");
         var quietActivity = HomeOverviewRules.Activity(true, 1, now.AddHours(-1), true, 0, true, 0, []);
