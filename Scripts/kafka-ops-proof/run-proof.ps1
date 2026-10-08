@@ -202,6 +202,19 @@ $under = & docker compose -p $project @(Get-ComposeFiles) exec -T broker-0 /opt/
 if ($under.Trim().Length -gt 0) { throw "Under-replicated partitions remain: $under" }
 Write-Output "PASS decommission-empty"
 
+if ($null -eq $dotnet) {
+    Write-Output "SKIP controller-roles (dotnet is not on PATH)"
+}
+elseif ([string]::IsNullOrWhiteSpace($env:KAFKA_BOOTSTRAP)) {
+    Write-Output "SKIP controller-roles (KAFKA_BOOTSTRAP is not set; pass -Publish)"
+}
+else {
+    Write-Output "STEP controller-roles"
+    & dotnet test (Join-Path $repo "DotNet\KafkaOps.Proof\KafkaOps.Proof.csproj") --filter "FullyQualifiedName~KitCluster_KnowsControllerRoles_AndAllowsBroker3" --nologo -v q
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Output "PASS controller-roles"
+}
+
 Write-Output "STEP stop-broker"
 Invoke-Compose @("stop", "broker-3")
 Write-Output "PASS decommission-stop"
@@ -214,7 +227,7 @@ elseif ([string]::IsNullOrWhiteSpace($env:KAFKA_BOOTSTRAP)) {
 }
 else {
     Write-Output "STEP console-flow"
-    & dotnet test (Join-Path $repo "DotNet\KafkaOps.Proof\KafkaOps.Proof.csproj") --filter "FullyQualifiedName~KafkaOpsConsoleFlowTests" --nologo -v q
+    & dotnet test (Join-Path $repo "DotNet\KafkaOps.Proof\KafkaOps.Proof.csproj") --filter "FullyQualifiedName~TwoPeopleApproveAndExecute_AndThreeGroupsAreListed" --nologo -v q
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Output "PASS console-flow"
 }
