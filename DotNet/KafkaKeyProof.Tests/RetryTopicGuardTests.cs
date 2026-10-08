@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
@@ -80,8 +81,11 @@ public class RetryTopicGuardTests
         Assert.DoesNotContain("WARNING: kafka-retry-services.txt was not fetched", yaml);
         Assert.Contains("ERROR: kafka-retry-services.txt was not found", script);
         Assert.Contains("ERROR: Failed to create", script);
-        Assert.Contains("SERVICE=\"${SERVICE#~}\"", yaml);
-        Assert.Contains("SERVICE=\"${SERVICE#~}\"", script);
+        const string strip = "SERVICE=\"${SERVICE#\"~\"}\"";
+        Assert.Contains(strip, yaml);
+        Assert.Contains(strip, script);
+        Assert.DoesNotContain("SERVICE=\"${SERVICE#~}\"", yaml);
+        Assert.DoesNotContain("SERVICE=\"${SERVICE#~}\"", script);
         Assert.Contains("SUFFIXES=(Redrive)", yaml);
         Assert.Contains("SUFFIXES=(Redrive)", script);
         Assert.Contains("for SUFFIX in \"${SUFFIXES[@]}\"; do", yaml);
@@ -125,6 +129,183 @@ public class RetryTopicGuardTests
         Assert.DoesNotContain("NotificationRequested-Retry-Notification", SubscribedRetryTopics(list));
         Assert.DoesNotContain("ReadyToAcquire-Retry-DataAcquisitionWorker", SubscribedRetryTopics(list));
         Assert.True(problems.Count == 0, string.Join("; ", problems));
+    }
+
+    [Fact]
+    public void BashParsesRedriveOnlyRowsAndRejectsATildeInsideAName()
+    {
+        var root = FindRepoRoot();
+        var yaml = ExtractRetryParse(File.ReadAllText(Path.Combine(root, "Azure_Pipelines", "kafka-topics-sync.yaml")));
+        var script = ExtractRetryParse(File.ReadAllText(Path.Combine(root, "Scripts", "create-topics-rest.sh")));
+        Assert.Equal(script, yaml);
+        Assert.Contains("SERVICE=\"${SERVICE#\"~\"}\"", script);
+
+        var bash = FindBash();
+        var list = Path.Combine(root, "kafka-retry-services.txt");
+        var withHome = RunRetryParse(bash, script, list, keepHome: true);
+        var withoutHome = RunRetryParse(bash, script, list, keepHome: false);
+        Assert.True(withHome.Exit == 0, withHome.Error);
+        Assert.True(withoutHome.Exit == 0, withoutHome.Error);
+        Assert.Equal(withHome.Topics, withoutHome.Topics);
+        Assert.Contains("NotificationRequested-Redrive-Notification", withHome.Topics);
+        Assert.Contains("ReadyToAcquire-Redrive-DataAcquisitionWorker", withHome.Topics);
+        Assert.DoesNotContain("NotificationRequested-Retry-Notification", withHome.Topics);
+        Assert.DoesNotContain("ReadyToAcquire-Retry-DataAcquisitionWorker", withHome.Topics);
+        Assert.Contains("AuditableEventOccurred-Retry-Audit", withHome.Topics);
+        Assert.Contains("AuditableEventOccurred-Redrive-Audit", withHome.Topics);
+        Assert.Contains("PatientEvent-Retry-Report", withHome.Topics);
+        Assert.Contains("PatientEvent-Redrive-QueryDispatch", withHome.Topics);
+        Assert.Equal(34, withHome.Topics.Count);
+
+        var empty = RunRetryParse(bash, script, WriteList("X:~"), keepHome: true);
+        var embedded = RunRetryParse(bash, script, WriteList("X:a~b"), keepHome: true);
+        Assert.NotEqual(0, empty.Exit);
+        Assert.NotEqual(0, embedded.Exit);
+        Assert.Empty(empty.Topics);
+        Assert.Empty(embedded.Topics);
+    }
+
+    private static string ExtractRetryParse(string text)
+    {
+        const string begin = "# retry-service-parse: begin";
+        const string end = "# retry-service-parse: end";
+        var start = text.IndexOf(begin, StringComparison.Ordinal);
+        var stop = text.IndexOf(end, StringComparison.Ordinal);
+        if (start < 0 || stop < start)
+        {
+            throw new InvalidOperationException("Retry service parse block was not found.");
+        }
+
+        var lines = text[(start + begin.Length)..stop]
+            .Split('\n')
+            .Select(line => line.Trim().TrimEnd('\r'))
+            .Where(line => line.Length > 0);
+        return string.Join("\n", lines);
+    }
+
+    private static string WriteList(string line)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "kafka-retry-parse-" + Guid.NewGuid().ToString("N") + ".txt");
+        File.WriteAllText(path, line + "\n");
+        return path;
+    }
+
+    private static (int Exit, HashSet<string> Topics, string Error) RunRetryParse(string bash, string parseBlock, string listPath, bool keepHome)
+    {
+        var scriptPath = Path.Combine(Path.GetTempPath(), "kafka-retry-parse-" + Guid.NewGuid().ToString("N") + ".sh");
+        var script = "#!/usr/bin/env bash\nset -euo pipefail\n" +
+            (keepHome ? "" : "unset HOME\n") +
+            "while IFS=: read -r MAIN_TOPIC SERVICES || [[ -n \"${MAIN_TOPIC:-}\" ]]; do\n" +
+            "  [[ -z \"${MAIN_TOPIC:-}\" || \"$MAIN_TOPIC\" =~ ^# ]] && continue\n" +
+            "  IFS=',' read -ra SERVICE_LIST <<< \"$SERVICES\"\n" +
+            "  for SERVICE in \"${SERVICE_LIST[@]}\"; do\n" +
+            parseBlock + "\n" +
+            "    for SUFFIX in \"${SUFFIXES[@]}\"; do\n" +
+            "      printf '%s\\n' \"${MAIN_TOPIC}-${SUFFIX}-${SERVICE}\"\n" +
+            "    done\n" +
+            "  done\n" +
+            "done < \"$1\"\n";
+        File.WriteAllText(scriptPath, script.Replace("\r\n", "\n", StringComparison.Ordinal));
+        try
+        {
+            var start = new ProcessStartInfo(bash)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            start.ArgumentList.Add("--noprofile");
+            start.ArgumentList.Add("--norc");
+            start.ArgumentList.Add(scriptPath.Replace('\\', '/'));
+            start.ArgumentList.Add(listPath.Replace('\\', '/'));
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("bash did not start.");
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(15000))
+            {
+                process.Kill(entireProcessTree: true);
+                throw new TimeoutException("bash parse did not finish.");
+            }
+
+            var topics = new HashSet<string>(
+                stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+                StringComparer.Ordinal);
+            return (process.ExitCode, topics, stderr);
+        }
+        finally
+        {
+            File.Delete(scriptPath);
+            if (listPath.Contains("kafka-retry-parse-", StringComparison.Ordinal))
+            {
+                File.Delete(listPath);
+            }
+        }
+    }
+
+    private static string FindBash()
+    {
+        var candidates = new List<string>();
+        var git = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "usr", "bin", "bash.exe");
+        if (File.Exists(git))
+        {
+            candidates.Add(git);
+        }
+
+        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var dir in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(dir.Trim(), OperatingSystem.IsWindows() ? "bash.exe" : "bash");
+            if (File.Exists(candidate) && !candidates.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        foreach (var candidate in candidates)
+        {
+            if (BashPrintsOk(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("bash was not found.");
+    }
+
+    private static bool BashPrintsOk(string bash)
+    {
+        try
+        {
+            var start = new ProcessStartInfo(bash)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            start.ArgumentList.Add("--noprofile");
+            start.ArgumentList.Add("--norc");
+            start.ArgumentList.Add("-c");
+            start.ArgumentList.Add("echo ok");
+            using var process = Process.Start(start);
+            if (process == null)
+            {
+                return false;
+            }
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                return false;
+            }
+
+            return process.ExitCode == 0 && stdout.Contains("ok", StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static HashSet<string> SubscribedRetryTopics(RetryList list)
