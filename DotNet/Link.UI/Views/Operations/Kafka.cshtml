@@ -1,0 +1,111 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+}
+
+<partial name="_BackButton" model="@(new BackLink("/Operations", "Operations"))" />
+<h1 class="h3 mt-3">Kafka</h1>
+<p class="text-muted">Cluster health, consumer replicas, and brokers. Adding partitions is a separate, permanent action.</p>
+<partial name="_Nav" />
+
+<div id="kafkaResults" data-au-refresh="8000">
+    <nav class="lu-section-nav mt-3" aria-label="Kafka">
+        <a class="@(query.View == ThroughputKafkaPageQuery.Overview ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Overview, page: 1)">Overview</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Topic ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, page: 1)">Topic</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Consumers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, page: 1)">Consumers</a>
+        <a class="@(query.View == ThroughputKafkaPageQuery.Brokers ? "lu-nav-current" : "")" href="@query.Href(view: ThroughputKafkaPageQuery.Brokers, page: 1)">Brokers</a>
+    </nav>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Error))
+    {
+        <div class="alert alert-secondary" role="status">@Model.Error</div>
+    }
+    @if (Model.Topics.ReadOnly)
+    {
+        <div class="alert alert-secondary" role="status">This environment is read-only. Kafka changes are refused.</div>
+    }
+
+    <form class="row g-2 align-items-end mt-3" method="get" action="/Operations/Kafka">
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="kafka-q">Search</label>
+            <input class="form-control" id="kafka-q" name="q" value="@query.Q" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="kafka-family">Family</label>
+            <select class="form-select" id="kafka-family" name="family">
+                <option value="">All families</option>
+                @foreach (var family in Model.Families)
+                {
+                    if (family == query.Family)
+                    {
+                        <option value="@family" selected>@family</option>
+                    }
+                    else
+                    {
+                        <option value="@family">@family</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="kafka-key">Key class</label>
+            <select class="form-select" id="kafka-key" name="keyClass">
+                <option value="">All key classes</option>
+                @foreach (var keyClass in Model.KeyClasses)
+                {
+                    if (keyClass == query.KeyClass)
+                    {
+                        <option value="@keyClass" selected>@keyClass</option>
+                    }
+                    else
+                    {
+                        <option value="@keyClass">@keyClass</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="kafka-tests" name="tests" value="1" @(query.Tests ? "checked" : null) />
+                <label class="form-check-label" for="kafka-tests">Include test groups</label>
+            </div>
+        </div>
+        <input type="hidden" name="sort" value="@query.Sort" />
+        <input type="hidden" name="dir" value="@query.Dir" />
+        <input type="hidden" name="pageSize" value="@query.PageSize" />
+        <input type="hidden" name="view" value="@query.View" />
+        <input type="hidden" name="group" value="@query.Group" />
+        <input type="hidden" name="topic" value="@query.TopicName" />
+        <input type="hidden" name="broker" value="@query.Broker" />
+        <input type="hidden" name="advanced" value="@(query.Advanced ? "1" : "")" />
+        <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+        <div class="col-auto">
+            <button class="btn btn-au-neutral" type="submit">Search</button>
+        </div>
+    </form>
+    <p class="text-muted mb-0">Groups named e2e-diag-* and Dynamic:* stay hidden unless Include test groups is checked. <span class="lu-live-label">Live</span></p>
+
+    @if (query.View == ThroughputKafkaPageQuery.Overview)
+    {
+        <partial name="_Overview" model="Model" />
+    }
+    else if (query.View == ThroughputKafkaPageQuery.Topic)
+    {
+        <partial name="_Topic" model="Model" />
+    }
+    else if (query.View == ThroughputKafkaPageQuery.Consumers)
+    {
+        <partial name="_Consumers" model="Model" />
+    }
+    else
+    {
+        <partial name="_Brokers" model="Model" />
+    }
+
+    <partial name="_ChangeRequest" model="Model" />
+    <div id="kafka-ops-chart-data" hidden>@Html.Raw(Model.ChartJson)</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="~/js/kafka-ops.js" asp-append-version="true"></script>

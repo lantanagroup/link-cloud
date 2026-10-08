@@ -1,0 +1,138 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var cluster = Model.Cluster;
+    var origin = ReturnUrlRules.Here(Context.Request);
+    string SortDir(string column) => query.Sort == column && query.Dir == "asc" ? "desc" : "asc";
+}
+
+<div class="row g-2 mt-3">
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@(cluster.ControllerId?.ToString() ?? "—")</div><div class="au-stat-label">Controller</div></div></div>
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.BrokerCount</div><div class="au-stat-label">Brokers</div></div></div>
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.UnderReplicatedPartitions</div><div class="au-stat-label">Under-replicated</div></div></div>
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.OfflinePartitions</div><div class="au-stat-label">Offline</div></div></div>
+    <div class="col"><div class="au-stat-tile"><div class="au-stat-value">@cluster.IsrShrunkPartitions</div><div class="au-stat-label">ISR shrink</div></div></div>
+</div>
+<p class="text-muted mt-2">Provider @Model.Infra.Provider. @(Model.Infra.Enabled ? "Replica and broker changes are enabled." : Model.Infra.Detail)</p>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Topics</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th><a href="@query.Href(sort: "topic", dir: SortDir("topic"), page: 1)">Topic</a></th>
+                        <th><a href="@query.Href(sort: "key", dir: SortDir("key"), page: 1)">Key</a></th>
+                        <th><a href="@query.Href(sort: "partitions", dir: SortDir("partitions"), page: 1)">Partitions</a></th>
+                        <th>RF</th>
+                        <th><a href="@query.Href(sort: "lag", dir: SortDir("lag"), page: 1)">Lag</a></th>
+                        <th><a href="@query.Href(sort: "rate", dir: SortDir("rate"), page: 1)">Produce rate</a></th>
+                        <th>Ceiling</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.TopicRows)
+                {
+                    <tr>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = row.Topic, Compact = true, CopyLabel = "Copy topic", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1) })" /></td>
+                        <td>@row.KeyClass <span class="text-muted">@row.KeyShape</span></td>
+                        <td>@row.Partitions</td>
+                        <td>@row.ReplicationFactor</td>
+                        <td>@row.TotalLag</td>
+                        <td>@row.ProduceRatePerSecond.ToString("0.###")</td>
+                        <td>@row.MaxReplicas</td>
+                        <td>
+                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Topic, topic: row.Topic, page: 1)" title="Open topic @row.Topic" aria-label="Open topic @row.Topic"><i class="bi bi-hdd-network" aria-hidden="true"></i></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TopicRows.Count == 0)
+        {
+            <p class="text-muted mb-0 mt-2">No topics match this search.</p>
+        }
+        <p class="text-muted mt-2 mb-0">@Model.TopicCount topics. Page @query.Page of @Model.TopicPages.</p>
+        <div class="d-flex gap-2 mt-2">
+            @if (query.Page > 1)
+            {
+                <a class="btn btn-sm btn-au-neutral" href="@query.Href(page: query.Page - 1)">Previous</a>
+            }
+            @if (query.Page < Model.TopicPages)
+            {
+                <a class="btn btn-sm btn-au-neutral" href="@query.Href(page: query.Page + 1)">Next</a>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Lag by group</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Group</th>
+                        <th>State</th>
+                        <th>Members</th>
+                        <th>Lag</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.Groups.Groups.OrderBy(item => item.GroupId, StringComparer.OrdinalIgnoreCase))
+                {
+                    <tr>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Group", Value = row.GroupId, Compact = true, CopyLabel = "Copy group id", ReturnUrl = origin, LinkHref = query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1) })" /></td>
+                        <td><span class="badge @StatusPills.ForKafka(row.State)">@row.State</span></td>
+                        <td>@row.Members.Count</td>
+                        <td>@row.TotalLag</td>
+                        <td>
+                            <a class="btn btn-sm btn-au-neutral" href="@query.Href(view: ThroughputKafkaPageQuery.Consumers, group: row.GroupId, page: 1)" title="Open group @row.GroupId" aria-label="Open group @row.GroupId"><i class="bi bi-people" aria-hidden="true"></i></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<h2 class="h5 mt-4">Produce rate and lag</h2>
+<div class="lu-chart"><canvas id="kafkaRateChart"></canvas></div>
+<div class="lu-chart"><canvas id="kafkaLagChart"></canvas></div>
+
+<div class="au-card card mt-3">
+    <div class="card-header">Broker rights</div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(Model.Capabilities.Error))
+        {
+            <p class="text-muted">@Model.Capabilities.Error</p>
+        }
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Topic</th>
+                        <th>Can alter partitions</th>
+                        <th>Authorized operations</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var right in Model.Capabilities.Topics.OrderBy(item => item.Topic, StringComparer.Ordinal))
+                {
+                    <tr>
+                        <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Topic", Value = right.Topic, Compact = true, CopyLabel = "Copy topic" })" /></td>
+                        <td>@(right.CanAlterPartitions is null ? "Unknown" : right.CanAlterPartitions.Value ? "Yes" : "No")</td>
+                        <td>@(right.AuthorizedOperations.Count == 0 ? (right.Error ?? "None reported") : string.Join(", ", right.AuthorizedOperations))</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
