@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,17 +16,17 @@ using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 
-public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>
+public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>
 {
-    ILogger<BaseListener<ReadyToAcquire, long, ReadyToAcquire, string, ResourceAcquired>> _logger;
+    ILogger<BaseListener<ReadyToAcquire, string, ReadyToAcquire, string, ResourceAcquired>> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
 
     public ReadyToAcquireListener(
         ILogger<ReadyToAcquireListener> logger,
-        IKafkaConsumerFactory<long, ReadyToAcquire> kafkaConsumerFactory,
-        IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> deadLetterConsumerHandler,
+        IKafkaConsumerFactory<string, ReadyToAcquire> kafkaConsumerFactory,
+        IDeadLetterExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> deadLetterConsumerHandler,
         IDeadLetterExceptionHandler<ReadyToAcquire, string, string> deadLetterConsumerErrorHandler,
-        ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> transientExceptionHandler,
+        ITransientExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> transientExceptionHandler,
         ServiceInformation serviceInformation,
         IServiceScopeFactory serviceScopeFactory)
         : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation)
@@ -44,7 +45,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         return settings;
     }
 
-    protected override async Task ExecuteListenerAsync(ConsumeResult<long, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
+    protected override async Task ExecuteListenerAsync(ConsumeResult<string, ReadyToAcquire> consumeResult, CancellationToken cancellationToken = default)
     {
         var value = consumeResult.Message?.Value;
         if (value?.LogId == null || string.IsNullOrWhiteSpace(value.FacilityId))
@@ -115,14 +116,13 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         }
     }
 
-    protected override string ExtractCorrelationId(ConsumeResult<long, ReadyToAcquire> consumeResult)
+    protected override string ExtractCorrelationId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
         return "";
     }
 
-    protected override string ExtractFacilityId(ConsumeResult<long, ReadyToAcquire> consumeResult)
+    protected override string ExtractFacilityId(ConsumeResult<string, ReadyToAcquire> consumeResult)
     {
-        if (string.IsNullOrWhiteSpace(consumeResult.Message.Value.FacilityId)) return null;
-        return consumeResult.Message.Value.FacilityId;
+        return KafkaIdentity.Facility(consumeResult.Message.Value?.FacilityId, consumeResult.Message.Key) ?? string.Empty;
     }
 }

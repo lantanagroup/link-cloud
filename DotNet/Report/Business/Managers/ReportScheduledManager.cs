@@ -48,6 +48,15 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             int pageSize, int pageNumber, CancellationToken cancellationToken = default);
 
         Task<ReportSummaryApiModel?> GetReportSummary(string reportScheduleId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Atomically claims manifest production for one schedule. Only one caller across pods wins.
+        /// </summary>
+        Task<bool> TryClaimManifestAsync(Guid reportScheduleId, CancellationToken cancellationToken = default);
+
+        Task ReleaseManifestClaimAsync(Guid reportScheduleId, CancellationToken cancellationToken = default);
+
+        Task<bool> MarkManifestEmittedAsync(Guid reportScheduleId, CancellationToken cancellationToken = default);
     }
 
     public class ReportScheduledManager : IReportScheduledManager
@@ -190,8 +199,54 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
 
             _context.Update(entity);
+            // The model does not carry the claim columns. A status update must not clear a claim
+            // that another statement just wrote, including a stale tracked value.
+            var entry = _context.Entry(entity);
+            entry.Property(e => e.ManifestState).IsModified = false;
+            entry.Property(e => e.ManifestClaimedAt).IsModified = false;
             await _context.SaveChangesAsync(cancellationToken);
             return model;
+        }
+
+        public async Task<bool> TryClaimManifestAsync(Guid reportScheduleId, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+            var expiredBefore = now.Subtract(ReportScheduleManifest.ClaimLease);
+            var claimed = ReportScheduleManifest.Claimed;
+            var none = ReportScheduleManifest.None;
+            var rows = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $@"UPDATE ReportSchedule
+                   SET ManifestState = {claimed}, ManifestClaimedAt = {now}
+                   WHERE Id = {reportScheduleId}
+                     AND (ManifestState = {none}
+                          OR (ManifestState = {claimed} AND ManifestClaimedAt < {expiredBefore}))",
+                cancellationToken);
+            return rows == 1;
+        }
+
+        public async Task ReleaseManifestClaimAsync(Guid reportScheduleId, CancellationToken cancellationToken = default)
+        {
+            var none = ReportScheduleManifest.None;
+            var claimed = ReportScheduleManifest.Claimed;
+            DateTime? claimedAt = null;
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $@"UPDATE ReportSchedule
+                   SET ManifestState = {none}, ManifestClaimedAt = {claimedAt}
+                   WHERE Id = {reportScheduleId} AND ManifestState = {claimed}",
+                cancellationToken);
+        }
+
+        public async Task<bool> MarkManifestEmittedAsync(Guid reportScheduleId, CancellationToken cancellationToken = default)
+        {
+            var emitted = ReportScheduleManifest.Emitted;
+            var claimed = ReportScheduleManifest.Claimed;
+            DateTime? claimedAt = null;
+            var rows = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $@"UPDATE ReportSchedule
+                   SET ManifestState = {emitted}, ManifestClaimedAt = {claimedAt}
+                   WHERE Id = {reportScheduleId} AND ManifestState = {claimed}",
+                cancellationToken);
+            return rows == 1;
         }
 
         public async Task<ReportScheduleModel> AddAsync(ReportScheduleModel model, CancellationToken cancellationToken)

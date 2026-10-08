@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
@@ -70,10 +71,11 @@ namespace LantanaGroup.Link.Report.Listeners
                 EnableAutoCommit = false
             };
 
-            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig);
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using var consumer = _kafkaConsumerFactory.CreateConsumer(consumerConfig, assignmentTracker: assignmentTracker);
             try
             {
-                consumer.Subscribe(nameof(KafkaTopic.ValidationComplete));
+                consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.ValidationComplete), "Report"));
                 _logger.LogInformation("{Name}: Started validation complete consumer for topic '{Topic}' at {StartTime}", nameof(ValidationCompleteListener), nameof(KafkaTopic.ValidationComplete), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
@@ -83,33 +85,34 @@ namespace LantanaGroup.Link.Report.Listeners
                     {
                         await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            if (result == null)
-                            {
-                                throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
-                            }
-
-                            facilityId = result.Message.Key;
+                            var accounted = false;
                             try
                             {
+                                if (result == null)
+                                {
+                                    throw new DeadLetterException($"Received null message from topic '{nameof(KafkaTopic.ValidationComplete)}'.");
+                                }
+
+                                facilityId = KafkaIdentity.Facility(result.Message?.Value?.FacilityId, result.Message?.Key) ?? string.Empty;
                                 await ProcessMessageAsync(result, consumeCancellationToken);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (DeadLetterException ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (TransientException ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (TimeoutException ex)
                             {
                                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
                                 var transientException = new TransientException(exceptionMessage, ex);
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
                             }
                             catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
@@ -118,7 +121,15 @@ namespace LantanaGroup.Link.Report.Listeners
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
-                                consumer.SafeCommit(result, _logger);
+                                accounted = true;
+                            }
+                            finally
+                            {
+                                if (accounted && result != null && !consumeCancellationToken.IsCancellationRequested)
+                                {
+                                    assignmentTracker.MarkProcessed(result);
+                                    consumer.SafeCommit(result, _logger);
+                                }
                             }
                         }, cancellationToken);
                     }
@@ -156,8 +167,14 @@ namespace LantanaGroup.Link.Report.Listeners
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-            var facilityId = result.Message.Key;
             var value = result.Message.Value;
+            var facilityId = KafkaIdentity.Facility(value?.FacilityId, result.Message.Key) ?? string.Empty;
+            var patientId = KafkaIdentity.Patient(value?.PatientId, result.Message.Key);
+            if (value != null && !string.IsNullOrWhiteSpace(patientId))
+            {
+                value.PatientId = patientId;
+            }
+
             var reportId = Guid.Parse(value.ReportTrackingId);
 
             if (await PipelineAbortSkip.ShouldSkipAsync(

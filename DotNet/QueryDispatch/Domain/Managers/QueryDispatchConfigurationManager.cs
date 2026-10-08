@@ -79,6 +79,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
+                    Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                     Value = auditMessage
                 });
 
@@ -115,6 +116,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
+                    Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                     Value = auditMessage
                 });
 
@@ -161,6 +163,7 @@ namespace QueryDispatch.Domain.Managers
 
                 _producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
+                    Key = KafkaKeys.ForAudit(auditMessage.FacilityId, auditMessage.PatientId, QueryDispatchConstants.ServiceName),
                     Value = auditMessage
                 });
 

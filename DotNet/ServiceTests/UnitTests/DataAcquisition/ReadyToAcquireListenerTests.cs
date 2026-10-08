@@ -170,10 +170,10 @@ public class ReadyToAcquireListenerTests
         Mock<IDataAcquisitionLogManager> logManagerMock,
         TestAcquisitionProcessorBackgroundService processor)
     {
-        var deadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire>>();
+        var deadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, string, ReadyToAcquire>>();
         var deadLetterErrorHandlerMock = new Mock<IDeadLetterExceptionHandler<ReadyToAcquire, string, string>>();
-        var transientHandlerMock = new Mock<ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire>>();
-        var consumerFactoryMock = new Mock<IKafkaConsumerFactory<long, ReadyToAcquire>>();
+        var transientHandlerMock = new Mock<ITransientExceptionHandler<ReadyToAcquire, string, ReadyToAcquire>>();
+        var consumerFactoryMock = new Mock<IKafkaConsumerFactory<string, ReadyToAcquire>>();
 
         var services = new ServiceCollection();
         services.AddScoped(_ => logManagerMock.Object);
@@ -190,13 +190,13 @@ public class ReadyToAcquireListenerTests
             provider.GetRequiredService<IServiceScopeFactory>());
     }
 
-    private static ConsumeResult<long, ReadyToAcquire> CreateConsumeResult(long logId, string facilityId)
+    private static ConsumeResult<string, ReadyToAcquire> CreateConsumeResult(long logId, string facilityId)
     {
-        return new ConsumeResult<long, ReadyToAcquire>
+        return new ConsumeResult<string, ReadyToAcquire>
         {
-            Message = new Message<long, ReadyToAcquire>
+            Message = new Message<string, ReadyToAcquire>
             {
-                Key = logId,
+                Key = KafkaKeys.ForFacility(facilityId),
                 Value = new ReadyToAcquire
                 {
                     LogId = logId,
@@ -211,17 +211,17 @@ public class ReadyToAcquireListenerTests
     {
         public TestReadyToAcquireListener(
             ILogger<ReadyToAcquireListener> logger,
-            IKafkaConsumerFactory<long, ReadyToAcquire> kafkaConsumerFactory,
-            IDeadLetterExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> deadLetterConsumerHandler,
+            IKafkaConsumerFactory<string, ReadyToAcquire> kafkaConsumerFactory,
+            IDeadLetterExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> deadLetterConsumerHandler,
             IDeadLetterExceptionHandler<ReadyToAcquire, string, string> deadLetterConsumerErrorHandler,
-            ITransientExceptionHandler<ReadyToAcquire, long, ReadyToAcquire> transientExceptionHandler,
+            ITransientExceptionHandler<ReadyToAcquire, string, ReadyToAcquire> transientExceptionHandler,
             ServiceInformation serviceInformation,
             IServiceScopeFactory serviceScopeFactory)
             : base(logger, kafkaConsumerFactory, deadLetterConsumerHandler, deadLetterConsumerErrorHandler, transientExceptionHandler, serviceInformation, serviceScopeFactory)
         {
         }
 
-        public Task InvokeExecuteListenerAsync(ConsumeResult<long, ReadyToAcquire> consumeResult, CancellationToken cancellationToken)
+        public Task InvokeExecuteListenerAsync(ConsumeResult<string, ReadyToAcquire> consumeResult, CancellationToken cancellationToken)
             => ExecuteListenerAsync(consumeResult, cancellationToken);
     }
 
@@ -231,8 +231,8 @@ public class ReadyToAcquireListenerTests
             : base(
                 new Mock<ILogger<AcquisitionProcessorBackgroundService>>().Object,
                 new ServiceCollection().BuildServiceProvider(),
-                new Mock<IProducer<ResourceKey, ResourcesAcquired>>().Object,
-                new Mock<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>().Object,
+                new Mock<IProducer<string, ResourcesAcquired>>().Object,
+                new Mock<IProducer<string, MappingOutcomeEvaluatedValue>>().Object,
                 Options.Create(new LantanaGroup.Link.DataAcquisition.Domain.Settings.AcquisitionWorkerProcessorSettings()))
         {
         }

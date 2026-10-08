@@ -8,7 +8,10 @@ using LantanaGroup.Link.Notification.Application.NotificationConfiguration.Queri
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Notification.Listeners
@@ -36,11 +39,12 @@ namespace LantanaGroup.Link.Notification.Listeners
 
         private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false))
+            var assignmentTracker = new KafkaAssignmentTracker();
+            using (var _consumer = _kafkaConsumerFactory.CreateNotificationRequestedConsumer(enableAutoCommit: false, assignmentTracker))
             {
                 try
                 {
-                    _consumer.Subscribe(nameof(KafkaTopic.NotificationRequested));
+                    _consumer.Subscribe(KafkaTopicNames.Subscription(nameof(KafkaTopic.NotificationRequested), NotificationConstants.ServiceName));
                     _logger.LogConsumerStarted(nameof(KafkaTopic.NotificationRequested), DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
@@ -59,6 +63,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                     }
 
                                     NotificationMessage messageValue = result.Message.Value;
+                                    var facilityId = KafkaIdentity.Facility(messageValue.FacilityId, result.Message.Key);
 
                                     if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
                                     {
@@ -118,7 +123,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         }
 
                                         //create notification
-                                        CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, result.Message.Key, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
+                                        CreateNotificationModel notificationModel = _notificationFactory.CreateNotificationModelCreate(messageValue.NotificationType, facilityId, messageValue.CorrelationId, messageValue.Subject, messageValue.Body, recipients, bccs);                                                                                                       
                                                                           
                                         string notificationId = await _createNotificationCommand.Execute(notificationModel, consumeCancellationToken);
                                         _logger.LogNotificationCreation(notificationId, notificationModel);
@@ -128,9 +133,9 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         SendNotificationModel sendModel = _notificationFactory.CreateSendNotificationModel(notification.Id, notification.Recipients, notification.Bcc, notification.Subject, notification.Body);
 
                                         //if a facility based notification, get their configuration and add it to the send model
-                                        if (!string.IsNullOrEmpty(result.Message.Key))
+                                        if (!string.IsNullOrEmpty(facilityId))
                                         {
-                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(result.Message.Key, consumeCancellationToken);
+                                            NotificationConfigurationModel config = await _getFacilityConfigurationQuery.Execute(facilityId, consumeCancellationToken);
                                             sendModel.FacilityConfig = config;
                                         }
 
@@ -138,8 +143,8 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         await _sendNotificationCommand.Execute(sendModel, consumeCancellationToken);
                                     }                                    
 
-                                    //consume the result and offset
-                                    _consumer.Commit(result);
+                                    assignmentTracker.MarkProcessed(result);
+                                    _consumer.SafeCommit(result, _logger);
                                 }
 
                             }, cancellationToken);

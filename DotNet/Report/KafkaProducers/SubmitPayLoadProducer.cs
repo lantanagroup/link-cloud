@@ -13,10 +13,10 @@ namespace LantanaGroup.Link.Report.KafkaProducers
     {
         private readonly ILogger<SubmitPayloadProducer> _logger;
         private readonly IServiceScopeFactory _serviceScopeFactory;
-        private readonly IProducer<SubmitPayloadKey, SubmitPayloadValue> _submitPayloadProducer;
+        private readonly IProducer<string, SubmitPayloadValue> _submitPayloadProducer;
 
 
-        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<SubmitPayloadKey, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
+        public SubmitPayloadProducer(IServiceScopeFactory serviceScopeFactory, IProducer<string, SubmitPayloadValue> submitPayloadProducer, ILogger<SubmitPayloadProducer> logger)
         {
             _submitPayloadProducer = submitPayloadProducer;
             _serviceScopeFactory = serviceScopeFactory;
@@ -36,14 +36,14 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
+            var key = string.IsNullOrWhiteSpace(patientId)
+                ? KafkaKeys.ForFacility(schedule.FacilityId)
+                : KafkaKeys.ForPatient(schedule.FacilityId, patientId);
+
             _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
-                new Message<SubmitPayloadKey, SubmitPayloadValue>
+                new Message<string, SubmitPayloadValue>
                 {
-                    Key = new SubmitPayloadKey()
-                    {
-                        FacilityId = schedule.FacilityId,
-                        ReportScheduleId = schedule.Id
-                    },
+                    Key = key,
                     Value = new SubmitPayloadValue()
                     {
                         PayloadType = payloadType,
@@ -51,7 +51,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PayloadUri = payloadUri,
                         ReportTypes = schedule.ReportTypes,
                         StartDate = schedule.ReportStartDate.UtcDateTime,
-                        EndDate = schedule.ReportEndDate.UtcDateTime
+                        EndDate = schedule.ReportEndDate.UtcDateTime,
+                        FacilityId = schedule.FacilityId,
+                        ReportScheduleId = schedule.Id
                     },
 
                     Headers = CreateHeaders(corrId, metricsMode)

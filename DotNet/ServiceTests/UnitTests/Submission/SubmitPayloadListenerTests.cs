@@ -19,13 +19,13 @@ namespace UnitTests.Submission;
 public class SubmitPayloadListenerTests
 {
     private readonly Mock<ILogger<SubmitPayloadListener>> _loggerMock = new();
-    private readonly Mock<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>> _consumerFactoryMock = new();
-    private readonly Mock<IConsumer<SubmitPayloadKey, SubmitPayloadValue>> _consumerMock = new();
-    private readonly Mock<ITransientExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue>> _transientHandlerMock = new();
-    private readonly Mock<IDeadLetterExceptionHandler<SubmitPayloadListener, SubmitPayloadKey, SubmitPayloadValue>> _deadLetterHandlerMock = new();
+    private readonly Mock<IKafkaConsumerFactory<string, SubmitPayloadValue>> _consumerFactoryMock = new();
+    private readonly Mock<IConsumer<string, SubmitPayloadValue>> _consumerMock = new();
+    private readonly Mock<ITransientExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue>> _transientHandlerMock = new();
+    private readonly Mock<IDeadLetterExceptionHandler<SubmitPayloadListener, string, SubmitPayloadValue>> _deadLetterHandlerMock = new();
     private readonly Mock<IStorageService> _storageServiceMock = new();
     private readonly Mock<ISubmissionServiceMetrics> _metricsMock = new();
-    private readonly Mock<IProducer<PayloadSubmittedKey, PayloadSubmittedValue>> _payloadProducerMock = new();
+    private readonly Mock<IProducer<string, PayloadSubmittedValue>> _payloadProducerMock = new();
     private readonly Mock<ILogger<AuditableEventOccurredProducer>> _auditLoggerMock = new();
     private readonly Mock<IProducer<string, AuditEventMessage>> _auditProducerMock = new();
 
@@ -34,8 +34,9 @@ public class SubmitPayloadListenerTests
         _consumerFactoryMock
             .Setup(f => f.CreateConsumer(
                 It.IsAny<ConsumerConfig>(),
-                It.IsAny<IDeserializer<SubmitPayloadKey>?>(),
-                It.IsAny<IDeserializer<SubmitPayloadValue>?>()))
+                It.IsAny<IDeserializer<string>?>(),
+                It.IsAny<IDeserializer<SubmitPayloadValue>?>(),
+                It.IsAny<KafkaAssignmentTracker?>()))
             .Returns(_consumerMock.Object);
 
         _metricsMock
@@ -64,15 +65,21 @@ public class SubmitPayloadListenerTests
             new AuditableEventOccurredProducer(_auditLoggerMock.Object, _auditProducerMock.Object),
             Options.Create(new ExternalBlobStorageSettings { SuppressManifest = suppressManifest }));
 
-    private static ConsumeResult<SubmitPayloadKey, SubmitPayloadValue> BuildConsumeResult(
+    private static ConsumeResult<string, SubmitPayloadValue> BuildConsumeResult(
         string facilityId, PayloadType payloadType) =>
         new()
         {
-            Message = new Message<SubmitPayloadKey, SubmitPayloadValue>
+            Topic = nameof(KafkaTopic.SubmitPayload),
+            Partition = 0,
+            Offset = 0,
+            Message = new Message<string, SubmitPayloadValue>
             {
-                Key = new SubmitPayloadKey { FacilityId = facilityId, ReportScheduleId = Guid.NewGuid() },
+                Key = facilityId + ":patient-1",
                 Value = new SubmitPayloadValue
                 {
+                    FacilityId = facilityId,
+                    PatientId = "patient-1",
+                    ReportScheduleId = Guid.NewGuid(),
                     PayloadType = payloadType,
                     PayloadUri = "some/uri",
                     ReportTypes = ["ACH"]
@@ -83,7 +90,7 @@ public class SubmitPayloadListenerTests
 
     private static Task InvokeConsumeAsync(
         SubmitPayloadListener listener,
-        ConsumeResult<SubmitPayloadKey, SubmitPayloadValue> result)
+        ConsumeResult<string, SubmitPayloadValue> result)
     {
         var method = typeof(SubmitPayloadListener)
             .GetMethod("ConsumeAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -117,9 +124,12 @@ public class SubmitPayloadListenerTests
         _payloadProducerMock.Verify(
             p => p.Produce(
                 It.IsAny<string>(),
-                It.Is<Message<PayloadSubmittedKey, PayloadSubmittedValue>>(
-                    m => m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<PayloadSubmittedKey, PayloadSubmittedValue>>>()),
+                It.Is<Message<string, PayloadSubmittedValue>>(
+                    m => m.Value.PayloadType == PayloadType.ReportSchedule
+                         && m.Key == KafkaKeys.ForPatient("facility-1", "patient-1")
+                         && m.Value.FacilityId == "facility-1"
+                         && m.Value.PatientId == "patient-1"),
+                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
             Times.Once);
     }
 
@@ -140,8 +150,8 @@ public class SubmitPayloadListenerTests
         _payloadProducerMock.Verify(
             p => p.Produce(
                 It.IsAny<string>(),
-                It.IsAny<Message<PayloadSubmittedKey, PayloadSubmittedValue>>(),
-                It.IsAny<Action<DeliveryReport<PayloadSubmittedKey, PayloadSubmittedValue>>>()),
+                It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
             Times.Once);
     }
 
@@ -162,8 +172,8 @@ public class SubmitPayloadListenerTests
         _payloadProducerMock.Verify(
             p => p.Produce(
                 It.IsAny<string>(),
-                It.IsAny<Message<PayloadSubmittedKey, PayloadSubmittedValue>>(),
-                It.IsAny<Action<DeliveryReport<PayloadSubmittedKey, PayloadSubmittedValue>>>()),
+                It.IsAny<Message<string, PayloadSubmittedValue>>(),
+                It.IsAny<Action<DeliveryReport<string, PayloadSubmittedValue>>>()),
             Times.Once);
     }
 
