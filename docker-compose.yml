@@ -686,13 +686,6 @@ services:
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
-      # DMRP system feature switch, on by default in this stack to match DMRP:Enabled in the tenant
-      # service's appsettings.Docker.json. Override with LINK_DMRP_ENABLED in the shell or .env. The
-      # two must stay in step: a change to the tenant side needs a tenant image rebuild - appsettings
-      # is baked into it, so recreating the container on its own keeps the value the image was built
-      # with. UI on while the services are off makes the facility form quietly create facilities
-      # that report nothing; the other way round fails loudly.
-      LINK_DMRP_ENABLED: ${LINK_DMRP_ENABLED:-true}
     networks:
       - link-nw
     depends_on:
