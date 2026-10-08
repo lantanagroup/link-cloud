@@ -131,21 +131,36 @@
         return new URLSearchParams(window.location.search);
     }
 
-    function readQuery() {
+    // The first table on a page keeps q/type/sort/dir. Any later table prefixes
+    // those keys with its id so one table's search does not reload into the others.
+    function queryPrefix(shell) {
+        var shells = Array.prototype.slice.call(document.querySelectorAll('[data-au-table]'));
+        var index = shells.indexOf(shell);
+        if (index <= 0) return '';
+        var table = shell._auTable || shell.querySelector('table');
+        var id = table && table.id ? table.id : ('t' + index);
+        return id + '_';
+    }
+
+    function readQuery(shell) {
         var params = pageParams();
+        var prefix = queryPrefix(shell);
+        function get(key) { return params.get(prefix + key) || ''; }
+        var dir = get('dir');
         return {
-            q: params.get('q') || '',
-            type: params.get('type') || '',
-            sort: params.get('sort') || '',
-            dir: params.get('dir') === 'asc' ? 'asc' : (params.get('dir') === 'desc' ? 'desc' : '')
+            q: get('q'),
+            type: get('type'),
+            sort: get('sort'),
+            dir: dir === 'asc' ? 'asc' : (dir === 'desc' ? 'desc' : '')
         };
     }
 
     function writeQuery(shell) {
         var params = pageParams();
+        var prefix = queryPrefix(shell);
         function put(key, value) {
-            if (value) params.set(key, value);
-            else params.delete(key);
+            if (value) params.set(prefix + key, value);
+            else params.delete(prefix + key);
         }
         put('q', (shell._auSearch || '').trim());
         put('type', shell._auType || '');
@@ -171,7 +186,7 @@
     }
 
     function restoreQuery(shell) {
-        var saved = readQuery();
+        var saved = readQuery(shell);
         shell._auSearch = saved.q;
         shell._auType = saved.type;
         var search = shell.querySelector('.au-table-search');
