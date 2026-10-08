@@ -133,7 +133,7 @@ public static class AutomationRules
             FinishedAt = finishedAt,
             Error = string.IsNullOrWhiteSpace(error) ? null : error.Trim(),
             RetentionNotice = string.IsNullOrWhiteSpace(retentionNotice) ? null : retentionNotice.Trim(),
-            Duration = string.IsNullOrWhiteSpace(duration) ? null : duration.Trim(),
+            Duration = ResolveDuration(duration, storedStatus, startedAt, finishedAt, createdAt),
             FacilityId = facility,
             AutomationCreatedFacility = automationCreatedFacility,
             ReportId = report,
@@ -217,6 +217,34 @@ public static class AutomationRules
         return span.TotalHours >= 1
             ? span.ToString(@"h\:mm\:ss")
             : span.ToString(@"m\:ss");
+    }
+
+    /// <summary>
+    /// A finished run always has a duration. The stored pipeline span wins.
+    /// When that span was never written, the wall clock from start to finish is used.
+    /// </summary>
+    public static string? ResolveDuration(
+        string? stored,
+        string? status,
+        DateTimeOffset? startedAt,
+        DateTimeOffset? finishedAt,
+        DateTimeOffset createdAt)
+    {
+        if (!string.IsNullOrWhiteSpace(stored))
+            return stored.Trim();
+
+        if (!IsTerminal(status) || finishedAt is null)
+            return null;
+
+        return FormatWallClock(finishedAt.Value - (startedAt ?? createdAt));
+    }
+
+    public static string FormatWallClock(TimeSpan span)
+    {
+        if (span.TotalSeconds < 1)
+            return span.TotalSeconds > 0 ? "< 1s" : "0:00";
+
+        return FormatDuration(span.TotalSeconds);
     }
 
     private sealed class MutableDay

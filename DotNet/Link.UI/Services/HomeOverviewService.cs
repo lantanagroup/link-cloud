@@ -272,11 +272,32 @@ public sealed class HomeOverviewService : IHomeOverview
         if (_apiHealth is null)
             return (false, "API health storage is not configured.", null, null, null, null);
 
-        var context = await _apiHealth.GetLatestRunContextAsync(cancellationToken);
-        if (context is null || context.RunId == Guid.Empty)
+        var contextTask = _apiHealth.GetLatestRunContextAsync(cancellationToken);
+        var executionTask = _apiHealth.GetLatestExecutionRunStatusAsync(cancellationToken);
+        await Task.WhenAll(contextTask, executionTask);
+
+        AutomationRunRow? scenario = null;
+        try
+        {
+            scenario = await _runs.FindLatestNamedRunAsync(HomeOverviewRules.ApiHealthScenarioName, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "The latest API health scenario run could not be read.");
+        }
+
+        var chosen = HomeOverviewRules.ChooseLatestApiHealth(
+            await contextTask,
+            await executionTask,
+            scenario);
+        if (chosen is null)
             return (true, null, null, null, null, null);
 
-        return (true, null, context.RunId, context.RunMode, context.ServiceName, HomeOverviewRules.When(context.StartedAt));
+        return (true, null, chosen.RunId, chosen.Mode, chosen.Service, HomeOverviewRules.When(chosen.At));
     }
 
     private Task<RunCard> LoadRunsAsync(CancellationToken cancellationToken) =>
