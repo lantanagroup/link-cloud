@@ -175,7 +175,9 @@ public class KafkaConfig {
             ObjectProvider<SslBundles> sslBundles,
             Serializer<String> keySerializer,
             Serializer<String> valueSerializer) {
+        // Idempotence requires retries above zero. This template sets retries to 0, so turn it off here only.
         return new KafkaTemplate<>(getProducerFactory(properties, sslBundles, keySerializer, valueSerializer, Map.of(
+                ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false,
                 ProducerConfig.MAX_BLOCK_MS_CONFIG, Properties.MAX_BLOCK_MS_CONFIG,
                 ProducerConfig.RETRIES_CONFIG, 0)));
     }

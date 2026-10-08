@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -249,7 +250,7 @@ public class ReportManifestProducerTests
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
         harness.ScheduleManager.Verify(
-            m => m.TryClaimManifestAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            m => m.TryClaimManifestAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -276,10 +277,10 @@ public class ReportManifestProducerTests
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
         harness.ScheduleManager.Verify(
-            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<CancellationToken>()),
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Once);
         harness.ScheduleManager.Verify(
-            m => m.MarkManifestEmittedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            m => m.MarkManifestEmittedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -330,8 +331,58 @@ public class ReportManifestProducerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
         harness.ScheduleManager.Verify(
-            m => m.MarkManifestEmittedAsync(harness.Schedule.Id, It.IsAny<CancellationToken>()),
+            m => m.MarkManifestEmittedAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    /// <summary>
+    /// A live claim belongs to another attempt. Treating it as done commits the offset
+    /// or deletes the end-of-period job, so the manifest is never retried.
+    /// </summary>
+    [Fact]
+    public async Task Produce_LiveClaim_ThrowsAndDoesNotUpload()
+    {
+        var harness = new Harness();
+        harness.ScheduleManager
+            .Setup(m => m.TryClaimManifestAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ManifestClaimResult.Held);
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The lease expired and another pod owns the claim. Stop before the upload and
+    /// leave that claim in place.
+    /// </summary>
+    [Fact]
+    public async Task Produce_ClaimLostBeforeUpload_ThrowsAndDoesNotUpload()
+    {
+        var harness = new Harness();
+        harness.ScheduleManager
+            .Setup(m => m.RenewManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion
@@ -340,7 +391,10 @@ public class ReportManifestProducerTests
     {
         private int _claims;
 
-        public bool TryClaim() => Interlocked.Increment(ref _claims) == 1;
+        public ManifestClaimResult TryClaim() =>
+            Interlocked.Increment(ref _claims) == 1
+                ? ManifestClaimResult.Won
+                : ManifestClaimResult.AlreadyEmitted;
     }
 
     private sealed class Harness
@@ -390,21 +444,24 @@ public class ReportManifestProducerTests
             if (claimCounter == null)
             {
                 ScheduleManager
-                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(true);
+                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(ManifestClaimResult.Won);
             }
             else
             {
                 ScheduleManager
-                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<CancellationToken>()))
+                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                     .ReturnsAsync(claimCounter.TryClaim);
             }
 
             ScheduleManager
-                .Setup(m => m.ReleaseManifestClaimAsync(Schedule.Id, It.IsAny<CancellationToken>()))
+                .Setup(m => m.ReleaseManifestClaimAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
             ScheduleManager
-                .Setup(m => m.MarkManifestEmittedAsync(Schedule.Id, It.IsAny<CancellationToken>()))
+                .Setup(m => m.RenewManifestClaimAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            ScheduleManager
+                .Setup(m => m.MarkManifestEmittedAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true);
 
             var reportEntryRepository = new Mock<IEntityRepository<ReportEntry>>();

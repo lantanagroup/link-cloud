@@ -73,4 +73,37 @@ public class KafkaTopicAndAssignmentTests
         Assert.Equal(AutoOffsetReset.Latest, config.AutoOffsetReset);
         Assert.Equal(PartitionAssignmentStrategy.CooperativeSticky, config.PartitionAssignmentStrategy);
     }
+
+    [Fact]
+    public void ApplyConsumerStaticMembershipUsesAStableMemberName()
+    {
+        var off = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(off, "DataAcquisition", staticMembership: false, staticMemberName: "DataAcquisitionRequested");
+        Assert.Null(off.GroupInstanceId);
+
+        var first = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(first, "DataAcquisition", staticMembership: true, staticMemberName: "DataAcquisitionRequested");
+        var again = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(again, "DataAcquisition", staticMembership: true, staticMemberName: "DataAcquisitionRequested");
+        Assert.False(string.IsNullOrWhiteSpace(first.GroupInstanceId));
+        Assert.Equal(first.GroupInstanceId, again.GroupInstanceId);
+        Assert.Contains("DataAcquisitionRequested", first.GroupInstanceId);
+
+        var other = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(other, "DataAcquisition", staticMembership: true, staticMemberName: "PatientCensusScheduled");
+        Assert.NotEqual(first.GroupInstanceId, other.GroupInstanceId);
+
+        var preset = new ConsumerConfig { GroupInstanceId = "already-set" };
+        KafkaClientDefaults.ApplyConsumer(preset, "DataAcquisition", staticMembership: true, staticMemberName: "DataAcquisitionRequested");
+        Assert.Equal("already-set", preset.GroupInstanceId);
+
+        var longName = new string('a', 300);
+        var longFirst = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(longFirst, longName, staticMembership: true, staticMemberName: "DataAcquisitionRequested");
+        var longOther = new ConsumerConfig();
+        KafkaClientDefaults.ApplyConsumer(longOther, longName, staticMembership: true, staticMemberName: "PatientCensusScheduled");
+        Assert.True(longFirst.GroupInstanceId!.Length <= 249);
+        Assert.EndsWith("DataAcquisitionRequested", longFirst.GroupInstanceId);
+        Assert.NotEqual(longFirst.GroupInstanceId, longOther.GroupInstanceId);
+    }
 }

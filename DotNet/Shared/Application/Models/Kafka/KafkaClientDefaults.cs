@@ -29,7 +29,7 @@ public static class KafkaClientDefaults
         config.ClientId = BuildClientId(serviceClientId ?? config.ClientId, "p");
     }
 
-    public static void ApplyConsumer(ConsumerConfig config, string? serviceClientId = null, bool staticMembership = false)
+    public static void ApplyConsumer(ConsumerConfig config, string? serviceClientId = null, bool staticMembership = false, string? staticMemberName = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         if (config.AutoOffsetReset is null)
@@ -43,8 +43,26 @@ public static class KafkaClientDefaults
         config.ClientId = BuildClientId(serviceClientId ?? config.ClientId, "c" + ConsumerConfigVersion.ToString());
         if (staticMembership && string.IsNullOrWhiteSpace(config.GroupInstanceId))
         {
-            config.GroupInstanceId = BuildClientId(serviceClientId ?? config.ClientId, "static");
+            var member = string.IsNullOrWhiteSpace(staticMemberName) ? "static" : "static-" + staticMemberName.Trim();
+            config.GroupInstanceId = FitGroupInstanceId(BuildClientId(serviceClientId ?? config.ClientId, member), member);
         }
+    }
+
+    private static string FitGroupInstanceId(string instanceId, string member)
+    {
+        const int maxLength = 249;
+        if (instanceId.Length <= maxLength)
+        {
+            return instanceId;
+        }
+
+        var suffix = "-" + member;
+        if (suffix.Length >= maxLength)
+        {
+            return suffix.Substring(suffix.Length - maxLength, maxLength);
+        }
+
+        return instanceId.Substring(0, maxLength - suffix.Length) + suffix;
     }
 
     public static string BuildClientId(string? serviceClientId, string role)
