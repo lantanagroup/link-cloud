@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Link.UI.Models;
 
 namespace Link.UI.Services;
@@ -149,9 +151,9 @@ public static class AutomationRules
         var succeeded = rows.Count(row => row.Status == "Succeeded");
         var failed = rows.Count(row => row.Status == "Failed");
         var completed = rows
-            .Where(row => row.Status is "Succeeded" or "Failed" && row.FinishedAt.HasValue)
-            .Select(row => (row.FinishedAt!.Value - row.CreatedAt).TotalSeconds)
-            .Where(seconds => seconds > 0)
+            .Select(row => DurationSeconds(row.Duration, row.Status, row.StartedAt, row.FinishedAt, row.CreatedAt))
+            .Where(seconds => seconds is > 0)
+            .Select(seconds => seconds!.Value)
             .ToList();
 
         var cutoff = now.AddDays(-(WindowDays - 1)).UtcDateTime.Date;
@@ -230,6 +232,9 @@ public static class AutomationRules
         DateTimeOffset? finishedAt,
         DateTimeOffset createdAt)
     {
+        if (TryParseDuration(stored, out var seconds))
+            return seconds > 0 && seconds < 1 ? "< 1s" : FormatDuration(seconds);
+
         if (!string.IsNullOrWhiteSpace(stored))
             return stored.Trim();
 
@@ -237,6 +242,67 @@ public static class AutomationRules
             return null;
 
         return FormatWallClock(finishedAt.Value - (startedAt ?? createdAt));
+    }
+
+    /// <summary>
+    /// Seconds behind the duration a row shows. Only a succeeded or failed run
+    /// counts. A stored span wins. Otherwise the run uses start-to-finish, which
+    /// drops queue time. Running, queued, and cancelled runs contribute nothing.
+    /// </summary>
+    public static double? DurationSeconds(
+        string? stored,
+        string? status,
+        DateTimeOffset? startedAt,
+        DateTimeOffset? finishedAt,
+        DateTimeOffset createdAt)
+    {
+        if (status is not ("Succeeded" or "Failed") || finishedAt is null)
+            return null;
+
+        if (TryParseDuration(stored, out var parsed) && parsed > 0)
+            return parsed;
+
+        var wall = (finishedAt.Value - (startedAt ?? createdAt)).TotalSeconds;
+        return wall > 0 ? wall : null;
+    }
+
+    public static bool TryParseDuration(string? stored, out double seconds)
+    {
+        seconds = 0;
+        if (string.IsNullOrWhiteSpace(stored))
+            return false;
+
+        var text = stored.Trim();
+        if (text.Equals("< 1s", StringComparison.OrdinalIgnoreCase))
+        {
+            seconds = 0.5;
+            return true;
+        }
+
+        var clock = Regex.Match(text, @"^(?:(\d+):)?(\d+):(\d{2})$");
+        if (clock.Success)
+        {
+            var hours = clock.Groups[1].Success ? int.Parse(clock.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            var minutes = int.Parse(clock.Groups[2].Value, CultureInfo.InvariantCulture);
+            var secs = int.Parse(clock.Groups[3].Value, CultureInfo.InvariantCulture);
+            seconds = hours * 3600 + minutes * 60 + secs;
+            return true;
+        }
+
+        var words = Regex.Match(
+            text,
+            @"^(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+(?:\.\d+)?)\s*s)?$",
+            RegexOptions.IgnoreCase);
+        if (words.Success && words.Value.Length == text.Length && words.Groups.Cast<Group>().Skip(1).Any(group => group.Success))
+        {
+            var hours = words.Groups[1].Success ? double.Parse(words.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+            var minutes = words.Groups[2].Success ? double.Parse(words.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+            var secs = words.Groups[3].Success ? double.Parse(words.Groups[3].Value, CultureInfo.InvariantCulture) : 0;
+            seconds = hours * 3600 + minutes * 60 + secs;
+            return seconds >= 0 && (hours > 0 || minutes > 0 || secs > 0 || text.Contains('0'));
+        }
+
+        return false;
     }
 
     public static string FormatWallClock(TimeSpan span)
