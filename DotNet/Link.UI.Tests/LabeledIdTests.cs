@@ -63,7 +63,6 @@ public class LabeledIdTests
         foreach (var relative in new[]
         {
             "Views/Tenants/Report.cshtml",
-            "Views/Reports/Prequal.cshtml",
             "Views/Reports/Validation.cshtml",
             "Views/Reports/Acquisition.cshtml",
             "Views/Reports/Measure.cshtml"

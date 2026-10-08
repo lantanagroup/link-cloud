@@ -16,9 +16,12 @@ public static class ReportsRules
     public const int MaxResultChars = 4_000_000;
     public const int MaxJsonChars = 750_000;
     public const int DefaultLogPageSize = 10;
+    public const int DefaultIssuePageSize = 25;
 
     public static readonly string[] Cadences = ["Daily", "Monthly", "Custom"];
     public static readonly int[] LogPageSizes = [10, 20, 50];
+    public static readonly int[] IssuePageSizes = [10, 25, 50, 100];
+    public static readonly string[] IssueSorts = ["severity", "code", "patient", "message", "location"];
 
     public static bool CanDownload(bool deleted, string? payloadRootUri) =>
         !deleted && !string.IsNullOrWhiteSpace(payloadRootUri);
@@ -261,20 +264,193 @@ public static class ReportsRules
         out int total)
     {
         var name = FacilityViewRules.Clean(category);
-        IEnumerable<ValidationIssueRow> matched = issues;
-        if (name is not null)
-        {
-            matched = name.Equals("Uncategorized", StringComparison.OrdinalIgnoreCase)
-                ? issues.Where(issue => issue.Categories.Count == 0
-                    || issue.Categories.Any(item => string.IsNullOrWhiteSpace(item.Title)
-                        || item.Title.Equals("Uncategorized", StringComparison.OrdinalIgnoreCase)))
-                : issues.Where(issue => issue.Categories.Any(item =>
-                    item.Title.Equals(name, StringComparison.OrdinalIgnoreCase)));
-        }
-
+        IEnumerable<ValidationIssueRow> matched = name is null
+            ? issues
+            : issues.Where(issue => InCategory(issue, name));
         var list = matched.ToList();
         total = list.Count;
         return list.Count <= MaxListedIssues ? list : list.Take(MaxListedIssues).ToList();
+    }
+
+    public static bool InCategory(ValidationIssueRow issue, string name)
+    {
+        if (name.Equals("Uncategorized", StringComparison.OrdinalIgnoreCase))
+        {
+            return issue.Categories.Count == 0
+                || issue.Categories.Any(item => string.IsNullOrWhiteSpace(item.Title)
+                    || item.Title.Equals("Uncategorized", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return issue.Categories.Any(item =>
+            item.Title.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static ValidationIssueQuery NormalizeIssueQuery(
+        string? text,
+        string? severity,
+        string? code,
+        string? category,
+        string? sort,
+        string? dir,
+        int page,
+        int pageSize)
+    {
+        var cleanSort = FacilityViewRules.Clean(sort)?.ToLowerInvariant();
+        if (cleanSort is null || !IssueSorts.Contains(cleanSort))
+            cleanSort = "severity";
+
+        var descending = string.IsNullOrWhiteSpace(dir)
+            ? cleanSort == "severity"
+            : !dir.Trim().Equals("asc", StringComparison.OrdinalIgnoreCase);
+
+        return new ValidationIssueQuery
+        {
+            Text = FacilityViewRules.Clean(text),
+            Severity = FacilityViewRules.Clean(severity),
+            Code = FacilityViewRules.Clean(code),
+            Category = FacilityViewRules.Clean(category),
+            Sort = cleanSort,
+            Descending = descending,
+            Page = page < 1 ? 1 : page,
+            PageSize = IssuePageSizes.Contains(pageSize) ? pageSize : DefaultIssuePageSize
+        };
+    }
+
+    public static string NextIssueDir(string currentSort, bool descending, string column)
+    {
+        if (!string.Equals(currentSort, column, StringComparison.OrdinalIgnoreCase))
+            return column == "severity" ? "desc" : "asc";
+
+        return descending ? "asc" : "desc";
+    }
+
+    public static string IssueStanding(IReadOnlyList<ValidationIssueRow> issues)
+    {
+        if (issues.Count == 0)
+            return "—";
+
+        return GroupIssues(issues).Any(group => !group.Acceptable) ? "Unacceptable" : "Acceptable";
+    }
+
+    public static IssueSlice SliceIssues(IReadOnlyList<ValidationIssueRow> issues, ValidationIssueQuery query)
+    {
+        var severities = issues
+            .Select(issue => issue.Severity.Trim())
+            .Where(value => value.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(SeverityRank)
+            .ThenBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var categories = issues
+            .SelectMany(CategoryNames)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var counts = issues
+            .GroupBy(issue => string.IsNullOrWhiteSpace(issue.Severity) ? "—" : issue.Severity.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ValidationSeverityCount { Name = group.Key, Count = group.Count() })
+            .OrderByDescending(count => SeverityRank(count.Name))
+            .ThenBy(count => count.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        IEnumerable<ValidationIssueRow> filtered = issues;
+        if (query.Severity is not null)
+            filtered = filtered.Where(issue => issue.Severity.Equals(query.Severity, StringComparison.OrdinalIgnoreCase));
+        if (query.Code is not null)
+            filtered = filtered.Where(issue => issue.Code.Contains(query.Code, StringComparison.OrdinalIgnoreCase));
+        if (query.Category is not null)
+            filtered = filtered.Where(issue => InCategory(issue, query.Category));
+        if (query.Text is not null)
+        {
+            filtered = filtered.Where(issue =>
+                issue.Message.Contains(query.Text, StringComparison.OrdinalIgnoreCase)
+                || issue.Code.Contains(query.Text, StringComparison.OrdinalIgnoreCase)
+                || issue.PatientId.Contains(query.Text, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filtered = query.Sort switch
+        {
+            "code" => Order(filtered, issue => issue.Code, query.Descending),
+            "patient" => Order(filtered, issue => issue.PatientId, query.Descending),
+            "message" => Order(filtered, issue => issue.Message, query.Descending),
+            "location" => Order(filtered, issue => issue.Location, query.Descending),
+            _ => query.Descending
+                ? filtered.OrderByDescending(issue => SeverityRank(issue.Severity)).ThenBy(issue => issue.Code, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(issue => SeverityRank(issue.Severity)).ThenBy(issue => issue.Code, StringComparer.OrdinalIgnoreCase)
+        };
+
+        var list = filtered.ToList();
+        var total = list.Count;
+        var pages = total == 0 ? 0 : (int)Math.Ceiling(total / (double)query.PageSize);
+        var number = query.Page < 1 ? 1 : query.Page;
+        if (pages > 0 && number > pages)
+            number = pages;
+
+        var page = total == 0
+            ? new List<ValidationIssueRow>()
+            : list.Skip((number - 1) * query.PageSize).Take(query.PageSize).ToList();
+        return new IssueSlice(page, total, number, pages, severities, categories, counts);
+    }
+
+    public static string IssueHref(
+        ValidationIssueQuery query,
+        string? facilityId,
+        string? reportId,
+        string? returnUrl,
+        int? page = null,
+        string? sort = null,
+        string? dir = null)
+    {
+        var pairs = new (string Key, string? Value)[]
+        {
+            ("facilityId", facilityId),
+            ("reportId", reportId),
+            ("returnUrl", returnUrl),
+            ("q", query.Text),
+            ("severity", query.Severity),
+            ("code", query.Code),
+            ("category", query.Category),
+            ("sort", sort ?? query.Sort),
+            ("dir", dir ?? (query.Descending ? "desc" : "asc")),
+            ("page", (page ?? query.Page).ToString()),
+            ("pageSize", query.PageSize.ToString())
+        };
+        var queryString = string.Join("&", pairs
+            .Where(pair => !string.IsNullOrEmpty(pair.Value))
+            .Select(pair => Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value!)));
+        return queryString.Length == 0 ? "/Reports/Validation" : "/Reports/Validation?" + queryString;
+    }
+
+    private static IEnumerable<ValidationIssueRow> Order(
+        IEnumerable<ValidationIssueRow> issues,
+        Func<ValidationIssueRow, string> key,
+        bool descending) =>
+        descending
+            ? issues.OrderByDescending(key, StringComparer.OrdinalIgnoreCase)
+            : issues.OrderBy(key, StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<string> CategoryNames(ValidationIssueRow issue)
+    {
+        if (issue.Categories.Count == 0)
+            return ["Uncategorized"];
+
+        return issue.Categories.Select(item =>
+            string.IsNullOrWhiteSpace(item.Title) ? "Uncategorized" : item.Title.Trim());
+    }
+
+    public static int SeverityRank(string? severity)
+    {
+        if (string.IsNullOrWhiteSpace(severity))
+            return 0;
+        if (severity.Contains("fatal", StringComparison.OrdinalIgnoreCase))
+            return 4;
+        if (severity.Contains("error", StringComparison.OrdinalIgnoreCase))
+            return 3;
+        if (severity.Contains("warn", StringComparison.OrdinalIgnoreCase))
+            return 2;
+        if (severity.Contains("info", StringComparison.OrdinalIgnoreCase))
+            return 1;
+        return 0;
     }
 
     public static string? PrettyJson(string? json, out bool tooLarge)
@@ -408,3 +584,12 @@ public static class ReportsRules
         };
     }
 }
+
+public sealed record IssueSlice(
+    IReadOnlyList<ValidationIssueRow> Page,
+    int Total,
+    int PageNumber,
+    int TotalPages,
+    IReadOnlyList<string> Severities,
+    IReadOnlyList<string> Categories,
+    IReadOnlyList<ValidationSeverityCount> SeverityCounts);

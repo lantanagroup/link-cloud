@@ -126,7 +126,6 @@ public class ReturnUrlRulesTests
 
         foreach (var relative in new[]
         {
-            "Views/Reports/Prequal.cshtml",
             "Views/Reports/Validation.cshtml",
             "Views/Reports/Acquisition.cshtml",
             "Views/Tenants/Report.cshtml",

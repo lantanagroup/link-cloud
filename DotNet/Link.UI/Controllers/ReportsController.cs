@@ -129,19 +129,33 @@ public sealed class ReportsController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Prequal(string? facilityId, string? reportId, string? category, CancellationToken cancellationToken)
+    public IActionResult Prequal()
     {
-        var page = await _reports.LoadPrequalAsync(facilityId, reportId, category, cancellationToken);
-        ViewData["Title"] = "Prequalification";
-        return View(page);
+        var query = string.Join("&", Request.Query.SelectMany(pair =>
+            pair.Value.Select(value =>
+                Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(value ?? string.Empty))));
+        var target = query.Length == 0 ? "/Reports/Validation" : "/Reports/Validation?" + query;
+        return LocalRedirect(target);
     }
 
     [HttpGet]
-    public async Task<IActionResult> Validation(string? facilityId, string? reportId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Validation(
+        string? facilityId,
+        string? reportId,
+        string? q,
+        string? severity,
+        string? code,
+        string? category,
+        string? sort,
+        string? dir,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
-        var page = await _reports.LoadValidationAsync(facilityId, reportId, cancellationToken);
+        var query = ReportsRules.NormalizeIssueQuery(q, severity, code, category, sort, dir, page, pageSize);
+        var model = await _reports.LoadValidationPageAsync(facilityId, reportId, query, cancellationToken);
         ViewData["Title"] = "Validation";
-        return View(page);
+        return View(model);
     }
 
     [HttpGet]
