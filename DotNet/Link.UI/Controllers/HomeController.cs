@@ -19,10 +19,18 @@ public sealed class HomeController : Controller
     }
 
     /// <summary>
-    /// Admin.BFF login sets RedirectUri to {origin}/dashboard. Land on the dashboard.
+    /// Admin.BFF login sets RedirectUri to {origin}/dashboard. Land on the dashboard,
+    /// or on the local return path stored before the challenge. That path is read once.
     /// </summary>
     [HttpGet("/dashboard")]
-    public IActionResult Dashboard() => RedirectToAction(nameof(Index));
+    public IActionResult Dashboard()
+    {
+        var target = SignInRules.TakeReturn(Request, Response);
+        if (!string.IsNullOrEmpty(target) && !string.Equals(target, "/", StringComparison.Ordinal))
+            return Redirect(target);
+
+        return RedirectToAction(nameof(Index));
+    }
 
     /// <summary>HTML fragment the home region swaps in. The shell paints before this runs.</summary>
     [HttpGet("/Home/overview")]
