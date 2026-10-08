@@ -39,11 +39,6 @@ public sealed class KafkaAssignmentTracker
                 : committed.Offset);
     }
 
-    internal IReadOnlyList<TopicPartitionOffset> OffsetsCommittedFor(IReadOnlyList<TopicPartitionOffset> revoked)
-    {
-        return OffsetsForRevoked(revoked, new Dictionary<TopicPartition, Offset>(_processed));
-    }
-
     public void OnRevoked<TKey, TValue>(IConsumer<TKey, TValue> consumer, IReadOnlyList<TopicPartitionOffset> revoked, ILogger? logger = null)
     {
         CommitNamed(consumer, revoked, logger);
@@ -69,17 +64,15 @@ public sealed class KafkaAssignmentTracker
     {
         var snapshot = new Dictionary<TopicPartition, Offset>(_processed);
         var batch = OffsetsForRevoked(partitions, snapshot);
+        if (batch.Count > 0)
+        {
+            consumer.SafeCommit(batch, logger);
+        }
+
         foreach (var partition in partitions)
         {
             _processed.TryRemove(partition.TopicPartition, out _);
         }
-
-        if (batch.Count == 0)
-        {
-            return;
-        }
-
-        consumer.SafeCommit(batch, logger);
     }
 }
 
