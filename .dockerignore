@@ -22,7 +22,9 @@ Azure_Pipelines/
 docs/
 Java/
 Web/
-Scripts/
+# Local scripts are not part of the image build, except the feed restore helper.
+Scripts/*
+!Scripts/docker-compose.restore-feed.sh
 Tests/
 **/*Tests/
 Prompt Staging/
@@ -55,6 +57,9 @@ smoke-test*.log
 **/bin/
 **/charts
 **/docker-compose*
+# The pattern above also matches the feed restore helper. The last matching
+# pattern wins, so this exception has to stay below that rule.
+!Scripts/docker-compose.restore-feed.sh
 **/Dockerfile*
 **/node_modules
 **/npm-debug.log
