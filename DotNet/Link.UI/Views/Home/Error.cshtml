@@ -4,6 +4,7 @@
 <div class="au-card card">
     <div class="card-header">Error</div>
     <div class="card-body">
-        <p class="mb-0">An unexpected error occurred.</p>
+        <p class="mb-2">An unexpected error occurred.</p>
+        <partial name="_LabeledId" model="@(new LabeledId { Label = "Request ID", Value = Context.TraceIdentifier })" />
     </div>
 </div>
