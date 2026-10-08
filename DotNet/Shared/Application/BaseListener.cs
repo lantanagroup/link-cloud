@@ -41,6 +41,12 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
 
     }
 
+    /// <summary>
+    /// False when this service does not host a consumer for its retry topic.
+    /// Failures then go to the error topic instead of a topic nobody reads.
+    /// </summary>
+    protected virtual bool RetryFailures => true;
+
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await base.StartAsync(cancellationToken);
@@ -92,7 +98,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         catch (TransientException ex)
                         {
-                            TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            if (RetryFailures)
+                            {
+                                TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            }
+                            else
+                            {
+                                DeadLetterConsumerHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                            }
+
                             accounted = true;
                         }
                         catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
@@ -105,7 +119,15 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                                 "Unhandled exception in listener for {ServiceName} on topic {Topic}",
                                 ServiceInformation.ServiceConfigName, this.TopicName);
 
-                            TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            if (RetryFailures)
+                            {
+                                TransientExceptionHandler.HandleException(consumeResult, new TransientException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            }
+                            else
+                            {
+                                DeadLetterConsumerHandler.HandleException(consumeResult, new DeadLetterException($"{ServiceInformation.ServiceConfigName} Exception thrown: " + ex.Message, ex), ExtractFacilityId(consumeResult));
+                            }
+
                             accounted = true;
                         }
                         finally

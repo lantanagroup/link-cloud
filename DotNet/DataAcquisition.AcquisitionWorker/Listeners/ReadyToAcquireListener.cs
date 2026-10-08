@@ -35,6 +35,8 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, string, Ready
         _serviceScopeFactory = serviceScopeFactory;
     }
 
+    protected override bool RetryFailures => false;
+
     protected override ConsumerConfig CreateConsumerConfig()
     {
         var settings = new ConsumerConfig

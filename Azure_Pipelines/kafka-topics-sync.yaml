@@ -204,8 +204,14 @@ stages:
 
             # Topics that are not listed are left in place. This sync never deletes and never recreates.
             echo "Creating per-service retry and redrive topics..."
-            RETRY_CONTENT=$(curl -s -f "$(RETRY_SERVICES_URL)" || true)
-            if [[ -n "$RETRY_CONTENT" ]]; then
+            if ! RETRY_CONTENT=$(curl -s -f "$(RETRY_SERVICES_URL)"); then
+              echo "ERROR: kafka-retry-services.txt was not fetched. Per-service retry topics were not created."
+              exit 1
+            fi
+            if [[ -z "$RETRY_CONTENT" ]]; then
+              echo "ERROR: kafka-retry-services.txt was empty. Per-service retry topics were not created."
+              exit 1
+            fi
               while IFS=: read -r MAIN_TOPIC SERVICES || [[ -n "$MAIN_TOPIC" ]]; do
                 [[ -z "$MAIN_TOPIC" || "$MAIN_TOPIC" =~ ^# ]] && continue
                 MAIN_PARTITIONS=$(echo "$DESIRED_TOPICS" | awk -F: -v t="$MAIN_TOPIC" '$1==t {print $2; exit}')
@@ -221,28 +227,40 @@ stages:
                       "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$DERIVED")
                     if [[ "$DERIVED_CODE" == "404" ]]; then
                       echo "Creating '$DERIVED' with $MAIN_PARTITIONS partitions."
-                      curl -s -o /dev/null -u "$USERNAME:$PASSWORD" \
+                      CREATE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                        -u "$USERNAME:$PASSWORD" \
                         -X POST "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \
                         -H "Content-Type: application/json" \
-                        -d "{\"topic_name\":\"$DERIVED\",\"partitions_count\":$MAIN_PARTITIONS,\"replication_factor\":$MAIN_REPLICAS}"
-                    elif [[ "${GROW_PARTITIONS}" == "true" && "$DERIVED_CODE" == "200" ]]; then
-                      LIVE_DERIVED=$(curl -s -u "$USERNAME:$PASSWORD" \
-                        "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$DERIVED" \
-                        | grep -oE '"partitions_count":[0-9]+' | head -n 1 | cut -d: -f2)
-                      if [[ "$LIVE_DERIVED" =~ ^[0-9]+$ && "$MAIN_PARTITIONS" =~ ^[0-9]+$ && "$LIVE_DERIVED" -lt "$MAIN_PARTITIONS" ]]; then
-                        echo "Growing '$DERIVED' from $LIVE_DERIVED to $MAIN_PARTITIONS partitions."
-                        curl -s -o /dev/null -u "$USERNAME:$PASSWORD" \
-                          -X PATCH "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$DERIVED" \
-                          -H "Content-Type: application/json" \
-                          -d "{\"partitions_count\":$MAIN_PARTITIONS}"
+                        -d "{\"topic_name\":\"$DERIVED\",\"partitions_count\":$MAIN_PARTITIONS,\"replication_factor\":$MAIN_REPLICAS}")
+                      if [[ "$CREATE_CODE" != "200" && "$CREATE_CODE" != "201" ]]; then
+                        echo "ERROR: Failed to create '$DERIVED' (HTTP $CREATE_CODE)."
+                        exit 1
                       fi
+                    elif [[ "$DERIVED_CODE" == "200" ]]; then
+                      if [[ "${GROW_PARTITIONS}" == "true" ]]; then
+                        LIVE_DERIVED=$(curl -s -u "$USERNAME:$PASSWORD" \
+                          "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$DERIVED" \
+                          | grep -oE '"partitions_count":[0-9]+' | head -n 1 | cut -d: -f2)
+                        if [[ "$LIVE_DERIVED" =~ ^[0-9]+$ && "$MAIN_PARTITIONS" =~ ^[0-9]+$ && "$LIVE_DERIVED" -lt "$MAIN_PARTITIONS" ]]; then
+                          echo "Growing '$DERIVED' from $LIVE_DERIVED to $MAIN_PARTITIONS partitions."
+                          GROW_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+                            -u "$USERNAME:$PASSWORD" \
+                            -X PATCH "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics/$DERIVED" \
+                            -H "Content-Type: application/json" \
+                            -d "{\"partitions_count\":$MAIN_PARTITIONS}")
+                          if [[ "$GROW_CODE" != "200" && "$GROW_CODE" != "204" ]]; then
+                            echo "ERROR: Failed to grow '$DERIVED' (HTTP $GROW_CODE)."
+                            exit 1
+                          fi
+                        fi
+                      fi
+                    else
+                      echo "ERROR: Unexpected status $DERIVED_CODE checking topic '$DERIVED'."
+                      exit 1
                     fi
                   done
                 done
               done <<< "$RETRY_CONTENT"
-            else
-              echo "WARNING: kafka-retry-services.txt was not fetched. Per-service retry topics were not created."
-            fi
 
             echo "Listing topics that are not in topics.txt (left unchanged)..."
             ALL_TOPICS=$(curl -s -u "$USERNAME:$PASSWORD" "$REST_PROXY_URL/v3/clusters/$CLUSTER_ID/topics" \

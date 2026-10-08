@@ -31,6 +31,25 @@ public static class KafkaTopicNames
         return mainTopic + "-Error";
     }
 
+    /// <summary>
+    /// The business topic for a main, retry, or redrive name.
+    /// A failure while reading a redrive record must retry that business topic, not the redrive name.
+    /// </summary>
+    public static string Main(string? topic)
+    {
+        if (TryMainFromRedrive(topic, out var main, out _) || TryMainFromRetry(topic, out main, out _))
+        {
+            return main;
+        }
+
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            throw new ArgumentException("Topic is required.", nameof(topic));
+        }
+
+        return topic;
+    }
+
     public static string[] Subscription(string mainTopic, string serviceName)
     {
         return [mainTopic, Redrive(mainTopic, serviceName)];

@@ -11,9 +11,7 @@ PatientCensusScheduled:DataAcquisition
 PatientEvent:QueryDispatch,Report
 PatientListsAcquired:Census
 CernerPatientsAcquired:Census
-ReadyToAcquire:DataAcquisitionWorker
 ReportScheduled:Report,QueryDispatch
 ResourcesAcquired:Normalization
 SubmitPayload:Submission
 ValidationComplete:Report
-NotificationRequested:Notification
