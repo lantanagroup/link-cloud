@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Results;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
@@ -79,6 +80,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                             {
                                 Value = new Models.Kafka.DataAcquisitionRequested
                                 {
+                                    FacilityId = request.FacilityId,
                                     PatientId = request.PatientId,
                                     QueryType = QueryPlanType.Initial.ToString(),
                                     ScheduledReports = new List<ScheduledReport>
@@ -91,7 +93,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
                                         }
                                     }
                                 },
-                                Key = request.FacilityId,
+                                Key = string.IsNullOrWhiteSpace(request.PatientId)
+                                    ? KafkaKeys.ForFacility(request.FacilityId)
+                                    : KafkaKeys.ForPatient(request.FacilityId, request.PatientId),
                                 Headers = new Confluent.Kafka.Headers()
                             }
                         }

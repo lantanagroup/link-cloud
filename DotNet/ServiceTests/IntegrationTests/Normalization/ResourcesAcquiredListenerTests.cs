@@ -53,9 +53,11 @@ namespace IntegrationTests.Normalization
 
             UploadResourceCacheRedis(correlationId);
 
-            var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
+            var key = KafkaKeys.ForPatient(facilityId, patientId);
             var value = new ResourcesAcquiredValue()
             {
+                FacilityId = facilityId,
+                PatientId = patientId,
                 QueryType = QueryType.Initial.ToString(),
                 CacheType = ResourceCacheType.Redis,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
@@ -73,9 +75,9 @@ namespace IntegrationTests.Normalization
             };
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) } };
 
-            var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+            var consumeResult = new ConsumeResult<string, ResourcesAcquiredValue>
             {
-                Message = new Message<ResourceKey, ResourcesAcquiredValue> { Key = key, Value = value, Headers = headers }
+                Message = new Message<string, ResourcesAcquiredValue> { Key = key, Value = value, Headers = headers }
             };
 
             await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
@@ -83,7 +85,7 @@ namespace IntegrationTests.Normalization
             _fixture.ResourcesNormalizedProducerMock.Verify(
                 p => p.ProduceAsync(
                     It.IsAny<string>(),
-                    It.Is<Message<ResourceKey, ResourcesNormalizedValue>>(m => m.Key.PatientId == patientId),
+                    It.Is<Message<string, ResourcesNormalizedValue>>(m => m.Key == KafkaKeys.ForPatient(facilityId, patientId)),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -106,9 +108,11 @@ namespace IntegrationTests.Normalization
 
             UploadResourceCacheABS(correlationId);
 
-            var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
+            var key = KafkaKeys.ForPatient(facilityId, patientId);
             var value = new ResourcesAcquiredValue()
             {
+                FacilityId = facilityId,
+                PatientId = patientId,
                 QueryType = QueryType.Initial.ToString(),
                 CacheType = ResourceCacheType.ABS,
                 CacheKeys = new List<string>() { correlationId + ":Location" },
@@ -126,9 +130,9 @@ namespace IntegrationTests.Normalization
             };
             var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) } };
 
-            var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+            var consumeResult = new ConsumeResult<string, ResourcesAcquiredValue>
             {
-                Message = new Message<ResourceKey, ResourcesAcquiredValue> { Key = key, Value = value, Headers = headers }
+                Message = new Message<string, ResourcesAcquiredValue> { Key = key, Value = value, Headers = headers }
             };
 
             await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
@@ -136,7 +140,7 @@ namespace IntegrationTests.Normalization
             _fixture.ResourcesNormalizedProducerMock.Verify(
                 p => p.ProduceAsync(
                     It.IsAny<string>(),
-                    It.Is<Message<ResourceKey, ResourcesNormalizedValue>>(m => m.Key.PatientId == patientId),
+                    It.Is<Message<string, ResourcesNormalizedValue>>(m => m.Key == KafkaKeys.ForPatient(facilityId, patientId)),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -155,13 +159,15 @@ namespace IntegrationTests.Normalization
 
             await LoadFacilityLocationConfig(facilityId, scope);
 
-            var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+            var consumeResult = new ConsumeResult<string, ResourcesAcquiredValue>
             {
-                Message = new Message<ResourceKey, ResourcesAcquiredValue>
+                Message = new Message<string, ResourcesAcquiredValue>
                 {
-                    Key = new ResourceKey { FacilityId = facilityId, PatientId = patientId },
+                    Key = KafkaKeys.ForPatient(facilityId, patientId),
                     Value = new ResourcesAcquiredValue
                     {
+                        FacilityId = facilityId,
+                        PatientId = patientId,
                         QueryType = QueryType.Initial.ToString(),
                         CacheType = ResourceCacheType.ABS,
                         CacheKeys = new List<string> { correlationId + ":Location" },
@@ -189,7 +195,7 @@ namespace IntegrationTests.Normalization
             _fixture.ResourcesNormalizedProducerMock.Verify(
                 p => p.ProduceAsync(
                     It.IsAny<string>(),
-                    It.IsAny<Message<ResourceKey, ResourcesNormalizedValue>>(),
+                    It.IsAny<Message<string, ResourcesNormalizedValue>>(),
                     It.IsAny<CancellationToken>()),
                 Times.Never);
         }

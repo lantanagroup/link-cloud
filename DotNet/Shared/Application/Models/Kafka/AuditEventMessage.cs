@@ -18,6 +18,7 @@ public class PropertyChangeModel
 public class AuditEventMessage
 {
     public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
     public string? ServiceName { get; set; }
     public string? CorrelationId { get; set; }
     public DateTime? EventDate { get; set; }

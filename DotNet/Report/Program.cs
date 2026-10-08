@@ -131,9 +131,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaConsumerFactory<string, DataAcquisitionRequestedValue>, KafkaConsumerFactory<string, DataAcquisitionRequestedValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, PatientEventValue>, KafkaConsumerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, ValidationCompleteValue>, KafkaConsumerFactory<string, ValidationCompleteValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>, KafkaConsumerFactory<Null, MeasureReportGeneratedValue>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, PayloadSubmittedValue>, KafkaConsumerFactory<string, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, MeasureReportGeneratedValue>, KafkaConsumerFactory<string, MeasureReportGeneratedValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, MappingOutcomeEvaluatedValue>, KafkaConsumerFactory<string, MappingOutcomeEvaluatedValue>>();
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -143,17 +143,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<string, PatientEventValue>, KafkaProducerFactory<string, PatientEventValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, KafkaProducerFactory<string, GenerateReportValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, ValidationCompleteValue>, KafkaProducerFactory<string, ValidationCompleteValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PayloadSubmittedValue>, KafkaProducerFactory<string, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<Null, MeasureReportGeneratedValue>, KafkaProducerFactory<Null, MeasureReportGeneratedValue>>();
-
-    // The MappingOutcomeEvaluated dead-letter handler republishes with the consumed key type.
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, MeasureReportGeneratedValue>, KafkaProducerFactory<string, MeasureReportGeneratedValue>>();
 
     // Required by the typed dead-letter and transient handlers on MappingOutcomeListener: both take an
     // IKafkaProducerFactory<K, V> to republish onto the -Error and -Retry topics. Without it the listener
-    // cannot be constructed and the service fails at startup.
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<ResourceKey, MappingOutcomeEvaluatedValue>>();
+    // cannot be constructed and the service fails at startup. The consume-exception handler republishes
+    // with a string value and uses the IKafkaProducerFactory<string, string> registered above.
+    builder.Services.AddTransient<IKafkaProducerFactory<string, MappingOutcomeEvaluatedValue>, KafkaProducerFactory<string, MappingOutcomeEvaluatedValue>>();
 
     builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
     builder.Services.AddTransient<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();

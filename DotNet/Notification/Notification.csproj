@@ -22,18 +22,16 @@
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" VersionOverride="8.0.8">
+    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" VersionOverride="7.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.Extensions.Compliance.Redaction" />
-    <PackageReference Include="Microsoft.Extensions.Telemetry" VersionOverride="8.10.0" />
+    <PackageReference Include="Microsoft.Extensions.Telemetry" />
     <PackageReference Include="Microsoft.Identity.Client" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
-    <PackageReference Include="MongoDB.Driver" VersionOverride="2.30.0" />
-    <PackageReference Include="MongoDB.Driver.Core.Extensions.DiagnosticSources" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Enrichers.Span" />
     <PackageReference Include="Serilog.Exceptions" />

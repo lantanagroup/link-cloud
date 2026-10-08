@@ -11,6 +11,7 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -121,10 +122,10 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.IsAny<Message<SubmitPayloadKey, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -201,11 +202,14 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
-                It.Is<Message<SubmitPayloadKey, SubmitPayloadValue>>(m =>
+                It.Is<Message<string, SubmitPayloadValue>>(m =>
+                    m.Key == KafkaKeys.ForFacility(FacilityId) &&
+                    m.Value.FacilityId == FacilityId &&
+                    m.Value.ReportScheduleId == harness.Schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<SubmitPayloadKey, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
 
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
@@ -245,11 +249,14 @@ public class ReportManifestProducerTests
         harness.ScheduleManager.Verify(
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.TryClaimManifestAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     /// <summary>
-    /// A failed manifest upload returns false before either branch runs. A bypassed report
-    /// must not be marked complete when its manifest never reached internal/.
+    /// A failed manifest upload releases the claim and throws. Returning false would let the
+    /// period job delete itself, and a blob outage would leave the manifest unproduced.
     /// </summary>
     [Fact]
     public async Task Produce_SubmissionBypassedAndUploadFails_DoesNotSetTerminalStatus()
@@ -262,16 +269,192 @@ public class ReportManifestProducerTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("blob storage unavailable"));
 
-        var produced = await harness.Producer.Produce(harness.Schedule);
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
 
-        Assert.False(produced);
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
         harness.ScheduleManager.Verify(
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
             Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// A broker rejection of the submission produce must not mark the manifest emitted.
+    /// </summary>
+    [Fact]
+    public async Task Produce_SubmissionDeliveryFails_ReleasesClaimAndDoesNotMarkEmitted()
+    {
+        var harness = new Harness();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ProduceException<string, SubmitPayloadValue>(
+                new Error(ErrorCode.Local_MsgTimedOut, "delivery failed"),
+                new DeliveryResult<string, SubmitPayloadValue>()));
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Cancelling the caller must not cancel the submission produce or the emitted mark.
+    /// A cancelled wait would release the claim while the record can still land, or leave
+    /// the claim stuck after the record was delivered.
+    /// </summary>
+    [Fact]
+    public async Task Produce_CancelledCaller_DoesNotReleaseTheClaimForTheSubmissionWait()
+    {
+        var harness = new Harness();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.Is<CancellationToken>(token => token.IsCancellationRequested)))
+            .ThrowsAsync(new OperationCanceledException(cancelled.Token));
+        harness.ScheduleManager
+            .Setup(m => m.MarkManifestEmittedAsync(
+                harness.Schedule.Id,
+                It.IsAny<Guid>(),
+                It.Is<CancellationToken>(token => token.IsCancellationRequested)))
+            .ThrowsAsync(new OperationCanceledException(cancelled.Token));
+
+        Assert.True(await harness.Producer.Produce(harness.Schedule, cancellationToken: cancelled.Token));
+
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// Two completions of the last patient must upload and produce one manifest.
+    /// The claim returns true only for the first caller.
+    /// </summary>
+    [Fact]
+    public async Task Produce_ParallelLastPatientCompletion_EmitsOneManifest()
+    {
+        var claims = new ClaimCounter();
+        var harness = new Harness(claimCounter: claims);
+
+        var results = await Task.WhenAll(
+            harness.Producer.Produce(harness.Schedule),
+            harness.Producer.Produce(harness.Schedule));
+
+        Assert.Equal(1, results.Count(produced => produced));
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.SubmitPayloadKafkaProducer.Verify(
+            p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// A redelivery after the manifest was emitted must not upload or produce again.
+    /// </summary>
+    [Fact]
+    public async Task Produce_RedeliveryAfterEmit_DoesNotEmitAgain()
+    {
+        var harness = new Harness(claimCounter: new ClaimCounter());
+
+        Assert.True(await harness.Producer.Produce(harness.Schedule));
+        Assert.False(await harness.Producer.Produce(harness.Schedule));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    /// <summary>
+    /// A live claim belongs to another attempt. Treating it as done commits the offset
+    /// or deletes the end-of-period job, so the manifest is never retried.
+    /// </summary>
+    [Fact]
+    public async Task Produce_LiveClaim_ThrowsAndDoesNotUpload()
+    {
+        var harness = new Harness();
+        harness.ScheduleManager
+            .Setup(m => m.TryClaimManifestAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ManifestClaimResult.Held);
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// The lease expired and another pod owns the claim. Stop before the upload and
+    /// leave that claim in place.
+    /// </summary>
+    [Fact]
+    public async Task Produce_ClaimLostBeforeUpload_ThrowsAndDoesNotUpload()
+    {
+        var harness = new Harness();
+        harness.ScheduleManager
+            .Setup(m => m.RenewManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.BlobStorage.Verify(
+            b => b.UploadManifestAsync(
+                It.IsAny<ReportScheduleModel>(),
+                It.IsAny<IEnumerable<Resource>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     #endregion
+
+    private sealed class ClaimCounter
+    {
+        private int _claims;
+
+        public ManifestClaimResult TryClaim() =>
+            Interlocked.Increment(ref _claims) == 1
+                ? ManifestClaimResult.Won
+                : ManifestClaimResult.AlreadyEmitted;
+    }
 
     private sealed class Harness
     {
@@ -280,7 +463,7 @@ public class ReportManifestProducerTests
         public Mock<IReportScheduledManager> ScheduleManager { get; } = new();
         public Mock<IReportEntryManager> EntryManager { get; } = new();
         public Mock<BlobStorageService> BlobStorage { get; }
-        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
+        public Mock<IProducer<string, SubmitPayloadValue>> SubmitPayloadKafkaProducer { get; } = new();
 
         /// <param name="enableSubmission">
         /// False models a report requested with bypassSubmission: true.
@@ -294,7 +477,8 @@ public class ReportManifestProducerTests
         public Harness(
             bool enableSubmission = true,
             bool endOfReportPeriodJobHasRun = true,
-            bool allEntriesComplete = true)
+            bool allEntriesComplete = true,
+            ClaimCounter? claimCounter = null)
         {
             Schedule = new ReportScheduleModel
             {
@@ -315,6 +499,29 @@ public class ReportManifestProducerTests
             ScheduleManager
                 .Setup(m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((ReportScheduleModel m, CancellationToken _) => m);
+
+            if (claimCounter == null)
+            {
+                ScheduleManager
+                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(ManifestClaimResult.Won);
+            }
+            else
+            {
+                ScheduleManager
+                    .Setup(m => m.TryClaimManifestAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(claimCounter.TryClaim);
+            }
+
+            ScheduleManager
+                .Setup(m => m.ReleaseManifestClaimAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            ScheduleManager
+                .Setup(m => m.RenewManifestClaimAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+            ScheduleManager
+                .Setup(m => m.MarkManifestEmittedAsync(Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
 
             var reportEntryRepository = new Mock<IEntityRepository<ReportEntry>>();
             reportEntryRepository
@@ -390,6 +597,13 @@ public class ReportManifestProducerTests
                     It.IsAny<IEnumerable<Resource>>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Uri("https://blob.example.com/internal/manifest.ndjson"));
+
+            SubmitPayloadKafkaProducer
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue> { Status = PersistenceStatus.Persisted });
 
             var submitPayloadProducer = new SubmitPayloadProducer(
                 scopeFactory,

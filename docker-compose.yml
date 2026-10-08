@@ -379,6 +379,7 @@ services:
       - .docker/kafka-client.properties:/etc/kafka-client.properties
       - ./Scripts/create-topics-rest.sh:/create-topics-rest.sh
       - ./topics.txt:/topics.txt
+      - ./kafka-retry-services.txt:/kafka-retry-services.txt
     depends_on:
       rest-proxy:
         condition: service_healthy

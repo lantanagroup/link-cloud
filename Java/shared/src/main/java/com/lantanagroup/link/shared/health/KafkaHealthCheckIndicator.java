@@ -1,5 +1,6 @@
 package com.lantanagroup.link.shared.health;
 
+import com.lantanagroup.link.shared.kafka.KafkaKeys;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,7 +47,7 @@ public class KafkaHealthCheckIndicator implements HealthIndicator {
             // the send() call itself is non-blocking so we need a get to force the program to wait till the broker acknowledges the message or throws an exception if Kafka is down or the timeout expires
             // the timeout on get should be >= MAX_BLOCK_MS_CONFIG configured on the ProducerConfig properties of KafkaTemplate; add another 1000 millis to the configured MAX_BLOCK_MS_CONFIG property
             long getTimeOut  = Properties.MAX_BLOCK_MS_CONFIG + 1000; // in millis
-            kafkaTemplate.send(Topics.SERVICE_HEALTH_CHECK, serviceName, message).get(getTimeOut, TimeUnit.MILLISECONDS);
+            kafkaTemplate.send(Topics.SERVICE_HEALTH_CHECK, KafkaKeys.forService(serviceName), message).get(getTimeOut, TimeUnit.MILLISECONDS);
             return true;
         } catch (Exception e) {
             return false;

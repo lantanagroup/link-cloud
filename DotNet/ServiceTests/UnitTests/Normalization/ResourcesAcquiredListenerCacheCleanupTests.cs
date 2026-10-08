@@ -38,7 +38,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
     public async Task ConsumeMessageAsync_DeadLetterFailure_PurgesTheResourceCache()
     {
         var purger = new Mock<IResourceCachePurger>();
-        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var deadLetterHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         var listener = BuildListener(purger, deadLetterHandler: deadLetterHandler);
 
         // A missing patient id fails validation, which raises a DeadLetterException.
@@ -57,7 +57,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
     public async Task ConsumeMessageAsync_TransientFailure_DoesNotPurgeTheResourceCache()
     {
         var purger = new Mock<IResourceCachePurger>();
-        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
             .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
@@ -69,7 +69,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
 
         transientHandler.Verify(
             item => item.HandleException(
-                It.IsAny<ConsumeResult<ResourceKey, ResourcesAcquiredValue>>(),
+                It.IsAny<ConsumeResult<string, ResourcesAcquiredValue>>(),
                 It.IsAny<TransientException>(),
                 FacilityId),
             Times.Once);
@@ -80,7 +80,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
     public async Task ConsumeMessageAsync_UnexpectedFailure_DoesNotPurgeTheResourceCache()
     {
         var purger = new Mock<IResourceCachePurger>();
-        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        var transientHandler = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         var resourceCache = new Mock<IResourceCache>();
         resourceCache
             .Setup(item => item.GetImplementation(It.IsAny<ResourceCacheType>()))
@@ -93,7 +93,7 @@ public class ResourcesAcquiredListenerCacheCleanupTests
         // Unexpected exceptions are wrapped as transient and retried, so the cache must survive.
         transientHandler.Verify(
             item => item.HandleException(
-                It.IsAny<ConsumeResult<ResourceKey, ResourcesAcquiredValue>>(),
+                It.IsAny<ConsumeResult<string, ResourcesAcquiredValue>>(),
                 It.IsAny<TransientException>(),
                 FacilityId),
             Times.Once);
@@ -127,20 +127,20 @@ public class ResourcesAcquiredListenerCacheCleanupTests
 
     private static ResourcesAcquiredListener BuildListener(
         Mock<IResourceCachePurger> purger,
-        Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>? deadLetterHandler = null,
-        Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>? transientHandler = null,
+        Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>? deadLetterHandler = null,
+        Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>? transientHandler = null,
         Mock<IResourceCache>? resourceCache = null,
         Mock<INormalizationServiceMetrics>? metrics = null)
     {
-        deadLetterHandler ??= new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
-        transientHandler ??= new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        deadLetterHandler ??= new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
+        transientHandler ??= new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, string, ResourcesAcquiredValue>>();
         resourceCache ??= new Mock<IResourceCache>();
         metrics ??= new Mock<INormalizationServiceMetrics>();
 
         deadLetterHandler.SetupProperty(item => item.Topic);
         transientHandler.SetupProperty(item => item.Topic);
 
-        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
+        var consumeExceptionHandler = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, string, string>>();
         consumeExceptionHandler.SetupProperty(item => item.Topic);
 
         var services = new ServiceCollection();
@@ -157,12 +157,12 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             Mock.Of<ILogger<ResourcesAcquiredListener>>(),
             new ServiceInformation { ServiceConfigName = "Normalization" },
             scopeFactory.Object,
-            Mock.Of<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>(),
+            Mock.Of<IKafkaConsumerFactory<string, ResourcesAcquiredValue>>(),
             consumeExceptionHandler.Object,
             deadLetterHandler.Object,
             transientHandler.Object,
             metrics.Object,
-            Mock.Of<IProducer<ResourceKey, ResourcesNormalizedValue>>(),
+            Mock.Of<IProducer<string, ResourcesNormalizedValue>>(),
             new CopyPropertyOperationService(Mock.Of<ILogger<CopyPropertyOperationService>>()),
             new CodeMapOperationService(Mock.Of<ILogger<CodeMapOperationService>>()),
             new HSLOCMapOperationService(Mock.Of<ILogger<HSLOCMapOperationService>>(),
@@ -174,27 +174,31 @@ public class ResourcesAcquiredListenerCacheCleanupTests
             resourceCache.Object,
             purger.Object,
             telemetrySettings.Object,
-            Mock.Of<IProducer<ResourceKey, MappingOutcomeEvaluatedValue>>());
+            Mock.Of<IProducer<string, MappingOutcomeEvaluatedValue>>());
     }
 
-    private static ConsumeResult<ResourceKey, ResourcesAcquiredValue> BuildConsumeResult(string patientId = PatientId)
+    private static ConsumeResult<string, ResourcesAcquiredValue> BuildConsumeResult(string patientId = PatientId)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(CorrelationId))
         };
 
-        return new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+        return new ConsumeResult<string, ResourcesAcquiredValue>
         {
             Topic = "ResourcesAcquired",
             Partition = new Partition(0),
             Offset = new Offset(0),
-            Message = new Message<ResourceKey, ResourcesAcquiredValue>
+            Message = new Message<string, ResourcesAcquiredValue>
             {
                 Headers = headers,
-                Key = new ResourceKey { FacilityId = FacilityId, PatientId = patientId },
+                Key = string.IsNullOrEmpty(patientId)
+                    ? KafkaKeys.ForFacility(FacilityId)
+                    : KafkaKeys.ForPatient(FacilityId, patientId),
                 Value = new ResourcesAcquiredValue
                 {
+                    FacilityId = FacilityId,
+                    PatientId = string.IsNullOrEmpty(patientId) ? null : patientId,
                     QueryType = "Initial",
                     ReportableEvent = "Adhoc",
                     ScheduledReports = new List<ScheduledReport> { new() { ReportTrackingId = "tracking-1" } },

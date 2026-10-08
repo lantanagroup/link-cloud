@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
 
@@ -33,8 +34,14 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
                 var message = new Message<string, object>
                 {
-                    Key = model.Key,
-                    Value = new DataAcquisitionRequestedMessage { PatientId = model.PatientId, QueryType = model.QueryType, ScheduledReports = model.ScheduledReports },
+                    Key = KafkaKeys.ForPatient(model.Key, model.PatientId),
+                    Value = new DataAcquisitionRequestedMessage
+                    {
+                        FacilityId = model.Key,
+                        PatientId = model.PatientId,
+                        QueryType = model.QueryType,
+                        ScheduledReports = model.ScheduledReports
+                    },
                     Headers = headers
                 };
 

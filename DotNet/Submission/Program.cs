@@ -159,12 +159,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<AuditableEventOccurredProducer>();
 
     // Add factories
-    builder.Services.AddTransient<IKafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaConsumerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<string, SubmitPayloadValue>, KafkaConsumerFactory<string, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>, KafkaProducerFactory<SubmitPayloadKey, SubmitPayloadValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>, KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<string, PayloadSubmittedValue>, KafkaProducerFactory<string, PayloadSubmittedValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
 
     //Add health checks
@@ -180,7 +180,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         ClientId = "Submission_PayloadSubmitted"
     };
-    var payloadSubmittedProducer = new KafkaProducerFactory<PayloadSubmittedKey, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
+    var payloadSubmittedProducer = new KafkaProducerFactory<string, PayloadSubmittedValue>(kafkaConnection).CreateProducer(payloadSubmittedConfig);
     builder.Services.AddSingleton(payloadSubmittedProducer);
     var auditableEventOccurredConfig = new ProducerConfig()
     {

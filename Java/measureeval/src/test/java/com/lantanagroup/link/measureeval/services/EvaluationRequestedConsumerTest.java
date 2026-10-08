@@ -6,6 +6,7 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
+import com.lantanagroup.link.shared.exceptions.ValidationException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -117,6 +118,37 @@ class EvaluationRequestedConsumerTest {
                 () -> consumer.process(buildRecord("facility-1", value)));
 
         verifyNoInteractions(evaluateMeasureService);
+    }
+
+    @Test
+    void process_valueFacilityWinsOverLegacyKey() {
+        EvaluationRequested value = new EvaluationRequested();
+        value.setFacilityId("from-value");
+        value.setPatientId("patient-1");
+        value.setPreviousReportId("report-1");
+        value.setReportTrackingId("tracking-1");
+
+        when(patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(
+                "from-value", "patient-1", "report-1"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class,
+                () -> consumer.process(new ConsumerRecord<>("topic", 0, 0, "{\"facilityId\":\"from-key\"}", value)));
+
+        verify(patientStatusRepository).findByFacilityIdAndPatientIdAndReportsReportTrackingId(
+                "from-value", "patient-1", "report-1");
+    }
+
+    @Test
+    void process_colonKeyIsNotParsedWhenValueOmitsFacility() {
+        EvaluationRequested value = new EvaluationRequested();
+        value.setPatientId("patient-1");
+        value.setPreviousReportId("report-1");
+
+        assertThrows(ValidationException.class,
+                () -> consumer.process(new ConsumerRecord<>("topic", 0, 0, "facility-1:patient-1", value)));
+
+        verifyNoInteractions(patientStatusRepository);
     }
 
     @Test

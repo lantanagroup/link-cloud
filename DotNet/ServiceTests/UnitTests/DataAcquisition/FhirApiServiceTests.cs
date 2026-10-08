@@ -149,7 +149,7 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
+        var kafkaProducer = new Mock<IProducer<string, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
         var resourceCache = new Mock<IResourceCache>();
         var locationMappingService = new Mock<ILocationMappingService>();
@@ -191,7 +191,7 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
+        var kafkaProducer = new Mock<IProducer<string, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
         var resourceCache = new Mock<IResourceCache>();
 
@@ -245,7 +245,7 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
+        var kafkaProducer = new Mock<IProducer<string, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
         var resourceCache = new Mock<IResourceCache>();
 
@@ -637,7 +637,7 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
+        var kafkaProducer = new Mock<IProducer<string, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
         var resourceCache = new Mock<IResourceCache>();
 
