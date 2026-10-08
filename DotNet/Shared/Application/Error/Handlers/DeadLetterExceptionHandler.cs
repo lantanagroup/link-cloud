@@ -117,9 +117,9 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
             var message = new Message<string, string>()
             {
                 Headers = ex.ConsumerRecord.Message.Headers,
-                Key = ex.ConsumerRecord.Message.Key != null
-                    ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key)
-                    : string.Empty,
+                Key = ex.ConsumerRecord.Message.Key == null
+                    ? null
+                    : Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key),
                 Value = ex.ConsumerRecord.Message.Value != null
                     ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Value)
                     : string.Empty
@@ -136,7 +136,7 @@ public class DeadLetterExceptionHandler<T, K, V> : IDeadLetterExceptionHandler<T
         }
     }
 
-    protected void ProduceConsumeExceptionDeadLetter(string key, string value, Headers headers, string exceptionMessage)
+    protected void ProduceConsumeExceptionDeadLetter(string? key, string value, Headers headers, string exceptionMessage)
     {
         if (string.IsNullOrWhiteSpace(Topic))
         {
