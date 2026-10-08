@@ -228,19 +228,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             foreach (var agg in aggregateResult.MeasureReportResults)
             {
-                var existing = (await reportPopulationManager.FindAsync(
-                    x => x.ReportScheduleId == reportTrackingId && x.ReportType == agg.ReportType, cancellationToken))
-                    .FirstOrDefault();
-
-                if (existing != null)
-                {
-                    await reportPopulationManager.UpdateAsyncWithAggregateResult(existing, agg, cancellationToken);
-                }
-                else
-                {
-                    await reportPopulationManager.AddAsyncWithAggregateResult(
-                        facilityId, reportTrackingId, agg, cancellationToken);
-                }
+                await reportPopulationManager.ApplyAggregateResultAsync(
+                    facilityId, reportTrackingId, agg, cancellationToken);
             }
 
             if (reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable))

@@ -45,6 +45,13 @@ public partial class ReportDbContext : DbContext
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
+            // PopulationId is optional. HasFilter(null) keeps the unique index unfiltered so two nulls
+            // cannot both sit on one report population. EF would otherwise filter nulls out of the index.
+            entity.HasIndex(e => new { e.ReportPopulationId, e.PopulationId })
+                .IsUnique()
+                .HasFilter(null)
+                .HasDatabaseName("IX_GroupPopulation_Population_PopulationId");
+
             entity.HasOne(d => d.ReportPopulation).WithMany(p => p.GroupPopulations).HasConstraintName("FK_GroupPopulations_ReportPopulations");
         });
 

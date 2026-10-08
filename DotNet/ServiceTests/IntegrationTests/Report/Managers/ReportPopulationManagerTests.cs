@@ -96,11 +96,10 @@ public class ReportPopulationManagerTests
         var facilityId = "fac-multi";
         await SeedReportScheduleAsync(context, scheduleId, facilityId);
 
-        var models = new[]
-        {
-            CreatePopulationModel(facilityId: facilityId, reportScheduleId: scheduleId),
-            CreatePopulationModel(facilityId: facilityId, reportScheduleId: scheduleId)
-        };
+        var first = CreatePopulationModel(facilityId: facilityId, reportScheduleId: scheduleId);
+        var second = CreatePopulationModel(facilityId: facilityId, reportScheduleId: scheduleId);
+        second.ReportType = "type2";
+        var models = new[] { first, second };
 
         var countBefore = await context.ReportPopulation.CountAsync();
 
