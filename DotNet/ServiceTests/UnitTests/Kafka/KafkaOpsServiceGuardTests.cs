@@ -333,11 +333,11 @@ public class KafkaOpsServiceGuardTests
     {
         var created = 0;
         var broken = new Mock<IAdminClient>();
-        broken.Setup(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
+        broken.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
             .ThrowsAsync(new KafkaException(ErrorCode.NotCoordinatorForGroup));
         var healthy = new Mock<IAdminClient>();
-        healthy.Setup(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
-            .ReturnsAsync(new ListConsumerGroupsResult { Valid = [] });
+        healthy.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult());
         var factory = new Mock<IKafkaAdminClientFactory>();
         factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
             .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
@@ -346,9 +346,11 @@ public class KafkaOpsServiceGuardTests
         await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
         var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
 
-        Assert.Empty(groups);
         Assert.Equal(2, created);
         broken.Verify(client => client.Dispose(), Times.Once);
+        broken.Verify(client => client.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()), Times.Never);
+        Assert.Contains(groups, group => group.GroupId == "Report" && group.State == "Empty");
+        Assert.All(groups, group => Assert.Empty(group.Members));
     }
 
     [Fact]
@@ -356,7 +358,7 @@ public class KafkaOpsServiceGuardTests
     {
         var created = 0;
         var client = new Mock<IAdminClient>();
-        client.Setup(item => item.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()))
+        client.Setup(item => item.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
             .ThrowsAsync(new InvalidOperationException("groups down"));
         var factory = new Mock<IKafkaAdminClientFactory>();
         factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
@@ -373,6 +375,45 @@ public class KafkaOpsServiceGuardTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
         Assert.Equal(2, created);
+    }
+
+    [Fact]
+    public async Task MissingCatalogGroups_RenderWithNoMembers()
+    {
+        var client = new Mock<IAdminClient>();
+        client.Setup(item => item.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.GroupIdNotFound) }
+                ]
+            });
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>())).Returns(client.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        var groups = await gateway.DescribeGroupsAsync(false, 1, CancellationToken.None);
+
+        var report = Assert.Single(groups, group => group.GroupId == "Report");
+        Assert.Equal("Empty", report.State);
+        Assert.Empty(report.Members);
+        Assert.All(groups, group => Assert.Empty(group.Members));
+        factory.Verify(item => item.Create(It.IsAny<AdminClientConfig>()), Times.Once);
+        client.Verify(item => item.ListConsumerGroupsAsync(It.IsAny<ListConsumerGroupsOptions>()), Times.Never);
+    }
+
+    [Fact]
+    public void Console_DoesNotListConsumerGroups()
+    {
+        var root = Path.Combine(RepoRoot(), "DotNet", "Admin.BFF");
+        foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                continue;
+            Assert.DoesNotContain("ListConsumerGroupsAsync", File.ReadAllText(file), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

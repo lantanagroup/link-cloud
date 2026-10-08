@@ -153,20 +153,18 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var listed = await admin.ListConsumerGroupsAsync(new ListConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(20) });
-        var ids = listed.Valid
-            .Select(group => group.GroupId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Where(id => includeTestGroups || !IsHiddenTestGroup(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
+        var ids = CatalogGroupIds(includeTestGroups);
         if (ids.Count == 0)
             return [];
 
-        var described = await admin.DescribeConsumerGroupsAsync(ids, new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+        var described = await DescribeCatalogGroupsAsync(admin, ids, cancellationToken);
+        var present = described
+            .Where(group => !string.IsNullOrWhiteSpace(group.GroupId) && !IsMissingGroup(group.Error))
+            .Select(group => group.GroupId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         var offsetResults = await ConsumerGroupOffsetQueries.ListPerGroupAsync<ListConsumerGroupOffsetsResult>(
-            ids,
+            present,
             async (groupId, token) =>
             {
                 var listed = await admin.ListConsumerGroupOffsetsAsync(
@@ -194,9 +192,16 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var watermarks = await WatermarksForCommittedAsync(admin, watermarkTopics, committed, cancellationToken);
 
         var views = new List<GroupView>();
-        foreach (var group in described.ConsumerGroupDescriptions)
+        foreach (var groupId in ids)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var group = described.FirstOrDefault(candidate => string.Equals(candidate.GroupId, groupId, StringComparison.Ordinal));
+            if (group is null || IsMissingGroup(group.Error))
+            {
+                views.Add(new GroupView { GroupId = groupId, State = "Empty" });
+                continue;
+            }
+
             var view = new GroupView
             {
                 GroupId = group.GroupId ?? "",
@@ -368,6 +373,47 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             _admin = null;
         }
     }
+
+    private async Task<List<ConsumerGroupDescription>> DescribeCatalogGroupsAsync(IAdminClient admin, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var described = await admin.DescribeConsumerGroupsAsync(
+                ids,
+                new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+            return described.ConsumerGroupDescriptions?.ToList() ?? [];
+        }
+        catch (DescribeConsumerGroupsException ex)
+        {
+            var rows = ex.Results?.ConsumerGroupDescriptions?.ToList();
+            if (rows is null)
+                throw;
+            return rows;
+        }
+    }
+
+    private static List<string> CatalogGroupIds(bool includeTestGroups)
+    {
+        var ids = new List<string>();
+        foreach (var topic in KafkaTopicCatalog.Topics)
+        {
+            foreach (var groupId in topic.Groups)
+            {
+                if (string.IsNullOrWhiteSpace(groupId))
+                    continue;
+                if (!includeTestGroups && IsHiddenTestGroup(groupId))
+                    continue;
+                if (!ids.Contains(groupId, StringComparer.Ordinal))
+                    ids.Add(groupId);
+            }
+        }
+
+        return ids;
+    }
+
+    private static bool IsMissingGroup(Error? error) =>
+        error is { Code: ErrorCode.GroupIdNotFound };
 
     internal static bool IsHiddenTestGroup(string groupId) =>
         groupId.StartsWith("e2e-diag-", StringComparison.OrdinalIgnoreCase)
