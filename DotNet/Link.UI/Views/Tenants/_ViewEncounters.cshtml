@@ -63,7 +63,7 @@
                         <p class="mb-2 mt-2">This location mapping is inactive. Encounters referencing it will not map to the organization.</p>
                     }
                     <dl class="row mb-0 mt-2">
-                        <dt class="col-sm-3">Mapping ID</dt><dd class="col-sm-9">@detail.Id</dd>
+                        <dt class="col-sm-3">Mapping ID</dt><dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Mapping", Value = detail.Id.ToString(), Compact = true, CopyLabel = "Copy mapping id" })" /></dd>
                         <dt class="col-sm-3">Location ID</dt><dd class="col-sm-9"><partial name="_LabeledId" model="@(new LabeledId { Label = "Location", Value = detail.LocationId, Compact = true, CopyLabel = "Copy location id" })" /></dd>
                         <dt class="col-sm-3">Name</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(detail.Name) ? "—" : detail.Name)</dd>
                         <dt class="col-sm-3">Alias</dt><dd class="col-sm-9">@(string.IsNullOrWhiteSpace(detail.Alias) ? "—" : detail.Alias)</dd>
@@ -100,7 +100,7 @@
                     @foreach (var row in Model.Encounters)
                     {
                         <tr>
-                            <td>@row.Id</td>
+                            <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Mapping", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy mapping id" })" /></td>
                             <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Encounter", Value = row.EncounterId, Compact = true, CopyLabel = "Copy encounter id" })" /></td>
                             <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Patient", Value = row.PatientId, Compact = true, CopyLabel = "Copy patient id" })" /></td>
                             <td>

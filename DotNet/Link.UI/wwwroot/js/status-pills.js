@@ -126,6 +126,17 @@
         return on ? "au-badge-success" : "au-badge-muted";
     }
 
+    function forPeriod(status) {
+        var s = norm(status);
+        if (s === "overlap") return "au-badge-success";
+        if (s === "outsidebefore" || s === "outsideafter") return "au-badge-warning";
+        return "";
+    }
+
+    function forAccepting(on) {
+        return on ? "au-badge-active" : "au-badge-muted";
+    }
+
     function forReadiness(ready) {
         return ready ? "au-badge-success" : "au-badge-warning";
     }
@@ -178,6 +189,8 @@
         forMilestone: forMilestone,
         forCheck: forCheck,
         forFlag: forFlag,
+        forPeriod: forPeriod,
+        forAccepting: forAccepting,
         forReadiness: forReadiness,
         hollowFromClass: hollowFromClass,
         solidFromClass: solidFromClass

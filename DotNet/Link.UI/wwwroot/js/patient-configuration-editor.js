@@ -545,11 +545,13 @@
         return { start: new Date(rs.getTime() - boundaryPadMs), end: new Date(re.getTime() + boundaryPadMs) };
     }
 
-    function formatStayStamp(d) {
-        if (!d || isNaN(d.getTime())) return '';
-        function pad(n) { return n < 10 ? '0' + n : '' + n; }
-        return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate())
-            + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ' UTC';
+    function appendStayStamp(el, label, date) {
+        el.append(document.createTextNode(label));
+        var shown = window.luLocalInstant ? window.luLocalInstant(date) : { text: "", title: "" };
+        var span = document.createElement("span");
+        span.textContent = shown.text;
+        if (shown.title) span.setAttribute("title", shown.title);
+        el.append(span);
     }
 
     function patternExpectedInReport(pattern) {
@@ -567,8 +569,9 @@
         var hint = hit && hit.hint ? hit.hint : '';
         var window = computeStayWindow(pattern, reportPeriod.start, reportPeriod.end, 0);
         if (window) {
-            datesEl.textContent = 'Admit ' + formatStayStamp(window.start) + '  →  Discharge ' + formatStayStamp(window.end);
-            if (window.luPaintTimes) window.luPaintTimes(datesEl);
+            datesEl.replaceChildren();
+            appendStayStamp(datesEl, "Admit ", window.start);
+            appendStayStamp(datesEl, "  \u2192  Discharge ", window.end);
             var minutes = Math.max(1, Math.round((window.end - window.start) / 60000));
             setVal('PcDuration', minutes);
             if (hintEl) hintEl.textContent = hint + (patternExpectedInReport(pattern) ? '' : ' This stay is outside the report window.');

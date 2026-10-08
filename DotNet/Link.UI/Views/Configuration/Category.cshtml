@@ -108,7 +108,7 @@
                             @foreach (var rule in Model.Rules)
                             {
                                 <tr>
-                                    <td>@rule.Id</td>
+                                    <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Rule", Value = rule.Id.ToString(), Compact = true, CopyLabel = "Copy rule id" })" /></td>
                                     <td class="text-nowrap">@(string.IsNullOrWhiteSpace(rule.Timestamp) ? "—" : rule.Timestamp)</td>
                                     <td>@rule.Summary</td>
                                     <td>@(rule.Inverted ? "Yes" : "No")</td>
