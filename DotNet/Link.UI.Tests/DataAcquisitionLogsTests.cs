@@ -78,6 +78,9 @@ public class DataAcquisitionLogsTests
         module.Should().Contain("searchTerm");
         module.Should().Contain("data-da-host");
         module.Should().Contain("restoreChecked");
+        module.Should().Contain("removeAttribute(\"data-au-save\")");
+        module.Should().Contain("load(host, scopeUrl(host))");
+        module.Should().NotContain("applyPage");
 
         var controller = Read("DotNet/Link.UI/Controllers/LogsController.cs");
         controller.Should().Contain("AcquisitionLogPanelRules.AllowsRunEntry");
