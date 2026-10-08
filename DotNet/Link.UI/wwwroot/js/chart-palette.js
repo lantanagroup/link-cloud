@@ -22,6 +22,7 @@
         cancelled: "#ffc107",
         other: "#6c757d",
         accent: "#343a40",
+        orange: "#fd7e14",
         muted: "#545c64",
         gray: "#6c757d",
         entryStatus: {

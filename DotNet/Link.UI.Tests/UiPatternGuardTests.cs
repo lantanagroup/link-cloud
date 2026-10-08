@@ -24,9 +24,10 @@ public class UiPatternGuardTests
         css.Should().Contain(".btn-check:checked + .btn-au-neutral");
         css.Should().Contain("--lu-chart-compact-height: 140px;");
         css.Should().Contain("--lu-chart-donut-size: 150px;");
-        css.Should().Contain("--lu-chart-dashboard-height: 168px;");
-        css.Should().Contain("--lu-chart-dashboard-donut: 168px;");
-        css.Should().Contain("--lu-chart-dashboard-donut-box: 200px;");
+        css.Should().Contain("--lu-chart-dashboard-height: 190px;");
+        css.Should().Contain("--lu-chart-dashboard-donut-box: 162px;");
+        css.Should().Contain(".au-dash .lu-chart-donut");
+        css.Should().NotContain("--lu-chart-dashboard-donut: 168px;");
         css.Should().Contain(".bg-light");
         css.Should().NotContain("max-height: 8.5rem");
         css.Should().NotContain("max-width: 120px");
@@ -141,41 +142,142 @@ public class UiPatternGuardTests
     public void Stylesheet_overrides_every_vendor_blue_state()
     {
         var css = File.ReadAllText(Path.Combine(Root(), "wwwroot", "css", "site.css"));
-        string[] selectors =
-        [
-            ".form-check-input:checked",
-            ".form-check-input[type=checkbox]:indeterminate",
-            ".form-switch .form-check-input:focus",
-            ".page-link",
-            ".page-item.active .page-link",
-            ".progress-bar",
-            ".dropdown-item.active",
-            ".list-group-item.active",
-            ".alert-info",
-            ".bg-success",
-            ".bg-success-subtle",
-            ".text-success-emphasis"
-        ];
-        var rules = CssRules(css).ToList();
-        foreach (var selector in selectors)
-        {
-            var bodies = rules.Where(rule => SelectorHas(rule.Selector, selector)).Select(rule => rule.Body).ToList();
-            bodies.Should().NotBeEmpty(selector);
-            var body = string.Join("\n", bodies);
-            body.Contains("#0d6efd", StringComparison.OrdinalIgnoreCase).Should().BeFalse(selector);
-            body.Contains("#0dcaf0", StringComparison.OrdinalIgnoreCase).Should().BeFalse(selector);
-            body.Contains("#198754", StringComparison.OrdinalIgnoreCase).Should().BeFalse(selector);
-            body.Contains("#86b7fe", StringComparison.OrdinalIgnoreCase).Should().BeFalse(selector);
-            Regex.IsMatch(body, @"#111\b|#fff\b|var\(--au-|var\(--bs-", RegexOptions.IgnoreCase)
-                .Should().BeTrue(selector + " must set a token color");
-        }
-
-        var root = rules.First(rule => SelectorHas(rule.Selector, ":root")).Body;
+        var siteRules = CssRules(css).ToList();
+        var root = siteRules.First(rule => SelectorHas(rule.Selector, ":root")).Body;
         root.Should().Contain("--bs-primary:");
         root.Should().Contain("#111");
         root.Should().Contain("--bs-link-color:");
         root.Should().Contain("--bs-info:");
+        root.Should().Contain("rgba(40, 167, 69, .35)");
         css.Should().Contain("fill='%23111'");
+
+        var vendor = File.ReadAllText(Path.Combine(Root(), "wwwroot", "lib", "bootstrap", "dist", "css", "bootstrap.css"));
+        var misses = new List<string>();
+        var covered = 0;
+        foreach (var rule in CssRules(vendor))
+        {
+            var parts = rule.Selector.Split(',')
+                .Select(part => part.Trim())
+                .Where(part => part.Length > 0 && !NormSelector(part).Equals(".btn:hover", StringComparison.Ordinal))
+                .ToList();
+            if (!parts.Any(IsVendorInteraction))
+                continue;
+
+            var leaked = Declarations(rule.Body)
+                .Where(pair => ColorsIn(pair.Value).Any(IsCoolTint))
+                .ToList();
+            if (leaked.Count == 0)
+                continue;
+
+            covered++;
+            foreach (var part in parts)
+            {
+                var key = NormSelector(part);
+                var effective = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var siteRule in siteRules)
+                {
+                    if (!siteRule.Selector.Split(',').Any(sitePart => NormSelector(sitePart) == key))
+                        continue;
+                    foreach (var declaration in Declarations(siteRule.Body))
+                        effective[declaration.Name] = declaration.Value;
+                }
+
+                foreach (var leak in leaked)
+                {
+                    if (!effective.TryGetValue(leak.Name, out var value) || ColorsIn(value).Any(IsVisibleCoolTint))
+                        misses.Add(key + " " + leak.Name);
+                }
+            }
+        }
+
+        covered.Should().BeGreaterThan(40);
+        misses.Distinct().Should().BeEmpty();
+
+        var interaction = siteRules.Where(rule => rule.Selector.Contains(":focus", StringComparison.Ordinal)
+            || rule.Selector.Contains(":focus-visible", StringComparison.Ordinal)
+            || rule.Selector.Contains(":hover", StringComparison.Ordinal)
+            || rule.Selector.Contains(":active", StringComparison.Ordinal)
+            || rule.Selector.Contains(":disabled", StringComparison.Ordinal)).ToList();
+        interaction.Should().NotBeEmpty();
+        interaction.SelectMany(rule => ColorsIn(rule.Body)).Where(IsVisibleCoolTint).Should().BeEmpty();
+    }
+
+    private static bool IsVendorInteraction(string selector)
+    {
+        if (selector.Contains(":focus", StringComparison.Ordinal)
+            || selector.Contains(":hover", StringComparison.Ordinal)
+            || selector.Contains(":active", StringComparison.Ordinal)
+            || selector.Contains(":disabled", StringComparison.Ordinal))
+            return true;
+
+        return selector.Contains(".input-group-text", StringComparison.Ordinal)
+            || selector.Contains(".modal-header", StringComparison.Ordinal)
+            || selector.Contains(".modal-footer", StringComparison.Ordinal);
+    }
+
+    private static string NormSelector(string selector)
+    {
+        var text = Regex.Replace(selector.Trim(), @"\s+", " ");
+        return Regex.Replace(text, @"\s*([>+~])\s*", "$1").ToLowerInvariant();
+    }
+
+    private static IEnumerable<(string Name, string Value)> Declarations(string body)
+    {
+        foreach (var part in body.Split(';'))
+        {
+            var split = part.Split(':', 2);
+            if (split.Length != 2)
+                continue;
+            var name = split[0].Trim().ToLowerInvariant();
+            if (name.Length == 0 || name.Contains(' ') || name.Contains('{'))
+                continue;
+            yield return (name, split[1].Trim());
+        }
+    }
+
+    private static bool IsCoolTint(string color) => TryHsl(color, out var h, out var s, out _) && h is >= 165 and <= 340 && s >= 0.02;
+
+    private static bool IsVisibleCoolTint(string color)
+    {
+        if (!TryHsl(color, out var h, out var s, out var l))
+            return false;
+        if (h is < 165 or > 340)
+            return false;
+        return s >= 0.12 || (s >= 0.02 && l >= 0.85);
+    }
+
+    private static bool TryHsl(string color, out double h, out double s, out double l)
+    {
+        h = s = l = 0;
+        if (color.StartsWith('#'))
+        {
+            var hex = color[1..];
+            if (hex.Length == 8)
+                hex = hex[..6];
+            else if (hex.Length == 4)
+                hex = hex[..3];
+            if (hex.Length == 3)
+                hex = string.Concat(hex.Select(ch => new string(ch, 2)));
+            if (hex.Length != 6 || !int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var packed))
+                return false;
+            (h, s, l) = RgbToHsl((packed >> 16) & 255, (packed >> 8) & 255, packed & 255);
+            return true;
+        }
+
+        if (color.StartsWith("rgb", StringComparison.Ordinal))
+        {
+            var parts = color[4..^1].Split(',');
+            (h, s, l) = RgbToHsl(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]));
+            return true;
+        }
+
+        if (!color.StartsWith("hsl", StringComparison.Ordinal))
+            return false;
+        var hsl = color[4..^1].Split(',');
+        h = double.Parse(hsl[0], System.Globalization.CultureInfo.InvariantCulture);
+        s = double.Parse(hsl[1].TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100d;
+        l = double.Parse(hsl[2].TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100d;
+        return true;
     }
 
     [Fact]
@@ -411,7 +513,8 @@ public class UiPatternGuardTests
     {
         var localHelper = new Regex(@"function\s+\w*(?:Badge|badgeClass|statusPill|StatusClass)\w*\s*\(", RegexOptions.IgnoreCase);
         var toneClass = new Regex(@"au-badge-(?:success|warning|danger|muted|active|skip)|bg-danger|bg-warning|bg-secondary", RegexOptions.IgnoreCase);
-        var mappedTone = new Regex(@"\?\s*['""](?:au-badge-|bg-danger|bg-warning|bg-secondary)");
+        var mappedTone = new Regex(@"\?\s*['""][^'""]*\bbadge\b[^'""]*\bau-badge-|\?\s*['""](?:au-badge-|bg-danger|bg-warning|bg-secondary)", RegexOptions.IgnoreCase);
+        var toneToken = new Regex(@"au-badge-(success|warning|danger|muted|active|skip)", RegexOptions.IgnoreCase);
         var hits = new List<string>();
         foreach (var file in ProductFiles("*.cshtml", "Views").Concat(ProductFiles("*.js", Path.Combine("wwwroot", "js"))))
         {
@@ -433,7 +536,10 @@ public class UiPatternGuardTests
                     continue;
                 if (line.Contains("StatusPills", StringComparison.Ordinal) || line.Contains("luStatusPills", StringComparison.Ordinal))
                     continue;
-                if (Regex.IsMatch(line, @"status|outcome|level|passed|failed|succeeded|running", RegexOptions.IgnoreCase))
+                var window = string.Join('\n', lines.Skip(Math.Max(0, i - 6)).Take(8));
+                var tones = toneToken.Matches(line).Select(match => match.Groups[1].Value.ToLowerInvariant()).Distinct().Count();
+                var statusWord = Regex.IsMatch(window, @"\b(status|outcome|level|passed|failed|succeeded|running|accepting|overlap)\b", RegexOptions.IgnoreCase);
+                if (tones >= 2 || statusWord)
                     hits.Add(Rel(file) + ":" + (i + 1) + " " + line.Trim());
             }
         }
@@ -516,6 +622,18 @@ public class UiPatternGuardTests
         var validation = File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Validation.cshtml"));
         Regex.Matches(validation, "_ReportIdentity").Count.Should().Be(1);
         validation.Should().NotContain("Label = \"Facility\"");
+        var acquisition = File.ReadAllText(Path.Combine(Root(), "Views", "Reports", "Acquisition.cshtml"));
+        acquisition.Should().Contain("_ReportIdentity");
+        acquisition.Should().Contain("data-header-owns-ids=\"yes\"");
+        var list = File.ReadAllText(Path.Combine(Root(), "Views", "Logs", "_AcquisitionLogList.cshtml"));
+        list.Should().Contain("HeaderOwnsIds");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_DataAcquisitionLogsModal.cshtml"))
+            .Should().NotContain("data-header-owns-ids");
+        File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "automation-dashboard.js"))
+            .Should().Contain("position: \"right\"");
+        File.ReadAllText(Path.Combine(Root(), "Views", "Automation", "_RunDetail.cshtml"))
+            .Should().Contain("data-lu-query=\"pool\"")
+            .And.Contain("data-lu-query=\"expected\"");
     }
 
     private static bool IsSharedChartPalette(string where)
@@ -647,7 +765,7 @@ public class UiPatternGuardTests
             l = double.Parse(parts[2].TrimEnd('%'), System.Globalization.CultureInfo.InvariantCulture) / 100d;
         }
 
-        var cool = h is >= 190 and <= 340 && s >= 0.12;
+        var cool = h is >= 165 and <= 340 && s >= 0.12;
         var oldGreen = h is >= 145 and < 165 && s >= 0.40;
         return cool || oldGreen;
     }

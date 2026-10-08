@@ -51,7 +51,13 @@
             statusChart = new Chart(statusCanvas, {
                 type: "doughnut",
                 data: statusData,
-                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: "bottom" } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    layout: { padding: 0 },
+                    plugins: { legend: { position: "right", align: "center", labels: { boxWidth: 12, padding: 8, font: { size: 12 } } } }
+                }
             });
         }
 
@@ -90,7 +96,8 @@
                     maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
                     animation: false,
-                    plugins: { legend: { position: "bottom" } }
+                    layout: { padding: 0 },
+                    plugins: { legend: { position: "right", align: "center", labels: { boxWidth: 12, padding: 6, font: { size: 12 } } } }
                 }
             });
         }
