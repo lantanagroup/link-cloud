@@ -132,8 +132,8 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
 
             builder.Services.TryAddSingleton(TimeProvider.System);
 
-            AddMockDmrpWriteThrough(builder.Services,
-                MockDmrpStatus.FromConfiguration(builder.Configuration, section.Get<DmrpSettings>()!));
+            var mockDmrp = MockDmrpStatus.FromConfiguration(builder.Configuration, section.Get<DmrpSettings>()!);
+            AddMockDmrpWriteThrough(builder.Services, mockDmrp);
 
             if (!builder.Services.Any(d => d.ServiceType == typeof(IFacilityTimeZoneSource)))
             {
@@ -179,8 +179,16 @@ namespace LantanaGroup.Link.DMRP.DependencyInjection
             builder.Services.RemoveAll<IFacilityOperations>();
             builder.Services.TryAddScoped<THostFacilityOperations>();
             builder.Services.AddScoped<IFacilityOperations>(sp =>
-                ActivatorUtilities.CreateInstance<DmrpFacilityOperations>(sp,
-                    sp.GetRequiredService<THostFacilityOperations>()));
+            {
+                IFacilityOperations dmrpOperations = ActivatorUtilities.CreateInstance<DmrpFacilityOperations>(sp,
+                    sp.GetRequiredService<THostFacilityOperations>());
+
+                // With the Mock DMRP API switched on, one more layer outside: the facility form's selection
+                // is written to the mock before the DMRP operations derive the schedule from it.
+                return mockDmrp.IsEnabled
+                    ? ActivatorUtilities.CreateInstance<MockDmrpSyncFacilityOperations>(sp, dmrpOperations)
+                    : dmrpOperations;
+            });
 
             return true;
         }

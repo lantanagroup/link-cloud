@@ -18,6 +18,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using Microsoft.Extensions.Options;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -455,6 +459,33 @@ namespace UnitTests.DMRP
 
             // The host's implementation has to remain resolvable, because the module delegates to it.
             Assert.NotNull(scope.ServiceProvider.GetRequiredService<HostFacilityOperations>());
+        }
+
+        /// <summary>
+        /// With the mock switched on, the write-through is one more layer outside the DMRP operations; with
+        /// it off, nothing changes from today.
+        /// </summary>
+        [Theory]
+        [InlineData("true", typeof(MockDmrpSyncFacilityOperations))]
+        [InlineData("false", typeof(DmrpFacilityOperations))]
+        public void AddDmrpModule_puts_the_mock_write_through_outside_the_dmrp_operations_only_when_the_mock_is_on(
+            string mockEnabled, Type expected)
+        {
+            var builder = CreateBuilder(enabled: true, MockSettings(mockEnabled, "http://mock-dmrp-api:8080"));
+
+            builder.AddDmrpModule<TenantDbContext, HostFacilityOperations>(builder.Services.AddControllers(),
+                                                                           ClassicGroup);
+
+            // The mock client authenticates with the host's Link token plumbing.
+            builder.Services.AddSingleton(Options.Create(
+                new BackendAuthenticationServiceExtension.LinkBearerServiceOptions { AllowAnonymous = true }));
+            builder.Services.AddSingleton(Options.Create(new LinkTokenServiceSettings()));
+            builder.Services.AddSingleton(Mock.Of<ICreateSystemToken>());
+
+            using var provider = BuildProviderWithModuleDependencies(builder);
+            using var scope = provider.CreateScope();
+
+            Assert.IsType(expected, scope.ServiceProvider.GetRequiredService<IFacilityOperations>());
         }
 
         [Fact]
