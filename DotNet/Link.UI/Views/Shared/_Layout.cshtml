@@ -71,7 +71,7 @@
                 </a>
                 @if (LinkUiFeatures.Value.AutomationEnabled)
                 {
-                    <a class="lu-nav-link @(Ctrl("Automation") || Ctrl("Metrics") || Ctrl("ApiHealth") || Ctrl("Cleanup") ? "active" : "")" asp-controller="Automation" asp-action="Index">
+                    <a class="lu-nav-link @(AutomationSurface.IsAutomationPath(Context.Request.Path) ? "active" : "")" asp-controller="Automation" asp-action="Index">
                         <i class="bi bi-lightning-charge me-2"></i>Automation
                     </a>
                 }
