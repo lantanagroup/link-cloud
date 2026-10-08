@@ -16,22 +16,37 @@ Service ports are listed at the top of `docker-compose.yml` (e.g. fhir 6157, adm
 
 ### Azure Artifacts (Thetis)
 
-Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source with no credentials, so `dotnet restore` / `dotnet build link-cloud.sln` and `docker compose build` 401 until the machine is authenticated. `packageSourceMapping` keeps every other package on nuget.org.
+Automation, Automation.UI, and MockFhirServer restore `LantanaGroup.Thetis.*` from Azure Artifacts feed `Shared_BOTW_Feed`. Repo `nuget.config` lists that source and does not store a token. Do not write a PAT or access token into `nuget.config`. `packageSourceMapping` keeps every other package on nuget.org.
 
-You can also add `Shared_BOTW_Feed` as a NuGet source in Visual Studio (Tools > Options > NuGet Package Manager > Package Sources) using `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json`, then sign into the `lantanagroup` Azure DevOps org. Repo `nuget.config` already lists that source, so opening this branch in VS usually shows it without adding it by hand. VS restore then uses your Azure DevOps login instead of a PAT, if the account has Read on the feed.
-
-Otherwise create a PAT and put it in the environment:
-
-1. In Azure DevOps, open User settings (avatar) > Personal access tokens > New Token.
-2. Organization: `lantanagroup`. Scope: **Packaging > Read**. Create and copy the token.
-3. In PowerShell:
+`docker compose` inside this repo passes a short-lived Azure CLI token to those images only as the BuildKit secret `feed_accesstoken`. One-time setup from the repo root:
 
 ```powershell
-$env:AZURE_ARTIFACTS_PAT = "<token>"
-dotnet nuget update source Shared_BOTW_Feed --username az --password $env:AZURE_ARTIFACTS_PAT --store-password-in-clear-text --configfile nuget.config
+powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1
 ```
 
-`docker compose` reads the same `AZURE_ARTIFACTS_PAT` environment variable as the `feed_accesstoken` secret (see `docker-compose.yml`). Set it in the shell before `docker compose build` / `up`, or in a local `.env` next to the compose file (do not commit the token). CI uses the `AZURE_ARTIFACTS_PAT` GitHub/Azure secret.
+Git Bash:
+
+```bash
+bash ./Scripts/docker-compose.feed-token-install.sh
+```
+
+The installer adds one line to the shell profile:
+
+```powershell
+. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token
+```
+
+```bash
+. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token
+```
+
+Open a new shell in the repo and run `docker compose` as usual. The wrapper fetches a token into the gitignored file `.azure-artifacts.env` when that file is missing or the token has less than 10 minutes left, then passes `AZURE_ARTIFACTS_PAT` only to the docker process. The parent shell does not keep the variable. On Windows the file's ACL is limited to the current user. The token is not printed.
+
+If Azure CLI is missing, `Scripts/docker-compose.feed-token.ps1` (and the Git Bash script `Scripts/docker-compose.feed-token-fetch.sh`) installs it for the current user with `winget install --id Microsoft.AzureCLI --scope user`. If winget is missing, policy blocks the install, the install fails, or sign-in is cancelled, the command prints that reason and stops. A `docker compose` command in this repo then stops before Docker starts and tells you to run the installer lines above. Install Azure CLI yourself (no admin) from https://aka.ms/installazurecliwindows and run the fetch script again, or finish `az login`.
+
+Visual Studio can still restore on the host after you sign into the `lantanagroup` Azure DevOps org. Add `Shared_BOTW_Feed` under Tools > Options > NuGet Package Manager > Package Sources with `https://pkgs.dev.azure.com/lantanagroup/nhsnlink/_packaging/Shared_BOTW_Feed/nuget/v3/index.json` if it is not already listed. That path does not write credentials into the tracked `nuget.config`.
+
+CI is unchanged. GitHub Actions sets `AZURE_ARTIFACTS_PAT` and bakes `docker-compose.yml`, which supplies the `feed_accesstoken` secret. The Automation image pipeline passes `--secret id=feed_accesstoken,env=SYSTEM_ACCESSTOKEN`.
 
 ### .NET
 
