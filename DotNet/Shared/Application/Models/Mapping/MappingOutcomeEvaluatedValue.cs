@@ -27,6 +27,8 @@ public class MappingOutcomeEvaluatedValue
     /// Which service produced this message. Determines which of the properties below carry meaning; see
     /// <see cref="MappingOutcomeSource"/>.
     /// </summary>
+    public string? FacilityId { get; set; }
+    public string? PatientId { get; set; }
     public MappingOutcomeSource Source { get; set; }
 
     /// <summary>

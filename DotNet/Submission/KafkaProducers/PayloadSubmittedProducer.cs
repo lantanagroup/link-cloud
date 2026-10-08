@@ -6,26 +6,27 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Submission.KafkaProducers;
 
-public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubmittedValue> producer)
+public class PayloadSubmittedProducer(IProducer<string, PayloadSubmittedValue> producer)
 {
     public void Produce(string? correlationId, string facilityId, Guid reportScheduleId, PayloadType payloadType, string? patientId = null)
     {
         if (correlationId == null)
             correlationId = Guid.NewGuid().ToString();
 
+        var key = string.IsNullOrWhiteSpace(patientId)
+            ? KafkaKeys.ForFacility(facilityId)
+            : KafkaKeys.ForPatient(facilityId, patientId);
+
         try
         {
-            producer.Produce(nameof(KafkaTopic.PayloadSubmitted), new Message<PayloadSubmittedKey, PayloadSubmittedValue>
+            producer.Produce(nameof(KafkaTopic.PayloadSubmitted), new Message<string, PayloadSubmittedValue>
             {
-                Key = new PayloadSubmittedKey()
-                {
-                    FacilityId = facilityId,
-                    ReportScheduleId = reportScheduleId,
-
-                },
+                Key = key,
                 Value = new PayloadSubmittedValue()
                 {
                     PayloadType = payloadType,
+                    FacilityId = facilityId,
+                    ReportScheduleId = reportScheduleId,
                     PatientId = patientId
                 },
                 Headers = new Headers()
@@ -36,7 +37,7 @@ public class PayloadSubmittedProducer(IProducer<PayloadSubmittedKey, PayloadSubm
 
             producer.Flush();
         }
-        catch (ProduceException<PayloadSubmittedKey, PayloadSubmittedValue> ex)
+        catch (ProduceException<string, PayloadSubmittedValue> ex)
         {
             throw new Exception($"Failed to produce PayloadSubmitted message for facility: {facilityId}: {ex.Message}");
         }

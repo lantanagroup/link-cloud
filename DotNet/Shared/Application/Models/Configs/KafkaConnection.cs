@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 
@@ -12,8 +13,10 @@ public class KafkaConnection
             ClientId = ClientId,
             GroupId = GroupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
+            PartitionAssignmentStrategy = PartitionAssignmentStrategy.CooperativeSticky,
             AllowAutoCreateTopics = true
         };
+        KafkaClientDefaults.ApplyConsumer(config, ClientId, StaticMembership);
 
         if (SaslProtocolEnabled)
         {
@@ -33,6 +36,7 @@ public class KafkaConnection
             BootstrapServers = string.Join(", ", BootstrapServers),
             ClientId = ClientId
         };
+        KafkaClientDefaults.ApplyProducer(config, ClientId);
 
         if (SaslProtocolEnabled)
         {
@@ -47,6 +51,11 @@ public class KafkaConnection
 
     public List<string> BootstrapServers { get; set; } = new List<string>();
     public string ClientId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When true, consumers set a group instance id. Off unless an environment turns it on.
+    /// </summary>
+    public bool StaticMembership { get; set; }
     public string GroupId { get; set; } = "default";
     public bool SaslProtocolEnabled { get; set; } = false;
     public SecurityProtocol Protocol { get; set; } = SecurityProtocol.SaslPlaintext;

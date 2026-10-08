@@ -73,11 +73,13 @@ public class KafkaConfig {
     }
 
     @Bean
-    public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
+    public Deserializer<?> keyDeserializer() {
+        // The key is a partition string. Identity comes from the value, with KafkaKeyLegacy for a
+        // legacy JSON or plain key. A colon key must not be deserialized into an id object.
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCES_NORMALIZED, new JsonDeserializer<>(ResourceKey.class, objectMapper),
-                Topics.RESOURCES_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
-                Topics.RESOURCES_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCES_NORMALIZED, new StringDeserializer(),
+                Topics.RESOURCES_NORMALIZED_ERROR, new StringDeserializer(),
+                Topics.RESOURCES_NORMALIZED_RETRY, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_ERROR, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_RETRY, new StringDeserializer());
@@ -230,6 +232,8 @@ public class KafkaConfig {
         Map<String, Object> overrides = new HashMap<>();
         overrides.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, Properties.MAX_BLOCK_MS_CONFIG);
         overrides.put(ProducerConfig.RETRIES_CONFIG, 0);
+        // Idempotence requires retries above zero. This template sets retries to 0, so turn it off here only.
+        overrides.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, false);
 
         return new KafkaTemplate<>(producerFactoryWithOverrides(properties, sslBundles, keySerializer, valueSerializer, overrides));
     }

@@ -28,8 +28,8 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly ILogger<AcquisitionProcessorBackgroundService> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
-    private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
-    private readonly IProducer<ResourceKey, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
+    private readonly IProducer<string, ResourcesAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<string, MappingOutcomeEvaluatedValue> _mappingOutcomeProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -38,8 +38,8 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     public AcquisitionProcessorBackgroundService(
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
-        IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
-        IProducer<ResourceKey, MappingOutcomeEvaluatedValue> mappingOutcomeProducer,
+        IProducer<string, ResourcesAcquired> resourceAcquiredProducer,
+        IProducer<string, MappingOutcomeEvaluatedValue> mappingOutcomeProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
@@ -122,7 +122,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
-        var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<long, ReadyToAcquire>>();
+        var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, ReadyToAcquire>>();
         var dependencyChecker = scope.ServiceProvider.GetRequiredService<IAcquisitionDependencyChecker>();
 
         DataAcquisitionLogModel? log = null;
@@ -313,6 +313,10 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 nameof(QueryPhase.Initial),
                 StringComparison.OrdinalIgnoreCase);
 
+            var partitionKey = KafkaKeys.ForPatient(tailResult.FacilityId, tailResult.PatientId);
+            tailResult.ResourcesAcquired.FacilityId = tailResult.FacilityId;
+            tailResult.ResourcesAcquired.PatientId = tailResult.PatientId;
+
             if (isInitialPhase)
             {
                 try
@@ -323,13 +327,14 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     // nothing downstream depends on the ordering of these two produces.
                     await _mappingOutcomeProducer.ProduceAsync(
                         KafkaTopic.MappingOutcomeEvaluated.ToString(),
-                        new Message<ResourceKey, MappingOutcomeEvaluatedValue>
+                        new Message<string, MappingOutcomeEvaluatedValue>
                         {
-                            Key = new ResourceKey
-                                { FacilityId = tailResult.FacilityId, PatientId = tailResult.PatientId },
+                            Key = partitionKey,
                             Headers = headers,
                             Value = new MappingOutcomeEvaluatedValue
                             {
+                                FacilityId = tailResult.FacilityId,
+                                PatientId = tailResult.PatientId,
                                 Source = MappingOutcomeSource.Acquisition,
                                 ScheduledReports = tailResult.ResourcesAcquired.ScheduledReports,
                                 LocationOrgOutcome = locationOrgOutcome,
@@ -357,13 +362,9 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             await _resourceAcquiredProducer.ProduceAsync(
                     KafkaTopic.ResourcesAcquired.ToString(),
-                    new Message<ResourceKey, ResourcesAcquired>
+                    new Message<string, ResourcesAcquired>
                     {
-                        Key = new ResourceKey
-                        {
-                            FacilityId = tailResult.FacilityId,
-                            PatientId = tailResult.PatientId
-                        },
+                        Key = partitionKey,
                         Headers = headers,
                         Value = tailResult.ResourcesAcquired
                     },

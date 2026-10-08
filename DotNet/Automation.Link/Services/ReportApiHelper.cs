@@ -140,6 +140,7 @@ public class ReportApiHelper
 
         var value = new ReportScheduledValue
         {
+            FacilityId = facilityId,
             ReportTypes = reportTypes.ToList(),
             Frequency = frequency,
             StartDate = startDateUtc,
@@ -151,7 +152,7 @@ public class ReportApiHelper
             nameof(KafkaTopic.ReportScheduled),
             new Message<string, ReportScheduledValue>
             {
-                Key = facilityId,
+                Key = KafkaKeys.ForFacility(facilityId),
                 Value = value,
                 Headers = CreateScheduledReportHeaders(trackingId, isMetricsRun)
             });
