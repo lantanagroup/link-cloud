@@ -40,7 +40,9 @@ public class ProducerPartitionerGuardTests
         return normalized.Contains("\\obj\\", StringComparison.Ordinal)
             || normalized.Contains("\\bin\\", StringComparison.Ordinal)
             || normalized.Contains("\\ServiceTests\\", StringComparison.Ordinal)
-            || normalized.Contains("\\KafkaKeyProof.Tests\\", StringComparison.Ordinal);
+            || normalized.Contains("\\KafkaKeyProof.Tests\\", StringComparison.Ordinal)
+            // The console proof seeds one record so throwaway groups have a member. The key is a fixed probe value, not a facility or patient key.
+            || normalized.EndsWith("\\KafkaOps.Proof\\KafkaOpsConsoleFlowTests.cs", StringComparison.Ordinal);
     }
 
     private static string FindRepoRoot()
