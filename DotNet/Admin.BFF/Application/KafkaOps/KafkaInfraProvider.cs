@@ -514,6 +514,7 @@ public static class ReassignmentListText
             return new ReassignmentListing { Known = true };
 
         var topics = new List<string>();
+        var partitions = new List<string>();
         var sawPartitions = false;
         var start = text.IndexOf('{');
         var end = text.LastIndexOf('}');
@@ -522,13 +523,18 @@ public static class ReassignmentListText
             try
             {
                 using var document = JsonDocument.Parse(text.Substring(start, end - start + 1));
-                if (document.RootElement.TryGetProperty("partitions", out var partitions) && partitions.ValueKind == JsonValueKind.Array)
+                if (document.RootElement.TryGetProperty("partitions", out var entries) && entries.ValueKind == JsonValueKind.Array)
                 {
                     sawPartitions = true;
-                    foreach (var partition in partitions.EnumerateArray())
+                    foreach (var entry in entries.EnumerateArray())
                     {
-                        if (partition.TryGetProperty("topic", out var topic) && topic.ValueKind == JsonValueKind.String)
-                            Add(topics, topic.GetString());
+                        if (entry.TryGetProperty("topic", out var topic) && topic.ValueKind == JsonValueKind.String)
+                        {
+                            var name = topic.GetString();
+                            Add(topics, name);
+                            if (entry.TryGetProperty("partition", out var number) && number.TryGetInt32(out var id))
+                                AddKey(partitions, name, id);
+                        }
                     }
                 }
             }
@@ -539,10 +545,15 @@ public static class ReassignmentListText
         }
 
         foreach (Match match in Regex.Matches(text, @"(?m)^(.+)-(\d+)\s*:\s*replicas\s*:", RegexOptions.CultureInvariant))
-            Add(topics, match.Groups[1].Value.Trim());
+        {
+            var name = match.Groups[1].Value.Trim();
+            Add(topics, name);
+            if (int.TryParse(match.Groups[2].Value, out var id))
+                AddKey(partitions, name, id);
+        }
 
-        if (topics.Count > 0)
-            return new ReassignmentListing { Known = true, Topics = topics };
+        if (topics.Count > 0 || partitions.Count > 0)
+            return new ReassignmentListing { Known = true, Topics = topics, Partitions = partitions };
         if (sawPartitions)
             return new ReassignmentListing { Known = true };
         return new ReassignmentListing();
@@ -553,6 +564,15 @@ public static class ReassignmentListText
         if (string.IsNullOrWhiteSpace(topic) || topics.Contains(topic, StringComparer.Ordinal))
             return;
         topics.Add(topic);
+    }
+
+    private static void AddKey(List<string> partitions, string? topic, int partition)
+    {
+        if (string.IsNullOrWhiteSpace(topic))
+            return;
+        var key = topic + "\n" + partition;
+        if (!partitions.Contains(key, StringComparer.Ordinal))
+            partitions.Add(key);
     }
 }
 
