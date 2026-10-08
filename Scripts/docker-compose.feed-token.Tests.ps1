@@ -309,6 +309,13 @@ try {
     & $installer -ProfilePath $utf16Profile -InstallDir $installDir | Out-Null
     $utf16Text = [System.IO.File]::ReadAllText($utf16Profile)
     Write-Result ($utf16Text.Contains('kept') -and $utf16Text.Contains('link-cloud-feed-token')) 'installer keeps an existing UTF-16 profile readable'
+    $ansiProfile = Join-Path $repo 'profile-ansi.ps1'
+    $ansiEnc = [System.Text.Encoding]::GetEncoding(1252)
+    $ansiBody = "Write-Host 'caf$([char]0x00E9)'`r`n"
+    [System.IO.File]::WriteAllBytes($ansiProfile, $ansiEnc.GetBytes($ansiBody))
+    & $installer -ProfilePath $ansiProfile -InstallDir $installDir | Out-Null
+    $ansiText = Get-Content -Raw -LiteralPath $ansiProfile
+    Write-Result (($null -ne $ansiText) -and $ansiText.Contains([char]0x00E9) -and $ansiText.Contains('link-cloud-feed-token')) 'installer keeps an ANSI profile readable'
 
     # Fetch script with a mock az. The sentinel must not appear in the child output.
     $mockDir = Join-Path $repo 'mock-az'
