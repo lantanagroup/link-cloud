@@ -200,7 +200,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     _logger.LogDebug("Report manifest submission is disabled (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
                 }
 
-                if (!await _reportScheduleManager.MarkManifestEmittedAsync(schedule.Id, claimToken, cancellationToken))
+                if (!await _reportScheduleManager.MarkManifestEmittedAsync(schedule.Id, claimToken, CancellationToken.None))
                 {
                     throw new TransientException($"Report manifest claim was lost before it was marked emitted (ReportId = {schedule.Id}).");
                 }

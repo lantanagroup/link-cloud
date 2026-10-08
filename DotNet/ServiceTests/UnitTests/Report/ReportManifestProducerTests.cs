@@ -310,8 +310,9 @@ public class ReportManifestProducerTests
     }
 
     /// <summary>
-    /// Cancelling the caller must not cancel the submission produce. A cancelled wait
-    /// would release the claim while the record can still land on the broker.
+    /// Cancelling the caller must not cancel the submission produce or the emitted mark.
+    /// A cancelled wait would release the claim while the record can still land, or leave
+    /// the claim stuck after the record was delivered.
     /// </summary>
     [Fact]
     public async Task Produce_CancelledCaller_DoesNotReleaseTheClaimForTheSubmissionWait()
@@ -323,6 +324,12 @@ public class ReportManifestProducerTests
             .Setup(p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.Is<CancellationToken>(token => token.IsCancellationRequested)))
+            .ThrowsAsync(new OperationCanceledException(cancelled.Token));
+        harness.ScheduleManager
+            .Setup(m => m.MarkManifestEmittedAsync(
+                harness.Schedule.Id,
+                It.IsAny<Guid>(),
                 It.Is<CancellationToken>(token => token.IsCancellationRequested)))
             .ThrowsAsync(new OperationCanceledException(cancelled.Token));
 
