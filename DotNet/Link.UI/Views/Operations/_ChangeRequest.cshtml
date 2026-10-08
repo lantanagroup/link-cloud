@@ -1,0 +1,100 @@
+@model ThroughputKafkaPage
+@{
+    var request = Model.Request;
+    var query = Model.Query;
+}
+@if (request is not null)
+{
+    var cancellable = request.Kind is "DecommissionBroker" or "Rebalance" && request.Status is "Executing" or "Converging";
+    <div class="au-card card mt-3" id="kafka-request-progress" data-status-url="/Operations/Kafka/requests/@request.Id.ToString("D")">
+        <div class="card-header">Change request</div>
+        <div class="card-body">
+            <p><partial name="_LabeledId" model="@(new LabeledId { Label = "Request", Value = request.Id.ToString("D"), CopyLabel = "Copy request id" })" /></p>
+            <p><partial name="_LabeledId" model="@(new LabeledId { Label = "Correlation", Value = request.CorrelationId, CopyLabel = "Copy correlation id" })" /></p>
+            <p>@request.Kind <span class="badge @StatusPills.ForKafka(request.Status)" id="kafka-request-status">@request.Status</span></p>
+            <p>Requester @request.Requester. Approver @(string.IsNullOrWhiteSpace(request.Approver) ? "—" : request.Approver).</p>
+            @if (request.Kind == "PartitionIncrease")
+            {
+                <p>@request.Topic from @request.BeforePartitions to @request.RequestedPartitions. Replica ceiling @request.MaxReplicas. Retry @request.RetryTopic increases with it, and so does the error topic.</p>
+            }
+            else if (request.Kind == "ScaleReplicas")
+            {
+                <p>Group @request.GroupId from @request.BeforeReplicas to @request.DesiredReplicas members.</p>
+            }
+            else if (request.BrokerId >= 0)
+            {
+                <p>Broker @request.BrokerId.</p>
+            }
+            <p id="kafka-request-progress-text">@request.Progress</p>
+            <p>@request.DryRunSummary</p>
+            @if (!string.IsNullOrWhiteSpace(request.Failure))
+            {
+                <p id="kafka-request-failure">@request.Failure</p>
+            }
+            <p><span>Opened </span><span>@LinkUiTime.Display(request.CreatedUtc)</span></p>
+            @if (request.ApprovedUtc is not null)
+            {
+                <p><span>Approved </span><span>@LinkUiTime.Display(request.ApprovedUtc)</span></p>
+            }
+            @if (request.ExecutedUtc is not null)
+            {
+                <p><span>Executed </span><span>@LinkUiTime.Display(request.ExecutedUtc)</span></p>
+            }
+            @if (request.ConvergedUtc is not null)
+            {
+                <p><span>Converged </span><span>@LinkUiTime.Display(request.ConvergedUtc)</span></p>
+            }
+            @if (request.Groups.Count > 0)
+            {
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Group</th>
+                            <th>Assigned</th>
+                            <th>Expected</th>
+                            <th>Complete</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kafka-request-groups">
+                    @foreach (var group in request.Groups)
+                    {
+                        <tr>
+                            <td>@group.GroupId</td>
+                            <td>@group.AssignedPartitions</td>
+                            <td>@group.ExpectedPartitions</td>
+                            <td>@(group.Complete ? "Yes" : "No")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+            <div class="d-flex gap-2">
+                <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/approve">
+                    @Html.AntiForgeryToken()
+                    <partial name="_QueryFields" model="query" />
+                    <button class="btn btn-sm btn-success" type="submit" title="Approve change" aria-label="Approve change"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                </form>
+                <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/execute">
+                    @Html.AntiForgeryToken()
+                    <partial name="_QueryFields" model="query" />
+                    <button class="btn btn-sm btn-success" type="submit" title="Execute change" aria-label="Execute change"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+                </form>
+                @if (cancellable)
+                {
+                    <form method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/cancel">
+                        @Html.AntiForgeryToken()
+                        <partial name="_QueryFields" model="query" />
+                        <button class="btn btn-sm btn-au-neutral" type="submit" title="Cancel reassignment" aria-label="Cancel reassignment"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                    </form>
+                }
+                <form class="d-flex gap-2" method="post" action="/Operations/Kafka/requests/@request.Id.ToString("D")/reject">
+                    @Html.AntiForgeryToken()
+                    <partial name="_QueryFields" model="query" />
+                    <label class="visually-hidden" for="reject-reason">Rejection reason</label>
+                    <input class="form-control form-control-sm" id="reject-reason" name="reason" placeholder="Rejection reason" />
+                    <button class="btn btn-sm btn-danger" type="submit" title="Reject change" aria-label="Reject change"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
