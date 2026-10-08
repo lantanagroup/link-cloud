@@ -4,12 +4,13 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 namespace Automation.UI.Services;
 
 /// <summary>
-/// Per-run poller. Every run polls five pipeline domains so Run Details stays live.
+/// Per-run poller. Every run polls the pipeline so Run Details stays live.
 /// Metrics runs poll every 5s; ordinary runs poll every 15s. Both honor the 8s HTTP
-/// cache. A full-domain snapshot still runs once in <see cref="FinalPollAsync"/>.
+/// cache. A final poll still runs once in <see cref="FinalPollAsync"/>.
 ///
-/// Data persists across process restarts. Multiple UI instances can read
-/// the same data. The controller reads are instant (no API calls).
+/// The store keeps the counts, timestamps, and milestones the charts need.
+/// Notes, acquired resource ids, FHIR queries, measure-report id lists,
+/// per-patient measure rows, and org-location rows stay in Report and Data Acquisition.
 /// </summary>
 public sealed class StoreBackedServicePoller
 {
@@ -145,15 +146,14 @@ public sealed class StoreBackedServicePoller
     /// Called at run completion to guarantee the last state is persisted
     /// even if the polling loop was between cycles when cancellation hit.
     /// </summary>
-    public async Task FinalPollAsync()
+    public async Task FinalPollAsync(CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(_meta.ReportId, out var scheduleId))
             return;
 
-        var ct = CancellationToken.None;
         try
         {
-            await PollAllDomainsAsync(scheduleId, ct);
+            await PollAllDomainsAsync(scheduleId, cancellationToken);
             _logger.LogInformation("[Run {RunId}] Final domain snapshot persisted", _meta.RunId);
         }
         catch (Exception ex)
@@ -162,51 +162,81 @@ public sealed class StoreBackedServicePoller
         }
     }
 
+    private async Task<bool> ReportStillCurrentAsync(CancellationToken ct)
+    {
+        var meta = await _store.GetRunMetaAsync(_meta.RunId, ct);
+        return meta != null
+            && string.Equals(meta.ReportId, _meta.ReportId, StringComparison.Ordinal)
+            && string.Equals(meta.FacilityId, _meta.FacilityId, StringComparison.Ordinal);
+    }
+
     private async Task PollScheduleAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportScheduleAsync(scheduleId);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
+        var result = await _reader.GetReportScheduleAsync(scheduleId, ct);
         await _store.SetDomainAsync(_meta.RunId, "schedule", result, ct);
     }
 
     private async Task PollEntriesAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
-        await _store.SetDomainAsync(_meta.RunId, "entries", result, ct);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
+        var result = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId, ct);
+        await _store.SetDomainAsync(_meta.RunId, "entries", PipelineDataReader.ReportEntryRollup.From(result), ct);
     }
 
     private async Task PollPopulationsAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId);
-        await _store.SetDomainAsync(_meta.RunId, "populations", result, ct);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
+        var result = await _reader.GetReportPopulationsAsync(scheduleId, _meta.FacilityId, ct);
+        await _store.SetDomainAsync(_meta.RunId, "populations", RunHistorySlim.ToPopulationCounts(result), ct);
     }
 
     private async Task PollAcquisitionAsync(CancellationToken ct)
     {
-        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
 
-        // Always write � even when null � so stale data from a prior report
+        var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId, ct);
+
+        // Always write, even when null, so stale data from a prior report
         // (e.g., before regeneration cleared snapshots) is overwritten.
         await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, ct);
     }
 
     private async Task PollAcquisitionLogsAsync(CancellationToken ct)
     {
-        var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId);
-        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", logs, ct);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
+        var logs = await _reader.GetAcquisitionLogsAsync(_meta.FacilityId, _meta.ReportId, ct);
+        var withNotes = await _reader.AttachFailureNotesAsync(logs, RunHistorySlim.FailureSampleIds(logs), ct);
+        await _store.SetDomainAsync(_meta.RunId, "acquisitionLogs", RunHistorySlim.ToAcquisitionChart(withNotes), ct);
     }
 
     private async Task PollOrgLocationAsync(CancellationToken ct)
     {
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
         var snapshot = new OrgLocationSnapshot(
-            await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId),
-            await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId),
-            await _reader.GetEncounterMappingsAsync(_meta.FacilityId));
-        await _store.SetDomainAsync(_meta.RunId, "orgLocation", snapshot, ct);
+            await _reader.GetOrganizationLocationConfigurationsAsync(_meta.FacilityId, ct),
+            await _reader.GetOrganizationLocationMappingsAsync(_meta.FacilityId, ct),
+            await _reader.GetEncounterMappingsAsync(_meta.FacilityId, ct));
+        await _store.SetDomainAsync(_meta.RunId, "orgLocation", RunHistorySlim.SlimOrgLocation(snapshot), ct);
     }
 
     private async Task PollMeasureEvalResourcesAsync(Guid scheduleId, CancellationToken ct)
     {
-        var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId);
-        await _store.SetDomainAsync(_meta.RunId, "measureResources", result, ct);
+        if (!await ReportStillCurrentAsync(ct))
+            return;
+
+        var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId, ct);
+        await _store.SetDomainAsync(_meta.RunId, "measureResources", RunHistorySlim.SlimMeasureResources(result), ct);
     }
 }
