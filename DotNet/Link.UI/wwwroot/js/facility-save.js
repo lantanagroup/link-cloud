@@ -203,7 +203,6 @@
     }
 
     function collapseEmpty(form) {
-        form.classList.add("d-none");
         var body = form.closest(".accordion-body") || form.parentElement;
         if (body && body.querySelector(":scope > .alert-warning")) {
             var blocked = form.querySelector("button[type='submit'], input[type='submit']");
@@ -211,6 +210,7 @@
             setExpanded(sectionItem(form), true);
             return;
         }
+        form.classList.add("d-none");
         if (body) {
             body.querySelectorAll(":scope > .au-note").forEach(function (alert) {
                 alert.classList.add("d-none");
