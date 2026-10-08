@@ -75,7 +75,7 @@ set -e
 err=$(cat "$repo/err.txt")
 if [ "$code" -ne 0 ]; then pass 'missing file fetch failure is non-zero'; else fail 'missing file fetch failure is non-zero'; fi
 if [ ! -s "$log" ]; then pass 'missing file fetch failure does not call docker'; else fail 'missing file fetch failure does not call docker'; fi
-printf '%s' "$err" | grep -F 'Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1' >/dev/null && pass 'bash missing message has the PowerShell setup line' || fail 'bash missing message has the PowerShell setup line'
+printf '%s' "$err" | grep -F 'Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"' >/dev/null && pass 'bash missing message has the PowerShell setup line' || fail 'bash missing message has the PowerShell setup line'
 printf '%s' "$err" | grep -F 'Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh' >/dev/null && pass 'bash missing message has the Git Bash setup line' || fail 'bash missing message has the Git Bash setup line'
 printf '%s' "$err" | grep -F 'link-cloud-feed-token' >/dev/null && pass 'bash missing message has a profile line' || fail 'bash missing message has a profile line'
 printf '%s' "$err" | grep -F "$sentinel" >/dev/null && fail 'bash missing message does not contain the token' || pass 'bash missing message does not contain the token'

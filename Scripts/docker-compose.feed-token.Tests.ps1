@@ -95,7 +95,7 @@ try {
     $missing = ($global:LinkCloudFeedTokenHooks['Messages'] -join "`n")
     Write-Result ($LASTEXITCODE -eq 1) 'missing file fetch failure sets exit 1'
     Write-Result ($global:LinkCloudFeedTokenHooks['DockerCalls'].Count -eq 0) 'missing file fetch failure does not call docker'
-    Write-Result ($missing.Contains('Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1')) 'missing message has the PowerShell setup line'
+    Write-Result ($missing.Contains('Azure token missing. Run this one-time setup: powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"')) 'missing message has the PowerShell setup line'
     Write-Result ($missing.Contains('PowerShell profile line: . "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'missing message has the PowerShell profile line'
     Write-Result ($missing.Contains('Git Bash: bash ./Scripts/docker-compose.feed-token-install.sh')) 'missing message has the Git Bash setup line'
     Write-Result ($missing.Contains('Git Bash profile line: . "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token')) 'missing message has the Git Bash profile line'
@@ -285,13 +285,28 @@ try {
     $profilePath = Join-Path $repo 'profile.ps1'
     $installDir = Join-Path $repo 'install-dir'
     $installer = Join-Path $PSScriptRoot 'docker-compose.feed-token-install.ps1'
+    $hostBefore = $null
+    if (Test-Path -LiteralPath $PROFILE) { $hostBefore = [System.IO.File]::ReadAllBytes($PROFILE) }
     & $installer -ProfilePath $profilePath -InstallDir $installDir | Out-Null
     & $installer -ProfilePath $profilePath -InstallDir $installDir | Out-Null
     $profileText = [System.IO.File]::ReadAllText($profilePath)
     $markerCount = ([regex]::Matches($profileText, 'link-cloud-feed-token')).Count
     Write-Result ($markerCount -eq 1) 'installer adds the profile line once'
-    Write-Result ($profileText.Contains($installDir) -and $profileText.Contains('docker-compose.feed-token-profile.ps1')) 'installer profile line uses the install directory'
+    $hostAfter = $null
+    if (Test-Path -LiteralPath $PROFILE) { $hostAfter = [System.IO.File]::ReadAllBytes($PROFILE) }
+    $hostUnchanged = ($null -eq $hostBefore -and $null -eq $hostAfter)
+    if ($null -ne $hostBefore -and $null -ne $hostAfter -and $hostBefore.Length -eq $hostAfter.Length) {
+        $hostUnchanged = $true
+        for ($i = 0; $i -lt $hostBefore.Length; $i++) {
+            if ($hostBefore[$i] -ne $hostAfter[$i]) { $hostUnchanged = $false; break }
+        }
+    }
+    Write-Result ($hostUnchanged -and (Test-Path -LiteralPath $profilePath) -and $profileText.Contains('link-cloud-feed-token')) 'ProfilePath writes the given file and leaves the host profile unchanged'
+    $documented = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\DEVELOPMENT.md'))
+    Write-Result ($documented.Contains('powershell -NoProfile -ExecutionPolicy Bypass -File ./Scripts/docker-compose.feed-token-install.ps1 -ProfilePath "$PROFILE"')) 'documented setup passes the calling shell profile'
     $installerText = [System.IO.File]::ReadAllText($installer)
+    Write-Result ($installerText.Contains('if (-not $ProfilePath)') -and $installerText.Contains('$ProfilePath = $PROFILE')) 'installer defaults to the running host profile'
+    Write-Result ($profileText.Contains($installDir) -and $profileText.Contains('docker-compose.feed-token-profile.ps1')) 'installer profile line uses the install directory'
     Write-Result ($installerText.Contains('. "$env:USERPROFILE\.link-cloud\docker-compose.feed-token-profile.ps1" # link-cloud-feed-token')) 'default install line stays the documented snippet'
     $loader = Join-Path $repo 'load-profile.ps1'
     $loaderBody = ". '$profilePath'`r`nif (Get-Command compose -CommandType Function -ErrorAction SilentlyContinue) { 'loaded' }`r`n"
