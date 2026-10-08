@@ -868,7 +868,9 @@ a.au-kpi-link:hover {
 .au-kpi-auto { border-top-color: var(--au-warning); }
 .au-kpi-bad { border-top-color: var(--au-danger); }
 .home-card-link { color: #fff; text-decoration: none; }
-.home-card-link:hover { color: var(--au-accent); }
+.home-card-link:hover { color: #fff; text-decoration: underline; }
+.au-pulse-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.au-pulse-compact .au-pulse-head { padding: .4rem .75rem; }
 .home-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

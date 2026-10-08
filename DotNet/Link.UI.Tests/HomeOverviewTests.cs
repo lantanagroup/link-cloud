@@ -321,7 +321,8 @@ public class HomeOverviewTests
         overview.Should().Contain("asp-controller=\"Logs\" asp-action=\"Acquisition\"");
         overview.Should().Contain("asp-route-status=\"Failed,MaxRetriesReached\"");
         overview.Should().Contain("au-kpi-card");
-        overview.Should().Contain("au-service-chip");
+        overview.Should().Contain("name=\"_ServiceMonitor\"");
+        overview.Should().Contain("class=\"btn btn-sm btn-au-neutral\" asp-controller=\"System\" asp-action=\"Health\"");
         overview.Should().Contain("id=\"homeOverview\"");
         overview.Should().Contain("Nothing needs attention right now.");
         overview.Should().Contain("home-row-main");
