@@ -32,6 +32,7 @@ public sealed class AuthController : Controller
     [HttpGet("/logout")]
     public IActionResult SignedOut()
     {
-        return RedirectToAction("Index", "Home");
+        ViewData["Title"] = "Signed out";
+        return View();
     }
 }

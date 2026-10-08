@@ -214,7 +214,11 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> UpdateSftpCredentialsAsync(string organizationId, object credentials, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteSftpCredentialsAsync(string organizationId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetSftpCredentialStatusAsync(string organizationId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> TestSavedSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Tests the saved sFTP configuration. HTTP 200 still carries <c>success</c> and <c>message</c>; a failed connection is not an error status.
+    /// <c>POST /api/data/{organizationId}/sftp-configurations/test-connection</c>.
+    /// </summary>
+    Task<LinkApiResponse<SftpTestConnectionResultApiModel>> TestSavedSftpConnectionAsync(string organizationId, CancellationToken cancellationToken = default);
 
     /// <summary>Reads one sFTP acquisition log: <c>GET /api/data/sftp-logs/{logId}</c>.</summary>
     Task<LinkApiResponse<SftpLogApiModel>> GetSftpLogAsync(string logId, CancellationToken cancellationToken = default);
