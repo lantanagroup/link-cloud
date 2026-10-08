@@ -1238,6 +1238,16 @@ public class UiPatternGuardTests
         js.Should().NotContain("params.set('q'");
     }
 
+    [Fact]
+    public void Removing_an_imported_upload_asks_to_discard_the_bundle()
+    {
+        var view = File.ReadAllText(Path.Combine(Root(), "Views", "Shared", "_ScenarioEditorModal.cshtml"));
+        view.Should().Contain("postJson(discardUploadedBundleUrl, { uploadedBundleId: bundleId })");
+        var handler = view[(view.IndexOf("var rm = e.target.closest('.btn-remove-imported')", StringComparison.Ordinal))..];
+        handler.Should().Contain("row.dataset.uploadedBundleId");
+        handler.Should().Contain("if (bundleId)");
+    }
+
     private static (double H, double S, double L) RgbToHsl(int r, int g, int b)
     {
         var red = r / 255d;
