@@ -89,7 +89,18 @@ echo "Creating per-service retry and redrive topics from $RETRY_FILE"
     MAIN_REPLICAS=${MAIN_REPLICAS:-1}
     IFS=',' read -ra SERVICE_LIST <<< "$SERVICES"
     for SERVICE in "${SERVICE_LIST[@]}"; do
-      for SUFFIX in Retry Redrive; do
+      SERVICE="${SERVICE#"${SERVICE%%[![:space:]]*}"}"
+      SERVICE="${SERVICE%"${SERVICE##*[![:space:]]}"}"
+      SUFFIXES=(Retry Redrive)
+      if [[ "$SERVICE" == "~"* ]]; then
+        SERVICE="${SERVICE#~}"
+        SUFFIXES=(Redrive)
+      fi
+      if [[ -z "$SERVICE" || "$SERVICE" == *"~"* ]]; then
+        echo "ERROR: invalid service for topic '$MAIN_TOPIC'."
+        exit 1
+      fi
+      for SUFFIX in "${SUFFIXES[@]}"; do
         DERIVED="${MAIN_TOPIC}-${SUFFIX}-${SERVICE}"
         DERIVED_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
           -u "$USERNAME:$PASSWORD" \
