@@ -297,29 +297,46 @@ public class UiPatternGuardTests
             .ToList();
         buttonClasses.Should().NotBeEmpty();
 
+        var extraClasses = parsed
+            .Where(rule => rule.Classes.Contains("btn"))
+            .SelectMany(rule => rule.Classes)
+            .Where(name => name != "btn" && !name.StartsWith("btn-", StringComparison.Ordinal) && name != "disabled")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var failures = new List<string>();
         foreach (var button in buttonClasses)
         {
-            foreach (var state in new string?[] { null, "hover", "focus", "active", "disabled" })
+            var elements = new List<HashSet<string>>
             {
-                var element = new HashSet<string>(StringComparer.Ordinal) { "btn", button };
-                if (state == "disabled")
-                    element.Add("disabled");
-                if (!TryResolvePaint(parsed, vars, element, state, out var color, out var background, out var transparent)
-                    || transparent
-                    || RelativeLuminance(background) >= 0.2)
-                    continue;
+                new(StringComparer.Ordinal) { "btn", button }
+            };
+            foreach (var extra in extraClasses)
+                elements.Add(new HashSet<string>(StringComparer.Ordinal) { "btn", button, extra });
 
-                var label = "." + button + " " + (state ?? "rest");
-                if (color is null)
+            foreach (var classes in elements)
+            {
+                foreach (var state in new string?[] { null, "hover", "focus", "active", "disabled" })
                 {
-                    failures.Add(label + " dark fill " + Format(background) + " has no text color");
-                    continue;
-                }
+                    var element = new HashSet<string>(classes, StringComparer.Ordinal);
+                    if (state == "disabled")
+                        element.Add("disabled");
+                    if (!TryResolvePaint(parsed, vars, element, state, out var color, out var background, out var transparent)
+                        || transparent
+                        || RelativeLuminance(background) >= 0.2)
+                        continue;
 
-                var contrast = Contrast(RelativeLuminance(color.Value), RelativeLuminance(background));
-                if (contrast < 4.5)
-                    failures.Add(label + " " + Format(color.Value) + " on " + Format(background) + " contrast " + contrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+                    var label = "." + string.Join(".", element.OrderBy(name => name, StringComparer.Ordinal)) + " " + (state ?? "rest");
+                    if (color is null)
+                    {
+                        failures.Add(label + " dark fill " + Format(background) + " has no text color");
+                        continue;
+                    }
+
+                    var contrast = Contrast(RelativeLuminance(color.Value), RelativeLuminance(background));
+                    if (contrast < 4.5)
+                        failures.Add(label + " " + Format(color.Value) + " on " + Format(background) + " contrast " + contrast.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+                }
             }
         }
 

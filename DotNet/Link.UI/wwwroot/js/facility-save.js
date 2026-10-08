@@ -643,6 +643,7 @@
                 blank.setAttribute("data-dispatch-blank", "false");
                 blank.setAttribute("data-dispatch-new", "true");
             }
+            markDirty(form);
             updateCounts();
             var focus = row && row.querySelector("input:not([type='hidden']):not([type='checkbox'])");
             if (focus) focus.focus();

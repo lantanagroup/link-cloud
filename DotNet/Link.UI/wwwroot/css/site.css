@@ -726,6 +726,12 @@ details.au-facility-actions > summary::-webkit-details-marker {
   padding: .15rem .4rem;
   opacity: 1;
 }
+.btn.au-info-toggle,
+.btn.au-info-toggle:hover,
+.btn.au-info-toggle:focus,
+.btn.au-info-toggle[aria-expanded="true"] {
+  color: #fff;
+}
 .pc-section-reset { flex-shrink: 0; }
 .au-help-text {
   font-size: .78rem;
