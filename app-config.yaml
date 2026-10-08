@@ -147,7 +147,7 @@ global:
     defaultValue: "1"
     consumers: ["AdminBFF"]
   - key: "KafkaOps:CacheSeconds"
-    description: "Seconds to cache topic and group views. Clamped to 5-10."
+    description: "Seconds to cache topic, group, cluster, and capability views. Clamped to 5-10. A view with an error is not cached."
     required: false
     defaultValue: "8"
     consumers: ["AdminBFF"]
@@ -172,7 +172,7 @@ global:
     defaultValue: "Disabled"
     consumers: ["AdminBFF"]
   - key: "KafkaOps:ScaleTimeoutSeconds"
-    description: "How long to wait for a replica change or a broker add to become stable before the request needs attention."
+    description: "How long to wait for a replica change or a broker move to settle before the request is marked timed out. The broker is not removed when the wait ends."
     required: false
     defaultValue: "180"
     consumers: ["AdminBFF"]
@@ -186,12 +186,36 @@ global:
     defaultValue: "kafka"
     consumers: ["AdminBFF"]
   - key: "KafkaOps:KafkaNodePool"
-    description: "Strimzi KafkaNodePool name whose spec.replicas is the broker count. Used only when the Strimzi provider is enabled."
+    description: "Strimzi KafkaNodePool name. Adding a broker increases spec.replicas. Removing a broker sets the strimzi.io/remove-node-ids annotation to that broker id and decreases spec.replicas by one."
     required: false
     consumers: ["AdminBFF"]
   - key: "KafkaOps:ConsumerDeployments"
     description: "Comma-separated group=deployment pairs that map a consumer group id to the Deployment the Strimzi provider scales."
     required: false
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ComposeFile"
+    description: "Pipe-separated compose file paths used only when KafkaOps:InfraProvider is LocalCompose. Empty means the compose command does not pass -f. A path may contain a drive letter and backslashes."
+    required: false
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ExtraBrokerProfile"
+    description: "Compose profile that starts the extra broker when LocalCompose adds a broker."
+    required: false
+    defaultValue: "extra-broker"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:ExtraBrokerService"
+    description: "Compose service name started when LocalCompose adds a broker."
+    required: false
+    defaultValue: "broker-3"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:BrokerServicePrefix"
+    description: "Prefix plus the broker id is the compose service LocalCompose stops when a broker is removed."
+    required: false
+    defaultValue: "broker-"
+    consumers: ["AdminBFF"]
+  - key: "KafkaOps:BrokerService"
+    description: "Compose service LocalCompose execs into when it runs the partition reassignment tool."
+    required: false
+    defaultValue: "broker-0"
     consumers: ["AdminBFF"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."

@@ -70,6 +70,7 @@ public class KafkaOpsPageTests
         text.Should().Contain("aria-label");
         text.Should().Contain("data-au-refresh");
         text.Should().Contain("returnUrl");
+        text.Should().Contain("LagKnown");
         text.Should().NotContain("left unchanged");
         text.Should().NotContain("btn-outline-");
         text.Should().NotContain("btn-primary");
@@ -81,6 +82,7 @@ public class KafkaOpsPageTests
         script.Should().NotContain("#0d6efd");
         script.Should().Contain("#28a745");
         script.Should().Contain("luPaintTimes");
+        script.Should().Contain("TimedOut");
     }
 
     [Fact]
@@ -89,6 +91,7 @@ public class KafkaOpsPageTests
         StatusPills.ForKafka("Stable").Should().Be("au-badge-success");
         StatusPills.ForKafka("Converging").Should().Be("au-badge-active");
         StatusPills.ForKafka("Failed").Should().Be("au-badge-danger");
+        StatusPills.ForKafka("TimedOut").Should().Be("au-badge-danger");
         StatusPills.ForKafka("Empty").Should().Be("au-badge-warning");
         StatusPills.ForKafka(null).Should().Be("au-badge-muted");
     }

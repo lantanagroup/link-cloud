@@ -257,6 +257,8 @@ public sealed class OperationsController : Controller
         }
 
         error ??= topics.Error ?? groups.Error ?? cluster.Error ?? capabilities.Error;
+        if (string.IsNullOrWhiteSpace(error))
+            error = topics.GroupsError;
         return new ThroughputKafkaPage
         {
             Query = query,

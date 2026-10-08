@@ -280,7 +280,10 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
 
     private async Task<IResult> Execute(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken)
     {
-        if (!kafkaOps.CanManage(user) && !kafkaOps.CanScale(user))
+        var existing = await kafkaOps.GetAsync(id, cancellationToken);
+        if (existing is null)
+            return Problem("That change request was not found or it has expired.", StatusCodes.Status404NotFound);
+        if (!KafkaOpsExecution.Allows(kafkaOps.CanManage(user), kafkaOps.CanScale(user), existing.Kind))
             return Results.Forbid();
         try
         {

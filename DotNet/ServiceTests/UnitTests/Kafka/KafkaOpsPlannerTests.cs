@@ -50,6 +50,30 @@ public class KafkaOpsPlannerTests
     }
 
     [Fact]
+    public void Decommission_RefusesAControllerEligibleBroker()
+    {
+        var partitions = new List<BrokerPartitionFact>
+        {
+            new()
+            {
+                Topic = "ReadyToAcquire",
+                Partition = 0,
+                Leader = 1,
+                Replicas = [1, 2, 3],
+                MinInSyncReplicas = 2
+            }
+        };
+        var brokers = new List<int> { 0, 1, 2, 3 };
+
+        var controller = BrokerMovePlanner.Decommission(1, brokers, partitions, [0, 1, 2]);
+        Assert.False(controller.Accepted);
+        Assert.Contains(controller.Errors, error => error.Contains("controller", StringComparison.OrdinalIgnoreCase));
+
+        var brokerOnly = BrokerMovePlanner.Decommission(3, brokers, partitions, [0, 1, 2]);
+        Assert.True(brokerOnly.Accepted);
+    }
+
+    [Fact]
     public void Decommission_AllowsAnEmptyBroker()
     {
         var plan = BrokerMovePlanner.Decommission(9, [1, 9],
@@ -92,6 +116,11 @@ public class KafkaOpsPlannerTests
         await provider.ApplyReassignmentAsync("""{"leavingBroker":3,"partitions":[]}""", CancellationToken.None);
 
         Assert.Contains("\"replicas\":4", kubernetes.Applied["kafkanodepools/link-brokers"], StringComparison.Ordinal);
+        await provider.RemoveBrokerAsync(1, CancellationToken.None);
+        var removed = kubernetes.Applied["kafkanodepools/link-brokers"];
+        Assert.Contains("strimzi.io/remove-node-ids", removed, StringComparison.Ordinal);
+        Assert.Contains("[1]", removed, StringComparison.Ordinal);
+        Assert.Contains("\"replicas\":2", removed, StringComparison.Ordinal);
         Assert.Contains("\"replicas\":2", kubernetes.Applied["deployments/report"], StringComparison.Ordinal);
         Assert.Contains("remove-brokers", kubernetes.Applied["kafkarebalances/link-ops-remove-brokers"], StringComparison.Ordinal);
         Assert.Contains("strimzi.io/rebalance", kubernetes.Applied["kafkarebalances/link-ops-remove-brokers"], StringComparison.Ordinal);
@@ -128,6 +157,38 @@ public class KafkaOpsPlannerTests
         Assert.Contains("--scale", process.Arguments);
         Assert.Contains("consumer=3", process.Arguments);
         Assert.DoesNotContain("528", process.Arguments, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalCompose_PassesTheComposeFile_AndTheConfiguredBrokerNames()
+    {
+        var process = new RecordingProcess();
+        var provider = new LocalComposeKafkaInfraProvider(process, new KafkaOpsOptions
+        {
+            ComposeProject = "kafka-ops-proof",
+            ComposeFile = @"C:\proof\compose.yml|C:\proof\compose.publish.yml",
+            ExtraBrokerProfile = "extra-broker",
+            ExtraBrokerService = "broker-3",
+            BrokerServicePrefix = "broker-",
+            BrokerService = "broker-0"
+        });
+
+        await provider.AddBrokerAsync(CancellationToken.None);
+        Assert.Contains("-f", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains(@"C:\proof\compose.yml", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("compose.publish.yml", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("--profile", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("extra-broker", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("broker-3", process.Arguments, StringComparison.Ordinal);
+
+        await provider.RemoveBrokerAsync(2, CancellationToken.None);
+        Assert.Contains("stop", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("broker-2", process.Arguments, StringComparison.Ordinal);
+
+        await provider.ApplyReassignmentAsync("{}", CancellationToken.None);
+        Assert.Contains("exec", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("-T", process.Arguments, StringComparison.Ordinal);
+        Assert.Contains("broker-0", process.Arguments, StringComparison.Ordinal);
     }
 
     private sealed class RecordingKubernetes : IKubernetesResourceClient

@@ -82,7 +82,8 @@ public static class StatusPills
             || status.Equals("offline", StringComparison.OrdinalIgnoreCase)
             || status.Equals("missing", StringComparison.OrdinalIgnoreCase)
             || status.Equals("Rejected", StringComparison.OrdinalIgnoreCase)
-            || status.Equals("NeedsAttention", StringComparison.OrdinalIgnoreCase))
+            || status.Equals("NeedsAttention", StringComparison.OrdinalIgnoreCase)
+            || status.Equals("TimedOut", StringComparison.OrdinalIgnoreCase))
             return "au-badge-danger";
         if (status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
             || status.Equals("Empty", StringComparison.OrdinalIgnoreCase))

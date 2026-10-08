@@ -123,13 +123,13 @@
             });
         }
         if (typeof window.luPaintTimes === "function") window.luPaintTimes(progress);
-        if (statusName === "Done" || statusName === "Failed" || statusName === "Rejected" || statusName === "Cancelled" || statusName === "NeedsAttention")
+        if (statusName === "Done" || statusName === "Failed" || statusName === "Rejected" || statusName === "Cancelled" || statusName === "NeedsAttention" || statusName === "TimedOut")
             window.clearInterval(poll);
     }
 
     function pill(status) {
         if (status === "Stable" || status === "up" || status === "Done" || status === "Approved") return "au-badge-success";
-        if (status === "Failed" || status === "Rejected" || status === "NeedsAttention" || status === "Dead" || status === "offline") return "au-badge-danger";
+        if (status === "Failed" || status === "Rejected" || status === "NeedsAttention" || status === "TimedOut" || status === "Dead" || status === "offline") return "au-badge-danger";
         if (status === "Cancelled" || status === "Empty") return "au-badge-warning";
         if (status === "Pending" || status === "Executing" || status === "Converging" || status === "Verifying") return "au-badge-active";
         return "au-badge-muted";

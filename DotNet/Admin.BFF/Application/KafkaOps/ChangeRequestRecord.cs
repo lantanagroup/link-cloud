@@ -14,7 +14,8 @@ public enum KafkaChangeStatus
     Done,
     NeedsAttention,
     Failed,
-    Cancelled
+    Cancelled,
+    TimedOut
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -77,6 +78,8 @@ public sealed class ChangeRequestRecord
     public List<OffsetCheckpoint> LatestOffsets { get; set; } = [];
     public List<string> AffectedGroups { get; set; } = [];
     public List<GroupProgress> Groups { get; set; } = [];
+    public int PollFailures { get; set; }
+    public DateTimeOffset? NextPollUtc { get; set; }
 }
 
 public sealed class OffsetCheckpoint

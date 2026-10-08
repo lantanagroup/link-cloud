@@ -32,12 +32,18 @@ public sealed class BrokerMovePlan
 
 public static class BrokerMovePlanner
 {
-    public static BrokerMovePlan Decommission(int brokerId, IReadOnlyList<int> brokerIds, IReadOnlyList<BrokerPartitionFact> partitions)
+    public static BrokerMovePlan Decommission(
+        int brokerId,
+        IReadOnlyList<int> brokerIds,
+        IReadOnlyList<BrokerPartitionFact> partitions,
+        IReadOnlyCollection<int>? controllerEligibleIds = null)
     {
         var plan = new BrokerMovePlan { BrokerId = brokerId };
         plan.Notes.Add("Removing a broker moves every replica off it first. The broker is stopped only after it has no replicas, no leaders, and the cluster has no under-replicated or offline partitions.");
         if (!brokerIds.Contains(brokerId))
             plan.Errors.Add($"Broker {brokerId} is not in the cluster.");
+        if (controllerEligibleIds is not null && controllerEligibleIds.Contains(brokerId))
+            plan.Errors.Add($"Broker {brokerId} is controller-eligible. Decommission a broker that is not in the controller quorum.");
 
         var others = brokerIds.Where(id => id != brokerId).ToList();
         var load = others.ToDictionary(id => id, _ => 0);
