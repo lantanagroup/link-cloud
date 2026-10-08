@@ -518,6 +518,10 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
 
+                    b.Property<long?>("MisfireOriginalFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
+
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")
                         .HasColumnName("NEXT_FIRE_TIME");
@@ -629,7 +633,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__GroupPop__3214EC0792FCF5E1");
 
-                    b.HasIndex("ReportPopulationId");
+                    b.HasIndex(new[] { "ReportPopulationId", "PopulationId" }, "IX_GroupPopulation_Population_PopulationId")
+                        .IsUnique();
 
                     b.ToTable("GroupPopulation");
                 });
@@ -656,7 +661,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__MeasureR__3214EC07051D5E54");
 
-                    b.HasIndex("GroupPopulationId");
+                    b.HasIndex(new[] { "GroupPopulationId", "MeasureReportId" }, "IX_MeasureReportPopulation_Group_MeasureReport")
+                        .IsUnique();
 
                     b.ToTable("MeasureReportPopulation");
                 });
@@ -734,6 +740,7 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AcquisitionDetails")
+                        .HasMaxLength(2147483647)
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("AcquisitionEvaluatedAt")
@@ -760,6 +767,7 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("NormalizationDetails")
+                        .HasMaxLength(2147483647)
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("NormalizationEvaluatedAt")
@@ -815,7 +823,8 @@ namespace LantanaGroup.Link.Report.Migrations
                     b.HasKey("Id")
                         .HasName("PK__ReportPo__3214EC07B5921BDB");
 
-                    b.HasIndex("ReportScheduleId");
+                    b.HasIndex(new[] { "ReportScheduleId", "ReportType" }, "IX_ReportPopulation_Schedule_ReportType")
+                        .IsUnique();
 
                     b.HasIndex(new[] { "FacilityId" }, "IX_ReportPopulations_FacilityId");
 
@@ -923,11 +932,11 @@ namespace LantanaGroup.Link.Report.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
-                    b.Property<DateTime>("ReportEndDate")
-                        .HasColumnType("datetime2");
+                    b.Property<DateTimeOffset>("ReportEndDate")
+                        .HasColumnType("datetimeoffset(7)");
 
-                    b.Property<DateTime>("ReportStartDate")
-                        .HasColumnType("datetime2");
+                    b.Property<DateTimeOffset>("ReportStartDate")
+                        .HasColumnType("datetimeoffset(7)");
 
                     b.Property<string>("Status")
                         .IsRequired()
