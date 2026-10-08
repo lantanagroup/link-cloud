@@ -273,19 +273,33 @@ public sealed class RunExportService : IRunExportService
             }
         }
 
-        var entriesSnap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default);
-        var entries = entriesSnap?.Data;
-        if (entries is { Count: > 0 })
+        var entryRollup = (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, "entries", default))?.Data;
+        if (entryRollup is { EntryCount: > 0 })
         {
             sb.AppendLine();
-            WriteSubHeader(sb, "Report entry status vs prediction");
-            foreach (var entry in entries)
+            WriteSubHeader(sb, "Report entry status");
+            sb.AppendLine($"  Entries                      : {entryRollup.EntryCount}");
+            foreach (var status in entryRollup.ReportingStatuses)
+                sb.AppendLine($"  reporting {status.Status,-22} {status.Count,8:N0}");
+            foreach (var status in entryRollup.SubmissionStatuses)
+                sb.AppendLine($"  submission {status.Status,-21} {status.Count,8:N0}");
+            sb.AppendLine("  Per-patient rows stay in Report.");
+        }
+        else
+        {
+            var entries = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, "entries", default))?.Data;
+            if (entries is { Count: > 0 })
             {
-                var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
-                var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
-                sb.AppendLine(
-                    $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
-                    (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
+                sb.AppendLine();
+                WriteSubHeader(sb, "Report entry status vs prediction");
+                foreach (var entry in entries)
+                {
+                    var expected = manifest?.ExpectedSubmittedPatientIds.Contains(entry.PatientId) == true;
+                    var measureStatuses = string.Join(", ", entry.MeasureReports.Select(mr => $"{mr.ReportType}:{mr.Status}"));
+                    sb.AppendLine(
+                        $"  {entry.PatientId}  expectedSubmitted={expected} reporting={entry.ReportingStatus} submission={entry.SubmissionStatus}" +
+                        (string.IsNullOrWhiteSpace(measureStatuses) ? "" : $"  [{measureStatuses}]"));
+                }
             }
         }
 
@@ -342,7 +356,7 @@ public sealed class RunExportService : IRunExportService
 
         await AppendRawDomainAsync(sb, runId, "schedule",      "Raw report schedule",      ct);
         await AppendRawDomainAsync(sb, runId, "entries",       "Raw report entries",       ct);
-        await AppendRawDomainAsync(sb, runId, "populations",   "Raw report populations",   ct);
+        await AppendPopulationCountsAsync(sb, runId, ct);
 
         return sb.ToString();
     }
@@ -369,50 +383,86 @@ public sealed class RunExportService : IRunExportService
 
     private async Task AppendAcquisitionLogsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
     {
-        var snap = await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct);
-        var logs = snap?.Data;
-        if (logs is not { Count: > 0 })
+        var chart = (await _snapshotStore.GetDomainAsync<AcquisitionLogChart>(runId, "acquisitionLogs", ct))?.Data;
+        if (chart == null)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.AcquisitionLogInfo>>(runId, "acquisitionLogs", ct))?.Data;
+            if (legacy is { Count: > 0 })
+                chart = RunHistorySlim.ToAcquisitionChart(legacy);
+        }
+
+        if (chart == null || chart.TotalLogs == 0)
             return;
 
         sb.AppendLine();
-        WriteSubHeader(sb, $"Acquisition logs ({logs.Count})");
-        foreach (var log in logs)
+        WriteSubHeader(sb, $"Acquisition log summary ({chart.TotalLogs})");
+        sb.AppendLine("  Individual logs are not kept on the run. Open Data Acquisition while the source is still there.");
+        sb.AppendLine($"  Completed                    : {chart.CompletedCount}");
+        sb.AppendLine($"  Skipped                      : {chart.SkippedCount}");
+        sb.AppendLine($"  Failed                       : {chart.FailureCount}");
+        sb.AppendLine($"  Duration ms (min/avg/max)    : {AcquisitionLogChart.FormatDuration(chart)}");
+        if (chart.ResourceTypeCounts.Count > 0)
         {
-            var types = string.Join(",", log.FhirQueries.SelectMany(q => q.ResourceTypes).Distinct());
-            sb.AppendLine(
-                $"  log={log.Id} patient={log.PatientId} phase={log.QueryPhase} status={log.Status} types=[{types}] acquired={log.ResourceAcquiredIds.Count}");
-            foreach (var id in log.ResourceAcquiredIds.Take(8))
-                sb.AppendLine($"    {id}");
-            if (log.ResourceAcquiredIds.Count > 8)
-                sb.AppendLine($"    ... {log.ResourceAcquiredIds.Count - 8} more resource id(s)");
+            sb.AppendLine("  Logs by resource type:");
+            foreach (var type in chart.ResourceTypeCounts)
+                sb.AppendLine($"    {type.Status,-28} {type.Count}");
         }
+
+        if (chart.Failures.Count == 0)
+            return;
+
+        sb.AppendLine($"  Failure sample ({chart.Failures.Count} of {chart.FailureCount}):");
+        foreach (var failure in chart.Failures)
+        {
+            var types = string.Join(",", failure.ResourceTypes);
+            sb.AppendLine($"    log={failure.LogId} status={failure.Status} phase={failure.QueryPhase} types=[{types}] {failure.Message}");
+        }
+    }
+
+    private async Task AppendPopulationCountsAsync(StringBuilder sb, Guid runId, CancellationToken ct)
+    {
+        var counts = (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, "populations", ct))?.Data;
+        if (counts == null)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", ct))?.Data;
+            if (legacy == null)
+                return;
+
+            counts = RunHistorySlim.ToPopulationCounts(legacy);
+        }
+
+        sb.AppendLine();
+        WriteSubHeader(sb, "Report populations");
+        sb.AppendLine($"  Report types                 : {counts.ReportTypeCount}");
+        sb.AppendLine($"  Group population sets        : {counts.GroupCount}");
+        sb.AppendLine($"  Measure-report references    : {counts.MeasureReportPopulationCount}");
+        sb.AppendLine("  Measure-report ids are not kept on the run. They stay in Report.");
     }
 
     private async Task AppendOrgLocationAsync(StringBuilder sb, Guid runId, CancellationToken ct)
     {
-        var snap = await _snapshotStore.GetDomainAsync<StoreBackedServicePoller.OrgLocationSnapshot>(runId, "orgLocation", ct);
-        var data = snap?.Data;
-        if (data == null)
+        var summary = (await _snapshotStore.GetDomainAsync<OrgLocationSummary>(runId, "orgLocation", ct))?.Data;
+        if (summary == null || summary.ConfigurationCount + summary.LocationMappingCount + summary.EncounterMappingCount == 0)
+        {
+            var legacy = (await _snapshotStore.GetDomainAsync<StoreBackedServicePoller.OrgLocationSnapshot>(runId, "orgLocation", ct))?.Data;
+            if (legacy != null)
+                summary = RunHistorySlim.SlimOrgLocation(legacy);
+        }
+
+        if (summary == null)
             return;
 
         sb.AppendLine();
         WriteSubHeader(sb, "Org-location mapping (post-run)");
-        sb.AppendLine($"  Configurations           : {data.Configurations.Count} (active={data.Configurations.Count(c => c.IsActive)})");
-        sb.AppendLine($"  Location mappings        : {data.LocationMappings.Count} (IsOrgLocation={data.LocationMappings.Count(m => m.IsOrgLocation)})");
-        sb.AppendLine($"  Encounter mappings       : {data.EncounterMappings.Count} (MappedToOrg={data.EncounterMappings.Count(m => m.MappedToOrg)})");
 
-        foreach (var mapping in data.LocationMappings.Take(20))
-            sb.AppendLine($"    location={mapping.LocationId} active={mapping.IsActive} isOrgLocation={mapping.IsOrgLocation}");
+        sb.AppendLine($"  Configurations           : {summary.ConfigurationCount} (active={summary.ActiveConfigurationCount})");
+        sb.AppendLine($"  Location mappings        : {summary.LocationMappingCount} (IsOrgLocation={summary.OrgLocationMappingCount})");
+        sb.AppendLine($"  Encounter mappings       : {summary.EncounterMappingCount} (MappedToOrg={summary.MappedToOrgCount})");
+        sb.AppendLine("  Location and encounter rows are not kept on the run. They stay in Data Acquisition.");
 
-        foreach (var mapping in data.EncounterMappings.Take(20))
-        {
-            var locations = string.Join(",", mapping.EncounterLocations.Select(l => l.LocationId));
-            sb.AppendLine($"    encounter={mapping.EncounterId} patient={mapping.PatientId} mappedToOrg={mapping.MappedToOrg} locations=[{locations}]");
-        }
-
-        if (data.Configurations.Any(c => c.IsActive)
-            && data.EncounterMappings.Count > 0
-            && data.EncounterMappings.All(m => !m.MappedToOrg))
+        if (summary.ActiveConfigurationCount > 0
+            && summary.EncounterMappingCount > 0
+            && summary.MappedToOrgCount == 0)
         {
             sb.AppendLine();
             sb.AppendLine("  WARNING: no encounters MappedToOrg. Data Acquisition strips those encounters");
@@ -460,7 +510,8 @@ public sealed class RunExportService : IRunExportService
                 me.StatusCounts, me.FunnelCounts, me.ResourceTypeCounts, me.ThroughputBuckets, me.Errors,
                 me.ActiveDurationSeconds);
 
-        await AppendRawDomainAsync(sb, runId, "measureResources", "Raw measure-eval resource counts", ct);
+        await AppendRawDomainAsync(sb, runId, "measureResources", "Measure-eval resource counts by type", ct);
+        sb.AppendLine("  Per-patient measure rows are not kept on the run. They stay in Report.");
         return sb.ToString();
     }
 
@@ -793,8 +844,9 @@ public sealed class RunExportService : IRunExportService
             object? data = domain switch
             {
                 "schedule"           => (await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, domain, ct))?.Data,
-                "entries"            => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
-                "populations"        => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, domain, ct))?.Data,
+                "entries"            => (object?)(await _snapshotStore.GetDomainAsync<PipelineDataReader.ReportEntryRollup>(runId, domain, ct))?.Data
+                    ?? (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.ReportEntryInfo>>(runId, domain, ct))?.Data,
+                "populations"        => (await _snapshotStore.GetDomainAsync<PipelineDataReader.PopulationCountSnapshot>(runId, domain, ct))?.Data,
                 "acquisitionSummary" => (await _snapshotStore.GetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, domain, ct))?.Data,
                 "measureResources"   => (await _snapshotStore.GetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, domain, ct))?.Data,
                 "validatorResults"   => (await _snapshotStore.GetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, domain, ct))?.Data,
