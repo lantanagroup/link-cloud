@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.DMRP.MockDmrp;
 /// <remarks>
 /// The row is unlabeled in App Configuration so both services see it, and it exists only where the mock is
 /// deployed. A production store never carries it, so the write-through cannot turn on there, and the Link
-/// token is never sent to the real DMRP API.
+/// token is never sent to the real DMRP API. See dev-docs/mock-dmrp-write-through.md.
 /// </remarks>
 public sealed class MockDmrpStatus : IMockDmrpStatus
 {

@@ -26,6 +26,9 @@ namespace LantanaGroup.Link.DMRP.MockDmrp;
 /// The mock is written before Tenant's own save and is not part of its transaction. If Tenant then refuses
 /// the save, the mock can be ahead of Link until the next save or nightly sync brings them back in line.
 /// </para>
+/// <para>
+/// See dev-docs/mock-dmrp-write-through.md.
+/// </para>
 /// </remarks>
 public sealed class MockDmrpSyncFacilityOperations : IFacilityOperations
 {
