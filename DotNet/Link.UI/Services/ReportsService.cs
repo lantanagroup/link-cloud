@@ -40,15 +40,12 @@ public sealed class ReportsService
         "Validation service URL is not configured (ServiceRegistry:ValidationServiceUrl).";
     public const string MeasureNotConfigured =
         "MeasureEval service URL is not configured (ServiceRegistry:MeasureServiceUrl).";
-    public const string AcquisitionNotConfigured =
-        "Data acquisition service URL is not configured (ServiceRegistry:DataAcquisitionServiceUrl).";
 
     private readonly IFacilityServiceClient _facilities;
     private readonly IReportServiceClient? _reports;
     private readonly ISubmissionServiceClient? _submission;
     private readonly IValidationServiceClient? _validation;
     private readonly IMeasureEvalServiceClient? _measure;
-    private readonly IDataAcquisitionServiceClient? _acquisition;
     private readonly LinkUiFeatureOptions _options;
     private readonly IMemoryCache _counts;
     private readonly ILogger<ReportsService> _logger;
@@ -59,7 +56,6 @@ public sealed class ReportsService
         ISubmissionServiceClient? submission,
         IValidationServiceClient? validation,
         IMeasureEvalServiceClient? measure,
-        IDataAcquisitionServiceClient? acquisition,
         IOptions<LinkUiFeatureOptions> options,
         IMemoryCache counts,
         ILogger<ReportsService> logger)
@@ -69,7 +65,6 @@ public sealed class ReportsService
         _submission = submission;
         _validation = validation;
         _measure = measure;
-        _acquisition = acquisition;
         _options = options.Value;
         _counts = counts;
         _logger = logger;
@@ -84,7 +79,6 @@ public sealed class ReportsService
             Blank(registry.SubmissionServiceUrl) ? null : services.GetRequiredService<ISubmissionServiceClient>(),
             Blank(registry.ValidationServiceUrl) ? null : services.GetRequiredService<IValidationServiceClient>(),
             Blank(registry.MeasureServiceUrl) ? null : services.GetRequiredService<IMeasureEvalServiceClient>(),
-            Blank(registry.DataAcquisitionServiceUrl) ? null : services.GetRequiredService<IDataAcquisitionServiceClient>(),
             services.GetRequiredService<IOptions<LinkUiFeatureOptions>>(),
             services.GetRequiredService<IMemoryCache>(),
             services.GetRequiredService<ILogger<ReportsService>>());
@@ -536,77 +530,13 @@ public sealed class ReportsService
         return (new ReportsAction(true, string.Empty), bundle.Body, page.PatientId);
     }
 
-    public async Task<AcquisitionLogPage> LoadAcquisitionAsync(
+    public async Task<ReportSectionPage> LoadSectionAsync(
         string? facilityId,
         string? reportId,
-        string? patientId,
-        int pageNumber,
-        int pageSize,
         CancellationToken cancellationToken)
     {
         var opened = await OpenReportAsync(facilityId, reportId, cancellationToken);
-        var page = Copy<AcquisitionLogPage>(opened.Page);
-        page.PatientId = FacilityViewRules.Clean(patientId);
-        page.PageSize = ReportsRules.ClampLogPageSize(pageSize);
-        var number = FacilityViewRules.ClampPage(pageNumber);
-        if (page.LoadError is not null || page.NotFound)
-            return page;
-
-        if (_acquisition is null)
-        {
-            page.SectionError = AcquisitionNotConfigured;
-            return page;
-        }
-
-        try
-        {
-            var response = await _acquisition.SearchAcquisitionLogsAsync(
-                page.FacilityId!,
-                page.ReportId,
-                pageSize: page.PageSize,
-                pageNumber: number,
-                sortBy: "ExecutionDate",
-                sortOrder: nameof(SortOrder.Descending),
-                cancellationToken: cancellationToken,
-                patientId: page.PatientId);
-
-            if (response.StatusCode == StatusCodes.Status204NoContent)
-            {
-                page.Paging = new PageBar { Page = 1, PageSize = page.PageSize };
-                return page;
-            }
-
-            if (!response.IsSuccessStatusCode || response.Body is null)
-            {
-                page.SectionError = FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
-                return page;
-            }
-
-            page.Paging = Bar(response.Body.Metadata, number, page.PageSize, response.Body.Records.Count);
-            page.Logs = response.Body.Records.Select(row => new AcquisitionLogRow
-            {
-                Id = row.Id,
-                PatientId = row.PatientId ?? "",
-                Status = row.Status?.ToString() ?? "",
-                Phase = row.QueryPhase?.ToString() ?? "",
-                Priority = row.Priority ?? "",
-                Created = FacilityViewRules.When(row.CreateDate),
-                Completed = FacilityViewRules.When(row.CompletionDate),
-                Resources = row.ResourceTypes is not { Count: > 0 } ? "—" : string.Join(", ", row.ResourceTypes),
-                Notes = row.Notes?.Count ?? 0
-            }).ToList();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Acquisition log failed. ReportId={ReportId}", page.ReportId.Sanitize());
-            page.SectionError = "Data acquisition service call failed: " + ex.Message;
-        }
-
-        return page;
+        return opened.Page;
     }
 
     private async Task ReadSummaryAsync(ValidationPage page, CancellationToken cancellationToken)

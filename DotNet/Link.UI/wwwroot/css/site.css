@@ -230,6 +230,19 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   color: #fff;
   opacity: .55;
 }
+.btn-check:checked + .btn-au-neutral,
+.btn-check:checked + .btn-au-neutral:hover {
+  background-color: var(--au-dark);
+  border-color: var(--au-dark);
+  color: #fff;
+}
+details.au-facility-actions > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.au-facility-actions > summary::-webkit-details-marker {
+  display: none;
+}
 
 .btn-au-close,
 .btn-au-close:hover,
