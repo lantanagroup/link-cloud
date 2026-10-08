@@ -537,6 +537,7 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Approve", user, id, CancellationToken.None));
         Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Reject", user, id, new RejectBody { Reason = "no" }, CancellationToken.None));
         Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Cancel", user, id, CancellationToken.None));
+        Assert.Equal(StatusCodes.Status403Forbidden, await Invoke(endpoints, "Execute", user, id, CancellationToken.None));
     }
 
     [Fact]
@@ -730,7 +731,7 @@ public class KafkaOpsServiceGuardTests
     }
 
     [Fact]
-    public async Task UnknownReassignment_RefusesMoves_AndStillAllowsScaleAndCancel()
+    public async Task UnknownReassignment_RefusesMovesAndCancelExecution_AndStillAllowsScale()
     {
         var (service, broker, infra) = NewService(requireSecondApprover: false);
         broker.Reassignments = new ReassignmentListing { Known = false };
@@ -779,9 +780,11 @@ public class KafkaOpsServiceGuardTests
         infra.Reassignments = new ReassignmentListing { Known = false };
         var cancel = await service.CancelAsync(User("alice", ManageScaling), moving.Id, CancellationToken.None);
         await service.ApproveAsync(User("bob", ManageScaling), cancel.Id, CancellationToken.None);
-        var cancelled = await service.ExecuteAsync(User("carol", ManageScaling), cancel.Id, CancellationToken.None);
-        Assert.Equal(KafkaChangeStatus.Cancelled, cancelled.Status);
-        Assert.DoesNotContain("cannot confirm", cancelled.Progress, StringComparison.OrdinalIgnoreCase);
+        var refusedCancel = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageScaling), cancel.Id, CancellationToken.None));
+        Assert.Contains("cannot confirm no reassignment is in flight", refusedCancel.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, infra.CancelCalls);
+        Assert.Equal(KafkaChangeStatus.Converging, (await service.GetAsync(moving.Id, CancellationToken.None))!.Status);
 
         broker.Reassignments = new ReassignmentListing { Known = false };
         infra.Reassignments = new ReassignmentListing { Known = true, Topics = ["ops-proof-log"] };
@@ -849,15 +852,16 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(0, infra.RemoveCalls);
 
         broker.Reassignments = new ReassignmentListing { Known = false };
+        infra.Reassignments = new ReassignmentListing { Known = false };
         await service.TrackAsync(CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.TimedOut, stored.Status);
         Assert.Equal(0, infra.CancelCalls);
         Assert.Equal(0, infra.RemoveCalls);
 
+        broker.Reassignments = new ReassignmentListing { Known = true };
         var blocked = await service.PlanAsync("ReportScheduled", 4, false, null, CancellationToken.None);
         Assert.Contains(blocked.Errors, error => error.Contains("ReadyToAcquire", StringComparison.Ordinal));
 
-        broker.Reassignments = new ReassignmentListing { Known = true };
         await service.TrackAsync(CancellationToken.None);
         Assert.Equal(KafkaChangeStatus.Failed, stored.Status);
         Assert.Contains("ended before the replicas matched", stored.Failure, StringComparison.OrdinalIgnoreCase);
@@ -916,6 +920,7 @@ public class KafkaOpsServiceGuardTests
         Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
         await service.ApproveAsync(User("bob", ManageScaling), cancel.Id, CancellationToken.None);
 
+        broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ReadyToAcquire"] };
         broker.Placements.Clear();
         broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 0], Isr = [1, 2, 0] });
         var mismatch = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
@@ -934,6 +939,153 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(KafkaChangeStatus.Cancelled, (await service.GetAsync(created.Id, CancellationToken.None))!.Status);
         Assert.Equal(2, infra.CancelCalls);
         Assert.Equal(created.RebalanceName, infra.LastRebalanceName);
+    }
+
+    [Fact]
+    public async Task Cancel_RevertsOnlyThePartitionsStillInFlight()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReportScheduled", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var created = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), created.Id, CancellationToken.None);
+        await service.ExecuteAsync(User("carol", ManageScaling), created.Id, CancellationToken.None);
+        var stored = (await service.GetAsync(created.Id, CancellationToken.None))!;
+
+        broker.Reassignments = new ReassignmentListing { Known = false };
+        infra.Reassignments = new ReassignmentListing { Known = false };
+        var cancel = await service.CancelAsync(User("alice", ManageScaling), created.Id, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), cancel.Id, CancellationToken.None);
+        var unknown = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ExecuteAsync(User("carol", ManageScaling), cancel.Id, CancellationToken.None));
+        Assert.Contains("cannot confirm no reassignment is in flight", unknown.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, infra.CancelCalls);
+        Assert.Equal(KafkaChangeStatus.Converging, stored.Status);
+
+        var again = await service.CancelAsync(User("alice", ManageScaling), created.Id, CancellationToken.None);
+        await service.ApproveAsync(User("bob", ManageScaling), again.Id, CancellationToken.None);
+        broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ReadyToAcquire"] };
+        broker.Placements.Clear();
+        ApplyAssignment(broker, stored.OriginalAssignmentJson, topic => topic == "ReadyToAcquire");
+        ApplyAssignment(broker, stored.ReassignmentJson, topic => topic != "ReadyToAcquire");
+
+        var done = await service.ExecuteAsync(User("carol", ManageScaling), again.Id, CancellationToken.None);
+        Assert.Equal(KafkaChangeStatus.Cancelled, done.Status);
+        Assert.Contains("1 partitions had already moved and keep their new replicas.", done.Progress, StringComparison.Ordinal);
+        Assert.Contains("The broker was not stopped.", done.Progress, StringComparison.Ordinal);
+        Assert.Equal(KafkaChangeStatus.Cancelled, stored.Status);
+        Assert.Equal(1, infra.CancelCalls);
+    }
+
+    [Fact]
+    public async Task TwoRebalanceRequests_GetDistinctNames()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: true);
+        broker.ControllerId = 2;
+        broker.Eligible.Clear();
+        broker.Eligible.Add(0);
+        broker.RolesKnown = true;
+        broker.Placements.Add(new PartitionPlacement { Topic = "ReadyToAcquire", Partition = 0, Leader = 1, Replicas = [1, 2, 3], Isr = [1, 2, 3] });
+        var first = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+        await service.RejectAsync(User("bob", ManageScaling), first.Id, "not now", CancellationToken.None);
+        var second = await service.CreateDecommissionAsync(User("alice", ManageScaling), 3, "remove the spare broker", null, CancellationToken.None);
+
+        Assert.NotEqual(first.RebalanceName, second.RebalanceName);
+        Assert.Equal(KafkaRebalanceNames.For(first.Id), first.RebalanceName);
+        Assert.Equal(KafkaRebalanceNames.For(second.Id), second.RebalanceName);
+    }
+
+    [Fact]
+    public async Task OrderSensitiveFamilyCompletion_RequiresASecondApprover()
+    {
+        var (service, broker, _) = NewService(requireSecondApprover: false);
+        broker.SetCount("PatientEvent", 4);
+        broker.SetCount("PatientEvent-Retry", 3);
+        broker.SetCount("PatientEvent-Error", 3);
+
+        var plan = await service.PlanFamilyAsync("PatientEvent", true, "the window was observed outside this request", CancellationToken.None);
+        Assert.True(plan.Accepted, string.Join(" ", plan.Errors));
+        Assert.True(plan.SecondApproverRequired);
+
+        var created = await service.CreateFamilyAsync(
+            User("alice", ManageTopics),
+            "PatientEvent",
+            "catch the family up",
+            true,
+            "the window was observed outside this request",
+            "PatientEvent",
+            null,
+            CancellationToken.None);
+        Assert.True(created.SecondApproverRequired);
+        Assert.Equal(KafkaChangeStatus.Pending, created.Status);
+        var self = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.ApproveAsync(User("alice", ManageTopics), created.Id, CancellationToken.None));
+        Assert.Contains("cannot approve", self.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddBrokerPlan_RefusesWhileAMoveIsUnknownOrInFlight()
+    {
+        var (service, broker, infra) = NewService(requireSecondApprover: true);
+        var endpoints = new KafkaOpsEndpoints(service, NullLogger<KafkaOpsEndpoints>.Instance);
+        var viewer = User("pat", nameof(LinkSystemPermissions.CanViewInfrastructure));
+        Assert.Equal(StatusCodes.Status200OK, await Invoke(endpoints, "PlanAddBroker", viewer, CancellationToken.None));
+
+        broker.Reassignments = new ReassignmentListing { Known = false };
+        infra.Reassignments = new ReassignmentListing { Known = false };
+        Assert.Equal(StatusCodes.Status400BadRequest, await Invoke(endpoints, "PlanAddBroker", viewer, CancellationToken.None));
+        var unknown = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanAddBrokerAsync(CancellationToken.None));
+        Assert.Contains("cannot confirm no reassignment is in flight", unknown.Message, StringComparison.OrdinalIgnoreCase);
+
+        broker.Reassignments = new ReassignmentListing { Known = true, Topics = ["ReadyToAcquire"] };
+        var busy = await Assert.ThrowsAsync<KafkaOpsRejectedException>(() =>
+            service.PlanAddBrokerAsync(CancellationToken.None));
+        Assert.Contains("ReadyToAcquire", busy.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DescribeConsumerGroupsException_WithNotCoordinator_RebuildsTheClient()
+    {
+        var created = 0;
+        var broken = new Mock<IAdminClient>();
+        broken.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ThrowsAsync(new DescribeConsumerGroupsException(new DescribeConsumerGroupsReport
+            {
+                ConsumerGroupDescriptions =
+                [
+                    new ConsumerGroupDescription { GroupId = "Report", Error = new Error(ErrorCode.NotCoordinatorForGroup) }
+                ]
+            }));
+        var healthy = new Mock<IAdminClient>();
+        healthy.Setup(client => client.DescribeConsumerGroupsAsync(It.IsAny<IEnumerable<string>>(), It.IsAny<DescribeConsumerGroupsOptions>()))
+            .ReturnsAsync(new DescribeConsumerGroupsResult());
+        var factory = new Mock<IKafkaAdminClientFactory>();
+        factory.Setup(item => item.Create(It.IsAny<AdminClientConfig>()))
+            .Returns(() => ++created == 1 ? broken.Object : healthy.Object);
+        var gateway = new KafkaBrokerGateway(new KafkaConnection { BootstrapServers = ["localhost:9092"] }, factory.Object);
+
+        await Assert.ThrowsAsync<KafkaException>(() => gateway.DescribeGroupsAsync(false, 1, CancellationToken.None));
+        Assert.Equal(2, created);
+        broken.Verify(client => client.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    public async Task RoleLookup_UsesAFifteenSecondTimeout()
+    {
+        DescribeConfigsOptions? seen = null;
+        var admin = new Mock<IAdminClient>();
+        admin.Setup(client => client.DescribeConfigsAsync(It.IsAny<IEnumerable<ConfigResource>>(), It.IsAny<DescribeConfigsOptions>()))
+            .Callback<IEnumerable<ConfigResource>, DescribeConfigsOptions>((_, options) => seen = options)
+            .ReturnsAsync([]);
+        await KafkaBrokerGateway.ControllerEligibleIdsAsync(admin.Object, RoleBrokers(), CancellationToken.None);
+
+        Assert.NotNull(seen);
+        Assert.Equal(TimeSpan.FromSeconds(15), seen!.RequestTimeout);
     }
 
     [Fact]
@@ -984,6 +1136,25 @@ public class KafkaOpsServiceGuardTests
         Assert.Equal(KafkaChangeStatus.Done, warnedStored.Status);
         Assert.Contains("did not finish", warnedStored.Warning, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("", warnedStored.Failure);
+    }
+
+    private static void ApplyAssignment(FakeBroker broker, string json, Func<string, bool> take)
+    {
+        using var document = JsonDocument.Parse(json);
+        foreach (var partition in document.RootElement.GetProperty("partitions").EnumerateArray())
+        {
+            var topic = partition.GetProperty("topic").GetString() ?? "";
+            if (!take(topic))
+                continue;
+            broker.Placements.Add(new PartitionPlacement
+            {
+                Topic = topic,
+                Partition = partition.GetProperty("partition").GetInt32(),
+                Leader = partition.GetProperty("replicas").EnumerateArray().First().GetInt32(),
+                Replicas = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList(),
+                Isr = partition.GetProperty("replicas").EnumerateArray().Select(item => item.GetInt32()).ToList()
+            });
+        }
     }
 
     private static void ReplacePlacements(FakeBroker broker, string reassignmentJson)
