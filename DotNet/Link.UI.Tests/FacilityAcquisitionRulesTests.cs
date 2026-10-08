@@ -59,6 +59,92 @@ public class FacilityAcquisitionRulesTests
     }
 
     [Fact]
+    public void Overnight_pull_window_validates_and_is_sent()
+    {
+        var built = FacilityAcquisitionRules.TryBuildFhirQuery(
+            new FhirQueryPanel
+            {
+                FhirServerBaseUrl = "https://fhir.example.org",
+                MaxConcurrentRequests = 1,
+                MaxRetries = 0,
+                MinPull = "18:00:00",
+                MaxPull = "06:00:00"
+            },
+            "link-ui-p2b",
+            "America/Chicago",
+            out var body,
+            out var error);
+
+        built.Should().BeTrue(error);
+        body!["MinAcquisitionPullTime"].Should().Be("18:00:00");
+        body["MaxAcquisitionPullTime"].Should().Be("06:00:00");
+        FacilityAcquisitionRules.PullWindowHint("18:00:00", "06:00:00")
+            .Should().Be(FacilityAcquisitionRules.OvernightWindowHint);
+    }
+
+    [Fact]
+    public void Equal_pull_times_stay_valid_and_show_no_overnight_hint()
+    {
+        var built = FacilityAcquisitionRules.TryBuildFhirQuery(
+            new FhirQueryPanel
+            {
+                FhirServerBaseUrl = "https://fhir.example.org",
+                MaxConcurrentRequests = 1,
+                MaxRetries = 0,
+                MinPull = "18:00:00",
+                MaxPull = "18:00:00"
+            },
+            "link-ui-p2b",
+            "America/Chicago",
+            out var body,
+            out var error);
+
+        built.Should().BeTrue(error);
+        body!["MinAcquisitionPullTime"].Should().Be("18:00:00");
+        body["MaxAcquisitionPullTime"].Should().Be("18:00:00");
+        FacilityAcquisitionRules.PullWindowHint("18:00:00", "18:00:00").Should().BeNull();
+        FacilityAcquisitionRules.PullWindowHint("06:00:00", "18:00:00").Should().BeNull();
+        FacilityAcquisitionRules.PullWindowHint(null, null).Should().BeNull();
+    }
+
+    [Fact]
+    public void Blank_secret_names_keep_the_saved_value()
+    {
+        var saved = new FhirQueryPanel
+        {
+            UserName = "kv-user",
+            Password = "kv-password",
+            AuthKey = "kv-key",
+            ClientId = "kv-client",
+            ClientSecret = "kv-secret",
+            CustomHeaders = new List<HeaderInput> { new() { Key = "X-Api", Value = "kv-header" } }
+        };
+        var posted = new FhirQueryPanel
+        {
+            UserName = " ",
+            Password = "",
+            AuthKey = "",
+            ClientId = "",
+            ClientSecret = "replaced",
+            CustomHeaders = new List<HeaderInput>
+            {
+                new() { Key = "X-Api", Value = "" },
+                new() { Key = "X-New", Value = "" }
+            }
+        };
+
+        FacilityAcquisitionRules.KeepBlankSecrets(saved, posted);
+
+        posted.UserName.Should().Be("kv-user");
+        posted.Password.Should().Be("kv-password");
+        posted.AuthKey.Should().Be("kv-key");
+        posted.ClientId.Should().Be("kv-client");
+        posted.ClientSecret.Should().Be("replaced");
+        posted.CustomHeaders[0].Value.Should().Be("kv-header");
+        posted.CustomHeaders[1].Value.Should().BeNullOrEmpty();
+    }
+
+    [Fact]
     public void Fhir_query_rejects_one_sided_pull_times()
     {
         var built = FacilityAcquisitionRules.TryBuildFhirQuery(

@@ -4,7 +4,7 @@
     string Collapse(string? error, bool readFailed) =>
         string.IsNullOrWhiteSpace(error) && !readFailed ? "accordion-collapse collapse" : "accordion-collapse collapse show";
     string Button(string? error, bool readFailed) =>
-        string.IsNullOrWhiteSpace(error) && !readFailed ? "accordion-button collapsed" : "accordion-button";
+        string.IsNullOrWhiteSpace(error) && !readFailed ? "accordion-button collapsed" : "accordion-button lu-section-invalid";
     string Expanded(string? error, bool readFailed) =>
         string.IsNullOrWhiteSpace(error) && !readFailed ? "false" : "true";
     string SetupLabel(string method) => method switch
@@ -49,11 +49,11 @@ else
             <div class="accordion-body">
                 @if (!string.IsNullOrWhiteSpace(Model.FhirQueryError))
                 {
-                    <div class="alert alert-warning">@Model.FhirQueryError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.FhirQueryError</div>
                 }
                 else if (query.ReadFailed)
                 {
-                    <div class="alert alert-warning">The FHIR query configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                    <div class="alert alert-warning lu-section-error">The FHIR query configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
                 }
                 else if (!query.Exists)
                 {
@@ -87,6 +87,7 @@ else
                             </div>
                         </div>
                         <p class="form-text">Pull times are the facility local time of day. Enter both, or leave both empty. The facility timezone is @Model.TimeZone.</p>
+                        <p id="pullWindowHint" class="form-text text-muted@(FacilityAcquisitionRules.PullWindowHint(query.MinPull, query.MaxPull) is null ? " d-none" : "")">@FacilityAcquisitionRules.OvernightWindowHint</p>
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" id="fhirAuthEnabled" name="AuthEnabled" value="true" @(query.AuthEnabled ? "checked" : null) />
                             <label class="form-check-label" for="fhirAuthEnabled">Authentication</label>
@@ -105,20 +106,20 @@ else
                                 <div class="row g-3">
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="fhirUserName">User name secret name</label>
-                                        <input id="fhirUserName" name="UserName" value="@query.UserName" class="form-control" autocomplete="off" />
+                                        <input id="fhirUserName" name="UserName" type="password" value="" class="form-control" autocomplete="new-password" />
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="fhirPassword">Password secret name</label>
-                                        <input id="fhirPassword" name="Password" value="@query.Password" class="form-control" autocomplete="off" />
+                                        <input id="fhirPassword" name="Password" type="password" value="" class="form-control" autocomplete="new-password" />
                                     </div>
                                 </div>
-                                <p class="form-text">Key Vault secret names. Do not enter the secret itself.</p>
+                                <p class="form-text">Key Vault secret names. Do not enter the secret itself. Leave a name blank to keep the saved secret name.</p>
                             </div>
                             <div data-auth-panel="Epic">
                                 <div class="row g-3">
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="fhirAuthKey">Key secret name</label>
-                                        <input id="fhirAuthKey" name="AuthKey" value="@query.AuthKey" class="form-control" autocomplete="off" />
+                                        <input id="fhirAuthKey" name="AuthKey" type="password" value="" class="form-control" autocomplete="new-password" />
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="fhirTokenUrl">Token URL</label>
@@ -130,7 +131,8 @@ else
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="fhirClientId">Client id secret name</label>
-                                        <input id="fhirClientId" name="ClientId" value="@query.ClientId" class="form-control" autocomplete="off" />
+                                        <input id="fhirClientId" name="ClientId" type="password" value="" class="form-control" autocomplete="new-password" />
+                                        <p class="form-text mb-0">Leave a name blank to keep the saved secret name.</p>
                                     </div>
                                 </div>
                             </div>
@@ -142,11 +144,12 @@ else
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="oauthClientId">Client id secret name</label>
-                                        <input id="oauthClientId" name="ClientId" value="@query.ClientId" class="form-control" autocomplete="off" />
+                                        <input id="oauthClientId" name="ClientId" type="password" value="" class="form-control" autocomplete="new-password" />
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="oauthClientSecret">Client secret name</label>
-                                        <input id="oauthClientSecret" name="ClientSecret" value="@query.ClientSecret" class="form-control" autocomplete="off" />
+                                        <input id="oauthClientSecret" name="ClientSecret" type="password" value="" class="form-control" autocomplete="new-password" />
+                                        <p class="form-text mb-0">Leave a name blank to keep the saved secret name.</p>
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label" for="oauthScope">Scope</label>
@@ -164,7 +167,7 @@ else
                                         </div>
                                         <div class="col-12 col-md-5">
                                             <label class="form-label" for="header-value-@i">Secret name</label>
-                                            <input id="header-value-@i" name="CustomHeaders[@i].Value" value="@query.CustomHeaders[i].Value" class="form-control" autocomplete="off" />
+                                            <input id="header-value-@i" name="CustomHeaders[@i].Value" type="password" value="" class="form-control" autocomplete="new-password" />
                                         </div>
                                         <div class="col-12 col-md-2">
                                             <div class="form-check mb-2">
@@ -174,7 +177,7 @@ else
                                         </div>
                                     </div>
                                 }
-                                <p class="form-text">Leave the last header row blank to ignore it. Values are Key Vault secret names.</p>
+                                <p class="form-text">Leave the last header row blank to ignore it. Values are Key Vault secret names. Leave a secret name blank to keep the saved name, or check Remove to drop that header.</p>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success">@(query.Exists ? "Save FHIR query" : "Add FHIR query")</button>
@@ -200,11 +203,11 @@ else
             <div class="accordion-body">
                 @if (!string.IsNullOrWhiteSpace(Model.FhirListError))
                 {
-                    <div class="alert alert-warning">@Model.FhirListError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.FhirListError</div>
                 }
                 else if (list.ReadFailed)
                 {
-                    <div class="alert alert-warning">The FHIR list configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                    <div class="alert alert-warning lu-section-error">The FHIR list configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
                 }
                 else if (!list.Exists)
                 {
@@ -258,18 +261,18 @@ else
         <h2 class="accordion-header" id="queryPlanHeading">
             <button class="@Button(Model.QueryPlanError, plan.ReadFailed || showPlanEditor)" type="button" data-bs-toggle="collapse" data-bs-target="#queryPlanPanel" aria-expanded="@Expanded(Model.QueryPlanError, plan.ReadFailed || showPlanEditor)" aria-controls="queryPlanPanel">
                 Query plan
-                <span class="badge text-bg-light ms-2" id="queryPlanCount">@planCount</span>
+                <span class="text-muted ms-2" id="queryPlanCount">@planCount</span>
             </button>
         </h2>
         <div id="queryPlanPanel" class="@Collapse(Model.QueryPlanError, plan.ReadFailed || showPlanEditor)" aria-labelledby="queryPlanHeading">
             <div class="accordion-body">
                 @if (!string.IsNullOrWhiteSpace(Model.QueryPlanError))
                 {
-                    <div class="alert alert-warning">@Model.QueryPlanError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.QueryPlanError</div>
                 }
                 else if (plan.ReadFailed)
                 {
-                    <div class="alert alert-warning">This query plan could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                    <div class="alert alert-warning lu-section-error">This query plan could not be read. Saving is hidden so an empty form cannot replace it.</div>
                 }
                 else if (planCount == 0)
                 {
@@ -441,11 +444,11 @@ else
             <div class="accordion-body">
                 @if (!string.IsNullOrWhiteSpace(Model.ReportingOrgError))
                 {
-                    <div class="alert alert-warning">@Model.ReportingOrgError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.ReportingOrgError</div>
                 }
                 else if (org.ReadFailed)
                 {
-                    <div class="alert alert-warning">The reporting organization configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                    <div class="alert alert-warning lu-section-error">The reporting organization configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
                 }
                 else if (!org.Exists)
                 {
@@ -585,11 +588,11 @@ else
             <div class="accordion-body">
                 @if (!string.IsNullOrWhiteSpace(Model.SftpError))
                 {
-                    <div class="alert alert-warning">@Model.SftpError</div>
+                    <div class="alert alert-warning lu-section-error">@Model.SftpError</div>
                 }
                 else if (sftp.ReadFailed)
                 {
-                    <div class="alert alert-warning">The SFTP configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
+                    <div class="alert alert-warning lu-section-error">The SFTP configuration could not be read. Saving is hidden so an empty form cannot replace it.</div>
                 }
                 else if (!sftp.Exists)
                 {
@@ -794,9 +797,33 @@ else
             document.querySelectorAll("[data-query-type]").forEach(function (select) {
                 select.addEventListener("change", syncQueries);
             });
+            function syncPullHint() {
+                var min = document.getElementById("minPull");
+                var max = document.getElementById("maxPull");
+                var hint = document.getElementById("pullWindowHint");
+                if (!min || !max || !hint) return;
+                function seconds(value) {
+                    var parts = String(value || "").trim().split(":");
+                    if (parts.length < 2) return null;
+                    var hours = Number(parts[0]);
+                    var minutes = Number(parts[1]);
+                    var secs = parts.length > 2 ? Number(parts[2]) : 0;
+                    if (![hours, minutes, secs].every(function (n) { return Number.isFinite(n); })) return null;
+                    return (hours * 3600) + (minutes * 60) + secs;
+                }
+                var minSeconds = seconds(min.value);
+                var maxSeconds = seconds(max.value);
+                hint.classList.toggle("d-none", !(minSeconds !== null && maxSeconds !== null && minSeconds > maxSeconds));
+            }
+
+            var minPull = document.getElementById("minPull");
+            var maxPull = document.getElementById("maxPull");
+            if (minPull) minPull.addEventListener("input", syncPullHint);
+            if (maxPull) maxPull.addEventListener("input", syncPullHint);
             syncAuth();
             syncOrg();
             syncQueries();
+            syncPullHint();
         })();
     </script>
 }
