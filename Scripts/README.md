@@ -15,7 +15,7 @@ subfolder and is summarised at the end.
 |---|---|
 | `check_health.sh <project> [timeout] [interval]` | Polls docker-compose service health until everything is healthy or the timeout expires. Writes `service-logs/` on failure. |
 | `docker-compose.feed-token.ps1` / `docker-compose.feed-token-fetch.sh` | Fetches a short-lived Azure DevOps token into gitignored `.azure-artifacts.env`. When Azure CLI is missing, the PowerShell script installs Microsoft's per-user ZIP under `%LOCALAPPDATA%\AzureCLI`. Does not print the token. |
-| `docker-compose.feed-token-install.ps1` / `docker-compose.feed-token-install.sh` | One-time setup. Adds one profile line so `docker compose` inside this repo refreshes that token. The documented PowerShell command passes `-ProfilePath "$PROFILE"` so the calling shell's profile is updated. |
+| `docker-compose.feed-token-install.ps1` / `docker-compose.feed-token-install.sh` | One-time setup. Adds one profile line so `docker compose` inside this repo refreshes that token. The documented PowerShell command passes `-ProfilePath "$PROFILE"` so the calling shell's profile is updated. The profile loads only when the execution policy allows local scripts. See `DEVELOPMENT.md`. |
 | `docker-compose.feed-token-profile.ps1` / `docker-compose.feed-token-profile.sh` | The `docker` and `compose` functions those profile lines load. |
 | `docker-compose.restore-feed.sh` | Image build helper. Restores a project with the `feed_accesstoken` BuildKit secret and stops before restore when the secret is missing. |
 | `clean.py` | Deletes or drops SQL tables, Mongo collections, Kafka topics and Redis keys across services. `--drop-tables` drops rather than empties; `--bypass-prompt` skips confirmation. |
