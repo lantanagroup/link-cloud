@@ -280,6 +280,12 @@ pre code, a > code { color: inherit; }
 /* ===================================================================
    Buttons â€” colour vocabulary
    =================================================================== */
+/* Plain buttons keep near-black text. Variant rules below win on the same element. */
+.btn,
+.btn:hover {
+  color: #222;
+}
+
 .btn-au-action {
   background: var(--au-accent-fill); color: #fff; border: none;
 }
@@ -292,12 +298,6 @@ pre code, a > code { color: inherit; }
 }
 .btn-au-run:hover { background: #333; color: #fff; }
 .btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
-
-/* Plain buttons keep near-black text. Variant rules below win on the same element. */
-.btn,
-.btn:hover {
-  color: #222;
-}
 
 /* overrides for bootstrap btn-success / danger / warning.
    :disabled and :hover beat a plain .btn-success rule, so every state uses the token. */
@@ -419,14 +419,14 @@ details.au-facility-actions > summary::-webkit-details-marker {
 /* ===================================================================
    Status badges
    =================================================================== */
-.au-badge-success  { background: var(--au-success) !important; }
-.au-badge-danger   { background: var(--au-danger)  !important; }
+.au-badge-success  { background: var(--au-success) !important; color: #fff !important; }
+.au-badge-danger   { background: var(--au-danger)  !important; color: #fff !important; }
 .au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
-.badge.bg-success { background-color: var(--au-success) !important; }
-.badge.bg-danger { background-color: var(--au-danger) !important; }
+.badge.bg-success { background-color: var(--au-success) !important; color: #fff !important; }
+.badge.bg-danger { background-color: var(--au-danger) !important; color: #fff !important; }
 .badge.bg-warning { background-color: var(--au-warning) !important; color: #111 !important; }
 .au-badge-active   { background: #343a40 !important; color: #fff !important; }
-.au-badge-muted    { background: var(--au-muted)   !important; }
+.au-badge-muted    { background: var(--au-muted)   !important; color: #fff !important; }
 .au-badge-skip     { background: #6c757d !important; color: #fff !important; }
 
 /* ===================================================================
@@ -2504,6 +2504,9 @@ a.lu-clip {
   color: #fff;
   min-width: 12ch;
 }
+.au-card .card-header .lu-id-label {
+  color: #adb5bd;
+}
 .lu-row-actions {
   display: flex;
   flex-wrap: nowrap;
@@ -2891,6 +2894,7 @@ a:hover {
 .btn-outline-secondary:hover {
   background-color: #3d444b;
   border-color: #3d444b;
+  color: #fff;
 }
 .btn-check:focus+.btn-outline-secondary,
 .btn-outline-secondary:focus {
@@ -2903,6 +2907,7 @@ a:hover {
 .btn-outline-secondary.dropdown-toggle.show {
   background-color: #3d444b;
   border-color: #3d444b;
+  color: #fff;
 }
 .btn-check:checked+.btn-outline-secondary:focus,
 .btn-check:active+.btn-outline-secondary:focus,
@@ -3181,10 +3186,12 @@ caption,
 .btn-dark {
   background-color: #111;
   border-color: #111;
+  color: #fff;
 }
 .btn-info {
   background-color: #545c64;
   border-color: #545c64;
+  color: #fff;
 }
 .btn-light {
   background-color: #f8f8f8;
@@ -3326,6 +3333,7 @@ kbd {
 .nav-pills .nav-link.active,
 .nav-pills .show > .nav-link {
   background-color: #111;
+  color: #fff;
 }
 .nav-tabs {
   border-bottom: 1px solid #e0e0e0;
@@ -3340,10 +3348,15 @@ kbd {
   --bs-table-hover-color: #222;
 }
 .table-dark {
+  --bs-table-color: #fff;
   --bs-table-bg: #222;
   --bs-table-striped-bg: #2a2a2a;
+  --bs-table-striped-color: #fff;
   --bs-table-hover-bg: #333;
+  --bs-table-hover-color: #fff;
   --bs-table-active-bg: #3a3a3a;
+  --bs-table-active-color: #fff;
+  color: #fff;
   border-color: #3a3a3a;
 }
 .table-info,
