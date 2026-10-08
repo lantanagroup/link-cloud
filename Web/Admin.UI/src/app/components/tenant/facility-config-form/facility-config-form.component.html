@@ -121,13 +121,11 @@
           }
         </mat-select>
       </mat-form-field>
-    </div>
 
-    @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
-      <div>
-        <small class="error">{{ reportsNotUniqueError }}</small>
-      </div>
-    }
+      @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+        <mat-error class="reports-error">{{ reportsNotUniqueError }}</mat-error>
+      }
+    </div>
     }
 
   </form>

@@ -11,14 +11,11 @@
   margin-top: 10px
 }
 
-.error {
-  color: red;
-  font-size: 18px;  /* Increased font size */
-  font-weight: bold; /* Make the text bold */
-  padding: 5px;  /* Add some padding */
-  background-color: #f8d7da;  /* Light red background */
-  border: 1px solid #f5c6cb;  /* Border color */
-  border-radius: 5px;  /* Rounded corners */
+// Sits under the last picker, styled like the measure definition form's form-level error.
+.reports-error {
+  margin-top: -6px;
+  color: #d32f2f;
+  font-size: 14px;
 }
 
 
