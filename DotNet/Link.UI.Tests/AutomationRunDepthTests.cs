@@ -64,7 +64,9 @@ public class AutomationRunDepthTests
         var detail = Read("DotNet/Link.UI/Views/Automation/_RunDetail.cshtml");
         detail.Should().NotContain("Model.Logs");
         detail.Should().Contain("id=\"logBox\"");
-        detail.Should().Contain("id=\"liveUtilizationCard\"");
+        detail.Should().Contain("!Model.Status.IsTerminal()");
+        detail.Should().Contain("name=\"_ServiceMonitor\"");
+        detail.Should().NotContain("id=\"liveUtilizationCard\"");
         detail.Should().Contain("id=\"btnCancelRun\"");
 
         var script = Read("DotNet/Link.UI/Views/Automation/_RunDetailScript.cshtml");
@@ -74,6 +76,16 @@ public class AutomationRunDepthTests
         script.Should().Contain("CancelJson");
         script.Should().Contain("DeleteJson");
         script.Should().Contain("Export");
+        script.Should().Contain("window.auPulseStop");
+
+        var monitor = Read("DotNet/Link.UI/Views/Shared/_ServiceMonitor.cshtml");
+        monitor.Should().Contain("id=\"liveUtilizationCard\"");
+        monitor.Should().Contain("data-url=");
+        Read("DotNet/Link.UI/Views/Metrics/Index.cshtml").Should().Contain("name=\"_ServiceMonitor\"");
+        Read("DotNet/Link.UI/Views/Automation/Run.cshtml").Should().Contain("!detail.Status.IsTerminal()");
+        var pulse = Read("DotNet/Link.UI/wwwroot/js/live-utilization.js");
+        pulse.Should().Contain("window.auPulseStop");
+        pulse.Should().Contain("if (!card || !card.getAttribute('data-url') || timer) return;");
 
         var manifest = Read("DotNet/Link.UI/Views/Automation/Manifest.cshtml");
         manifest.Should().Contain("Generated vs ABS");

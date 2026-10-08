@@ -138,7 +138,10 @@ else
     @if (detail is not null)
     {
         @await Html.PartialAsync("_RunDetailScript", detail)
-        <script src="~/js/live-utilization.js" asp-append-version="true"></script>
+        @if (!detail.Status.IsTerminal())
+        {
+            <script src="~/js/live-utilization.js" asp-append-version="true"></script>
+        }
     }
     <script src="~/js/automation-run.js" asp-append-version="true"></script>
 }

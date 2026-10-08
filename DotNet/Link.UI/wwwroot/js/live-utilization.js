@@ -233,7 +233,11 @@
 
     async function poll() {
         var card = $('liveUtilizationCard');
-        if (!card || inFlight || document.hidden) return;
+        if (!card) {
+            stop();
+            return;
+        }
+        if (inFlight || document.hidden) return;
         inFlight = true;
         try {
             var response = await fetch(card.getAttribute('data-url'), { headers: { Accept: 'application/json' }, cache: 'no-store' });
@@ -250,7 +254,8 @@
     }
 
     function start() {
-        if (timer) return;
+        var card = $('liveUtilizationCard');
+        if (!card || !card.getAttribute('data-url') || timer) return;
         poll();
         timer = setInterval(poll, 5000);
     }
@@ -260,9 +265,16 @@
         timer = null;
     }
 
+    function removeCard() {
+        stop();
+        var card = $('liveUtilizationCard');
+        if (card) card.remove();
+    }
+    window.auPulseStop = removeCard;
+
     function bind() {
         var card = $('liveUtilizationCard');
-        if (!card || card.dataset.pulseBound === 'true') return;
+        if (!card || !card.getAttribute('data-url') || card.dataset.pulseBound === 'true') return;
         card.dataset.pulseBound = 'true';
         card.addEventListener('click', function (e) {
             var seg = e.target.closest('[data-pulse-group]');
@@ -283,14 +295,25 @@
             if (!selectedKey) userPinned = false;
             render({ reachable: true, sampledAt: new Date().toISOString(), services: lastServices });
         });
-        document.addEventListener('visibilitychange', function () {
-            if (document.hidden) stop();
-            else start();
-        });
-        window.addEventListener('pagehide', stop);
         start();
     }
 
+    var lifeBound = false;
+    function bindLife() {
+        if (lifeBound) return;
+        lifeBound = true;
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) stop();
+            else if ($('liveUtilizationCard')) start();
+        });
+        window.addEventListener('pagehide', stop);
+        document.addEventListener('au-refreshed', function () {
+            if (!$('liveUtilizationCard')) stop();
+            else bind();
+        });
+    }
+
+    bindLife();
     if (document.readyState === 'loading')
         document.addEventListener('DOMContentLoaded', bind);
     else
