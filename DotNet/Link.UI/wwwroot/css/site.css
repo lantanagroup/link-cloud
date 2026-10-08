@@ -6,9 +6,9 @@
 :root {
   --au-dark:        #111;
   --au-dark-soft:   #1a1a1a;
-  --au-accent:      #4da3ff;
-  --au-accent-fill: #084298;
-  --au-accent-soft: #e8f3ff;
+  --au-accent:      #343a40;
+  --au-accent-fill: #111;
+  --au-accent-soft: #f3f5f8;
   --au-success:     #28a745;
   --au-danger:      #dc3545;
   --au-warning:     #ffc107;
@@ -25,6 +25,16 @@ html { font-size: 14px; position: relative; min-height: 100%; }
 @media (min-width: 768px) { html { font-size: 15px; } }
 
 body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
+a { color: #111; }
+a:hover { color: #343a40; }
+.form-check-input:checked {
+  background-color: #111;
+  border-color: #111;
+}
+.form-check-input:focus {
+  border-color: #111;
+  box-shadow: 0 0 0 .2rem rgba(17,17,17,.16);
+}
 
 /* Nested page containers sit inside _Layout's container-xl â€” drop the extra gutters. */
 .container .container {
@@ -54,11 +64,11 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 }
 .au-navbar .navbar-brand,
 .au-navbar .nav-link { color: #fff !important; font-weight: 500; }
-.au-navbar .nav-link:hover { color: var(--au-accent) !important; }
+.au-navbar .nav-link:hover { color: #fff !important; }
 .au-navbar .nav-link.active,
 .au-navbar .nav-link.active:hover,
 .au-navbar .nav-item.dropdown.show > .nav-link {
-  color: var(--au-accent) !important;
+  color: #fff !important;
 }
 .au-navbar .nav-link.active {
   position: relative;
@@ -70,7 +80,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   right: .7rem;
   bottom: .15rem;
   height: 2px;
-  background: var(--au-accent);
+  background: var(--au-warning);
   border-radius: 2px;
 }
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
@@ -152,7 +162,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   background: var(--au-accent-fill); color: #fff; border: none;
 }
 .btn-au-action:hover,
-.btn-au-action:focus { background: #06357a; color: #fff; }
+.btn-au-action:focus { background: #333; color: #fff; }
 
 .btn-au-run {
   background: var(--au-dark); color: #fff; border: none;
@@ -235,10 +245,28 @@ body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
   background-color: var(--au-dark);
   border-color: var(--au-dark);
   color: #fff;
+  box-shadow: inset 0 0 0 2px #fff, 0 0 0 2px var(--au-dark);
+}
+.btn-check:checked + .btn-au-neutral::before {
+  content: "\2713\00a0";
+  font-weight: 700;
 }
 details.au-facility-actions > summary {
   cursor: pointer;
   list-style: none;
+}
+.au-facility-actions .card-body p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem;
+}
+.au-facility-actions .lu-labeled-id {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  max-width: 16rem;
+  vertical-align: middle;
 }
 details.au-facility-actions > summary::-webkit-details-marker {
   display: none;
@@ -298,7 +326,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   padding: .5rem .75rem;
 }
 .au-table tbody tr:hover,
-.au-card .table tbody tr:hover { background: rgba(77,163,255,.06); }
+.au-card .table tbody tr:hover { background: rgba(17,17,17,.04); }
 .au-card .table thead th a,
 .au-card .table thead th a:visited {
   color: inherit;
@@ -758,8 +786,8 @@ details.au-facility-actions > summary::-webkit-details-marker {
   margin-bottom: .65rem;
 }
 .au-cfggen-choice.is-recommended {
-  border-color: #b8d9ff;
-  background: #f5f9ff;
+  border-color: var(--au-border);
+  background: var(--au-bg);
 }
 .au-cfggen-choice-head {
   display: flex;
@@ -844,7 +872,7 @@ details.au-facility-actions > summary::-webkit-details-marker {
   height: 100%;
 }
 a.au-kpi-link:hover {
-  border-top-color: #2b86e6;
+  border-top-color: #111;
   box-shadow: 0 4px 14px rgba(0,0,0,.12);
   color: inherit;
 }
@@ -883,7 +911,7 @@ a.au-kpi-link:hover {
   text-decoration: none;
 }
 .home-row:hover { color: inherit; background: #f7f8fa; }
-.home-row-main { min-width: 0; overflow-wrap: anywhere; }
+.home-row-main { min-width: 0; }
 .home-row-time { white-space: nowrap; justify-self: end; }
 .home-name { overflow-wrap: anywhere; }
 @media (max-width: 767.98px) {
@@ -975,7 +1003,7 @@ a.au-service-chip:focus { color: inherit; }
 }
 .au-live-gauge-pipeline {
   background: #fff;
-  border-color: rgba(77,163,255,.28);
+  border-color: rgba(17,17,17,.18);
   box-shadow: var(--au-card-shadow);
 }
 .au-live-gauge-name {
@@ -1046,7 +1074,7 @@ a.au-scenario-card {
   border: 1px solid transparent;
 }
 a.au-scenario-card:hover {
-  border-color: rgba(77,163,255,.45);
+  border-color: rgba(17,17,17,.28);
   box-shadow: 0 4px 14px rgba(0,0,0,.12);
   color: inherit;
 }
@@ -1088,7 +1116,7 @@ a.au-scenario-card:hover {
   fill: #6b7280;
   font-family: inherit;
 }
-.au-trend a:hover circle { fill: #2b86e6; }
+.au-trend a:hover circle { fill: #111; }
 .au-sparkline {
   color: var(--au-accent);
   flex-shrink: 0;
@@ -1160,7 +1188,7 @@ a.au-scenario-card:hover {
 }
 .form-control:focus, .form-select:focus {
   border-color: var(--au-accent);
-  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
+  box-shadow: 0 0 0 .2rem rgba(17,17,17,.16);
 }
 
 .nav-tabs .nav-link {
@@ -1342,8 +1370,9 @@ a.au-scenario-card:hover {
   line-height: 1.2;
 }
 .au-pulse-seg button.is-on {
-  background: var(--au-accent);
+  background: #111;
   color: #fff;
+  box-shadow: inset 0 0 0 1px #fff;
 }
 .au-pulse-seg button:focus-visible {
   outline: 2px solid var(--au-accent);
@@ -1372,11 +1401,11 @@ a.au-scenario-card:hover {
 }
 .au-pulse-cell:hover,
 .au-pulse-cell.is-selected {
-  border-color: var(--au-accent);
-  background: rgba(77,163,255,.14);
+  border-color: #fff;
+  background: rgba(255,255,255,.12);
 }
 .au-pulse-cell.is-pipeline {
-  border-color: rgba(77,163,255,.28);
+  border-color: rgba(255,255,255,.28);
 }
 .au-pulse-cell.is-hot {
   box-shadow: 0 0 0 1px rgba(220,53,69,.5), 0 0 14px rgba(220,53,69,.28);
@@ -1424,6 +1453,9 @@ a.au-scenario-card:hover {
   font-size: .62rem;
   color: rgba(255,255,255,.45);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .au-pulse-read span {
   color: rgba(255,255,255,.32);
@@ -1507,8 +1539,8 @@ a.au-scenario-card:hover {
    Patient configuration â€” shape strip + intent chips
    =================================================================== */
 .pc-shape {
-  background: linear-gradient(180deg, #f7fbff 0%, #fff 100%);
-  border: 1px solid #d7e6f7;
+  background: var(--au-bg);
+  border: 1px solid var(--au-border);
   border-radius: var(--au-radius);
   padding: .75rem .9rem;
   margin: 1rem 0 .75rem;
@@ -1550,7 +1582,7 @@ a.au-scenario-card:hover {
   margin-top: .65rem;
 }
 .pc-intent-chip {
-  border: 1px solid #c9daf0;
+  border: 1px solid var(--au-border);
   background: #fff;
   color: #234;
   font-size: .75rem;
@@ -1560,13 +1592,13 @@ a.au-scenario-card:hover {
   line-height: 1.2;
 }
 .pc-intent-chip:hover:not(:disabled) {
-  border-color: var(--au-accent);
-  color: #0b5cab;
-  background: var(--au-accent-soft);
+  border-color: #111;
+  color: #111;
+  background: var(--au-bg);
 }
 .pc-intent-chip.is-on {
-  background: var(--au-accent);
-  border-color: var(--au-accent);
+  background: #111;
+  border-color: #111;
   color: #fff;
 }
 .pc-intent-chip:disabled { opacity: .55; cursor: not-allowed; }
@@ -1620,7 +1652,7 @@ a.au-scenario-card:hover {
   z-index: 1;
 }
 .au-health-table tbody td { vertical-align: middle; padding: .45rem .75rem; }
-.au-health-table tbody tr:hover { background: rgba(77,163,255,.06); }
+.au-health-table tbody tr:hover { background: rgba(17,17,17,.04); }
 
 /* ===================================================================
    Accordion polish (patient config + elsewhere)
@@ -1634,7 +1666,7 @@ a.au-scenario-card:hover {
   box-shadow: none;
 }
 .accordion-button:focus {
-  box-shadow: 0 0 0 .2rem rgba(77,163,255,.2);
+  box-shadow: 0 0 0 .2rem rgba(17,17,17,.16);
 }
 /* ===================================================================
    Link.UI â€” left-hand vertical shell (phase 1)
@@ -1711,7 +1743,7 @@ html:has(body.lu-body) {
   font-size: 1.1rem;
 }
 
-.lu-brand-link:hover { color: var(--au-accent) !important; }
+.lu-brand-link:hover { color: #fff !important; }
 
 .lu-nav {
   display: flex;
@@ -1746,8 +1778,9 @@ html:has(body.lu-body) {
 }
 
 .lu-nav-link.active {
-  background: rgba(77,163,255,.18);
-  color: var(--au-accent) !important;
+  background: rgba(255,255,255,.12);
+  color: #fff !important;
+  box-shadow: inset 3px 0 0 var(--au-warning);
 }
 
 .lu-nav-link-muted {
@@ -1816,7 +1849,14 @@ html:has(body.lu-body) {
 .lu-body .text-muted { color: var(--au-muted) !important; }
 
 .lu-facility-id {
-  word-break: break-all;
+  display: inline-block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .8rem;
 }
 
 @media (max-width: 767.98px) {
@@ -1886,6 +1926,37 @@ html:has(body.lu-body) {
   background: transparent !important;
   border-radius: 0 !important;
   box-shadow: inset 0 -3px 0 var(--au-warning) !important;
+}
+.lu-section-nav button {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: .35rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: .95rem;
+  line-height: 1.4;
+  padding: .45rem .85rem;
+  margin: 0;
+  background: transparent;
+  color: rgba(255,255,255,.82);
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+.lu-section-nav button:hover,
+.lu-section-nav button:focus {
+  color: #fff;
+  background: rgba(255,255,255,.14);
+}
+.lu-section-nav button.active,
+.lu-section-nav button.active:hover,
+.lu-section-nav button.active:focus {
+  color: #fff;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: inset 0 -3px 0 var(--au-warning);
 }
 .lu-live-label {
   font-size: .75rem;
@@ -2018,7 +2089,7 @@ html:has(body.lu-body) {
   border-bottom: 1px solid var(--bs-border-color, #dee2e6);
 }
 
-.lu-location-row.is-selected { background: #f3f8fd; }
+.lu-location-row.is-selected { background: var(--au-bg); }
 
 .lu-hsloc-detail {
   border: 1px solid var(--bs-border-color, #dee2e6);
@@ -2050,7 +2121,7 @@ html:has(body.lu-body) {
 }
 .lu-admin form[method="post"] .btn-au-action:hover,
 .lu-admin form[method="post"] .btn-au-action:focus {
-  background: #1e7e34;
+  background: var(--au-success);
   color: #fff;
 }
 .lu-admin .btn-outline-danger {
@@ -2305,4 +2376,67 @@ html:has(body.lu-body) {
   padding-top: var(--lu-dialog-top);
 }
 .au-modal-panel { max-height: calc(100vh - var(--lu-dialog-top) - .75rem); }
+
+.card-header.bg-primary,
+.card-header.text-bg-primary {
+  background-color: var(--au-dark) !important;
+  color: #fff !important;
+}
+#runHeaderActions { flex-wrap: wrap; }
+#runHeaderActions .btn { white-space: nowrap; flex: 0 0 auto; }
+@media (max-width: 767.98px) {
+  .d-flex:has(> #runHeaderActions) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .75rem;
+  }
+  #runHeaderActions { width: 100%; justify-content: flex-start; }
+}
+.lu-id-strip { align-items: center; }
+.lu-id-strip .badge { align-self: center; white-space: nowrap; }
+.lu-logs-table { table-layout: fixed; width: 100%; min-width: 72rem; }
+.lu-logs-table th,
+.lu-logs-table td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.lu-logs-table th:first-child,
+.lu-logs-table td:first-child { width: 2.5rem; overflow: visible; }
+.lu-logs-table .lu-labeled-id-compact { flex-wrap: nowrap; }
+.lu-logs-table .lu-clip { max-width: 100%; min-width: 0; }
+.lu-logs-table .lu-col-created { width: 11rem; white-space: nowrap; }
+.lu-logs-table .lu-col-action { width: 4.25rem; overflow: visible; white-space: nowrap; }
+#validationIssues .table { table-layout: fixed; width: 100%; min-width: 48rem; }
+#validationIssues .table th,
+#validationIssues .table td {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+#validationIssues .lu-labeled-id-compact { flex-wrap: nowrap; }
+#validationIssues .lu-clip { max-width: 100%; min-width: 0; }
+.lu-issue-filters .col-category { flex: 1 1 14rem; max-width: none; min-width: 12rem; }
+.text-success { color: var(--au-success) !important; }
+.text-danger { color: var(--au-danger) !important; }
+.badge.bg-success,
+.badge.text-bg-success { background-color: var(--au-success) !important; color: #fff !important; }
+.lu-reports-table { table-layout: fixed; width: 100%; }
+.lu-reports-table th,
+.lu-reports-table td { overflow: hidden; }
+.lu-reports-table .lu-col-action { width: 8.5rem; overflow: visible; white-space: nowrap; }
+.lu-reports-table .lu-measures-col { width: 14%; }
+.lu-measures {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+.lu-measures .lu-clip { min-width: 0; }
+.lu-issue-filters .form-select,
+.lu-issue-filters .form-control { width: 100%; min-width: 0; }
 

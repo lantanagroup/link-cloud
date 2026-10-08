@@ -76,7 +76,7 @@
         let validationCountKey = '';
         let validationMovedAt = 0;
         const validationQuietMs = 30 * 60 * 1000;
-        let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
+        let currentFinishedAt = '@(Model.FinishedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ") ?? string.Empty)';
         let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
         let snapshotTimer = null;
         let statusPollTimer = null;
@@ -545,7 +545,7 @@
                     labels: items.map(x => x.status || 'Unknown'),
                     datasets: [{
                         data: items.map(x => x.count || 0),
-                        backgroundColor: ['#0d6efd', '#198754', '#6f42c1', '#20c997', '#fd7e14', '#6c757d'],
+                        backgroundColor: ['#343a40', '#28a745', '#6f42c1', '#545c64', '#fd7e14', '#6c757d'],
                         borderRadius: 6
                     }]
                 },
@@ -616,7 +616,7 @@
             const labels = [];
             const values = [];
             const colors = [];
-            const fallbackPalette = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b'];
+            const fallbackPalette = ['#343a40', '#6f42c1', '#ffc107', '#dc3545', '#28a745', '#6c757d'];
             let legendHtml = '';
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
@@ -649,11 +649,11 @@
 
         function getScheduleStatusClass(status) {
             const s = (status || '').toLowerCase();
-            if (s === 'submitted') return 'bg-success';
-            if (s === 'endofperiod') return 'bg-success-subtle text-success-emphasis';
-            if (s === 'scheduled') return 'bg-warning text-dark';
-            if (s === 'new') return 'bg-secondary';
-            return 'bg-secondary';
+            if (s === 'submitted') return 'au-badge-success';
+            if (s === 'endofperiod') return 'au-badge-warning';
+            if (s === 'failed' || s === 'error') return 'au-badge-danger';
+            if (s === 'running' || s === 'processing' || s === 'queued') return 'au-badge-active';
+            return 'au-badge-muted';
         }
 
         function validationStatusCount(snapshot, name) {
@@ -730,7 +730,20 @@
             if (value === 'cancelled' || value === '2') return 'Cancelled';
             if (value === 'running' || value === '1') return 'Running';
             if (value === 'queued' || value === '0') return 'Queued';
-            return String(status || '');
+            return String(status || 'Unknown');
+        }
+
+        function runStatusClass(status) {
+            const value = String(status || '').toLowerCase();
+            if (value === 'succeeded' || value === '3') return 'au-badge-success';
+            if (value === 'failed' || value === '4') return 'au-badge-danger';
+            if (value === 'cancelled' || value === '2') return 'au-badge-warning';
+            if (value === 'running' || value === '1' || value === 'queued' || value === '0'
+                || value === 'livewindowopen' || value === '5'
+                || value === 'reportfinalization' || value === '6'
+                || value === 'collectingmetrics' || value === '7')
+                return 'au-badge-active';
+            return 'au-badge-muted';
         }
 
         function isLiveWindowOpen(status) {
@@ -1116,7 +1129,11 @@
             const reportIdFromStatus = run.reportId || '-';
             document.getElementById('scheduleReportName').textContent = reportIdFromStatus;
             document.getElementById('headerReportId').textContent = reportIdFromStatus;
-            document.getElementById('status').textContent = displayStatus(run.status);
+            const statusNode = document.getElementById('status');
+            if (statusNode) {
+                statusNode.textContent = displayStatus(run.status);
+                statusNode.className = 'badge ' + runStatusClass(run.status);
+            }
             showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
             const retention = document.getElementById('runRetention');
@@ -1557,15 +1574,15 @@
 
                 const statusPill = document.getElementById('scheduleStatusPill');
                 statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
-                statusPill.textContent = schedule?.scheduleStatus || '-';
+                statusPill.textContent = schedule?.scheduleStatus || 'Unknown';
 
                 renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], {
-                    submitted: '#198754',
-                    submitting: '#06b6d4',
-                    noteligable: '#f59e0b',
-                    failedsubmission: '#ef4444',
-                    pendingvalidation: '#94a3b8',
-                    unknown: '#cbd5e1'
+                    submitted: '#28a745',
+                    submitting: '#343a40',
+                    noteligable: '#ffc107',
+                    failedsubmission: '#dc3545',
+                    pendingvalidation: '#6c757d',
+                    unknown: '#545c64'
                 });
 
                 document.getElementById('populationSummary').textContent = snapshot.report?.populationSummary || 'No population data yet.';
@@ -1583,18 +1600,18 @@
                 const dataAcq = lastDataAcqSnapshot || dataAcqCandidate;
 
                 renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], {
-                    completed: '#198754',
-                    processing: '#06b6d4',
-                    failed: '#ef4444',
-                    pending: '#f59e0b',
-                    unknown: '#94a3b8'
+                    completed: '#28a745',
+                    processing: '#343a40',
+                    failed: '#dc3545',
+                    pending: '#ffc107',
+                    unknown: '#6c757d'
                 }, true);
 
                 document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
                 document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
                 document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
                 document.getElementById('dataAcqActiveDuration').textContent = activeDurationOf(dataAcq);
-                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#06b6d4');
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#343a40');
                 renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
                 dataAcqErrors = dataAcq.errors || [];
                 document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
@@ -1619,12 +1636,12 @@
                 document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
                 document.getElementById('measureActiveDuration').textContent = activeDurationOf(snapshot.measureEval);
                 renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
-                    'no measure report': '#94a3b8',
-                    notreportable: '#f59e0b',
-                    readyforvalidation: '#198754'
+                    'no measure report': '#6c757d',
+                    notreportable: '#ffc107',
+                    readyforvalidation: '#28a745'
                 });
                 renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
-                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#0d6efd');
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#343a40');
 
                 measureErrors = snapshot.measureEval?.errors || [];
                 document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
@@ -1642,11 +1659,11 @@
                 document.getElementById('validationFailedCount').textContent = validationFailed;
                 document.getElementById('validationActiveDuration').textContent = activeDurationOf(snapshot.validation);
                 renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
-                    notvalidated: '#94a3b8',
-                    failedvalidation: '#ef4444',
-                    passedvalidation: '#198754'
+                    notvalidated: '#6c757d',
+                    failedvalidation: '#dc3545',
+                    passedvalidation: '#28a745'
                 });
-                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#28a745');
 
                 validationErrors = snapshot.validation?.errors || [];
                 document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';
@@ -1662,12 +1679,15 @@
                 } else if (runIsComplete) {
                     const elapsedMs = runCompletedAtMs ? (Date.now() - runCompletedAtMs) : 0;
                     const settled = isReportSettled(snapshot);
+                    const finishedMs = Date.parse(currentFinishedAt || '');
+                    const finishedBeforeOpen = !Number.isNaN(finishedMs) && (Date.now() - finishedMs) > 30000;
 
-                    setFinalizingBadge(!settled, 'Finalizing…');
+                    setFinalizingBadge(!settled && !finishedBeforeOpen, 'Finalizing…');
 
                     // Keep polling briefly after completion so final persisted schedule/milestones
-                    // can catch up in the UI.
-                    if ((snapshotIsFinal && settled && elapsedMs >= 2000) || elapsedMs >= 30000) {
+                    // can catch up in the UI. A run that finished before this page opened
+                    // has already had that window.
+                    if (finishedBeforeOpen || (snapshotIsFinal && settled && elapsedMs >= 2000) || elapsedMs >= 30000) {
                         setFinalizingBadge(false);
                         stopSnapshotPolling();
                     }
@@ -1731,7 +1751,11 @@
             setFinalizingBadge(true, 'Collecting step timings…');
             startStatusPolling();
         }
-        if (!isRunComplete(currentRunStatus) && !currentFinishedAt && !isCollectingMetrics(currentRunStatus))
+        const openedFinishedMs = Date.parse(currentFinishedAt || '');
+        const openedRecentlyFinished = isRunComplete(currentRunStatus)
+            && !Number.isNaN(openedFinishedMs)
+            && (Date.now() - openedFinishedMs) <= 30000;
+        if (openedRecentlyFinished || (!isRunComplete(currentRunStatus) && !currentFinishedAt && !isCollectingMetrics(currentRunStatus)))
             snapshotTimer = setInterval(refreshSnapshot, 2000);
 
         // Probe for manifest availability (repeated until found).

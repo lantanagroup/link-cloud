@@ -38,6 +38,9 @@
         var search = host.querySelector("[data-da-search]");
         var term = search ? search.value.trim() : "";
         if (term) params.set("searchTerm", term);
+        var here = window.location.pathname + window.location.search;
+        if (here.charAt(0) === "/" && here.indexOf("://") < 0 && here.indexOf("\\") < 0)
+            params.set("returnUrl", here);
         var base = host.getAttribute("data-panel-url") || "";
         var query = params.toString();
         return query ? base + "?" + query : base;

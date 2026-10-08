@@ -9,14 +9,7 @@
         $"<a class=\"au-sort-header\" data-sort-col=\"{column}\" href=\"{Url.Action("Index", new { pageNumber = 1, pageSize = Model.PageSize, sortBy = column, sortDir = SortDirFor(column) })}\">{label}{SortMark(column)}</a>";
     string PageHref(int page) =>
         Url.Action("Index", new { pageNumber = page, pageSize = Model.PageSize, sortBy = Model.SortBy, sortDir = Model.SortDir }) ?? "#";
-    string Badge(AutomationRunRow run)
-    {
-        if (run.Status == "Succeeded") return "au-badge-success";
-        if (run.Status == "Failed") return "au-badge-danger";
-        if (run.Status == "Cancelled") return "au-badge-warning";
-        if (AutomationRules.IsInProgress(run.Status)) return "au-badge-active";
-        return "au-badge-muted";
-    }
+    string Badge(AutomationRunRow run) => StatusPills.ForRun(run.Status);
 }
 <div class="au-card"
      data-page-number="@Model.PageNumber"

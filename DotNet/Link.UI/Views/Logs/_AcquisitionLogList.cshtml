@@ -98,12 +98,12 @@ else
                 }
                 else
                 {
-                    <ul class="mb-0">
+                    <div class="d-flex flex-wrap gap-2">
                         @foreach (var count in Model.Counts)
                         {
-                            <li>@count.Name: @count.Count</li>
+                            <span class="badge @StatusPills.ForLog(count.Name)">@count.Name @count.Count</span>
                         }
-                    </ul>
+                    </div>
                 }
             </div>
         </div>
@@ -138,7 +138,7 @@ else
                 <form method="post" data-au-save asp-action="Process" id="acquisition-logs">
                     <partial name="_AcquisitionFields" model="query" />
                     <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-2">
+                        <table class="table table-sm align-middle mb-2 lu-logs-table">
                             <thead>
                                 <tr>
                                     <th scope="col"><input class="form-check-input" type="checkbox" data-au-select-page aria-label="Select all logs on this page" /></th>
@@ -156,7 +156,8 @@ else
                                     <th scope="col"><a href="@Href(SortRoute("QueryPhase", false))" @(Model.Embedded ? "data-da-panel" : null)>Phase@(Mark("QueryPhase"))</a></th>
                                     <th scope="col"><a href="@Href(SortRoute("QueryType", false))" @(Model.Embedded ? "data-da-panel" : null)>Type@(Mark("QueryType"))</a></th>
                                     <th scope="col">Resources</th>
-                                    <th scope="col"><a href="@Href(SortRoute("CreateDate", true))" @(Model.Embedded ? "data-da-panel" : null)>Created@(Mark("CreateDate"))</a></th>
+                                    <th scope="col" class="lu-col-created"><a href="@Href(SortRoute("CreateDate", true))" @(Model.Embedded ? "data-da-panel" : null)>Created@(Mark("CreateDate"))</a></th>
+                                    <th scope="col" class="lu-col-action">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -183,7 +184,7 @@ else
                                         }
                                     </td>
                                     <td>
-                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }), ReturnUrl = Model.Embedded ? null : ReturnUrlRules.Here(Context.Request) })" />
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Log", Value = row.Id.ToString(), Compact = true, CopyLabel = "Copy log id", LinkHref = Url.Action("AcquisitionDetail", new { id = row.Id }), ReturnUrl = Model.Embedded ? ReturnUrlRules.Sanitize(query.ReturnUrl) : ReturnUrlRules.Here(Context.Request) })" />
                                         @(row.Deleted ? " (deleted)" : "")
                                     </td>
                                     @if (!hideFacility)
@@ -200,11 +201,17 @@ else
                                             <partial name="_LabeledId" model="@(new LabeledId { Label = "Report ID", Value = row.ReportId, Compact = true, CopyLabel = "Copy report id", LinkHref = row.ReportLink ? Url.Action("Acquisition", "Reports", new { facilityId = row.FacilityId, reportId = row.ReportId }) : null })" />
                                         </td>
                                     }
-                                    <td>@row.Status</td>
+                                    <td><span class="badge @StatusPills.ForLog(row.Status)">@(string.IsNullOrWhiteSpace(row.Status) ? "Unknown" : row.Status)</span></td>
                                     <td>@row.Phase</td>
                                     <td>@row.QueryType</td>
                                     <td>@row.Resources</td>
-                                    <td class="text-nowrap">@row.Created</td>
+                                    <td class="text-nowrap lu-col-created">@row.Created</td>
+                                    <td class="lu-col-action">
+                                        @if (!row.Deleted && row.CanProcess)
+                                        {
+                                            <button type="submit" class="btn btn-sm btn-success lu-icon-btn" formaction="@Url.Action("ProcessOne", new { id = row.Id })" formmethod="post" onclick="return confirm('Process this acquisition log?');" title="Execute" aria-label="Execute"><i class="bi bi-play-fill" aria-hidden="true"></i></button>
+                                        }
+                                    </td>
                                 </tr>
                             }
                             </tbody>
