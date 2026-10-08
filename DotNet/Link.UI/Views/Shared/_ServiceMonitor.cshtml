@@ -1,0 +1,37 @@
+@model ServiceMonitorModel
+<div class="au-pulse @(Model.Compact ? "au-pulse-compact mb-3" : "mb-4")"
+     id="liveUtilizationCard"
+     data-url="@Model.PollUrl"
+     data-compact="@(Model.Compact ? "yes" : null)"
+     title="CPU is percent of this machine. Polls Prometheus about every five seconds while this page is open. Not saved.">
+    <div class="au-pulse-head">
+        <div>
+            <div class="au-pulse-kicker">Live fleet</div>
+            <div class="au-pulse-title"><i class="bi bi-activity me-1"></i>CPU and RAM pulse</div>
+            <div class="au-pulse-status" id="liveUtilizationStatus">Watching while this page is open. Not saved.</div>
+            <div class="au-pulse-hottest" id="livePulseHottest"></div>
+        </div>
+        <div class="au-pulse-controls">
+            <div class="au-pulse-seg" role="group" aria-label="View">
+                <button type="button" data-pulse-group="view" data-pulse-value="compact" class="is-on">Pulse</button>
+                <button type="button" data-pulse-group="view" data-pulse-value="expanded">Cards</button>
+            </div>
+            <div class="au-pulse-seg" role="group" aria-label="Filter">
+                <button type="button" data-pulse-group="filter" data-pulse-value="all">All</button>
+                <button type="button" data-pulse-group="filter" data-pulse-value="pipeline" class="is-on">Pipeline</button>
+                <button type="button" data-pulse-group="filter" data-pulse-value="hot">Hot</button>
+            </div>
+            <div class="au-pulse-seg" role="group" aria-label="Sort">
+                <button type="button" data-pulse-group="sort" data-pulse-value="heat" class="is-on">Hottest</button>
+                <button type="button" data-pulse-group="sort" data-pulse-value="name">A–Z</button>
+            </div>
+        </div>
+    </div>
+    <div id="livePulseStrip" class="au-pulse-strip">
+        <div class="small px-2 py-2" style="color:rgba(255,255,255,.6)">Connecting to Prometheus…</div>
+    </div>
+    <div id="livePulseExpanded" class="au-pulse-expanded" hidden></div>
+    <div class="au-pulse-detail" id="livePulseDetail">
+        <p class="au-pulse-detail-empty mb-0">@Model.Detail</p>
+    </div>
+</div>

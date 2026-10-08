@@ -1139,6 +1139,7 @@
                 startStatusPolling();
             } else if (isRunComplete(currentRunStatus)) {
                 stopStatusPolling();
+                if (window.auPulseStop) window.auPulseStop();
                 swapCancelToDelete();
                 startAdvancedPerformancePolling();
             }
