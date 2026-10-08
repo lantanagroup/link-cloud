@@ -145,6 +145,21 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+                                // A later commit on this partition would cover this offset. The main topic
+                                // is already committed, so rewind and try the schedule again.
+                                if (consumeResult != null)
+                                {
+                                    try
+                                    {
+                                        consumer.Seek(consumeResult.TopicPartitionOffset);
+                                    }
+                                    catch (KafkaException seekEx)
+                                    {
+                                        _logger.LogError(seekEx, "Failed to rewind retry message {TopicPartitionOffset}.", consumeResult.TopicPartitionOffset);
+                                    }
+                                }
+
+                                await Task.Delay(TimeSpan.FromSeconds(1), consumeCancellationToken);
                             }
                             finally
                             {
