@@ -315,10 +315,7 @@ public sealed class KafkaOpsEndpoints(IKafkaOpsService kafkaOps, ILogger<KafkaOp
         }
         catch (KafkaOpsRejectedException ex)
         {
-            var status = ex.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase)
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status400BadRequest;
-            return Problem(ex.Message, status);
+            return StatusFor(ex);
         }
     }
 
