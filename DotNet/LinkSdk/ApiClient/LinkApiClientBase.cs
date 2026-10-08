@@ -62,6 +62,15 @@ public abstract class LinkApiClientBase : IDisposable
     }
 
     /// <summary>
+    /// Builds a request that never carries the Link system token, whatever this client is configured with.
+    /// </summary>
+    /// <remarks>
+    /// For a route that may belong to a third party. Sending a Link token there would hand a credential
+    /// to a host that has no business holding it, so use this until the host's identity is established.
+    /// </remarks>
+    protected IFlurlRequest AnonymousRequest(string relativePath) => _client.Request(relativePath);
+
+    /// <summary>
     /// Executes a request and returns the full response (status code + deserialized body).
     /// Does NOT swallow any status codes — the caller decides how to handle each response.
     /// </summary>

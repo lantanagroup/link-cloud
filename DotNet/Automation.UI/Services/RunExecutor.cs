@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -160,7 +161,7 @@ internal sealed class RunExecutor
         var output = callbacks.Output;
 
         ServiceProvider? runServices = null;
-        MockDmrpApiHelper? mockDmrpApiHelperForCleanup = null;
+        IMockDmrpServiceClient? mockDmrpClientForCleanup = null;
         var cleanupMockDmrpEntries = false;
 
         state.Status = AutomationRunStatus.Running;
@@ -211,8 +212,11 @@ internal sealed class RunExecutor
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
             var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
-            var mockDmrpApiHelper = services.GetRequiredService<MockDmrpApiHelper>();
-            mockDmrpApiHelperForCleanup = mockDmrpApiHelper;
+            // Resolved only for a DMRP run, so a stack with no mock URL configured can still run the rest.
+            var mockDmrpClient = state.Options.EnableDmrp
+                ? services.GetRequiredService<IMockDmrpServiceClient>()
+                : null;
+            mockDmrpClientForCleanup = mockDmrpClient;
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
@@ -242,9 +246,17 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
-                await mockDmrpApiHelper.EnsureReachableAsync(
-                    state.Options.NhsnOrganizationId,
-                    cancellationToken);
+                var reachable = await mockDmrpClient!.SearchEntriesAsync(
+                    facilityId: state.Options.NhsnOrganizationId,
+                    pageSize: 1,
+                    cancellationToken: cancellationToken);
+
+                if (!reachable.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"MockDmrpApi reachability check failed with HTTP {reachable.StatusCode}. " +
+                        $"Response: {reachable.RawBody}");
+                }
 
                 output.WriteLine(
                     $"MockDmrpApi reachable for NHSN Organization ID " +
@@ -498,13 +510,14 @@ internal sealed class RunExecutor
                 // Facility-scoped cleanup is intentionally used instead of the global endpoint.
                 cleanupMockDmrpEntries = true;
 
-                await mockDmrpApiHelper.DeleteFacilityEntriesAsync(
+                await DeleteMockDmrpEntriesAsync(
+                    mockDmrpClient!,
                     facilityId,
                     cancellationToken);
 
                 foreach (var (month, year) in reportingPeriods)
                 {
-                    var seeded = await mockDmrpApiHelper.CreateEntryAsync(
+                    var created = await mockDmrpClient!.CreateEntryAsync(
                         new MockDmrpEntryRequest
                         {
                             FacilityId = facilityId,
@@ -515,6 +528,15 @@ internal sealed class RunExecutor
                             IsReporting = "Y"
                         },
                         cancellationToken);
+
+                    if (!created.IsSuccessStatusCode || created.Body is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to seed MockDmrpApi entry. " +
+                            $"HTTP {created.StatusCode}. Response: {created.RawBody}");
+                    }
+
+                    var seeded = created.Body;
 
                     seededDmrpEntries.Add(new
                     {
@@ -1367,12 +1389,13 @@ internal sealed class RunExecutor
         finally
         {
             if (cleanupMockDmrpEntries &&
-                mockDmrpApiHelperForCleanup != null &&
+                mockDmrpClientForCleanup != null &&
                 !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
             {
                 try
                 {
-                    await mockDmrpApiHelperForCleanup.DeleteFacilityEntriesAsync(
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClientForCleanup,
                         state.Options.NhsnOrganizationId,
                         CancellationToken.None);
 
@@ -1398,6 +1421,20 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    private static async Task DeleteMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                         string nhsnOrganizationId,
+                                                         CancellationToken cancellationToken)
+    {
+        var deleted = await client.DeleteEntriesForFacilityAsync(nhsnOrganizationId, cancellationToken);
+
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clean up MockDmrpApi entries for NHSN organization " +
+                $"'{nhsnOrganizationId}'. HTTP {deleted.StatusCode}. Response: {deleted.RawBody}");
         }
     }
 
@@ -2196,7 +2233,14 @@ internal sealed class RunExecutor
 
         services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportApiHelper>();
-        services.AddTransient<MockDmrpApiHelper>();
+        services.AddMockDmrpServiceClient(sp =>
+        {
+            var url = sp.GetRequiredService<IOptions<ServiceRegistry>>().Value.MockDmrpApiUrl;
+
+            return string.IsNullOrWhiteSpace(url)
+                ? throw new InvalidOperationException("ServiceRegistry:MockDmrpApiUrl is not configured.")
+                : url;
+        });
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
