@@ -61,11 +61,11 @@
                         <td>
                             @if (t.IsSystem)
                             {
-                                <span class="badge bg-dark">System</span>
+                                <text>System</text>
                             }
                             else
                             {
-                                <span class="badge bg-light text-dark border">Custom</span>
+                                <text>Custom</text>
                             }
                         </td>
                         <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
@@ -253,7 +253,7 @@
         row.className = 'card mb-2 p-2 identifier-match-row map-match-card';
         row.dataset.matchType = 'Identifier';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-muted ms-1">Identifier</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="ms-1">Identifier</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<div class="row g-2">'
@@ -335,7 +335,7 @@
         row.className = 'card mb-2 p-2 custom-match-row map-match-card';
         row.dataset.matchType = 'Custom';
         row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
-            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge au-badge-muted ms-1">Custom FHIRPath</span></div>'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="ms-1">Custom FHIRPath</span></div>'
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<label class="form-label mb-1 small">FHIRPath</label>'

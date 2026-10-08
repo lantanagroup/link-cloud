@@ -66,11 +66,11 @@
                             <td>
                                 @if (t.IsSystem)
                                 {
-                                    <span class="badge bg-dark">System</span>
+                                    <text>System</text>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-light text-dark border">Custom</span>
+                                    <text>Custom</text>
                                 }
                             </td>
                             <td class="small text-muted">@LinkUiTime.Display(t.UpdatedAt)</td>
@@ -663,10 +663,12 @@
         var fb = el.parentElement.querySelector('.invalid-feedback');
         if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
         fb.textContent = msg; fb.style.display = 'block';
+        if (window.luSectionValidity) window.luSectionValidity.mark(el, msg);
     }
     function clearQpFieldErrors() {
         document.querySelectorAll('#qpConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
         document.querySelectorAll('#qpConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+        if (window.luSectionValidity) window.luSectionValidity.sync(document.getElementById('qpConfigArea') || document);
     }
 
     // ===================================================================

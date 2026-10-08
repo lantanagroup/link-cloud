@@ -17,4 +17,19 @@ public static class LabeledIdRules
 
         return trimmed;
     }
+
+    /// <summary>
+    /// Copy buttons belong on identifiers. Dates, seeds, counts, names, and measure lists do not get one.
+    /// </summary>
+    public static bool AllowsCopy(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+            return false;
+
+        return label.Trim().ToLowerInvariant() switch
+        {
+            "seed" or "date" or "time" or "count" or "name" or "measures" or "package" => false,
+            _ => true
+        };
+    }
 }

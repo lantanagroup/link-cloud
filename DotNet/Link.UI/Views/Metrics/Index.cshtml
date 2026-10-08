@@ -176,15 +176,15 @@
                             }
                             @if (card.VersionChanged)
                             {
-                                <span class="badge bg-light text-dark border">Setup v@(card.ScenarioVersion)</span>
+                                <span>Setup v@(card.ScenarioVersion)</span>
                             }
                             @if (card.LastStagesUnavailable)
                             {
-                                <span class="badge bg-light text-dark border">Step timings missing</span>
+                                <span class="badge au-badge-warning">Step timings missing</span>
                             }
                             else if (card.LastStagesIncomplete)
                             {
-                                <span class="badge bg-light text-dark border">Partial timings</span>
+                                <span class="badge au-badge-warning">Partial timings</span>
                             }
                         </div>
                     </a>
@@ -268,11 +268,11 @@
                                     @run.ScenarioName
                                     @if (run.ScenarioVersion > 1)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">v@(run.ScenarioVersion)</span>
+                                        <span class="ms-1">v@(run.ScenarioVersion)</span>
                                     }
                                     @if (run.StagesIncomplete)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">Partial</span>
+                                        <span class="badge au-badge-warning ms-1">Partial</span>
                                     }
                                 </td>
                                 <td>

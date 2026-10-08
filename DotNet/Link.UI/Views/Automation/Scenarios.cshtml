@@ -78,24 +78,24 @@
                                         <br /><small class="text-muted">@s.Description</small>
                                     }
                                 </td>
-                                <td><span class="badge bg-light text-dark border">@s.ReportMethod</span></td>
+                                <td>@s.ReportMethod</td>
                                 <td>
                                     @foreach (var m in s.SelectedMeasures)
                                     {
-                                        <span class="badge au-badge-muted">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                                        <div>@ProfiledMeasureCatalog.GetDisplayName(m)</div>
                                     }
                                 </td>
                                 <td>@patientCount</td>
                                 <td>@resourceRange</td>
-                                <td><partial name="_LabeledId" model="@(new LabeledId { Label = "Seed", Value = s.Seed.ToString(), Compact = true, CopyLabel = "Copy seed" })" /></td>
+                                <td>@s.Seed</td>
                                 <td>
                                     @if (s.IsSystemScenario)
                                     {
-                                        <span class="badge bg-dark">System</span>
+                                        <text>System</text>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-light text-dark border">Custom</span>
+                                        <text>Custom</text>
                                     }
                                 </td>
                                 <td class="small text-muted">@LinkUiTime.Display(s.UpdatedAt)</td>

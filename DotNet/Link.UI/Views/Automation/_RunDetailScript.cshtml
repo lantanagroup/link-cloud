@@ -1333,7 +1333,7 @@
                 const failed = m.failed === true;
                 const completed = m.completed === true;
                 const tone = window.luStatusPills.forMilestone(failed, completed);
-                div.className = 'rounded-pill d-inline-flex align-items-center justify-content-center ' + tone + (tone === 'au-badge-muted' ? '' : ' text-white');
+                div.className = 'rounded-pill d-inline-flex align-items-center justify-content-center ' + tone;
                 div.style.width = '136px';
                 div.style.height = '30px';
                 div.style.fontSize = '0.8rem';
@@ -1441,7 +1441,7 @@
             let html = `<button class="btn btn-sm ${allActive ? 'btn-dark' : 'btn-au-neutral'} ex-group-chip" data-group="">All</button>`;
             for (const g of _exModalGroups) {
                 const active = _exModalActiveGroup === g.label;
-                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-au-neutral'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="badge bg-light text-dark ms-1">${g.count}</span></button>`;
+                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-au-neutral'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="ms-1">${g.count}</span></button>`;
             }
             host.innerHTML = html;
 

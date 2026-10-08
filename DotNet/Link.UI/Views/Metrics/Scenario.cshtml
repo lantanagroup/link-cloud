@@ -26,7 +26,7 @@
                 @Model.SetupSummary
                 @if (Model.HasVersionChange)
                 {
-                    <span class="ms-2 badge bg-light text-dark border">Setup changed · now v@(Model.CurrentVersion)</span>
+                    <span class="ms-2">Setup changed · now v@(Model.CurrentVersion)</span>
                 }
             </p>
         </div>
@@ -113,11 +113,11 @@
                                     </span>
                                     @if (run.ScenarioVersion > 1)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">v@(run.ScenarioVersion)</span>
+                                        <span class="ms-1">v@(run.ScenarioVersion)</span>
                                     }
                                     @if (run.StagesIncomplete)
                                     {
-                                        <span class="badge bg-light text-dark border ms-1">Partial</span>
+                                        <span class="badge au-badge-warning ms-1">Partial</span>
                                     }
                                 </td>
                                 <td>@FormatDuration(run.E2eDurationSeconds)</td>

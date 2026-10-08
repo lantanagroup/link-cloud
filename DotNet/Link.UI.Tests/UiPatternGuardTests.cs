@@ -148,7 +148,7 @@ public class UiPatternGuardTests
         root.Should().Contain("#111");
         root.Should().Contain("--bs-link-color:");
         root.Should().Contain("--bs-info:");
-        root.Should().Contain("rgba(40, 167, 69, .35)");
+        root.Should().Contain("rgba(var(--au-success-rgb), .35)");
         css.Should().Contain("fill='%23111'");
 
         var vendor = File.ReadAllText(Path.Combine(Root(), "wwwroot", "lib", "bootstrap", "dist", "css", "bootstrap.css"));

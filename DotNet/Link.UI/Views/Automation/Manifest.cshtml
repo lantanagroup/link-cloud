@@ -34,7 +34,7 @@
 <!-- ── Nav Tabs ── -->
 <ul class="lu-section-nav" role="tablist">
     <li><button class="active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
-    <li><button data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge au-badge-muted ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
+    <li><button data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="text-muted ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
     @if (isComplete)
     {
         <li><button data-bs-toggle="tab" data-bs-target="#tab-comparison" type="button" id="comparisonTab">
@@ -186,7 +186,7 @@
             : 'Download generated FHIR bundle (replayed from this run\'s generation template)';
         const href = `${downloadBundleUrl}?id=${encodeURIComponent(runId)}&patientId=${encodeURIComponent(patientId)}`;
         const staleClass = stale ? ' btn-au-neutral' : ' btn-au-neutral';
-        return `<a href="${href}" class="btn btn-sm${staleClass} py-0 px-1" title="${escapeHtml(title)}" download>
+        return `<a href="${href}" class="btn btn-sm${staleClass} lu-icon-btn py-0 px-1" title="${escapeHtml(title)}" download>
             <i class="bi bi-download"></i><span class="visually-hidden">Download bundle</span>
         </a>`;
     }
@@ -233,7 +233,7 @@
     function renderBadgeSet(items) {
         if (!items?.length) return '<span class="text-muted small">None</span>';
         return '<div class="d-flex flex-wrap gap-1">' +
-            items.map(t => `<span class="badge au-badge-muted">${escapeHtml(t)}</span>`).join('') +
+            items.map(t => `<span>${escapeHtml(t)}</span>`).join(' ') +
             '</div>';
     }
 
@@ -431,7 +431,7 @@
         entries.forEach(([pid, measures]) => {
             const badge = measures.length > 0
                 ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
-                : '<span class="badge au-badge-muted">None</span>';
+                : '<span>None</span>';
 
             html += `
                 <tr>
@@ -599,7 +599,7 @@
                 || fallbackInpatientPatternByPatient?.[pid]
                 || defaultScheduledPattern;
             const types = Object.entries(counts).sort(([,a],[,b]) => b - a)
-                .map(([t, c]) => `<span class="badge au-badge-muted me-1 mb-1" data-bs-toggle="tooltip" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
+                .map(([t, c]) => `<span class="me-1 mb-1" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
                 .join('');
             html += `<tr>
                 <td>${window.luLabeledId('Patient', pid)}</td>
@@ -736,15 +736,15 @@
             </div>
             <div class="mb-2 text-muted">A resource is predicted to appear in ABS when it passes all prediction filters below.</div>
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <span class="badge au-badge-active">1</span><span><strong>Generated</strong></span>
+                <span>1</span><span><strong>Generated</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
-                <span class="badge au-badge-muted">2</span><span><strong>Query Plan Acquires</strong></span>
+                <span>2</span><span><strong>Query Plan Acquires</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
-                <span class="badge au-badge-success">3</span><span><strong>CQL References</strong></span>
+                <span>3</span><span><strong>CQL References</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
-                <span class="badge bg-dark">4</span><span><strong>Prediction (Expected in ABS)</strong></span>
+                <span>4</span><span><strong>Prediction (Expected in ABS)</strong></span>
                 <span class="mx-1 text-muted">vs</span>
-                <span class="badge au-badge-muted">5</span><span><strong>Actual ABS</strong></span>
+                <span>5</span><span><strong>Actual ABS</strong></span>
             </div>
             <div class="text-muted">
                 <strong>Prediction</strong> includes Organization Resource Map scope when configured (org-location filtering),

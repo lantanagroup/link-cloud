@@ -29,17 +29,17 @@
     <ul class="lu-section-nav" id="normTabs" role="tablist">
         <li role="presentation">
             <button class="active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
-                <i class="bi bi-gear me-1"></i>Operations <span class="badge au-badge-muted">@operations.Count</span>
+                <i class="bi bi-gear me-1"></i>Operations <span class="text-muted">@operations.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
-                <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge au-badge-muted">@sequences.Count</span>
+                <i class="bi bi-list-ol me-1"></i>Sequences <span class="text-muted">@sequences.Count</span>
             </button>
         </li>
         <li role="presentation">
             <button id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
-                <i class="bi bi-box me-1"></i>Suites <span class="badge au-badge-muted">@suites.Count</span>
+                <i class="bi bi-box me-1"></i>Suites <span class="text-muted">@suites.Count</span>
             </button>
         </li>
     </ul>
@@ -80,11 +80,11 @@
                                             <br /><small class="text-muted">@op.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge au-badge-muted">@op.OperationType</span></td>
+                                    <td>@op.OperationType</td>
                                     <td><small class="text-muted">@string.Join(", ", op.ResourceTypes)</small></td>
                                     <td>
-                                        @if (op.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (op.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(op.UpdatedAt)</td>
                                     <td class="text-nowrap">
@@ -142,10 +142,10 @@
                                             <br /><small class="text-muted">@seq.Description</small>
                                         }
                                     </td>
-                                    <td><span class="badge au-badge-muted">@seq.Entries.Count op(s)</span></td>
+                                    <td>@seq.Entries.Count op(s)</td>
                                     <td>
-                                        @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (seq.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(seq.UpdatedAt)</td>
                                     <td class="text-nowrap">
@@ -211,8 +211,8 @@
                                         <small class="text-muted">@suite.SequenceIds.Count seq, @suite.OperationIds.Count op(s)</small>
                                     </td>
                                     <td>
-                                        @if (suite.IsSystem) { <span class="badge bg-dark">System</span> }
-                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                        @if (suite.IsSystem) { <text>System</text> }
+                                        else { <text>Custom</text> }
                                     </td>
                                     <td class="small text-muted">@LinkUiTime.Display(suite.UpdatedAt)</td>
                                     <td class="text-nowrap">
@@ -981,7 +981,7 @@
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
         row.innerHTML = `
-            <span class="badge bg-dark" style="width:28px;">${seq}</span>
+            <span class="text-muted" style="min-width:1.5rem;display:inline-block;">${seq}</span>
             <select class="form-select form-select-sm seq-op-select"></select>
             <button type="button" class="btn btn-sm btn-danger lu-icon-btn" title="Remove" aria-label="Remove">
                 <i class="bi bi-x-lg" aria-hidden="true"></i>

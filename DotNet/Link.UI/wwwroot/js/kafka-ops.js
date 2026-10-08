@@ -1,5 +1,5 @@
 (function () {
-    var colors = ["#28a745", "#dc3545", "#343a40", "#6c757d", "#212529"];
+    var colors = [getComputedStyle(document.documentElement).getPropertyValue("--au-success").trim(), "#dc3545", "#343a40", "#6c757d", "#212529"];
     var charts = {};
     var poll;
 
