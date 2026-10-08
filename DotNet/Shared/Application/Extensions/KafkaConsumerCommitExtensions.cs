@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 /// killing the consumer loop or host process.
 ///
 /// The Kafka client will automatically re-join the consumer group on the next poll,
-/// so a failed commit is recoverable ï¿½ the worst case is that the message will be
+/// so a failed commit is recoverable — the worst case is that the message will be
 /// redelivered (at-least-once semantics).
 /// </summary>
 public static class KafkaConsumerCommitExtensions
