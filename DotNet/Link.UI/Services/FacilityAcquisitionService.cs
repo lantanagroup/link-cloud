@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -53,11 +54,9 @@ public sealed class FacilityAcquisitionService
         if (!FacilityAcquisitionRules.TryBuildFhirQuery(input, page.FacilityId!, page.TimeZone, out var body, out var error))
             return error;
 
-        var response = input.Exists
-            ? await _client.UpdateFhirQueryConfigurationAsync(body!, cancellationToken)
-            : await _client.CreateFhirQueryConfigurationAsync(body!, cancellationToken);
+        var response = await FacilityConfigurationService.SaveFhirQueryAsync(_client, body!, input.Exists, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("FHIR query save", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -68,8 +67,8 @@ public sealed class FacilityAcquisitionService
 
     public async Task<string?> DeleteFhirQueryAsync(FacilityHubViewModel page, CancellationToken cancellationToken)
     {
-        var response = await _client.DeleteFhirQueryConfigurationAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteFhirQueryAsync(_client, page.FacilityId!, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("FHIR query delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -92,11 +91,9 @@ public sealed class FacilityAcquisitionService
         if (!FacilityAcquisitionRules.TryBuildFhirList(input, page.FacilityId!, preserved, out var body, out var error))
             return error;
 
-        var response = input.Exists
-            ? await _client.UpdateFhirListConfigurationAsync(body!, cancellationToken)
-            : await _client.CreateFhirListConfigurationAsync(body!, cancellationToken);
+        var response = await FacilityConfigurationService.SaveFhirListAsync(_client, body!, input.Exists, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("FHIR list save", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -107,8 +104,8 @@ public sealed class FacilityAcquisitionService
 
     public async Task<string?> DeleteFhirListAsync(FacilityHubViewModel page, CancellationToken cancellationToken)
     {
-        var response = await _client.DeleteFhirListConfigurationAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteFhirListAsync(_client, page.FacilityId!, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("FHIR list delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -127,10 +124,10 @@ public sealed class FacilityAcquisitionService
             return error;
 
         var response = input.Exists
-            ? await _client.UpdateQueryPlanAsync(page.FacilityId!, body!, cancellationToken)
-            : await _client.CreateQueryPlanAsync(page.FacilityId!, ToPlan(body!), cancellationToken);
+            ? await FacilityConfigurationService.UpdateQueryPlanAsync(_client, page.FacilityId!, body!, cancellationToken)
+            : await FacilityConfigurationService.CreateQueryPlanAsync(_client, page.FacilityId!, ToPlan(body!), cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("Query plan save", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -142,8 +139,8 @@ public sealed class FacilityAcquisitionService
     public async Task<string?> DeleteQueryPlanAsync(FacilityHubViewModel page, string? type, CancellationToken cancellationToken)
     {
         var planType = FacilityAcquisitionRules.NormalizePlanType(type);
-        var response = await _client.DeleteQueryPlanAsync(page.FacilityId!, planType, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteQueryPlanAsync(_client, page.FacilityId!, planType, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("Query plan delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -159,11 +156,10 @@ public sealed class FacilityAcquisitionService
         if (!FacilityAcquisitionRules.TryBuildReportingOrg(input, out var body, out var error))
             return error;
 
-        var response = input.Exists && input.ConfigId is int configId
-            ? await _client.UpdateOrganizationLocationConfigurationByIdAsync(configId, body!, cancellationToken)
-            : await _client.CreateOrganizationLocationConfigurationAsync(page.FacilityId!, body!, cancellationToken);
+        var response = await FacilityConfigurationService.SaveReportingOrganizationAsync(
+            _client, page.FacilityId!, body!, input.Exists, input.ConfigId, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("Reporting organization save", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -177,8 +173,8 @@ public sealed class FacilityAcquisitionService
         if (configId is not int id)
             return "No reporting organization configuration is selected.";
 
-        var response = await _client.DeleteOrganizationLocationConfigurationByIdAsync(id, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteReportingOrganizationAsync(_client, id, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("Reporting organization delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -194,11 +190,10 @@ public sealed class FacilityAcquisitionService
         if (!FacilityAcquisitionRules.TryBuildSftp(input, page.FacilityId!, out var body, out var credentials, out var error))
             return error;
 
-        var response = input.Exists
-            ? await _client.UpdateSftpConfigurationAsync(page.FacilityId!, input.ConfigurationId ?? string.Empty, body!, cancellationToken)
-            : await _client.CreateSftpConfigurationAsync(page.FacilityId!, body!, cancellationToken);
+        var response = await FacilityConfigurationService.SaveSftpAsync(
+            _client, page.FacilityId!, body!, input.Exists, input.ConfigurationId, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("SFTP save", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -221,11 +216,12 @@ public sealed class FacilityAcquisitionService
 
         if (credentials is { } pair)
         {
-            var saved = await _client.UpdateSftpCredentialsAsync(
+            var saved = await FacilityConfigurationService.UpdateSftpCredentialsAsync(
+                _client,
                 page.FacilityId!,
                 new { Username = pair.Username, Password = pair.Password },
                 cancellationToken);
-            if (!saved.IsSuccessStatusCode)
+            if (!saved.Success)
             {
                 LogFailure("SFTP credentials save", page.FacilityId, saved);
                 return "SFTP configuration was saved, but the credentials were not. "
@@ -241,8 +237,8 @@ public sealed class FacilityAcquisitionService
         if (string.IsNullOrWhiteSpace(configurationId))
             return "No SFTP configuration is selected.";
 
-        var response = await _client.DeleteSftpConfigurationAsync(page.FacilityId!, configurationId, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteSftpAsync(_client, page.FacilityId!, configurationId, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("SFTP delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -253,8 +249,8 @@ public sealed class FacilityAcquisitionService
 
     public async Task<string?> DeleteSftpCredentialsAsync(FacilityHubViewModel page, CancellationToken cancellationToken)
     {
-        var response = await _client.DeleteSftpCredentialsAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteSftpCredentialsAsync(_client, page.FacilityId!, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("SFTP credentials delete", page.FacilityId, response);
             return FacilityFormRules.ServiceMessage("Data acquisition", response.StatusCode, response.RawBody);
@@ -547,14 +543,20 @@ public sealed class FacilityAcquisitionService
         return source.ToDictionary(pair => pair.Key, pair => pair.Value ?? new object());
     }
 
-    private void LogFailure(string operation, string? facilityId, LinkApiResponse response)
+    private void LogFailure(string operation, string? facilityId, LinkApiResponse response) =>
+        LogFailure(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void LogFailure(string operation, string? facilityId, FacilitySectionResult response) =>
+        LogFailure(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void LogFailure(string operation, string? facilityId, int statusCode, string? traceId)
     {
         _logger.LogWarning(
             "{Operation} failed with status {StatusCode}. FacilityId={FacilityId} TraceId={TraceId}",
             operation,
-            response.StatusCode,
+            statusCode,
             facilityId?.Sanitize(),
-            response.TraceId);
+            traceId);
     }
 
     private static bool IsMissing(int statusCode) =>

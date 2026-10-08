@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
@@ -123,8 +124,8 @@ public sealed class FacilityNormalizationService
         if (id is null)
         {
             request!.VendorVersionIds = vendorIds ?? [];
-            var created = await _client.CreateOperationAsync(request, cancellationToken);
-            if (!created.IsSuccessStatusCode)
+            var created = await FacilityConfigurationService.CreateNormalizationOperationAsync(_client, request, cancellationToken);
+            if (!created.Success)
             {
                 Log("Normalization operation create", facilityId, created);
                 return FacilityFormRules.ServiceMessage("Normalization", created.StatusCode, created.RawBody);
@@ -133,7 +134,7 @@ public sealed class FacilityNormalizationService
             return null;
         }
 
-        var updated = await _client.UpdateOperationAsync(new UpdateNormalizationOperationRequestApiModel
+        var updated = await FacilityConfigurationService.UpdateNormalizationOperationAsync(_client, new UpdateNormalizationOperationRequestApiModel
         {
             Id = id,
             FacilityId = request!.FacilityId,
@@ -142,7 +143,7 @@ public sealed class FacilityNormalizationService
             IsDisabled = isDisabled,
             VendorVersionIds = vendorIds
         }, cancellationToken);
-        if (!updated.IsSuccessStatusCode)
+        if (!updated.Success)
         {
             Log("Normalization operation update", facilityId, updated);
             return FacilityFormRules.ServiceMessage("Normalization", updated.StatusCode, updated.RawBody);
@@ -224,8 +225,8 @@ public sealed class FacilityNormalizationService
                     : $"Imported {created} operation(s), then the next one was not created: {buildError}";
             }
 
-            var response = await _client.CreateOperationAsync(request!, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            var response = await FacilityConfigurationService.CreateNormalizationOperationAsync(_client, request!, cancellationToken);
+            if (!response.Success)
             {
                 Log("Normalization extension import", facilityId, response);
                 var message = FacilityFormRules.ServiceMessage("Normalization", response.StatusCode, response.RawBody);
@@ -245,11 +246,11 @@ public sealed class FacilityNormalizationService
         if (!Guid.TryParse(operationId, out var id))
             return "Invalid operation id.";
 
-        var response = await _client.DeleteFacilityOperationAsync(facilityId, id, cancellationToken);
+        var response = await FacilityConfigurationService.DeleteNormalizationOperationAsync(_client, facilityId, id, cancellationToken);
         if (response.StatusCode == StatusCodes.Status404NotFound)
             return "That operation was not found.";
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             Log("Normalization operation delete", facilityId, response);
             return FacilityFormRules.ServiceMessage("Normalization", response.StatusCode, response.RawBody);
@@ -302,8 +303,9 @@ public sealed class FacilityNormalizationService
         if (clear)
             return await ClearSequenceAsync(facilityId, resourceType, cancellationToken);
 
-        var saved = await _client.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
-        if (!saved.IsSuccessStatusCode)
+        var saved = await FacilityConfigurationService.CreateNormalizationSequencesAsync(
+            _client, facilityId, resourceType, sequences, cancellationToken);
+        if (!saved.Success)
         {
             Log("Normalization sequence save", facilityId, saved);
             return FacilityFormRules.ServiceMessage("Normalization", saved.StatusCode, saved.RawBody);
@@ -358,7 +360,8 @@ public sealed class FacilityNormalizationService
 
     private async Task<string?> ClearSequenceAsync(string facilityId, string resourceType, CancellationToken cancellationToken)
     {
-        var response = await _client.DeleteOperationSequencesAsync(facilityId, resourceType, cancellationToken);
+        var response = await FacilityConfigurationService.DeleteNormalizationSequencesAsync(
+            _client, facilityId, resourceType, cancellationToken);
         if (response.StatusCode is StatusCodes.Status204NoContent or StatusCodes.Status404NotFound)
             return null;
 
@@ -621,13 +624,19 @@ public sealed class FacilityNormalizationService
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name!);
 
-    private void Log(string operation, string? facilityId, LinkApiResponse response)
+    private void Log(string operation, string? facilityId, LinkApiResponse response) =>
+        Log(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void Log(string operation, string? facilityId, FacilitySectionResult response) =>
+        Log(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void Log(string operation, string? facilityId, int statusCode, string? traceId)
     {
         _logger.LogWarning(
             "{Operation} failed with status {StatusCode}. FacilityId={FacilityId} TraceId={TraceId}",
             operation,
-            response.StatusCode,
+            statusCode,
             facilityId?.Sanitize(),
-            response.TraceId);
+            traceId);
     }
 }

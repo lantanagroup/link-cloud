@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -140,8 +141,8 @@ public sealed class FacilityHubService
             return FacilityWriteResult.Stay(page);
         }
 
-        var response = await _facilities.CreateAsync(model!, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var response = await FacilityConfigurationService.CreateFacilityAsync(_facilities, model!, cancellationToken);
+        if (!response.Success)
         {
             LogFailure("Facility create", model!.FacilityId, response);
             page.FormError = FacilityFormRules.ServiceMessage("Tenant", response.StatusCode, response.RawBody);
@@ -175,8 +176,8 @@ public sealed class FacilityHubService
             return FacilityWriteResult.Stay(page);
         }
 
-        var response = await _facilities.UpdateAsync(id, model!, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var response = await FacilityConfigurationService.UpdateFacilityAsync(_facilities, id, model!, cancellationToken);
+        if (!response.Success)
         {
             LogFailure("Facility update", id, response);
             page.FormError = FacilityFormRules.ServiceMessage("Tenant", response.StatusCode, response.RawBody);
@@ -220,11 +221,9 @@ public sealed class FacilityHubService
             ScheduledTrigger = page.CensusTrigger
         };
 
-        var response = censusExists
-            ? await _census.UpdateCensusConfigAsync(page.FacilityId!, request, cancellationToken)
-            : await _census.CreateCensusConfigAsync(request, cancellationToken);
+        var response = await FacilityConfigurationService.SaveCensusAsync(_census, request, censusExists, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("Census save", page.FacilityId, response);
             page.CensusError = FacilityFormRules.ServiceMessage("Census", response.StatusCode, response.RawBody);
@@ -248,8 +247,8 @@ public sealed class FacilityHubService
             return FacilityWriteResult.Stay(page);
         }
 
-        var response = await _census.DeleteCensusConfigAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteCensusAsync(_census, page.FacilityId!, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("Census delete", page.FacilityId, response);
             page.CensusError = FacilityFormRules.ServiceMessage("Census", response.StatusCode, response.RawBody);
@@ -290,11 +289,10 @@ public sealed class FacilityHubService
             DispatchSchedules = normalized
         };
 
-        var response = queryDispatchExists
-            ? await _queryDispatch.UpsertQueryDispatchConfigurationAsync(page.FacilityId!, request, cancellationToken)
-            : await _queryDispatch.CreateQueryDispatchConfigurationAsync(request, cancellationToken);
+        var response = await FacilityConfigurationService.SaveQueryDispatchAsync(
+            _queryDispatch, request, queryDispatchExists, cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("Query dispatch save", page.FacilityId, response);
             page.QueryDispatchError = FacilityFormRules.ServiceMessage("Query dispatch", response.StatusCode, response.RawBody);
@@ -318,8 +316,8 @@ public sealed class FacilityHubService
             return FacilityWriteResult.Stay(page);
         }
 
-        var response = await _queryDispatch.DeleteQueryDispatchConfigurationAsync(page.FacilityId!, cancellationToken);
-        if (!response.IsSuccessStatusCode && !IsMissing(response.StatusCode))
+        var response = await FacilityConfigurationService.DeleteQueryDispatchAsync(_queryDispatch, page.FacilityId!, cancellationToken);
+        if (!response.Success && !IsMissing(response.StatusCode))
         {
             LogFailure("Query dispatch delete", page.FacilityId, response);
             page.QueryDispatchError = FacilityFormRules.ServiceMessage("Query dispatch", response.StatusCode, response.RawBody);
@@ -478,7 +476,7 @@ public sealed class FacilityHubService
             });
         }
 
-        var response = await _facilities.SoftDeleteAsync(id, cancellationToken);
+        var response = await FacilityConfigurationService.SoftDeleteFacilityAsync(_facilities, id, cancellationToken);
         // Tenant answers a successful delete with 204. That status means "missing" on GET, not here.
         if (response.StatusCode == StatusCodes.Status404NotFound)
         {
@@ -489,7 +487,7 @@ public sealed class FacilityHubService
             });
         }
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.Success)
         {
             LogFailure("Facility remove", id, response);
             var page = await LoadEditAsync(id, cancellationToken);
@@ -818,14 +816,20 @@ public sealed class FacilityHubService
         }
     }
 
-    private void LogFailure(string operation, string? facilityId, LinkApiResponse response)
+    private void LogFailure(string operation, string? facilityId, LinkApiResponse response) =>
+        LogFailure(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void LogFailure(string operation, string? facilityId, FacilitySectionResult response) =>
+        LogFailure(operation, facilityId, response.StatusCode, response.TraceId);
+
+    private void LogFailure(string operation, string? facilityId, int statusCode, string? traceId)
     {
         _logger.LogWarning(
             "{Operation} failed with status {StatusCode}. FacilityId={FacilityId} TraceId={TraceId}",
             operation,
-            response.StatusCode,
+            statusCode,
             facilityId?.Sanitize(),
-            response.TraceId);
+            traceId);
     }
 
     private static bool IsMissing(int statusCode) =>
