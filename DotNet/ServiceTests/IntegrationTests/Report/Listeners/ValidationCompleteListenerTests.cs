@@ -242,7 +242,7 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
@@ -250,7 +250,7 @@ public class ValidationCompleteListenerTests
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -325,7 +325,7 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
@@ -333,7 +333,7 @@ public class ValidationCompleteListenerTests
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -407,10 +407,10 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.NotSubmitted, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -473,7 +473,7 @@ public class ValidationCompleteListenerTests
         Assert.Equal(SubmissionStatus.Submitting, updatedEntry.SubmissionStatus);
 
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForPatient(facilityId, patientId) &&
@@ -481,7 +481,7 @@ public class ValidationCompleteListenerTests
                     m.Value.ReportScheduleId == reportId &&
                     m.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry &&
                     m.Value.PatientId == patientId),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -560,10 +560,10 @@ public class ValidationCompleteListenerTests
 
         // Still no submission of any kind.
         _fixture.SubmitPayloadKafkaProducerMock.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
