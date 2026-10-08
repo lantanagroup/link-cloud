@@ -3,6 +3,7 @@ using LantanaGroup.Link.Notification.Application.Models;
 using System.Text;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Infrastructure;
+using ServiceActivitySource = LantanaGroup.Link.Notification.Infrastructure.ServiceActivitySource;
 using LantanaGroup.Link.Notification.Settings;
 using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Models;
