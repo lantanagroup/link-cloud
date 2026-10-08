@@ -16,7 +16,8 @@
         IsLinkAdmin,
         CanViewInfrastructure,
         CanManageKafkaTopics,
-        CanManageScaling
+        CanManageScaling,
+        CanMigrateKafkaTopics
     }
 
     public enum LinkTenantPermissions

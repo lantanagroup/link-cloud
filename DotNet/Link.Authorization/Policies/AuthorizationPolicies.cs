@@ -143,6 +143,14 @@ namespace Link.Authorization.Policies
                 .Build();
         }
 
+        public static AuthorizationPolicy CanMigrateKafkaTopics()
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, [nameof(LinkSystemPermissions.CanMigrateKafkaTopics)])
+                .Build();
+        }
+
         public static AuthorizationPolicy CanOperateKafka()
         {
             return new AuthorizationPolicyBuilder()
