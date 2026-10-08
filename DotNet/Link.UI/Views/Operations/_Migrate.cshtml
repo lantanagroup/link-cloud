@@ -1,0 +1,283 @@
+@model ThroughputKafkaPage
+@{
+    var query = Model.Query;
+    var topic = Model.SelectedTopic;
+    var detail = Model.Detail;
+    var plan = Model.MigrationPlan;
+    var migration = Model.Migration;
+    var topicName = topic?.Topic ?? query.TopicName;
+}
+
+<h2 class="h5 mt-3">Migrate a topic</h2>
+<p class="text-muted">An increase creates a verified backup, deletes the topic, and creates it empty at the new partition count. Consumer groups start at offset 0. The backup stays until a person confirms cleanup or the retention expires. Nothing is copied back onto the new topic.</p>
+
+<form class="row g-2 align-items-end" method="get" action="/Operations/Kafka">
+    <input type="hidden" name="view" value="@ThroughputKafkaPageQuery.Migrate" />
+    <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+    <div class="col-12 col-md-6">
+        <label class="form-label" for="migrate-topic">Topic</label>
+        <select class="form-select" id="migrate-topic" name="topic">
+            @foreach (var row in Model.Topics.Topics.Where(row => row.Slice1Eligible))
+            {
+                if (row.Topic == topicName)
+                {
+                    <option value="@row.Topic" selected>@row.Topic (@row.Partitions)</option>
+                }
+                else
+                {
+                    <option value="@row.Topic">@row.Topic (@row.Partitions)</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-au-neutral" type="submit">Open</button>
+    </div>
+</form>
+
+@if (detail is not null)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Topic detail</div>
+        <div class="card-body">
+            <p>Id <partial name="_LabeledId" model="@(new LabeledId { Label = "Topic id", Value = detail.TopicId, Compact = true, CopyLabel = "Copy topic id" })" /></p>
+            <p>@detail.Partitions partitions, RF @detail.ReplicationFactor, @(detail.FullIsr ? "full ISR" : "ISR short")@(detail.LeadersSkewed ? ", leaders skewed" : ""). Key @detail.KeyClass @detail.KeyShape.</p>
+            <p>@(detail.Slice1Eligible ? detail.Eligibility : detail.Eligibility)</p>
+            <p>Estimated records @detail.EstimatedRecords. @(detail.PartitionDrift ? "Live count differs from topics.txt (3)." : "Live count matches topics.txt.")</p>
+            @if (detail.Held)
+            {
+                <p>This topic is held.</p>
+            }
+            <p>Stop set: @(detail.StopSet.Count == 0 ? "none" : string.Join(", ", detail.StopSet))</p>
+            <p>Producers: @(detail.Producers.Count == 0 ? "none" : string.Join("; ", detail.Producers))</p>
+            <p>Consumers: @(detail.Consumers.Count == 0 ? "none" : string.Join("; ", detail.Consumers))</p>
+            @if (!string.IsNullOrWhiteSpace(detail.Error))
+            {
+                <p class="text-muted">@detail.Error</p>
+            }
+            @if (detail.PartitionsDetail.Count > 0)
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr><th>Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Preferred</th><th>Start</th><th>End</th></tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in detail.PartitionsDetail)
+                        {
+                            <tr>
+                                <td>@row.Partition</td>
+                                <td>@row.Leader</td>
+                                <td>@string.Join(", ", row.Replicas)</td>
+                                <td>@string.Join(", ", row.Isr)</td>
+                                <td>@(row.PreferredLeader ? "yes" : "no")</td>
+                                <td>@row.LogStart</td>
+                                <td>@row.HighWatermark</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (Model.Configs is not null)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Configs</div>
+        <div class="card-body">
+            <p>
+                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)">All</a>
+                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=sibling">Sibling</a>
+                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=broker">Broker default</a>
+                <a href="@query.Href(view: ThroughputKafkaPageQuery.Migrate, topic: topicName)&amp;diff=frozen">Frozen snapshot</a>
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Name</th><th>Value</th><th>Source</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in Model.Configs.Configs)
+                    {
+                        <tr><td>@row.Name</td><td>@row.Value</td><td>@row.Source</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @foreach (var change in Model.Configs.Changes)
+            {
+                <p class="mb-1">@change</p>
+            }
+        </div>
+    </div>
+}
+
+@if (plan is not null)
+{
+    <div class="alert alert-secondary mt-3" role="status">
+        <p>@(plan.Accepted ? "Dry run accepted." : "Dry run refused.") @plan.Summary</p>
+        <p>Window @plan.WindowMinutes minutes. Alert at @plan.AlertMinutes minutes. Plan hash @plan.PlanHash.</p>
+        <p>Stop set: @string.Join(", ", plan.StopSet)</p>
+        <p>Siblings grown before the stop: @string.Join(", ", plan.Siblings)</p>
+        @foreach (var warning in plan.Warnings)
+        {
+            <p class="mb-1">@warning</p>
+        }
+        @foreach (var item in plan.Errors)
+        {
+            <p class="mb-1">@item</p>
+        }
+        <p class="mb-0">In-place add keeps the topic name and remaps keys. Migrate stops the workloads, copies the log to the backup, and recreates an empty topic. Use an in-place add when the quiet window can be met.</p>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(topicName))
+{
+    <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="topic" value="@topicName" />
+        <input type="hidden" name="returnUrl" value="@query.ReturnUrl" />
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="migrate-partitions">Target partitions</label>
+            <input class="form-control" id="migrate-partitions" name="partitions" type="number" min="1" value="@((topic?.Partitions ?? 3) + 1)" />
+        </div>
+        <div class="col-auto form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="migrate-skip" name="backupSkip" value="true" />
+            <label class="form-check-label" for="migrate-skip">Skip backup</label>
+        </div>
+        <div class="col-auto form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="migrate-skip-ack" name="backupSkipAcknowledged" value="true" />
+            <label class="form-check-label" for="migrate-skip-ack">Skip acknowledged</label>
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="migrate-reason">Reason</label>
+            <input class="form-control" id="migrate-reason" name="reason" />
+        </div>
+        <div class="col-12 col-md-4">
+            <label class="form-label" for="migrate-confirm">Type the topic name</label>
+            <input class="form-control" id="migrate-confirm" name="confirmation" autocomplete="off" aria-label="Type the topic name to request the migration" />
+        </div>
+        <div class="col-auto mt-4">
+            <button class="btn btn-au-neutral" type="submit" formaction="/Operations/Kafka/migrations/plan">Dry run</button>
+            <button class="btn btn-success" type="submit">Request</button>
+        </div>
+    </form>
+}
+
+@if (migration is not null)
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Migration <partial name="_LabeledId" model="@(new LabeledId { Label = "Migration", Value = migration.Id.ToString("D"), Compact = true, CopyLabel = "Copy migration id" })" /></div>
+        <div class="card-body">
+            <p>@migration.Topic from @migration.OriginalPartitions to @migration.TargetPartitions. Step @migration.StepName.</p>
+            <p>Requester @migration.Requester. Approver @migration.Approver. Executor @migration.Executor.</p>
+            <p>Plan hash @migration.PlanHash.</p>
+            <p>Backup @(string.IsNullOrWhiteSpace(migration.BackupTopic) ? "not created" : migration.BackupTopic)@(migration.BackupCleanupRequired ? " is kept and flagged for cleanup." : ".")</p>
+            @if (migration.BackupSkipped)
+            {
+                <p>The backup was skipped. The recreated topic starts empty.</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(migration.Failure))
+            {
+                <p>@migration.Failure</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(migration.Evidence))
+            {
+                <p>@migration.Evidence</p>
+            }
+            <p>The new topic stays empty. Groups are committed at offset 0. History stays on the backup for replay. Nothing is reprocessed.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" action="/Operations/Kafka/migrations/approve">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="migrationId" value="@migration.Id" />
+                    <input type="hidden" name="topic" value="@migration.Topic" />
+                    <button class="btn btn-au-neutral" type="submit" aria-label="Approve migration">Approve</button>
+                </form>
+                <form method="post" action="/Operations/Kafka/migrations/execute">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="migrationId" value="@migration.Id" />
+                    <input type="hidden" name="topic" value="@migration.Topic" />
+                    <button class="btn btn-success" type="submit" aria-label="Execute migration">Execute</button>
+                </form>
+                <form method="post" action="/Operations/Kafka/migrations/abort">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="migrationId" value="@migration.Id" />
+                    <input type="hidden" name="topic" value="@migration.Topic" />
+                    <button class="btn btn-au-neutral" type="submit" aria-label="Abort migration">Abort</button>
+                </form>
+            </div>
+            <form class="row g-2 mt-3" method="post" action="/Operations/Kafka/migrations/go">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="migrationId" value="@migration.Id" />
+                <input type="hidden" name="topic" value="@migration.Topic" />
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="migrate-go">Type the topic name</label>
+                    <input class="form-control" id="migrate-go" name="confirmation" autocomplete="off" aria-label="Type the topic name before go" />
+                </div>
+                <div class="col-auto mt-4">
+                    <button class="btn btn-success" type="submit">Go</button>
+                </div>
+            </form>
+            <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations/recover">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="migrationId" value="@migration.Id" />
+                <input type="hidden" name="topic" value="@migration.Topic" />
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="migrate-recover">Type the topic name</label>
+                    <input class="form-control" id="migrate-recover" name="confirmation" autocomplete="off" aria-label="Type the topic name to recover the original count" />
+                </div>
+                <div class="col-auto mt-4">
+                    <button class="btn btn-au-neutral" type="submit">Recover original</button>
+                </div>
+            </form>
+            @if (migration.ManualChecklist)
+            {
+                <form class="row g-2 mt-2" method="post" action="/Operations/Kafka/migrations/manual">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="migrationId" value="@migration.Id" />
+                    <input type="hidden" name="topic" value="@migration.Topic" />
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="migrate-workload">Workload confirmed stopped or started</label>
+                        <input class="form-control" id="migrate-workload" name="workload" />
+                    </div>
+                    <div class="col-auto mt-4">
+                        <button class="btn btn-au-neutral" type="submit">Confirm step</button>
+                    </div>
+                </form>
+            }
+            <h3 class="h6 mt-3">Timeline</h3>
+            <ul class="mb-0">
+                @foreach (var entry in migration.Timeline)
+                {
+                    <li>@entry.Sequence @LinkUiTime.Display(entry.At) @entry.Text</li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(migration.BackupTopic))
+    {
+        <form class="row g-2 mt-3" method="post" action="/Operations/Kafka/migrations/backup-delete">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="migrationId" value="@migration.Id" />
+            <input type="hidden" name="topic" value="@migration.Topic" />
+            <input type="hidden" name="backupName" value="@migration.BackupTopic" />
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="migrate-backup">Type the backup topic name</label>
+                <input class="form-control" id="migrate-backup" name="confirmation" autocomplete="off" aria-label="Type the backup topic name to delete it" />
+            </div>
+            <div class="col-auto mt-4">
+                <button class="btn btn-au-neutral" type="submit">Delete backup</button>
+            </div>
+        </form>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.Runbook))
+{
+    <div class="au-card card mt-3">
+        <div class="card-header">Runbook</div>
+        <div class="card-body"><pre class="mb-0">@Model.Runbook</pre></div>
+    </div>
+}

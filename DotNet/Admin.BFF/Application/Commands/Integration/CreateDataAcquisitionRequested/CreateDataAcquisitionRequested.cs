@@ -3,6 +3,7 @@ using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -13,11 +14,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
     {
         private readonly ILogger<CreateDataAcquisitionRequested> _logger;
         private readonly IProducer<string, object> _producer;
+        private readonly IMigrationHoldRegistry? _holds;
 
-        public CreateDataAcquisitionRequested(ILogger<CreateDataAcquisitionRequested> logger, IProducer<string, object> producer)
+        public CreateDataAcquisitionRequested(ILogger<CreateDataAcquisitionRequested> logger, IProducer<string, object> producer, IMigrationHoldRegistry? holds = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+            _holds = holds;
         }
 
         public async Task<string> Execute(DataAcquisitionRequested model, string? userId = null)
@@ -45,6 +48,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                     Headers = headers
                 };
 
+                MigrationHoldGuard.RefuseIfHeld(_holds, nameof(KafkaTopic.DataAcquisitionRequested));
                 await _producer.ProduceAsync(nameof(KafkaTopic.DataAcquisitionRequested), message);
                 _logger.LogKafkaProducerDataAcquisitionRequested(correlationId);
 
