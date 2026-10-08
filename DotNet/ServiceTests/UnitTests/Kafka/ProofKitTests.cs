@@ -21,21 +21,45 @@ public class ProofKitTests
         Assert.Contains("consumer:", text, StringComparison.Ordinal);
         Assert.Contains("ops-proof-log", text, StringComparison.Ordinal);
         Assert.Contains("ops-proof-consumers", text, StringComparison.Ordinal);
+        Assert.Contains("HOST://localhost:19094", text, StringComparison.Ordinal);
+        Assert.Contains("HOST://localhost:19095", text, StringComparison.Ordinal);
+        Assert.Contains("HOST://localhost:19096", text, StringComparison.Ordinal);
+        Assert.Contains("HOST://localhost:19097", text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Runner_RequiresTheAllowLatch_AndDoesNotDeleteVolumes()
+    public void PublishFile_DoesNotChangeBrokerZero()
+    {
+        var text = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "kafka-ops-proof", "compose.publish.yml"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.DoesNotContain("\n  broker-0:", text, StringComparison.Ordinal);
+        Assert.Contains("host-proxy-0", text, StringComparison.Ordinal);
+        Assert.Contains("alpine/socat", text, StringComparison.Ordinal);
+        Assert.Contains("extra-broker", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Runner_RequiresTheAllowLatch_AndRemovesVolumes()
     {
         var root = RepoRoot();
         foreach (var name in new[] { "run-proof.ps1", "run-proof.sh" })
         {
             var text = File.ReadAllText(Path.Combine(root, "Scripts", "kafka-ops-proof", name));
             Assert.Contains("KAFKA_PROOF_ALLOW", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("down -v", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("down --volumes", text, StringComparison.Ordinal);
+            Assert.Contains("down -v", text, StringComparison.Ordinal);
+            Assert.Contains("--remove-orphans", text, StringComparison.Ordinal);
+            Assert.Contains("extra-broker", text, StringComparison.Ordinal);
             Assert.Contains("ops-proof-consumers", text, StringComparison.Ordinal);
             Assert.Contains("broker-3", text, StringComparison.Ordinal);
+            Assert.Contains("KafkaOps.Proof", text, StringComparison.Ordinal);
+            Assert.Contains("KafkaOpsConsoleFlowTests", text, StringComparison.Ordinal);
+            Assert.Contains("exit 2", text, StringComparison.Ordinal);
         }
+
+        var windows = File.ReadAllText(Path.Combine(root, "Scripts", "kafka-ops-proof", "run-proof.ps1"));
+        Assert.DoesNotContain("Write-Error", windows, StringComparison.Ordinal);
+        Assert.Contains("dotnet is not on PATH", windows, StringComparison.Ordinal);
+        Assert.Contains("KAFKA_BOOTSTRAP is not set", windows, StringComparison.Ordinal);
     }
 
     private static string RepoRoot()

@@ -1,7 +1,8 @@
 # Isolated-host proof for the Kafka operations console.
 # Refuses to run unless KAFKA_PROOF_ALLOW=1.
 # This workstation also requires KAFKA_PROOF_ALLOW_ON_THIS_PC=1, which is not set for day-to-day work.
-# Stopping the project uses "down" without deleting volumes.
+# Stopping the project removes the extra broker and the volumes.
+# A refusal writes to stderr and exits 2.
 
 [CmdletBinding()]
 param(
@@ -11,24 +12,26 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if ($env:KAFKA_PROOF_ALLOW -ne "1") {
-    Write-Error "Refusing to start containers. Set KAFKA_PROOF_ALLOW=1 on the isolated host."
+function Exit-Refusal {
+    param([string]$Message)
+    [Console]::Error.WriteLine($Message)
     exit 2
 }
 
+if ($env:KAFKA_PROOF_ALLOW -ne "1") {
+    Exit-Refusal "Refusing to start containers. Set KAFKA_PROOF_ALLOW=1 on the isolated host."
+}
+
 if ($env:COMPUTERNAME -eq "DESKTOP-5NA82VF" -and $env:KAFKA_PROOF_ALLOW_ON_THIS_PC -ne "1") {
-    Write-Error "This workstation is not the isolated Docker host. The kit stays stopped here."
-    exit 2
+    Exit-Refusal "This workstation is not the isolated Docker host. The kit stays stopped here."
 }
 
 $project = if ([string]::IsNullOrWhiteSpace($env:KAFKA_PROOF_COMPOSE_PROJECT)) { "kafka-ops-proof" } else { $env:KAFKA_PROOF_COMPOSE_PROJECT.Trim() }
 if ($project -notmatch "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$") {
-    Write-Error "The compose project name is invalid."
-    exit 2
+    Exit-Refusal "The compose project name is invalid."
 }
 if ($project -match "linkui|scaffold|shared") {
-    Write-Error "Refusing a compose project name that could match the shared stack."
-    exit 2
+    Exit-Refusal "Refusing a compose project name that could match the shared stack."
 }
 
 $here = $PSScriptRoot
@@ -70,10 +73,9 @@ function Invoke-Broker {
 }
 
 if ($Down) {
-    $files = @("-f", $compose)
-    & docker compose -p $project @files down --timeout 30
+    & docker compose -p $project -f $compose -f $publishFile --profile extra-broker down -v --remove-orphans --timeout 30
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Output "Stopped project $project. Volumes were left in place."
+    Write-Output "Stopped project $project and removed its volumes, including the extra broker."
     exit 0
 }
 
@@ -81,15 +83,16 @@ if ($Publish) {
     $portText = if ([string]::IsNullOrWhiteSpace($env:KAFKA_PROOF_PORT)) { "19094" } else { $env:KAFKA_PROOF_PORT.Trim() }
     $portNumber = 0
     if (-not [int]::TryParse($portText, [ref]$portNumber) -or $portNumber -lt 1 -or $portNumber -gt 65535) {
-        Write-Error "KAFKA_PROOF_PORT is not a valid port."
-        exit 2
+        Exit-Refusal "KAFKA_PROOF_PORT is not a valid port."
     }
     if ($portNumber -ge 5280 -and $portNumber -le 5294) {
-        Write-Error "Port $portNumber is reserved. Pick a host port outside 5280-5294."
-        exit 2
+        Exit-Refusal "Port $portNumber is reserved. Pick a host port outside 5280-5294."
     }
-    $env:KAFKA_PROOF_PORT = "$portNumber"
-    $env:KAFKA_BOOTSTRAP = "localhost:$portNumber"
+    if ($portNumber -ne 19094) {
+        Exit-Refusal "KAFKA_PROOF_PORT must stay 19094. Broker 0 advertises localhost:19094, and a different port would recreate the controller."
+    }
+    $env:KAFKA_PROOF_PORT = "19094"
+    $env:KAFKA_BOOTSTRAP = "localhost:19094"
 }
 
 Write-Output "STEP unit-tests"
@@ -98,13 +101,18 @@ if ($null -eq $dotnet) {
     Write-Output "SKIP unit-tests (dotnet is not on PATH)"
 }
 else {
-    & dotnet test (Join-Path $repo "DotNet\ServiceTests\ServiceTests.csproj") --filter "FullyQualifiedName~UnitTests.Kafka" --nologo -v q
+    & dotnet test (Join-Path $repo "DotNet\KafkaOps.Proof\KafkaOps.Proof.csproj") --filter "Category=UnitTests" --nologo -v q
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Output "PASS unit-tests"
 }
 
 Write-Output "STEP compose-up"
-Invoke-Compose @("up", "-d")
+if ($Publish) {
+    Invoke-Compose @("up", "-d", "--no-recreate")
+}
+else {
+    Invoke-Compose @("up", "-d")
+}
 
 Write-Output "STEP overview"
 $created = $false
@@ -138,7 +146,12 @@ if (-not $stable) { throw "ops-proof-consumers did not become Stable with 3 memb
 Write-Output "PASS replicas"
 
 Write-Output "STEP add-broker"
-Invoke-Compose @("--profile", "extra-broker", "up", "-d", "broker-3")
+if ($Publish) {
+    Invoke-Compose @("--profile", "extra-broker", "up", "-d", "--no-recreate", "broker-3", "host-proxy-3")
+}
+else {
+    Invoke-Compose @("--profile", "extra-broker", "up", "-d", "broker-3")
+}
 $joined = $false
 for ($i = 0; $i -lt 40; $i++) {
     Assert-Time
@@ -187,17 +200,20 @@ Write-Output "STEP stop-broker"
 Invoke-Compose @("stop", "broker-3")
 Write-Output "PASS decommission-stop"
 
-if (-not [string]::IsNullOrWhiteSpace($env:KAFKA_BOOTSTRAP) -and $null -ne $dotnet) {
-    Write-Output "STEP bootstrap-test"
-    & dotnet test (Join-Path $repo "DotNet\ServiceTests\ServiceTests.csproj") --filter "FullyQualifiedName~KafkaOpsProofTests" --nologo -v q
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Output "PASS bootstrap-test"
+if ($null -eq $dotnet) {
+    Write-Output "SKIP console-flow (dotnet is not on PATH)"
+}
+elseif ([string]::IsNullOrWhiteSpace($env:KAFKA_BOOTSTRAP)) {
+    Write-Output "SKIP console-flow (KAFKA_BOOTSTRAP is not set; pass -Publish)"
 }
 else {
-    Write-Output "SKIP bootstrap-test (set -Publish or KAFKA_BOOTSTRAP to run it)"
+    Write-Output "STEP console-flow"
+    & dotnet test (Join-Path $repo "DotNet\KafkaOps.Proof\KafkaOps.Proof.csproj") --filter "FullyQualifiedName~KafkaOpsConsoleFlowTests" --nologo -v q
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Output "PASS console-flow"
 }
 
 Write-Output "PASS proof"
 Write-Output "Inspect the project with: docker compose -p $project -f $compose ps"
 Write-Output "Stop it with: $PSCommandPath -Down"
-Write-Output "That stop leaves volumes in place."
+Write-Output "That stop removes the extra broker and the volumes."

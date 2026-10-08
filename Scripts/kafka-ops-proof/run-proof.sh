@@ -2,7 +2,8 @@
 # Isolated-host proof for the Kafka operations console.
 # Refuses to run unless KAFKA_PROOF_ALLOW=1.
 # The day-to-day workstation also requires KAFKA_PROOF_ALLOW_ON_THIS_PC=1.
-# "down" does not delete volumes.
+# "down" removes the extra broker and the volumes.
+# A refusal exits 2.
 set -euo pipefail
 
 if [[ "${KAFKA_PROOF_ALLOW:-}" != "1" ]]; then
@@ -38,8 +39,8 @@ for arg in "$@"; do
   case "$arg" in
     --publish) publish_flag=1 ;;
     --down)
-      docker compose -p "$project" -f "$compose" down --timeout 30
-      echo "Stopped project $project. Volumes were left in place."
+      docker compose -p "$project" -f "$compose" -f "$publish" --profile extra-broker down -v --remove-orphans --timeout 30
+      echo "Stopped project $project and removed its volumes, including the extra broker."
       exit 0
       ;;
     *) echo "Unknown argument: $arg" >&2; exit 2 ;;
@@ -56,8 +57,12 @@ if [[ "$publish_flag" == "1" ]]; then
     echo "Port $port is reserved. Pick a host port outside 5280-5294." >&2
     exit 2
   fi
-  export KAFKA_PROOF_PORT="$port"
-  export KAFKA_BOOTSTRAP="localhost:$port"
+  if (( port != 19094 )); then
+    echo "KAFKA_PROOF_PORT must stay 19094. Broker 0 advertises localhost:19094, and a different port would recreate the controller." >&2
+    exit 2
+  fi
+  export KAFKA_PROOF_PORT="19094"
+  export KAFKA_BOOTSTRAP="localhost:19094"
   files+=(-f "$publish")
 fi
 
@@ -75,14 +80,18 @@ compose() {
 
 echo "STEP unit-tests"
 if command -v dotnet >/dev/null 2>&1; then
-  dotnet test "$repo/DotNet/ServiceTests/ServiceTests.csproj" --filter "FullyQualifiedName~UnitTests.Kafka" --nologo -v q
+  dotnet test "$repo/DotNet/KafkaOps.Proof/KafkaOps.Proof.csproj" --filter "Category=UnitTests" --nologo -v q
   echo "PASS unit-tests"
 else
   echo "SKIP unit-tests (dotnet is not on PATH)"
 fi
 
 echo "STEP compose-up"
-compose up -d
+if [[ "$publish_flag" == "1" ]]; then
+  compose up -d --no-recreate
+else
+  compose up -d
+fi
 
 echo "STEP overview"
 created=0
@@ -118,7 +127,11 @@ done
 echo "PASS replicas"
 
 echo "STEP add-broker"
-compose --profile extra-broker up -d broker-3
+if [[ "$publish_flag" == "1" ]]; then
+  compose --profile extra-broker up -d --no-recreate broker-3 host-proxy-3
+else
+  compose --profile extra-broker up -d broker-3
+fi
 joined=0
 for _ in $(seq 1 40); do
   check_time
@@ -177,15 +190,17 @@ echo "STEP stop-broker"
 compose stop broker-3
 echo "PASS decommission-stop"
 
-if [[ -n "${KAFKA_BOOTSTRAP:-}" ]] && command -v dotnet >/dev/null 2>&1; then
-  echo "STEP bootstrap-test"
-  dotnet test "$repo/DotNet/ServiceTests/ServiceTests.csproj" --filter "FullyQualifiedName~KafkaOpsProofTests" --nologo -v q
-  echo "PASS bootstrap-test"
+if ! command -v dotnet >/dev/null 2>&1; then
+  echo "SKIP console-flow (dotnet is not on PATH)"
+elif [[ -z "${KAFKA_BOOTSTRAP:-}" ]]; then
+  echo "SKIP console-flow (KAFKA_BOOTSTRAP is not set; pass --publish)"
 else
-  echo "SKIP bootstrap-test (pass --publish or set KAFKA_BOOTSTRAP to run it)"
+  echo "STEP console-flow"
+  dotnet test "$repo/DotNet/KafkaOps.Proof/KafkaOps.Proof.csproj" --filter "FullyQualifiedName~KafkaOpsConsoleFlowTests" --nologo -v q
+  echo "PASS console-flow"
 fi
 
 echo "PASS proof"
 echo "Inspect the project with: docker compose -p $project -f $compose ps"
 echo "Stop it with: $0 --down"
-echo "That stop leaves volumes in place."
+echo "That stop removes the extra broker and the volumes."
