@@ -91,16 +91,52 @@ public class KafkaKeyLegacyTests
     [Fact]
     public void ServiceNamesComeFromTheSharedFixture()
     {
+        var fixture = ReadServiceNameFixture(FindRepoRoot());
+        Assert.Equal(
+            fixture.OrderBy(name => name, StringComparer.Ordinal),
+            KafkaKeyLegacy.KnownServiceNames.OrderBy(name => name, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void ProductionProjectsDoNotReferenceTheTestsTree()
+    {
         var root = FindRepoRoot();
-        var file = ReadFixtureText(root);
-        using var stream = typeof(KafkaKeyLegacy).Assembly.GetManifestResourceStream("LantanaGroup.Link.Shared.kafka-service-names.json");
-        Assert.NotNull(stream);
-        using var reader = new StreamReader(stream!);
-        var embedded = reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
-        Assert.Equal(file, embedded);
-        var names = JsonSerializer.Deserialize<string[]>(file);
-        Assert.NotNull(names);
-        Assert.Equal(names!.Length, names.Distinct(StringComparer.Ordinal).Count());
+        var hits = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+        {
+            if (IsSkipped(file))
+            {
+                continue;
+            }
+
+            var name = Path.GetFileName(file);
+            var isProject = name.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("pom.xml", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("Dockerfile", StringComparison.OrdinalIgnoreCase);
+            if (!isProject)
+            {
+                continue;
+            }
+
+            var parts = file.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (parts.Any(part => part.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase) || part.Equals("ServiceTests", StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (name.EndsWith("Tests.csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var text = File.ReadAllText(file);
+            if (ProductionTestsReference.IsMatch(text))
+            {
+                hits.Add(Path.GetRelativePath(root, file));
+            }
+        }
+
+        Assert.True(hits.Count == 0, string.Join("; ", hits));
     }
 
     private static HashSet<string> ReadServiceNameFixture(string root)
@@ -131,8 +167,12 @@ public class KafkaKeyLegacyTests
     private static bool IsSkipped(string path)
     {
         var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return parts.Any(part => part is "bin" or "obj");
+        return parts.Any(part => part is "bin" or "obj" or "node_modules" or "target" or "dist" or ".git");
     }
+
+    private static readonly Regex ProductionTestsReference = new(
+        @"(^|[^A-Za-z0-9])Tests[/\\]|\.\.[/\\]\.\.[/\\]Tests",
+        RegexOptions.CultureInvariant);
 
     private static string FindRepoRoot()
     {
