@@ -316,6 +316,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             }
         }
 
+        var roles = await ControllerEligibleIdsAsync(admin, brokers, cancellationToken);
         return new ClusterSnapshot
         {
             BrokerCount = described.Nodes.Count,
@@ -323,7 +324,8 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             UnderReplicatedPartitions = underReplicated,
             OfflinePartitions = offline,
             IsrShrunkPartitions = isrShrunk,
-            ControllerEligibleIds = await ControllerEligibleIdsAsync(admin, brokers, described.Controller?.Id, cancellationToken),
+            ControllerEligibleIds = roles.Ids,
+            ControllerRolesKnown = roles.Known,
             LogDirsAvailable = false,
             LogDirDetail = "This client cannot describe log directories. A broker is empty when no partition lists it as a replica or a leader.",
             Brokers = brokers.OrderBy(broker => broker.Id).ToList(),
@@ -433,17 +435,13 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return map;
     }
 
-    private static async Task<List<int>> ControllerEligibleIdsAsync(
+    private static async Task<(List<int> Ids, bool Known)> ControllerEligibleIdsAsync(
         IAdminClient admin,
         IReadOnlyList<BrokerSnapshot> brokers,
-        int? controllerId,
         CancellationToken cancellationToken)
     {
-        var eligible = new List<int>();
-        if (controllerId is int active)
-            eligible.Add(active);
         if (brokers.Count == 0)
-            return eligible;
+            return ([], false);
 
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -451,9 +449,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             var described = await admin.DescribeConfigsAsync(
                 brokers.Select(broker => new ConfigResource { Type = ResourceType.Broker, Name = broker.Id.ToString() }).ToList(),
                 new DescribeConfigsOptions { RequestTimeout = TimeSpan.FromSeconds(15) });
+            var eligible = new List<int>();
             foreach (var result in described)
             {
-                if (!int.TryParse(result.ConfigResource.Name, out var id))
+                if (!int.TryParse(result.ConfigResource.Name, out var id) || eligible.Contains(id))
                     continue;
                 string? roles = null;
                 foreach (var entry in result.Entries)
@@ -462,20 +461,16 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
                         roles = entry.Value.Value;
                 }
 
-                if (roles is not null
-                    && roles.Contains("controller", StringComparison.OrdinalIgnoreCase)
-                    && !eligible.Contains(id))
-                {
+                if (roles is not null && roles.Contains("controller", StringComparison.OrdinalIgnoreCase))
                     eligible.Add(id);
-                }
             }
+
+            return (eligible, true);
         }
         catch (KafkaException)
         {
-            // Broker config is optional. The active controller is still refused.
+            return ([], false);
         }
-
-        return eligible;
     }
 
     private static async Task<Dictionary<string, string>> ConfigsAsync(IAdminClient admin, string topic, CancellationToken cancellationToken)
