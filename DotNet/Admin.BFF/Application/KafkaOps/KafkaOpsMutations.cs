@@ -156,6 +156,12 @@ public sealed partial class KafkaOpsService
         });
     }
 
+    public async Task<InfraStatus> PlanAddBrokerAsync(CancellationToken cancellationToken)
+    {
+        await EnsureNoReassignmentAsync(null, cancellationToken);
+        return Infra;
+    }
+
     public async Task<ChangeRequestRecord> CreateAddBrokerAsync(ClaimsPrincipal user, string reason, string? correlationId, CancellationToken cancellationToken)
     {
         EnsureWritable();
@@ -217,19 +223,30 @@ public sealed partial class KafkaOpsService
         var target = await RequireAsync(record.TargetRequestId, cancellationToken);
         try
         {
+            var listing = await LiveReassignmentsAsync(cancellationToken);
+            if (!listing.Known)
+                throw new KafkaOpsRejectedException(UnknownReassignmentDetail());
             if (!_infra.Enabled)
                 throw new KafkaOpsRejectedException(_infra.Detail);
+
+            var inFlight = new HashSet<string>(listing.Topics, StringComparer.Ordinal);
+            var original = ReadMoves(record.OriginalAssignmentJson);
+            var stillMoving = original.Where(move => inFlight.Contains(move.Topic)).ToList();
+            var alreadyMoved = original.Count - stillMoving.Count;
             await _infra.CancelReassignmentAsync(record.RebalanceName, cancellationToken);
             var cluster = await _broker.DescribeClusterAsync(cancellationToken);
-            if (!ReplicasMatch(record.OriginalAssignmentJson, cluster))
+            if (!MovedPartitionsMatch(stillMoving, cluster))
                 throw new KafkaOpsRejectedException("The replicas did not return to the original assignment.");
 
             var now = DateTimeOffset.UtcNow;
+            var progress = alreadyMoved == 0
+                ? "Replicas returned to the original assignment."
+                : alreadyMoved + " partitions had already moved and keep their new replicas. The broker was not stopped.";
             record.Status = KafkaChangeStatus.Cancelled;
-            record.Progress = "Replicas returned to the original assignment.";
+            record.Progress = progress;
             record.ClosedUtc = now;
             target.Status = KafkaChangeStatus.Cancelled;
-            target.Progress = "Reassignment cancelled. Replicas returned to the original assignment.";
+            target.Progress = progress;
             target.ClosedUtc = now;
             target.Failure = "";
             await SaveAsync(record, cancellationToken);
@@ -370,8 +387,8 @@ public sealed partial class KafkaOpsService
 
         if (alreadyTimedOut)
         {
-            // Unknown stays timed out. Do not ask the provider here, and do not stop the broker.
-            var listing = await _broker.ListInFlightReassignmentsAsync(cancellationToken);
+            // A known-empty list closes the record. Unknown stays timed out and does not stop the broker.
+            var listing = await LiveReassignmentsAsync(cancellationToken);
             if (listing.Known && listing.Topics.Count == 0)
             {
                 await PersistFailedAsync(record, "The reassignment ended before the replicas matched.", cancellationToken);
@@ -611,12 +628,7 @@ public sealed partial class KafkaOpsService
         var names = new List<string>();
         var listing = await LiveReassignmentsAsync(cancellationToken);
         if (!listing.Known)
-        {
-            var detail = "Cannot confirm no reassignment is in flight.";
-            if (!_infra.Enabled)
-                detail += " Enable an infra provider to allow this.";
-            throw new KafkaOpsRejectedException(detail);
-        }
+            throw new KafkaOpsRejectedException(UnknownReassignmentDetail());
 
         foreach (var topic in listing.Topics)
         {
@@ -668,11 +680,18 @@ public sealed partial class KafkaOpsService
         return JsonSerializer.Serialize(new { partitions });
     }
 
-    private static bool ReplicasMatch(string originalJson, ClusterSnapshot cluster)
+    private string UnknownReassignmentDetail()
     {
-        var expected = ReadMoves(originalJson);
+        var detail = "Cannot confirm no reassignment is in flight.";
+        if (!_infra.Enabled)
+            detail += " Enable an infra provider to allow this.";
+        return detail;
+    }
+
+    private static bool MovedPartitionsMatch(IReadOnlyList<ReplicaMove> expected, ClusterSnapshot cluster)
+    {
         if (expected.Count == 0)
-            return false;
+            return true;
         return expected.All(move => cluster.Placements.Any(placement =>
             placement.Topic == move.Topic
             && placement.Partition == move.Partition

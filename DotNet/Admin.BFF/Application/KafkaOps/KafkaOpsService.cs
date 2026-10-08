@@ -28,6 +28,7 @@ public interface IKafkaOpsService
     Task<ChangeRequestRecord> CreateDecommissionAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken);
     Task<BrokerMovePlan> PlanRebalanceAsync(int brokerId, CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CreateRebalanceAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken);
+    Task<InfraStatus> PlanAddBrokerAsync(CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CreateAddBrokerAsync(ClaimsPrincipal user, string reason, string? correlationId, CancellationToken cancellationToken);
     Task<ChangeRequestRecord> CancelAsync(ClaimsPrincipal user, Guid id, CancellationToken cancellationToken);
     InfraStatus Infra { get; }
@@ -39,6 +40,7 @@ public interface IKafkaOpsService
     Task TrackAsync(CancellationToken cancellationToken);
     bool CanView(ClaimsPrincipal user);
     bool CanManage(ClaimsPrincipal user);
+    bool ReadOnly { get; }
 }
 
 public sealed class KafkaTopicsResponse
@@ -889,7 +891,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         }
     }
 
-    private bool ReadOnly => _readOnly;
+    public bool ReadOnly => _readOnly;
 
     private static bool AssignmentMatches(string assignment, string topic)
     {
