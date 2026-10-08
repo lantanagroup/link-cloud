@@ -255,8 +255,8 @@ public class ReportManifestProducerTests
     }
 
     /// <summary>
-    /// A failed manifest upload returns false before either branch runs. A bypassed report
-    /// must not be marked complete when its manifest never reached internal/.
+    /// A failed manifest upload releases the claim and throws. Returning false would let the
+    /// period job delete itself, and a blob outage would leave the manifest unproduced.
     /// </summary>
     [Fact]
     public async Task Produce_SubmissionBypassedAndUploadFails_DoesNotSetTerminalStatus()
@@ -269,9 +269,8 @@ public class ReportManifestProducerTests
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("blob storage unavailable"));
 
-        var produced = await harness.Producer.Produce(harness.Schedule);
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
 
-        Assert.False(produced);
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
         harness.ScheduleManager.Verify(
             m => m.UpdateAsync(It.IsAny<ReportScheduleModel>(), It.IsAny<CancellationToken>()),
