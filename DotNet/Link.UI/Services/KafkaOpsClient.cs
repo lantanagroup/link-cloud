@@ -255,6 +255,7 @@ public sealed class KafkaTopicsResponse
     public int Cap { get; set; }
     public bool ReadOnly { get; set; }
     public string? Error { get; set; }
+    public string? GroupsError { get; set; }
 }
 
 public sealed class KafkaTopicRow
@@ -273,6 +274,7 @@ public sealed class KafkaTopicRow
     public Dictionary<string, string> Configs { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public double ProduceRatePerSecond { get; set; }
     public long TotalLag { get; set; }
+    public bool LagKnown { get; set; } = true;
     public int MaxReplicas { get; set; }
     public List<string> Groups { get; set; } = [];
     public string? Error { get; set; }

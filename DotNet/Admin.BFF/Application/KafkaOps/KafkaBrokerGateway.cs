@@ -148,9 +148,17 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             return [];
 
         var described = await admin.DescribeConsumerGroupsAsync(ids, new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
-        var offsetResults = await admin.ListConsumerGroupOffsetsAsync(
-            ids.Select(id => new ConsumerGroupTopicPartitions(id, null)).ToList(),
-            new ListConsumerGroupOffsetsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+        var offsetResults = await ConsumerGroupOffsetQueries.ListPerGroupAsync<ListConsumerGroupOffsetsResult>(
+            ids,
+            async (groupId, token) =>
+            {
+                var listed = await admin.ListConsumerGroupOffsetsAsync(
+                    new ConsumerGroupTopicPartitions[] { new(groupId, null) },
+                    new ListConsumerGroupOffsetsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+                token.ThrowIfCancellationRequested();
+                return listed;
+            },
+            cancellationToken);
 
         var committed = new Dictionary<string, List<TopicPartitionOffsetError>>(StringComparer.Ordinal);
         foreach (var groupOffsets in offsetResults)
@@ -267,6 +275,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var placements = new List<PartitionPlacement>();
         var underReplicated = 0;
         var offline = 0;
+        var isrShrunk = 0;
         foreach (var topic in metadata.Topics)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -276,10 +285,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             {
                 var replicas = partition.Replicas?.ToList() ?? [];
                 var isr = partition.InSyncReplicas?.ToList() ?? [];
-                if (partition.Leader < 0)
-                    offline++;
-                if (replicas.Count > 0 && isr.Count < replicas.Count)
-                    underReplicated++;
+                var health = ClusterHealthCounts.ForPartition(partition.Leader, replicas, isr);
+                offline += health.Offline;
+                underReplicated += health.UnderReplicated;
+                isrShrunk += health.IsrShrunk;
                 placements.Add(new PartitionPlacement
                 {
                     Topic = topic.Topic ?? "",
@@ -313,7 +322,8 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             ControllerId = described.Controller?.Id,
             UnderReplicatedPartitions = underReplicated,
             OfflinePartitions = offline,
-            IsrShrunkPartitions = underReplicated,
+            IsrShrunkPartitions = isrShrunk,
+            ControllerEligibleIds = await ControllerEligibleIdsAsync(admin, brokers, described.Controller?.Id, cancellationToken),
             LogDirsAvailable = false,
             LogDirDetail = "This client cannot describe log directories. A broker is empty when no partition lists it as a replica or a leader.",
             Brokers = brokers.OrderBy(broker => broker.Id).ToList(),
@@ -421,6 +431,51 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         }
 
         return map;
+    }
+
+    private static async Task<List<int>> ControllerEligibleIdsAsync(
+        IAdminClient admin,
+        IReadOnlyList<BrokerSnapshot> brokers,
+        int? controllerId,
+        CancellationToken cancellationToken)
+    {
+        var eligible = new List<int>();
+        if (controllerId is int active)
+            eligible.Add(active);
+        if (brokers.Count == 0)
+            return eligible;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var described = await admin.DescribeConfigsAsync(
+                brokers.Select(broker => new ConfigResource { Type = ResourceType.Broker, Name = broker.Id.ToString() }).ToList(),
+                new DescribeConfigsOptions { RequestTimeout = TimeSpan.FromSeconds(15) });
+            foreach (var result in described)
+            {
+                if (!int.TryParse(result.ConfigResource.Name, out var id))
+                    continue;
+                string? roles = null;
+                foreach (var entry in result.Entries)
+                {
+                    if (string.Equals(entry.Key, "process.roles", StringComparison.OrdinalIgnoreCase))
+                        roles = entry.Value.Value;
+                }
+
+                if (roles is not null
+                    && roles.Contains("controller", StringComparison.OrdinalIgnoreCase)
+                    && !eligible.Contains(id))
+                {
+                    eligible.Add(id);
+                }
+            }
+        }
+        catch (KafkaException)
+        {
+            // Broker config is optional. The active controller is still refused.
+        }
+
+        return eligible;
     }
 
     private static async Task<Dictionary<string, string>> ConfigsAsync(IAdminClient admin, string topic, CancellationToken cancellationToken)

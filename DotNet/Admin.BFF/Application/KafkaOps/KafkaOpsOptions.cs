@@ -31,6 +31,14 @@ public sealed class KafkaOpsOptions
 
     public string ComposeProject { get; set; } = "";
 
+    public string ComposeFile { get; set; } = "";
+
+    public string BrokerServicePrefix { get; set; } = "broker-";
+
+    public string ExtraBrokerProfile { get; set; } = "extra-broker";
+
+    public string ExtraBrokerService { get; set; } = "broker-3";
+
     public string KubernetesNamespace { get; set; } = "kafka";
 
     public string KafkaNodePool { get; set; } = "";

@@ -67,8 +67,20 @@ public sealed partial class KafkaOpsService
         });
     }
 
-    public async Task<BrokerMovePlan> PlanDecommissionAsync(int brokerId, CancellationToken cancellationToken) =>
-        BrokerMovePlanner.Decommission(brokerId, await BrokerIdsAsync(cancellationToken), await FactsAsync(cancellationToken));
+    public async Task<BrokerMovePlan> PlanDecommissionAsync(int brokerId, CancellationToken cancellationToken)
+    {
+        var cluster = await GetClusterAsync(cancellationToken);
+        if (cluster.Error is not null)
+            throw new KafkaOpsRejectedException(cluster.Error);
+        var eligible = cluster.ControllerEligibleIds.ToList();
+        if (cluster.ControllerId is int controller && !eligible.Contains(controller))
+            eligible.Add(controller);
+        return BrokerMovePlanner.Decommission(
+            brokerId,
+            cluster.Brokers.Select(broker => broker.Id).ToList(),
+            await FactsAsync(cancellationToken),
+            eligible);
+    }
 
     public async Task<ChangeRequestRecord> CreateDecommissionAsync(ClaimsPrincipal user, int brokerId, string reason, string? correlationId, CancellationToken cancellationToken)
     {
@@ -164,11 +176,12 @@ public sealed partial class KafkaOpsService
         var error = ChangeRequestWorkflow.MarkExecuting(record, UserName(user), DateTimeOffset.UtcNow);
         if (error is not null)
             throw new KafkaOpsRejectedException(error);
-        if (!_infra.Enabled)
-            throw new KafkaOpsRejectedException(_infra.Detail);
 
         try
         {
+            if (!_infra.Enabled)
+                throw new KafkaOpsRejectedException(_infra.Detail);
+
             switch (record.Kind)
             {
                 case KafkaChangeKind.ScaleReplicas:
@@ -205,17 +218,11 @@ public sealed partial class KafkaOpsService
                     throw new KafkaOpsRejectedException("This change has no infrastructure action.");
             }
         }
-        catch (KafkaOpsRejectedException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
-            record.Status = KafkaChangeStatus.Failed;
-            record.Failure = ex.Message;
-            record.ClosedUtc = DateTimeOffset.UtcNow;
-            await SaveAsync(record, cancellationToken);
-            await AuditAsync(record, "execution-failed", cancellationToken);
+            await PersistFailedAsync(record, ex.Message, cancellationToken);
+            if (ex is KafkaOpsRejectedException)
+                throw;
             throw new KafkaOpsRejectedException(ex.Message);
         }
 
@@ -227,8 +234,10 @@ public sealed partial class KafkaOpsService
 
     private async Task TrackInfraAsync(ChangeRequestRecord record, CancellationToken cancellationToken)
     {
-        var timedOut = record.ExecutedUtc is { } executed
-            && DateTimeOffset.UtcNow - executed > TimeSpan.FromSeconds(Math.Max(30, _options.Value.ScaleTimeoutSeconds));
+        var timedOut = InfraTimedOut(record);
+        if (record.NextPollUtc is { } next && DateTimeOffset.UtcNow < next && !timedOut)
+            return;
+
         try
         {
             var done = record.Kind switch
@@ -244,14 +253,30 @@ public sealed partial class KafkaOpsService
                 record.Status = KafkaChangeStatus.Done;
                 record.ClosedUtc = DateTimeOffset.UtcNow;
                 record.ConvergedUtc = DateTimeOffset.UtcNow;
+                record.PollFailures = 0;
+                record.NextPollUtc = null;
                 await SaveAsync(record, cancellationToken);
                 await AuditAsync(record, "converged", cancellationToken);
                 return;
             }
+
+            record.PollFailures = 0;
+            record.NextPollUtc = null;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Infrastructure poll failed for {Kind}", record.Kind);
+            if (timedOut)
+            {
+                await PersistTimedOutAsync(record, "The change did not settle before the timeout. The last poll failed. " + ex.Message, cancellationToken);
+                return;
+            }
+
+            record.PollFailures++;
+            var delaySeconds = Math.Min(30, 1 << Math.Min(record.PollFailures, 5));
+            record.NextPollUtc = DateTimeOffset.UtcNow.AddSeconds(delaySeconds);
+            record.Progress = "The last poll failed and will be retried. " + ex.Message;
+            await SaveAsync(record, cancellationToken);
             return;
         }
 
@@ -261,17 +286,35 @@ public sealed partial class KafkaOpsService
             return;
         }
 
-        record.Status = KafkaChangeStatus.NeedsAttention;
+        await PersistTimedOutAsync(record, "The change did not settle before the timeout. The broker was not removed.", cancellationToken);
+    }
+
+    private bool InfraTimedOut(ChangeRequestRecord record) =>
+        record.ExecutedUtc is { } executed
+        && DateTimeOffset.UtcNow - executed > TimeSpan.FromSeconds(Math.Max(30, _options.Value.ScaleTimeoutSeconds));
+
+    private async Task PersistTimedOutAsync(ChangeRequestRecord record, string reason, CancellationToken cancellationToken)
+    {
+        record.Status = KafkaChangeStatus.TimedOut;
         record.ClosedUtc = DateTimeOffset.UtcNow;
-        record.Failure = "The change did not settle before the timeout. The broker was not removed.";
+        record.Failure = reason;
         await SaveAsync(record, cancellationToken);
-        await AuditAsync(record, "needs-attention", cancellationToken);
+        await AuditAsync(record, "timed-out", cancellationToken);
     }
 
     private async Task<bool> ScaleSettledAsync(ChangeRequestRecord record, CancellationToken cancellationToken)
     {
         var groups = await _broker.DescribeGroupsAsync(false, _options.Value.ExpectedConfigVersion, cancellationToken);
         var group = groups.FirstOrDefault(candidate => candidate.GroupId == record.GroupId);
+        if (record.DesiredReplicas == 0)
+        {
+            var drained = group is null || group.Members.Count == 0;
+            record.Progress = drained
+                ? "Group has no members."
+                : "Waiting for 0 members. Current state: " + group!.State + ", members " + group.Members.Count + ".";
+            return drained;
+        }
+
         var stable = group is not null
             && group.State.Equals("Stable", StringComparison.OrdinalIgnoreCase)
             && group.Members.Count == record.DesiredReplicas

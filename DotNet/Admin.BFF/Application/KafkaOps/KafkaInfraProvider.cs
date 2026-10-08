@@ -116,11 +116,18 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         return ComposeAsync(cancellationToken, null, "up", "-d", "--scale", service + "=" + replicas, "--no-recreate", service);
     }
 
-    public Task AddBrokerAsync(CancellationToken cancellationToken) =>
-        ComposeAsync(cancellationToken, null, "--profile", "extra-broker", "up", "-d", "broker-3");
+    public Task AddBrokerAsync(CancellationToken cancellationToken)
+    {
+        var profile = TokenOrDefault(_options.ExtraBrokerProfile, "extra-broker", "profile");
+        var service = TokenOrDefault(_options.ExtraBrokerService, "broker-3", "service");
+        return ComposeAsync(cancellationToken, null, "--profile", profile, "up", "-d", service);
+    }
 
-    public Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken) =>
-        ComposeAsync(cancellationToken, null, "stop", "broker-" + brokerId);
+    public Task RemoveBrokerAsync(int brokerId, CancellationToken cancellationToken)
+    {
+        var prefix = TokenOrDefault(_options.BrokerServicePrefix, "broker-", "prefix");
+        return ComposeAsync(cancellationToken, null, "stop", prefix + brokerId);
+    }
 
     public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken)
     {
@@ -143,6 +150,8 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
     {
         RequireToken(_options.ComposeProject, "project");
         var arguments = new List<string> { "compose", "-p", _options.ComposeProject };
+        foreach (var path in ComposeFiles())
+            arguments.AddRange(["-f", path]);
         arguments.AddRange(args);
         var result = await _process.RunAsync("docker", arguments, stdin, cancellationToken);
         if (result.ExitCode != 0)
@@ -161,10 +170,35 @@ public sealed class LocalComposeKafkaInfraProvider : IKafkaInfraProvider
         return null;
     }
 
+    private IEnumerable<string> ComposeFiles()
+    {
+        if (string.IsNullOrWhiteSpace(_options.ComposeFile))
+            yield break;
+
+        foreach (var segment in _options.ComposeFile.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            RequirePath(segment);
+            yield return segment;
+        }
+    }
+
+    private static string TokenOrDefault(string? value, string fallback, string name)
+    {
+        var chosen = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        RequireToken(chosen, name);
+        return chosen;
+    }
+
     private static void RequireToken(string? value, string name)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 80 || !value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.'))
             throw new KafkaOpsRejectedException("The " + name + " name is invalid.");
+    }
+
+    private static void RequirePath(string value)
+    {
+        if (value.Length == 0 || value.Length > 260 || !value.All(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' or ':' or '\\' or '/'))
+            throw new KafkaOpsRejectedException("The compose file path is invalid.");
     }
 
     private static string Trim(string value) =>
@@ -219,14 +253,24 @@ public sealed class StrimziKafkaInfraProvider : IKafkaInfraProvider
         var current = await ReadReplicasAsync(pool, cancellationToken);
         if (current <= 1)
             throw new KafkaOpsRejectedException("The node pool cannot be scaled below one broker.");
+        var body = JsonSerializer.Serialize(new
+        {
+            metadata = new
+            {
+                annotations = new Dictionary<string, string>
+                {
+                    ["strimzi.io/remove-node-ids"] = "[" + brokerId + "]"
+                }
+            },
+            spec = new { replicas = current - 1 }
+        });
         await _kubernetes.ApplyAsync(
             "kafka.strimzi.io/v1beta2",
             "kafkanodepools",
             Namespace(),
             pool,
-            JsonSerializer.Serialize(new { spec = new { replicas = current - 1 } }),
+            body,
             cancellationToken);
-        await _kubernetes.DeleteAsync("kafka.strimzi.io/v1beta2", "kafkarebalances", Namespace(), RebalanceName(brokerId), cancellationToken);
     }
 
     public Task ApplyReassignmentAsync(string reassignmentJson, CancellationToken cancellationToken)
@@ -289,8 +333,6 @@ public sealed class StrimziKafkaInfraProvider : IKafkaInfraProvider
 
         return null;
     }
-
-    private static string RebalanceName(int brokerId) => "link-ops-remove-brokers";
 
     private static int? LeavingBroker(string json)
     {
