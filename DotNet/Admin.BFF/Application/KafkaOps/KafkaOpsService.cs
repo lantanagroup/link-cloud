@@ -40,6 +40,7 @@ public interface IKafkaOpsService
     Task TrackAsync(CancellationToken cancellationToken);
     bool CanView(ClaimsPrincipal user);
     bool CanManage(ClaimsPrincipal user);
+    bool CanMigrate(ClaimsPrincipal user);
     bool ReadOnly { get; }
 }
 
@@ -73,6 +74,21 @@ public sealed class KafkaTopicRow
     public int MaxReplicas { get; set; }
     public List<string> Groups { get; set; } = [];
     public string? Error { get; set; }
+    public bool FullIsr { get; set; }
+    public double LargestLeaderShare { get; set; }
+    public bool LeadersSkewed { get; set; }
+    public long EstimatedBytes { get; set; }
+    public string SizeClass { get; set; } = "small";
+    public int ServiceRetryPartitions { get; set; }
+    public int ServiceRedrivePartitions { get; set; }
+    public bool ServiceRetryBehind { get; set; }
+    public bool ServiceRedriveBehind { get; set; }
+    public bool PinnedSiblingBehind { get; set; }
+    public int TopicsFilePartitions { get; set; } = 3;
+    public bool PartitionDrift { get; set; }
+    public bool Slice1Eligible { get; set; }
+    public string MigrationEligibility { get; set; } = "";
+    public string PartitionAddReason { get; set; } = "";
 }
 
 public sealed class KafkaGroupsResponse
@@ -109,6 +125,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     private readonly IHostEnvironment _environment;
     private readonly IProducer<string, AuditEventMessage>? _audit;
     private readonly IKafkaInfraProvider _infra;
+    private readonly IKafkaOpsLease? _lease;
+    private readonly IMigrationRuntime? _migrations;
     private readonly ILogger<KafkaOpsService> _logger;
     private readonly bool _anonymousAccess;
     private readonly bool _readOnly;
@@ -121,7 +139,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         ILogger<KafkaOpsService> logger,
         IConfiguration configuration,
         IEnumerable<IProducer<string, AuditEventMessage>> auditProducers,
-        IKafkaInfraProvider infra)
+        IKafkaInfraProvider infra,
+        IKafkaOpsLease? lease = null,
+        IMigrationRuntime? migrations = null)
     {
         _broker = broker;
         _cache = cache;
@@ -129,6 +149,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         _environment = environment;
         _logger = logger;
         _infra = infra;
+        _lease = lease;
+        _migrations = migrations;
         _anonymousAccess = configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
         _audit = auditProducers.FirstOrDefault();
         var readOnlySetting = configuration.GetSection(KafkaOpsOptions.SectionName)["ReadOnly"];
@@ -143,6 +165,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
 
     public bool CanScale(ClaimsPrincipal user) =>
         _anonymousAccess || Has(user, LinkSystemPermissions.CanManageScaling);
+
+    public bool CanMigrate(ClaimsPrincipal user) =>
+        _anonymousAccess || Has(user, LinkSystemPermissions.CanMigrateKafkaTopics);
 
     public InfraStatus Infra => new()
     {
@@ -180,6 +205,14 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                 byName.TryGetValue(KafkaTopicCatalog.ErrorName(entry.Topic), out var error);
                 var partitions = main?.Partitions ?? 0;
                 var retryPartitions = retry?.Partitions ?? 0;
+                var errorPartitions = error?.Partitions ?? 0;
+                var family = KafkaTopicCatalog.FamilyOf(entry.Topic);
+                var serviceRetry = SiblingCounts(family.RetryServices, service => KafkaTopicCatalog.ServiceRetryName(entry.Topic, service), byName, partitions);
+                var redriveServices = family.RetryServices.Concat(family.RedriveOnlyServices).Distinct(StringComparer.Ordinal).ToList();
+                var serviceRedrive = SiblingCounts(redriveServices, service => KafkaTopicCatalog.ServiceRedriveName(entry.Topic, service), byName, partitions);
+                var retryBehind = retryPartitions > 0 && retryPartitions < partitions;
+                var errorBehind = errorPartitions > 0 && errorPartitions < partitions;
+                var bytes = (main?.HighWatermarks.Sum() ?? 0) * 256L;
                 var rate = await ProduceRateAsync(entry.Topic, main?.HighWatermarks.Sum() ?? 0, cancellationToken);
                 var lag = groupsKnown
                     ? groups!.Where(group => entry.Groups.Contains(group.GroupId, StringComparer.Ordinal))
@@ -195,9 +228,9 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     OrderSensitive = entry.OrderSensitive,
                     Partitions = partitions,
                     RetryPartitions = retryPartitions,
-                    ErrorPartitions = error?.Partitions ?? 0,
-                    RetryBehind = retryPartitions > 0 && retryPartitions < partitions,
-                    ErrorBehind = (error?.Partitions ?? 0) > 0 && (error?.Partitions ?? 0) < partitions,
+                    ErrorPartitions = errorPartitions,
+                    RetryBehind = retryBehind,
+                    ErrorBehind = errorBehind,
                     ReplicationFactor = main?.ReplicationFactor ?? 0,
                     Configs = main?.Configs ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
                     ProduceRatePerSecond = rate,
@@ -205,7 +238,22 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
                     LagKnown = groupsKnown,
                     MaxReplicas = partitions,
                     Groups = entry.Groups.ToList(),
-                    Error = main?.Error
+                    Error = main?.Error,
+                    FullIsr = main?.FullIsr ?? false,
+                    LargestLeaderShare = main?.LargestLeaderShare ?? 0,
+                    LeadersSkewed = main?.LeadersSkewed ?? false,
+                    EstimatedBytes = bytes,
+                    SizeClass = bytes < 10_000_000 ? "small" : bytes < 100_000_000 ? "medium" : "large",
+                    ServiceRetryPartitions = serviceRetry.Partitions,
+                    ServiceRedrivePartitions = serviceRedrive.Partitions,
+                    ServiceRetryBehind = serviceRetry.Behind,
+                    ServiceRedriveBehind = serviceRedrive.Behind,
+                    PinnedSiblingBehind = family.JavaPinnedSiblings && (retryBehind || errorBehind),
+                    TopicsFilePartitions = 3,
+                    PartitionDrift = partitions > 0 && partitions != 3,
+                    Slice1Eligible = family.Slice1Eligible,
+                    MigrationEligibility = family.Slice1Eligible ? "Eligible for an increase migration." : family.IneligibleReason,
+                    PartitionAddReason = entry.HardBlocked ? entry.BlockReason : "Eligible for an in-place increase."
                 });
             }
         }
@@ -469,6 +517,27 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
         await _cache.GetAsync<ChangeRequestRecord>(RequestKey(id), cancellationToken);
 
     public async Task TrackAsync(CancellationToken cancellationToken)
+    {
+        if (_lease is null)
+        {
+            await TrackOpenChangesAsync(cancellationToken);
+            return;
+        }
+
+        try
+        {
+            await using var hold = await _lease.AcquireAsync(cancellationToken);
+            await TrackOpenChangesAsync(cancellationToken);
+            if (_migrations is not null)
+                await _migrations.TickOpenAsync(hold.Fence, cancellationToken);
+        }
+        catch (KafkaOpsRejectedException ex) when (ex.Message.Contains("lease", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Kafka executor lease is held.");
+        }
+    }
+
+    private async Task TrackOpenChangesAsync(CancellationToken cancellationToken)
     {
         var ids = await IdsAsync(cancellationToken);
         foreach (var id in ids)
@@ -906,6 +975,8 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     {
         if (ReadOnly)
             throw new KafkaOpsForbiddenException("Kafka changes are read-only in this environment.");
+        if (_migrations?.HasOrphanBlock == true)
+            throw new KafkaOpsRejectedException("An orphan _linkmig topic is present. Resolve it before another Kafka change.");
     }
 
     private string Key(string suffix) => "kafka-ops:" + _environment.EnvironmentName + ":" + suffix;
@@ -915,6 +986,26 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     private static bool Open(ChangeRequestRecord record) =>
         record.Status is KafkaChangeStatus.Pending or KafkaChangeStatus.Approved or KafkaChangeStatus.Executing or KafkaChangeStatus.Converging or KafkaChangeStatus.Verifying;
 
+    private static (int Partitions, bool Behind) SiblingCounts(
+        IReadOnlyList<string> services,
+        Func<string, string> name,
+        Dictionary<string, TopicWatermark> byName,
+        int mainPartitions)
+    {
+        var present = new List<int>();
+        var behind = false;
+        foreach (var service in services)
+        {
+            if (!byName.TryGetValue(name(service), out var row) || row.Partitions <= 0)
+                continue;
+            present.Add(row.Partitions);
+            if (mainPartitions > 0 && row.Partitions < mainPartitions)
+                behind = true;
+        }
+
+        return (present.Count == 0 ? 0 : present.Min(), behind);
+    }
+
     private static List<string> TopicNames()
     {
         var names = new List<string>();
@@ -923,10 +1014,23 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
             names.Add(topic.Topic);
             names.Add(KafkaTopicCatalog.RetryName(topic.Topic));
             names.Add(KafkaTopicCatalog.ErrorName(topic.Topic));
+            var family = KafkaTopicCatalog.FamilyOf(topic.Topic);
+            foreach (var service in family.RetryServices)
+            {
+                names.Add(KafkaTopicCatalog.ServiceRetryName(topic.Topic, service));
+                names.Add(KafkaTopicCatalog.ServiceRedriveName(topic.Topic, service));
+            }
+
+            foreach (var service in family.RedriveOnlyServices)
+                names.Add(KafkaTopicCatalog.ServiceRedriveName(topic.Topic, service));
         }
 
         return names;
     }
+
+    public static string IndexKey(string environment) => "kafka-ops:" + environment + ":index";
+
+    public static string RequestStorageKey(string environment, Guid id) => "kafka-ops:" + environment + ":request:" + id.ToString("N");
 
     public static bool Has(ClaimsPrincipal user, LinkSystemPermissions permission) =>
         user.HasClaim(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, permission.ToString());

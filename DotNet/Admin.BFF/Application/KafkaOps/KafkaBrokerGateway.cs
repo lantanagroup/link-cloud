@@ -15,6 +15,9 @@ public sealed class TopicWatermark
     public string? Error { get; set; }
     public List<string> AuthorizedOperations { get; set; } = [];
     public bool? CanAlterPartitions { get; set; }
+    public bool FullIsr { get; set; }
+    public double LargestLeaderShare { get; set; }
+    public bool LeadersSkewed { get; set; }
 }
 
 public sealed class GroupView
@@ -113,7 +116,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var present = topics.Where(known.Contains).ToList();
         var result = topics
             .Where(name => !known.Contains(name))
-            .Select(name => new TopicWatermark { Topic = name, Error = "Unknown topic or partition" })
+            .Select(name => new TopicWatermark { Topic = name, Error = "Unknown topic or partition", FullIsr = false })
             .ToList();
         if (present.Count == 0)
             return result;
@@ -136,6 +139,26 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
             view.Partitions = topic.Partitions?.Count ?? 0;
             view.ReplicationFactor = topic.Partitions?.FirstOrDefault()?.Replicas?.Count ?? 0;
+            var leaders = new List<int>();
+            var fullIsr = view.Partitions > 0;
+            foreach (var partition in topic.Partitions ?? [])
+            {
+                var replicas = partition.Replicas?.Select(node => node.Id).ToList() ?? [];
+                var isr = partition.ISR?.Select(node => node.Id).ToList() ?? [];
+                var leader = partition.Leader?.Id ?? -1;
+                leaders.Add(leader);
+                if (isr.Count != replicas.Count || replicas.Count == 0)
+                    fullIsr = false;
+            }
+
+            view.FullIsr = fullIsr;
+            if (leaders.Count > 0)
+            {
+                var distinct = leaders.Where(id => id >= 0).Distinct().Count();
+                var ideal = distinct == 0 ? 1d : 1d / distinct;
+                view.LargestLeaderShare = leaders.GroupBy(id => id).Max(group => group.Count() / (double)leaders.Count);
+                view.LeadersSkewed = view.LargestLeaderShare - ideal > 0.34;
+            }
             if (topic.AuthorizedOperations is not null)
             {
                 view.AuthorizedOperations = topic.AuthorizedOperations

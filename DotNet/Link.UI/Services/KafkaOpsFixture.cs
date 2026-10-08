@@ -87,7 +87,7 @@ public sealed class KafkaOpsFixture
         if (row is null)
             plan.Errors.Add("The topic is not in the catalog.");
         if (row?.HardBlocked == true)
-            plan.Errors.Add("DataAcquisitionRequested is produced by .NET with CRC32 and by MeasureEval with murmur2. The same facility key can land on different partitions. Partition changes stay blocked until every .NET producer uses murmur2.");
+            plan.Errors.Add("Partition changes for this topic are blocked.");
         if (row is not null && partitions <= row.Partitions)
             plan.Errors.Add("Partitions can only increase.");
         if (partitions > Math.Max(1, _document.Topics.Cap))

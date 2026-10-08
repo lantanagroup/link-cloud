@@ -6,6 +6,7 @@ using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
@@ -95,10 +96,10 @@ public class AutomationRunManager : IAutomationRunManager
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.ScenarioId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
+        await RefuseIfProduceHeldAsync(cancellationToken);
         _runs[runId] = state;
 
         await PersistRunInputAsync(runId, request);
-
         await PersistRunSummaryAsync(state);
 
         state.ExecutionTask = Task.Run(async () =>
@@ -135,6 +136,26 @@ public class AutomationRunManager : IAutomationRunManager
         }, CancellationToken.None);
 
         return runId;
+    }
+
+    private async Task RefuseIfProduceHeldAsync(CancellationToken cancellationToken)
+    {
+        var source = _hostServices.GetService<IKafkaTopicHoldSource>();
+        if (source is null)
+            return;
+        IReadOnlyList<string> holds;
+        try
+        {
+            holds = await source.GetHeldTopicsAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Kafka holds could not be read. The run was allowed to start.");
+            return;
+        }
+
+        if (holds.Contains(nameof(KafkaTopic.ReportScheduled), StringComparer.Ordinal))
+            throw new TopicHeldException(nameof(KafkaTopic.ReportScheduled));
     }
 
     private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)

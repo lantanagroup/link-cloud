@@ -10,6 +10,7 @@ public sealed record ThroughputKafkaPageQuery
     public const string Topic = "topic";
     public const string Consumers = "consumers";
     public const string Brokers = "brokers";
+    public const string Migrate = "migrate";
 
     public string Q { get; init; } = "";
     public string Sort { get; init; } = "topic";
@@ -41,7 +42,7 @@ public sealed record ThroughputKafkaPageQuery
             sort = "topic";
         if (dir is not ("asc" or "desc"))
             dir = "asc";
-        if (view is not (Overview or Topic or Consumers or Brokers))
+        if (view is not (Overview or Topic or Consumers or Brokers or Migrate))
             view = Overview;
 
         var q = One(query, "q");
@@ -138,6 +139,11 @@ public sealed record ThroughputKafkaPage
     public BrokerSnapshot? SelectedBroker { get; init; }
     public List<KafkaPartitionDetail> Partitions { get; init; } = [];
     public int ReplicaCeiling { get; init; }
+    public KafkaMigrationPlan? MigrationPlan { get; init; }
+    public KafkaMigrationRecord? Migration { get; init; }
+    public KafkaTopicDetail? Detail { get; init; }
+    public KafkaTopicConfigs? Configs { get; init; }
+    public string? Runbook { get; init; }
 
     public string ChartJson
     {
@@ -166,6 +172,19 @@ public sealed record ThroughputKafkaPage
             });
         }
     }
+}
+
+public sealed class KafkaMigrationForm
+{
+    public string? Topic { get; set; }
+    public int Partitions { get; set; }
+    public string? Reason { get; set; }
+    public string? Confirmation { get; set; }
+    public bool BackupSkip { get; set; }
+    public bool BackupSkipAcknowledged { get; set; }
+    public Guid MigrationId { get; set; }
+    public string? Workload { get; set; }
+    public string? BackupName { get; set; }
 }
 
 public sealed class KafkaPartitionDetail
