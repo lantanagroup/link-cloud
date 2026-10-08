@@ -93,7 +93,8 @@ if [ "$code" -eq 9 ]; then pass 'bash docker exit code is propagated'; else fail
 grep -F 'ARG:compose' "$log" >/dev/null && grep -F 'ARG:up' "$log" >/dev/null && grep -F 'ARG:my service' "$log" >/dev/null && pass 'bash args with spaces are passed through' || fail 'bash args with spaces are passed through'
 grep -F 'TOKEN:match' "$log" >/dev/null && pass 'bash token is visible to the docker child' || fail 'bash token is visible to the docker child'
 if [ -z "${AZURE_ARTIFACTS_PAT:-}" ]; then pass 'bash token is not kept in the parent shell'; else fail 'bash token is not kept in the parent shell'; fi
-calls=$(grep -c '^ARGC:' "$log")
+calls=$(grep -c '^ARGC:' "$log" || true)
+calls=${calls:-0}
 if [ "$calls" -eq 1 ]; then pass 'bash docker is invoked once'; else fail 'bash docker is invoked once'; fi
 
 # Near expiry refreshes. fetch-ok writes a fresh expiry.
@@ -141,7 +142,8 @@ export LINK_CLOUD_INSTALL_DIR="$install_dir"
 export LINK_CLOUD_PROFILE_PATH="$profile_path"
 bash "$root/docker-compose.feed-token-install.sh" >"$repo/install-out.txt"
 bash "$root/docker-compose.feed-token-install.sh" >"$repo/install-out.txt"
-count=$(grep -c 'link-cloud-feed-token' "$profile_path")
+count=$(grep -c 'link-cloud-feed-token' "$profile_path" 2>/dev/null || true)
+count=${count:-0}
 if [ "$count" -eq 1 ]; then pass 'bash installer adds the profile line once'; else fail 'bash installer adds the profile line once'; fi
 grep -F '. "$HOME/.link-cloud/docker-compose.feed-token.sh" # link-cloud-feed-token' "$profile_path" >/dev/null && pass 'bash installer writes the profile snippet' || fail 'bash installer writes the profile snippet'
 if [ -f "$install_dir/docker-compose.feed-token.sh" ]; then pass 'bash installer copies the profile script'; else fail 'bash installer copies the profile script'; fi
