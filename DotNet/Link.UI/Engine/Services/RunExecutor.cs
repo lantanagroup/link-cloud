@@ -2428,8 +2428,8 @@ internal sealed class RunExecutor
 
     /// <summary>
     /// Resolves the normalization suite and creates the appropriate operations and sequences
-    /// via the Normalization API for the given facility. Replaces the legacy
-    /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
+    /// via <see cref="FacilityConfigurationService"/>. Replaces the legacy
+    /// <c>FacilityConfigurationService.EnsureNormalizationConfigAsync</c> which only created a single
     /// hard-coded CopyProperty operation.
     /// </summary>
     private async Task<NormalizationFacilitySetup> EnsureNormalizationFromSuiteAsync(
@@ -2513,8 +2513,9 @@ internal sealed class RunExecutor
         {
             if (existingOperations.Count > 0)
             {
-                var deletedOps = await normalizationClient.DeleteFacilityOperationsAsync(facilityId, cancellationToken);
-                if (!IsSuccessOrMissing(deletedOps))
+                var deletedOps = await FacilityConfigurationService.DeleteNormalizationOperationsAsync(
+                    normalizationClient, facilityId, cancellationToken);
+                if (!deletedOps.Success && deletedOps.StatusCode != 404)
                 {
                     throw new InvalidOperationException(
                         $"Failed to clear normalization operations for facility '{facilityId}'. HTTP {deletedOps.StatusCode}: {deletedOps.RawBody ?? "(no body)"}");
@@ -2523,8 +2524,9 @@ internal sealed class RunExecutor
 
             // Deleting the operations already removes their sequences, so this delete is often a 404.
             // A facility can also have sequences and no operations. Either way, nothing left is success.
-            var deletedSequences = await normalizationClient.DeleteOperationSequencesAsync(facilityId, cancellationToken: cancellationToken);
-            if (!IsSuccessOrMissing(deletedSequences))
+            var deletedSequences = await FacilityConfigurationService.DeleteNormalizationSequencesAsync(
+                normalizationClient, facilityId, resourceType: null, cancellationToken);
+            if (!deletedSequences.Success && deletedSequences.StatusCode != 404)
             {
                 throw new InvalidOperationException(
                     $"Failed to clear normalization sequences for facility '{facilityId}'. HTTP {deletedSequences.StatusCode}: {deletedSequences.RawBody ?? "(no body)"}");
@@ -2618,19 +2620,22 @@ internal sealed class RunExecutor
                     break;
             }
 
-            var createResp = await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
-            {
-                ResourceTypes = opDef.ResourceTypes,
-                FacilityId = facilityId,
-                Operation = apiOp,
-                Description = opDef.Description ?? string.Empty,
-                VendorVersionIds = []
-            }, cancellationToken);
+            var createResp = await FacilityConfigurationService.CreateNormalizationOperationAsync(
+                normalizationClient,
+                new CreateNormalizationOperationRequestApiModel
+                {
+                    ResourceTypes = opDef.ResourceTypes,
+                    FacilityId = facilityId,
+                    Operation = apiOp,
+                    Description = opDef.Description ?? string.Empty,
+                    VendorVersionIds = []
+                },
+                cancellationToken);
 
-            if (!createResp.IsSuccessStatusCode)
+            if (!createResp.Success)
             {
                 var detail = string.IsNullOrWhiteSpace(createResp.RawBody) ? "" : $": {createResp.RawBody}";
-                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}{detail}");
+                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {createResp.StatusCode}{detail}");
             }
 
             output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");
@@ -2639,8 +2644,9 @@ internal sealed class RunExecutor
 
         foreach (var leftover in existingPoolByKey.SelectMany(pair => pair.Value))
         {
-            var deleted = await normalizationClient.DeleteFacilityOperationAsync(facilityId, leftover.Id, cancellationToken);
-            if (!IsSuccessOrMissing(deleted))
+            var deleted = await FacilityConfigurationService.DeleteNormalizationOperationAsync(
+                normalizationClient, facilityId, leftover.Id, cancellationToken);
+            if (!deleted.Success && deleted.StatusCode != 404)
             {
                 throw new InvalidOperationException(
                     $"Failed to remove normalization operation '{leftover.Name}' ({leftover.OperationType}) for facility '{facilityId}'. HTTP {deleted.StatusCode}: {deleted.RawBody ?? "(no body)"}");
@@ -2699,8 +2705,9 @@ internal sealed class RunExecutor
                     })
                     .ToList();
 
-                var seqResp = await normalizationClient.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
-                if (seqResp.IsSuccessStatusCode)
+                var seqResp = await FacilityConfigurationService.CreateNormalizationSequencesAsync(
+                    normalizationClient, facilityId, resourceType, sequences, cancellationToken);
+                if (seqResp.Success)
                 {
                     output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
                     for (var idx = 0; idx < ordered.Count; idx++)
@@ -2717,16 +2724,10 @@ internal sealed class RunExecutor
                     }
                 }
                 else
-                    throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {(int)seqResp.StatusCode}");
+                    throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {seqResp.StatusCode}");
             }
         }
 
         return new NormalizationFacilitySetup(resolution, runtimeSequences);
     }
-
-    /// <summary>
-    /// Normalization returns 404 when the facility already has nothing to delete.
-    /// </summary>
-    private static bool IsSuccessOrMissing(LantanaGroup.Link.Sdk.ApiClient.LinkApiResponse response) =>
-        response.IsSuccessStatusCode || response.StatusCode == 404;
 }
