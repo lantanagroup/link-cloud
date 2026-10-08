@@ -57,6 +57,7 @@ public class AutomationRunDepthTests
 
         var dashboard = Read("DotNet/Link.UI/wwwroot/js/automation-dashboard.js");
         dashboard.Should().Contain("/Automation/recent");
+        dashboard.Should().Contain("window.luPaintTimes(host)");
         dashboard.Should().Contain("btn-cancel-run");
         dashboard.Should().Contain("btn-delete-run");
         dashboard.Should().Contain("btnNewScenarioFromRuns");
@@ -77,6 +78,7 @@ public class AutomationRunDepthTests
         script.Should().Contain("DeleteJson");
         script.Should().Contain("Export");
         script.Should().Contain("window.auPulseStop");
+        script.Should().Contain("window.luPaintTimes(host)");
 
         var monitor = Read("DotNet/Link.UI/Views/Shared/_ServiceMonitor.cshtml");
         monitor.Should().Contain("id=\"liveUtilizationCard\"");
