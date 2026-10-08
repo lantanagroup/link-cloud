@@ -28,6 +28,20 @@ public class UiPatternGuardTests
         css.Should().Contain("--lu-chart-dashboard-donut: 168px;");
         css.Should().NotContain("max-height: 8.5rem");
         css.Should().NotContain("max-width: 120px");
+        css.Should().Contain("#recentRunsCard .table-responsive");
+        css.Should().Contain(".table { border-color: #e0e0e0; }");
+    }
+
+    [Fact]
+    public void Recent_runs_refit_after_the_table_is_replaced()
+    {
+        var dash = File.ReadAllText(Path.Combine(Root(), "wwwroot", "js", "automation-dashboard.js"));
+        var replaced = dash.IndexOf("host.innerHTML = html", StringComparison.Ordinal);
+        replaced.Should().BeGreaterThan(0);
+        var refit = dash.IndexOf("requestAnimationFrame(fitRecentRuns)", replaced, StringComparison.Ordinal);
+        refit.Should().BeGreaterThan(replaced);
+        dash.Should().Contain("quickLaunchCard");
+        dash.Should().Contain(".lu-main");
     }
 
     [Fact]
