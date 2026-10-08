@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -14,7 +15,7 @@ class KafkaKeyGoldenTest {
     @Test
     void fixtureMatchesCanonicalBytesAndMurmur2Partitions() throws Exception {
         Path root = findRepoRoot();
-        JsonNode rows = new ObjectMapper().readTree(root.resolve("tests").resolve("fixtures").resolve("kafka-key-golden.json").toFile());
+        JsonNode rows = new ObjectMapper().readTree(goldenFixture(root).toFile());
         StringBuilder mismatches = new StringBuilder();
         for (JsonNode row : rows) {
             String facilityId = row.get("facilityId").asText();
@@ -50,5 +51,25 @@ class KafkaKeyGoldenTest {
             dir = dir.getParent();
         }
         throw new IllegalStateException("Could not find the repository root.");
+    }
+
+    private static Path goldenFixture(Path root) throws IOException {
+        Path tests = child(root, "tests");
+        Path fixtures = child(tests, "fixtures");
+        try (var files = Files.list(fixtures)) {
+            return files
+                    .filter(path -> path.getFileName().toString().equalsIgnoreCase("kafka-key-golden.json"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Kafka key golden fixture was not found under the repository root."));
+        }
+    }
+
+    private static Path child(Path parent, String name) throws IOException {
+        try (var children = Files.list(parent)) {
+            return children
+                    .filter(path -> Files.isDirectory(path) && path.getFileName().toString().equalsIgnoreCase(name))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Could not find " + name + " under " + parent));
+        }
     }
 }

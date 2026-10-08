@@ -75,8 +75,32 @@ public sealed record LinkMessageKey(string FacilityId, string? PatientId)
         }
     }
 
+    internal static void RejectUnpairedSurrogates(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var character = value[i];
+            if (char.IsHighSurrogate(character))
+            {
+                if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1]))
+                {
+                    throw new ArgumentException("Identifier contains an unpaired surrogate.");
+                }
+
+                i++;
+                continue;
+            }
+
+            if (char.IsLowSurrogate(character))
+            {
+                throw new ArgumentException("Identifier contains an unpaired surrogate.");
+            }
+        }
+    }
+
     private static string Escape(string value)
     {
+        RejectUnpairedSurrogates(value);
         var builder = new StringBuilder(value.Length + 8);
         foreach (var character in value)
         {

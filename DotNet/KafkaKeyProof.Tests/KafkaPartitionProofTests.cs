@@ -7,6 +7,8 @@ namespace LantanaGroup.Link.KafkaKeyProof.Tests;
 
 public class KafkaPartitionProofTests
 {
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     public static IEnumerable<object[]> PartitionCounts()
     {
         yield return [3];
@@ -61,7 +63,7 @@ public class KafkaPartitionProofTests
         {
             Directory.CreateDirectory(resultsDir);
             var line = "dotnet\t" + topic + "\t" + partitionCount + "\t" + key + "\t" + delivery.Partition.Value + Environment.NewLine;
-            await File.AppendAllTextAsync(Path.Combine(resultsDir, "partitions.tsv"), line, Encoding.UTF8);
+            await File.AppendAllTextAsync(Path.Combine(resultsDir, "partitions.tsv"), line, Utf8NoBom);
         }
     }
 }

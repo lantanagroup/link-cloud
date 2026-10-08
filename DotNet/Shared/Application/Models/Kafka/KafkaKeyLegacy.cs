@@ -8,6 +8,27 @@ namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 /// </summary>
 public static class KafkaKeyLegacy
 {
+    // Plain keys produced for a service (health checks, audits with no facility) are not facility ids.
+    private static readonly HashSet<string> ServiceNames = new(StringComparer.Ordinal)
+    {
+        "Account",
+        "Audit",
+        "Census",
+        "DataAcquisition",
+        "DataAcquisitionWorker",
+        "LinkAdminBFF",
+        "MockDmrpApi",
+        "Normalization",
+        "Notification",
+        "QueryDispatch",
+        "Report",
+        "Submission",
+        "Tenant",
+        "Terminology",
+        "ValidationService",
+        "measureeval"
+    };
+
     public static bool TryReadFacility(string? key, out string facilityId)
     {
         facilityId = string.Empty;
@@ -27,6 +48,11 @@ public static class KafkaKeyLegacy
                 }
             }
 
+            return false;
+        }
+
+        if (ServiceNames.Contains(plain!))
+        {
             return false;
         }
 

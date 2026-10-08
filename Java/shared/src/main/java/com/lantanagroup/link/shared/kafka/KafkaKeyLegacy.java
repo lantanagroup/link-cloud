@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 // TODO: remove legacy key fallback after one release once producers write ids on the value.
@@ -13,6 +14,24 @@ public final class KafkaKeyLegacy {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final UUID NIL_UUID = new UUID(0L, 0L);
+    // Plain keys produced for a service (health checks, audits with no facility) are not facility ids.
+    private static final Set<String> SERVICE_NAMES = Set.of(
+            "Account",
+            "Audit",
+            "Census",
+            "DataAcquisition",
+            "DataAcquisitionWorker",
+            "LinkAdminBFF",
+            "MockDmrpApi",
+            "Normalization",
+            "Notification",
+            "QueryDispatch",
+            "Report",
+            "Submission",
+            "Tenant",
+            "Terminology",
+            "ValidationService",
+            "measureeval");
 
     private KafkaKeyLegacy() {
     }
@@ -24,6 +43,9 @@ public final class KafkaKeyLegacy {
         }
         if (opened.object != null) {
             return nonBlank(textProperty(opened.object, "facilityId"));
+        }
+        if (SERVICE_NAMES.contains(opened.plain)) {
+            return null;
         }
         return opened.plain;
     }

@@ -26,5 +26,12 @@
     "patientId": "患者",
     "key": "{\"facilityId\":\"施設\",\"patientId\":\"患者\"}",
     "partitions": { "3": 0, "6": 3, "12": 3, "24": 3 }
+  },
+  {
+    "name": "supplementary",
+    "facilityId": "😀",
+    "patientId": "patient-proof",
+    "key": "{\"facilityId\":\"😀\",\"patientId\":\"patient-proof\"}",
+    "partitions": { "3": 2, "6": 2, "12": 2, "24": 2 }
   }
 ]
