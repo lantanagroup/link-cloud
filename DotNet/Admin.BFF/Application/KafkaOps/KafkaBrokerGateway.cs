@@ -47,12 +47,25 @@ public sealed class PartitionLagView
     public bool Owned { get; set; }
 }
 
+public sealed class ReassignmentListing
+{
+    public bool Known { get; set; }
+    public List<string> Topics { get; set; } = [];
+}
+
+public static class KafkaLeaderElection
+{
+    public static readonly ElectionType Kind = ElectionType.Preferred;
+}
+
 public interface IKafkaBrokerGateway
 {
     Task<IReadOnlyList<TopicWatermark>> DescribeTopicsAsync(IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken);
     Task<IReadOnlyList<GroupView>> DescribeGroupsAsync(bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken);
     Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken);
     Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken);
+    Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken);
+    Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken);
 }
 
 public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
@@ -69,11 +82,9 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
     private readonly KafkaConnection _connection;
     private readonly IKafkaAdminClientFactory _clients;
-    private readonly object _gate = new();
+    private readonly SemaphoreSlim _adminGate = new(1, 1);
+    private readonly Dictionary<string, int> _failuresByOperation = new(StringComparer.Ordinal);
     private IAdminClient? _admin;
-    private int _users;
-    private int _consecutiveFailures;
-    private bool _rebuildWhenIdle;
 
     public KafkaBrokerGateway(KafkaConnection connection)
         : this(connection, new ConfluentAdminClientFactory())
@@ -87,7 +98,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     }
 
     public Task<IReadOnlyList<TopicWatermark>> DescribeTopicsAsync(IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken) =>
-        UseClientAsync(admin => DescribeTopicsCoreAsync(admin, topics, probeAlter, cancellationToken), cancellationToken);
+        UseClientAsync("topics", (admin, token) => DescribeTopicsCoreAsync(admin, topics, probeAlter, token), cancellationToken);
 
     private async Task<IReadOnlyList<TopicWatermark>> DescribeTopicsCoreAsync(IAdminClient admin, IReadOnlyList<string> topics, bool probeAlter, CancellationToken cancellationToken)
     {
@@ -116,6 +127,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             var view = new TopicWatermark { Topic = topic.Name ?? "" };
             if (topic.Error.IsError)
             {
+                ThrowIfStale(topic.Error);
                 view.Error = topic.Error.Reason;
                 result.Add(view);
                 continue;
@@ -147,26 +159,23 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     }
 
     public Task<IReadOnlyList<GroupView>> DescribeGroupsAsync(bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken) =>
-        UseClientAsync(admin => DescribeGroupsCoreAsync(admin, includeTestGroups, expectedConfigVersion, cancellationToken), cancellationToken);
+        UseClientAsync("groups", (admin, token) => DescribeGroupsCoreAsync(admin, includeTestGroups, expectedConfigVersion, token), cancellationToken);
 
     private async Task<IReadOnlyList<GroupView>> DescribeGroupsCoreAsync(IAdminClient admin, bool includeTestGroups, int expectedConfigVersion, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        var listed = await admin.ListConsumerGroupsAsync(new ListConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(20) });
-        var ids = listed.Valid
-            .Select(group => group.GroupId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Where(id => includeTestGroups || !IsHiddenTestGroup(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
+        var ids = CatalogGroupIds(includeTestGroups);
         if (ids.Count == 0)
             return [];
 
-        var described = await admin.DescribeConsumerGroupsAsync(ids, new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+        var described = await DescribeCatalogGroupsAsync(admin, ids, cancellationToken);
+        var present = described
+            .Where(group => !string.IsNullOrWhiteSpace(group.GroupId) && !IsMissingGroup(group.Error))
+            .Select(group => group.GroupId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
         var offsetResults = await ConsumerGroupOffsetQueries.ListPerGroupAsync<ListConsumerGroupOffsetsResult>(
-            ids,
+            present,
             async (groupId, token) =>
             {
                 var listed = await admin.ListConsumerGroupOffsetsAsync(
@@ -185,6 +194,9 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             committed[groupOffsets.Group] = groupOffsets.Partitions?.ToList() ?? [];
         }
 
+        foreach (var row in committed.Values.SelectMany(rows => rows))
+            ThrowIfStale(row.Error);
+
         var watermarkTopics = committed.Values
             .SelectMany(rows => rows)
             .Select(row => row.Topic)
@@ -194,9 +206,17 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         var watermarks = await WatermarksForCommittedAsync(admin, watermarkTopics, committed, cancellationToken);
 
         var views = new List<GroupView>();
-        foreach (var group in described.ConsumerGroupDescriptions)
+        foreach (var groupId in ids)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var group = described.FirstOrDefault(candidate => string.Equals(candidate.GroupId, groupId, StringComparison.Ordinal));
+            if (group is null || IsMissingGroup(group.Error))
+            {
+                views.Add(new GroupView { GroupId = groupId, State = "Empty" });
+                continue;
+            }
+
+            ThrowIfGroupFailed(group.Error);
             var view = new GroupView
             {
                 GroupId = group.GroupId ?? "",
@@ -228,6 +248,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
             {
                 foreach (var row in rows)
                 {
+                    ThrowIfStale(row.Error);
                     var key = row.Topic + "-" + row.Partition.Value;
                     var high = watermarks.TryGetValue(key, out var watermark) ? watermark : 0;
                     var committedOffset = row.Offset.IsSpecial ? 0 : Math.Max(0, row.Offset.Value);
@@ -253,10 +274,32 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         return views;
     }
 
-    public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken) =>
-        UseClientAsync(async admin =>
+    public Task<ReassignmentListing> ListInFlightReassignmentsAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // The admin client in use cannot list partition reassignments, so this answer is not a clear cluster.
+        return Task.FromResult(new ReassignmentListing());
+    }
+
+    public Task ElectPreferredLeadersAsync(IReadOnlyList<TopicPartition> partitions, CancellationToken cancellationToken)
+    {
+        if (partitions.Count == 0)
+            return Task.CompletedTask;
+        return UseClientAsync("election", async (admin, token) =>
         {
-            await IncreasePartitionsCoreAsync(admin, topic, newCount, cancellationToken);
+            token.ThrowIfCancellationRequested();
+            await admin.ElectLeadersAsync(
+                KafkaLeaderElection.Kind,
+                partitions,
+                new ElectLeadersOptions { RequestTimeout = TimeSpan.FromSeconds(15), OperationTimeout = TimeSpan.FromSeconds(15) });
+            return true;
+        }, cancellationToken);
+    }
+
+    public Task IncreasePartitionsAsync(string topic, int newCount, CancellationToken cancellationToken) =>
+        UseClientAsync("partitions", async (admin, token) =>
+        {
+            await IncreasePartitionsCoreAsync(admin, topic, newCount, token);
             return true;
         }, cancellationToken);
 
@@ -275,7 +318,7 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     }
 
     public Task<ClusterSnapshot> DescribeClusterAsync(CancellationToken cancellationToken) =>
-        UseClientAsync(admin => DescribeClusterCoreAsync(admin, cancellationToken), cancellationToken);
+        UseClientAsync("cluster", (admin, token) => DescribeClusterCoreAsync(admin, token), cancellationToken);
 
     private async Task<ClusterSnapshot> DescribeClusterCoreAsync(IAdminClient admin, CancellationToken cancellationToken)
     {
@@ -306,6 +349,8 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var topic in metadata.Topics)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (topic.Error.IsError)
+                ThrowIfStale(topic.Error);
             if (topic.Error.IsError || topic.Partitions is null)
                 continue;
             foreach (var partition in topic.Partitions)
@@ -362,10 +407,15 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
 
     public void Dispose()
     {
-        lock (_gate)
+        _adminGate.Wait();
+        try
         {
             _admin?.Dispose();
             _admin = null;
+        }
+        finally
+        {
+            _adminGate.Release();
         }
     }
 
@@ -373,76 +423,53 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         groupId.StartsWith("e2e-diag-", StringComparison.OrdinalIgnoreCase)
         || groupId.StartsWith("Dynamic:", StringComparison.Ordinal);
 
-    private async Task<T> UseClientAsync<T>(Func<IAdminClient, Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> UseClientAsync<T>(string operation, Func<IAdminClient, CancellationToken, Task<T>> action, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var admin = Borrow();
-        Exception? error = null;
+        await _adminGate.WaitAsync(cancellationToken);
         try
         {
-            return await action(admin);
-        }
-        catch (Exception ex)
-        {
-            error = ex;
-            throw;
+            _admin ??= _clients.Create(AdminConfig());
+            try
+            {
+                var result = await action(_admin, cancellationToken);
+                _failuresByOperation[operation] = 0;
+                return result;
+            }
+            catch (Exception ex)
+            {
+                NoteFailure(operation, ex);
+                throw;
+            }
         }
         finally
         {
-            Release(admin, error);
+            _adminGate.Release();
         }
     }
 
-    private IAdminClient Borrow()
+    private void NoteFailure(string operation, Exception error)
     {
-        lock (_gate)
+        if (error is OperationCanceledException)
+            return;
+
+        if (!IsStaleAdminError(error))
         {
-            if (_rebuildWhenIdle && _users == 0)
-                DropAdmin();
-
-            _admin ??= _clients.Create(AdminConfig());
-            _users++;
-            return _admin;
+            var count = _failuresByOperation.GetValueOrDefault(operation) + 1;
+            _failuresByOperation[operation] = count;
+            if (count < AdminClientFailureLimit)
+                return;
         }
+
+        SwapAdmin();
     }
 
-    private void Release(IAdminClient admin, Exception? error)
+    private void SwapAdmin()
     {
-        lock (_gate)
-        {
-            _users = Math.Max(0, _users - 1);
-            if (error is null)
-            {
-                _consecutiveFailures = 0;
-                return;
-            }
-
-            if (error is OperationCanceledException)
-                return;
-
-            var rebuild = IsStaleAdminError(error);
-            if (!rebuild)
-            {
-                _consecutiveFailures++;
-                rebuild = _consecutiveFailures >= AdminClientFailureLimit;
-            }
-
-            if (!rebuild || !ReferenceEquals(_admin, admin))
-                return;
-
-            if (_users == 0)
-                DropAdmin();
-            else
-                _rebuildWhenIdle = true;
-        }
-    }
-
-    private void DropAdmin()
-    {
-        _admin?.Dispose();
-        _admin = null;
-        _consecutiveFailures = 0;
-        _rebuildWhenIdle = false;
+        var fresh = _clients.Create(AdminConfig());
+        var old = _admin;
+        _admin = fresh;
+        _failuresByOperation.Clear();
+        old?.Dispose();
     }
 
     private AdminClientConfig AdminConfig()
@@ -467,12 +494,83 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
     {
         if (error is not KafkaException kafka)
             return false;
+        return IsStaleAdminCode(kafka.Error.Code);
+    }
 
-        return kafka.Error.Code is ErrorCode.NotCoordinatorForGroup
+    private static bool IsStaleAdminCode(ErrorCode code) =>
+        code is ErrorCode.NotCoordinatorForGroup
             or ErrorCode.GroupCoordinatorNotAvailable
+            or ErrorCode.LeaderNotAvailable
+            or ErrorCode.NotLeaderForPartition
             or ErrorCode.Local_Transport
             or ErrorCode.Local_AllBrokersDown
+            or ErrorCode.Local_TimedOut
+            or ErrorCode.RequestTimedOut
             or ErrorCode.NetworkException;
+
+    private static bool IsMissingGroup(Error? error) =>
+        error is { Code: ErrorCode.GroupIdNotFound };
+
+    private static void ThrowIfGroupFailed(Error? error)
+    {
+        if (error is null || error.Code == ErrorCode.NoError || IsMissingGroup(error))
+            return;
+        throw new KafkaException(error);
+    }
+
+    private static void ThrowIfStale(Error? error)
+    {
+        if (error is not null && IsStaleAdminCode(error.Code))
+            throw new KafkaException(error);
+    }
+
+    private static void RejectUnsafeGroupErrors(IEnumerable<ConsumerGroupDescription> groups)
+    {
+        foreach (var group in groups)
+        {
+            if (IsMissingGroup(group.Error))
+                continue;
+            ThrowIfGroupFailed(group.Error);
+        }
+    }
+
+    private async Task<List<ConsumerGroupDescription>> DescribeCatalogGroupsAsync(IAdminClient admin, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var described = await admin.DescribeConsumerGroupsAsync(
+                ids,
+                new DescribeConsumerGroupsOptions { RequestTimeout = TimeSpan.FromSeconds(30) });
+            var rows = described.ConsumerGroupDescriptions?.ToList() ?? [];
+            RejectUnsafeGroupErrors(rows);
+            return rows;
+        }
+        catch (DescribeConsumerGroupsException ex)
+        {
+            var rows = ex.Results?.ConsumerGroupDescriptions?.ToList() ?? [];
+            RejectUnsafeGroupErrors(rows);
+            return rows;
+        }
+    }
+
+    private static List<string> CatalogGroupIds(bool includeTestGroups)
+    {
+        var ids = new List<string>();
+        foreach (var topic in KafkaTopicCatalog.Topics)
+        {
+            foreach (var groupId in topic.Groups)
+            {
+                if (string.IsNullOrWhiteSpace(groupId))
+                    continue;
+                if (!includeTestGroups && IsHiddenTestGroup(groupId))
+                    continue;
+                if (!ids.Contains(groupId, StringComparer.Ordinal))
+                    ids.Add(groupId);
+            }
+        }
+
+        return ids;
     }
 
     private static async Task<List<long>> HighWatermarksAsync(IAdminClient admin, string topic, int partitions, CancellationToken cancellationToken)
@@ -490,7 +588,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var info in listed.ResultInfos)
         {
             var error = info.TopicPartitionOffsetError;
-            if (error is null || error.Error.IsError)
+            if (error is null)
+                continue;
+            ThrowIfStale(error.Error);
+            if (error.Error.IsError)
                 continue;
             if (error.Partition.Value >= 0 && error.Partition.Value < values.Length)
                 values[error.Partition.Value] = error.Offset.Value;
@@ -531,7 +632,10 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         foreach (var info in listed.ResultInfos)
         {
             var error = info.TopicPartitionOffsetError;
-            if (error is null || error.Error.IsError)
+            if (error is null)
+                continue;
+            ThrowIfStale(error.Error);
+            if (error.Error.IsError)
                 continue;
             map[error.Topic + "-" + error.Partition.Value] = Math.Max(0, error.Offset.Value);
         }

@@ -2,7 +2,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.KafkaOps;
 
 public static class ConsumerGroupOffsetQueries
 {
-    public const int MaxParallel = 4;
+    public const int MaxParallel = 1;
 
     public static async Task<List<T>> ListPerGroupAsync<T>(
         IReadOnlyList<string> groupIds,
