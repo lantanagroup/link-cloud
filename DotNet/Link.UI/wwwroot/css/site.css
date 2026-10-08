@@ -30,6 +30,7 @@
   --bs-success-rgb: 40, 167, 69;
   --bs-info: var(--au-muted);
   --bs-info-rgb: 84, 92, 100;
+  --bs-border-color: #e0e0e0;
   --bs-link-color: #111;
   --bs-link-hover-color: #343a40;
   --bs-link-color-rgb: 17, 17, 17;
@@ -45,6 +46,13 @@ html { font-size: 14px; position: relative; min-height: 100%; }
 body { margin-bottom: 60px; background: var(--au-bg); color: var(--au-text); }
 a { color: #111; }
 a:hover { color: #343a40; }
+.table { border-color: #e0e0e0; }
+.progress { background-color: #e9e9e9; }
+.border { border-color: #e0e0e0 !important; }
+.border-top { border-top-color: #e0e0e0 !important; }
+.border-end { border-right-color: #e0e0e0 !important; }
+.border-bottom { border-bottom-color: #e0e0e0 !important; }
+.border-start { border-left-color: #e0e0e0 !important; }
 code, kbd, samp { color: #111; }
 pre code, a > code { color: inherit; }
 
@@ -1326,6 +1334,9 @@ a.au-scenario-card:hover {
 .au-card .table-responsive {
   max-height: min(70vh, 740px);
   overflow: auto;
+}
+#recentRunsCard .table-responsive {
+  max-height: none;
 }
 .au-table-toolbar {
   display: flex;
