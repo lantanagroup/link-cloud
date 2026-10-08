@@ -31,7 +31,7 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         FacilityModel existing,
         string? vendorName,
-        bool dmrpEnabled,
+        bool sendEmptySchedule,
         CancellationToken cancellationToken)
     {
         var desired = ResolveVendor(vendorName, vendorExplicit: true);
@@ -55,7 +55,9 @@ public static class FacilitySetupHelper
             TimeZone = string.IsNullOrWhiteSpace(existing.TimeZone) ? FacilityTimeZone : existing.TimeZone,
             Vendor = desired,
             VendorVersionId = vendorVersionId,
-            ScheduledReports = dmrpEnabled
+            // Empty only while Tenant derives the schedule itself. Otherwise the stored schedule goes back
+            // unchanged: with the Mock DMRP write-through, an empty one would un-enroll the facility.
+            ScheduledReports = sendEmptySchedule
                 ? MonthlySchedule([])
                 : existing.ScheduledReports ?? MonthlySchedule([])
         }, cancellationToken);
@@ -206,12 +208,14 @@ public static class FacilitySetupHelper
     /// monthly.
     /// </summary>
     /// <remarks>
-    /// How that schedule gets set depends on whether the Tenant service is hosting the DMRP module.
-    /// With DMRP off it is posted with the facility. With DMRP on it is not the caller's to give —
-    /// Tenant derives it from the facility's DMRP reporting plans and refuses a request that carries
-    /// one — so the same schedule has to be reached by enrolling the facility in those measures and
-    /// letting Tenant derive it. Both paths leave the same monthly schedule behind, which is what the
-    /// rest of the run and the tenant database validator expect.
+    /// How that schedule gets set depends on how the Tenant service is set up. With DMRP off it is posted
+    /// with the facility. With DMRP on and the Mock DMRP API switched on it is posted the same way, and
+    /// Tenant writes it to the mock as the facility's enrollment, so each measure needs a measure mapping
+    /// first. With DMRP on and no mock it is not the caller's to give — Tenant derives it from the
+    /// facility's DMRP reporting plans and refuses a request that carries one — so the same schedule has
+    /// to be reached by enrolling the facility in those measures and letting Tenant derive it. Every path
+    /// leaves the same monthly schedule behind, which is what the rest of the run and the tenant database
+    /// validator expect.
     /// </remarks>
     /// <returns>True when this call created the facility. False when it already existed.</returns>
     public static async Task<bool> EnsureFacilityAsync(
@@ -231,25 +235,36 @@ public static class FacilitySetupHelper
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
             if (vendorExplicit)
             {
-                var dmrpEnabledForUpdate = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
-                await ApplyExplicitVendorAsync(
-                    facilityClient, output, existing.Body, vendorName, dmrpEnabledForUpdate, cancellationToken);
+                var dmrpForUpdate = await GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
+                await ApplyExplicitVendorAsync(facilityClient, output, existing.Body, vendorName,
+                    sendEmptySchedule: TenantDerivesTheSchedule(dmrpForUpdate), cancellationToken);
             }
 
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
             return false;
         }
 
-        var dmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken);
+        var dmrp = await GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
+        var derived = TenantDerivesTheSchedule(dmrp);
+
+        if (dmrp.MockDmrpEnabled)
+        {
+            // Tenant turns each scheduled report into enrollment through its measure mapping, and refuses
+            // one it has no mapping for.
+            foreach (var measureId in measureIds)
+            {
+                await EnsureMeasureMappingAsync(dmrpClient, output, measureId, cancellationToken);
+            }
+        }
 
         var facility = new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = FacilityTimeZone,
-            // Empty under DMRP, and not merely unselected: a request that names any report is refused
-            // outright. The measures are enrolled below instead.
-            ScheduledReports = MonthlySchedule(dmrpEnabled ? [] : measureIds)
+            // Empty while Tenant derives the schedule, and not merely unselected: a request that names any
+            // report is refused outright. The measures are enrolled below instead.
+            ScheduledReports = MonthlySchedule(derived ? [] : measureIds)
         };
         await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
         var createResponse = await facilityClient.CreateAsync(facility, cancellationToken);
@@ -265,7 +280,7 @@ public static class FacilitySetupHelper
 
         await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
 
-        if (dmrpEnabled)
+        if (derived)
         {
             await EnrollFacilityInDmrpMeasuresAsync(facilityClient, dmrpClient, output, facilityId,
                 measureIds, cancellationToken, vendorName, vendorExplicit);
@@ -273,6 +288,59 @@ public static class FacilitySetupHelper
 
         return true;
     }
+
+    /// <summary>
+    /// Whether the Tenant service hosts the DMRP module, and whether it writes facility schedules through
+    /// to the Mock DMRP API.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than configured, so no third copy of either switch has to be kept in step. A Tenant
+    /// that predates <c>api/dmrp/dmrp-status</c> answers it 404; for that one the module is detected the
+    /// older way, by its reporting-plans route, and there is no write-through.
+    /// </remarks>
+    public static async Task<DmrpStatusModel> GetDmrpStatusAsync(
+        IDmrpServiceClient dmrpClient,
+        IAutomationOutput output,
+        CancellationToken cancellationToken = default)
+    {
+        var status = await dmrpClient.GetDmrpStatusAsync(cancellationToken);
+
+        if (status.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            return new DmrpStatusModel
+            {
+                DmrpEnabled = await DmrpIsEnabledAsync(dmrpClient, output, cancellationToken)
+            };
+        }
+
+        if (!status.IsSuccessStatusCode || status.Body is null)
+        {
+            // Guessing either way strands the run, so name the request that failed instead.
+            throw new InvalidOperationException(
+                "Could not determine whether DMRP is enabled on the Tenant service. " +
+                $"GET api/dmrp/dmrp-status returned HTTP {status.StatusCode}: {status.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(status.Body switch
+        {
+            { DmrpEnabled: false } =>
+                "DMRP is not enabled on the Tenant service; the facility's schedule is posted with it.",
+            { MockDmrpEnabled: true } =>
+                "DMRP is enabled with the Mock DMRP API switched on; the facility's schedule is posted with it " +
+                "and Tenant writes it to the mock as enrollment.",
+            _ =>
+                "DMRP is enabled on the Tenant service; the facility's schedule is derived from its reporting plans."
+        });
+
+        return status.Body;
+    }
+
+    /// <summary>
+    /// True when Tenant builds the facility's schedule from its reporting plans and refuses one in the
+    /// request: DMRP on, with no Mock DMRP write-through.
+    /// </summary>
+    private static bool TenantDerivesTheSchedule(DmrpStatusModel status) =>
+        status.DmrpEnabled && !status.MockDmrpEnabled;
 
     private static TenantScheduledReportConfig MonthlySchedule(IReadOnlyList<string> measureIds) => new()
     {
@@ -853,7 +921,7 @@ public static class FacilitySetupHelper
             if (vendorExplicit)
             {
                 await ApplyExplicitVendorAsync(
-                    facilityClient, output, existing.Body, vendorName, dmrpEnabled: true, cancellationToken);
+                    facilityClient, output, existing.Body, vendorName, sendEmptySchedule: true, cancellationToken);
             }
 
             await WaitForFacilityReadConsistencyAsync(
@@ -890,6 +958,75 @@ public static class FacilitySetupHelper
             output,
             facilityId,
             cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates the facility, or saves it again if it exists, scheduled to report <paramref name="measureIds"/>
+    /// monthly, for a Tenant that writes facility schedules through to the Mock DMRP API.
+    /// </summary>
+    /// <remarks>
+    /// The save is what enrolls the facility in the mock, the same as saving the Admin UI facility form, so
+    /// nothing is seeded in the mock directly.
+    /// </remarks>
+    /// <returns>True when this call created the facility. False when it already existed.</returns>
+    public static async Task<bool> EnsureDmrpFacilityWithScheduleAsync(
+        IFacilityServiceClient facilityClient,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        CancellationToken cancellationToken = default,
+        string? vendorName = null,
+        bool vendorExplicit = false,
+        Func<Task>? onCreated = null)
+    {
+        var facility = new FacilityModel
+        {
+            FacilityId = facilityId,
+            FacilityName = facilityId,
+            TimeZone = FacilityTimeZone,
+            ScheduledReports = MonthlySchedule(measureIds)
+        };
+        await StampVendorAsync(facilityClient, output, facility, vendorName, vendorExplicit, cancellationToken);
+
+        var existing = await facilityClient.GetAsync(facilityId, cancellationToken);
+
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            var updated = await facilityClient.UpdateAsync(facilityId, facility, cancellationToken);
+
+            if (!updated.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to save DMRP facility '{facilityId}'. " +
+                    $"HTTP {updated.StatusCode}: {updated.RawBody ?? "(no body)"}");
+            }
+
+            output.WriteLine(
+                $"Facility '{facilityId}' already exists; saved it scheduled for {string.Join(", ", measureIds)}, " +
+                "which enrolls it in the Mock DMRP API.");
+
+            await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
+            return false;
+        }
+
+        var created = await facilityClient.CreateAsync(facility, cancellationToken);
+
+        if (!created.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create DMRP facility '{facilityId}'. " +
+                $"HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+        }
+
+        output.WriteLine(
+            $"Created facility '{facilityId}' scheduled for {string.Join(", ", measureIds)}, " +
+            "which enrolls it in the Mock DMRP API.");
+
+        if (onCreated != null)
+            await onCreated();
+
+        await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId, cancellationToken);
         return true;
     }
 

@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.Data.Repository.Mappings;
+using LantanaGroup.Link.DMRP.Models;
 using LantanaGroup.Link.DMRP.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
@@ -23,6 +24,19 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
 
         /// <summary>Removes the reporting plans of one facility. Returns the number of rows removed.</summary>
         Task<int> DeleteForFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Marks a facility's reporting rows in the given periods as no longer reporting, when their measure
+        /// maps to a dQM and is not in <paramref name="keepMeasures"/>. Returns the number of rows changed.
+        /// </summary>
+        /// <remarks>
+        /// For the Mock DMRP write-through, where the facility form's selection is the whole of the
+        /// enrollment. The DMRP sync cannot do this itself: it writes nothing when DMRP returns no entries,
+        /// and withdraws only within the components that answered. Rows whose measure has no dQM are left
+        /// alone, since they schedule nothing.
+        /// </remarks>
+        Task<int> WithdrawUnselectedAsync(string facilityId, IReadOnlyCollection<ReportingPeriod> periods,
+            IReadOnlySet<string> keepMeasures, CancellationToken cancellationToken = default);
     }
 
     public class FacilityReportingPlanManager : IFacilityReportingPlanManager
@@ -164,6 +178,59 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 removed, facilityId.SanitizeForLog());
 
             return removed;
+        }
+
+        public async Task<int> WithdrawUnselectedAsync(string facilityId, IReadOnlyCollection<ReportingPeriod> periods,
+            IReadOnlySet<string> keepMeasures, CancellationToken cancellationToken = default)
+        {
+            using Activity? activity =
+                ServiceActivitySource.Instance.StartActivity("Withdraw Unselected Reporting Plans");
+
+            ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+            ArgumentNullException.ThrowIfNull(periods);
+            ArgumentNullException.ThrowIfNull(keepMeasures);
+
+            if (periods.Count == 0)
+            {
+                return 0;
+            }
+
+            var months = periods.Select(p => p.Month).Distinct().ToList();
+            var years = periods.Select(p => p.Year).Distinct().ToList();
+
+            // The cross product of the months and years is as close as a translatable query gets; the
+            // periods actually asked for are picked out of it below.
+            var candidates = await _repository.FindAsync(p => p.FacilityId == facilityId
+                && p.IsReporting
+                && months.Contains(p.ReportingMonth)
+                && years.Contains(p.ReportingYear), cancellationToken);
+
+            var mappings = await _measureMappingRepository.GetAllAsync(cancellationToken);
+            var scheduledMeasures = mappings
+                .Where(m => !string.IsNullOrWhiteSpace(m.DQM))
+                .Select(m => m.Measure)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var withdrawn = candidates
+                .Where(p => periods.Contains(new ReportingPeriod(p.ReportingYear, p.ReportingMonth)))
+                .Where(p => scheduledMeasures.Contains(p.Measure))
+                .Where(p => !keepMeasures.Contains(p.Measure))
+                .ToList();
+
+            if (withdrawn.Count == 0)
+            {
+                return 0;
+            }
+
+            foreach (var plan in withdrawn)
+            {
+                // Set false rather than deleted, as the DMRP sync does: the row is the history.
+                plan.IsReporting = false;
+            }
+
+            await _repository.SaveChangesAsync(cancellationToken);
+
+            return withdrawn.Count;
         }
 
         /// <summary>

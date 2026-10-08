@@ -71,9 +71,9 @@
       }
     </mat-form-field>
 
-    <!-- DMRP feature flag: when it is retired, keep this branch and delete the @else that holds the
-         report pickers, along with the two error blocks below it. -->
-    @if (dmrpEnabled) {
+    <!-- With DMRP enabled the schedule comes from the facility's DMRP reporting plans, unless the Mock DMRP
+         API is switched on: then the pickers stay and Tenant writes the selection to the mock. -->
+    @if (!showReportPickers) {
       <div class="scheduled-reports-container">
         <span class="title">Scheduled Reports</span>
         <p>
@@ -84,6 +84,12 @@
     } @else {
     <div class="scheduled-reports-container">
       <span class="title">Scheduled Reports</span>
+      @if (mockDmrpEnabled) {
+        <p>
+          Saving writes these reports to the Mock DMRP API as this facility's enrollment. Each one needs a
+          measure mapping at its frequency.
+        </p>
+      }
 
       <mat-form-field class="form-select" appearance="outline">
         <mat-label>Monthly</mat-label>
@@ -115,13 +121,11 @@
           }
         </mat-select>
       </mat-form-field>
-    </div>
 
-    @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
-      <div>
-        <small class="error">{{ reportsNotUniqueError }}</small>
-      </div>
-    }
+      @if (reportsNotUniqueError && !viewOnly && (this.facilityConfigForm.touched || this.facilityConfigForm.dirty)) {
+        <mat-error class="reports-error">{{ reportsNotUniqueError }}</mat-error>
+      }
+    </div>
     }
 
   </form>

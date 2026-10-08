@@ -16,6 +16,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.MockDmrp;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -160,7 +161,7 @@ internal sealed class RunExecutor
         var output = callbacks.Output;
 
         ServiceProvider? runServices = null;
-        MockDmrpApiHelper? mockDmrpApiHelperForCleanup = null;
+        IMockDmrpServiceClient? mockDmrpClientForCleanup = null;
         var cleanupMockDmrpEntries = false;
 
         state.Status = AutomationRunStatus.Running;
@@ -211,8 +212,11 @@ internal sealed class RunExecutor
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
             var dmrpClient = services.GetRequiredService<IDmrpServiceClient>();
-            var mockDmrpApiHelper = services.GetRequiredService<MockDmrpApiHelper>();
-            mockDmrpApiHelperForCleanup = mockDmrpApiHelper;
+            // Resolved only for a DMRP run, so a stack with no mock URL configured can still run the rest.
+            var mockDmrpClient = state.Options.EnableDmrp
+                ? services.GetRequiredService<IMockDmrpServiceClient>()
+                : null;
+            mockDmrpClientForCleanup = mockDmrpClient;
             var reportHelper = services.GetRequiredService<ReportApiHelper>();
             var validationHelper = services.GetRequiredService<ValidationApiHelper>();
             var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
@@ -242,9 +246,17 @@ internal sealed class RunExecutor
             {
                 ValidateDmrpScenario(state.Options);
 
-                await mockDmrpApiHelper.EnsureReachableAsync(
-                    state.Options.NhsnOrganizationId,
-                    cancellationToken);
+                var reachable = await mockDmrpClient!.SearchEntriesAsync(
+                    facilityId: state.Options.NhsnOrganizationId,
+                    pageSize: 1,
+                    cancellationToken: cancellationToken);
+
+                if (!reachable.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException(
+                        $"MockDmrpApi reachability check failed with HTTP {reachable.StatusCode}. " +
+                        $"Response: {reachable.RawBody}");
+                }
 
                 output.WriteLine(
                     $"MockDmrpApi reachable for NHSN Organization ID " +
@@ -494,58 +506,105 @@ internal sealed class RunExecutor
                 var reportingPeriods = FacilitySetupHelper.GetDmrpReportingPeriods();
                 var seededDmrpEntries = new List<object>();
 
-                // Start from a clean mock enrollment for this NHSN organization.
-                // Facility-scoped cleanup is intentionally used instead of the global endpoint.
-                cleanupMockDmrpEntries = true;
+                var dmrpStatus = await FacilitySetupHelper.GetDmrpStatusAsync(dmrpClient, output, cancellationToken);
 
-                await mockDmrpApiHelper.DeleteFacilityEntriesAsync(
-                    facilityId,
-                    cancellationToken);
-
-                foreach (var (month, year) in reportingPeriods)
+                if (dmrpStatus.MockDmrpEnabled)
                 {
-                    var seeded = await mockDmrpApiHelper.CreateEntryAsync(
-                        new MockDmrpEntryRequest
+                    // Tenant writes a facility's schedule through to the mock as enrollment, so saving the
+                    // facility scheduled for the dQM is what enrolls it, the same as saving the Admin UI form.
+                    // Seeding the mock here and then saving the facility with no schedule would un-enroll it.
+                    // cleanupMockDmrpEntries stays false on purpose: the entries live as long as the facility,
+                    // and its teardown (a Tenant hard delete) clears them. Deleting them at the end of the run
+                    // would leave a facility Link still has enrolled with no enrollment in the mock.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureDmrpFacilityWithScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        [measureId],
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
                         {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        seededDmrpEntries.AddRange(await ReadMockDmrpEntriesAsync(mockDmrpClient!,
+                                                                                  facilityId,
+                                                                                  month,
+                                                                                  year,
+                                                                                  cancellationToken));
+                    }
+                }
+                else
+                {
+                    // Start from a clean mock enrollment for this NHSN organization.
+                    // Facility-scoped cleanup is intentionally used instead of the global endpoint.
+                    cleanupMockDmrpEntries = true;
+
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClient!,
+                        facilityId,
+                        cancellationToken);
+
+                    foreach (var (month, year) in reportingPeriods)
+                    {
+                        var created = await mockDmrpClient!.CreateEntryAsync(
+                            new MockDmrpEntryRequest
+                            {
+                                FacilityId = facilityId,
+                                Component = component,
+                                Measure = nhsnMeasure,
+                                ReportingMonth = month,
+                                ReportingYear = year,
+                                IsReporting = "Y"
+                            },
+                            cancellationToken);
+
+                        if (!created.IsSuccessStatusCode || created.Body is null)
+                        {
+                            throw new InvalidOperationException(
+                                $"Failed to seed MockDmrpApi entry. " +
+                                $"HTTP {created.StatusCode}. Response: {created.RawBody}");
+                        }
+
+                        var seeded = created.Body;
+
+                        seededDmrpEntries.Add(new
+                        {
+                            seeded.Id,
                             FacilityId = facilityId,
                             Component = component,
                             Measure = nhsnMeasure,
                             ReportingMonth = month,
                             ReportingYear = year,
                             IsReporting = "Y"
-                        },
-                        cancellationToken);
+                        });
 
-                    seededDmrpEntries.Add(new
-                    {
-                        seeded.Id,
-                        FacilityId = facilityId,
-                        Component = component,
-                        Measure = nhsnMeasure,
-                        ReportingMonth = month,
-                        ReportingYear = year,
-                        IsReporting = "Y"
-                    });
+                        output.WriteLine(
+                            $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
+                            $"{facilityId}, {component}/{nhsnMeasure}, {month}/{year}.");
+                    }
 
-                    output.WriteLine(
-                        $"Seeded MockDmrpApi enrollment '{seeded.Id}': " +
-                        $"{facilityId}, {component}/{nhsnMeasure}, {month}/{year}.");
+                    // Tenant refuses refresh for a facility it does not know, so create the
+                    // facility first with an empty DMRP-derived schedule.
+                    state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces,
+                        onCreated: async () =>
+                        {
+                            state.AutomationCreatedFacility = true;
+                            await callbacks.PersistOwnership();
+                        });
                 }
 
-                // Tenant refuses refresh for a facility it does not know, so create the
-                // facility first with an empty DMRP-derived schedule.
-                state.AutomationCreatedFacility = await FacilitySetupHelper.EnsureEmptyDmrpFacilityAsync(
-                    facilityClient,
-                    output,
-                    facilityId,
-                    cancellationToken,
-                    state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces,
-                    onCreated: async () =>
-                    {
-                        state.AutomationCreatedFacility = true;
-                        await callbacks.PersistOwnership();
-                    });
                 if (!state.AutomationCreatedFacility)
                     await callbacks.PersistRunSummary();
 
@@ -594,15 +653,19 @@ internal sealed class RunExecutor
                         $"for {month}/{year}.");
                 }
 
-                // The reporting plans now exist. Re-save the facility so
-                // DmrpFacilityOperations derives ScheduledReports from them.
-                await FacilitySetupHelper.RefreshDmrpDerivedScheduleAsync(
-                    facilityClient,
-                    output,
-                    facilityId,
-                    cancellationToken,
-                    state.Options.VendorName,
-                    state.Options.HonorExplicitFacilityPieces);
+                // The reporting plans now exist. Re-save the facility so DmrpFacilityOperations derives
+                // ScheduledReports from them. Not with the write-through: the save that enrolled the facility
+                // already derived its schedule, and saving it again with no schedule would un-enroll it.
+                if (!dmrpStatus.MockDmrpEnabled)
+                {
+                    await FacilitySetupHelper.RefreshDmrpDerivedScheduleAsync(
+                        facilityClient,
+                        output,
+                        facilityId,
+                        cancellationToken,
+                        state.Options.VendorName,
+                        state.Options.HonorExplicitFacilityPieces);
+                }
 
                 pipelineDataReader.InvalidateCache();
 
@@ -1367,12 +1430,13 @@ internal sealed class RunExecutor
         finally
         {
             if (cleanupMockDmrpEntries &&
-                mockDmrpApiHelperForCleanup != null &&
+                mockDmrpClientForCleanup != null &&
                 !string.IsNullOrWhiteSpace(state.Options.NhsnOrganizationId))
             {
                 try
                 {
-                    await mockDmrpApiHelperForCleanup.DeleteFacilityEntriesAsync(
+                    await DeleteMockDmrpEntriesAsync(
+                        mockDmrpClientForCleanup,
                         state.Options.NhsnOrganizationId,
                         CancellationToken.None);
 
@@ -1398,6 +1462,56 @@ internal sealed class RunExecutor
                 _liveInjector.CloseSession(state.RunId);
 
             runServices?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The facility's mock entries for one period, as the run summary records them.
+    /// </summary>
+    private static async Task<IEnumerable<object>> ReadMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                                          string facilityId,
+                                                                          int month,
+                                                                          int year,
+                                                                          CancellationToken cancellationToken)
+    {
+        var page = await client.SearchEntriesAsync(facilityId: facilityId,
+                                                   reportingMonth: month,
+                                                   reportingYear: year,
+                                                   pageSize: 100,
+                                                   cancellationToken: cancellationToken);
+
+        if (!page.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to read MockDmrpApi entries for '{facilityId}' for {month}/{year}. " +
+                $"HTTP {page.StatusCode}. Response: {page.RawBody}");
+        }
+
+        return (page.Body?.Records ?? [])
+            .Select(e => (object)new
+            {
+                e.Id,
+                e.FacilityId,
+                e.Component,
+                e.Measure,
+                e.ReportingMonth,
+                e.ReportingYear,
+                e.IsReporting
+            })
+            .ToList();
+    }
+
+    private static async Task DeleteMockDmrpEntriesAsync(IMockDmrpServiceClient client,
+                                                         string nhsnOrganizationId,
+                                                         CancellationToken cancellationToken)
+    {
+        var deleted = await client.DeleteEntriesForFacilityAsync(nhsnOrganizationId, cancellationToken);
+
+        if (!deleted.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to clean up MockDmrpApi entries for NHSN organization " +
+                $"'{nhsnOrganizationId}'. HTTP {deleted.StatusCode}. Response: {deleted.RawBody}");
         }
     }
 
@@ -2196,7 +2310,14 @@ internal sealed class RunExecutor
 
         services.AddTransient<ValidationApiHelper>();
         services.AddTransient<ReportApiHelper>();
-        services.AddTransient<MockDmrpApiHelper>();
+        services.AddMockDmrpServiceClient(sp =>
+        {
+            var url = sp.GetRequiredService<IOptions<ServiceRegistry>>().Value.MockDmrpApiUrl;
+
+            return string.IsNullOrWhiteSpace(url)
+                ? throw new InvalidOperationException("ServiceRegistry:MockDmrpApiUrl is not configured.")
+                : url;
+        });
         services.AddTransient<ReportDatabaseValidator>();
         services.AddTransient<ReportAbsManifestValidator>();
         services.AddTransient<DataAcquisitionDatabaseValidator>();
