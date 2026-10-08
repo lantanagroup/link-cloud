@@ -1,6 +1,8 @@
 using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Moq;
 
 namespace LantanaGroup.Link.KafkaKeyProof.Tests;
 
@@ -48,32 +50,45 @@ public class KafkaTopicAndAssignmentTests
     {
         var tracker = new KafkaAssignmentTracker();
         var partition = new TopicPartition("PatientEvent", new Partition(0));
-        tracker.MarkProcessed(new ConsumeResult<string, string>
-        {
-            Topic = partition.Topic,
-            Partition = partition.Partition,
-            Offset = 0
-        });
+        var consumer = new Mock<IConsumer<string, string>>();
+        var commits = new List<IReadOnlyList<TopicPartitionOffset>>();
+        consumer
+            .Setup(c => c.Commit(It.IsAny<IEnumerable<TopicPartitionOffset>>()))
+            .Callback<IEnumerable<TopicPartitionOffset>>(offsets => commits.Add(offsets.ToList()));
 
-        var consumer = new object();
-        KafkaAssignmentRegistry.Register(consumer, tracker);
-        KafkaAssignmentRegistry.Remember(consumer, new[]
-        {
-            new TopicPartitionOffset(partition, new Offset(2))
-        });
+        KafkaAssignmentRegistry.Register(consumer.Object, tracker);
+        consumer.Object.SafeCommit(new[] { new TopicPartitionOffset(partition, new Offset(2)) });
+
+        tracker.OnRevoked(consumer.Object, new[] { new TopicPartitionOffset(partition, Offset.Unset) });
+
+        Assert.Equal(2, commits.Count);
+        Assert.Equal(partition, commits[1].Single().TopicPartition);
+        Assert.Equal(2, commits[1].Single().Offset.Value);
+    }
+
+    [Fact]
+    public void RevokeAfterReassignDoesNotCommitTheStaleOffset()
+    {
+        var tracker = new KafkaAssignmentTracker();
+        var partition = new TopicPartition("PatientEvent", new Partition(0));
+        var consumer = new Mock<IConsumer<string, string>>();
+        var commits = new List<IReadOnlyList<TopicPartitionOffset>>();
+        consumer
+            .Setup(c => c.Commit(It.IsAny<IEnumerable<TopicPartitionOffset>>()))
+            .Callback<IEnumerable<TopicPartitionOffset>>(offsets => commits.Add(offsets.ToList()));
+
+        KafkaAssignmentRegistry.Register(consumer.Object, tracker);
+        consumer.Object.SafeCommit(new[] { new TopicPartitionOffset(partition, new Offset(100)) });
 
         var revoked = new[] { new TopicPartitionOffset(partition, Offset.Unset) };
-        var batch = tracker.OffsetsCommittedFor(revoked);
-        Assert.Single(batch);
-        Assert.Equal(partition, batch[0].TopicPartition);
-        Assert.Equal(2, batch[0].Offset.Value);
+        tracker.OnRevoked(consumer.Object, revoked);
+        var commitsAfterFirstRevoke = commits.Count;
 
-        KafkaAssignmentRegistry.Remember(consumer, new[]
-        {
-            new TopicPartitionOffset(partition, new Offset(1))
-        });
-        batch = tracker.OffsetsCommittedFor(revoked);
-        Assert.Equal(2, batch[0].Offset.Value);
+        // The partition is assigned again. No message on this pod has been processed.
+        tracker.OnRevoked(consumer.Object, revoked);
+
+        Assert.Equal(commitsAfterFirstRevoke, commits.Count);
+        Assert.Equal(100, commits[^1].Single().Offset.Value);
     }
 
     [Fact]
