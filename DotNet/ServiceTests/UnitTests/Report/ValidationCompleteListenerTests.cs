@@ -63,14 +63,14 @@ public class ValidationCompleteListenerTests
             Times.Once);
 
         harness.Producer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 nameof(KafkaTopic.SubmitPayload),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForPatient(FacilityId, PatientId) &&
                     m.Value.FacilityId == FacilityId &&
                     m.Value.PatientId == PatientId &&
                     m.Value.ReportScheduleId == harness.ReportId),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
