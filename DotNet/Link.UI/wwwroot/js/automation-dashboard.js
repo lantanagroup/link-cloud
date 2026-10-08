@@ -30,7 +30,7 @@
             labels: ["Succeeded", "Failed", "Cancelled", "Running", "Queued"],
             datasets: [{
                 data: [stats.succeeded || 0, stats.failed || 0, stats.cancelled || 0, stats.running || 0, stats.queued || 0],
-                backgroundColor: ["#28a745", "#dc3545", "#ffc107", "#4da3ff", "#6c757d"]
+                backgroundColor: ["#28a745", "#dc3545", "#ffc107", "#343a40", "#6c757d"]
             }]
         };
         if (statusChart) {
@@ -40,7 +40,7 @@
             statusChart = new Chart(statusCanvas, {
                 type: "doughnut",
                 data: statusData,
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: "bottom" } } }
             });
         }
 
@@ -69,6 +69,7 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+                    animation: false,
                     plugins: { legend: { position: "bottom" } }
                 }
             });
@@ -123,7 +124,8 @@
             row.append(badge, time);
             var details = document.createElement("a");
             details.className = "btn btn-sm btn-au-neutral mt-2 w-100";
-            details.href = "/Automation/Runs/" + run.runId;
+            var back = window.location.pathname + window.location.search;
+            details.href = "/Automation/Runs/" + encodeURIComponent(run.runId) + "?returnUrl=" + encodeURIComponent(back.charAt(0) === "/" ? back : "/Automation");
             details.textContent = "View Details";
             card.append(title, meta, row, details);
             col.append(card);
@@ -180,6 +182,35 @@
         return params;
     }
 
+    function recentAttr(key) {
+        if (key === "pageNumber") return "data-page-number";
+        if (key === "pageSize") return "data-page-size";
+        if (key === "sortBy") return "data-sort-by";
+        return "data-sort-dir";
+    }
+
+    function applyRecentFromLocation() {
+        var card = recentCard();
+        if (!card) return;
+        var current = new URL(window.location.href);
+        ["pageNumber", "pageSize", "sortBy", "sortDir"].forEach(function (key) {
+            var value = current.searchParams.get(key);
+            if (value) card.setAttribute(recentAttr(key), value);
+        });
+    }
+
+    function writeRecentQuery() {
+        if (!recentCard()) return;
+        var params = recentQuery();
+        var url = new URL(window.location.href);
+        ["pageNumber", "pageSize", "sortBy", "sortDir"].forEach(function (key) {
+            url.searchParams.set(key, params.get(key));
+        });
+        var next = url.pathname + "?" + url.searchParams.toString() + url.hash;
+        var now = window.location.pathname + window.location.search + window.location.hash;
+        if (next !== now) history.replaceState(null, "", next);
+    }
+
     function refreshRecent() {
         var host = document.getElementById("recentRunsHost");
         if (!host) return;
@@ -196,6 +227,7 @@
     }
 
     function refresh() {
+        writeRecentQuery();
         var ticket = ++refreshTicket;
         var dataUrl = new URL("/Automation/data", window.location.origin);
         dataUrl.search = recentQuery().toString();
@@ -448,6 +480,8 @@
         node.className = "badge " + badge;
     }
 
+    applyRecentFromLocation();
+    writeRecentQuery();
     draw(readStats());
     tick();
     setInterval(tick, 1000);

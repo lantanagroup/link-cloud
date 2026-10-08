@@ -41,7 +41,8 @@ public class AutomationRunDepthTests
     {
         var index = Read("DotNet/Link.UI/Views/Automation/Index.cshtml");
         index.Should().Contain("Quick Launch");
-        index.Should().Contain("card-header bg-primary text-white");
+        index.Should().Contain("id=\"activeCard\"");
+        index.Should().NotContain("bg-primary");
         index.Should().Contain("id=\"recentRunsHost\"");
         index.Should().Contain("id=\"btnNewScenarioFromRuns\"");
         index.Should().Contain("name=\"choice\"");

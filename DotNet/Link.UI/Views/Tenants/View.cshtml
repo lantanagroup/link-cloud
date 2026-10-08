@@ -8,7 +8,7 @@
     <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to tenants"))" />
     @if (!Model.NotFound && Model.LoadError is null)
     {
-        <a asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)"><i class="bi bi-gear me-1"></i>Configuration</a>
+        <a class="btn btn-sm btn-au-neutral lu-icon-btn" asp-action="Facility" asp-route-id="@Model.FacilityId" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)" title="Configuration" aria-label="Configuration"><i class="bi bi-gear" aria-hidden="true"></i></a>
         <button type="button" class="btn btn-sm btn-au-neutral" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal">Data acquisition logs</button>
     }
 </div>
