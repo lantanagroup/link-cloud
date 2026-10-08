@@ -22,7 +22,6 @@ public class FhirListConfigurationModel
     public string FacilityId { get; set; }
     [Required]
     public string FhirBaseServerUrl { get; set; }
-    public AuthenticationConfigurationModel? Authentication { get; set; }
     [Required]
     public List<EhrPatientListModel> EHRPatientLists { get; set; }
     [DataMember]
@@ -40,7 +39,6 @@ public class FhirListConfigurationModel
             Id = entity.Id.ToString(),
             FacilityId = entity.FacilityId,
             FhirBaseServerUrl = entity.FhirBaseServerUrl,
-            Authentication = entity.Authentication != null ? AuthenticationConfigurationModel.FromDomain(entity.Authentication) : null,
             EHRPatientLists = entity.EHRPatientLists?.Select(e => new EhrPatientListModel
             {
                 FhirId = e.FhirId,
