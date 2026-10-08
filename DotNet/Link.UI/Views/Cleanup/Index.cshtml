@@ -347,10 +347,10 @@
     }
 
     function badgeClass(status) {
-        if (status === 'running') return 'text-bg-primary';
-        if (status === 'completed') return 'text-bg-success';
-        if (status === 'failed') return 'text-bg-danger';
-        return 'text-bg-secondary';
+        if (status === 'running') return 'au-badge-active';
+        if (status === 'completed') return 'au-badge-success';
+        if (status === 'failed') return 'au-badge-danger';
+        return 'au-badge-muted';
     }
 
     function badgeText(status) {

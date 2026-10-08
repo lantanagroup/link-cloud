@@ -76,8 +76,12 @@
     </div>
 </div>
 
+<div id="recentRunsHost">
+    @await Html.PartialAsync("_RecentRuns", Model)
+</div>
+
 <div class="au-card card mb-3" id="activeCard" style="@(Model.ActiveRuns.Count == 0 ? "display:none" : "")">
-    <div class="card-header bg-primary text-white"><i class="bi bi-activity me-2"></i>Active Runs</div>
+    <div class="card-header"><i class="bi bi-activity me-2"></i>Active Runs</div>
     <div class="card-body">
         <div class="row g-2" id="activeRuns">
             @foreach (var run in Model.ActiveRuns)
@@ -183,10 +187,6 @@
         </div>
     </div>
 }
-
-<div id="recentRunsHost">
-    @await Html.PartialAsync("_RecentRuns", Model)
-</div>
 
 @if (Model.EngineReady)
 {

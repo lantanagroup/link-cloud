@@ -7,6 +7,8 @@
     var timer = null;
     var inFlight = false;
     var lastServices = [];
+    var healthReports = [];
+    var healthTimer = null;
 
     function $(id) { return document.getElementById(id); }
 
@@ -65,6 +67,29 @@
     }
     function shortName(name) {
         return String(name || '').replace('Data Acquisition', 'DA').replace('Measure Evaluation', 'Eval');
+    }
+    function normName(value) {
+        return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    function healthLabel(svc) {
+        var name = normName(svc.name);
+        var key = normName(svc.key);
+        var match = null;
+        function take(minLength) {
+            healthReports.forEach(function (report) {
+                if (match) return;
+                var service = normName(report.service);
+                if (!service || service.length < minLength) return;
+                var exact = service === name || service === key;
+                var loose = minLength > 1 && (
+                    (name && (name.indexOf(service) >= 0 || service.indexOf(name) >= 0))
+                    || (key && (key.indexOf(service) >= 0 || service.indexOf(key) >= 0)));
+                if (exact || loose) match = report.status || '—';
+            });
+        }
+        take(1);
+        if (!match) take(4);
+        return match || '—';
     }
 
     function remember(services) {
@@ -203,6 +228,8 @@
                         '<div class="au-pulse-label">' + escapeHtml(shortName(svc.name || svc.key)) + '</div>' +
                         '<div class="au-pulse-read"><span>CPU</span>' + escapeHtml(formatPercent(svc.cpuPercent)) + '</div>' +
                         '<div class="au-pulse-read"><span>RAM</span>' + escapeHtml(formatRam(svc.memoryBytes)) + '</div>' +
+                        '<div class="au-pulse-read"><span>p95</span>' + escapeHtml(formatApi(svc.apiP95Ms)) + '</div>' +
+                        '<div class="au-pulse-read"><span>Health</span>' + escapeHtml(healthLabel(svc)) + '</div>' +
                         '</button>';
                 }).join('');
             }
@@ -219,6 +246,7 @@
                         hMeter('CPU', cpuPct(svc), formatPercent(svc.cpuPercent)) +
                         hMeter('RAM', ramPct(svc), formatRam(svc.memoryBytes)) +
                         '<div class="small text-muted">API p95 ' + escapeHtml(formatApi(svc.apiP95Ms)) + '</div>' +
+                        '<div class="small text-muted">Health ' + escapeHtml(healthLabel(svc)) + '</div>' +
                         '</button>';
                 }).join('');
             }
@@ -253,16 +281,51 @@
         }
     }
 
+    async function pollHealth() {
+        var card = $('liveUtilizationCard');
+        if (!card) {
+            stop();
+            return;
+        }
+        var url = card.getAttribute('data-health-url');
+        if (!url) return;
+        try {
+            var response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (!response.ok) healthReports = [];
+            else {
+                var body = await response.json();
+                healthReports = (body && body.reports) || [];
+            }
+        } catch (e) {
+            healthReports = [];
+        }
+        if (lastServices.length)
+            render({ reachable: true, sampledAt: new Date().toISOString(), services: lastServices });
+    }
+
+    function startHealth() {
+        var card = $('liveUtilizationCard');
+        if (!card || !card.getAttribute('data-health-url') || healthTimer) return;
+        pollHealth();
+        healthTimer = setInterval(pollHealth, 15000);
+    }
+
     function start() {
         var card = $('liveUtilizationCard');
         if (!card || !card.getAttribute('data-url') || timer) return;
         poll();
         timer = setInterval(poll, 5000);
+        startHealth();
     }
     function stop() {
-        if (!timer) return;
-        clearInterval(timer);
-        timer = null;
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+        if (healthTimer) {
+            clearInterval(healthTimer);
+            healthTimer = null;
+        }
     }
 
     function removeCard() {

@@ -29,6 +29,7 @@ public sealed class AcquisitionQuery
     public string? SortDir { get; set; }
     public string? Scope { get; set; }
     public string? SearchTerm { get; set; }
+    public string? ReturnUrl { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = LogsRules.DefaultPageSize;
 
@@ -50,6 +51,7 @@ public sealed class AcquisitionQuery
         SortDir = SortDir,
         Scope = Scope,
         SearchTerm = SearchTerm,
+        ReturnUrl = ReturnUrl,
         Page = page,
         PageSize = pageSize
     };
@@ -91,6 +93,7 @@ public sealed class AcquisitionQuery
             route["cancellableOnly"] = "true";
         AutomationMarkRules.AddScope(route, Scope);
         Add(route, "searchTerm", SearchTerm);
+        Add(route, "returnUrl", ReturnUrlRules.Sanitize(ReturnUrl));
         if (MinAgeHours != LogsRules.DefaultMinAgeHours)
             route["minAgeHours"] = MinAgeHours.ToString();
         Add(route, "sortBy", sortBy ?? SortBy);

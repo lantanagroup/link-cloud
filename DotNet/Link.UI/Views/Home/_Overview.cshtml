@@ -9,6 +9,7 @@
     var trendMax = activity.Trend.Where(day => day.Reachable).Select(day => day.Count).DefaultIfEmpty(0).Max();
     var trendTotal = activity.Trend.Where(day => day.Reachable).Sum(day => day.Count);
     var trendKnown = activity.Trend.Any(day => day.Reachable);
+    var origin = ReturnUrlRules.Here(Context.Request);
 }
 
 <div id="homeOverview">
@@ -18,7 +19,7 @@
     }
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index" asp-route-scope="@Model.RealScope">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Tenants" asp-action="Index" asp-route-scope="@Model.RealScope" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@HomeOverviewRules.PrimaryFacilityText(facilities, Model.AutomationVisible)</div>
                 <div class="au-kpi-label">Facilities</div>
                 @if (facilities.Reachable)
@@ -28,35 +29,35 @@
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="New,Scheduled,EndOfPeriod">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="New,Scheduled,EndOfPeriod" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@activity.InFlightText</div>
                 <div class="au-kpi-label">In flight</div>
                 <div class="au-kpi-note">New, scheduled, or end of period</div>
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="Submitted">
+            <a class="au-kpi-card au-kpi-link" asp-controller="Reports" asp-action="Index" asp-route-status="Submitted" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@activity.SubmittedText</div>
                 <div class="au-kpi-label">Submitted</div>
                 <div class="au-kpi-note">Reports that were submitted</div>
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link @(activity.CompletedReachable && activity.CompletedNotSubmitted > 0 ? "au-kpi-auto" : "")" asp-controller="Reports" asp-action="Index" asp-route-status="CompletedNotSubmitted">
+            <a class="au-kpi-card au-kpi-link @(activity.CompletedReachable && activity.CompletedNotSubmitted > 0 ? "au-kpi-auto" : "")" asp-controller="Reports" asp-action="Index" asp-route-status="CompletedNotSubmitted" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@activity.CompletedText</div>
                 <div class="au-kpi-label">Not submitted</div>
                 <div class="au-kpi-note">Completed, still to send</div>
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link @(logs.Reachable && logs.Total > 0 ? "au-kpi-bad" : "")" asp-controller="Logs" asp-action="Acquisition" asp-route-status="Failed,MaxRetriesReached">
+            <a class="au-kpi-card au-kpi-link @(logs.Reachable && logs.Total > 0 ? "au-kpi-bad" : "")" asp-controller="Logs" asp-action="Acquisition" asp-route-status="Failed,MaxRetriesReached" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@logs.TotalText</div>
                 <div class="au-kpi-label">Failed acquisition</div>
                 <div class="au-kpi-note">Open the filtered logs</div>
             </a>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <a class="au-kpi-card au-kpi-link @(health.Reachable && health.Unhealthy > 0 ? "au-kpi-bad" : "")" asp-controller="System" asp-action="Health">
+            <a class="au-kpi-card au-kpi-link @(health.Reachable && health.Unhealthy > 0 ? "au-kpi-bad" : "")" asp-controller="System" asp-action="Health" asp-route-returnUrl="@origin">
                 <div class="au-kpi-value">@health.UnhealthyText</div>
                 <div class="au-kpi-label">Unhealthy</div>
                 <div class="au-kpi-note">@(health.Reachable ? $"{health.Healthy} healthy" : "Service health")</div>
@@ -68,7 +69,7 @@
         <div class="col-12 col-lg-7">
             <div class="au-card card h-100 mb-0">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <a class="home-card-link" asp-controller="Reports" asp-action="Index">Reports created</a>
+                    <a class="home-card-link" asp-controller="Reports" asp-action="Index" asp-route-returnUrl="@origin">Reports created</a>
                     <a class="btn btn-sm btn-au-neutral" asp-controller="Reports" asp-action="Index">Open</a>
                 </div>
                 <div class="card-body">
@@ -87,7 +88,7 @@
                             @foreach (var day in activity.Trend)
                             {
                                 var percent = day.Reachable ? HomeOverviewRules.BarPercent(day.Count, trendMax) : 0;
-                                <a class="home-trend-link" asp-controller="Reports" asp-action="Index" asp-route-created="@day.Day" title="@day.Day UTC">
+                                <a class="home-trend-link" asp-controller="Reports" asp-action="Index" asp-route-created="@day.Day" asp-route-returnUrl="@origin" title="@day.Day UTC">
                                     <span class="home-trend-plot" aria-hidden="true">
                                         <span class="home-trend-bar" style="height:@(percent)%"></span>
                                     </span>
@@ -112,7 +113,7 @@
                     {
                         foreach (var issue in Model.Issues)
                         {
-                            <a class="home-issue" href="@issue.Href">
+                            <a class="home-issue" href="@ReturnUrlRules.WithReturn(issue.Href, origin)">
                                 <span class="home-issue-title">@issue.Title</span>
                                 @if (!string.IsNullOrWhiteSpace(issue.Detail))
                                 {
@@ -210,7 +211,7 @@
                         }
                         else
                         {
-                            <partial name="_ServiceMonitor" model="@(new ServiceMonitorModel(Url.Action("LiveUtilization", "Metrics")!, compact: true))" />
+                            <partial name="_ServiceMonitor" model="@(new ServiceMonitorModel(Url.Action("LiveUtilization", "Metrics")!, compact: true, healthUrl: Url.Action("HealthStatus", "System")))" />
                         }
                     }
                     <div class="au-pulse-actions">
@@ -260,10 +261,11 @@
                             <div class="home-row">
                                 <span class="badge @report.Badge">@report.Status</span>
                                 <span class="home-row-main">
-                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, Compact = true, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = ReturnUrlRules.Here(Context.Request) })" />
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = report.FacilityId, CopyLabel = "Copy facility id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = origin })" />
+                                    <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = report.Id, CopyLabel = "Copy report id", LinkHref = Url.Action("Report", "Tenants", new { id = report.FacilityId, reportId = report.Id }), ReturnUrl = origin })" />
                                     <partial name="_AutomationBadge" model="report.AutomationRunId" />
                                 </span>
-                                <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">@report.When</a>
+                                <a class="home-row-time text-muted small" asp-controller="Tenants" asp-action="Report" asp-route-id="@report.FacilityId" asp-route-reportId="@report.Id" asp-route-returnUrl="@origin">@report.When</a>
                             </div>
                         }
                         <p class="small text-muted mt-2 mb-0">@reports.Total total</p>
@@ -312,11 +314,14 @@
                         {
                             foreach (var run in runs.Active.Concat(runs.Recent).Take(HomeOverviewRules.RowLimit))
                             {
-                                <a class="home-row" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id" asp-route-returnUrl="@ReturnUrlRules.Here(Context.Request)">
-                                    <span class="badge @run.Badge">@run.Status</span>
-                                    <span class="home-row-main"><span class="home-name">@run.Name</span></span>
+                                <div class="home-row">
+                                    <span class="badge @run.Badge">@(string.IsNullOrWhiteSpace(run.Status) ? "Unknown" : run.Status)</span>
+                                    <span class="home-row-main">
+                                        <a class="home-name" asp-controller="Automation" asp-action="Run" asp-route-id="@run.Id" asp-route-returnUrl="@origin">@run.Name</a>
+                                        <partial name="_LabeledId" model="@(new LabeledId { Label = "Run", Value = run.Id, CopyLabel = "Copy run id", LinkHref = Url.Action("Run", "Automation", new { id = run.Id }), ReturnUrl = origin })" />
+                                    </span>
                                     <span class="home-row-time text-muted small">@run.When</span>
-                                </a>
+                                </div>
                             }
                         }
                     </div>

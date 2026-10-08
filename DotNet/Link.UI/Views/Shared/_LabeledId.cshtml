@@ -1,7 +1,7 @@
 @model LabeledId
 @{
     var value = Model.Value?.Trim() ?? "";
-    var empty = string.IsNullOrWhiteSpace(value) || value == "—";
+    var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
     var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
     var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
     var safeLink = !string.IsNullOrWhiteSpace(href)
@@ -20,30 +20,30 @@
         <span class="lu-id-name">@Model.Name</span>
     }
     <span class="lu-id-value">
-        @if (empty)
+        @if (!string.IsNullOrWhiteSpace(Model.ValueElementId))
+        {
+            if (safeLink && !empty)
+            {
+                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId">@value</a>
+            }
+            else
+            {
+                <code class="lu-facility-id" title="@(empty ? null : value)" id="@Model.ValueElementId">@(empty ? "—" : value)</code>
+            }
+        }
+        else if (empty)
         {
             <span class="text-muted">—</span>
         }
         else if (safeLink)
         {
-            if (string.IsNullOrWhiteSpace(Model.ValueElementId))
-            {
-                <a class="lu-clip" href="@href" title="@value">@value</a>
-            }
-            else
-            {
-                <a class="lu-clip" href="@href" title="@value" id="@Model.ValueElementId">@value</a>
-            }
-        }
-        else if (string.IsNullOrWhiteSpace(Model.ValueElementId))
-        {
-            <code class="lu-facility-id" title="@value">@value</code>
+            <a class="lu-clip" href="@href" title="@value">@value</a>
         }
         else
         {
-            <code class="lu-facility-id" title="@value" id="@Model.ValueElementId">@value</code>
+            <code class="lu-facility-id" title="@value">@value</code>
         }
-        @if (!empty && Model.Copy)
+        @if ((!empty || !string.IsNullOrWhiteSpace(Model.ValueElementId)) && Model.Copy)
         {
             <partial name="_CopyButton" model="@(new CopyTarget { Value = value, Label = copyLabel })" />
         }
