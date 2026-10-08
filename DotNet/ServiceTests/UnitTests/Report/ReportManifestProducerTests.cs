@@ -122,10 +122,10 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -202,14 +202,14 @@ public class ReportManifestProducerTests
 
         Assert.True(produced);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.Is<Message<string, SubmitPayloadValue>>(m =>
                     m.Key == KafkaKeys.ForFacility(FacilityId) &&
                     m.Value.FacilityId == FacilityId &&
                     m.Value.ReportScheduleId == harness.Schedule.Id &&
                     m.Value.PayloadType == PayloadType.ReportSchedule),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
 
         Assert.Equal(ScheduleStatus.EndOfPeriod, harness.Schedule.Status);
@@ -284,6 +284,32 @@ public class ReportManifestProducerTests
     }
 
     /// <summary>
+    /// A broker rejection of the submission produce must not mark the manifest emitted.
+    /// </summary>
+    [Fact]
+    public async Task Produce_SubmissionDeliveryFails_ReleasesClaimAndDoesNotMarkEmitted()
+    {
+        var harness = new Harness();
+        harness.SubmitPayloadKafkaProducer
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<string, SubmitPayloadValue>>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ProduceException<string, SubmitPayloadValue>(
+                new Error(ErrorCode.Local_MsgTimedOut, "delivery failed"),
+                new DeliveryResult<string, SubmitPayloadValue>()));
+
+        await Assert.ThrowsAsync<TransientException>(() => harness.Producer.Produce(harness.Schedule));
+
+        harness.ScheduleManager.Verify(
+            m => m.ReleaseManifestClaimAsync(harness.Schedule.Id, It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        harness.ScheduleManager.Verify(
+            m => m.MarkManifestEmittedAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    /// <summary>
     /// Two completions of the last patient must upload and produce one manifest.
     /// The claim returns true only for the first caller.
     /// </summary>
@@ -305,10 +331,10 @@ public class ReportManifestProducerTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
         harness.SubmitPayloadKafkaProducer.Verify(
-            p => p.Produce(
+            p => p.ProduceAsync(
                 It.IsAny<string>(),
                 It.IsAny<Message<string, SubmitPayloadValue>>(),
-                It.IsAny<Action<DeliveryReport<string, SubmitPayloadValue>>>()),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -537,6 +563,13 @@ public class ReportManifestProducerTests
                     It.IsAny<IEnumerable<Resource>>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new Uri("https://blob.example.com/internal/manifest.ndjson"));
+
+            SubmitPayloadKafkaProducer
+                .Setup(p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<Message<string, SubmitPayloadValue>>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new DeliveryResult<string, SubmitPayloadValue> { Status = PersistenceStatus.Persisted });
 
             var submitPayloadProducer = new SubmitPayloadProducer(
                 scopeFactory,

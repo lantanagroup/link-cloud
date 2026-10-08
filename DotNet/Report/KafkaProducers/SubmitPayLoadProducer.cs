@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null, string? metricsMode = null, CancellationToken cancellationToken = default)
         {
             _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 ? KafkaKeys.ForFacility(schedule.FacilityId)
                 : KafkaKeys.ForPatient(schedule.FacilityId, patientId);
 
-            _submitPayloadProducer.Produce(nameof(KafkaTopic.SubmitPayload),
+            await _submitPayloadProducer.ProduceAsync(nameof(KafkaTopic.SubmitPayload),
                 new Message<string, SubmitPayloadValue>
                 {
                     Key = key,
@@ -57,9 +57,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     },
 
                     Headers = CreateHeaders(corrId, metricsMode)
-                });
-
-            _submitPayloadProducer.Flush();
+                },
+                cancellationToken);
 
             return true;
         }

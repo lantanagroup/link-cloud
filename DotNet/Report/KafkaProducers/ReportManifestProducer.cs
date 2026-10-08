@@ -182,8 +182,16 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     }
 
                     _logger.LogDebug("Producing report manifest to Kafka (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
-                    await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
-                        payloadUri: payloadUri?.ToString());
+                    try
+                    {
+                        await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule,
+                            payloadUri: payloadUri?.ToString(), cancellationToken: cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        await ReleaseManifestClaimQuietly(schedule.Id, claimToken, cancellationToken);
+                        throw new TransientException($"Failed to produce the report manifest submission (ReportId = {schedule.Id}).", ex);
+                    }
                 }
                 else
                 {
