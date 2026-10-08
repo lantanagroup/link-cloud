@@ -236,10 +236,25 @@ public sealed partial class KafkaOpsService
                 ? original.Where(move => inFlightPartitions.Contains(move.Topic + "\n" + move.Partition)).ToList()
                 : original.Where(move => inFlightTopics.Contains(move.Topic)).ToList();
             var alreadyMoved = original.Count - stillMoving.Count;
+            var requested = ReadMoves(record.ReassignmentJson);
             await _infra.CancelReassignmentAsync(record.RebalanceName, cancellationToken);
             var cluster = await _broker.DescribeClusterAsync(cancellationToken);
-            if (!MovedPartitionsMatch(stillMoving, cluster))
+            foreach (var move in stillMoving)
+            {
+                var placement = cluster.Placements.FirstOrDefault(item =>
+                    item.Topic == move.Topic && item.Partition == move.Partition);
+                if (placement is not null && move.Replicas.SequenceEqual(placement.Replicas))
+                    continue;
+                var landed = requested.FirstOrDefault(item =>
+                    item.Topic == move.Topic && item.Partition == move.Partition);
+                if (placement is not null && landed is not null && landed.Replicas.SequenceEqual(placement.Replicas))
+                {
+                    alreadyMoved++;
+                    continue;
+                }
+
                 throw new KafkaOpsRejectedException("The replicas did not return to the original assignment.");
+            }
 
             var now = DateTimeOffset.UtcNow;
             var progress = alreadyMoved == 0
@@ -689,16 +704,6 @@ public sealed partial class KafkaOpsService
         if (!_infra.Enabled)
             detail += " Enable an infra provider to allow this.";
         return detail;
-    }
-
-    private static bool MovedPartitionsMatch(IReadOnlyList<ReplicaMove> expected, ClusterSnapshot cluster)
-    {
-        if (expected.Count == 0)
-            return true;
-        return expected.All(move => cluster.Placements.Any(placement =>
-            placement.Topic == move.Topic
-            && placement.Partition == move.Partition
-            && move.Replicas.SequenceEqual(placement.Replicas)));
     }
 
     private async Task FinishMoveAsync(ChangeRequestRecord record, CancellationToken cancellationToken)

@@ -17,12 +17,14 @@ public class ProducerPartitionerGuardTests
             var text = File.ReadAllText(file);
             if (file.Replace('/', '\\').EndsWith("\\KafkaOps.Proof\\KafkaOpsConsoleFlowTests.cs", StringComparison.Ordinal))
             {
-                // One probe producer writes a fixed key to ops-proof-members. Any other builder in this file still fails.
+                // One probe producer writes a fixed key to ops-proof-members. Every Produce( call in this file uses memberTopic.
                 var builders = CountOf(text, "new ProducerBuilder");
                 var allowed = CountOf(text, "new ProducerBuilder<string, string>");
+                var produces = CountOf(text, "Produce(");
                 if (builders != 1
                     || allowed != 1
-                    || !text.Contains("Produce(memberTopic", StringComparison.Ordinal)
+                    || produces < 1
+                    || produces != CountOf(text, "Produce(memberTopic")
                     || !text.Contains("const string memberTopic = \"ops-proof-members\"", StringComparison.Ordinal))
                 {
                     failures.Add(file + " has a producer other than the ops-proof-members probe");
