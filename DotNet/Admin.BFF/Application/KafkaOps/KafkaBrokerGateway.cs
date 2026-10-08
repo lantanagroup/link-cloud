@@ -443,34 +443,45 @@ public sealed class KafkaBrokerGateway : IKafkaBrokerGateway, IDisposable
         if (brokers.Count == 0)
             return ([], false);
 
-        cancellationToken.ThrowIfCancellationRequested();
-        try
+        var eligible = new List<int>();
+        var seen = new HashSet<int>();
+        foreach (var broker in brokers)
         {
-            var described = await admin.DescribeConfigsAsync(
-                brokers.Select(broker => new ConfigResource { Type = ResourceType.Broker, Name = broker.Id.ToString() }).ToList(),
-                new DescribeConfigsOptions { RequestTimeout = TimeSpan.FromSeconds(15) });
-            var eligible = new List<int>();
-            foreach (var result in described)
+            if (!seen.Add(broker.Id))
+                continue;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            try
             {
-                if (!int.TryParse(result.ConfigResource.Name, out var id) || eligible.Contains(id))
-                    continue;
+                var described = await admin.DescribeConfigsAsync(
+                    [new ConfigResource { Type = ResourceType.Broker, Name = broker.Id.ToString() }],
+                    new DescribeConfigsOptions { RequestTimeout = TimeSpan.FromSeconds(15) });
+                var sawBroker = false;
                 string? roles = null;
-                foreach (var entry in result.Entries)
+                foreach (var result in described)
                 {
-                    if (string.Equals(entry.Key, "process.roles", StringComparison.OrdinalIgnoreCase))
-                        roles = entry.Value.Value;
+                    if (!int.TryParse(result.ConfigResource.Name, out var id) || id != broker.Id)
+                        continue;
+                    sawBroker = true;
+                    foreach (var entry in result.Entries)
+                    {
+                        if (string.Equals(entry.Key, "process.roles", StringComparison.OrdinalIgnoreCase))
+                            roles = entry.Value.Value;
+                    }
                 }
 
+                if (!sawBroker)
+                    return ([], false);
                 if (roles is not null && roles.Contains("controller", StringComparison.OrdinalIgnoreCase))
-                    eligible.Add(id);
+                    eligible.Add(broker.Id);
             }
+            catch (KafkaException)
+            {
+                return ([], false);
+            }
+        }
 
-            return (eligible, true);
-        }
-        catch (KafkaException)
-        {
-            return ([], false);
-        }
+        return (eligible, true);
     }
 
     private static async Task<Dictionary<string, string>> ConfigsAsync(IAdminClient admin, string topic, CancellationToken cancellationToken)

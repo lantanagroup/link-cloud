@@ -86,6 +86,10 @@ services:
 
   producer:
     image: apache/kafka:3.7.1
+    tmpfs:
+      - /etc/kafka/secrets
+      - /mnt/shared/config
+      - /var/lib/kafka/data
     entrypoint: ["/bin/bash", "-lc"]
     command:
       - |
@@ -99,6 +103,10 @@ services:
 
   consumer:
     image: apache/kafka:3.7.1
+    tmpfs:
+      - /etc/kafka/secrets
+      - /mnt/shared/config
+      - /var/lib/kafka/data
     entrypoint: ["/bin/bash", "-lc"]
     command:
       - |
