@@ -202,6 +202,21 @@ public class SaveInPlaceTests
     }
 
     [Fact]
+    public void Section_warning_keeps_the_add_editor_visible()
+    {
+        var js = File.ReadAllText(RepoFile("DotNet/Link.UI/wwwroot/js/facility-save.js"));
+        var start = js.IndexOf("function collapseEmpty(", StringComparison.Ordinal);
+        var end = js.IndexOf("function saveNameFor(", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThan(-1);
+        end.Should().BeGreaterThan(start);
+        var body = js.Substring(start, end - start);
+        var warn = body.IndexOf("alert-warning", StringComparison.Ordinal);
+        var hide = body.IndexOf("form.classList.add(\"d-none\")", StringComparison.Ordinal);
+        warn.Should().BeGreaterThan(-1);
+        hide.Should().BeGreaterThan(warn);
+    }
+
+    [Fact]
     public void Report_counts_survive_a_page_refresh()
     {
         var text = File.ReadAllText(RepoFile("DotNet/Link.UI/Views/Reports/Index.cshtml"));
