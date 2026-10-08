@@ -42,6 +42,8 @@ smoke-test*.log
 **/.dockerignore
 **/.editorconfig
 **/.env
+.azure-artifacts.env
+**/.azure-artifacts.env
 **/.git
 **/.gitattributes
 **/.gitignore

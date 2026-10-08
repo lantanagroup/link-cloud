@@ -129,9 +129,14 @@ function Invoke-LinkCloudFeedTokenFetch {
         $global:LASTEXITCODE = 1
         return 1
     }
-    & $fetch -RepoRoot $Root
-    if ($null -eq $LASTEXITCODE) { return 0 }
-    return [int]$LASTEXITCODE
+    # az login writes account JSON to the success stream. Capturing this
+    # function would otherwise return that JSON plus the exit code, and a
+    # later comparison against 0 would treat a successful fetch as failure.
+    & $fetch -RepoRoot $Root *>&1 | Out-Host
+    $code = $LASTEXITCODE
+    if ($null -eq $code) { $code = 0 }
+    $global:LASTEXITCODE = [int]$code
+    return [int]$code
 }
 
 function Test-LinkCloudFeedTokenFresh {

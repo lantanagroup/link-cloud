@@ -17,6 +17,46 @@ fail() {
   exit 1
 }
 
+on_windows_bash() {
+  case "$(uname -s 2>/dev/null || printf '%s' unknown)" in
+    MINGW*|MSYS*|CYGWIN*) return 0 ;;
+  esac
+  return 1
+}
+
+# Git Bash chmod does not remove inherited NTFS permissions. The PowerShell
+# script creates the file, restricts the ACL, then writes the token.
+delegate_to_windows_acl() {
+  local ps win_root script code
+  ps=$(command -v powershell.exe || true)
+  if [ -z "$ps" ]; then
+    fail "This is Windows Git Bash. chmod cannot limit the token file to the current user, and powershell.exe was not found. Run Scripts/docker-compose.feed-token.ps1."
+  fi
+  if ! command -v cygpath >/dev/null 2>&1; then
+    fail "This is Windows Git Bash and cygpath is missing, so the token file cannot be locked down. Run Scripts/docker-compose.feed-token.ps1."
+  fi
+  if [ ! -f "$root/Scripts/docker-compose.feed-token.ps1" ]; then
+    fail "Scripts/docker-compose.feed-token.ps1 was not found, so the token file cannot be locked down."
+  fi
+  win_root=$(cygpath -w "$root")
+  script=$(cygpath -w "$root/Scripts/docker-compose.feed-token.ps1")
+  set +e
+  "$ps" -NoProfile -ExecutionPolicy Bypass -File "$script" -RepoRoot "$win_root"
+  code=$?
+  set -e
+  if [ "$code" -ne 0 ]; then
+    fail "The Windows token script failed (exit $code). The token file was not kept."
+  fi
+  exit 0
+}
+
+file_mode_is_600() {
+  local mode
+  mode=$(stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1" 2>/dev/null || printf '%s' '')
+  mode=${mode#0}
+  [ "$mode" = "600" ]
+}
+
 find_az() {
   if command -v az >/dev/null 2>&1; then
     command -v az
@@ -48,6 +88,10 @@ refresh_path() {
     export PATH
   fi
 }
+
+if on_windows_bash; then
+  delegate_to_windows_acl
+fi
 
 if ! az_bin=$(find_az); then
   winget_bin=""
@@ -107,9 +151,17 @@ fi
 
 umask 077
 tmp=$(mktemp)
+chmod 600 "$tmp" || true
 printf '%s\n' "AZURE_ARTIFACTS_PAT=${token}" "AZURE_ARTIFACTS_PAT_EXPIRES_ON=${expires}" > "$tmp"
-chmod 600 "$tmp"
-mv "$tmp" "$env_file"
-chmod 600 "$env_file"
 unset token expires
+if ! file_mode_is_600 "$tmp"; then
+  rm -f "$tmp"
+  fail "The token file could not be limited to the current user, so it was not kept."
+fi
+mv "$tmp" "$env_file"
+chmod 600 "$env_file" || true
+if ! file_mode_is_600 "$env_file"; then
+  rm -f "$env_file"
+  fail "The token file could not be limited to the current user, so it was not kept."
+fi
 exit 0
