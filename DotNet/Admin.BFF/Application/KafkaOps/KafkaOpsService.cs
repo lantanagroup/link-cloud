@@ -822,7 +822,7 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     private void EnsureWritable()
     {
         if (ReadOnly)
-            throw new KafkaOpsRejectedException("Kafka changes are read-only in this environment.");
+            throw new KafkaOpsForbiddenException("Kafka changes are read-only in this environment.");
     }
 
     private string Key(string suffix) => "kafka-ops:" + _environment.EnvironmentName + ":" + suffix;
@@ -858,9 +858,14 @@ public sealed partial class KafkaOpsService : IKafkaOpsService
     }
 }
 
-public sealed class KafkaOpsRejectedException : Exception
+public class KafkaOpsRejectedException : Exception
 {
     public KafkaOpsRejectedException(string message) : base(message) { }
+}
+
+public sealed class KafkaOpsForbiddenException : KafkaOpsRejectedException
+{
+    public KafkaOpsForbiddenException(string message) : base(message) { }
 }
 
 public sealed class KafkaOpsNotFoundException : Exception

@@ -294,8 +294,17 @@ public sealed partial class KafkaOpsService
             return;
         }
 
-        await PersistTimedOutAsync(record, "The change did not settle before the timeout. The broker was not removed.", cancellationToken);
+        await PersistTimedOutAsync(record, TimedOutReason(record.Kind), cancellationToken);
     }
+
+    private static string TimedOutReason(KafkaChangeKind kind) => kind switch
+    {
+        KafkaChangeKind.ScaleReplicas => "The change did not settle before the timeout. The group did not reach the requested members.",
+        KafkaChangeKind.AddBroker => "The change did not settle before the timeout. The broker did not register.",
+        KafkaChangeKind.DecommissionBroker => "The change did not settle before the timeout. The broker was not removed.",
+        KafkaChangeKind.Rebalance => "The change did not settle before the timeout. The reassignment did not finish.",
+        _ => "The change did not settle before the timeout."
+    };
 
     private bool InfraTimedOut(ChangeRequestRecord record) =>
         record.ExecutedUtc is { } executed
@@ -444,7 +453,7 @@ public sealed partial class KafkaOpsService
     {
         var allowed = kind == KafkaChangeKind.PartitionIncrease ? CanManage(user) : CanScale(user);
         if (!allowed)
-            throw new KafkaOpsRejectedException("You are not allowed to run this change.");
+            throw new KafkaOpsForbiddenException("You are not allowed to run this change.");
     }
 
     private static List<ReplicaMove> ReadMoves(string json)
