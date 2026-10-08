@@ -60,7 +60,6 @@ public class PatientCensusServiceTests
         DataAcquisitionDbContext dbContext,
         string facilityId,
         string fhirBaseUrl = "http://localhost/fhir",
-        AuthenticationConfiguration? listAuthentication = null,
         AuthenticationConfiguration? queryAuthentication = null)
     {
         var listConfig = new FhirListConfiguration
@@ -69,7 +68,6 @@ public class PatientCensusServiceTests
             FacilityId = facilityId,
             FhirBaseServerUrl = fhirBaseUrl,
             EHRPatientLists = BuildStandardEhrPatientLists(facilityId),
-            Authentication = listAuthentication,
         };
         dbContext.FhirListConfigurations.Add(listConfig);
 
@@ -403,24 +401,18 @@ public class PatientCensusServiceTests
     }
 
     [Fact]
-    public async Task RetrieveListData_ListConfigHasStaleAuth_ReadsWithQueryConfigAuthAndCompletes()
+    public async Task RetrieveListData_QueryConfigHasAuth_ReadsEveryListWithQueryConfigAuthAndCompletes()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var logQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var tag = Guid.NewGuid().ToString("N")[..8];
-        var facilityId = $"CensusTest_StaleAuth_{tag}";
+        var facilityId = $"CensusTest_QueryAuth_{tag}";
 
-        // The list config holds a stale copy of the EHR credentials; the query config holds the current ones.
+        // The EHR credentials live only on the query config; census must read every List with them.
         await SeedFhirListAndQueryConfigAsync(
             dbContext,
             facilityId,
-            listAuthentication: new AuthenticationConfiguration
-            {
-                AuthType = "Epic",
-                Key = "not-a-pem",
-                ClientId = "stale-list-client",
-            },
             queryAuthentication: new AuthenticationConfiguration
             {
                 AuthType = "Epic",
