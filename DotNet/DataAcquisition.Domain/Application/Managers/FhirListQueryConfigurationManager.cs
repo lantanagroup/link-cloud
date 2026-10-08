@@ -15,9 +15,6 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IFhirListQueryConfigurationManager
 {
-    Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
-    Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default);
-    Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default);
     Task<FhirListConfigurationModel> CreateAsync(CreateFhirListConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<FhirListConfigurationModel> UpdateAsync(UpdateFhirListConfigurationModel entity, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
@@ -32,65 +29,6 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
         _database = database;
     }
 
-    public async Task<AuthenticationConfigurationModel> CreateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("FhirListQueryConfigurationManager.CreateAuthenticationConfiguration");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-
-        var queryResult = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
-
-        if (queryResult == null)
-            throw new MissingFacilityConfigurationException(
-                $"No configuration found for facilityId: {facilityId}. Unable to save authentication settings.");
-
-        if (queryResult.Authentication != null)
-        {
-            throw new EntityAlreadyExistsException(
-                $"An AuthenticationConfiguration already exists for the FhirQueryConfiguration for facilityId {facilityId}");
-        }
-
-        queryResult.Authentication = config;
-        await _database.FhirListConfigurationRepository.SaveChangesAsync();
-
-        return AuthenticationConfigurationModel.FromDomain(queryResult.Authentication);
-    }
-
-    public async Task<AuthenticationConfigurationModel> UpdateAuthenticationConfiguration(string facilityId, AuthenticationConfiguration config, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("FhirListQueryConfigurationManager.UpdateAuthenticationConfiguration");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-
-        var queryResult = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(q => q.FacilityId == facilityId);
-
-        if (queryResult == null)
-            throw new MissingFacilityConfigurationException(
-                $"No configuration found for facilityId: {facilityId}. Unable to save authentication settings.");
-
-        if (queryResult.Authentication == null)
-        {
-            throw new NotFoundException(
-                $"No AuthenticationConfiguration found for the FhirQueryConfiguration for facilityId {facilityId}");
-        }
-
-        queryResult.Authentication = config;
-        await _database.FhirListConfigurationRepository.SaveChangesAsync();
-
-        return AuthenticationConfigurationModel.FromDomain(queryResult.Authentication);
-    }
-
-    public async Task DeleteAuthenticationConfiguration(string facilityId, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("FhirListQueryConfigurationManager.DeleteAuthenticationConfiguration");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-
-        var entity = await _database.FhirListConfigurationRepository.SingleOrDefaultAsync(fl => fl.FacilityId == facilityId);
-
-        if (entity == null)
-            throw new NotFoundException();
-
-        entity.Authentication = null;
-        await _database.FhirListConfigurationRepository.SaveChangesAsync();
-    }
 
     public async Task<FhirListConfigurationModel> CreateAsync(CreateFhirListConfigurationModel model, CancellationToken cancellationToken = default)
     {
@@ -139,7 +77,6 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             }).ToList(),
             FhirBaseServerUrl = model.FhirBaseServerUrl,
             FacilityId = model.FacilityId,
-            Authentication = model.Authentication?.ToDomain(),
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow,
         };
@@ -175,7 +112,6 @@ public class FhirListQueryConfigurationManager : IFhirListQueryConfigurationMana
             throw new MissingFacilityConfigurationException();
         }
 
-        existingEntity.Authentication = model.Authentication?.ToDomain();
         existingEntity.EHRPatientLists = model.EHRPatientLists.Select(e => new EhrPatientList
         {
             FhirId = e.FhirId,

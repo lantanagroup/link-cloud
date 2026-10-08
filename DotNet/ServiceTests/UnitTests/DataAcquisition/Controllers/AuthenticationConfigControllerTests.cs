@@ -202,14 +202,22 @@ namespace UnitTests.DataAcquisition.Controllers
             _mocker.GetMock<IFhirQueryConfigurationManager>().Setup(x =>
                 x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
 
-            _mocker.GetMock<IFhirListQueryConfigurationManager>().Setup(x =>
-                x.DeleteAuthenticationConfiguration(It.IsAny<string>(), CancellationToken.None));
-
             var _controller = _mocker.CreateInstance<AuthenticationConfigController>();
 
             var result = await _controller.DeleteAuthenticationSettings(facilityId, It.IsAny<QueryConfigurationTypePathParameter>(), CancellationToken.None);
 
             Assert.IsType<AcceptedResult>(result);
+            _mocker.GetMock<IFhirQueryConfigurationManager>().Verify(x =>
+                x.DeleteAuthenticationConfiguration(facilityId, CancellationToken.None), Times.Once);
+        }
+
+        [Fact]
+        public void QueryConfigurationTypePathParameter_ListConfiguration_IsNoLongerDefined()
+        {
+            // The FHIR list configuration no longer carries authentication, so its path value must not bind.
+            Assert.False(Enum.TryParse<QueryConfigurationTypePathParameter>("fhirQueryListConfiguration", out _));
+            Assert.Equal([QueryConfigurationTypePathParameter.fhirQueryConfiguration],
+                         Enum.GetValues<QueryConfigurationTypePathParameter>());
         }
 
         [Fact]

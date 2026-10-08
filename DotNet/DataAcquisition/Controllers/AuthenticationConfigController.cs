@@ -20,18 +20,15 @@ public class AuthenticationConfigController : Controller
     private readonly ILogger<AuthenticationConfigController> _logger;
     private readonly IFhirQueryConfigurationManager _fhirQueryConfigurationManager;
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
-    private readonly IFhirQueryListConfigurationQueries _fhirQueryListConfigurationQueries;
-    private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
 
-
-    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
-        IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
+    public AuthenticationConfigController(
+        ILogger<AuthenticationConfigController> logger,
+        IFhirQueryConfigurationManager fhirQueryConfigurationManager,
+        IFhirQueryConfigurationQueries fhirQueryConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _fhirQueryListConfigurationManager = fhirQueryListConfigurationManager;
         _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
         _fhirQueryConfigurationManager = fhirQueryConfigurationManager;
-        _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
     }
 
     /// <summary>
@@ -69,16 +66,7 @@ public class AuthenticationConfigController : Controller
             {
                 throw new BadRequestException($"FacilityId is null.");
             }
-
-            AuthenticationConfigurationModel? result;
-            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
-            {
-                result = await _fhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
-            }
-            else
-            {
-                result = await _fhirQueryListConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
-            }
+            var result = await _fhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId(facilityId, cancellationToken);
 
             if (result == null)
             {
@@ -158,15 +146,7 @@ public class AuthenticationConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                AuthenticationConfigurationModel? result;
-                if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
-                {
-                    result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
-                }
-                else
-                {
-                    result = await _fhirQueryListConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
-                }
+                var result = await _fhirQueryConfigurationManager.CreateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
 
                 return CreatedAtAction(nameof(CreateAuthenticationSettings),
                     new
@@ -254,15 +234,7 @@ public class AuthenticationConfigController : Controller
 
             if (ModelState.IsValid)
             {
-                AuthenticationConfigurationModel? result;
-                if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
-                {
-                    result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
-                }
-                else
-                {
-                    result = await _fhirQueryListConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
-                }
+                var result = await _fhirQueryConfigurationManager.UpdateAuthenticationConfiguration(facilityId, authenticationConfiguration.ToDomain(), cancellationToken);
 
                 return Accepted(result);
             }
@@ -329,14 +301,7 @@ public class AuthenticationConfigController : Controller
                 throw new BadRequestException($"FacilityId is null.");
             }
 
-            if (queryConfigurationTypePathParameter == QueryConfigurationTypePathParameter.fhirQueryConfiguration)
-            {
-                await _fhirQueryConfigurationManager.DeleteAuthenticationConfiguration(facilityId, cancellationToken);
-            }
-            else
-            {
-                await _fhirQueryListConfigurationManager.DeleteAuthenticationConfiguration(facilityId, cancellationToken);
-            }
+            await _fhirQueryConfigurationManager.DeleteAuthenticationConfiguration(facilityId, cancellationToken);
 
             return Accepted();
         }
