@@ -40,7 +40,7 @@ else
                 <div class="row g-3">
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Status</div>
-                        <div id="runStatus">@run?.StatusLabel</div>
+                        <div id="runStatus" class="badge @StatusPills.ForRun(run?.Status)">@(string.IsNullOrWhiteSpace(run?.StatusLabel) ? "Unknown" : run!.StatusLabel)</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Scenario</div>
@@ -56,32 +56,18 @@ else
                     </div>
                     <div class="col-12 col-md-6">
                         <div class="small text-muted">Facility</div>
-                        <div id="runFacility">
-                            @if (run is not null && !string.IsNullOrWhiteSpace(run.FacilityId))
+                        <div id="runFacility" class="d-flex flex-wrap align-items-center gap-1">
+                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Facility", Value = run?.FacilityId, Compact = true, CopyLabel = "Copy facility id", ValueElementId = "facilityValue", LinkHref = string.IsNullOrWhiteSpace(run?.FacilityId) ? null : Url.Action("Facility", "Tenants", new { id = run!.FacilityId }) })" />
+                            @if (run?.ThrowawayFacility == true)
                             {
-                                <a asp-controller="Tenants" asp-action="Facility" asp-route-id="@run.FacilityId">@run.FacilityId</a>
-                                @if (run.ThrowawayFacility)
-                                {
-                                    <span class="badge bg-secondary ms-1">Automation facility</span>
-                                }
-                            }
-                            else
-                            {
-                                <span class="text-muted">—</span>
+                                <span class="badge bg-secondary" id="runFacilityBadge">Automation facility</span>
                             }
                         </div>
                     </div>
                     <div class="col-12 col-md-6">
                         <div class="small text-muted">Report</div>
                         <div id="runReport">
-                            @if (run is not null && !string.IsNullOrWhiteSpace(run.ReportId))
-                            {
-                                <a asp-controller="Reports" asp-action="Index" asp-route-facilityId="@run.FacilityId">@run.ReportId</a>
-                            }
-                            else
-                            {
-                                <span class="text-muted">—</span>
-                            }
+                            <partial name="_LabeledId" model="@(new LabeledId { Label = "Report", Value = run?.ReportId, Compact = true, CopyLabel = "Copy report id", ValueElementId = "reportValue", LinkHref = string.IsNullOrWhiteSpace(run?.ReportId) ? null : Url.Action("Index", "Reports", new { facilityId = run!.FacilityId }) })" />
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
@@ -94,7 +80,7 @@ else
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Duration</div>
-                        <div id="runDuration">@(run?.Duration ?? "—")</div>
+                        <div id="runDuration">@(string.IsNullOrWhiteSpace(run?.Duration) ? "—" : run!.Duration)</div>
                     </div>
                     <div class="col-6 col-md-3">
                         <div class="small text-muted">Templates</div>

@@ -440,6 +440,27 @@ public sealed class AutomationRunReader
         }
     }
 
+    public async Task<AutomationRunRow?> FindLatestNamedRunAsync(string runName, CancellationToken cancellationToken)
+    {
+        if (_runs is null || string.IsNullOrWhiteSpace(runName))
+            return null;
+
+        var name = runName.Trim();
+        var filter = Builders<AutomationRunDocument>.Filter.Or(
+            Builders<AutomationRunDocument>.Filter.Eq(row => row.RunName, name),
+            Builders<AutomationRunDocument>.Filter.Eq(row => row.Scenario, name));
+        var rows = await FindRowsAsync(
+            filter,
+            Builders<AutomationRunDocument>.Sort.Descending(row => row.CreatedAt),
+            skip: 0,
+            limit: 5,
+            cancellationToken);
+
+        return rows
+            .OrderByDescending(row => row.FinishedAt ?? row.StartedAt ?? row.CreatedAt)
+            .FirstOrDefault();
+    }
+
     private async Task<IReadOnlyList<AutomationRunRow>> LoadActiveAsync(CancellationToken cancellationToken)
     {
         var byFlag = await FindRowsAsync(

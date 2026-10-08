@@ -32,12 +32,12 @@
 </div>
 
 <!-- ── Nav Tabs ── -->
-<ul class="nav nav-tabs mb-3" role="tablist">
-    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
-    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge bg-secondary ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
+<ul class="lu-section-nav" role="tablist">
+    <li><button class="active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
+    <li><button data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge bg-secondary ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
     @if (isComplete)
     {
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-comparison" type="button" id="comparisonTab">
+        <li><button data-bs-toggle="tab" data-bs-target="#tab-comparison" type="button" id="comparisonTab">
             <i class="bi bi-arrow-left-right me-1"></i>Generated vs ABS</button></li>
     }
 </ul>
@@ -166,8 +166,8 @@
     const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
 
     const chartColors = [
-        '#4da3ff','#28a745','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14',
-        '#17a2b8','#e83e8c','#6610f2','#007bff','#6c757d','#343a40','#adb5bd'
+        '#343a40','#28a745','#ffc107','#dc3545','#6f42c1','#111','#fd7e14',
+        '#545c64','#e83e8c','#6c757d','#1a1a1a','#adb5bd','#343a40','#868e96'
     ];
 
     function escapeHtml(s) {
@@ -730,9 +730,9 @@
             </div>
             <div class="mb-2 text-muted">A resource is predicted to appear in ABS when it passes all prediction filters below.</div>
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                <span class="badge bg-primary">1</span><span><strong>Generated</strong></span>
+                <span class="badge au-badge-active">1</span><span><strong>Generated</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
-                <span class="badge bg-info text-dark">2</span><span><strong>Query Plan Acquires</strong></span>
+                <span class="badge au-badge-muted">2</span><span><strong>Query Plan Acquires</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
                 <span class="badge bg-success">3</span><span><strong>CQL References</strong></span>
                 <i class="bi bi-arrow-right text-muted"></i>
@@ -748,7 +748,7 @@
 
         // ── Summary stat tiles ──
         const predictionDelta = absTotal - expectedTotal;
-        const predDeltaClass = predictionDelta === 0 ? 'text-success' : predictionDelta > 0 ? 'text-info' : 'text-warning';
+        const predDeltaClass = predictionDelta === 0 ? 'text-success' : predictionDelta > 0 ? 'text-dark' : 'text-warning';
         const predDeltaSign = predictionDelta > 0 ? '+' : '';
         html += `<div class="row g-3 mb-3">
             <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Total resources generated and uploaded to FHIR"><div class="au-stat-value">${genTotal.toLocaleString()}</div><div class="au-stat-label">Generated</div></div></div>
@@ -788,7 +788,7 @@
                 verdict = '<i class="bi bi-check-circle-fill text-success"></i> Match';
                 rowClass = '';
             } else if (a > e) {
-                verdict = '<i class="bi bi-plus-circle-fill text-info"></i> ABS has more';
+                verdict = '<i class="bi bi-plus-circle-fill text-dark"></i> ABS has more';
                 rowClass = '';
             } else if (e > 0 && a === 0) {
                 verdict = '<i class="bi bi-x-circle-fill text-danger"></i> Missing from ABS';
@@ -869,7 +869,7 @@
                 let verdict, rowClass;
                 if (!(pid in absPatients)) { verdict = '<span class="badge au-badge-danger">Missing from ABS</span>'; rowClass = 'table-danger'; }
                 else if (d === 0) { verdict = '<i class="bi bi-check-circle-fill text-success"></i> Match'; rowClass = ''; }
-                else if (d > 0) { verdict = '<i class="bi bi-plus-circle text-info"></i> +' + d; rowClass = ''; }
+                else if (d > 0) { verdict = '<i class="bi bi-plus-circle text-dark"></i> +' + d; rowClass = ''; }
                 else { verdict = '<i class="bi bi-exclamation-triangle text-warning"></i> ' + d; rowClass = 'table-warning'; }
 
                 // Build per-type detail for expand row
@@ -910,7 +910,7 @@
                     if (pd === 0 && pe === pa) pv = '<i class="bi bi-check text-success"></i>';
                     else if (pe > 0 && pa === 0) pv = '<i class="bi bi-x-circle text-danger"></i> Missing';
                     else if (pa < pe) pv = '<i class="bi bi-exclamation-triangle text-warning"></i> Partial';
-                    else if (pa > pe) pv = '<i class="bi bi-plus-circle text-info"></i> Extra';
+                    else if (pa > pe) pv = '<i class="bi bi-plus-circle text-dark"></i> Extra';
                     else if (pg > 0 && pe === 0) pv = '<span class="text-muted">Filtered</span>';
                     else pv = '&ndash;';
                     const prc = pe > 0 && pa === 0 ? 'table-danger' : pa < pe ? 'table-warning' : '';

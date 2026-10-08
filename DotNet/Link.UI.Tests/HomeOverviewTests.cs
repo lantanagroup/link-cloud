@@ -1,3 +1,4 @@
+using Automation.UI.Models.ApiHealth;
 using FluentAssertions;
 using LantanaGroup.Link.Shared.Application.Enums;
 using Link.UI.Controllers;
@@ -124,6 +125,52 @@ public class HomeOverviewTests
     {
         HomeOverviewRules.ApiHealthText(true, null, null, null, null, null)
             .Should().Be("No API health run yet.");
+    }
+
+    [Fact]
+    public void Latest_api_health_includes_a_scenario_run()
+    {
+        var morning = new DateTimeOffset(2026, 10, 7, 14, 29, 0, TimeSpan.Zero);
+        var evening = new DateTimeOffset(2026, 10, 7, 0, 0, 0, TimeSpan.Zero).AddHours(20);
+        var stored = new ApiHealthLatestRunContext
+        {
+            RunId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RunMode = "All",
+            ServiceName = "",
+            StartedAt = morning
+        };
+        var scenario = new AutomationRunRow
+        {
+            RunId = Guid.Parse("a5bf9393-61fc-4f4c-85cc-c6eb817551ec"),
+            RunName = HomeOverviewRules.ApiHealthScenarioName,
+            Scenario = "Custom",
+            Status = "Succeeded",
+            CreatedAt = evening.AddMinutes(-1),
+            StartedAt = evening.AddMinutes(-1),
+            FinishedAt = evening
+        };
+
+        var chosen = HomeOverviewRules.ChooseLatestApiHealth(stored, execution: null, scenario);
+        chosen.Should().NotBeNull();
+        chosen!.RunId.Should().Be(scenario.RunId);
+        chosen.At.Should().Be(evening);
+        chosen.Mode.Should().Be("All");
+
+        var execution = new ApiHealthExecutionRunStatus
+        {
+            RunId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Scope = "All",
+            StartedAt = morning,
+            FinishedAt = evening.AddMinutes(5),
+            IsCompleted = true,
+            SeedRunId = scenario.RunId
+        };
+        var finished = HomeOverviewRules.ChooseLatestApiHealth(stored, execution, scenario);
+        finished!.RunId.Should().Be(execution.RunId);
+        finished.At.Should().Be(execution.FinishedAt!.Value);
+
+        HomeOverviewRules.ChooseLatestApiHealth(null, null, null).Should().BeNull();
+        HomeOverviewRules.When(evening).Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]

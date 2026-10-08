@@ -9,7 +9,7 @@
 }
 
 <div class="mb-3">
-    <a class="btn btn-sm btn-au-neutral" asp-action="Index"><i class="bi bi-arrow-left me-1"></i>Logs</a>
+    <partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to logs"))" />
 </div>
 <partial name="_Nav" />
 <h1 class="h3">Acquisition log</h1>
