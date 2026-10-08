@@ -483,7 +483,7 @@
                     const eligCells = allMeasures.map(m => {
                         const v = c.measureEligibilities?.[m];
                         const isQ = v === 'Qualifying' || v === 0 || v === '0';
-                        return `<td><span class="badge ${isQ ? 'au-badge-success' : 'au-badge-muted'}">${isQ ? 'Q' : 'NQ'}</span></td>`;
+                        return `<td><span class="badge ${window.luStatusPills.forFlag(isQ)}">${isQ ? 'Q' : 'NQ'}</span></td>`;
                     }).join('');
                     const min = c?.resourcesPerPatientMin ?? '-';
                     const max = c?.resourcesPerPatientMax ?? '-';
@@ -499,17 +499,11 @@
         }
 
         function fitChart(canvas) {
-            if (canvas.parentElement && canvas.parentElement.dataset.luChart) return;
-            const style = canvas.getAttribute('style') || '';
-            const match = style.match(/(?:max-height|height)\s*:\s*(\d+)px/);
-            let px = match ? Number(match[1]) : 200;
-            if (px > 220) px = 200;
-            const box = document.createElement('div');
-            box.className = 'lu-chart';
-            box.style.height = px + 'px';
-            box.dataset.luChart = '1';
-            canvas.parentElement.insertBefore(box, canvas);
-            box.appendChild(canvas);
+            if (window.luChartFrame) window.luChartFrame.fit(canvas);
+        }
+
+        function palette() {
+            return window.luChartPalette;
         }
 
         function upsertChart(canvasId, config) {
@@ -536,8 +530,14 @@
         function renderResourceMix(canvasId, counts) {
             const items = counts || [];
             if (!items.length) {
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId);
                 return;
             }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
 
             upsertChart(canvasId, {
                 type: 'bar',
@@ -545,7 +545,7 @@
                     labels: items.map(x => x.status || 'Unknown'),
                     datasets: [{
                         data: items.map(x => x.count || 0),
-                        backgroundColor: ['#343a40', '#28a745', '#6f42c1', '#545c64', '#fd7e14', '#6c757d'],
+                        backgroundColor: palette().resourceMix,
                         borderRadius: 6
                     }]
                 },
@@ -567,8 +567,14 @@
         function renderTimeline(canvasId, buckets, color) {
             const items = buckets || [];
             if (!items.length) {
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId);
                 return;
             }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
 
             upsertChart(canvasId, {
                 type: 'line',
@@ -609,14 +615,16 @@
                     charts[canvasId].destroy();
                     delete charts[canvasId];
                 }
-                legend.innerHTML = '<span class="text-muted small">No data yet.</span>';
+                if (legend) legend.innerHTML = '<span class="text-muted small">No data yet.</span>';
+                if (window.luChartFrame) window.luChartFrame.collapseEmpty(canvasId, false);
                 return;
             }
+            if (window.luChartFrame) window.luChartFrame.reveal(canvasId);
 
             const labels = [];
             const values = [];
             const colors = [];
-            const fallbackPalette = ['#343a40', '#6f42c1', '#ffc107', '#dc3545', '#28a745', '#6c757d'];
+            const fallbackPalette = palette().fallback;
             let legendHtml = '';
             for (let i = 0; i < items.length; i++) {
                 const item = items[i];
@@ -645,15 +653,6 @@
             });
 
             legend.innerHTML = legendHtml;
-        }
-
-        function getScheduleStatusClass(status) {
-            const s = (status || '').toLowerCase();
-            if (s === 'submitted') return 'au-badge-success';
-            if (s === 'endofperiod') return 'au-badge-warning';
-            if (s === 'failed' || s === 'error') return 'au-badge-danger';
-            if (s === 'running' || s === 'processing' || s === 'queued') return 'au-badge-active';
-            return 'au-badge-muted';
         }
 
         function validationStatusCount(snapshot, name) {
@@ -733,19 +732,6 @@
             return String(status || 'Unknown');
         }
 
-        function runStatusClass(status) {
-            const value = String(status || '').toLowerCase();
-            if (value === 'succeeded' || value === '3') return 'au-badge-success';
-            if (value === 'failed' || value === '4') return 'au-badge-danger';
-            if (value === 'cancelled' || value === '2') return 'au-badge-warning';
-            if (value === 'running' || value === '1' || value === 'queued' || value === '0'
-                || value === 'livewindowopen' || value === '5'
-                || value === 'reportfinalization' || value === '6'
-                || value === 'collectingmetrics' || value === '7')
-                return 'au-badge-active';
-            return 'au-badge-muted';
-        }
-
         function isLiveWindowOpen(status) {
             const value = String(status || '').toLowerCase();
             return value === 'livewindowopen' || value === '5';
@@ -811,11 +797,12 @@
         }
 
         function censusStateBadge(census) {
+            var tone = window.luStatusPills ? window.luStatusPills.forCensus(census) : 'au-badge-muted';
             if (census === 'Admitted')
-                return { label: 'Admitted', css: 'badge au-badge-success' };
+                return { label: 'Admitted', css: 'badge ' + tone };
             if (census === 'DischargedDuringWindow')
-                return { label: 'Discharged', css: 'badge au-badge-warning' };
-            return { label: 'Not admitted', css: 'badge au-badge-muted' };
+                return { label: 'Discharged', css: 'badge ' + tone };
+            return { label: 'Not admitted', css: 'badge ' + tone };
         }
 
         function eventTypeName(value) {
@@ -827,9 +814,8 @@
         }
 
         function eventTypeBadgeClass(name) {
-            if (name === 'Admit') return 'badge au-badge-success';
-            if (name === 'Discharge') return 'badge au-badge-warning';
-            return 'badge au-badge-muted';
+            var tone = window.luStatusPills ? window.luStatusPills.forEvent(name) : 'au-badge-muted';
+            return 'badge ' + tone;
         }
 
         function formatLogTime(value) {
@@ -1124,14 +1110,13 @@
             currentRunStatus = run.status || currentRunStatus;
             document.getElementById('runName').textContent = run.runName;
             document.getElementById('facilityId').textContent = run.facilityId || '-';
-            document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
             const reportIdFromStatus = run.reportId || '-';
-            document.getElementById('scheduleReportName').textContent = reportIdFromStatus;
-            document.getElementById('headerReportId').textContent = reportIdFromStatus;
+            const headerReport = document.getElementById('headerReportId');
+            if (headerReport) headerReport.textContent = reportIdFromStatus;
             const statusNode = document.getElementById('status');
             if (statusNode) {
                 statusNode.textContent = displayStatus(run.status);
-                statusNode.className = 'badge ' + runStatusClass(run.status);
+                statusNode.className = 'badge ' + window.luStatusPills.forRun(run.status);
             }
             showValidationHold();
             document.getElementById('error').textContent = run.error || '-';
@@ -1238,11 +1223,7 @@
                 const outcome = (item.outcome || 'Unknown');
                 const isPass = outcome.toLowerCase() === 'passed';
                 const isAdvisory = !isPass && (item.name || '').toUpperCase() === 'VALIDATION RESULTS (API)';
-                const badge = isPass
-                    ? 'au-badge-success'
-                    : isAdvisory
-                        ? 'au-badge-warning'
-                        : 'au-badge-danger';
+                const badge = window.luStatusPills.forCheck(isPass, isAdvisory);
                 const badgeText = isPass ? 'Passed' : isAdvisory ? 'Advisory' : outcome;
                 const issueText = isPass ? 'No issues' : `${item.issueCount || 0} issue(s)`;
 
@@ -1351,7 +1332,8 @@
                 const div = document.createElement('span');
                 const failed = m.failed === true;
                 const completed = m.completed === true;
-                div.className = `rounded-pill d-inline-flex align-items-center justify-content-center ${failed ? 'au-badge-danger text-white' : completed ? 'au-badge-success text-white' : 'au-badge-muted'}`;
+                const tone = window.luStatusPills.forMilestone(failed, completed);
+                div.className = 'rounded-pill d-inline-flex align-items-center justify-content-center ' + tone + (tone === 'au-badge-muted' ? '' : ' text-white');
                 div.style.width = '136px';
                 div.style.height = '30px';
                 div.style.fontSize = '0.8rem';
@@ -1499,9 +1481,7 @@
             const items = filtered.slice(0, maxRender);
 
             accordion.innerHTML = items.map(item => {
-                const levelBadge = item.level === 'FATAL' || item.level === 'ERROR'
-                    ? 'bg-danger' : item.level === 'WARN' || item.level === 'WARNING'
-                    ? 'bg-warning text-dark' : 'bg-secondary';
+                const levelClass = window.luStatusPills.forLevel(item.level);
                 const collapseId = `exCollapse${item.id}`;
                 const headerId = `exHeader${item.id}`;
                 const hasDetail = !!item.detail;
@@ -1509,13 +1489,13 @@
                 return `<div class="accordion-item">
                     <h2 class="accordion-header" id="${headerId}">
                         <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}" style="font-size:.82rem;">
-                            <span class="badge ${levelBadge} me-2" style="font-size:.65rem;">${item.level}</span>
+                            <span class="badge ${levelClass} me-2" style="font-size:.65rem;">${item.level}</span>
                             <span class="text-muted me-2" style="flex-shrink:0;font-size:.72rem;">${escapeHtml(item.component)}</span>
                             <span class="text-truncate">${escapeHtml(item.headline)}</span>
                         </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
-                        <div class="accordion-body p-3" style="background:#f8f9fa;">
+                        <div class="accordion-body p-3" style="background:#f8f8f8;">
                             ${hasDetail
                                 ? `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.detail)}</pre>`
                                 : `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.full)}</pre>`}
@@ -1561,9 +1541,8 @@
                 const schedule = snapshot.report?.schedule;
                 const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || '-';
                 const effectiveReportId = snapshot.reportId || snapshot.ReportId || '-';
-                document.getElementById('scheduleFacilityId').textContent = effectiveFacilityId;
-                document.getElementById('scheduleReportName').textContent = effectiveReportId;
-                document.getElementById('headerReportId').textContent = effectiveReportId;
+                const headerReportId = document.getElementById('headerReportId');
+                if (headerReportId) headerReportId.textContent = effectiveReportId;
                 document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
                 document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
                 document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
@@ -1577,17 +1556,10 @@
                 });
 
                 const statusPill = document.getElementById('scheduleStatusPill');
-                statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
+                statusPill.className = `badge ${window.luStatusPills.forSchedule(schedule?.scheduleStatus)}`;
                 statusPill.textContent = schedule?.scheduleStatus || 'Unknown';
 
-                renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], {
-                    submitted: '#28a745',
-                    submitting: '#343a40',
-                    noteligable: '#ffc107',
-                    failedsubmission: '#dc3545',
-                    pendingvalidation: '#6c757d',
-                    unknown: '#545c64'
-                });
+                renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], palette().entryStatus);
 
                 document.getElementById('populationSummary').textContent = snapshot.report?.populationSummary || 'No population data yet.';
 
@@ -1603,19 +1575,13 @@
 
                 const dataAcq = lastDataAcqSnapshot || dataAcqCandidate;
 
-                renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], {
-                    completed: '#28a745',
-                    processing: '#343a40',
-                    failed: '#dc3545',
-                    pending: '#ffc107',
-                    unknown: '#6c757d'
-                }, true);
+                renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], palette().dataAcqStatus, true);
 
                 document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
                 document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
                 document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
                 document.getElementById('dataAcqActiveDuration').textContent = activeDurationOf(dataAcq);
-                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#343a40');
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], palette().dataAcquisitionLine);
                 renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
                 dataAcqErrors = dataAcq.errors || [];
                 document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
@@ -1630,7 +1596,7 @@
                 document.getElementById('normalizationResPerSec').textContent = formatNumber(snapshot.normalization?.averageResourcesPerSecond);
                 document.getElementById('normalizationActiveDuration').textContent = activeDurationOf(snapshot.normalization);
                 renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
-                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], '#6f42c1');
+                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], palette().normalizationLine);
 
                 normalizationErrors = snapshot.normalization?.errors || [];
                 document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
@@ -1639,13 +1605,9 @@
                 document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
                 document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
                 document.getElementById('measureActiveDuration').textContent = activeDurationOf(snapshot.measureEval);
-                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
-                    'no measure report': '#6c757d',
-                    notreportable: '#ffc107',
-                    readyforvalidation: '#28a745'
-                });
+                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], palette().measureFunnel);
                 renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
-                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#343a40');
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], palette().measureLine);
 
                 measureErrors = snapshot.measureEval?.errors || [];
                 document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
@@ -1662,12 +1624,8 @@
                 document.getElementById('validationPassedCount').textContent = validationPassed;
                 document.getElementById('validationFailedCount').textContent = validationFailed;
                 document.getElementById('validationActiveDuration').textContent = activeDurationOf(snapshot.validation);
-                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
-                    notvalidated: '#6c757d',
-                    failedvalidation: '#dc3545',
-                    passedvalidation: '#28a745'
-                });
-                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#28a745');
+                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, palette().validationFunnel);
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], palette().validationLine);
 
                 validationErrors = snapshot.validation?.errors || [];
                 document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';

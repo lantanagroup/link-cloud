@@ -124,7 +124,7 @@
     <div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-2" id="useCases">
         <h3 class="h5 fw-semibold mb-0">Use cases</h3>
         <div class="d-flex align-items-center gap-2">
-            <input type="search" id="useCaseSearch" class="form-control form-control-sm" style="max-width:16rem;" placeholder="Filter use cases…" aria-label="Filter use cases" />
+            <input type="search" id="useCaseSearch" data-lu-query="useCase" class="form-control form-control-sm" style="max-width:16rem;" placeholder="Filter use cases…" aria-label="Filter use cases" />
             <span class="small text-muted">Newer runs sit to the right on the sparkline.</span>
         </div>
     </div>
@@ -150,7 +150,7 @@
                                 <div class="au-scenario-card-name">@card.Name</div>
                                 <div class="small text-muted">@card.SetupSummary</div>
                             </div>
-                            <span class="badge rounded-pill @(card.Outcome == "Succeeded" ? "au-badge-success" : card.Outcome == "Failed" ? "au-badge-danger" : "au-badge-muted")">
+                            <span class="badge rounded-pill @StatusPills.ForOutcome(card.Outcome)">
                                 @(card.Outcome == "Succeeded" ? "Passed" : card.Outcome == "Failed" ? "Failed" : string.IsNullOrWhiteSpace(card.Outcome) ? "—" : card.Outcome)
                             </span>
                         </div>
@@ -276,7 +276,7 @@
                                     }
                                 </td>
                                 <td>
-                                    <span class="badge rounded-pill @(run.Outcome == "Succeeded" ? "au-badge-success" : run.Outcome == "Failed" ? "au-badge-danger" : "au-badge-muted")">
+                                    <span class="badge rounded-pill @StatusPills.ForOutcome(run.Outcome)">
                                         @(run.Outcome == "Succeeded" ? "Passed" : run.Outcome == "Failed" ? "Failed" : run.Outcome)
                                     </span>
                                 </td>

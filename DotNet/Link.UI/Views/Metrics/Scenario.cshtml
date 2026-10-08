@@ -52,8 +52,8 @@
                 string Y(double seconds) => (padT + plotH - seconds / maxSec * plotH).ToString("0.##");
                 var path = string.Join(" ", pts.Select((p, i) => $"{(i == 0 ? "M" : "L")}{X(i)},{Y(p.E2eDurationSeconds)}"));
                 <svg class="au-trend" id="scenarioDurationChart" viewBox="0 0 640 160" role="img" aria-label="Total time over runs">
-                    <line x1="@padL.ToString("0")" y1="@padT.ToString("0")" x2="@padL.ToString("0")" y2="@(padT + plotH)" stroke="#d7dbe3" />
-                    <line x1="@padL.ToString("0")" y1="@(padT + plotH)" x2="@(padL + plotW)" y2="@(padT + plotH)" stroke="#d7dbe3" />
+                    <line x1="@padL.ToString("0")" y1="@padT.ToString("0")" x2="@padL.ToString("0")" y2="@(padT + plotH)" stroke="#dbdbdb" />
+                    <line x1="@padL.ToString("0")" y1="@(padT + plotH)" x2="@(padL + plotW)" y2="@(padT + plotH)" stroke="#dbdbdb" />
                     @Html.Raw($"<text x=\"4\" y=\"{padT + 4}\" class=\"au-trend-axis\">{(int)maxSec}s</text>")
                     @Html.Raw($"<text x=\"4\" y=\"{padT + plotH}\" class=\"au-trend-axis\">0</text>")
                     <path d="@path" fill="none" stroke="#343a40" stroke-width="2.5" />
@@ -108,7 +108,7 @@
                                     <input type="checkbox" class="form-check-input compare-run" value="@run.RunId" aria-label="Select for compare" />
                                 </td>
                                 <td>
-                                    <span class="badge rounded-pill @(run.Outcome == "Succeeded" ? "au-badge-success" : run.Outcome == "Failed" ? "au-badge-danger" : "au-badge-muted")">
+                                    <span class="badge rounded-pill @StatusPills.ForOutcome(run.Outcome)">
                                         @(run.Outcome == "Succeeded" ? "Passed" : run.Outcome == "Failed" ? "Failed" : run.Outcome)
                                     </span>
                                     @if (run.ScenarioVersion > 1)

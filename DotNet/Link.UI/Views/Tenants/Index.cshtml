@@ -104,7 +104,7 @@
                             <td>
                                 @if (tenant.IsDeleted)
                                 {
-                                    <span class="badge au-badge-muted">Deleted</span>
+                                    <span class="badge @StatusPills.ForAccountState(true, false)">Deleted</span>
                                     <form method="post" data-au-save asp-action="Restore" asp-route-id="@tenant.FacilityId" class="mt-2" onsubmit="return confirm('Restore this facility, its reports, and its logs?');">
                                         <input type="hidden" name="search" value="@Model.Search" />
                                         <input type="hidden" name="page" value="@Model.Page" />
@@ -117,12 +117,12 @@
                                         {
                                             <input type="hidden" name="scope" value="@scopeQuery" />
                                         }
-                                        <button type="submit" class="btn btn-sm btn-au-neutral">Restore</button>
+                                        <button type="submit" class="btn btn-sm btn-au-neutral lu-icon-btn" title="Restore" aria-label="Restore facility"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
                                     </form>
                                 }
                                 else
                                 {
-                                    <span class="badge au-badge-success">Active</span>
+                                    <span class="badge @StatusPills.ForAccountState(false, true)">Active</span>
                                 }
                             </td>
                         </tr>

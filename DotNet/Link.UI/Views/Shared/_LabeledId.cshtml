@@ -1,6 +1,7 @@
 @model LabeledId
 @{
     var value = Model.Value?.Trim() ?? "";
+    var displayName = LabeledIdRules.DisplayName(Model.Name, value);
     var empty = string.IsNullOrWhiteSpace(value) || value == "—" || value == "-";
     var copyLabel = string.IsNullOrWhiteSpace(Model.CopyLabel) ? "Copy " + Model.Label.ToLowerInvariant() : Model.CopyLabel;
     var href = ReturnUrlRules.WithReturn(Model.LinkHref, Model.ReturnUrl);
@@ -15,9 +16,9 @@
     {
         <span class="lu-id-label@(Model.Compact ? " visually-hidden" : "")">@Model.Label</span>
     }
-    @if (!string.IsNullOrWhiteSpace(Model.Name))
+    @if (!string.IsNullOrWhiteSpace(displayName))
     {
-        <span class="lu-id-name">@Model.Name</span>
+        <span class="lu-id-name">@displayName</span>
     }
     <span class="lu-id-value">
         @if (!string.IsNullOrWhiteSpace(Model.ValueElementId))

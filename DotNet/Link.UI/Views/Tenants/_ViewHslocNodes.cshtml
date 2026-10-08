@@ -17,7 +17,7 @@
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge @(node.Mapped ? "au-badge-success" : "au-badge-muted")">@(node.Mapped ? "Mapped" : "Unmapped")</span>
+                <span class="badge @StatusPills.ForMapped(node.Mapped)">@(node.Mapped ? "Mapped" : "Unmapped")</span>
                 <a asp-action="View" asp-route-id="@ViewData["FacilityId"]" asp-route-section="hsloc" asp-route-hsloc="@node.LocationId" asp-route-returnUrl="@ReturnUrlRules.FromQuery(Context.Request)">Mappings</a>
             </div>
         </div>
