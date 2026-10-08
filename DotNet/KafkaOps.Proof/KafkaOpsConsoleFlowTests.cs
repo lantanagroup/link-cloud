@@ -17,6 +17,31 @@ namespace KafkaOps.Proof;
 public class KafkaOpsConsoleFlowTests
 {
     [BrokerRequiredFact]
+    public async Task KitCluster_KnowsControllerRoles_AndAllowsBroker3()
+    {
+        var configured = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
+        if (string.IsNullOrWhiteSpace(configured))
+            throw new InvalidOperationException("KAFKA_BOOTSTRAP is not set.");
+
+        using var gateway = new KafkaBrokerGateway(new KafkaConnection
+        {
+            BootstrapServers = [configured],
+            SaslProtocolEnabled = false
+        });
+        var cluster = await gateway.DescribeClusterAsync(CancellationToken.None);
+        Assert.Null(cluster.Error);
+        Assert.True(cluster.ControllerRolesKnown);
+        Assert.Equal(new[] { 0, 1, 2 }, cluster.ControllerEligibleIds.OrderBy(id => id).ToArray());
+
+        var service = FlowService(gateway);
+        var ordinary = await service.PlanDecommissionAsync(3, CancellationToken.None);
+        Assert.True(ordinary.Accepted, string.Join(" ", ordinary.Errors));
+        var controller = await service.PlanDecommissionAsync(0, CancellationToken.None);
+        Assert.False(controller.Accepted);
+        Assert.Contains(controller.Errors, error => error.Contains("controller", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [BrokerRequiredFact]
     public async Task TwoPeopleApproveAndExecute_AndThreeGroupsAreListed()
     {
         var configured = Environment.GetEnvironmentVariable("KAFKA_BOOTSTRAP");
@@ -101,24 +126,7 @@ public class KafkaOpsConsoleFlowTests
             foreach (var group in groups)
                 Assert.Contains(described, row => row.GroupId == group);
 
-            var service = new KafkaOpsService(
-                gateway,
-                new FlowCache(),
-                Options.Create(new KafkaOpsOptions
-                {
-                    RequireSecondApprover = true,
-                    MaxPartitionsPerTopic = 24,
-                    RateLimitMinutes = 30,
-                    CacheSeconds = 8
-                }),
-                new FlowHost(),
-                NullLogger<KafkaOpsService>.Instance,
-                new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Authentication:EnableAnonymousAccess"] = "false"
-                }).Build(),
-                Array.Empty<IProducer<string, AuditEventMessage>>(),
-                new DisabledKafkaInfraProvider("Infrastructure is disabled for this test."));
+            var service = FlowService(gateway);
 
             var created = await service.CreateAsync(
                 User("alice", nameof(LinkSystemPermissions.CanManageKafkaTopics)),
@@ -174,6 +182,26 @@ public class KafkaOpsConsoleFlowTests
                 Skip = "KAFKA_BOOTSTRAP is not set.";
         }
     }
+
+    private static KafkaOpsService FlowService(KafkaBrokerGateway gateway) =>
+        new(
+            gateway,
+            new FlowCache(),
+            Options.Create(new KafkaOpsOptions
+            {
+                RequireSecondApprover = true,
+                MaxPartitionsPerTopic = 24,
+                RateLimitMinutes = 30,
+                CacheSeconds = 8
+            }),
+            new FlowHost(),
+            NullLogger<KafkaOpsService>.Instance,
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Authentication:EnableAnonymousAccess"] = "false"
+            }).Build(),
+            Array.Empty<IProducer<string, AuditEventMessage>>(),
+            new DisabledKafkaInfraProvider("Infrastructure is disabled for this test."));
 
     private static ClaimsPrincipal User(string name, string permission)
     {

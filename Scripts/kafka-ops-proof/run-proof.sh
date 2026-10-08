@@ -190,6 +190,16 @@ if [[ -n "${under//[[:space:]]/}" ]]; then
 fi
 echo "PASS decommission-empty"
 
+if ! command -v dotnet >/dev/null 2>&1; then
+  echo "SKIP controller-roles (dotnet is not on PATH)"
+elif [[ -z "${KAFKA_BOOTSTRAP:-}" ]]; then
+  echo "SKIP controller-roles (KAFKA_BOOTSTRAP is not set; pass --publish)"
+else
+  echo "STEP controller-roles"
+  dotnet test "$repo/DotNet/KafkaOps.Proof/KafkaOps.Proof.csproj" --filter "FullyQualifiedName~KitCluster_KnowsControllerRoles_AndAllowsBroker3" --nologo -v q
+  echo "PASS controller-roles"
+fi
+
 echo "STEP stop-broker"
 compose stop broker-3
 echo "PASS decommission-stop"
@@ -200,7 +210,7 @@ elif [[ -z "${KAFKA_BOOTSTRAP:-}" ]]; then
   echo "SKIP console-flow (KAFKA_BOOTSTRAP is not set; pass --publish)"
 else
   echo "STEP console-flow"
-  dotnet test "$repo/DotNet/KafkaOps.Proof/KafkaOps.Proof.csproj" --filter "FullyQualifiedName~KafkaOpsConsoleFlowTests" --nologo -v q
+  dotnet test "$repo/DotNet/KafkaOps.Proof/KafkaOps.Proof.csproj" --filter "FullyQualifiedName~TwoPeopleApproveAndExecute_AndThreeGroupsAreListed" --nologo -v q
   echo "PASS console-flow"
 fi
 
