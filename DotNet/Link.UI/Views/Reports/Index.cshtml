@@ -11,6 +11,8 @@
     var bar = Model.Paging;
 }
 
+<partial name="_BackButton" model="@(new BackLink(Url.Action("Index")!, "Back to reports"))" />
+
 <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
     <h1 class="h3 mb-0 me-auto">Reports</h1>
     <a class="btn btn-success" asp-action="Generate">Generate report</a>
